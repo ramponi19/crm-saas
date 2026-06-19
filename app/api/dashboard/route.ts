@@ -11,86 +11,134 @@ function getPeriodStarts(): Record<string, Date> {
   return { hoje, '7d': d7, '30d': d30, mes, ano }
 }
 
-interface PeriodKpis {
-  receita: number
-  lucro: number
-  qtdVendas: number
-  ticketMedio: number
-}
-
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const starts = getPeriodStarts()
-
-  // 12 meses atrás para pegar tudo de uma vez
   const inicio12m = new Date()
   inicio12m.setMonth(inicio12m.getMonth() - 12)
-  inicio12m.setDate(1)
-  inicio12m.setHours(0, 0, 0, 0)
+  inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
 
+  // Vendas do ano com cliente e produto
   const { data: vendasRaw } = await supabase
     .from('vendas')
-    .select('valor_venda, lucro, data_venda')
+    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, produto_id, vendedor_id')
     .gte('data_venda', inicio12m.toISOString())
-    .eq('status', 'concluida')
 
   const vendas = (vendasRaw ?? []) as Array<{
-    valor_venda: number
-    lucro: number | null
-    data_venda: string | null
+    id: number; valor_venda: number; lucro: number | null
+    data_venda: string | null; canal_venda: string | null
+    forma_pagamento: string | null; status: string | null
+    cliente_id: number | null; produto_id: number | null; vendedor_id: string | null
   }>
 
-  // KPIs por período
-  const periods: Record<string, PeriodKpis> = {}
-  for (const [key, start] of Object.entries(starts)) {
-    const startMs = start.getTime()
-    const filtradas = vendas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= startMs)
-    const receita = filtradas.reduce((s, v) => s + (Number(v.valor_venda) || 0), 0)
-    const lucro = filtradas.reduce((s, v) => s + (Number(v.lucro) || 0), 0)
-    const qtdVendas = filtradas.length
-    periods[key] = { receita, lucro, qtdVendas, ticketMedio: qtdVendas > 0 ? receita / qtdVendas : 0 }
-  }
+  // IDs únicos para joins
+  const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))]
+  const produtoIds  = [...new Set(vendas.map(v => v.produto_id).filter(Boolean))]
+  const vendedorIds = [...new Set(vendas.map(v => v.vendedor_id).filter(Boolean))]
 
-  // Faturamento mensal dos últimos 12 meses para o gráfico
-  const monthlyMap: Record<string, number> = {}
-  vendas.forEach(v => {
-    if (!v.data_venda) return
-    const d = new Date(v.data_venda)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    monthlyMap[key] = (monthlyMap[key] ?? 0) + (Number(v.valor_venda) || 0)
-  })
-  const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total }))
+  const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-  // Contadores globais em paralelo
   const [
+    { data: clientes },
+    { data: produtos },
     { count: totalClientes },
     { count: leadsAtivos },
     { count: leadsNovos },
     { count: estoqueDisponivel },
     { count: assistenciasAbertas },
-    { data: vendasRecentes },
+    { data: vendedoresRaw },
+    { data: metasRaw },
   ] = await Promise.all([
+    clienteIds.length
+      ? supabase.from('clientes').select('id, nome').in('id', clienteIds)
+      : Promise.resolve({ data: [] }),
+    produtoIds.length
+      ? supabase.from('produtos').select('id, nome').in('id', produtoIds)
+      : Promise.resolve({ data: [] }),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
     supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
-    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status').order('created_at', { ascending: false }).limit(5),
+    supabase.from('usuarios').select('id, nome'),
+    supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('mes_ano', mesAtual),
   ])
 
+  // Maps para lookup rápido
+  const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))
+  const produtoMap  = Object.fromEntries((produtos ?? []).map((p: { id: number; nome: string }) => [p.id, p.nome]))
+  const vendedorMap = Object.fromEntries((vendedoresRaw ?? []).map((u: { id: string; nome: string }) => [u.id, u.nome]))
+  const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string; meta_vendas_valor: number }) => [m.usuario_id, m.meta_vendas_valor]))
+
+  // KPIs por período (só concluídas)
+  const concluidas = vendas.filter(v => v.status === 'concluida')
+  const periods: Record<string, { receita: number; lucro: number; qtdVendas: number; ticketMedio: number }> = {}
+  for (const [key, start] of Object.entries(starts)) {
+    const startMs = start.getTime()
+    const f = concluidas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= startMs)
+    const receita = f.reduce((s, v) => s + (Number(v.valor_venda) || 0), 0)
+    const lucro   = f.reduce((s, v) => s + (Number(v.lucro) || 0), 0)
+    const qtd     = f.length
+    periods[key]  = { receita, lucro, qtdVendas: qtd, ticketMedio: qtd > 0 ? receita / qtd : 0 }
+  }
+
+  // Faturamento mensal 12 meses
+  const monthlyMap: Record<string, number> = {}
+  concluidas.forEach(v => {
+    if (!v.data_venda) return
+    const d = new Date(v.data_venda)
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    monthlyMap[k] = (monthlyMap[k] ?? 0) + (Number(v.valor_venda) || 0)
+  })
+  const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total }))
+
+  // Vendas recentes (últimas 6) com nomes
+  const recentes = [...vendas]
+    .sort((a, b) => new Date(b.data_venda ?? 0).getTime() - new Date(a.data_venda ?? 0).getTime())
+    .slice(0, 6)
+    .map(v => ({
+      id: v.id,
+      valor_venda: Number(v.valor_venda),
+      data_venda: v.data_venda,
+      canal_venda: v.canal_venda,
+      forma_pagamento: v.forma_pagamento,
+      status: v.status,
+      cliente_nome: v.cliente_id ? (clienteMap[v.cliente_id] ?? null) : null,
+      produto_nome:  v.produto_id  ? (produtoMap[v.produto_id]  ?? null) : null,
+    }))
+
+  // Top vendedores do mês com meta
+  const inicioMes = starts.mes.getTime()
+  const vendasMes = concluidas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
+  const vendedorStats: Record<string, { nome: string; total: number; qtd: number; meta: number | null }> = {}
+
+  // Incluir todos os usuários mesmo sem venda
+  ;(vendedoresRaw ?? []).forEach((u: { id: string; nome: string }) => {
+    vendedorStats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaMap[u.id] ?? null }
+  })
+  vendasMes.forEach(v => {
+    if (!v.vendedor_id) return
+    if (!vendedorStats[v.vendedor_id]) vendedorStats[v.vendedor_id] = { nome: vendedorMap[v.vendedor_id] ?? 'Vendedor', total: 0, qtd: 0, meta: null }
+    vendedorStats[v.vendedor_id].total += Number(v.valor_venda) || 0
+    vendedorStats[v.vendedor_id].qtd   += 1
+  })
+
+  const topVendedores = Object.entries(vendedorStats)
+    .map(([id, s]) => ({ id, ...s }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+
   return NextResponse.json({
-    periods,
-    faturamentoMensal,
+    periods, faturamentoMensal,
     globais: {
-      totalClientes: totalClientes ?? 0,
-      leadsAtivos: leadsAtivos ?? 0,
-      leadsNovos: leadsNovos ?? 0,
-      estoqueDisponivel: estoqueDisponivel ?? 0,
+      totalClientes: totalClientes ?? 0, leadsAtivos: leadsAtivos ?? 0,
+      leadsNovos: leadsNovos ?? 0, estoqueDisponivel: estoqueDisponivel ?? 0,
       assistenciasAbertas: assistenciasAbertas ?? 0,
     },
-    vendasRecentes: vendasRecentes ?? [],
+    vendasRecentes: recentes,
+    topVendedores,
   })
 }
