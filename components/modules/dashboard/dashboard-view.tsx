@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, TrendingDown, AlertTriangle, Package, Users, Zap } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
+import { useAnimatedNumber } from '@/lib/use-animated-number'
 import { cn } from '@/lib/utils'
 
 interface Kpis {
@@ -41,24 +42,49 @@ interface DashboardData {
   }>
 }
 
+interface PeriodKpis {
+  receita: number
+  lucro: number
+  qtdVendas: number
+  ticketMedio: number
+}
+
+const PERIOD_LABELS: Record<string, string> = {
+  hoje: 'hoje',
+  '7d': 'últimos 7 dias',
+  '30d': 'últimos 30 dias',
+  mes: 'este mês',
+  ano: 'este ano',
+}
+
+// ── Valor monetário animado ──
+function AnimatedCurrency({ value, className }: { value: number; className?: string }) {
+  const animated = useAnimatedNumber(value)
+  return <span className={className}>{formatCurrency(animated)}</span>
+}
+
+// ── Inteiro animado ──
+function AnimatedInt({ value, className }: { value: number; className?: string }) {
+  const animated = useAnimatedNumber(value)
+  return <span className={className}>{Math.round(animated)}</span>
+}
+
 function KpiCard({
   label,
-  value,
+  children,
   sub,
   delta,
   deltaUp,
   colorClass,
   delay = 0,
-  loading = false,
 }: {
   label: string
-  value: string
+  children: React.ReactNode
   sub?: string
   delta?: string
   deltaUp?: boolean
   colorClass?: string
   delay?: number
-  loading?: boolean
 }) {
   return (
     <div
@@ -81,58 +107,54 @@ function KpiCard({
       <div className={cn('font-mono text-[10.5px] tracking-[0.12em] text-[#6B7C92] mt-[18px]', colorClass)}>
         {label}
       </div>
-      <div className={cn(
-        'font-serif font-medium text-[30px] tracking-[-0.02em] text-[#F4F6F9] mt-1 transition-opacity duration-200',
-        loading && 'opacity-40'
-      )}>
-        {value}
+      <div className="font-serif font-medium text-[30px] tracking-[-0.02em] text-[#F4F6F9] mt-1">
+        {children}
       </div>
       {sub && <div className="text-[12px] text-[#5C6E84] mt-1">{sub}</div>}
     </div>
   )
 }
 
-const PERIOD_LABELS: Record<string, string> = {
-  hoje: 'hoje',
-  '7d': 'últimos 7 dias',
-  '30d': 'últimos 30 dias',
-  mes: 'este mês',
-  ano: 'este ano',
-}
-
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const [activePeriod, setActivePeriod] = useState('mes')
-  const [kpis, setKpis] = useState<Kpis>(initialData.kpis)
+  const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
+  const [globais, setGlobais] = useState({
+    totalClientes: initialData.kpis.totalClientes,
+    leadsAtivos: initialData.kpis.leadsAtivos,
+    leadsNovos: initialData.kpis.leadsNovos,
+    estoqueDisponivel: initialData.kpis.estoqueDisponivel,
+    assistenciasAbertas: initialData.kpis.assistenciasAbertas,
+  })
   const [vendasRecentes, setVendasRecentes] = useState<VendaRecente[]>(initialData.vendasRecentes)
-  const [loading, setLoading] = useState(false)
 
-  async function handlePeriodChange(period: string) {
-    if (period === activePeriod) return
-    setActivePeriod(period)
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/dashboard?period=${period}`)
-      if (res.ok) {
-        const json = await res.json()
-        setKpis(json.kpis)
+  // Carrega todos os períodos UMA vez ao montar
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/dashboard')
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (cancelled || !json) return
+        setPeriodsData(json.periods)
+        setGlobais(json.globais)
         setVendasRecentes(json.vendasRecentes)
-      }
-    } catch (e) {
-      console.error('Erro ao carregar período:', e)
-    } finally {
-      setLoading(false)
-    }
-  }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
-  const margem = kpis.receitaMes > 0
-    ? Math.round((kpis.lucroMes / kpis.receitaMes) * 100)
-    : 0
+  // KPIs do período ativo — troca INSTANTÂNEA (já em memória)
+  const cur = periodsData?.[activePeriod]
+  const receita = cur?.receita ?? initialData.kpis.receitaMes
+  const lucro = cur?.lucro ?? initialData.kpis.lucroMes
+  const qtdVendas = cur?.qtdVendas ?? initialData.kpis.qtdVendasMes
+  const ticketMedio = cur?.ticketMedio ?? initialData.kpis.ticketMedio
 
+  const margem = receita > 0 ? Math.round((lucro / receita) * 100) : 0
   const periodLabel = PERIOD_LABELS[activePeriod] ?? 'este mês'
 
   const funnelData = [
-    { label: 'Novo', count: kpis.leadsNovos, color: '#F0656B', pct: kpis.leadsAtivos > 0 ? Math.round((kpis.leadsNovos / kpis.leadsAtivos) * 100) : 0 },
-    { label: 'Em contato', count: kpis.leadsAtivos - kpis.leadsNovos, color: '#7FB0E8', pct: kpis.leadsAtivos > 0 ? Math.round(((kpis.leadsAtivos - kpis.leadsNovos) / kpis.leadsAtivos) * 100) : 0 },
+    { label: 'Novo', count: globais.leadsNovos, color: '#F0656B', pct: globais.leadsAtivos > 0 ? Math.round((globais.leadsNovos / globais.leadsAtivos) * 100) : 0 },
+    { label: 'Em contato', count: globais.leadsAtivos - globais.leadsNovos, color: '#7FB0E8', pct: globais.leadsAtivos > 0 ? Math.round(((globais.leadsAtivos - globais.leadsNovos) / globais.leadsAtivos) * 100) : 0 },
     { label: 'Proposta', count: 0, color: '#C6A86A', pct: 0 },
     { label: 'Negociação', count: 0, color: '#F4B740', pct: 0 },
     { label: 'Convertido', count: 0, color: '#34D399', pct: 0 },
@@ -145,7 +167,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         title="Visão geral"
         showPeriods
         activePeriod={activePeriod}
-        onPeriodChange={handlePeriodChange}
+        onPeriodChange={setActivePeriod}
       />
       <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
         <div className="max-w-[1320px] mx-auto space-y-5">
@@ -169,16 +191,16 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               <div className="flex items-end gap-[18px] mt-[26px]">
                 <div>
                   <div className="font-mono text-[10px] tracking-[0.18em] text-[#7E8EA2]">FATURAMENTO · {periodLabel.toUpperCase()}</div>
-                  <div className={cn(
-                    'font-serif font-medium text-[52px] leading-none tracking-[-0.03em] text-white mt-1.5 transition-opacity duration-200',
-                    loading && 'opacity-40'
-                  )}>
-                    {formatCurrency(kpis.receitaMes)}
-                  </div>
+                  <AnimatedCurrency
+                    value={receita}
+                    className="block font-serif font-medium text-[52px] leading-none tracking-[-0.03em] text-white mt-1.5"
+                  />
                 </div>
                 <div className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full bg-[rgba(52,211,153,0.14)] mb-2">
                   <TrendingUp size={15} className="text-[#34D399]" />
-                  <span className="text-[13px] font-bold text-[#34D399]">{kpis.qtdVendasMes} vendas</span>
+                  <span className="text-[13px] font-bold text-[#34D399]">
+                    <AnimatedInt value={qtdVendas} /> vendas
+                  </span>
                 </div>
               </div>
 
@@ -197,19 +219,27 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
 
           {/* ── KPI GRID ── */}
           <div className="grid grid-cols-4 gap-[18px]">
-            <KpiCard label="VENDAS TOTAIS" value={formatCurrency(kpis.receitaMes)} sub={periodLabel} delta="+18,2%" deltaUp delay={50} loading={loading} />
-            <KpiCard label="LUCRO BRUTO" value={formatCurrency(kpis.lucroMes)} sub={`margem de ${margem}%`} delta="+12,4%" deltaUp delay={120} loading={loading} />
-            <KpiCard label="TICKET MÉDIO" value={formatCurrency(kpis.ticketMedio)} sub="por venda fechada" delta="+5,1%" deltaUp delay={190} loading={loading} />
-            <KpiCard label="VENDAS FECHADAS" value={String(kpis.qtdVendasMes)} sub="no período" delta="+8,3%" deltaUp delay={260} loading={loading} />
+            <KpiCard label="VENDAS TOTAIS" sub={periodLabel} delta="+18,2%" deltaUp delay={50}>
+              <AnimatedCurrency value={receita} />
+            </KpiCard>
+            <KpiCard label="LUCRO BRUTO" sub={`margem de ${margem}%`} delta="+12,4%" deltaUp delay={120}>
+              <AnimatedCurrency value={lucro} />
+            </KpiCard>
+            <KpiCard label="TICKET MÉDIO" sub="por venda fechada" delta="+5,1%" deltaUp delay={190}>
+              <AnimatedCurrency value={ticketMedio} />
+            </KpiCard>
+            <KpiCard label="VENDAS FECHADAS" sub="no período" delta="+8,3%" deltaUp delay={260}>
+              <AnimatedInt value={qtdVendas} />
+            </KpiCard>
           </div>
 
           {/* ── STRIP ── */}
           <div className="grid grid-cols-4 gap-[18px]">
             {[
-              { icon: Package, color: '#F4B740', val: `${kpis.estoqueDisponivel} un`, sub: 'disponíveis em estoque', alert: kpis.estoqueDisponivel < 5 },
-              { icon: Users, color: '#7FB0E8', val: String(kpis.totalClientes), sub: 'clientes cadastrados', alert: false },
-              { icon: AlertTriangle, color: '#C4CCD6', val: String(kpis.assistenciasAbertas), sub: 'assistências abertas', alert: kpis.assistenciasAbertas > 0 },
-              { icon: TrendingUp, color: '#F0656B', val: String(kpis.leadsAtivos), sub: 'leads ativos no funil', alert: kpis.leadsNovos > 20 },
+              { icon: Package, color: '#F4B740', val: `${globais.estoqueDisponivel} un`, sub: 'disponíveis em estoque', alert: globais.estoqueDisponivel < 5 },
+              { icon: Users, color: '#7FB0E8', val: String(globais.totalClientes), sub: 'clientes cadastrados', alert: false },
+              { icon: AlertTriangle, color: '#C4CCD6', val: String(globais.assistenciasAbertas), sub: 'assistências abertas', alert: globais.assistenciasAbertas > 0 },
+              { icon: TrendingUp, color: '#F0656B', val: String(globais.leadsAtivos), sub: 'leads ativos no funil', alert: globais.leadsNovos > 20 },
             ].map(({ icon: Icon, color, val, sub, alert }, i) => (
               <div key={i} className={cn(
                 'bg-white/[0.025] border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
@@ -301,27 +331,27 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
           </div>
 
           {/* ── ALERTAS ── */}
-          {(kpis.estoqueDisponivel < 5 || kpis.leadsNovos > 20) && (
+          {(globais.estoqueDisponivel < 5 || globais.leadsNovos > 20) && (
             <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ATENÇÃO</div>
               <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-[18px]">Alertas</h3>
               <div className="space-y-3">
-                {kpis.estoqueDisponivel < 5 && (
+                {globais.estoqueDisponivel < 5 && (
                   <div className="flex gap-3 items-start p-3 rounded-[13px] bg-[rgba(215,40,47,0.1)] cursor-pointer hover:translate-x-[3px] transition-transform">
                     <Package size={24} className="text-[#F0656B] shrink-0" />
                     <div>
                       <div className="text-[13.5px] font-semibold text-[#EAEFF5]">Estoque crítico</div>
                       <div className="text-[11.5px] text-[#8A9BB0] mt-0.5 leading-[1.4]">
-                        Apenas {kpis.estoqueDisponivel} unidade{kpis.estoqueDisponivel !== 1 ? 's' : ''} disponível — reposição urgente necessária
+                        Apenas {globais.estoqueDisponivel} unidade{globais.estoqueDisponivel !== 1 ? 's' : ''} disponível — reposição urgente necessária
                       </div>
                     </div>
                   </div>
                 )}
-                {kpis.leadsNovos > 20 && (
+                {globais.leadsNovos > 20 && (
                   <div className="flex gap-3 items-start p-3 rounded-[13px] bg-[rgba(244,183,64,0.08)] cursor-pointer hover:translate-x-[3px] transition-transform">
                     <Users size={24} className="text-[#F4B740] shrink-0" />
                     <div>
-                      <div className="text-[13.5px] font-semibold text-[#EAEFF5]">{kpis.leadsNovos} leads sem tratativa</div>
+                      <div className="text-[13.5px] font-semibold text-[#EAEFF5]">{globais.leadsNovos} leads sem tratativa</div>
                       <div className="text-[11.5px] text-[#8A9BB0] mt-0.5 leading-[1.4]">
                         Leads acumulados aguardando primeiro contato no funil
                       </div>
