@@ -1,4 +1,4 @@
-export type KanbanStatus = 'novo' | 'contato' | 'proposta' | 'negociacao' | 'convertido' | 'perdido'
+export type KanbanStatus = 'novo' | 'em_contato' | 'negociando' | 'convertido' | 'perdido'
 
 export interface Lead {
   id: number
@@ -42,24 +42,17 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
     icon: '✦',
   },
   {
-    id: 'contato',
+    id: 'em_contato',
     label: 'Em Contato',
     color: 'text-violet-600 dark:text-violet-400',
     bgColor: 'bg-violet-50 dark:bg-violet-950/40',
     icon: '◎',
   },
   {
-    id: 'proposta',
-    label: 'Proposta',
+    id: 'negociando',
+    label: 'Negociando',
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/40',
-    icon: '◈',
-  },
-  {
-    id: 'negociacao',
-    label: 'Negociação',
-    color: 'text-orange-600 dark:text-orange-400',
-    bgColor: 'bg-orange-50 dark:bg-orange-950/40',
     icon: '⬡',
   },
   {
@@ -80,9 +73,8 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
 
 export const STATUS_LABELS: Record<KanbanStatus, string> = {
   novo: 'Novo',
-  contato: 'Em Contato',
-  proposta: 'Proposta',
-  negociacao: 'Negociação',
+  em_contato: 'Em Contato',
+  negociando: 'Negociando',
   convertido: 'Convertido',
   perdido: 'Perdido',
 }

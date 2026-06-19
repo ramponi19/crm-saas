@@ -45,9 +45,8 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
   const stats = useMemo(() => ({
     total: leads.length,
     novo: leads.filter(l => l.kanban_status === 'novo').length,
-    contato: leads.filter(l => l.kanban_status === 'contato').length,
-    proposta: leads.filter(l => l.kanban_status === 'proposta').length,
-    negociacao: leads.filter(l => l.kanban_status === 'negociacao').length,
+    em_contato: leads.filter(l => l.kanban_status === 'em_contato').length,
+    negociando: leads.filter(l => l.kanban_status === 'negociando').length,
     convertido: leads.filter(l => l.kanban_status === 'convertido').length,
     perdido: leads.filter(l => l.kanban_status === 'perdido').length,
     naoLidas: leads.reduce((sum, l) => sum + (l.msgs_nao_lidas ?? 0), 0),
@@ -95,9 +94,8 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
         <div className="flex gap-3 mb-4 overflow-x-auto pb-1">
           {[
             { label: 'Novos', value: stats.novo, color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300' },
-            { label: 'Contato', value: stats.contato, color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300' },
-            { label: 'Proposta', value: stats.proposta, color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' },
-            { label: 'Negociação', value: stats.negociacao, color: 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300' },
+            { label: 'Em Contato', value: stats.em_contato, color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300' },
+            { label: 'Negociando', value: stats.negociando, color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' },
             { label: 'Convertido', value: stats.convertido, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' },
             { label: 'Perdido', value: stats.perdido, color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' },
           ].map(s => (

@@ -107,6 +107,8 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
     if (!newMessage.trim()) return
     setSendingMsg(true)
     const supabase = createClient()
+
+    // 1. Registra no banco
     const { data, error } = await supabase
       .from('lead_mensagens')
       .insert({
@@ -121,15 +123,37 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
     if (error) {
       toast.error('Erro ao enviar mensagem')
-    } else {
-      setMessages(prev => [...prev, data])
-      setNewMessage('')
-      // Update ultima_tratativa
-      await supabase
-        .from('leads')
-        .update({ ultima_tratativa: new Date().toISOString() })
-        .eq('id', lead.id)
+      setSendingMsg(false)
+      return
     }
+
+    setMessages(prev => [...prev, data])
+    setNewMessage('')
+
+    // 2. Atualiza ultima_tratativa
+    await supabase
+      .from('leads')
+      .update({ ultima_tratativa: new Date().toISOString() })
+      .eq('id', lead.id)
+
+    // 3. Tenta enviar via WhatsApp se tiver telefone
+    if (lead.telefone) {
+      const numero = lead.telefone.replace(/\D/g, '')
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: numero.startsWith('55') ? numero : `55${numero}`, message: newMessage.trim() }),
+      })
+      const result = await res.json()
+      if (result.success) {
+        toast.success('Mensagem enviada via WhatsApp')
+      } else {
+        toast.success('Mensagem registrada (WhatsApp não configurado)')
+      }
+    } else {
+      toast.success('Mensagem registrada')
+    }
+
     setSendingMsg(false)
   }
 
@@ -373,7 +397,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
               </button>
             </div>
             <p className="text-[10px] text-[hsl(var(--crm-text-subtle))] mt-1.5 ml-1">
-              Enter para registrar · integração Z-API em breve
+              Enter para enviar · WhatsApp automático se número cadastrado
             </p>
           </div>
         </div>
