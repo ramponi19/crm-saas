@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'drive.google.com' },
     ],
   },
+  // força rebuild completo do CSS
+  generateBuildId: async () => `build-${Date.now()}`,
 }
 
 export default nextConfig
