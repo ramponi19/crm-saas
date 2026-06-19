@@ -6,37 +6,75 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
-  LayoutDashboard, Users, ShoppingCart, Package, Wrench,
-  Truck, Wallet, BarChart3, Settings, LogOut, MessageCircle,
-  Building2, CreditCard,
+  LayoutDashboard,
+  BarChart3,
+  ShoppingCart,
+  Calculator,
+  ClipboardList,
+  Filter,
+  Tag,
+  BoxesIcon,
+  BookOpen,
+  Users,
+  ShieldCheck,
+  Wrench,
+  Truck,
+  Wallet,
+  UsersRound,
+  Settings,
+  Building2,
+  CreditCard,
+  LogOut,
 } from 'lucide-react'
 
 const navGroups = [
   {
     label: 'Visão Geral',
     items: [
-      { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-      { href: '/leads',     label: 'Leads',       icon: MessageCircle, badge: null },
+      { href: '/dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+      { href: '/relatorios', label: 'Relatórios',  icon: BarChart3 },
     ],
   },
   {
-    label: 'Operações',
+    label: 'Vendas',
     items: [
-      { href: '/pdv',         label: 'PDV',          icon: ShoppingCart },
-      { href: '/clientes',    label: 'Clientes',     icon: Users },
-      { href: '/estoque',     label: 'Estoque',      icon: Package },
-      { href: '/assistencia', label: 'Assistência',  icon: Wrench },
-      { href: '/compras',     label: 'Compras',      icon: Truck },
+      { href: '/pdv',              label: 'PDV',              icon: ShoppingCart },
+      { href: '/simular-parcela',  label: 'Simular Parcela',  icon: Calculator },
+      { href: '/historico',        label: 'Histórico',        icon: ClipboardList },
+      { href: '/leads',            label: 'Leads',            icon: Filter, badge: true },
+      { href: '/tabela-precos',    label: 'Tabela de preços', icon: Tag },
     ],
   },
   {
-    label: 'Gestão',
+    label: 'Catálogo',
     items: [
-      { href: '/financeiro',   label: 'Financeiro',      icon: Wallet },
-      { href: '/relatorios',   label: 'Relatórios / BI', icon: BarChart3 },
-      { href: '/configuracoes',label: 'Configurações',   icon: Settings },
-      { href: '/empresa',      label: 'Minha empresa',   icon: Building2 },
-      { href: '/planos',       label: 'Planos',          icon: CreditCard },
+      { href: '/produtos',  label: 'Produtos',  icon: BoxesIcon },
+      { href: '/estoque',   label: 'Estoque',   icon: BookOpen },
+      { href: '/catalogo',  label: 'Catálogo',  icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Relacionamento',
+    items: [
+      { href: '/clientes',    label: 'Clientes',    icon: Users },
+      { href: '/garantia',    label: 'Garantia',    icon: ShieldCheck, badge: true },
+      { href: '/assistencia', label: 'Assistência', icon: Wrench },
+    ],
+  },
+  {
+    label: 'Operação',
+    items: [
+      { href: '/compras',    label: 'Compras',    icon: Truck },
+      { href: '/financeiro', label: 'Financeiro', icon: Wallet },
+      { href: '/equipe',     label: 'Equipe',     icon: UsersRound },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { href: '/configuracoes', label: 'Configurações',  icon: Settings },
+      { href: '/empresa',       label: 'Minha empresa',  icon: Building2 },
+      { href: '/planos',        label: 'Planos',         icon: CreditCard },
     ],
   },
 ]
@@ -46,6 +84,7 @@ interface SidebarProps {
   userRole?: string
   userEmpresa?: string
   leadsCount?: number
+  garantiasCount?: number
   empresaCor?: string
   empresaLogo?: string | null
 }
@@ -55,6 +94,7 @@ export function Sidebar({
   userRole = 'Admin',
   userEmpresa,
   leadsCount = 0,
+  garantiasCount = 0,
   empresaCor = '#D7282F',
   empresaLogo = null,
 }: SidebarProps) {
@@ -68,6 +108,12 @@ export function Sidebar({
   }
 
   const iniciais = (userEmpresa ?? userName).slice(0, 2).toUpperCase()
+
+  function getBadge(item: { href: string; label: string; badge?: boolean }) {
+    if (item.label === 'Leads' && item.badge && leadsCount > 0) return leadsCount
+    if (item.label === 'Garantia' && item.badge && garantiasCount > 0) return garantiasCount
+    return null
+  }
 
   return (
     <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-gradient dark:bg-[linear-gradient(180deg,#0C1526_0%,#0A1120_100%)] shrink-0">
@@ -107,7 +153,7 @@ export function Sidebar({
               {group.items.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const Icon = item.icon
-                const badge = item.label === 'Leads' && leadsCount > 0 ? leadsCount : null
+                const badge = getBadge(item)
 
                 return (
                   <Link
