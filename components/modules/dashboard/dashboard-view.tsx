@@ -483,7 +483,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 const canal = CANAIS_VENDA.find(c => c.value === v.canal_venda)
                 const avatarColors = ['#34D399', '#7FB0E8', '#D7282F', '#F4B740', '#C6A86A']
                 const color = avatarColors[i % avatarColors.length]
-                const hora = v.data_venda ? new Date(v.data_venda).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'
+                const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--/--'
                 return (
                   <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] transition-colors"
                     style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
