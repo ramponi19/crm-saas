@@ -128,6 +128,7 @@ export async function GET() {
 
   const topVendedores = Object.entries(vendedorStats)
     .map(([id, s]) => ({ id, ...s }))
+    .filter(v => v.total > 0)
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
