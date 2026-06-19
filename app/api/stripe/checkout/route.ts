@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { stripe, PLANOS, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
+import { getStripe, PLANOS, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
     }
 
-    // Busca empresa do usuário
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
       .select('empresa_id, empresas(id, nome, stripe_customer_id)')
@@ -25,20 +24,17 @@ export async function POST(req: NextRequest) {
 
     if (!vinculo) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
-    const empresaData = vinculo.empresas as unknown as { id: number; nome: string; stripe_customer_id: string | null }
+    const empresaData = (vinculo as unknown as { empresas: { id: number; nome: string; stripe_customer_id: string | null } }).empresas
     const empresaId = empresaData.id
-
-    // Cria ou recupera customer Stripe
     const customerId = await getOrCreateCustomer(empresaId, empresaData.nome, user.email!)
-
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
+    const stripe = getStripe()
 
-    // Cria sessão de checkout
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [{ price: plano.priceId, quantity: 1 }],
+      line_items: [{ price: plano.priceId as string, quantity: 1 }],
       subscription_data: {
         trial_period_days: 14,
         metadata: { empresa_id: String(empresaId) },
