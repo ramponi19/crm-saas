@@ -11,41 +11,55 @@ async function getDashboardData() {
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [
-    { data: vendasMes },
-    { count: totalClientes },
-    { count: leadsAtivos },
-    { count: leadsNovos },
-    { count: estoqueDisponivel },
-    { count: assistenciasAbertas },
-    { data: vendasRecentes },
-    { data: leadsRecentes },
-  ] = await Promise.all([
-    supabase
-      .from('vendas')
-      .select('valor_venda, lucro, forma_pagamento, canal_venda, data_venda')
-      .gte('data_venda', startOfMonth.toISOString())
-      .eq('status', 'concluida'),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
-    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
-    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
-    supabase
-      .from('vendas')
-      .select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status')
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabase
-      .from('leads')
-      .select('id, nome, origem, kanban_status, created_at, produto_interessado, msgs_nao_lidas')
-      .eq('ativo', true)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
+  // Queries separadas para evitar problema de inferência de tipos com Promise.all
+  const { data: vendasMes } = await supabase
+    .from('vendas')
+    .select('valor_venda, lucro, forma_pagamento, canal_venda, data_venda')
+    .gte('data_venda', startOfMonth.toISOString())
+    .eq('status', 'concluida')
 
-  const receitaMes = vendasMes?.reduce((sum, v) => sum + (v.valor_venda ?? 0), 0) ?? 0
-  const lucroMes = vendasMes?.reduce((sum, v) => sum + (v.lucro ?? 0), 0) ?? 0
+  const { count: totalClientes } = await supabase
+    .from('clientes')
+    .select('*', { count: 'exact', head: true })
+    .eq('ativo', true)
+
+  const { count: leadsAtivos } = await supabase
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+    .eq('ativo', true)
+
+  const { count: leadsNovos } = await supabase
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+    .eq('ativo', true)
+    .eq('kanban_status', 'novo')
+
+  const { count: estoqueDisponivel } = await supabase
+    .from('inventario_unidades')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'disponivel')
+    .eq('ativo', true)
+
+  const { count: assistenciasAbertas } = await supabase
+    .from('garantias_assistencias')
+    .select('*', { count: 'exact', head: true })
+    .not('status', 'in', '(concluida,cancelada)')
+
+  const { data: vendasRecentes } = await supabase
+    .from('vendas')
+    .select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: leadsRecentes } = await supabase
+    .from('leads')
+    .select('id, nome, origem, kanban_status, created_at, produto_interessado, msgs_nao_lidas')
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const receitaMes = (vendasMes ?? []).reduce((sum, v) => sum + (Number(v.valor_venda) ?? 0), 0)
+  const lucroMes = (vendasMes ?? []).reduce((sum, v) => sum + (Number(v.lucro) ?? 0), 0)
   const qtdVendasMes = vendasMes?.length ?? 0
   const ticketMedio = qtdVendasMes > 0 ? receitaMes / qtdVendasMes : 0
 
