@@ -6,7 +6,8 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
+    /* ── LIGHT: fundo azul acinzentado suave ── */
+    --background: 214 35% 91%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -16,19 +17,20 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 214 32% 91%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 214 32% 91%;
+    --muted: 214 32% 84%;
+    --muted-foreground: 215 16% 40%;
+    --accent: 214 32% 84%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 214 32% 82%;
+    --input: 214 32% 82%;
     --ring: 358 72% 51%;
     --radius: 0.75rem;
   }
 
   .dark {
+    /* ── DARK: navy quase preto ── */
     --background: 218 47% 8%;
     --foreground: 213 27% 94%;
     --card: 218 47% 10%;
