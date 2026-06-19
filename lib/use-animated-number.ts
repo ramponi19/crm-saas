@@ -1,47 +1,49 @@
-'use client'
-
 import { useEffect, useRef, useState } from 'react'
 
 /**
  * Anima um número de um valor anterior até o alvo.
- * Usa requestAnimationFrame com easing suave (cubic-bezier-like).
+ * Versão segura: cancela corretamente animações sobrepostas.
  */
-export function useAnimatedNumber(target: number, duration = 600): number {
+export function useAnimatedNumber(target: number, duration = 500): number {
   const [value, setValue] = useState(target)
-  const fromRef = useRef(target)
-  const rafRef = useRef<number | null>(null)
+  const stateRef = useRef({ from: target, raf: 0, start: 0 })
 
   useEffect(() => {
-    const from = fromRef.current
+    const state = stateRef.current
+    // Cancela animação anterior se ainda rodando
+    if (state.raf) cancelAnimationFrame(state.raf)
+
+    const from = value // começa do valor atual visível
     const to = target
-    if (from === to) {
-      setValue(to)
-      return
-    }
-    const start = performance.now()
+    if (from === to) return
 
-    // easeOutCubic — desacelera no final, sensação premium
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3)
+    state.from = from
+    state.start = performance.now()
 
-    function tick(now: number) {
-      const elapsed = now - start
-      const t = Math.min(elapsed / duration, 1)
+    const ease = (t: number) => t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2 // easeInOutCubic
+
+    const tick = (now: number) => {
+      const t = Math.min((now - state.start) / duration, 1)
       const eased = ease(t)
-      setValue(from + (to - from) * eased)
+      const current = state.from + (to - state.from) * eased
+      setValue(current)
       if (t < 1) {
-        rafRef.current = requestAnimationFrame(tick)
+        state.raf = requestAnimationFrame(tick)
       } else {
         setValue(to)
-        fromRef.current = to
+        state.raf = 0
       }
     }
 
-    rafRef.current = requestAnimationFrame(tick)
+    state.raf = requestAnimationFrame(tick)
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      fromRef.current = target
+      if (state.raf) cancelAnimationFrame(state.raf)
+      state.raf = 0
     }
-  }, [target, duration])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
 
   return value
 }
