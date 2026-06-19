@@ -490,7 +490,12 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                     <div className="font-mono text-[12px] text-[#6B7C92]">{data}</div>
                     <div>
                       <div className="text-[13px] font-semibold text-[#E9EEF4]">{v.cliente_nome ?? '—'}</div>
-                      <div className="text-[11px] text-[#6B7C92]">{v.produto_nome ?? v.forma_pagamento ?? 'Produto'} · {canal?.label ?? 'Loja física'}</div>
+                      <div className="text-[11px] text-[#6B7C92]">
+                        {v.produto_nome
+                          ? <>{v.produto_nome} · {canal?.label ?? 'Loja física'}</>
+                          : <>{canal?.label ?? 'Loja física'} · {v.forma_pagamento ?? 'Pix'}</>
+                        }
+                      </div>
                     </div>
                     <div className="font-serif text-[15px] text-[#F4F6F9] text-right">{formatCurrency(v.valor_venda)}</div>
                     <div className="text-right w-[96px]">
