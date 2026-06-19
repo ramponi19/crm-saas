@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { Topbar } from '@/components/layout/topbar'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
 
 export const metadata = { title: 'Dashboard' }
@@ -108,15 +107,5 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   const data = await getDashboardData()
-
-  return (
-    <>
-      <Topbar
-        eyebrow="PAINEL · JM STORE IMPORTADOS"
-        title="Visão geral"
-        showPeriods
-      />
-      <DashboardView data={data} />
-    </>
-  )
+  return <DashboardView data={data} />
 }
