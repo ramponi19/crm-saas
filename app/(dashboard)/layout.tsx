@@ -12,7 +12,6 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Busca empresa do usuário
   const { data: vinculo } = await supabase
     .from('empresa_usuarios')
     .select('role, empresa:empresas(id, nome, plano, wl_cor, wl_logo_url)')
@@ -20,7 +19,6 @@ export default async function DashboardLayout({
     .eq('ativo', true)
     .single()
 
-  // Se não tem empresa vinculada, redireciona para onboarding
   if (!vinculo) redirect('/register')
 
   const { data: usuarioRaw } = await supabase
@@ -35,15 +33,21 @@ export default async function DashboardLayout({
     .eq('ativo', true)
     .eq('kanban_status', 'novo')
 
-  const usuario = usuarioRaw as { nome: string; role: string } | null
-  const empresa = vinculo.empresa as { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null
+  const usuario = usuarioRaw as unknown as { nome: string; role: string } | null
+  const empresa = (vinculo as unknown as { role: string; empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null }).empresa
 
   return (
     <EmpresaProvider>
       <div className="flex h-screen bg-[#0A111E] overflow-hidden">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
-          userRole={vinculo.role === 'owner' ? 'Proprietário' : usuario?.role === 'admin' ? 'Administrador' : 'Vendedor'}
+          userRole={
+            (vinculo as unknown as { role: string }).role === 'owner'
+              ? 'Proprietário'
+              : usuario?.role === 'admin'
+              ? 'Administrador'
+              : 'Vendedor'
+          }
           userEmpresa={empresa?.nome}
           leadsCount={leadsCount ?? 0}
           empresaCor={empresa?.wl_cor ?? '#D7282F'}
