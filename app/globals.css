@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode */
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 358 72% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 32% 91%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 358 72% 51%;
+    --radius: 0.75rem;
+
+    /* CRM custom tokens — light */
+    --crm-bg: 215 28% 97%;
+    --crm-surface: 0 0% 100%;
+    --crm-surface-card: 214 100% 99%;
+    --crm-brand: 358 72% 51%;
+    --crm-brand-light: 358 80% 66%;
+    --crm-text-primary: 222 47% 11%;
+    --crm-text-muted: 215 16% 47%;
+    --crm-text-subtle: 215 16% 65%;
+    --crm-border: 214 32% 89%;
+  }
+
+  .dark {
+    /* Dark mode — fiel ao Claude Design original */
+    --background: 218 47% 8%;
+    --foreground: 213 27% 94%;
+    --card: 218 47% 10%;
+    --card-foreground: 213 27% 94%;
+    --popover: 218 47% 10%;
+    --popover-foreground: 213 27% 94%;
+    --primary: 358 72% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 218 35% 15%;
+    --secondary-foreground: 213 27% 94%;
+    --muted: 218 35% 15%;
+    --muted-foreground: 215 16% 57%;
+    --accent: 218 35% 15%;
+    --accent-foreground: 213 27% 94%;
+    --destructive: 358 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 35% 14%;
+    --input: 218 35% 14%;
+    --ring: 358 72% 51%;
+
+    /* CRM custom tokens — dark (do Claude Design) */
+    --crm-bg: 218 47% 8%;           /* #0A111E */
+    --crm-surface: 218 47% 10%;     /* #0C1526 */
+    --crm-surface-card: 218 47% 12%; /* #122036 */
+    --crm-brand: 358 72% 51%;       /* #D7282F */
+    --crm-brand-light: 358 80% 66%; /* #F0656B */
+    --crm-text-primary: 213 27% 96%; /* #F4F6F9 */
+    --crm-text-muted: 215 16% 57%;  /* #8A9BB0 */
+    --crm-text-subtle: 215 18% 39%; /* #5C6E84 */
+    --crm-border: 218 35% 14%;      /* rgba(255,255,255,0.06) */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    @apply font-serif;
+  }
+}
+
+@layer utilities {
+  /* Scrollbar customizado */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.09) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.09);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  /* Animações */
+  .animate-fade-up {
+    animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .animate-grow-x {
+    animation: growX 0.8s ease both;
+    transform-origin: left;
+  }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes growX {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes pulseDot {
+  0%   { box-shadow: 0 0 0 0 rgba(52,211,153,0.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(52,211,153,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+}
