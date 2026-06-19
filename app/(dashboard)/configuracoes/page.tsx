@@ -11,22 +11,29 @@ async function getConfigs() {
   const { data } = await supabase
     .from('configuracoes_sistema')
     .select('chave, valor')
-    .in('chave', ['whatsapp_evolution', 'whatsapp_official'])
+    .in('chave', ['whatsapp_evolution', 'whatsapp_official', 'dados_loja', 'preferencias'])
 
-  const evolution = data?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
-  const official = data?.find(d => d.chave === 'whatsapp_official')?.valor as OfficialConfig | undefined
+  const evolution   = data?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
+  const official    = data?.find(d => d.chave === 'whatsapp_official')?.valor as OfficialConfig | undefined
+  const dadosLoja   = data?.find(d => d.chave === 'dados_loja')?.valor ?? null
+  const preferencias = data?.find(d => d.chave === 'preferencias')?.valor ?? null
 
-  return { evolution: evolution ?? null, official: official ?? null }
+  return { evolution: evolution ?? null, official: official ?? null, dadosLoja, preferencias }
 }
 
 export default async function ConfiguracoesPage() {
-  const { evolution, official } = await getConfigs()
+  const { evolution, official, dadosLoja, preferencias } = await getConfigs()
 
   return (
     <div className="flex flex-col h-full">
-      <Topbar title="Configurações" />
+      <Topbar eyebrow="SISTEMA" title="Configurações" />
       <div className="flex-1 overflow-auto p-6">
-        <ConfiguracoesView evolution={evolution} official={official} />
+        <ConfiguracoesView
+          evolution={evolution}
+          official={official}
+          dadosLoja={dadosLoja}
+          preferencias={preferencias}
+        />
       </div>
     </div>
   )
