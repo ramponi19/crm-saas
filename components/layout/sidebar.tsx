@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   Users,
@@ -28,7 +29,7 @@ const navGroups = [
   {
     label: 'Operações',
     items: [
-      { href: '/pdv', label: 'PDV / Vendas', icon: ShoppingCart },
+      { href: '/pdv', label: 'PDV', icon: ShoppingCart },
       { href: '/clientes', label: 'Clientes', icon: Users },
       { href: '/estoque', label: 'Estoque', icon: Package },
       { href: '/assistencia', label: 'Assistência', icon: Wrench },
@@ -53,6 +54,13 @@ interface SidebarProps {
 
 export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsCount = 0 }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-gradient dark:bg-[linear-gradient(180deg,#0C1526_0%,#0A1120_100%)] shrink-0">
@@ -124,7 +132,7 @@ export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsC
             <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{userName}</div>
             <div className="text-[11px] text-[#5C6E84]">{userRole}</div>
           </div>
-          <button className="text-[#5C6E84] hover:text-[#9FB0C2] transition-colors">
+          <button className="text-[#5C6E84] hover:text-[#9FB0C2] transition-colors" onClick={handleLogout}>
             <LogOut size={18} />
           </button>
         </div>
