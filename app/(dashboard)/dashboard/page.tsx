@@ -112,7 +112,7 @@ export default async function DashboardPage() {
   return (
     <>
       <Topbar
-        eyebrow="Resumo do negócio"
+        eyebrow="PAINEL · JM STORE IMPORTADOS"
         title="Visão geral"
         showPeriods
       />
