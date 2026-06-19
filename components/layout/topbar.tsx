@@ -14,10 +14,11 @@ interface TopbarProps {
 }
 
 const periods = [
+  { value: 'hoje', label: 'Hoje'   },
   { value: '7d',   label: '7 dias' },
-  { value: 'mes',  label: 'Este mês' },
-  { value: 'ano',  label: 'Este ano' },
-  { value: 'tudo', label: 'Tudo' },
+  { value: '30d',  label: '30 dias'},
+  { value: 'mes',  label: 'Mês'    },
+  { value: 'ano',  label: 'Ano'    },
 ]
 
 export function Topbar({
@@ -27,14 +28,15 @@ export function Topbar({
   activePeriod = 'mes',
   onPeriodChange,
 }: TopbarProps) {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // Evita hydration mismatch — só renderiza ícone correto no client
   useEffect(() => { setMounted(true) }, [])
 
+  const isDark = !mounted || resolvedTheme === 'dark'
+
   function toggleTheme() {
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
+    setTheme(isDark ? 'light' : 'dark')
   }
 
   return (
@@ -62,9 +64,9 @@ export function Topbar({
               key={p.value}
               onClick={() => onPeriodChange?.(p.value)}
               className={cn(
-                'px-[14px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
+                'px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
                 activePeriod === p.value
-                  ? 'bg-[#F0353D] text-white font-bold'
+                  ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.35)]'
                   : 'text-[#8A9BB0] hover:text-[#D4DEEA] hover:bg-white/[0.06]'
               )}
             >
@@ -83,17 +85,13 @@ export function Topbar({
         />
       </div>
 
-      {/* Theme toggle — só mostra após montar para evitar flash */}
+      {/* Theme toggle */}
       <button
         onClick={toggleTheme}
         className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] hover:text-[#F4F6F9] transition-all"
-        title={mounted && resolvedTheme === 'dark' ? 'Mudar para claro' : 'Mudar para escuro'}
+        title={isDark ? 'Mudar para claro' : 'Mudar para escuro'}
       >
-        {mounted && resolvedTheme === 'dark' ? (
-          <Moon size={18} />
-        ) : (
-          <Sun size={18} />
-        )}
+        {isDark ? <Moon size={18} /> : <Sun size={18} />}
       </button>
 
       {/* Notifications */}
