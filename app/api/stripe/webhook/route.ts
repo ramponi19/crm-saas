@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       id: event.id,
       tipo: event.type,
       empresa_id: null,
-      payload: event.data.object as Record<string, unknown>,
+      payload: event.data.object as unknown as Record<string, unknown>,
     })
 
     return NextResponse.json({ ok: true })
