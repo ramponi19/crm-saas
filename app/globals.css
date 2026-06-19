@@ -4,8 +4,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* cache-bust: v2 */
-
 @layer base {
   :root {
     --background: 0 0% 98%;
@@ -28,15 +26,6 @@
     --input: 214 32% 91%;
     --ring: 358 72% 51%;
     --radius: 0.75rem;
-    --crm-bg: 215 28% 97%;
-    --crm-surface: 0 0% 100%;
-    --crm-surface-card: 214 100% 99%;
-    --crm-brand: 358 72% 51%;
-    --crm-brand-light: 358 80% 66%;
-    --crm-text-primary: 222 47% 11%;
-    --crm-text-muted: 215 16% 47%;
-    --crm-text-subtle: 215 16% 65%;
-    --crm-border: 214 32% 89%;
   }
 
   .dark {
@@ -59,29 +48,22 @@
     --border: 218 35% 14%;
     --input: 218 35% 14%;
     --ring: 358 72% 51%;
-    --crm-bg: 218 47% 8%;
-    --crm-surface: 218 47% 10%;
-    --crm-surface-card: 218 47% 12%;
-    --crm-brand: 358 72% 51%;
-    --crm-brand-light: 358 80% 66%;
-    --crm-text-primary: 213 27% 96%;
-    --crm-text-muted: 215 16% 57%;
-    --crm-text-subtle: 215 18% 39%;
-    --crm-border: 218 35% 14%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   h1, h2, h3 {
-    @apply font-serif;
+    font-family: 'Fraunces', Georgia, serif;
   }
 }
 
