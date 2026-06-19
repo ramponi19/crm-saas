@@ -1,16 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-// Períodos e suas datas de início (todos terminam em "agora")
 function getPeriodStarts(): Record<string, Date> {
   const now = new Date()
-
   const hoje = new Date(now); hoje.setHours(0, 0, 0, 0)
   const d7 = new Date(now); d7.setDate(d7.getDate() - 7); d7.setHours(0, 0, 0, 0)
   const d30 = new Date(now); d30.setDate(d30.getDate() - 30); d30.setHours(0, 0, 0, 0)
   const mes = new Date(now.getFullYear(), now.getMonth(), 1)
   const ano = new Date(now.getFullYear(), 0, 1)
-
   return { hoje, '7d': d7, '30d': d30, mes, ano }
 }
 
@@ -23,22 +20,21 @@ interface PeriodKpis {
 
 export async function GET() {
   const supabase = await createClient()
-
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-  }
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const starts = getPeriodStarts()
 
-  // ── 1 query só: traz todas as vendas concluídas do ANO (maior período)
-  //    e calcula os 5 períodos no servidor a partir desse conjunto.
-  //    Como filtramos pelo maior período, um único fetch cobre todos. ──
-  const inicioAno = starts.ano.toISOString()
+  // 12 meses atrás para pegar tudo de uma vez
+  const inicio12m = new Date()
+  inicio12m.setMonth(inicio12m.getMonth() - 12)
+  inicio12m.setDate(1)
+  inicio12m.setHours(0, 0, 0, 0)
+
   const { data: vendasRaw } = await supabase
     .from('vendas')
     .select('valor_venda, lucro, data_venda')
-    .gte('data_venda', inicioAno)
+    .gte('data_venda', inicio12m.toISOString())
     .eq('status', 'concluida')
 
   const vendas = (vendasRaw ?? []) as Array<{
@@ -47,26 +43,28 @@ export async function GET() {
     data_venda: string | null
   }>
 
-  // Calcula KPIs por período a partir do conjunto único
+  // KPIs por período
   const periods: Record<string, PeriodKpis> = {}
   for (const [key, start] of Object.entries(starts)) {
     const startMs = start.getTime()
-    const filtradas = vendas.filter(v => {
-      if (!v.data_venda) return false
-      return new Date(v.data_venda).getTime() >= startMs
-    })
+    const filtradas = vendas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= startMs)
     const receita = filtradas.reduce((s, v) => s + (Number(v.valor_venda) || 0), 0)
     const lucro = filtradas.reduce((s, v) => s + (Number(v.lucro) || 0), 0)
     const qtdVendas = filtradas.length
-    periods[key] = {
-      receita,
-      lucro,
-      qtdVendas,
-      ticketMedio: qtdVendas > 0 ? receita / qtdVendas : 0,
-    }
+    periods[key] = { receita, lucro, qtdVendas, ticketMedio: qtdVendas > 0 ? receita / qtdVendas : 0 }
   }
 
-  // ── Contadores globais (não dependem de período) ──
+  // Faturamento mensal dos últimos 12 meses para o gráfico
+  const monthlyMap: Record<string, number> = {}
+  vendas.forEach(v => {
+    if (!v.data_venda) return
+    const d = new Date(v.data_venda)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    monthlyMap[key] = (monthlyMap[key] ?? 0) + (Number(v.valor_venda) || 0)
+  })
+  const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total }))
+
+  // Contadores globais em paralelo
   const [
     { count: totalClientes },
     { count: leadsAtivos },
@@ -85,6 +83,7 @@ export async function GET() {
 
   return NextResponse.json({
     periods,
+    faturamentoMensal,
     globais: {
       totalClientes: totalClientes ?? 0,
       leadsAtivos: leadsAtivos ?? 0,
