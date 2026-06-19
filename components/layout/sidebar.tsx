@@ -35,6 +35,7 @@ const navGroups = [
       { href: '/relatorios',  label: 'Relatórios / BI', icon: BarChart3 },
       { href: '/configuracoes',label: 'Configurações',  icon: Settings },
       { href: '/empresa',     label: 'Minha empresa',   icon: Building2 },
+      { href: '/planos',      label: 'Planos',           icon: CreditCard },
     ],
   },
 ]
