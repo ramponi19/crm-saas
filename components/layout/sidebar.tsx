@@ -1,47 +1,40 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
-  LayoutDashboard,
-  Users,
-  ShoppingCart,
-  Package,
-  Wrench,
-  Truck,
-  Wallet,
-  BarChart3,
-  Settings,
-  LogOut,
-  MessageCircle,
+  LayoutDashboard, Users, ShoppingCart, Package, Wrench,
+  Truck, Wallet, BarChart3, Settings, LogOut, MessageCircle, Building2,
 } from 'lucide-react'
 
 const navGroups = [
   {
     label: 'Visão Geral',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/leads', label: 'Leads', icon: MessageCircle, badge: null },
+      { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+      { href: '/leads',     label: 'Leads',       icon: MessageCircle, badge: null },
     ],
   },
   {
     label: 'Operações',
     items: [
-      { href: '/pdv', label: 'PDV', icon: ShoppingCart },
-      { href: '/clientes', label: 'Clientes', icon: Users },
-      { href: '/estoque', label: 'Estoque', icon: Package },
-      { href: '/assistencia', label: 'Assistência', icon: Wrench },
-      { href: '/compras', label: 'Compras', icon: Truck },
+      { href: '/pdv',        label: 'PDV',         icon: ShoppingCart },
+      { href: '/clientes',   label: 'Clientes',    icon: Users },
+      { href: '/estoque',    label: 'Estoque',      icon: Package },
+      { href: '/assistencia',label: 'Assistência', icon: Wrench },
+      { href: '/compras',    label: 'Compras',      icon: Truck },
     ],
   },
   {
     label: 'Gestão',
     items: [
-      { href: '/financeiro', label: 'Financeiro', icon: Wallet },
-      { href: '/relatorios', label: 'Relatórios / BI', icon: BarChart3 },
-      { href: '/configuracoes', label: 'Configurações', icon: Settings },
+      { href: '/financeiro',  label: 'Financeiro',      icon: Wallet },
+      { href: '/relatorios',  label: 'Relatórios / BI', icon: BarChart3 },
+      { href: '/configuracoes',label: 'Configurações',  icon: Settings },
+      { href: '/empresa',     label: 'Minha empresa',   icon: Building2 },
     ],
   },
 ]
@@ -49,10 +42,20 @@ const navGroups = [
 interface SidebarProps {
   userName?: string
   userRole?: string
+  userEmpresa?: string
   leadsCount?: number
+  empresaCor?: string
+  empresaLogo?: string | null
 }
 
-export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsCount = 0 }: SidebarProps) {
+export function Sidebar({
+  userName = 'Administrador',
+  userRole = 'Admin',
+  userEmpresa,
+  leadsCount = 0,
+  empresaCor = '#D7282F',
+  empresaLogo = null,
+}: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -62,17 +65,33 @@ export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsC
     router.push('/login')
   }
 
+  // Iniciais da empresa para o avatar
+  const iniciais = (userEmpresa ?? userName).slice(0, 2).toUpperCase()
+
   return (
     <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-gradient dark:bg-[linear-gradient(180deg,#0C1526_0%,#0A1120_100%)] shrink-0">
 
-      {/* Brand */}
+      {/* Brand — white-label */}
       <div className="flex items-center gap-3 px-5 py-[22px] border-b border-white/[0.05]">
-        <div className="w-[46px] h-[46px] rounded-[13px] bg-gradient-to-br from-[#F6F3EB] to-[#DCD6C8] flex items-center justify-center shrink-0 shadow-[0_6px_18px_rgba(0,0,0,0.4),inset_0_0_0_1px_rgba(255,255,255,0.5)]">
-          <span className="font-sans font-extrabold text-[15px] text-[#0A111E] tracking-tight">JM</span>
-        </div>
-        <div className="leading-tight">
-          <div className="font-sans font-extrabold text-[17px] tracking-[0.01em] text-[#F4F6F9]">JM STORE</div>
-          <div className="font-mono text-[9px] tracking-[0.34em] text-[#F0353D] mt-[3px]">IMPORTADOS</div>
+        {empresaLogo ? (
+          <div className="w-[46px] h-[46px] rounded-[13px] bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
+            <Image src={empresaLogo} alt="Logo" width={40} height={40} className="object-contain" />
+          </div>
+        ) : (
+          <div
+            className="w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 shadow-[0_6px_18px_rgba(0,0,0,0.4)]"
+            style={{ background: `linear-gradient(135deg, ${empresaCor}CC, ${empresaCor}66)` }}
+          >
+            <span className="font-sans font-extrabold text-[15px] text-white tracking-tight">{iniciais}</span>
+          </div>
+        )}
+        <div className="leading-tight overflow-hidden">
+          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-[#F4F6F9] truncate">
+            {userEmpresa ?? 'CRM Store'}
+          </div>
+          <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: empresaCor }}>
+            SISTEMA
+          </div>
         </div>
       </div>
 
@@ -96,21 +115,26 @@ export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsC
                     className={cn(
                       'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150 group',
                       isActive
-                        ? 'bg-[rgba(215,40,47,0.1)] text-[#F4F6F9] font-semibold'
+                        ? 'text-[#F4F6F9] font-semibold'
                         : 'text-[#8A9BB0] hover:bg-white/[0.05] hover:text-[#D4DEEA]'
                     )}
+                    style={isActive ? { background: `${empresaCor}18` } : {}}
                   >
                     {/* Active bar */}
                     <span
                       className={cn(
-                        'absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] bg-[#F0353D] transition-opacity duration-200',
+                        'absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200',
                         isActive ? 'opacity-100' : 'opacity-0'
                       )}
+                      style={{ background: empresaCor }}
                     />
                     <Icon size={19} className="shrink-0" />
                     <span className="flex-1 truncate">{item.label}</span>
                     {badge && (
-                      <span className="font-mono text-[10px] font-semibold text-[#F0353D] bg-[rgba(215,40,47,0.14)] px-[7px] py-[2px] rounded-full">
+                      <span
+                        className="font-mono text-[10px] font-semibold px-[7px] py-[2px] rounded-full"
+                        style={{ color: empresaCor, background: `${empresaCor}22` }}
+                      >
                         {badge}
                       </span>
                     )}
@@ -125,7 +149,10 @@ export function Sidebar({ userName = 'Administrador', userRole = 'Admin', leadsC
       {/* User */}
       <div className="px-3 py-3 border-t border-white/[0.05]">
         <div className="flex items-center gap-[11px] px-[11px] py-[9px] rounded-[13px] bg-white/[0.03]">
-          <div className="w-[38px] h-[38px] rounded-[11px] bg-gradient-to-br from-[#D7282F] to-[#8E1B20] flex items-center justify-center font-bold text-[14px] text-white shrink-0">
+          <div
+            className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[14px] text-white shrink-0"
+            style={{ background: `linear-gradient(135deg, ${empresaCor}, ${empresaCor}88)` }}
+          >
             {userName.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
