@@ -19,6 +19,7 @@ interface Kpis {
 interface VendaRecente {
   id: number; valor_venda: number; forma_pagamento: string | null
   canal_venda: string | null; data_venda: string | null; status: string | null
+  cliente_nome?: string | null; produto_nome?: string | null
 }
 interface DashboardData {
   kpis: Kpis
@@ -220,41 +221,75 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
 }
 
 // ─────────────────────────────────────────
-// Top Vendedores
+// Top Vendedores — dados reais com meta
 // ─────────────────────────────────────────
-function TopVendedores({ vendas }: { vendas: VendaRecente[] }) {
-  const COLORS = ['#D7282F', '#7FB0E8', '#34D399', '#F4B740', '#C6A86A']
-  // Agrupa por canal como proxy de vendedor (dado real virá depois)
-  if (!vendas.length) return <div className="text-center py-6 text-[#5C6E84] text-[13px]">Sem dados.</div>
-  const canalMap: Record<string, number> = {}
-  vendas.forEach(v => { const c = v.canal_venda ?? 'loja_fisica'; canalMap[c] = (canalMap[c] ?? 0) + Number(v.valor_venda) })
-  const rows = Object.entries(canalMap).map(([canal, total], i) => ({
-    nome: CANAIS_VENDA.find(c => c.value === canal)?.label ?? canal,
-    vendas: vendas.filter(v => (v.canal_venda ?? 'loja_fisica') === canal).length,
-    valor: total, color: COLORS[i % COLORS.length],
-  })).sort((a, b) => b.valor - a.valor)
-  const maxVal = Math.max(...rows.map(r => r.valor), 1)
+const AVATAR_COLORS = ['#D7282F', '#7FB0E8', '#34D399', '#F4B740', '#C6A86A']
+
+function getInitials(nome: string) {
+  return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+}
+
+function TopVendedores({ vendedores }: {
+  vendedores: Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>
+}) {
+  if (!vendedores.length) return <div className="text-center py-6 text-[#5C6E84] text-[13px]">Sem dados.</div>
+  const maxTotal = Math.max(...vendedores.map(v => v.total), 1)
+
   return (
     <div className="flex flex-col gap-[18px]">
-      {rows.map((r, i) => (
-        <div key={i}>
-          <div className="flex items-center gap-[12px] mb-[9px]">
-            <div className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[13px] text-white flex-none"
-              style={{ background: `linear-gradient(135deg, ${r.color}88, ${r.color}44)`, border: `1px solid ${r.color}44`, color: r.color }}>
-              {r.nome.slice(0, 2).toUpperCase()}
+      {vendedores.map((v, i) => {
+        const color = AVATAR_COLORS[i % AVATAR_COLORS.length]
+        const pctMeta = v.meta && v.meta > 0 ? Math.min(Math.round((v.total / v.meta) * 100), 100) : null
+        const pctBar  = Math.max(Math.round((v.total / maxTotal) * 100), 4)
+        return (
+          <div key={v.id}>
+            <div className="flex items-center gap-[12px] mb-[9px]">
+              {/* Avatar com iniciais e cor única por posição */}
+              <div
+                className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[13px] flex-none"
+                style={{
+                  background: `linear-gradient(135deg, ${color}55, ${color}22)`,
+                  border: `1px solid ${color}44`,
+                  color: color,
+                }}
+              >
+                {getInitials(v.nome)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{v.nome}</div>
+                <div className="text-[11.5px] text-[#6B7C92]">
+                  {v.qtd} {v.qtd === 1 ? 'venda' : 'vendas'}
+                  {pctMeta !== null && (
+                    <span className={pctMeta >= 100 ? 'text-[#34D399] ml-1 font-semibold' : 'text-[#F4B740] ml-1'}>
+                      · meta {pctMeta}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-[13.5px] font-bold text-[#F4F6F9]">{formatCurrency(v.total)}</div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13.5px] font-semibold text-[#E9EEF4]">{r.nome}</div>
-              <div className="text-[11.5px] text-[#6B7C92]">{r.vendas} vendas</div>
+            {/* Barra de progresso — meta se tiver, senão relativa ao maior */}
+            <div className="h-[6px] rounded-[6px] bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-[6px] transition-all duration-700"
+                style={{
+                  width: `${pctMeta ?? pctBar}%`,
+                  background: pctMeta !== null && pctMeta >= 100
+                    ? 'linear-gradient(90deg, #16a34a, #34D399)'
+                    : 'linear-gradient(90deg, #8E1B20, #F0353D)',
+                }}
+              />
             </div>
-            <div className="text-[13.5px] font-bold text-[#F4F6F9]">{formatCurrency(r.valor)}</div>
+            {/* Label da meta se configurada */}
+            {v.meta !== null && (
+              <div className="flex justify-between mt-[4px]">
+                <span className="font-mono text-[9px] text-[#4F6178]">R$ 0</span>
+                <span className="font-mono text-[9px] text-[#4F6178]">{formatCurrency(v.meta)}</span>
+              </div>
+            )}
           </div>
-          <div className="h-[6px] rounded-[6px] bg-white/[0.06] overflow-hidden">
-            <div className="h-full rounded-[6px]"
-              style={{ width: `${(r.valor / maxVal) * 100}%`, background: `linear-gradient(90deg, #8E1B20, #F0353D)` }} />
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -274,6 +309,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
     assistenciasAbertas: initialData.kpis.assistenciasAbertas,
   })
   const [vendasRecentes, setVendasRecentes] = useState<VendaRecente[]>(initialData.vendasRecentes)
+  const [topVendedores, setTopVendedores] = useState<Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>>([])
 
   useEffect(() => {
     let cancelled = false
@@ -285,6 +321,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         setGlobais(json.globais)
         setVendasRecentes(json.vendasRecentes)
         if (json.faturamentoMensal) setFaturamentoMensal(json.faturamentoMensal)
+        if (json.topVendedores) setTopVendedores(json.topVendedores)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -437,7 +474,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               {/* Cabeçalho da tabela */}
               <div className="grid gap-[10px] px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
                 style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
-                <div>HORA</div><div>PRODUTO / CANAL</div>
+                <div>DATA</div><div>CLIENTE / PRODUTO</div>
                 <div className="text-right">VALOR</div><div className="text-right w-[96px]">STATUS</div>
               </div>
               {vendasRecentes.length === 0 ? (
@@ -450,10 +487,10 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 return (
                   <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] transition-colors"
                     style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
-                    <div className="font-mono text-[12px] text-[#6B7C92]">{hora}</div>
+                    <div className="font-mono text-[12px] text-[#6B7C92]">{data}</div>
                     <div>
-                      <div className="text-[13px] font-semibold text-[#E9EEF4]">{v.forma_pagamento ?? 'Pix'}</div>
-                      <div className="text-[11px] text-[#6B7C92]">{canal?.label ?? 'Loja física'} · {formatRelativeTime(v.data_venda)}</div>
+                      <div className="text-[13px] font-semibold text-[#E9EEF4]">{v.cliente_nome ?? '—'}</div>
+                      <div className="text-[11px] text-[#6B7C92]">{v.produto_nome ?? v.forma_pagamento ?? 'Produto'} · {canal?.label ?? 'Loja física'}</div>
                     </div>
                     <div className="font-serif text-[15px] text-[#F4F6F9] text-right">{formatCurrency(v.valor_venda)}</div>
                     <div className="text-right w-[96px]">
@@ -470,7 +507,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
             <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '620ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESTAQUE</div>
               <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-[20px]">Top vendedores</h3>
-              <TopVendedores vendas={vendasRecentes} />
+              <TopVendedores vendedores={topVendedores} />
             </div>
           </div>
 
