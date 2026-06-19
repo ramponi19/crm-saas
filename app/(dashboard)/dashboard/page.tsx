@@ -11,10 +11,9 @@ async function getDashboardData() {
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  // Queries separadas para evitar problema de inferência de tipos com Promise.all
-  const { data: vendasMes } = await supabase
+  const { data: vendasMesRaw } = await supabase
     .from('vendas')
-    .select('valor_venda, lucro, forma_pagamento, canal_venda, data_venda')
+    .select('*')
     .gte('data_venda', startOfMonth.toISOString())
     .eq('status', 'concluida')
 
@@ -45,22 +44,49 @@ async function getDashboardData() {
     .select('*', { count: 'exact', head: true })
     .not('status', 'in', '(concluida,cancelada)')
 
-  const { data: vendasRecentes } = await supabase
+  const { data: vendasRecentesRaw } = await supabase
     .from('vendas')
-    .select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(5)
 
-  const { data: leadsRecentes } = await supabase
+  const { data: leadsRecentesRaw } = await supabase
     .from('leads')
-    .select('id, nome, origem, kanban_status, created_at, produto_interessado, msgs_nao_lidas')
+    .select('*')
     .eq('ativo', true)
     .order('created_at', { ascending: false })
     .limit(5)
 
-  const receitaMes = (vendasMes ?? []).reduce((sum, v) => sum + (Number(v.valor_venda) ?? 0), 0)
-  const lucroMes = (vendasMes ?? []).reduce((sum, v) => sum + (Number(v.lucro) ?? 0), 0)
-  const qtdVendasMes = vendasMes?.length ?? 0
+  const vendasMes = (vendasMesRaw ?? []) as Array<{
+    valor_venda: number
+    lucro: number | null
+    forma_pagamento: string | null
+    canal_venda: string | null
+    data_venda: string | null
+  }>
+
+  const vendasRecentes = (vendasRecentesRaw ?? []) as Array<{
+    id: number
+    valor_venda: number
+    forma_pagamento: string | null
+    canal_venda: string | null
+    data_venda: string | null
+    status: string | null
+  }>
+
+  const leadsRecentes = (leadsRecentesRaw ?? []) as Array<{
+    id: number
+    nome: string | null
+    origem: string | null
+    kanban_status: string | null
+    created_at: string | null
+    produto_interessado: string | null
+    msgs_nao_lidas: number | null
+  }>
+
+  const receitaMes = vendasMes.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0)
+  const lucroMes = vendasMes.reduce((sum, v) => sum + (Number(v.lucro) || 0), 0)
+  const qtdVendasMes = vendasMes.length
   const ticketMedio = qtdVendasMes > 0 ? receitaMes / qtdVendasMes : 0
 
   return {
@@ -75,8 +101,8 @@ async function getDashboardData() {
       estoqueDisponivel: estoqueDisponivel ?? 0,
       assistenciasAbertas: assistenciasAbertas ?? 0,
     },
-    vendasRecentes: vendasRecentes ?? [],
-    leadsRecentes: leadsRecentes ?? [],
+    vendasRecentes,
+    leadsRecentes,
   }
 }
 
