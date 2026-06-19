@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, ShoppingCart, Package, Wrench,
-  Truck, Wallet, BarChart3, Settings, LogOut, MessageCircle, Building2,
+  Truck, Wallet, BarChart3, Settings, LogOut, MessageCircle,
+  Building2, CreditCard,
 } from 'lucide-react'
 
 const navGroups = [
@@ -21,21 +22,21 @@ const navGroups = [
   {
     label: 'Operações',
     items: [
-      { href: '/pdv',        label: 'PDV',         icon: ShoppingCart },
-      { href: '/clientes',   label: 'Clientes',    icon: Users },
-      { href: '/estoque',    label: 'Estoque',      icon: Package },
-      { href: '/assistencia',label: 'Assistência', icon: Wrench },
-      { href: '/compras',    label: 'Compras',      icon: Truck },
+      { href: '/pdv',         label: 'PDV',          icon: ShoppingCart },
+      { href: '/clientes',    label: 'Clientes',     icon: Users },
+      { href: '/estoque',     label: 'Estoque',      icon: Package },
+      { href: '/assistencia', label: 'Assistência',  icon: Wrench },
+      { href: '/compras',     label: 'Compras',      icon: Truck },
     ],
   },
   {
     label: 'Gestão',
     items: [
-      { href: '/financeiro',  label: 'Financeiro',      icon: Wallet },
-      { href: '/relatorios',  label: 'Relatórios / BI', icon: BarChart3 },
-      { href: '/configuracoes',label: 'Configurações',  icon: Settings },
-      { href: '/empresa',     label: 'Minha empresa',   icon: Building2 },
-      { href: '/planos',      label: 'Planos',           icon: CreditCard },
+      { href: '/financeiro',   label: 'Financeiro',      icon: Wallet },
+      { href: '/relatorios',   label: 'Relatórios / BI', icon: BarChart3 },
+      { href: '/configuracoes',label: 'Configurações',   icon: Settings },
+      { href: '/empresa',      label: 'Minha empresa',   icon: Building2 },
+      { href: '/planos',       label: 'Planos',          icon: CreditCard },
     ],
   },
 ]
@@ -66,13 +67,12 @@ export function Sidebar({
     router.push('/login')
   }
 
-  // Iniciais da empresa para o avatar
   const iniciais = (userEmpresa ?? userName).slice(0, 2).toUpperCase()
 
   return (
     <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-gradient dark:bg-[linear-gradient(180deg,#0C1526_0%,#0A1120_100%)] shrink-0">
 
-      {/* Brand — white-label */}
+      {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-[22px] border-b border-white/[0.05]">
         {empresaLogo ? (
           <div className="w-[46px] h-[46px] rounded-[13px] bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
@@ -121,7 +121,6 @@ export function Sidebar({
                     )}
                     style={isActive ? { background: `${empresaCor}18` } : {}}
                   >
-                    {/* Active bar */}
                     <span
                       className={cn(
                         'absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200',
