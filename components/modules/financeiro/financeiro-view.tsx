@@ -109,8 +109,8 @@ export function FinanceiroView({ lancamentos: initial, categorias, vendasMes }: 
     }
     setSaving(true)
     const payload = {
-      tipo: selecionado.tipo,
-      descricao: selecionado.descricao,
+      tipo: selecionado.tipo as 'receita' | 'despesa',
+      descricao: selecionado.descricao as string,
       valor: Number(selecionado.valor),
       data_venc: selecionado.data_venc,
       data_pgto: selecionado.data_pgto || null,
