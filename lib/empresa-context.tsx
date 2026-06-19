@@ -18,6 +18,10 @@ export interface Empresa {
   limite_usuarios: number
   limite_leads: number
   trial_ends_at: string | null
+  // Stripe
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  stripe_status: string | null
 }
 
 interface EmpresaContextType {
@@ -42,7 +46,6 @@ export function EmpresaProvider({ children }: { children: ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      // Busca empresa via vínculo usuario ↔ empresa
       const { data } = await supabase
         .from('empresa_usuarios')
         .select('empresa:empresas(*)')
@@ -53,8 +56,6 @@ export function EmpresaProvider({ children }: { children: ReactNode }) {
       if (data?.empresa) {
         const emp = data.empresa as unknown as Empresa
         setEmpresa(emp)
-
-        // Aplica white-label: cor primária
         if (emp.wl_cor) {
           document.documentElement.style.setProperty('--color-primary', emp.wl_cor)
         }
@@ -79,7 +80,6 @@ export function useEmpresa() {
   return useContext(EmpresaContext)
 }
 
-// Helper: verifica se o plano tem acesso a um módulo
 export function temAcesso(plano: Plano | undefined, modulo: 'bi' | 'multi_usuario' | 'api' | 'white_label'): boolean {
   const matriz: Record<typeof modulo, Plano[]> = {
     bi:            ['starter', 'pro'],
