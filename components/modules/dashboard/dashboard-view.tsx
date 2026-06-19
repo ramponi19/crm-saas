@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, TrendingDown, AlertTriangle, Package, Users, Zap } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
-import { useAnimatedNumber } from '@/lib/use-animated-number'
+import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { cn } from '@/lib/utils'
 
 interface Kpis {
@@ -55,18 +55,6 @@ const PERIOD_LABELS: Record<string, string> = {
   '30d': 'últimos 30 dias',
   mes: 'este mês',
   ano: 'este ano',
-}
-
-// ── Valor monetário animado ──
-function AnimatedCurrency({ value, className }: { value: number; className?: string }) {
-  const animated = useAnimatedNumber(value)
-  return <span className={className}>{formatCurrency(animated)}</span>
-}
-
-// ── Inteiro animado ──
-function AnimatedInt({ value, className }: { value: number; className?: string }) {
-  const animated = useAnimatedNumber(value)
-  return <span className={className}>{Math.round(animated)}</span>
 }
 
 function KpiCard({
