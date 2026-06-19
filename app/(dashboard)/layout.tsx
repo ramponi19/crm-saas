@@ -15,19 +15,19 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Buscar dados do usuário e contagem de leads
-  const [{ data: usuario }, { count: leadsCount }] = await Promise.all([
-    supabase
-      .from('usuarios')
-      .select('nome, role')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('ativo', true)
-      .eq('kanban_status', 'novo'),
-  ])
+  const { data: usuarioRaw } = await supabase
+    .from('usuarios')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  const { count: leadsCount } = await supabase
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+    .eq('ativo', true)
+    .eq('kanban_status', 'novo')
+
+  const usuario = usuarioRaw as { nome: string; role: string } | null
 
   return (
     <div className="flex h-screen bg-[#0A111E] overflow-hidden">

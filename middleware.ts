@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
+  const supabase = createServerClient<any>( // eslint-disable-line @typescript-eslint/no-explicit-any
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -26,12 +26,10 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
                       request.nextUrl.pathname.startsWith('/register')
 
-  // Não autenticado tentando acessar área protegida
   if (!user && !isAuthRoute && request.nextUrl.pathname !== '/') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Autenticado tentando acessar login → redireciona pro dashboard
   if (user && isAuthRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
