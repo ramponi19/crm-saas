@@ -1,31 +1,39 @@
 import Stripe from 'stripe'
 
-// Cliente Stripe (server-side only)
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
-  typescript: true,
-})
+// ─── Lazy client — só instancia quando chamado, não no build ─
+let _stripe: Stripe | null = null
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY não configurada')
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-05-28.basil',
+      typescript: true,
+    })
+  }
+  return _stripe
+}
 
 // ─── IDs dos produtos/preços no Stripe ───────────────────────
-// Após criar os produtos no Stripe Dashboard, cole os Price IDs aqui
-// ou defina as env vars STRIPE_PRICE_STARTER e STRIPE_PRICE_PRO
 export const PLANOS = {
   free: {
     nome: 'Free',
     preco: 0,
-    priceId: null,
+    priceId: null as string | null,
     limites: { usuarios: 1, leads: 100 },
   },
   starter: {
     nome: 'Starter',
-    preco: 19700, // em centavos = R$ 197,00
-    priceId: process.env.STRIPE_PRICE_STARTER ?? '',
+    preco: 19700,
+    get priceId() { return process.env.STRIPE_PRICE_STARTER ?? '' },
     limites: { usuarios: 3, leads: 500 },
   },
   pro: {
     nome: 'Pro',
-    preco: 39700, // em centavos = R$ 397,00
-    priceId: process.env.STRIPE_PRICE_PRO ?? '',
+    preco: 39700,
+    get priceId() { return process.env.STRIPE_PRICE_PRO ?? '' },
     limites: { usuarios: 999, leads: 99999 },
   },
 } as const
@@ -34,7 +42,6 @@ export type PlanoId = keyof typeof PLANOS
 
 // ─── Criar ou recuperar customer Stripe ──────────────────────
 export async function getOrCreateCustomer(empresaId: number, nome: string, email: string) {
-  // Busca no banco se já tem customer_id
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
@@ -44,18 +51,17 @@ export async function getOrCreateCustomer(empresaId: number, nome: string, email
     .eq('id', empresaId)
     .single()
 
-  if (empresa?.stripe_customer_id) {
-    return empresa.stripe_customer_id
+  if ((empresa as unknown as { stripe_customer_id: string | null })?.stripe_customer_id) {
+    return (empresa as unknown as { stripe_customer_id: string }).stripe_customer_id
   }
 
-  // Cria novo customer no Stripe
+  const stripe = getStripe()
   const customer = await stripe.customers.create({
     name: nome,
     email,
     metadata: { empresa_id: String(empresaId) },
   })
 
-  // Salva no banco
   await supabase
     .from('empresas')
     .update({ stripe_customer_id: customer.id })
