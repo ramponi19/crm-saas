@@ -5,6 +5,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, TrendingDown, AlertTriangle, Package, Users, Zap } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
 import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
+import { AreaChart } from '@/components/ui/area-chart'
 import { cn } from '@/lib/utils'
 
 interface Kpis {
@@ -103,9 +104,85 @@ function KpiCard({
   )
 }
 
+
+// ── Donut simples de vendas por canal ──
+const CANAL_COLORS: Record<string, { color: string; label: string }> = {
+  whatsapp:    { color: '#34D399', label: 'WhatsApp' },
+  instagram:   { color: '#F0454D', label: 'Instagram' },
+  loja_fisica: { color: '#AEB8C6', label: 'Loja física' },
+  site:        { color: '#7FB0E8', label: 'Site' },
+}
+
+function DonutCanais({ vendasRecentes }: { vendasRecentes: Array<{ canal_venda: string | null }> }) {
+  // Conta por canal
+  const counts: Record<string, number> = {}
+  vendasRecentes.forEach(v => {
+    const canal = v.canal_venda ?? 'loja_fisica'
+    counts[canal] = (counts[canal] ?? 0) + 1
+  })
+  const total = Object.values(counts).reduce((s, v) => s + v, 0)
+  if (total === 0) {
+    return (
+      <div className="text-center py-8 text-[#5C6E84] text-[13px]">
+        Sem dados de canal ainda.
+      </div>
+    )
+  }
+
+  const segs = Object.entries(counts).map(([canal, count]) => ({
+    canal,
+    count,
+    pct: Math.round((count / total) * 100),
+    color: CANAL_COLORS[canal]?.color ?? '#6B7C92',
+    label: CANAL_COLORS[canal]?.label ?? canal,
+  }))
+
+  // SVG donut
+  const R = 52, cx = 70, cy = 70
+  const C = 2 * Math.PI * R
+  let offset = 0
+  const rings = segs.map((s, i) => {
+    const len = C * s.pct / 100
+    const el = (
+      <circle
+        key={i} cx={cx} cy={cy} r={R}
+        fill="none" stroke={s.color} strokeWidth={15}
+        strokeDasharray={`${len} ${C - len}`}
+        strokeDashoffset={-offset}
+        transform={`rotate(-90 ${cx} ${cy})`}
+      />
+    )
+    offset += len
+    return el
+  })
+
+  return (
+    <div className="flex items-center gap-[18px]">
+      <svg width={140} height={140} viewBox="0 0 140 140" style={{ flex: 'none' }}>
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={15} />
+        {rings}
+        <text x={cx} y={cy - 3} textAnchor="middle" fill="#F4F6F9" fontSize={23}
+          fontFamily="Fraunces, serif" fontWeight={600}>{total}</text>
+        <text x={cx} y={cy + 15} textAnchor="middle" fill="#5C6E84" fontSize={9}
+          fontFamily="JetBrains Mono, monospace" letterSpacing="1.5">VENDAS</text>
+      </svg>
+      <div className="flex flex-col gap-[13px] flex-1">
+        {segs.map((s, i) => (
+          <div key={i} className="flex items-center gap-[10px]">
+            <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s.color }} />
+            <span className="text-[13px] text-[#9FB0C2] flex-1">{s.label}</span>
+            <span className="text-[13px] text-[#EEF2F7] font-bold font-mono">{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
+  const [faturamentoMensal, setFaturamentoMensal] = useState<Array<{ mes: string; total: number }>>([])
   const [globais, setGlobais] = useState({
     totalClientes: initialData.kpis.totalClientes,
     leadsAtivos: initialData.kpis.leadsAtivos,
@@ -125,6 +202,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         setPeriodsData(json.periods)
         setGlobais(json.globais)
         setVendasRecentes(json.vendasRecentes)
+        if (json.faturamentoMensal) setFaturamentoMensal(json.faturamentoMensal)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -242,7 +320,32 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
             ))}
           </div>
 
-          {/* ── FUNIL + VENDAS RECENTES ── */}
+          {/* ── CHARTS ROW A: Gráfico área + Donut ── */}
+          <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.85fr 1fr' }}>
+
+            {/* Tendência de faturamento */}
+            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '350ms' }}>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESEMPENHO</div>
+                  <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Tendência de faturamento</h3>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] font-mono text-[10.5px] text-[#9FB0C2]">
+                  12 MESES
+                </div>
+              </div>
+              <AreaChart data={faturamentoMensal} />
+            </div>
+
+            {/* Vendas por canal (donut simples) */}
+            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '420ms' }}>
+              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ORIGEM</div>
+              <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-[22px]">Vendas por canal</h3>
+              <DonutCanais vendasRecentes={vendasRecentes} />
+            </div>
+          </div>
+
+          {/* ── CHARTS ROW B: Funil + Vendas recentes ── */}
           <div className="grid grid-cols-[1fr_1.1fr] gap-[18px]">
 
             {/* Funil */}
