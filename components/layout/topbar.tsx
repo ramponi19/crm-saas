@@ -1,7 +1,8 @@
 'use client'
 
-import { Bell, Search, Sun, Moon, Monitor } from 'lucide-react'
+import { Bell, Search, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface TopbarProps {
@@ -13,9 +14,9 @@ interface TopbarProps {
 }
 
 const periods = [
-  { value: '7d', label: '7 dias' },
-  { value: 'mes', label: 'Este mês' },
-  { value: 'ano', label: 'Este ano' },
+  { value: '7d',   label: '7 dias' },
+  { value: 'mes',  label: 'Este mês' },
+  { value: 'ano',  label: 'Este ano' },
   { value: 'tudo', label: 'Tudo' },
 ]
 
@@ -26,15 +27,15 @@ export function Topbar({
   activePeriod = 'mes',
   onPeriodChange,
 }: TopbarProps) {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
-  const cycleTheme = () => {
-    if (theme === 'dark') setTheme('light')
-    else if (theme === 'light') setTheme('system')
-    else setTheme('dark')
+  // Evita hydration mismatch — só renderiza ícone correto no client
+  useEffect(() => { setMounted(true) }, [])
+
+  function toggleTheme() {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
   }
-
-  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
 
   return (
     <header className="flex items-center gap-5 px-[30px] py-4 border-b border-white/[0.06] bg-[rgba(10,17,30,0.6)] backdrop-blur-md shrink-0 z-10">
@@ -82,13 +83,17 @@ export function Topbar({
         />
       </div>
 
-      {/* Theme toggle */}
+      {/* Theme toggle — só mostra após montar para evitar flash */}
       <button
-        onClick={cycleTheme}
-        className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] transition-colors"
-        title="Alternar tema"
+        onClick={toggleTheme}
+        className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] hover:text-[#F4F6F9] transition-all"
+        title={mounted && resolvedTheme === 'dark' ? 'Mudar para claro' : 'Mudar para escuro'}
       >
-        <ThemeIcon size={18} />
+        {mounted && resolvedTheme === 'dark' ? (
+          <Moon size={18} />
+        ) : (
+          <Sun size={18} />
+        )}
       </button>
 
       {/* Notifications */}
