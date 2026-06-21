@@ -2,15 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import {
-  DndContext,
-  DragEndEvent,
-  DragOverEvent,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  closestCorners,
+  DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
+  PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
 } from '@dnd-kit/core'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, KanbanStatus, KANBAN_COLUMNS } from './types'
@@ -26,19 +19,12 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate }: KanbanBoardProps) {
-  const [activeId, setActiveId] = useState<number | null>(null)
-  const [localLeads, setLocalLeads] = useState<Lead[]>(leads)
+  const [activeId,    setActiveId]    = useState<number | null>(null)
+  const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
 
-  // Sync when parent filter changes
-  if (leads !== localLeads && !activeId) {
-    setLocalLeads(leads)
-  }
+  if (leads !== localLeads && !activeId) setLocalLeads(leads)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const getLeadsByStatus = useCallback(
     (status: KanbanStatus) => localLeads.filter(l => (l.kanban_status ?? 'novo') === status),
@@ -46,84 +32,48 @@ export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate }: Kanb
   )
 
   const activeLead = activeId ? localLeads.find(l => l.id === activeId) : null
+  const activeCol  = KANBAN_COLUMNS.find(c => c.id === (activeLead?.kanban_status ?? 'novo'))
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as number)
-  }
+  function handleDragStart(event: DragStartEvent) { setActiveId(event.active.id as number) }
 
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event
     if (!over) return
-
     const activeLeadId = active.id as number
-    const overStatus = over.data.current?.status as KanbanStatus | undefined
-    const overLeadId = over.data.current?.leadId as number | undefined
-
+    const overStatus   = over.data.current?.status as KanbanStatus | undefined
+    const overLeadId   = over.data.current?.leadId as number | undefined
     if (!overStatus && !overLeadId) return
-
     const targetStatus = overStatus ?? localLeads.find(l => l.id === overLeadId)?.kanban_status
-
     if (!targetStatus) return
-
-    setLocalLeads(prev =>
-      prev.map(l =>
-        l.id === activeLeadId
-          ? { ...l, kanban_status: targetStatus }
-          : l
-      )
-    )
+    setLocalLeads(prev => prev.map(l => l.id === activeLeadId ? { ...l, kanban_status: targetStatus } : l))
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveId(null)
-
-    if (!over) {
-      // Snap back — reset to original
-      setLocalLeads(leads)
-      return
-    }
-
+    if (!over) { setLocalLeads(leads); return }
     const leadId = active.id as number
-    const lead = localLeads.find(l => l.id === leadId)
+    const lead   = localLeads.find(l => l.id === leadId)
     if (!lead) return
-
     const originalStatus = leads.find(l => l.id === leadId)?.kanban_status
     if (lead.kanban_status === originalStatus) return
-
-    // Persist
     const supabase = createClient()
     const { error } = await supabase
       .from('leads')
-      .update({
-        kanban_status: lead.kanban_status,
-        data_transferencia_funil: new Date().toISOString(),
-      })
+      .update({ kanban_status: lead.kanban_status, data_transferencia_funil: new Date().toISOString() })
       .eq('id', leadId)
-
-    if (error) {
-      toast.error('Erro ao mover lead')
-      setLocalLeads(leads)
-      return
-    }
-
+    if (error) { toast.error('Erro ao mover lead'); setLocalLeads(leads); return }
     onLeadUpdate(lead)
     toast.success(`Lead movido para ${lead.kanban_status}`)
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 h-full overflow-x-auto px-6 py-4">
+    <DndContext sensors={sensors} collisionDetection={closestCorners}
+      onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+      <div className="flex gap-4 h-full overflow-x-auto px-[30px] py-4 pb-6">
         {KANBAN_COLUMNS.map(col => (
           <KanbanColumn
-            key={col.id}
-            column={col}
+            key={col.id} column={col}
             leads={getLeadsByStatus(col.id)}
             usuarios={usuarios}
             isDragging={activeId !== null}
@@ -131,16 +81,10 @@ export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate }: Kanb
           />
         ))}
       </div>
-
       <DragOverlay>
-        {activeLead && (
-          <div className="rotate-2 opacity-90 scale-105">
-            <LeadCard
-              lead={activeLead}
-              usuarios={usuarios}
-              onClick={() => {}}
-              isDragging
-            />
+        {activeLead && activeCol && (
+          <div className="rotate-1 opacity-90 scale-105">
+            <LeadCard lead={activeLead} usuarios={usuarios} onClick={() => {}} isDragging barColor={activeCol.color} />
           </div>
         )}
       </DragOverlay>
