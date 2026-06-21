@@ -73,21 +73,19 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
       onClick={onClick} className="cursor-pointer select-none">
       <div
-        className={`rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] ${temMsgs ? 'animate-[unreadPulse_2s_ease-in-out_infinite]' : ''}`}
+        className="rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] border border-white/[0.06]"
         style={{
           background: '#122036',
-          border: temMsgs ? '1px solid rgba(240,101,107,0.7)' : '1px solid rgba(255,255,255,0.06)',
           borderLeft: `3px solid ${barColor}`,
-          boxShadow: temMsgs ? '0 0 0 1px rgba(240,101,107,0.25), 0 0 16px rgba(240,101,107,0.18)' : 'none',
           opacity: isSortableDragging || isDragging ? 0.4 : 1,
         }}
       >
         {/* Linha 1: badge msgs + nome + ícone origem */}
         <div className="flex items-center gap-[9px] mb-[7px]">
           {temMsgs && (
-            <span className="w-[24px] h-[24px] rounded-full flex items-center justify-center text-[10.5px] font-bold text-white flex-none"
-              style={{ background: slaColor }}>
-              {(lead.msgs_nao_lidas ?? 0) > 9 ? '9+' : lead.msgs_nao_lidas}
+            <span className="min-w-[22px] h-[22px] px-[6px] rounded-full flex items-center justify-center font-mono text-[11px] font-bold text-white flex-none"
+              style={{ background: '#D7282F' }}>
+              {(lead.msgs_nao_lidas ?? 0) > 99 ? '99+' : lead.msgs_nao_lidas}
             </span>
           )}
           <div className="flex-1 text-[14px] font-semibold text-[#E9EEF4] truncate">
