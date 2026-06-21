@@ -1,5 +1,4 @@
 import { Sidebar } from '@/components/layout/sidebar'
-import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { redirect } from 'next/navigation'
@@ -55,7 +54,6 @@ export default async function DashboardLayout({
           empresaLogo={empresa?.wl_logo_url ?? null}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Topbar />
           {children}
         </div>
       </div>
