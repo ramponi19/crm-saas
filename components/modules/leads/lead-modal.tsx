@@ -189,7 +189,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
                 <button
                   onClick={() => setEditingStatus(!editingStatus)}
                   disabled={savingStatus}
-                  className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${col?.bgColor} ${col?.color} hover:opacity-80 transition-opacity`}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full hover:opacity-80 transition-opacity" style={{ background: col ? col.color + '22' : undefined, color: col?.color }}
                 >
                   {col?.label}
                   <ChevronDown className="w-3 h-3" />
@@ -201,7 +201,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
                       <button
                         key={c.id}
                         onClick={() => handleStatusChange(c.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[hsl(var(--muted))] transition-colors ${c.color}`}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.05] transition-colors" style={{ color: c.color }}
                       >
                         {c.label}
                       </button>
