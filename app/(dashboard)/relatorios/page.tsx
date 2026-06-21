@@ -4,61 +4,44 @@ import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 
 export const metadata = { title: 'Relatórios' }
 
-async function getRelatoriosData() {
+export default async function RelatoriosPage() {
   const supabase = await createClient()
 
-  const hoje = new Date()
-  const ano = hoje.getFullYear()
-  const inicioAno = `${ano}-01-01`
-  const fimAno    = `${ano}-12-31`
-
-  const [vendasRes, lancamentosRes, leadsPorStatusRes, estoqueRes, osRes] = await Promise.all([
+  const [
+    { data: vendasRaw },
+    { data: lancamentos },
+    { data: vendedoresRaw },
+  ] = await Promise.all([
     supabase
       .from('vendas')
-      .select('valor_venda, data_venda, forma_pagamento, canal_venda, status, lucro_bruto')
-      .gte('data_venda', inicioAno)
-      .lte('data_venda', fimAno)
-      .eq('status', 'concluida'),
-
+      .select('id, data_venda, valor_venda, desconto_valor, lucro, forma_pagamento, canal_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome), usuarios!vendedor_id(nome)')
+      .order('data_venda', { ascending: false })
+      .limit(500),
     supabase
       .from('lancamentos_financeiros')
-      .select('tipo, valor, data_venc, status, categoria')
-      .gte('data_venc', inicioAno)
-      .lte('data_venc', fimAno),
-
-    supabase
-      .from('leads')
-      .select('status, created_at'),
-
-    supabase
-      .from('estoque')
-      .select('preco_venda, preco_custo, status')
-      .eq('status', 'disponivel'),
-
-    supabase
-      .from('ordens_servico')
-      .select('orcamento_valor, status, data_entrada')
-      .gte('data_entrada', inicioAno),
+      .select('id, data_venc, descricao, categoria, tipo, valor, status')
+      .order('data_venc', { ascending: false })
+      .limit(200),
+    supabase.from('usuarios').select('nome').eq('ativo', true),
   ])
 
-  return {
-    vendas: vendasRes.data ?? [],
-    lancamentos: lancamentosRes.data ?? [],
-    leads: leadsPorStatusRes.data ?? [],
-    estoque: estoqueRes.data ?? [],
-    ordensServico: osRes.data ?? [],
-  }
-}
+  const vendas = (vendasRaw ?? []).map((v: any) => ({
+    ...v,
+    cliente_nome:  v.clientes?.nome  ?? null,
+    produto_nome:  v.produtos?.nome  ?? null,
+    vendedor_nome: v.usuarios?.nome  ?? null,
+  }))
 
-export default async function RelatoriosPage() {
-  const data = await getRelatoriosData()
+  const vendedores = (vendedoresRaw ?? []).map((u: any) => u.nome as string)
 
   return (
-    <div className="flex flex-col h-full">
-      <Topbar eyebrow="ANALYTICS" title="Relatórios / BI" />
-      <div className="flex-1 overflow-auto">
-        <RelatoriosView {...data} />
-      </div>
-    </div>
+    <>
+      <Topbar eyebrow="GESTÃO · INTELIGÊNCIA" title="Relatórios / BI" />
+      <RelatoriosView
+        vendas={vendas}
+        lancamentos={lancamentos ?? []}
+        vendedores={vendedores}
+      />
+    </>
   )
 }
