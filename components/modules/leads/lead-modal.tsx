@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Send, UserRound, UserCheck, Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, KANBAN_COLUMNS, STATUS_LABELS } from './types'
@@ -43,6 +43,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
   const [chat, setChat] = useState<ChatMsg[]>([])
   const [loadingChat, setLoadingChat] = useState(true)
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Busca mensagens reais de lead_mensagens
   useEffect(() => {
@@ -62,6 +63,8 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
       }))
       setChat(msgs)
       setLoadingChat(false)
+      // Rola para a última mensagem após renderizar
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       // Marca como lidas + zera contador do lead
       if ((lead.msgs_nao_lidas ?? 0) > 0) {
         await supabase.from('lead_mensagens').update({ lida: true }).eq('lead_id', lead.id).eq('lida', false)
@@ -73,6 +76,11 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
     return () => { cancel = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id])
+
+  // Mantém o scroll no fim quando novas mensagens entram
+  useEffect(() => {
+    if (!loadingChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chat.length, loadingChat])
 
   async function sendMsg() {
     const t = draft.trim(); if (!t) return
@@ -236,6 +244,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
                   </div>
                 )
               })}
+              <div ref={chatEndRef} />
             </div>
             <div className="flex gap-2 px-5 py-[14px] border-t border-white/[0.06]">
               <input value={draft} onChange={e => setDraft(e.target.value)}
