@@ -151,7 +151,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
                 className="mt-1 w-full text-sm rounded-lg border border-[hsl(var(--crm-border))] bg-[hsl(var(--crm-surface))] text-[hsl(var(--crm-text-primary))] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--crm-brand))]/20"
               >
                 {KANBAN_COLUMNS.map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                  <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
               </select>
             </div>
