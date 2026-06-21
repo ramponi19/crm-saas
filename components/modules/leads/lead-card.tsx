@@ -112,7 +112,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
 
         {/* Linha 3: valor + avatar responsável */}
         <div className="flex items-center justify-between mt-[11px]">
-          <span className="text-[13.5px] font-bold text-[#F0656B]">
+          <span className="text-[13.5px] font-bold text-[#F4F6F9]">
             {lead.valor_estimado
               ? lead.valor_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
               : '—'}
