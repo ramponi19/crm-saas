@@ -1,365 +1,381 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Users, Package, Wrench, BarChart3, PieChart, Activity } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Search, Download, Plus } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 
 interface Venda {
-  valor_venda: number
+  id: number
   data_venda: string | null
-  forma_pagamento: string | null
+  cliente_nome: string | null
+  produto_nome: string | null
+  vendedor_nome: string | null
   canal_venda: string | null
+  valor_venda: number
+  desconto_valor: number | null
+  lucro: number | null
+  forma_pagamento: string | null
   status: string | null
-  lucro_bruto: number | null
 }
 
 interface Lancamento {
+  id: number
+  data_venc: string
+  descricao: string | null
+  categoria: string | null
   tipo: string
   valor: number
-  data_venc: string
   status: string
-  categoria: string | null
-}
-
-interface Lead {
-  status: string
-  created_at: string
-}
-
-interface EstoqueItem {
-  preco_venda: number | null
-  preco_custo: number | null
-  status: string
-}
-
-interface OS {
-  orcamento_valor: number | null
-  status: string
-  data_entrada: string
 }
 
 interface Props {
   vendas: Venda[]
   lancamentos: Lancamento[]
-  leads: Lead[]
-  estoque: EstoqueItem[]
-  ordensServico: OS[]
+  vendedores: string[]
 }
 
-const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-
-const CANAL_LABEL: Record<string,string> = {
-  loja_fisica:'Loja física', whatsapp:'WhatsApp', instagram:'Instagram',
-  marketplace:'Marketplace', indicacao:'Indicação',
+const CANAL_LABEL: Record<string, string> = {
+  loja_fisica: 'Loja física', whatsapp: 'WhatsApp',
+  instagram: 'Instagram', site: 'Site', link: 'Link',
 }
 
-const PGTO_LABEL: Record<string,string> = {
-  pix:'Pix', dinheiro:'Dinheiro', credito:'Crédito', debito:'Débito',
-  transferencia:'Transferência', fiado:'Fiado',
+const TABS = [
+  { id: 'vendas',     label: 'Vendas',     icon: '📊' },
+  { id: 'financeiro', label: 'Financeiro', icon: '💰' },
+  { id: 'estoque',    label: 'Estoque',    icon: '📦' },
+  { id: 'leads',      label: 'Leads',      icon: '🎯' },
+]
+
+function exportCSV(rows: Venda[]) {
+  const header = 'Data,Cliente,Produto,Vendedor,Canal,Valor,Desconto,Lucro'
+  const lines = rows.map(v => [
+    v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
+    v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
+    CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
+    v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
+  ].join(','))
+  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = `vendas_${new Date().toISOString().slice(0,10)}.csv`; a.click()
 }
 
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? (value / max) * 100 : 0
+// Gráfico de barras SVG — vendas por dia
+function BarChart({ vendas }: { vendas: Venda[] }) {
+  const today = new Date()
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today); d.setDate(d.getDate() - (6 - i))
+    const key = d.toISOString().slice(0, 10)
+    const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const total = vendas
+      .filter(v => v.data_venda?.startsWith(key) && v.status === 'concluida')
+      .reduce((s, v) => s + v.valor_venda, 0)
+    return { label, total }
+  })
+  const maxVal = Math.max(...days.map(d => d.total), 1)
+  const W = 700, H = 160, pb = 28, pt = 10
+  const barW = 48, gap = (W - days.length * barW) / (days.length + 1)
+
   return (
-    <div className="w-full bg-white/[0.04] rounded-full h-2 overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-700"
-        style={{ width: `${pct}%`, background: color }}
-      />
-    </div>
+    <svg viewBox={`0 0 ${W} ${H + pb}`} width="100%" style={{ display: 'block' }}>
+      {days.map((d, i) => {
+        const x = gap + i * (barW + gap)
+        const barH = Math.max(((d.total / maxVal) * H) - pt, d.total > 0 ? 4 : 0)
+        const y = pt + (H - barH)
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={barH}
+              rx={6} fill={d.total > 0 ? 'url(#bg)' : 'rgba(255,255,255,0.04)'} />
+            {d.total > 0 && (
+              <text x={x + barW / 2} y={y - 6} textAnchor="middle"
+                fill="#9FB0C2" fontSize={9} fontFamily="JetBrains Mono, monospace">
+                {formatCurrency(d.total).replace('R$\u00a0', '')}
+              </text>
+            )}
+            <text x={x + barW / 2} y={H + pb - 4} textAnchor="middle"
+              fill="#4F6178" fontSize={10} fontFamily="JetBrains Mono, monospace">
+              {d.label}
+            </text>
+          </g>
+        )
+      })}
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F0454D" stopOpacity={0.9} />
+          <stop offset="100%" stopColor="#8E1B20" stopOpacity={0.7} />
+        </linearGradient>
+      </defs>
+    </svg>
   )
 }
 
-export function RelatoriosView({ vendas, lancamentos, leads, estoque, ordensServico }: Props) {
-  const [aba, setAba] = useState<'vendas' | 'financeiro' | 'canais' | 'leads'>('vendas')
+export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
+  const [aba, setAba]         = useState('vendas')
+  const [dataIni, setDataIni] = useState(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10)
+  })
+  const [dataFim, setDataFim] = useState(() => new Date().toISOString().slice(0, 10))
+  const [vendedor, setVendedor] = useState('Todos')
 
-  // ── Vendas por mês
-  const vendasPorMes = useMemo(() => {
-    const map: Record<number, { receita: number; lucro: number; qtd: number }> = {}
-    for (let i = 0; i < 12; i++) map[i] = { receita: 0, lucro: 0, qtd: 0 }
-    vendas.forEach(v => {
-      if (!v.data_venda) return
-      const mes = new Date(v.data_venda).getMonth()
-      map[mes].receita += v.valor_venda
-      map[mes].lucro   += v.lucro_bruto ?? 0
-      map[mes].qtd     += 1
-    })
-    return Object.entries(map).map(([m, d]) => ({ mes: MESES[Number(m)], ...d }))
-  }, [vendas])
+  const vendasFiltradas = useMemo(() => vendas.filter(v => {
+    if (!v.data_venda) return false
+    const d = v.data_venda.slice(0, 10)
+    if (d < dataIni || d > dataFim) return false
+    if (vendedor !== 'Todos' && v.vendedor_nome !== vendedor) return false
+    return true
+  }), [vendas, dataIni, dataFim, vendedor])
 
-  const maxReceita = Math.max(...vendasPorMes.map(m => m.receita), 1)
+  const kpis = useMemo(() => {
+    const concluidas = vendasFiltradas.filter(v => v.status === 'concluida')
+    const receita    = concluidas.reduce((s, v) => s + v.valor_venda, 0)
+    const lucro      = concluidas.reduce((s, v) => s + (v.lucro ?? 0), 0)
+    const qtd        = concluidas.length
+    const ticket     = qtd > 0 ? receita / qtd : 0
+    const margem     = receita > 0 ? (lucro / receita) * 100 : 0
+    return [
+      { l: 'FATURAMENTO',   v: formatCurrency(receita), c: '#34D399' },
+      { l: 'LUCRO BRUTO',   v: formatCurrency(lucro),   c: '#7FB0E8' },
+      { l: 'QTD VENDAS',    v: String(qtd),             c: '#F4B740' },
+      { l: 'TICKET MÉDIO',  v: formatCurrency(ticket),  c: '#F0656B' },
+      { l: 'MARGEM',        v: `${margem.toFixed(1)}%`, c: '#C6A86A' },
+    ]
+  }, [vendasFiltradas])
 
-  // ── Lancamentos pagos por mês
-  const lancPorMes = useMemo(() => {
-    const map: Record<number, { receitas: number; despesas: number }> = {}
-    for (let i = 0; i < 12; i++) map[i] = { receitas: 0, despesas: 0 }
-    lancamentos.filter(l => l.status === 'pago').forEach(l => {
-      const mes = new Date(l.data_venc + 'T00:00:00').getMonth()
-      if (l.tipo === 'receita') map[mes].receitas += l.valor
-      else map[mes].despesas += l.valor
-    })
-    return Object.entries(map).map(([m, d]) => ({ mes: MESES[Number(m)], ...d, saldo: d.receitas - d.despesas }))
-  }, [lancamentos])
+  // Lançamentos do mês corrente
+  const mesAtual = new Date().toISOString().slice(0, 7)
+  const lancMes   = lancamentos.filter(l => l.data_venc.startsWith(mesAtual))
+  const entradas  = lancMes.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
+  const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
+  const saldo     = entradas - saidas
 
-  const maxLanc = Math.max(...lancPorMes.map(m => Math.max(m.receitas, m.despesas)), 1)
-
-  // ── Por canal
-  const porCanal = useMemo(() => {
-    const map: Record<string, number> = {}
-    vendas.forEach(v => {
-      const k = v.canal_venda ?? 'outros'
-      map[k] = (map[k] ?? 0) + v.valor_venda
-    })
-    const total = Object.values(map).reduce((s,v) => s+v, 0)
-    return Object.entries(map)
-      .sort((a,b) => b[1]-a[1])
-      .map(([canal, valor]) => ({ canal, valor, pct: total > 0 ? (valor/total)*100 : 0 }))
-  }, [vendas])
-
-  // ── Por forma pgto
-  const porPgto = useMemo(() => {
-    const map: Record<string, number> = {}
-    vendas.forEach(v => {
-      const k = v.forma_pagamento ?? 'outros'
-      map[k] = (map[k] ?? 0) + v.valor_venda
-    })
-    const total = Object.values(map).reduce((s,v) => s+v, 0)
-    return Object.entries(map)
-      .sort((a,b) => b[1]-a[1])
-      .map(([pgto, valor]) => ({ pgto, valor, pct: total > 0 ? (valor/total)*100 : 0 }))
-  }, [vendas])
-
-  // ── Leads por status
-  const leadsPorStatus = useMemo(() => {
-    const map: Record<string, number> = {}
-    leads.forEach(l => { map[l.status] = (map[l.status] ?? 0) + 1 })
-    return Object.entries(map).sort((a,b) => b[1]-a[1])
-  }, [leads])
-
-  const totalLeads = leads.length
-  const leadsConvertidos = leads.filter(l => l.status === 'convertido').length
-  const taxaConversao = totalLeads > 0 ? (leadsConvertidos / totalLeads) * 100 : 0
-
-  // ── KPIs gerais
-  const totalReceita = vendas.reduce((s,v) => s + v.valor_venda, 0)
-  const totalLucro   = vendas.reduce((s,v) => s + (v.lucro_bruto ?? 0), 0)
-  const ticketMedio  = vendas.length > 0 ? totalReceita / vendas.length : 0
-  const valorEstoque = estoque.reduce((s,e) => s + (e.preco_venda ?? 0), 0)
-  const custoEstoque = estoque.reduce((s,e) => s + (e.preco_custo ?? 0), 0)
-  const osReceita    = ordensServico.filter(o => o.status === 'concluida').reduce((s,o) => s + (o.orcamento_valor ?? 0), 0)
-
-  const CANAL_COLORS = ['#6B8CFF','#34D399','#F59E0B','#F0353D','#EC4899','#8B5CF6']
+  const inputCls = "bg-white/[0.04] border border-white/[0.08] rounded-[10px] px-3 py-[9px] text-[#E9EEF4] text-[13px] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors [color-scheme:dark]"
 
   return (
-    <div className="p-8 space-y-7">
-      {/* KPIs */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {[
-          { label: 'Receita total (ano)', value: formatCurrency(totalReceita), sub: `${vendas.length} vendas`, icon: TrendingUp, color: '#34D399' },
-          { label: 'Lucro bruto (ano)',   value: formatCurrency(totalLucro),   sub: `${totalLucro > 0 ? ((totalLucro/totalReceita)*100).toFixed(1) : 0}% margem`, icon: Activity, color: '#6B8CFF' },
-          { label: 'Ticket médio',        value: formatCurrency(ticketMedio),  sub: 'por venda', icon: BarChart3, color: '#F59E0B' },
-          { label: 'Estoque disponível',  value: formatCurrency(valorEstoque), sub: `${estoque.length} itens`, icon: Package, color: '#F0353D' },
-        ].map(k => {
-          const Icon = k.icon
-          return (
-            <div key={k.label} className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className="text-[11px] text-[#5C6E84] font-mono tracking-wider uppercase">{k.label}</div>
-                <Icon size={16} style={{ color: k.color }} />
-              </div>
-              <div className="text-xl font-semibold text-[#F4F6F9]">{k.value}</div>
-              <div className="text-xs text-[#5C6E84] mt-1">{k.sub}</div>
-            </div>
-          )
-        })}
-      </div>
+    <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
+      <div className="max-w-[1320px] mx-auto animate-fade-up space-y-4">
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-1 w-fit">
-        {([
-          { id: 'vendas',     label: 'Vendas / mês' },
-          { id: 'financeiro', label: 'Fluxo financeiro' },
-          { id: 'canais',     label: 'Canais & Pagamentos' },
-          { id: 'leads',      label: 'Leads & Conversão' },
-        ] as const).map(t => (
-          <button
-            key={t.id}
-            onClick={() => setAba(t.id)}
-            className={cn(
-              'px-4 py-2 rounded-[9px] text-sm font-semibold transition-all',
-              aba === t.id ? 'bg-[#1A2A3F] text-[#D4DEEA]' : 'text-[#5C6E84] hover:text-[#8A9BB0]'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Conteúdo por aba */}
-      {aba === 'vendas' && (
-        <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-          <h3 className="text-sm font-semibold text-[#D4DEEA] mb-6">Receita mensal — {new Date().getFullYear()}</h3>
-          <div className="grid grid-cols-12 gap-2 items-end h-48">
-            {vendasPorMes.map((m) => {
-              const h = maxReceita > 0 ? (m.receita / maxReceita) * 100 : 0
-              return (
-                <div key={m.mes} className="flex flex-col items-center gap-1 group">
-                  <div className="w-full relative flex flex-col justify-end" style={{ height: '160px' }}>
-                    <div
-                      className="w-full rounded-t-[6px] bg-gradient-to-t from-[#D7282F] to-[#6B8CFF] transition-all duration-500 relative group-hover:opacity-90"
-                      style={{ height: `${Math.max(h, 2)}%` }}
-                    >
-                      {m.receita > 0 && (
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] text-[#8A9BB0] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                          {formatCurrency(m.receita)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-[#3F516A] font-mono">{m.mes}</span>
-                  {m.qtd > 0 && <span className="text-[9px] text-[#3F516A]">{m.qtd}v</span>}
-                </div>
-              )
-            })}
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-[4px] bg-[#0E1A2B] border border-white/[0.06] rounded-[13px] p-[5px] w-max overflow-x-auto">
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setAba(t.id)}
+              className={cn(
+                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
+                aba === t.id
+                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  : 'text-[#6B7C92] hover:text-[#C4CCD6] hover:bg-white/[0.04]'
+              )}>
+              <span>{t.icon}</span> {t.label}
+            </button>
+          ))}
         </div>
-      )}
 
-      {aba === 'financeiro' && (
-        <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-          <h3 className="text-sm font-semibold text-[#D4DEEA] mb-6">Receitas vs Despesas — {new Date().getFullYear()}</h3>
-          <div className="space-y-3">
-            {lancPorMes.map(m => (
-              <div key={m.mes} className="grid grid-cols-[40px_1fr_1fr_80px] items-center gap-4">
-                <span className="text-xs text-[#5C6E84] font-mono">{m.mes}</span>
-                <div>
-                  <Bar value={m.receitas} max={maxLanc} color="#34D399" />
-                </div>
-                <div>
-                  <Bar value={m.despesas} max={maxLanc} color="#F0353D" />
-                </div>
-                <span className={cn('text-xs font-semibold text-right', m.saldo >= 0 ? 'text-[#34D399]' : 'text-[#F0353D]')}>
-                  {m.saldo >= 0 ? '+' : ''}{formatCurrency(m.saldo)}
-                </span>
+        {/* ── ABA VENDAS ── */}
+        {aba === 'vendas' && (<>
+
+          {/* Filtros */}
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] p-[16px_18px] flex items-end gap-4 flex-wrap">
+            <div>
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">INÍCIO</div>
+              <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">FIM</div>
+              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputCls} />
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">VENDEDOR</div>
+              <select value={vendedor} onChange={e => setVendedor(e.target.value)}
+                className={cn(inputCls, 'w-full cursor-pointer')}>
+                {['Todos', ...vendedores].map(v => (
+                  <option key={v} style={{ background: '#0E1A2C' }}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <button className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+              <Search size={15} /> Gerar
+            </button>
+            <button onClick={() => exportCSV(vendasFiltradas)}
+              className="flex items-center gap-2 px-[16px] py-[11px] rounded-[10px] border border-white/[0.1] bg-white/[0.04] text-[#C4CCD6] font-semibold text-[13px] hover:bg-white/[0.09] transition-colors">
+              <Download size={15} /> CSV
+            </button>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-5 gap-[14px]">
+            {kpis.map(k => (
+              <div key={k.l} className="bg-[#122036] border border-white/[0.06] rounded-[14px] p-[16px_18px]"
+                style={{ borderTop: `3px solid ${k.c}` }}>
+                <div className="font-mono text-[9.5px] tracking-[0.1em] text-[#6B7C92]">{k.l}</div>
+                <div className="font-serif text-[23px] mt-1" style={{ color: k.c }}>{k.v}</div>
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/[0.06]">
-            <span className="flex items-center gap-1.5 text-xs text-[#5C6E84]"><span className="w-3 h-2 rounded-sm bg-[#34D399]" />Receitas</span>
-            <span className="flex items-center gap-1.5 text-xs text-[#5C6E84]"><span className="w-3 h-2 rounded-sm bg-[#F0353D]" />Despesas</span>
-          </div>
-        </div>
-      )}
 
-      {aba === 'canais' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-            <h3 className="text-sm font-semibold text-[#D4DEEA] mb-5">Vendas por canal</h3>
-            <div className="space-y-3">
-              {porCanal.length === 0 ? (
-                <p className="text-sm text-[#3F516A]">Sem dados</p>
-              ) : porCanal.map((c, i) => (
-                <div key={c.canal} className="space-y-1.5">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-[#D4DEEA]">{CANAL_LABEL[c.canal] ?? c.canal}</span>
-                    <span className="text-xs text-[#8A9BB0]">{formatCurrency(c.valor)} · {c.pct.toFixed(1)}%</span>
+          {/* Gráfico barras por dia */}
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[22px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ÚLTIMOS 7 DIAS</div>
+            <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-[18px]">Vendas por dia</h3>
+            <BarChart vendas={vendas} />
+          </div>
+
+          {/* Tabela de vendas */}
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] overflow-x-auto">
+            <div style={{ minWidth: 920 }}>
+              <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
+                style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
+                <div>DATA</div><div>CLIENTE</div><div>PRODUTO</div><div>VENDEDOR</div>
+                <div>CANAL</div><div className="text-right">VALOR</div>
+                <div className="text-right">DESC.</div><div className="text-right">LUCRO</div>
+              </div>
+              {vendasFiltradas.length === 0 ? (
+                <div className="text-center py-10 text-[#5C6E84] text-[13px]">Nenhuma venda no período.</div>
+              ) : vendasFiltradas.map(v => (
+                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors items-center"
+                  style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
+                  <div className="font-mono text-[11px] text-[#8A9BB0]">
+                    {v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}
                   </div>
-                  <Bar value={c.pct} max={100} color={CANAL_COLORS[i % CANAL_COLORS.length]} />
+                  <div className="text-[12.5px] font-semibold text-[#E9EEF4] truncate">{v.cliente_nome ?? '—'}</div>
+                  <div className="text-[12.5px] text-[#B7C2D0] truncate">{v.produto_nome ?? v.forma_pagamento ?? '—'}</div>
+                  <div className="text-[12px] text-[#8A9BB0]">{v.vendedor_nome ?? '—'}</div>
+                  <div>
+                    <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold bg-white/[0.06] text-[#9FB0C2]">
+                      {CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}
+                    </span>
+                  </div>
+                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#F4F6F9]">
+                    {formatCurrency(v.valor_venda)}
+                  </div>
+                  <div className="text-right font-mono text-[12px] text-[#F0656B]">
+                    {v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}
+                  </div>
+                  <div className={cn('text-right font-mono text-[12.5px] font-bold',
+                    (v.lucro ?? 0) > 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                    {v.lucro != null ? formatCurrency(v.lucro) : '—'}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-            <h3 className="text-sm font-semibold text-[#D4DEEA] mb-5">Formas de pagamento</h3>
-            <div className="space-y-3">
-              {porPgto.length === 0 ? (
-                <p className="text-sm text-[#3F516A]">Sem dados</p>
-              ) : porPgto.map((p, i) => (
-                <div key={p.pgto} className="space-y-1.5">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-[#D4DEEA]">{PGTO_LABEL[p.pgto] ?? p.pgto}</span>
-                    <span className="text-xs text-[#8A9BB0]">{formatCurrency(p.valor)} · {p.pct.toFixed(1)}%</span>
-                  </div>
-                  <Bar value={p.pct} max={100} color={CANAL_COLORS[i % CANAL_COLORS.length]} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+        </>)}
 
-      {aba === 'leads' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Taxa conversão */}
-          <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-            <h3 className="text-sm font-semibold text-[#D4DEEA] mb-5">Funil de conversão</h3>
-            <div className="space-y-4">
-              <div className="text-center py-4">
-                <div className="text-4xl font-bold text-[#6B8CFF]">{taxaConversao.toFixed(1)}%</div>
-                <div className="text-sm text-[#5C6E84] mt-1">taxa de conversão</div>
-                <div className="text-xs text-[#3F516A] mt-0.5">{leadsConvertidos} de {totalLeads} leads</div>
-              </div>
-              <div className="space-y-2">
-                {leadsPorStatus.map(([status, qtd]) => (
-                  <div key={status} className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-sm capitalize text-[#D4DEEA]">{status}</span>
-                      <span className="text-xs text-[#8A9BB0]">{qtd} leads</span>
-                    </div>
-                    <Bar value={qtd} max={totalLeads} color={
-                      status === 'convertido' ? '#34D399' :
-                      status === 'perdido' ? '#F0353D' :
-                      status === 'negociacao' ? '#F59E0B' : '#6B8CFF'
-                    } />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* ── ABA FINANCEIRO ── */}
+        {aba === 'financeiro' && (<>
 
-          {/* Assistência */}
-          <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] p-6">
-            <h3 className="text-sm font-semibold text-[#D4DEEA] mb-5">Assistência técnica</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Receita OS (ano)',   value: formatCurrency(osReceita), color: '#34D399' },
-                  { label: 'Total OS',           value: String(ordensServico.length), color: '#6B8CFF' },
-                  { label: 'Valor em estoque',   value: formatCurrency(valorEstoque), color: '#F59E0B' },
-                  { label: 'Custo do estoque',   value: formatCurrency(custoEstoque), color: '#F0353D' },
-                ].map(k => (
-                  <div key={k.label} className="bg-[#0A111E] rounded-[12px] p-3">
-                    <div className="text-[10px] text-[#3F516A] font-mono uppercase tracking-wider mb-1">{k.label}</div>
-                    <div className="text-lg font-semibold" style={{ color: k.color }}>{k.value}</div>
-                  </div>
-                ))}
-              </div>
+          {/* Gráfico fluxo caixa placeholder */}
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+            <div className="flex justify-between items-start mb-[18px]">
               <div>
-                <div className="text-xs text-[#5C6E84] mb-2">Status das OS</div>
-                <div className="space-y-1.5">
-                  {[
-                    { s: 'aguardando', label: 'Aguardando', color: '#F59E0B' },
-                    { s: 'em_andamento', label: 'Em andamento', color: '#6B8CFF' },
-                    { s: 'concluida', label: 'Concluída', color: '#34D399' },
-                    { s: 'cancelada', label: 'Cancelada', color: '#5C6E84' },
-                  ].map(({ s, label, color }) => {
-                    const qtd = ordensServico.filter(o => o.status === s).length
-                    return (
-                      <div key={s} className="flex items-center gap-3">
-                        <span className="text-xs text-[#8A9BB0] w-24">{label}</span>
-                        <div className="flex-1">
-                          <Bar value={qtd} max={Math.max(ordensServico.length, 1)} color={color} />
-                        </div>
-                        <span className="text-xs font-mono text-[#5C6E84] w-6 text-right">{qtd}</span>
-                      </div>
-                    )
-                  })}
+                <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">6 MESES</div>
+                <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Fluxo de caixa</h3>
+              </div>
+              <div className="flex gap-4">
+                <span className="flex items-center gap-[6px] text-[12px] text-[#9FB0C2]">
+                  <span className="w-[10px] h-[10px] rounded-[3px] bg-[#34D399]" /> Entradas
+                </span>
+                <span className="flex items-center gap-[6px] text-[12px] text-[#9FB0C2]">
+                  <span className="w-[12px] h-[3px] rounded-[2px] bg-[#F0656B]" /> Saídas
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-center h-[120px] text-[#4F6178] text-[13px] font-mono">
+              Gráfico em construção
+            </div>
+          </div>
+
+          {/* Livro-caixa */}
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[20px_24px_14px]">
+            <div className="flex items-center justify-between gap-3 mb-[14px] flex-wrap">
+              <div>
+                <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9]">
+                  Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                </h3>
+                <div className="text-[12px] text-[#6B7C92] mt-[2px]">
+                  Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
+                  {' · '}Saídas <span className="text-[#F0656B] font-bold">{formatCurrency(saidas)}</span>
+                  {' · '}Saldo{' '}
+                  <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                    {formatCurrency(saldo)}
+                  </span>
                 </div>
+              </div>
+              <button className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all">
+                <Plus size={16} /> Novo lançamento
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div style={{ minWidth: 720 }}>
+                <div className="grid gap-3 py-[14px] px-[6px] font-mono text-[9.5px] tracking-[0.12em] text-[#5C6E84] border-b border-white/[0.06]"
+                  style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
+                  <div>DATA</div><div>DESCRIÇÃO</div><div>CATEGORIA</div>
+                  <div>TIPO</div><div className="text-right">VALOR</div><div className="text-right">STATUS</div>
+                </div>
+                {lancMes.length === 0 ? (
+                  <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem lançamentos este mês.</div>
+                ) : lancMes.map(l => {
+                  const isReceit = l.tipo === 'receita'
+                  const isPago   = l.status === 'pago'
+                  return (
+                    <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors"
+                      style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
+                      <div className="font-mono text-[11px] text-[#8A9BB0]">
+                        {new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </div>
+                      <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{l.descricao ?? '—'}</div>
+                      <div className="text-[12px] text-[#8A9BB0]">{l.categoria ?? '—'}</div>
+                      <div>
+                        <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
+                          style={{
+                            background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(240,101,107,0.12)',
+                            color: isReceit ? '#34D399' : '#F0656B',
+                          }}>
+                          {isReceit ? 'Entrada' : 'Saída'}
+                        </span>
+                      </div>
+                      <div className={cn('text-right font-mono text-[13px] font-semibold',
+                        isReceit ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                        {isReceit ? '+' : '−'} {formatCurrency(l.valor)}
+                      </div>
+                      <div className="text-right">
+                        <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold"
+                          style={{
+                            background: isPago ? 'rgba(52,211,153,0.1)' : 'rgba(244,183,64,0.1)',
+                            color: isPago ? '#34D399' : '#F4B740',
+                          }}>
+                          {isPago ? 'Pago' : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </>)}
+
+        {/* ── ABA ESTOQUE ── */}
+        {aba === 'estoque' && (
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">INVENTÁRIO</div>
+            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-4">Relatório de estoque</h3>
+            <div className="flex items-center justify-center h-[160px] text-[#4F6178] text-[13px] font-mono">
+              Em construção — conectando dados do estoque
+            </div>
+          </div>
+        )}
+
+        {/* ── ABA LEADS ── */}
+        {aba === 'leads' && (
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CONVERSÃO</div>
+            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-4">Relatório de leads</h3>
+            <div className="flex items-center justify-center h-[160px] text-[#4F6178] text-[13px] font-mono">
+              Em construção — conectando dados de leads
+            </div>
+          </div>
+        )}
+
+      </div>
+    </main>
   )
 }
