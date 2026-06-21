@@ -1,8 +1,10 @@
 'use client'
 
-import { Bell, Search, Moon, Sun } from 'lucide-react'
+import { Bell, Search, Moon, Sun, X } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 interface TopbarProps {
@@ -13,6 +15,14 @@ interface TopbarProps {
   onPeriodChange?: (period: string) => void
 }
 
+interface NotifLead {
+  id: number
+  nome: string | null
+  produto_interessado: string | null
+  origem: string | null
+  nao_lidas: number
+}
+
 const periods = [
   { value: 'hoje', label: 'Hoje'   },
   { value: '7d',   label: '7 dias' },
@@ -20,6 +30,10 @@ const periods = [
   { value: 'mes',  label: 'Mês'    },
   { value: 'ano',  label: 'Ano'    },
 ]
+
+const ORIGEM_EMOJI: Record<string, string> = {
+  whatsapp: '💬', instagram: '📸', messenger: '💙', manual: '👤',
+}
 
 export function Topbar({
   eyebrow,
@@ -30,76 +44,147 @@ export function Topbar({
 }: TopbarProps) {
   const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifs, setNotifs] = useState<NotifLead[]>([])
+  const notifRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
 
-  const isDark = !mounted || resolvedTheme === 'dark'
+  // Busca leads com mensagens não lidas
+  useEffect(() => {
+    const supabase = createClient()
+    async function load() {
+      const { data: msgs } = await supabase
+        .from('lead_mensagens')
+        .select('lead_id')
+        .eq('lida', false)
+        .eq('direcao', 'recebida')
+      if (!msgs) return
+      const contagem: Record<number, number> = {}
+      for (const m of msgs) {
+        const id = (m as any).lead_id as number
+        if (id != null) contagem[id] = (contagem[id] ?? 0) + 1
+      }
+      const ids = Object.keys(contagem).map(Number)
+      if (ids.length === 0) { setNotifs([]); return }
+      const { data: leads } = await supabase
+        .from('leads')
+        .select('id, nome, produto_interessado, origem')
+        .in('id', ids)
+        .eq('ativo', true)
+      const list: NotifLead[] = (leads ?? []).map((l: any) => ({
+        id: l.id, nome: l.nome, produto_interessado: l.produto_interessado,
+        origem: l.origem, nao_lidas: contagem[l.id] ?? 0,
+      })).sort((a, b) => b.nao_lidas - a.nao_lidas)
+      setNotifs(list)
+    }
+    load()
+  }, [])
 
-  function toggleTheme() {
-    setTheme(isDark ? 'light' : 'dark')
-  }
+  // Fecha painel ao clicar fora
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const isDark = !mounted || resolvedTheme === 'dark'
+  const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
+
+  function toggleTheme() { setTheme(isDark ? 'light' : 'dark') }
 
   return (
     <header className="flex items-center gap-5 px-[30px] py-4 border-b border-white/[0.06] bg-[rgba(10,17,30,0.6)] backdrop-blur-md shrink-0 z-10">
 
-      {/* Title */}
       <div className="min-w-0">
         {eyebrow && (
-          <div className="font-mono text-[10px] tracking-[0.18em] text-[#F0353D] uppercase">
-            {eyebrow}
-          </div>
+          <div className="font-mono text-[10px] tracking-[0.18em] text-[#F0353D] uppercase">{eyebrow}</div>
         )}
-        <h1 className="font-serif font-normal text-[25px] tracking-[-0.02em] text-[#F4F6F9] mt-[3px] whitespace-nowrap">
-          {title}
-        </h1>
+        <h1 className="font-serif font-normal text-[25px] tracking-[-0.02em] text-[#F4F6F9] mt-[3px] whitespace-nowrap">{title}</h1>
       </div>
 
       <div className="flex-1" />
 
-      {/* Period selector */}
       {showPeriods && (
         <div className="flex gap-[3px] p-[3px] rounded-[11px] bg-white/[0.04] border border-white/[0.08]">
           {periods.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => onPeriodChange?.(p.value)}
-              className={cn(
-                'px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
+            <button key={p.value} onClick={() => onPeriodChange?.(p.value)}
+              className={cn('px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
                 activePeriod === p.value
                   ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.35)]'
-                  : 'text-[#8A9BB0] hover:text-[#D4DEEA] hover:bg-white/[0.06]'
-              )}
-            >
+                  : 'text-[#8A9BB0] hover:text-[#D4DEEA] hover:bg-white/[0.06]')}>
               {p.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Search */}
       <div className="relative flex items-center">
         <Search size={17} className="absolute left-3 text-[#46586E] pointer-events-none" />
-        <input
-          placeholder="Buscar produto, cliente, IMEI…"
-          className="bg-white/[0.04] border border-white/[0.08] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-white/[0.06] transition-all"
-        />
+        <input placeholder="Buscar produto, cliente, IMEI…"
+          className="bg-white/[0.04] border border-white/[0.08] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-white/[0.06] transition-all" />
       </div>
 
-      {/* Theme toggle */}
-      <button
-        onClick={toggleTheme}
+      <button onClick={toggleTheme}
         className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] hover:text-[#F4F6F9] transition-all"
-        title={isDark ? 'Mudar para claro' : 'Mudar para escuro'}
-      >
+        title={isDark ? 'Mudar para claro' : 'Mudar para escuro'}>
         {isDark ? <Moon size={18} /> : <Sun size={18} />}
       </button>
 
       {/* Notifications */}
-      <div className="relative">
-        <button className="relative w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] transition-colors">
+      <div className="relative" ref={notifRef}>
+        <button onClick={() => setNotifOpen(o => !o)}
+          className="relative w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#9FB0C2] hover:bg-white/[0.08] transition-colors">
           <Bell size={19} />
-          <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#F0353D] border-2 border-[#0A111E]" />
+          {totalNaoLidas > 0 && (
+            <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#F0353D] border-2 border-[#0A111E] animate-pulse" />
+          )}
         </button>
+
+        {notifOpen && (
+          <div className="absolute right-0 top-[50px] w-[330px] bg-[#0E1A2C] border border-white/[0.1] rounded-[16px] shadow-[0_24px_60px_rgba(0,0,0,0.6)] z-30 overflow-hidden"
+            style={{ animation: 'popIn 0.18s ease' }}>
+            <div className="flex items-center justify-between px-[17px] py-[15px] border-b border-white/[0.07]">
+              <span className="font-serif text-[16px] text-[#F4F6F9]">Notificações</span>
+              {totalNaoLidas > 0 && (
+                <span className="font-mono text-[10px] text-[#F0656B] bg-[rgba(215,40,47,0.12)] px-[8px] py-[2px] rounded-full">
+                  {totalNaoLidas} não lidas
+                </span>
+              )}
+            </div>
+            <div className="max-h-[320px] overflow-y-auto scrollbar-thin">
+              {notifs.length === 0 ? (
+                <div className="px-6 py-8 text-center text-[#5C6E84] text-[13px]">Tudo em dia ✓</div>
+              ) : notifs.map(n => (
+                <button key={n.id}
+                  onClick={() => { setNotifOpen(false); router.push('/leads') }}
+                  className="w-full flex items-center gap-[11px] px-[17px] py-[13px] border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-left">
+                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[rgba(215,40,47,0.14)] flex items-center justify-center flex-none text-[16px]">
+                    {ORIGEM_EMOJI[n.origem ?? 'manual'] ?? '👤'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{n.nome ?? `Lead #${n.id}`}</div>
+                    <div className="text-[11.5px] text-[#8A9BB0] truncate">
+                      {n.nao_lidas} nova{n.nao_lidas > 1 ? 's' : ''} mensagem{n.nao_lidas > 1 ? 's' : ''}
+                      {n.produto_interessado ? ` · ${n.produto_interessado}` : ''}
+                    </div>
+                  </div>
+                  <span className="min-w-[20px] h-[20px] px-[5px] rounded-full bg-[#D7282F] text-white font-mono text-[10px] font-bold flex items-center justify-center flex-none">
+                    {n.nao_lidas > 99 ? '99+' : n.nao_lidas}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => { setNotifOpen(false); router.push('/leads') }}
+              className="w-full py-[13px] bg-[rgba(215,40,47,0.1)] text-[#F0656B] text-[13px] font-semibold hover:bg-[rgba(215,40,47,0.16)] transition-colors">
+              Ver todos os leads
+            </button>
+          </div>
+        )}
       </div>
     </header>
   )
