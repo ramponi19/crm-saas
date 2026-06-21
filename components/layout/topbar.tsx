@@ -52,6 +52,13 @@ export function Topbar({
 
   useEffect(() => { setMounted(true) }, [])
 
+  // Pede permissão para notificações do navegador
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+  }, [])
+
   // Busca leads com mensagens não lidas (+ atualização em tempo real)
   useEffect(() => {
     const supabase = createClient()
@@ -82,10 +89,34 @@ export function Topbar({
     }
     load()
 
-    // Realtime: recarrega notificações quando há mudança em mensagens
+    // Realtime: recarrega notificações + dispara notificação do navegador
     const channel = supabase
       .channel('topbar_notifs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: any) => {
+        load()
+        // Notificação do navegador apenas para mensagens NOVAS recebidas
+        if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            // Busca o nome do lead para a notificação
+            let titulo = 'Nova mensagem'
+            try {
+              const { data } = await supabase
+                .from('leads')
+                .select('nome, origem')
+                .eq('id', payload.new.lead_id)
+                .maybeSingle()
+              if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
+              else if (data?.origem) titulo = `Nova mensagem · ${data.origem}`
+            } catch {}
+            const notif = new Notification(titulo, {
+              body: payload.new.conteudo?.slice(0, 120) ?? '',
+              icon: '/favicon.ico',
+              tag: `lead-${payload.new.lead_id}`,
+            })
+            notif.onclick = () => { window.focus(); router.push('/leads') }
+          }
+        }
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
