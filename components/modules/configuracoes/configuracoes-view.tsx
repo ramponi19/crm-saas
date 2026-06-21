@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plug, Percent, Timer, Save, X } from 'lucide-react'
+import { Plug, Percent, Timer, Save, X, Link as LinkIcon, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -9,13 +9,19 @@ import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import { EvolutionCard } from './evolution-card'
 import { OfficialCard } from './official-card'
 
+interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
+
 interface Props {
   evolution: EvolutionConfig | null
   official: OfficialConfig | null
+  instagram: MetaConfig | null
+  messenger: MetaConfig | null
   dadosLoja: any
   preferencias: any
   taxas: Array<{ forma_pagamento: string; parcelas: number; percentual_taxa: number }>
 }
+
+const WEBHOOK_URL = 'https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads'
 
 const TABS = [
   { id: 'integracoes', label: 'Integrações',     Icon: Plug    },
@@ -48,7 +54,7 @@ const PROVIDER_FIELDS: Record<Provider, Array<{ key: string; label: string; plac
   ],
 }
 
-export function ConfiguracoesView({ evolution, official, taxas }: Props) {
+export function ConfiguracoesView({ evolution, official, instagram, messenger, taxas }: Props) {
   const supabase = createClient()
   const [aba, setAba]       = useState('integracoes')
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
@@ -67,13 +73,15 @@ export function ConfiguracoesView({ evolution, official, taxas }: Props) {
       svg: <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.66-.61-2.93-1.27-4.85-4.22-5-4.42-.15-.2-1.2-1.59-1.2-3.03 0-1.44.76-2.15 1.02-2.44.27-.29.59-.37.79-.37.2 0 .39 0 .57.01.18.01.43-.07.67.51.24.6.83 2.04.9 2.19.07.15.12.32.02.51-.09.2-.14.32-.27.49-.14.17-.29.38-.41.51-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.2.68-.79.86-1.06.18-.27.36-.22.61-.13.25.09 1.58.74 1.86.88.27.14.46.2.52.31.07.12.07.66-.17 1.34z" fill="currentColor"/>,
     },
     {
-      id: 'instagram', nome: 'Instagram Direct', color: '#E1487B', provider: 'meta', ativo: false,
-      desc: 'Meta · conecte a conta @ comercial',
+      id: 'instagram', nome: 'Instagram Direct', color: '#E1487B', provider: 'meta',
+      ativo: !!instagram?.ativo,
+      desc: instagram?.page_id ? `Meta · página ${instagram.page_id}` : 'Meta · conecte a conta @ comercial',
       svg: <><rect x="2" y="2" width="20" height="20" rx="5.5" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.3" fill="currentColor"/></>,
     },
     {
-      id: 'messenger', nome: 'Messenger', color: '#3B9BFF', provider: 'meta', ativo: false,
-      desc: 'Meta · conecte a página do Facebook',
+      id: 'messenger', nome: 'Messenger', color: '#3B9BFF', provider: 'meta',
+      ativo: !!messenger?.ativo,
+      desc: messenger?.page_id ? `Meta · página ${messenger.page_id}` : 'Meta · conecte a página do Facebook',
       svg: <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.19.16.14.26.35.27.57l.05 1.78c.02.57.6.94 1.12.71l1.99-.88c.17-.07.36-.09.53-.04 1.91.53 3.92.5 5.81-.07C20.36 19.85 22 16.04 22 11.7 22 6.13 17.64 2 12 2z" fill="currentColor"/>,
     },
   ]
@@ -85,8 +93,19 @@ export function ConfiguracoesView({ evolution, official, taxas }: Props) {
       init.url = evolution.api_url ?? ''
       init.inst = evolution.instance ?? ''
       init.apikey = evolution.api_key ?? ''
+    } else if (canal.provider === 'meta') {
+      const cfg = canal.id === 'instagram' ? instagram : canal.id === 'messenger' ? messenger : null
+      if (cfg) {
+        init.pageid = cfg.page_id ?? ''
+        init.token = cfg.access_token ?? ''
+      }
     }
     setModalValues(init)
+  }
+
+  function copyWebhook() {
+    navigator.clipboard?.writeText(WEBHOOK_URL)
+    toast.success('URL do webhook copiada!')
   }
 
   async function saveModal() {
@@ -287,6 +306,26 @@ export function ConfiguracoesView({ evolution, official, taxas }: Props) {
                     className="w-full bg-white/[0.04] border border-white/[0.1] rounded-[10px] px-3 py-[10px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors" />
                 </div>
               ))}
+            </div>
+
+            {/* Webhook URL */}
+            <div className="mt-[18px] p-[14px_16px] rounded-[13px]" style={{ background: 'rgba(127,176,232,0.06)', border: '1px solid rgba(127,176,232,0.18)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <LinkIcon size={16} className="text-[#9CC2EE]" />
+                <span className="font-mono text-[10px] tracking-[0.12em] text-[#9CC2EE]">URL DO WEBHOOK</span>
+              </div>
+              <div className="flex items-center gap-[10px]">
+                <code className="flex-1 min-w-0 font-mono text-[12px] text-[#E9EEF4] bg-black/25 border border-white/[0.07] rounded-[8px] px-3 py-[9px] overflow-x-auto whitespace-nowrap">
+                  {WEBHOOK_URL}
+                </code>
+                <button onClick={copyWebhook}
+                  className="flex items-center gap-[6px] px-[13px] py-[9px] rounded-[9px] border border-white/[0.1] bg-white/[0.05] text-[#C4CCD6] text-[12px] font-semibold hover:bg-white/[0.1] transition-colors flex-none">
+                  <Copy size={14} /> Copiar
+                </button>
+              </div>
+              <p className="text-[11px] text-[#7E8EA2] mt-2">
+                Configure esta URL no painel do {modalCanal.provider === 'evolution' ? 'Evolution' : 'Meta'} para receber as mensagens.
+              </p>
             </div>
 
             <div className="flex gap-3 mt-6">
