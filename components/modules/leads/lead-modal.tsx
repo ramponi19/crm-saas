@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Send, UserRound, UserCheck, Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, KANBAN_COLUMNS, STATUS_LABELS } from './types'
@@ -41,20 +41,52 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
   })
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
-  const [chat, setChat] = useState<ChatMsg[]>(() => {
-    const primeiroNome = (lead.nome ?? 'Cliente').split(' ')[0]
-    const prod = lead.produto_interessado ?? 'produto'
-    return [
-      { from: 'cliente', text: `Oi! Vi o ${prod}, ainda tem disponível?`, time: '10:32' },
-      { from: 'loja',    text: `Olá ${primeiroNome}! Temos sim 🙌`,        time: '10:35' },
-      { from: 'cliente', text: 'Quero! Qual a condição no crédito?',       time: '10:37' },
-    ]
-  })
+  const [chat, setChat] = useState<ChatMsg[]>([])
+  const [loadingChat, setLoadingChat] = useState(true)
 
-  function sendMsg() {
+  // Busca mensagens reais de lead_mensagens
+  useEffect(() => {
+    let cancel = false
+    async function load() {
+      setLoadingChat(true)
+      const { data } = await supabase
+        .from('lead_mensagens')
+        .select('direcao, conteudo, created_at')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: true })
+      if (cancel) return
+      const msgs: ChatMsg[] = (data ?? []).map((m: any) => ({
+        from: m.direcao === 'enviada' ? 'loja' : 'cliente',
+        text: m.conteudo ?? '',
+        time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      }))
+      setChat(msgs)
+      setLoadingChat(false)
+      // Marca como lidas + zera contador do lead
+      if ((lead.msgs_nao_lidas ?? 0) > 0) {
+        await supabase.from('lead_mensagens').update({ lida: true }).eq('lead_id', lead.id).eq('lida', false)
+        await supabase.from('leads').update({ msgs_nao_lidas: 0 }).eq('id', lead.id)
+        onUpdate({ ...lead, msgs_nao_lidas: 0 })
+      }
+    }
+    load()
+    return () => { cancel = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.id])
+
+  async function sendMsg() {
     const t = draft.trim(); if (!t) return
-    setChat(prev => [...prev, { from: 'loja', text: t, time: 'agora' }])
     setDraft('')
+    setChat(prev => [...prev, { from: 'loja', text: t, time: 'agora' }])
+    const { error } = await supabase.from('lead_mensagens').insert({
+      lead_id: lead.id,
+      direcao: 'enviada',
+      conteudo: t,
+      origem: lead.origem ?? 'manual',
+      lida: true,
+    })
+    if (error) toast.error('Erro ao enviar mensagem')
+    else await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
   }
 
   async function handleSave() {
@@ -179,7 +211,15 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
               HISTÓRICO DE MENSAGENS
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-[18px_20px] flex flex-col gap-[10px]" style={{ background: 'rgba(0,0,0,0.18)' }}>
-              {chat.map((m, i) => {
+              {loadingChat ? (
+                <div className="flex items-center justify-center h-full text-[#5C6E84] text-[13px]">Carregando mensagens…</div>
+              ) : chat.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-[#5C6E84] gap-2 py-10">
+                  <Send size={28} className="opacity-30" />
+                  <p className="text-[13px]">Nenhuma mensagem ainda.</p>
+                  <p className="text-[11.5px] text-[#4F6178]">As conversas deste canal aparecerão aqui.</p>
+                </div>
+              ) : chat.map((m, i) => {
                 const isLoja = m.from === 'loja'
                 return (
                   <div key={i} className={`flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
