@@ -82,8 +82,8 @@ export function LeadsTable({ leads, usuarios, onLeadClick }: LeadsTableProps) {
                 {/* Status */}
                 <td className="px-3 py-3">
                   {col && (
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${col.bgColor} ${col.color}`}>
-                      <span>{col.icon}</span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full" style={{ background: col.color + '22', color: col.color }}>
+                      
                       {col.label}
                     </span>
                   )}
