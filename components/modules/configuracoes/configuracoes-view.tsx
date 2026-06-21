@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
-import { EvolutionCard } from './evolution-card'
-import { OfficialCard } from './official-card'
 
 interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
 
@@ -42,11 +40,17 @@ interface IntegracaoCanal {
 }
 
 // Campos por provider (espelha o modelo)
-const PROVIDER_FIELDS: Record<Provider, Array<{ key: string; label: string; placeholder: string }>> = {
+const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeholder: string }>> = {
   evolution: [
     { key: 'url',     label: 'URL da API',   placeholder: 'https://evo.suaempresa.com' },
     { key: 'inst',    label: 'Instância',    placeholder: 'jmstore-01' },
     { key: 'apikey',  label: 'API Key',      placeholder: '••••••••••••' },
+  ],
+  oficial: [
+    { key: 'phone_number_id', label: 'Phone Number ID',          placeholder: '123456789012345' },
+    { key: 'waba_id',         label: 'WABA ID',                  placeholder: '123456789012345' },
+    { key: 'access_token',    label: 'Token de acesso permanente', placeholder: 'EAAxxxxx...' },
+    { key: 'webhook_verify_token', label: 'Token de verificação do webhook', placeholder: 'um-token-secreto' },
   ],
   meta: [
     { key: 'pageid', label: 'ID da página / conta', placeholder: '1029384756' },
@@ -60,6 +64,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [waProvider, setWaProvider] = useState<'evolution' | 'oficial'>('evolution')
 
   const integracoes: IntegracaoCanal[] = [
     {
@@ -89,10 +94,21 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   function openModal(canal: IntegracaoCanal) {
     setModalCanal(canal)
     const init: Record<string, string> = {}
-    if (canal.provider === 'evolution' && evolution) {
-      init.url = evolution.api_url ?? ''
-      init.inst = evolution.instance ?? ''
-      init.apikey = evolution.api_key ?? ''
+    if (canal.id === 'whatsapp') {
+      // Detecta qual provider está ativo
+      const usaOficial = !!official?.ativo && !evolution?.ativo
+      setWaProvider(usaOficial ? 'oficial' : 'evolution')
+      if (evolution) {
+        init.url = evolution.api_url ?? ''
+        init.inst = evolution.instance ?? ''
+        init.apikey = evolution.api_key ?? ''
+      }
+      if (official) {
+        init.phone_number_id = official.phone_number_id ?? ''
+        init.waba_id = official.waba_id ?? ''
+        init.access_token = official.access_token ?? ''
+        init.webhook_verify_token = official.webhook_verify_token ?? ''
+      }
     } else if (canal.provider === 'meta') {
       const cfg = canal.id === 'instagram' ? instagram : canal.id === 'messenger' ? messenger : null
       if (cfg) {
@@ -112,17 +128,42 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     if (!modalCanal) return
     setSaving(true)
     try {
-      if (modalCanal.provider === 'evolution') {
-        const cfg: EvolutionConfig = {
-          ativo: true,
-          api_url: modalValues.url ?? '',
-          api_key: modalValues.apikey ?? '',
-          instance: modalValues.inst ?? '',
+      if (modalCanal.id === 'whatsapp') {
+        if (waProvider === 'evolution') {
+          const cfg: EvolutionConfig = {
+            ativo: true,
+            api_url: modalValues.url ?? '',
+            api_key: modalValues.apikey ?? '',
+            instance: modalValues.inst ?? '',
+          }
+          await supabase.from('configuracoes_sistema')
+            .upsert({ chave: 'whatsapp_evolution', valor: cfg }, { onConflict: 'chave' })
+          // Desativa oficial
+          if (official) {
+            await supabase.from('configuracoes_sistema')
+              .upsert({ chave: 'whatsapp_official', valor: { ...official, ativo: false } }, { onConflict: 'chave' })
+          }
+        } else {
+          const cfg: OfficialConfig = {
+            ativo: true,
+            provider: 'meta',
+            phone_number_id: modalValues.phone_number_id ?? '',
+            waba_id: modalValues.waba_id ?? '',
+            access_token: modalValues.access_token ?? '',
+            webhook_verify_token: modalValues.webhook_verify_token ?? '',
+            api_version: official?.api_version ?? 'v19.0',
+            api_url: official?.api_url ?? 'https://graph.facebook.com',
+          }
+          await supabase.from('configuracoes_sistema')
+            .upsert({ chave: 'whatsapp_official', valor: cfg }, { onConflict: 'chave' })
+          // Desativa evolution
+          if (evolution) {
+            await supabase.from('configuracoes_sistema')
+              .upsert({ chave: 'whatsapp_evolution', valor: { ...evolution, ativo: false } }, { onConflict: 'chave' })
+          }
         }
-        await supabase.from('configuracoes_sistema')
-          .upsert({ chave: 'whatsapp_evolution', valor: cfg }, { onConflict: 'chave' })
       } else {
-        // Meta — Instagram/Messenger: salva chave específica do canal
+        // Meta — Instagram/Messenger
         await supabase.from('configuracoes_sistema')
           .upsert({ chave: `meta_${modalCanal.id}`, valor: {
             ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
@@ -170,7 +211,6 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── INTEGRAÇÕES ── */}
         {aba === 'integracoes' && (
-          <div className="space-y-4">
             <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CANAIS DE ATENDIMENTO</div>
               <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-1">Integrações</h3>
@@ -198,11 +238,6 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 ))}
               </div>
             </div>
-
-            {/* Cards grandes de configuração WhatsApp */}
-            <EvolutionCard config={evolution} onSaved={() => location.reload()} />
-            <OfficialCard config={official} onSaved={() => location.reload()} />
-          </div>
         )}
 
         {/* ── TAXAS ── */}
@@ -287,7 +322,9 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <div>
                   <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9]">Configurar {modalCanal.nome}</h3>
                   <div className="text-[12px] text-[#7E8EA2] mt-[2px]">
-                    {modalCanal.provider === 'evolution' ? 'Evolution API' : 'Meta Cloud API'}
+                    {modalCanal.id === 'whatsapp'
+                      ? (waProvider === 'evolution' ? 'Evolution API' : 'Meta Cloud API (oficial)')
+                      : 'Meta Cloud API'}
                   </div>
                 </div>
               </div>
@@ -297,8 +334,29 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
               </button>
             </div>
 
+            {/* Seletor de provider — só WhatsApp */}
+            {modalCanal.id === 'whatsapp' && (
+              <div className="flex gap-2 mb-4 p-1 bg-white/[0.04] rounded-[11px] border border-white/[0.06]">
+                {([
+                  { k: 'evolution', label: 'Evolution API', tag: 'Legado' },
+                  { k: 'oficial',   label: 'API Oficial',   tag: 'Recomendado' },
+                ] as const).map(opt => (
+                  <button key={opt.k} onClick={() => setWaProvider(opt.k)}
+                    className={cn('flex-1 flex items-center justify-center gap-2 py-[9px] rounded-[8px] text-[12.5px] font-semibold transition-all',
+                      waProvider === opt.k ? 'bg-white/[0.08] text-[#F4F6F9]' : 'text-[#6B7C92] hover:text-[#C4CCD6]')}>
+                    {opt.label}
+                    <span className="text-[9px] font-mono px-[6px] py-[2px] rounded-full"
+                      style={{ background: opt.k === 'oficial' ? 'rgba(52,211,153,0.15)' : 'rgba(244,183,64,0.15)',
+                               color: opt.k === 'oficial' ? '#34D399' : '#F4B740' }}>
+                      {opt.tag}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex flex-col gap-4">
-              {PROVIDER_FIELDS[modalCanal.provider].map(f => (
+              {(PROVIDER_FIELDS[modalCanal.id === 'whatsapp' ? waProvider : modalCanal.provider]).map(f => (
                 <div key={f.key}>
                   <label className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block">{f.label}</label>
                   <input value={modalValues[f.key] ?? ''} placeholder={f.placeholder}
