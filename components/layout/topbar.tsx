@@ -108,16 +108,29 @@ export function Topbar({
               if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
               else if (data?.origem) titulo = `Nova mensagem · ${data.origem}`
             } catch {}
-            const notif = new Notification(titulo, {
-              body: payload.new.conteudo?.slice(0, 120) ?? '',
-              icon: '/favicon.ico',
-              tag: `lead-${payload.new.lead_id}`,
-            })
-            notif.onclick = () => { window.focus(); router.push('/leads') }
+            try {
+              // Sem `icon` propositalmente: um ícone que retorna 404 faz o Chrome
+              // engolir a notificação inteira sem mostrar nada. Sem icon, ele usa
+              // o ícone padrão da aba e a notificação sempre aparece.
+              const notif = new Notification(titulo, {
+                body: payload.new.conteudo?.slice(0, 120) ?? '',
+                tag: `lead-${payload.new.lead_id}`,
+                renotify: true,
+              } as NotificationOptions)
+              notif.onclick = () => { window.focus(); router.push('/leads') }
+              setTimeout(() => { try { notif.close() } catch {} }, 8000)
+            } catch (e) {
+              console.warn('[topbar] falha ao disparar notificação do navegador:', e)
+            }
           }
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        // Diagnóstico: confirma que o canal realmente conectou.
+        // Se não aparecer "SUBSCRIBED" no console, o Realtime não está chegando
+        // ao navegador (ver Database → Replication no Supabase).
+        console.log('[topbar] realtime lead_mensagens status:', status)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [])
 
@@ -220,6 +233,32 @@ export function Topbar({
             <button onClick={() => { setNotifOpen(false); router.push('/leads') }}
               className="w-full py-[13px] bg-[rgba(215,40,47,0.1)] text-[#F0656B] text-[13px] font-semibold hover:bg-[rgba(215,40,47,0.16)] transition-colors">
               Ver todos os leads
+            </button>
+            <button
+              onClick={async () => {
+                if (typeof window === 'undefined' || !('Notification' in window)) {
+                  alert('Este navegador não suporta notificações.')
+                  return
+                }
+                let perm = Notification.permission
+                if (perm === 'default') perm = await Notification.requestPermission()
+                if (perm !== 'granted') {
+                  alert('Permissão de notificação: ' + perm + '. Ative nas configurações do site (cadeado na barra de endereço).')
+                  return
+                }
+                try {
+                  const n = new Notification('🔔 Teste — JM Store CRM', {
+                    body: 'Se você está vendo isto, as notificações estão funcionando!',
+                    tag: 'jmstore-teste',
+                    renotify: true,
+                  } as NotificationOptions)
+                  setTimeout(() => { try { n.close() } catch {} }, 6000)
+                } catch (e) {
+                  alert('Falha ao disparar: ' + (e as Error).message)
+                }
+              }}
+              className="w-full py-[10px] text-[#6B7C92] text-[11.5px] font-medium hover:text-[#9FB0C2] hover:bg-white/[0.03] transition-colors border-t border-white/[0.05]">
+              Testar notificação do navegador
             </button>
           </div>
         )}
