@@ -16,7 +16,7 @@ export interface Lead {
   ultima_tratativa: string | null
   ultima_mensagem_at: string | null
   produto_interessado: string | null
-  valor_estimado: number | null
+  valor_estimado?: number | null
   convertido_em: number | null
 }
 
