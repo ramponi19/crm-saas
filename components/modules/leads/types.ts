@@ -16,6 +16,7 @@ export interface Lead {
   ultima_tratativa: string | null
   ultima_mensagem_at: string | null
   produto_interessado: string | null
+  valor_estimado: number | null
   convertido_em: number | null
 }
 
@@ -28,53 +29,18 @@ export interface Usuario {
 export interface KanbanColumn {
   id: KanbanStatus
   label: string
-  color: string
-  bgColor: string
-  icon: string
+  color: string      // dot + accent color hex
 }
 
 export const KANBAN_COLUMNS: KanbanColumn[] = [
-  {
-    id: 'novo',
-    label: 'Novo',
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/40',
-    icon: '✦',
-  },
-  {
-    id: 'em_contato',
-    label: 'Em Contato',
-    color: 'text-violet-600 dark:text-violet-400',
-    bgColor: 'bg-violet-50 dark:bg-violet-950/40',
-    icon: '◎',
-  },
-  {
-    id: 'negociando',
-    label: 'Negociando',
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/40',
-    icon: '⬡',
-  },
-  {
-    id: 'convertido',
-    label: 'Convertido',
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-950/40',
-    icon: '✓',
-  },
-  {
-    id: 'perdido',
-    label: 'Perdido',
-    color: 'text-rose-600 dark:text-rose-400',
-    bgColor: 'bg-rose-50 dark:bg-rose-950/40',
-    icon: '✕',
-  },
+  { id: 'novo',       label: 'Novo',       color: '#7FB0E8' },
+  { id: 'em_contato', label: 'Em contato', color: '#C6A86A' },
+  { id: 'negociando', label: 'Negociando', color: '#F4B740' },
+  { id: 'convertido', label: 'Convertido', color: '#34D399' },
+  { id: 'perdido',    label: 'Perdido',    color: '#F0656B' },
 ]
 
 export const STATUS_LABELS: Record<KanbanStatus, string> = {
-  novo: 'Novo',
-  em_contato: 'Em Contato',
-  negociando: 'Negociando',
-  convertido: 'Convertido',
-  perdido: 'Perdido',
+  novo: 'Novo', em_contato: 'Em contato', negociando: 'Negociando',
+  convertido: 'Convertido', perdido: 'Perdido',
 }
