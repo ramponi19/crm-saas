@@ -22,21 +22,25 @@ export default async function RelatoriosPage() {
       .select('id, data_venc, descricao, categoria, tipo, valor, status')
       .order('data_venc', { ascending: false })
       .limit(200),
-    supabase.from('usuarios').select('nome').eq('ativo', true),
+    // Buscar todos os usuários sem filtrar por ativo (campo pode não existir)
+    supabase.from('usuarios').select('nome'),
   ])
 
   const vendas = (vendasRaw ?? []).map((v: any) => ({
     ...v,
-    cliente_nome:  v.clientes?.nome  ?? null,
-    produto_nome:  v.produtos?.nome  ?? null,
-    vendedor_nome: v.usuarios?.nome  ?? null,
+    cliente_nome:  v.clientes?.nome ?? null,
+    produto_nome:  v.produtos?.nome ?? null,
+    vendedor_nome: v.usuarios?.nome ?? null,
   }))
 
-  const vendedores = (vendedoresRaw ?? []).map((u: any) => u.nome as string)
+  // Deduplica e filtra nulos
+  const vendedores = [...new Set(
+    (vendedoresRaw ?? []).map((u: any) => u.nome as string).filter(Boolean)
+  )]
 
   return (
     <>
-      <Topbar eyebrow="GESTÃO · INTELIGÊNCIA" title="Relatórios / BI" />
+      <Topbar eyebrow="ANÁLISE" title="Relatórios" />
       <RelatoriosView
         vendas={vendas}
         lancamentos={lancamentos ?? []}
