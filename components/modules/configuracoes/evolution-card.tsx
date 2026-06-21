@@ -102,6 +102,21 @@ export function EvolutionCard({ config, onSaved }: Props) {
         />
       </div>
 
+      
+      {/* Webhook URL */}
+      <div className="rounded-lg px-3 py-3 relative" style={{ background: 'rgba(127,176,232,0.06)', border: '1px solid rgba(127,176,232,0.18)' }}>
+        <div className="flex items-center gap-2 mb-2">
+          <svg className="w-4 h-4 text-[#9CC2EE]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
+          <span className="text-[10px] font-mono tracking-wider text-[#9CC2EE]">URL DO WEBHOOK</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 min-w-0 text-[11px] font-mono text-foreground bg-black/25 border border-white/[0.07] rounded px-2.5 py-2 overflow-x-auto whitespace-nowrap">https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads</code>
+          <button type="button" onClick={() => { navigator.clipboard?.writeText('https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads') }}
+            className="px-3 py-2 rounded-lg border border-input bg-background text-xs font-medium text-muted-foreground hover:text-foreground whitespace-nowrap">Copiar</button>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-2">Configure esta URL no painel para receber as mensagens recebidas.</p>
+      </div>
+
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <button
