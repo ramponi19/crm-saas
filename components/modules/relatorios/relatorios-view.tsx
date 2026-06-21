@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Download, Plus } from 'lucide-react'
+import { TrendingUp, Boxes, Users, Download, Search } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 
 interface Venda {
@@ -40,10 +40,10 @@ const CANAL_LABEL: Record<string, string> = {
 }
 
 const TABS = [
-  { id: 'vendas',     label: 'Vendas',     icon: '📊' },
-  { id: 'financeiro', label: 'Financeiro', icon: '💰' },
-  { id: 'estoque',    label: 'Estoque',    icon: '📦' },
-  { id: 'leads',      label: 'Leads',      icon: '🎯' },
+  { id: 'vendas',    label: 'Vendas',   Icon: TrendingUp },
+  { id: 'estoque',   label: 'Estoque',  Icon: Boxes      },
+  { id: 'clientes',  label: 'Clientes', Icon: Users      },
+  { id: 'exportar',  label: 'Exportar', Icon: Download   },
 ]
 
 function exportCSV(rows: Venda[]) {
@@ -55,11 +55,12 @@ function exportCSV(rows: Venda[]) {
     v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
   ].join(','))
   const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-  a.download = `vendas_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `vendas_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
 }
 
-// Gráfico de barras SVG — vendas por dia
 function BarChart({ vendas }: { vendas: Venda[] }) {
   const today = new Date()
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -74,17 +75,22 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
   const maxVal = Math.max(...days.map(d => d.total), 1)
   const W = 700, H = 160, pb = 28, pt = 10
   const barW = 48, gap = (W - days.length * barW) / (days.length + 1)
-
   return (
     <svg viewBox={`0 0 ${W} ${H + pb}`} width="100%" style={{ display: 'block' }}>
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F0454D" stopOpacity={0.9} />
+          <stop offset="100%" stopColor="#8E1B20" stopOpacity={0.7} />
+        </linearGradient>
+      </defs>
       {days.map((d, i) => {
         const x = gap + i * (barW + gap)
         const barH = Math.max(((d.total / maxVal) * H) - pt, d.total > 0 ? 4 : 0)
         const y = pt + (H - barH)
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH}
-              rx={6} fill={d.total > 0 ? 'url(#bg)' : 'rgba(255,255,255,0.04)'} />
+            <rect x={x} y={y} width={barW} height={barH} rx={6}
+              fill={d.total > 0 ? 'url(#bg)' : 'rgba(255,255,255,0.04)'} />
             {d.total > 0 && (
               <text x={x + barW / 2} y={y - 6} textAnchor="middle"
                 fill="#9FB0C2" fontSize={9} fontFamily="JetBrains Mono, monospace">
@@ -98,22 +104,16 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
           </g>
         )
       })}
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F0454D" stopOpacity={0.9} />
-          <stop offset="100%" stopColor="#8E1B20" stopOpacity={0.7} />
-        </linearGradient>
-      </defs>
     </svg>
   )
 }
 
 export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
-  const [aba, setAba]         = useState('vendas')
-  const [dataIni, setDataIni] = useState(() => {
+  const [aba, setAba]           = useState('vendas')
+  const [dataIni, setDataIni]   = useState(() => {
     const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10)
   })
-  const [dataFim, setDataFim] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dataFim, setDataFim]   = useState(() => new Date().toISOString().slice(0, 10))
   const [vendedor, setVendedor] = useState('Todos')
 
   const vendasFiltradas = useMemo(() => vendas.filter(v => {
@@ -125,23 +125,22 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   }), [vendas, dataIni, dataFim, vendedor])
 
   const kpis = useMemo(() => {
-    const concluidas = vendasFiltradas.filter(v => v.status === 'concluida')
-    const receita    = concluidas.reduce((s, v) => s + v.valor_venda, 0)
-    const lucro      = concluidas.reduce((s, v) => s + (v.lucro ?? 0), 0)
-    const qtd        = concluidas.length
-    const ticket     = qtd > 0 ? receita / qtd : 0
-    const margem     = receita > 0 ? (lucro / receita) * 100 : 0
+    const conc     = vendasFiltradas.filter(v => v.status === 'concluida')
+    const receita  = conc.reduce((s, v) => s + v.valor_venda, 0)
+    const lucro    = conc.reduce((s, v) => s + (v.lucro ?? 0), 0)
+    const qtd      = conc.length
+    const ticket   = qtd > 0 ? receita / qtd : 0
+    const descontos = conc.reduce((s, v) => s + (v.desconto_valor ?? 0), 0)
     return [
-      { l: 'FATURAMENTO',   v: formatCurrency(receita), c: '#34D399' },
-      { l: 'LUCRO BRUTO',   v: formatCurrency(lucro),   c: '#7FB0E8' },
-      { l: 'QTD VENDAS',    v: String(qtd),             c: '#F4B740' },
-      { l: 'TICKET MÉDIO',  v: formatCurrency(ticket),  c: '#F0656B' },
-      { l: 'MARGEM',        v: `${margem.toFixed(1)}%`, c: '#C6A86A' },
+      { l: 'TOTAL VENDAS',  v: formatCurrency(receita),  c: '#F0656B' },
+      { l: 'LUCRO TOTAL',   v: formatCurrency(lucro),    c: '#34D399' },
+      { l: 'TICKET MÉDIO',  v: formatCurrency(ticket),   c: '#7FB0E8' },
+      { l: 'DESCONTOS',     v: formatCurrency(descontos),c: '#F4B740' },
+      { l: 'QTD. VENDAS',   v: String(qtd),              c: '#C6A86A' },
     ]
   }, [vendasFiltradas])
 
-  // Lançamentos do mês corrente
-  const mesAtual = new Date().toISOString().slice(0, 7)
+  const mesAtual  = new Date().toISOString().slice(0, 7)
   const lancMes   = lancamentos.filter(l => l.data_venc.startsWith(mesAtual))
   const entradas  = lancMes.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
   const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
@@ -155,22 +154,21 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
 
         {/* Tabs */}
         <div className="flex gap-[4px] bg-[#0E1A2B] border border-white/[0.06] rounded-[13px] p-[5px] w-max overflow-x-auto">
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setAba(t.id)}
+          {TABS.map(({ id, label, Icon }) => (
+            <button key={id} onClick={() => setAba(id)}
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                aba === t.id
+                aba === id
                   ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
                   : 'text-[#6B7C92] hover:text-[#C4CCD6] hover:bg-white/[0.04]'
               )}>
-              <span>{t.icon}</span> {t.label}
+              <Icon size={16} /> {label}
             </button>
           ))}
         </div>
 
         {/* ── ABA VENDAS ── */}
         {aba === 'vendas' && (<>
-
           {/* Filtros */}
           <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] p-[16px_18px] flex items-end gap-4 flex-wrap">
             <div>
@@ -185,7 +183,8 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">VENDEDOR</div>
               <select value={vendedor} onChange={e => setVendedor(e.target.value)}
                 className={cn(inputCls, 'w-full cursor-pointer')}>
-                {['Todos', ...vendedores].map(v => (
+                <option style={{ background: '#0E1A2C' }}>Todos</option>
+                {vendedores.map(v => (
                   <option key={v} style={{ background: '#0E1A2C' }}>{v}</option>
                 ))}
               </select>
@@ -210,14 +209,14 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
             ))}
           </div>
 
-          {/* Gráfico barras por dia */}
+          {/* Gráfico */}
           <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[22px_26px]">
             <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ÚLTIMOS 7 DIAS</div>
             <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-[18px]">Vendas por dia</h3>
             <BarChart vendas={vendas} />
           </div>
 
-          {/* Tabela de vendas */}
+          {/* Tabela */}
           <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] overflow-x-auto">
             <div style={{ minWidth: 920 }}>
               <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
@@ -229,7 +228,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               {vendasFiltradas.length === 0 ? (
                 <div className="text-center py-10 text-[#5C6E84] text-[13px]">Nenhuma venda no período.</div>
               ) : vendasFiltradas.map(v => (
-                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors items-center"
+                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] items-center"
                   style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
                   <div className="font-mono text-[11px] text-[#8A9BB0]">
                     {v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}
@@ -242,9 +241,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                       {CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}
                     </span>
                   </div>
-                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#F4F6F9]">
-                    {formatCurrency(v.valor_venda)}
-                  </div>
+                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#F4F6F9]">{formatCurrency(v.valor_venda)}</div>
                   <div className="text-right font-mono text-[12px] text-[#F0656B]">
                     {v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}
                   </div>
@@ -258,51 +255,23 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           </div>
         </>)}
 
-        {/* ── ABA FINANCEIRO ── */}
-        {aba === 'financeiro' && (<>
-
-          {/* Gráfico fluxo caixa placeholder */}
+        {/* ── ABA ESTOQUE ── */}
+        {aba === 'estoque' && (
           <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="flex justify-between items-start mb-[18px]">
-              <div>
-                <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">6 MESES</div>
-                <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Fluxo de caixa</h3>
-              </div>
-              <div className="flex gap-4">
-                <span className="flex items-center gap-[6px] text-[12px] text-[#9FB0C2]">
-                  <span className="w-[10px] h-[10px] rounded-[3px] bg-[#34D399]" /> Entradas
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">FLUXO FINANCEIRO</div>
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-[14px] mt-[5px]">
+              <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9]">
+                Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </h3>
+              <div className="text-[12px] text-[#6B7C92]">
+                Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
+                {' · '}Saídas <span className="text-[#F0656B] font-bold">{formatCurrency(saidas)}</span>
+                {' · '}Saldo{' '}
+                <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                  {formatCurrency(saldo)}
                 </span>
-                <span className="flex items-center gap-[6px] text-[12px] text-[#9FB0C2]">
-                  <span className="w-[12px] h-[3px] rounded-[2px] bg-[#F0656B]" /> Saídas
-                </span>
               </div>
             </div>
-            <div className="flex items-center justify-center h-[120px] text-[#4F6178] text-[13px] font-mono">
-              Gráfico em construção
-            </div>
-          </div>
-
-          {/* Livro-caixa */}
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[20px_24px_14px]">
-            <div className="flex items-center justify-between gap-3 mb-[14px] flex-wrap">
-              <div>
-                <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9]">
-                  Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                </h3>
-                <div className="text-[12px] text-[#6B7C92] mt-[2px]">
-                  Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
-                  {' · '}Saídas <span className="text-[#F0656B] font-bold">{formatCurrency(saidas)}</span>
-                  {' · '}Saldo{' '}
-                  <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
-                    {formatCurrency(saldo)}
-                  </span>
-                </div>
-              </div>
-              <button className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all">
-                <Plus size={16} /> Novo lançamento
-              </button>
-            </div>
-
             <div className="overflow-x-auto">
               <div style={{ minWidth: 720 }}>
                 <div className="grid gap-3 py-[14px] px-[6px] font-mono text-[9.5px] tracking-[0.12em] text-[#5C6E84] border-b border-white/[0.06]"
@@ -310,67 +279,70 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                   <div>DATA</div><div>DESCRIÇÃO</div><div>CATEGORIA</div>
                   <div>TIPO</div><div className="text-right">VALOR</div><div className="text-right">STATUS</div>
                 </div>
-                {lancMes.length === 0 ? (
-                  <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem lançamentos este mês.</div>
-                ) : lancMes.map(l => {
-                  const isReceit = l.tipo === 'receita'
-                  const isPago   = l.status === 'pago'
-                  return (
-                    <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors"
-                      style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
-                      <div className="font-mono text-[11px] text-[#8A9BB0]">
-                        {new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}
+                {lancMes.length === 0
+                  ? <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem lançamentos este mês.</div>
+                  : lancMes.map(l => {
+                    const isReceit = l.tipo === 'receita'
+                    const isPago   = l.status === 'pago'
+                    return (
+                      <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                        style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
+                        <div className="font-mono text-[11px] text-[#8A9BB0]">
+                          {new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                        <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{l.descricao ?? '—'}</div>
+                        <div className="text-[12px] text-[#8A9BB0]">{l.categoria ?? '—'}</div>
+                        <div>
+                          <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
+                            style={{ background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(240,101,107,0.12)', color: isReceit ? '#34D399' : '#F0656B' }}>
+                            {isReceit ? 'Entrada' : 'Saída'}
+                          </span>
+                        </div>
+                        <div className={cn('text-right font-mono text-[13px] font-semibold', isReceit ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                          {isReceit ? '+' : '−'} {formatCurrency(l.valor)}
+                        </div>
+                        <div className="text-right">
+                          <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold"
+                            style={{ background: isPago ? 'rgba(52,211,153,0.1)' : 'rgba(244,183,64,0.1)', color: isPago ? '#34D399' : '#F4B740' }}>
+                            {isPago ? 'Pago' : 'Pendente'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{l.descricao ?? '—'}</div>
-                      <div className="text-[12px] text-[#8A9BB0]">{l.categoria ?? '—'}</div>
-                      <div>
-                        <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
-                          style={{
-                            background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(240,101,107,0.12)',
-                            color: isReceit ? '#34D399' : '#F0656B',
-                          }}>
-                          {isReceit ? 'Entrada' : 'Saída'}
-                        </span>
-                      </div>
-                      <div className={cn('text-right font-mono text-[13px] font-semibold',
-                        isReceit ? 'text-[#34D399]' : 'text-[#F0656B]')}>
-                        {isReceit ? '+' : '−'} {formatCurrency(l.valor)}
-                      </div>
-                      <div className="text-right">
-                        <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold"
-                          style={{
-                            background: isPago ? 'rgba(52,211,153,0.1)' : 'rgba(244,183,64,0.1)',
-                            color: isPago ? '#34D399' : '#F4B740',
-                          }}>
-                          {isPago ? 'Pago' : 'Pendente'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
               </div>
-            </div>
-          </div>
-        </>)}
-
-        {/* ── ABA ESTOQUE ── */}
-        {aba === 'estoque' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">INVENTÁRIO</div>
-            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-4">Relatório de estoque</h3>
-            <div className="flex items-center justify-center h-[160px] text-[#4F6178] text-[13px] font-mono">
-              Em construção — conectando dados do estoque
             </div>
           </div>
         )}
 
-        {/* ── ABA LEADS ── */}
-        {aba === 'leads' && (
+        {/* ── ABA CLIENTES ── */}
+        {aba === 'clientes' && (
+          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] flex items-center justify-center h-[200px]">
+            <div className="text-center text-[#4F6178] font-mono text-[13px]">Relatório de clientes em construção</div>
+          </div>
+        )}
+
+        {/* ── ABA EXPORTAR ── */}
+        {aba === 'exportar' && (
           <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CONVERSÃO</div>
-            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-4">Relatório de leads</h3>
-            <div className="flex items-center justify-center h-[160px] text-[#4F6178] text-[13px] font-mono">
-              Em construção — conectando dados de leads
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">EXPORTAÇÕES</div>
+            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-6">Exportar dados</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendas) },
+                { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => {} },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => {} },
+                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => {} },
+              ].map(e => (
+                <button key={e.label} onClick={e.action}
+                  className="flex items-start gap-4 p-[18px_20px] bg-white/[0.03] border border-white/[0.08] rounded-[16px] hover:bg-white/[0.06] hover:border-[rgba(215,40,47,0.3)] transition-all text-left">
+                  <Download size={22} className="text-[#F0656B] mt-[2px] flex-none" />
+                  <div>
+                    <div className="text-[13.5px] font-semibold text-[#E9EEF4]">{e.label}</div>
+                    <div className="text-[12px] text-[#6B7C92] mt-[3px]">{e.sub}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
