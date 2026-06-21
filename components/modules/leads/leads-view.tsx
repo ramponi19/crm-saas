@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Lead, Usuario } from './types'
+import { createClient } from '@/lib/supabase/client'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
@@ -26,6 +27,26 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
       .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
     return { ativos: ativos.length, taxa, negoc }
   }, [leads])
+
+  // Realtime: novas mensagens recebidas incrementam o badge do card
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('kanban_msgs')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'lead_mensagens' },
+        (payload: any) => {
+          const m = payload.new
+          if (m.direcao !== 'recebida') return
+          setLeads(prev => prev.map(l =>
+            l.id === m.lead_id
+              ? { ...l, msgs_nao_lidas: (l.msgs_nao_lidas ?? 0) + 1, ultima_mensagem_at: m.created_at }
+              : l
+          ))
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   function handleLeadUpdate(updated: Lead) {
     setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
