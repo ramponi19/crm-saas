@@ -73,7 +73,38 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
       }
     }
     load()
-    return () => { cancel = true }
+
+    // Realtime: escuta novas mensagens deste lead
+    const channel = supabase
+      .channel(`lead_msgs_${lead.id}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
+        (payload: any) => {
+          const m = payload.new
+          // Evita duplicar mensagens que o próprio vendedor acabou de enviar (otimista)
+          setChat(prev => {
+            const novaMsg: ChatMsg = {
+              from: m.direcao === 'enviada' ? 'loja' : 'cliente',
+              text: m.conteudo ?? '',
+              time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+            }
+            // Se for enviada e já existir uma igual com time 'agora', substitui
+            if (novaMsg.from === 'loja') {
+              const idx = prev.findIndex(x => x.from === 'loja' && x.text === novaMsg.text && x.time === 'agora')
+              if (idx >= 0) {
+                const copy = [...prev]; copy[idx] = novaMsg; return copy
+              }
+            }
+            return [...prev, novaMsg]
+          })
+          // Mensagem recebida enquanto o modal está aberto → marca como lida na hora
+          if (m.direcao === 'recebida' && !m.lida) {
+            supabase.from('lead_mensagens').update({ lida: true }).eq('id', m.id)
+          }
+        })
+      .subscribe()
+
+    return () => { cancel = true; supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id])
 
