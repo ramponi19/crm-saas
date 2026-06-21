@@ -52,7 +52,7 @@ export function Topbar({
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Busca leads com mensagens não lidas
+  // Busca leads com mensagens não lidas (+ atualização em tempo real)
   useEffect(() => {
     const supabase = createClient()
     async function load() {
@@ -81,6 +81,13 @@ export function Topbar({
       setNotifs(list)
     }
     load()
+
+    // Realtime: recarrega notificações quando há mudança em mensagens
+    const channel = supabase
+      .channel('topbar_notifs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, () => load())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   // Fecha painel ao clicar fora
