@@ -91,7 +91,7 @@ export function Topbar({
 
     // Realtime: recarrega notificações + dispara notificação do navegador
     const channel = supabase
-      .channel('topbar_notifs')
+      .channel(`topbar_notifs_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: any) => {
         load()
         // Notificação do navegador apenas para mensagens NOVAS recebidas
@@ -149,7 +149,7 @@ export function Topbar({
   function toggleTheme() { setTheme(isDark ? 'light' : 'dark') }
 
   return (
-    <header className="flex items-center gap-5 px-[30px] py-4 border-b border-white/[0.06] bg-[rgba(10,17,30,0.6)] backdrop-blur-md shrink-0 z-10">
+    <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-white/[0.06] bg-[rgba(10,17,30,0.6)] backdrop-blur-md shrink-0 z-10">
 
       <div className="min-w-0">
         {eyebrow && (
