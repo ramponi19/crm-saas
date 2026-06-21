@@ -20,14 +20,15 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick 
   })
 
   return (
-    <div className="flex flex-col w-72 flex-shrink-0">
-      {/* Column Header */}
-      <div className={`flex items-center justify-between px-3 py-2 rounded-t-xl ${column.bgColor} border border-b-0 border-[hsl(var(--crm-border))]`}>
-        <div className="flex items-center gap-2">
-          <span className={`text-base leading-none ${column.color}`}>{column.icon}</span>
-          <span className={`text-sm font-semibold ${column.color}`}>{column.label}</span>
-        </div>
-        <span className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded-full ${column.bgColor} ${column.color} border border-current/20`}>
+    <div className="flex flex-col flex-none w-[286px]">
+      {/* Header da coluna */}
+      <div className="flex items-center gap-[9px] px-1 pb-[14px]">
+        <span
+          className="w-[9px] h-[9px] rounded-full flex-none"
+          style={{ background: column.color }}
+        />
+        <span className="text-[13.5px] font-bold text-[#E9EEF4]">{column.label}</span>
+        <span className="font-mono text-[11px] text-[#6B7C92] bg-white/[0.05] px-[8px] py-[2px] rounded-full">
           {leads.length}
         </span>
       </div>
@@ -35,33 +36,28 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick 
       {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-[400px] max-h-[calc(100vh-280px)] overflow-y-auto rounded-b-xl border border-[hsl(var(--crm-border))] p-2 flex flex-col gap-2 transition-colors ${
-          isOver
-            ? 'bg-[hsl(var(--crm-brand))]/5 border-[hsl(var(--crm-brand))]/40'
-            : 'bg-[hsl(var(--crm-surface))]'
-        }`}
+        className="flex flex-col gap-[11px] min-h-[90px] rounded-[13px] transition-colors duration-150"
+        style={{
+          background: isOver ? `${column.color}08` : 'transparent',
+          outline: isOver ? `1px dashed ${column.color}44` : 'none',
+          padding: isOver ? '8px' : '0',
+        }}
       >
-        <SortableContext
-          items={leads.map(l => l.id)}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map(lead => (
             <LeadCard
               key={lead.id}
               lead={lead}
               usuarios={usuarios}
               onClick={() => onLeadClick(lead)}
+              barColor={column.color}
             />
           ))}
         </SortableContext>
 
         {leads.length === 0 && (
-          <div className={`flex-1 flex items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-            isOver
-              ? 'border-[hsl(var(--crm-brand))]/40 bg-[hsl(var(--crm-brand))]/5'
-              : 'border-[hsl(var(--crm-border))]'
-          }`}>
-            <p className="text-xs text-[hsl(var(--crm-text-subtle))]">
+          <div className="flex-1 min-h-[80px] flex items-center justify-center rounded-[13px] border border-dashed border-white/[0.06]">
+            <p className="text-[12px] text-[#4F6178]">
               {isDragging ? 'Soltar aqui' : 'Nenhum lead'}
             </p>
           </div>
