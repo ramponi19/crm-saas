@@ -73,10 +73,12 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
       onClick={onClick} className="cursor-pointer select-none">
       <div
-        className="rounded-[13px] border border-white/[0.06] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px]"
+        className={`rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] ${temMsgs ? 'animate-[unreadPulse_2s_ease-in-out_infinite]' : ''}`}
         style={{
           background: '#122036',
+          border: temMsgs ? '1px solid rgba(240,101,107,0.7)' : '1px solid rgba(255,255,255,0.06)',
           borderLeft: `3px solid ${barColor}`,
+          boxShadow: temMsgs ? '0 0 0 1px rgba(240,101,107,0.25), 0 0 16px rgba(240,101,107,0.18)' : 'none',
           opacity: isSortableDragging || isDragging ? 0.4 : 1,
         }}
       >
