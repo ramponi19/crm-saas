@@ -12,7 +12,7 @@ async function getConfigs() {
     supabase
       .from('configuracoes_sistema')
       .select('chave, valor')
-      .in('chave', ['whatsapp_evolution', 'whatsapp_official', 'dados_loja', 'preferencias']),
+      .in('chave', ['whatsapp_evolution', 'whatsapp_official', 'meta_instagram', 'meta_messenger', 'dados_loja', 'preferencias']),
     supabase
       .from('taxas_pagamento')
       .select('forma_pagamento, parcelas, percentual_taxa')
@@ -21,13 +21,15 @@ async function getConfigs() {
 
   const evolution    = configs?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
   const official     = configs?.find(d => d.chave === 'whatsapp_official')?.valor as OfficialConfig | undefined
+  const instagram    = configs?.find(d => d.chave === 'meta_instagram')?.valor ?? null
+  const messenger    = configs?.find(d => d.chave === 'meta_messenger')?.valor ?? null
   const dadosLoja    = configs?.find(d => d.chave === 'dados_loja')?.valor ?? null
   const preferencias = configs?.find(d => d.chave === 'preferencias')?.valor ?? null
 
   return {
     evolution: evolution ?? null,
     official: official ?? null,
-    dadosLoja, preferencias,
+    instagram, messenger, dadosLoja, preferencias,
     taxas: (taxas ?? []).map((t: any) => ({
       forma_pagamento: t.forma_pagamento,
       parcelas: t.parcelas,
@@ -37,7 +39,7 @@ async function getConfigs() {
 }
 
 export default async function ConfiguracoesPage() {
-  const { evolution, official, dadosLoja, preferencias, taxas } = await getConfigs()
+  const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas } = await getConfigs()
 
   return (
     <>
@@ -45,6 +47,8 @@ export default async function ConfiguracoesPage() {
       <ConfiguracoesView
         evolution={evolution}
         official={official}
+        instagram={instagram}
+        messenger={messenger}
         dadosLoja={dadosLoja}
         preferencias={preferencias}
         taxas={taxas}
