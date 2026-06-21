@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
+import { EvolutionCard } from './evolution-card'
+import { OfficialCard } from './official-card'
 
 interface Props {
   evolution: EvolutionConfig | null
@@ -149,32 +151,38 @@ export function ConfiguracoesView({ evolution, official, taxas }: Props) {
 
         {/* ── INTEGRAÇÕES ── */}
         {aba === 'integracoes' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CANAIS DE ATENDIMENTO</div>
-            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-1">Integrações</h3>
-            <p className="text-[12.5px] text-[#8A9BB0] mb-[18px]">
-              WhatsApp via <strong className="text-[#C4CCD6]">Evolution API</strong>; Instagram e Messenger via Meta.
-              Conecte cada canal para a caixa de entrada unificada dos leads.
-            </p>
-            <div className="flex flex-col gap-3">
-              {integracoes.map(i => (
-                <div key={i.id} className="flex items-center gap-[14px] p-[14px_16px] rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
-                  <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-[#E9EEF4]">{i.nome}</div>
-                    <div className="text-[11.5px] text-[#6B7C92]">{i.desc}</div>
+          <div className="space-y-4">
+            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CANAIS DE ATENDIMENTO</div>
+              <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-1">Integrações</h3>
+              <p className="text-[12.5px] text-[#8A9BB0] mb-[18px]">
+                WhatsApp via <strong className="text-[#C4CCD6]">Evolution API</strong>; Instagram e Messenger via Meta.
+                Conecte cada canal para a caixa de entrada unificada dos leads.
+              </p>
+              <div className="flex flex-col gap-3">
+                {integracoes.map(i => (
+                  <div key={i.id} className="flex items-center gap-[14px] p-[14px_16px] rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
+                    <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-semibold text-[#E9EEF4]">{i.nome}</div>
+                      <div className="text-[11.5px] text-[#6B7C92]">{i.desc}</div>
+                    </div>
+                    <span className="px-[11px] py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
+                      style={{ background: i.ativo ? 'rgba(52,211,153,0.13)' : 'rgba(107,124,146,0.18)', color: i.ativo ? '#34D399' : '#8A9BB0' }}>
+                      {i.ativo ? 'Conectado' : 'Inativo'}
+                    </span>
+                    <button onClick={() => openModal(i)}
+                      className="px-[14px] py-2 rounded-[10px] bg-white/[0.05] border border-white/[0.1] text-[#C4CCD6] text-[12.5px] font-semibold hover:bg-white/[0.1] transition-colors whitespace-nowrap">
+                      Configurar
+                    </button>
                   </div>
-                  <span className="px-[11px] py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
-                    style={{ background: i.ativo ? 'rgba(52,211,153,0.13)' : 'rgba(107,124,146,0.18)', color: i.ativo ? '#34D399' : '#8A9BB0' }}>
-                    {i.ativo ? 'Conectado' : 'Inativo'}
-                  </span>
-                  <button onClick={() => openModal(i)}
-                    className="px-[14px] py-2 rounded-[10px] bg-white/[0.05] border border-white/[0.1] text-[#C4CCD6] text-[12.5px] font-semibold hover:bg-white/[0.1] transition-colors whitespace-nowrap">
-                    Configurar
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+
+            {/* Cards grandes de configuração WhatsApp */}
+            <EvolutionCard config={evolution} onSaved={() => location.reload()} />
+            <OfficialCard config={official} onSaved={() => location.reload()} />
           </div>
         )}
 
