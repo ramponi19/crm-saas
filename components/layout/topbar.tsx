@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 
 interface TopbarProps {
   eyebrow?: string
-  title: string
+  title?: string
   showPeriods?: boolean
   activePeriod?: string
   onPeriodChange?: (period: string) => void
@@ -37,7 +37,7 @@ const ORIGEM_EMOJI: Record<string, string> = {
 
 export function Topbar({
   eyebrow,
-  title,
+  title = '',
   showPeriods = false,
   activePeriod = 'mes',
   onPeriodChange,
