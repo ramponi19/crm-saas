@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { MessageCircle, Phone, Instagram, Clock, User } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { Lead, Usuario } from './types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -12,122 +12,120 @@ interface LeadCardProps {
   usuarios: Usuario[]
   onClick: () => void
   isDragging?: boolean
+  barColor: string
 }
 
-export function LeadCard({ lead, usuarios, onClick, isDragging = false }: LeadCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging: isSortableDragging,
-  } = useSortable({
-    id: lead.id,
-    data: { leadId: lead.id },
-  })
+const ORIGEM_META: Record<string, { icon: string; color: string }> = {
+  whatsapp:  { icon: '💬', color: '#34D399' },
+  instagram: { icon: '📸', color: '#F0656B' },
+  site:      { icon: '🌐', color: '#7FB0E8' },
+  indicacao: { icon: '🤝', color: '#F4B740' },
+  loja:      { icon: '🏪', color: '#C6A86A' },
+}
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+const AVATAR_COLORS = ['#D7282F','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7']
+const getAvatarColor = (nome: string) => AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length]
+const getInitials    = (nome: string) => nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()
+
+function formatWait(date: string | null) {
+  if (!date) return null
+  return formatDistanceToNow(new Date(date), { locale: ptBR, addSuffix: false })
+}
+
+function getSlaColor(date: string | null): string {
+  if (!date) return '#6B7C92'
+  const h = (Date.now() - new Date(date).getTime()) / 3_600_000
+  if (h < 4)  return '#34D399'
+  if (h < 24) return '#F4B740'
+  return '#F0656B'
+}
+
+export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor }: LeadCardProps) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: lead.id, data: { leadId: lead.id } })
+
+  const style = { transform: CSS.Transform.toString(transform), transition }
 
   const responsavel = usuarios.find(u => u.id === lead.responsavel_id)
-  const temMensagensNaoLidas = (lead.msgs_nao_lidas ?? 0) > 0
-
-  const ultimaAtividade = lead.ultima_mensagem_at
-    ? formatDistanceToNow(new Date(lead.ultima_mensagem_at), { locale: ptBR, addSuffix: true })
-    : lead.ultima_tratativa
-    ? formatDistanceToNow(new Date(lead.ultima_tratativa), { locale: ptBR, addSuffix: true })
-    : null
+  const temMsgs     = (lead.msgs_nao_lidas ?? 0) > 0
+  const lastAt      = lead.ultima_mensagem_at ?? lead.ultima_tratativa
+  const slaColor    = getSlaColor(lastAt)
+  const waitLabel   = formatWait(lastAt)
+  const origem      = ORIGEM_META[lead.origem ?? ''] ?? { icon: '💬', color: '#6B7C92' }
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
+      ref={setNodeRef} style={style} {...attributes} {...listeners}
       onClick={onClick}
-      className={`
-        group relative rounded-xl border bg-[hsl(var(--crm-surface))] p-3 cursor-pointer
-        transition-all duration-150 select-none
-        ${isSortableDragging || isDragging
-          ? 'opacity-40 shadow-2xl border-[hsl(var(--crm-brand))]/40'
-          : 'border-[hsl(var(--crm-border))] hover:border-[hsl(var(--crm-brand))]/30 hover:shadow-md hover:-translate-y-0.5'
-        }
-        ${temMensagensNaoLidas ? 'ring-1 ring-[hsl(var(--crm-brand))]/30' : ''}
-      `}
+      className="cursor-pointer select-none"
+      style-hover="transform:translateY(-2px)"
     >
-      {/* Badge de msgs não lidas */}
-      {temMensagensNaoLidas && (
-        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[hsl(var(--crm-brand))] text-white text-[10px] font-bold flex items-center justify-center">
-          {lead.msgs_nao_lidas! > 9 ? '9+' : lead.msgs_nao_lidas}
-        </span>
-      )}
-
-      {/* Nome */}
-      <p className="text-sm font-semibold text-[hsl(var(--crm-text-primary))] mb-1 truncate">
-        {lead.nome ?? 'Lead sem nome'}
-      </p>
-
-      {/* Produto */}
-      {lead.produto_interessado && (
-        <p className="text-xs text-[hsl(var(--crm-text-muted))] mb-2 truncate">
-          {lead.produto_interessado}
-        </p>
-      )}
-
-      {/* Contatos */}
-      <div className="flex items-center gap-2 mb-2">
-        {lead.telefone && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-[hsl(var(--crm-text-subtle))]">
-            <Phone className="w-3 h-3" />
-            <span className="font-mono">{lead.telefone.slice(-8)}</span>
-          </span>
-        )}
-        {lead.instagram && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-[hsl(var(--crm-text-subtle))]">
-            <Instagram className="w-3 h-3" />
-            <span className="truncate max-w-[80px]">{lead.instagram}</span>
-          </span>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          {/* Origem */}
-          {lead.origem && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--crm-text-muted))] font-medium">
-              {lead.origem}
+      <div
+        className="rounded-[13px] border border-white/[0.06] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px]"
+        style={{
+          background: '#122036',
+          borderLeft: `3px solid ${barColor}`,
+          opacity: isSortableDragging || isDragging ? 0.4 : 1,
+        }}
+      >
+        {/* Linha 1: badge msgs + nome + ícone origem */}
+        <div className="flex items-center gap-[9px] mb-[7px]">
+          {temMsgs && (
+            <span
+              className="w-[24px] h-[24px] rounded-full flex items-center justify-center text-[10.5px] font-bold text-white flex-none"
+              style={{ background: slaColor }}
+            >
+              {(lead.msgs_nao_lidas ?? 0) > 9 ? '9+' : lead.msgs_nao_lidas}
             </span>
           )}
-          {/* Msgs */}
-          {(lead.msgs_nao_lidas ?? 0) === 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-[hsl(var(--crm-text-subtle))]">
-              <MessageCircle className="w-3 h-3" />
-            </span>
-          )}
+          <div className="flex-1 text-[14px] font-semibold text-[#E9EEF4] truncate">
+            {lead.nome ?? 'Lead sem nome'}
+          </div>
+          <span className="text-[18px] flex-none" title={lead.origem ?? ''}>
+            {origem.icon}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Responsável */}
-          {responsavel && (
-            <span
-              title={responsavel.nome}
-              className="inline-flex items-center gap-1 text-[10px] text-[hsl(var(--crm-text-subtle))]"
-            >
-              <User className="w-3 h-3" />
-              <span className="truncate max-w-[60px]">{responsavel.nome.split(' ')[0]}</span>
-            </span>
-          )}
+        {/* Produto interessado */}
+        {lead.produto_interessado && (
+          <div className="text-[12px] text-[#7E8EA2] mb-[9px] truncate">
+            {lead.produto_interessado}
+          </div>
+        )}
 
-          {/* Tempo */}
-          {ultimaAtividade && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-[hsl(var(--crm-text-subtle))]">
-              <Clock className="w-3 h-3" />
-              <span>{ultimaAtividade.replace('há ', '').replace(' atrás', '')}</span>
+        {/* Linha de espera (SLA) */}
+        {lastAt && waitLabel && (
+          <div className="flex items-center gap-[6px] mb-[9px]">
+            <span className="w-[8px] h-[8px] rounded-full flex-none" style={{ background: slaColor, boxShadow: `0 0 7px ${slaColor}` }} />
+            <Clock size={13} style={{ color: slaColor }} />
+            <span className="font-mono text-[11px] font-semibold" style={{ color: slaColor }}>
+              {waitLabel}
             </span>
+            <span className="flex-1" />
+            <span className="font-mono text-[9.5px] text-[#5C6E84]">
+              {new Date(lastAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+            </span>
+          </div>
+        )}
+
+        {/* Linha 3: valor + avatar responsável */}
+        <div className="flex items-center justify-between mt-[11px]">
+          <span className="text-[13.5px] font-bold text-[#F0656B]">
+            {lead.valor_estimado
+              ? lead.valor_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+              : '—'}
+          </span>
+          {responsavel ? (
+            <div
+              className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[10.5px] font-bold text-white"
+              style={{ background: getAvatarColor(responsavel.nome) }}
+            >
+              {getInitials(responsavel.nome)}
+            </div>
+          ) : (
+            <div className="w-[28px] h-[28px] rounded-[8px] bg-white/[0.06]" />
           )}
         </div>
       </div>
