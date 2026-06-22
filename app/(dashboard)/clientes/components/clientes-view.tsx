@@ -120,7 +120,7 @@ export default function ClientesView({ clientes }: Props) {
       {/* Topbar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#3F516A] uppercase mb-0.5">Relacionamento</p>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">Relacionamento</p>
           <h1 className="text-xl font-bold text-[#F4F6F9]">Clientes</h1>
         </div>
       </div>
@@ -128,12 +128,12 @@ export default function ClientesView({ clientes }: Props) {
       {/* Search + Button */}
       <div className="flex items-center gap-3 px-6 py-4 shrink-0">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3F516A]" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5C6E84]" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente por nome, e-mail ou telefone..."
-            className="w-full bg-[#0D1824] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.15] transition-colors"
+            className="w-full bg-[#122036] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#5C6E84] outline-none focus:border-white/[0.15] transition-colors"
           />
         </div>
         <button
@@ -145,15 +145,14 @@ export default function ClientesView({ clientes }: Props) {
         </button>
       </div>
 
-      {/* Table */}
+      {/* Table — card azul-médio como no modelo */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        {/* Card da tabela: mesmo fundo da página para as linhas se destacarem pelo hover */}
-        <div className="border border-white/[0.06] rounded-[16px] overflow-hidden">
+        <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="bg-[#0D1824] border-b border-white/[0.06]">
+              <tr className="border-b border-white/[0.08]">
                 {['Cliente', 'Telefone', 'Cidade', 'Compras', 'Total Gasto', 'Última', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase px-5 py-3.5 whitespace-nowrap">
+                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -161,12 +160,12 @@ export default function ClientesView({ clientes }: Props) {
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
-                <tr className="bg-[#0D1824]">
-                  <td colSpan={7} className="text-center py-16 text-[#3F516A] text-sm">
+                <tr>
+                  <td colSpan={7} className="text-center py-16 text-[#5C6E84] text-sm">
                     Nenhum cliente encontrado
                   </td>
                 </tr>
-              ) : filtrados.map((c, i) => {
+              ) : filtrados.map(c => {
                 const color = avatarColor(c.nome)
                 const tv = c.total_vendas ?? 0
                 const vt = c.valor_total ?? 0
@@ -174,13 +173,9 @@ export default function ClientesView({ clientes }: Props) {
                   <tr
                     key={c.id}
                     onClick={() => openCliente(c)}
-                    className={cn(
-                      'border-b border-white/[0.04] hover:bg-[#0D1824] cursor-pointer transition-colors last:border-0',
-                      i % 2 === 0 ? 'bg-[#0A111E]' : 'bg-[#0B1520]'
-                    )}
+                    className="border-b border-white/[0.05] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0"
                   >
-                    {/* Cliente */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
@@ -196,41 +191,35 @@ export default function ClientesView({ clientes }: Props) {
                         </div>
                       </div>
                     </td>
-                    {/* Telefone */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <span className="text-sm text-[#8A9BB0]">{c.telefone ?? '—'}</span>
                     </td>
-                    {/* Cidade */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <span className="text-sm text-[#8A9BB0]">
                         {c.cidade && c.estado ? `${c.cidade} · ${c.estado}` : c.cidade ?? c.estado ?? '—'}
                       </span>
                     </td>
-                    {/* Compras */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <span className={cn(
                         'text-sm font-semibold font-mono',
-                        tv > 0 ? 'text-[#F4F6F9]' : 'text-[#3F516A]'
+                        tv > 0 ? 'text-[#F4F6F9]' : 'text-[#5C6E84]'
                       )}>
                         {tv}
                       </span>
                     </td>
-                    {/* Total Gasto */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       {vt > 0 ? (
                         <span className="text-sm font-bold text-[#F4F6F9]">
                           {vt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       ) : (
-                        <span className="text-[#3F516A]">—</span>
+                        <span className="text-[#5C6E84]">—</span>
                       )}
                     </td>
-                    {/* Última compra */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <span className="text-sm text-[#8A9BB0]">{fmtUltimaCompra(c.ultima_compra)}</span>
                     </td>
-                    {/* Status */}
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
                       <StatusBadge tipo={c.tipo_cliente} ativo={c.ativo} />
                     </td>
                   </tr>
@@ -241,7 +230,6 @@ export default function ClientesView({ clientes }: Props) {
         </div>
       </div>
 
-      {/* Modal */}
       {modalOpen && (
         <ClienteModal
           cliente={isNew ? null : clienteSelecionado}
