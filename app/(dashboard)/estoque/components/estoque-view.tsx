@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Package, AlertTriangle, TrendingUp, DollarSign, ChevronRight, Tag } from 'lucide-react'
+import { Search, Package, CheckCircle, Clock, Wrench, TrendingUp, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
-import ProdutoModal from './produto-modal'
+import { Topbar } from '@/components/layout/topbar'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 interface Unidade {
   id: number
@@ -27,357 +29,430 @@ interface Unidade {
   created_at: string
 }
 
-interface ProdutoCat {
+interface Movimentacao {
   id: number
-  nome: string
-  marca_id: number | null
-  marca_nome: string
-  categoria_id: number | null
-  categoria_nome: string | null
-  ativo: boolean
+  produto_nome: string
+  tipo_movimento: string
+  quantidade: number
+  observacoes: string | null
+  created_at: string
+  usuario_nome: string | null
 }
 
 interface Props {
   itens: Unidade[]
+  movimentacoes: Movimentacao[]
   marcas: { id: number; nome: string }[]
   categorias: { id: number; nome: string }[]
-  produtos: ProdutoCat[]
+  produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  disponivel: { label: 'Disponível', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  reservado:  { label: 'Reservado',  color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  vendido:    { label: 'Vendido',    color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' },
-  assistencia:{ label: 'Assistência',color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
+const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  disponivel:  { label: 'Disponível',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
+  reservado:   { label: 'Reservado',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  vendido:     { label: 'Vendido',     color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' },
+  assistencia: { label: 'Em reparo',   color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
 }
 
-export default function EstoqueView({ itens, marcas, categorias, produtos: produtosInit }: Props) {
-  const [tab, setTab] = useState<'unidades' | 'produtos'>('unidades')
+const CONDICAO_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  novo:      { label: 'Novo',       color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
+  seminovo:  { label: 'Seminovo',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  usado:     { label: 'Usado',      color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' },
+  defeito:   { label: 'Com defeito',color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+}
 
-  // --- Unidades ---
+const TIPO_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  entrada:  { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
+  saida:    { label: 'Saída',    color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+  ajuste:   { label: 'Ajuste',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  compra:   { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
+  venda:    { label: 'Saída',    color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+}
+
+const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmtDate = (s: string) => {
+  const d = new Date(s)
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
+
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, categorias, produtos }: Props) {
+  const [tab, setTab] = useState<Tab>('lista')
+  const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState<string>('todos')
-  const [filtroMarca, setFiltroMarca] = useState<string>('todas')
-  const [modalUnidade, setModalUnidade] = useState(false)
+  const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [filtroMarca, setFiltroMarca] = useState('todas')
   const [unidadeSel, setUnidadeSel] = useState<Unidade | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
-  // --- Produtos ---
-  const [produtos, setProdutos] = useState<ProdutoCat[]>(produtosInit)
-  const [searchProd, setSearchProd] = useState('')
-  const [filtroMarcaProd, setFiltroMarcaProd] = useState('todas')
-  const [modalProduto, setModalProduto] = useState(false)
-  const [produtoSel, setProdutoSel] = useState<ProdutoCat | null>(null)
-
+  // Stats
   const stats = useMemo(() => {
-    const disponiveis = itens.filter(i => i.status === 'disponivel')
-    const valorEstoque = disponiveis.reduce((acc, i) => acc + (i.preco_venda ?? 0), 0)
-    const semIMEI = disponiveis.filter(i => !i.imei && !i.numero_serie).length
-    return { total: itens.length, disponiveis: disponiveis.length, valorEstoque, semIMEI }
+    const disponiveis = itens.filter(i => i.status === 'disponivel').length
+    const reservados = itens.filter(i => i.status === 'reservado').length
+    const reparo = itens.filter(i => i.status === 'assistencia').length
+    const vendidos = itens.filter(i => i.status === 'vendido').length
+    const total = itens.length
+    const valorEstoque = itens.filter(i => i.status === 'disponivel').reduce((acc, i) => acc + (i.preco_venda ?? 0), 0)
+    return { total, disponiveis, reservados, reparo, vendidos, valorEstoque }
   }, [itens])
 
-  const filtrados = useMemo(() => {
-    return itens.filter(i => {
-      const matchSearch = !search ||
-        i.produto_nome.toLowerCase().includes(search.toLowerCase()) ||
-        i.marca_nome.toLowerCase().includes(search.toLowerCase()) ||
-        (i.imei ?? '').includes(search) ||
-        (i.numero_serie ?? '').includes(search) ||
-        (i.cor ?? '').toLowerCase().includes(search.toLowerCase())
-      const matchStatus = filtroStatus === 'todos' || i.status === filtroStatus
-      const matchMarca = filtroMarca === 'todas' || i.marca_nome === filtroMarca
-      return matchSearch && matchStatus && matchMarca
-    })
-  }, [itens, search, filtroStatus, filtroMarca])
+  const marcasUnicas = useMemo(() => [...new Set(itens.map(i => i.marca_nome))].filter(Boolean), [itens])
 
-  const produtosFiltrados = useMemo(() => {
-    return produtos.filter(p => {
-      const matchSearch = !searchProd ||
-        p.nome.toLowerCase().includes(searchProd.toLowerCase()) ||
-        p.marca_nome.toLowerCase().includes(searchProd.toLowerCase())
-      const matchMarca = filtroMarcaProd === 'todas' || p.marca_nome === filtroMarcaProd
-      return matchSearch && matchMarca
-    })
-  }, [produtos, searchProd, filtroMarcaProd])
+  const filtrados = useMemo(() => itens.filter(i => {
+    const matchSearch = !search ||
+      i.produto_nome.toLowerCase().includes(search.toLowerCase()) ||
+      i.marca_nome.toLowerCase().includes(search.toLowerCase()) ||
+      (i.imei ?? '').includes(search) ||
+      (i.numero_serie ?? '').includes(search)
+    const matchStatus = filtroStatus === 'todos' || i.status === filtroStatus
+    const matchMarca = filtroMarca === 'todas' || i.marca_nome === filtroMarca
+    return matchSearch && matchStatus && matchMarca
+  }), [itens, search, filtroStatus, filtroMarca])
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={14} /> },
+    { key: 'lista',     label: 'Lista',     icon: <List size={14} /> },
+    { key: 'entrada',   label: 'Entrada',   icon: <ArrowDownLeft size={14} /> },
+    { key: 'historico', label: 'Histórico', icon: <History size={14} /> },
+  ]
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 py-6 border-b border-white/[0.06] shrink-0">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-[#F4F6F9]">Estoque</h1>
-            <p className="text-sm text-[#5C6E84] mt-0.5">
-              {tab === 'unidades' ? `${itens.length} unidades cadastradas` : `${produtos.length} modelos cadastrados`}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 bg-[#0D1824] border border-white/[0.06] rounded-[10px] p-1">
-            {([['unidades', 'Unidades'], ['produtos', 'Produtos']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={cn(
-                  'px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all',
-                  tab === key ? 'bg-[rgba(215,40,47,0.15)] text-[#F0353D]' : 'text-[#5C6E84] hover:text-[#8A9BB0]'
-                )}
-              >{label}</button>
-            ))}
-          </div>
+    <div className="flex flex-col h-full bg-[#070E18] overflow-hidden">
+      <Topbar eyebrow="Catálogo · Controle de Unidades" title="Estoque" />
+
+      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
+                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+              {t.icon}{t.label}
+            </button>
+          ))}
         </div>
-        <button
-          onClick={() => {
-            if (tab === 'unidades') { setUnidadeSel(null); setModalUnidade(true) }
-            else { setProdutoSel(null); setModalProduto(true) }
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          {tab === 'unidades' ? 'Adicionar Unidade' : 'Novo Produto'}
-        </button>
-      </div>
 
-      {tab === 'unidades' ? (
-        <>
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 px-8 py-5 shrink-0">
-            {[
-              { label: 'Total Unidades', value: stats.total, icon: Package, color: '#6B8CFF' },
-              { label: 'Disponíveis', value: stats.disponiveis, icon: TrendingUp, color: '#22C55E' },
-              { label: 'Valor em Estoque', value: fmt(stats.valorEstoque), icon: DollarSign, color: '#F59E0B' },
-              { label: 'Sem ID / IMEI', value: stats.semIMEI, icon: AlertTriangle, color: stats.semIMEI > 0 ? '#F0353D' : '#5C6E84' },
-            ].map(s => (
-              <div key={s.label} className="bg-[#0D1824] border border-white/[0.06] rounded-[14px] px-5 py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: s.color + '1A' }}>
-                  <s.icon size={20} style={{ color: s.color }} />
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#5C6E84] font-mono tracking-wide uppercase">{s.label}</div>
-                  <div className="text-xl font-bold text-[#F4F6F9] mt-0.5">{s.value}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Filtros */}
-          <div className="flex items-center gap-3 px-8 pb-4 shrink-0">
-            <div className="relative flex-1 max-w-sm">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3F516A]" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por modelo, IMEI, cor..."
-                className="w-full bg-[#0D1824] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.15]"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-[#0D1824] border border-white/[0.06] rounded-[10px] p-1">
+        {/* ── DASHBOARD ── */}
+        {tab === 'dashboard' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-4 gap-4">
               {[
-                { key: 'todos', label: 'Todos' },
-                { key: 'disponivel', label: 'Disponível' },
-                { key: 'reservado', label: 'Reservado' },
-                { key: 'assistencia', label: 'Assistência' },
-                { key: 'vendido', label: 'Vendido' },
-              ].map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setFiltroStatus(f.key)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-[8px] text-xs font-medium transition-all',
-                    filtroStatus === f.key ? 'bg-[rgba(215,40,47,0.15)] text-[#F0353D]' : 'text-[#5C6E84] hover:text-[#8A9BB0]'
-                  )}
-                >
-                  {f.label}
-                </button>
+                { icon: <Package size={20}/>, label: 'Unidades ativas', value: stats.total, color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
+                { icon: <CheckCircle size={20}/>, label: 'Disponíveis', value: stats.disponiveis, color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
+                { icon: <Clock size={20}/>, label: 'Reservadas', value: stats.reservados, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+                { icon: <Wrench size={20}/>, label: 'Em reparo', value: stats.reparo, color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+              ].map((c, i) => (
+                <div key={i} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-5 flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>{c.icon}</div>
+                  <div>
+                    <div className="text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em]">{c.label}</div>
+                    <div className="text-[26px] font-serif text-[#F4F6F9] leading-none mt-1">{c.value}</div>
+                  </div>
+                </div>
               ))}
             </div>
-            <select
-              value={filtroMarca}
-              onChange={e => setFiltroMarca(e.target.value)}
-              className="bg-[#0D1824] border border-white/[0.06] rounded-[10px] px-3 py-2 text-xs text-[#8A9BB0] outline-none"
-            >
-              <option value="todas">Todas as marcas</option>
-              {marcas.map(m => <option key={m.id} value={m.nome}>{m.nome}</option>)}
-            </select>
-          </div>
 
-          {/* Tabela Unidades */}
-          <div className="flex-1 overflow-y-auto px-8 pb-6">
-            <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    {['Produto', 'IMEI / Série', 'Cor / Armazenamento', 'Bateria', 'Status', 'Custo', 'Venda', ''].map(h => (
-                      <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase px-4 py-3.5">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtrados.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-16 text-[#3F516A] text-sm">
-                        Nenhuma unidade encontrada
-                      </td>
-                    </tr>
-                  ) : filtrados.map(item => {
-                    const st = STATUS_LABELS[item.status ?? ''] ?? STATUS_LABELS.disponivel
-                    return (
-                      <tr
-                        key={item.id}
-                        onClick={() => { setUnidadeSel(item); setModalUnidade(true) }}
-                        className="border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-colors"
-                      >
-                        <td className="px-4 py-3.5">
-                          <div>
-                            <div className="text-sm font-semibold text-[#E9EEF4]">{item.produto_nome}</div>
-                            <div className="text-[11px] text-[#5C6E84]">{item.marca_nome}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="font-mono text-xs text-[#8A9BB0]">
-                            {item.imei ?? item.numero_serie ?? <span className="text-[#F59E0B]">Sem ID</span>}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="text-xs text-[#8A9BB0]">
-                            {[item.cor, item.armazenamento].filter(Boolean).join(' · ') || '—'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          {item.bateria ? (
-                            <span className={cn('text-xs font-mono', Number(item.bateria) < 80 ? 'text-[#F59E0B]' : 'text-[#22C55E]')}>
-                              {item.bateria}%
-                            </span>
-                          ) : <span className="text-[#3F516A] text-xs">—</span>}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ color: st.color, background: st.bg }}>
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="text-sm text-[#8A9BB0]">{item.preco_custo ? fmt(item.preco_custo) : '—'}</span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="text-sm font-semibold text-[#F4F6F9]">{item.preco_venda ? fmt(item.preco_venda) : '—'}</span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <ChevronRight size={15} className="text-[#3F516A]" />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-6 space-y-4">
+              <div className="text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.12em]">Distribuição por Status</div>
+              {[
+                { label: 'Disponíveis', count: stats.disponiveis, color: '#22C55E' },
+                { label: 'Reservadas',  count: stats.reservados,  color: '#F59E0B' },
+                { label: 'Em reparo',   count: stats.reparo,       color: '#6B8CFF' },
+                { label: 'Vendidas (total)', count: stats.vendidos, color: '#5C6E84' },
+              ].map(r => (
+                <div key={r.label} className="flex items-center gap-4">
+                  <div className="w-32 text-[13px] text-[#8A9BB0]">{r.label}</div>
+                  <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700"
+                      style={{ width: stats.total ? `${(r.count / stats.total) * 100}%` : '0%', background: r.color }} />
+                  </div>
+                  <div className="w-8 text-[13px] text-[#C4CCD6] font-semibold text-right">{r.count}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </>
-      ) : (
-        <>
-          {/* Filtros Produtos */}
-          <div className="flex items-center gap-3 px-8 py-5 shrink-0">
-            <div className="relative flex-1 max-w-sm">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3F516A]" />
-              <input
-                value={searchProd}
-                onChange={e => setSearchProd(e.target.value)}
-                placeholder="Buscar por modelo ou marca..."
-                className="w-full bg-[#0D1824] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.15]"
-              />
+        )}
+
+        {/* ── LISTA ── */}
+        {tab === 'lista' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-[360px]">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#46586E]" />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar por IMEI, número de série..."
+                  className="w-full bg-[#0C1828] border border-white/[0.08] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
+              </div>
+
+              <div className="flex gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[11px]">
+                {['todos','disponivel','reservado','assistencia','vendido'].map(s => (
+                  <button key={s} onClick={() => setFiltroStatus(s)}
+                    className={cn('px-3 py-1.5 rounded-[8px] text-[12px] font-medium capitalize transition-all',
+                      filtroStatus === s ? 'bg-[#E03037] text-white font-bold' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                    {s === 'todos' ? 'Todos' : STATUS_STYLE[s]?.label ?? s}
+                  </button>
+                ))}
+              </div>
+
+              {marcasUnicas.length > 0 && (
+                <select value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}
+                  className="bg-[#0C1828] border border-white/[0.08] rounded-[11px] px-3 py-2.5 text-[13px] text-[#8A9BB0] outline-none">
+                  <option value="todas">Todas as marcas</option>
+                  {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              )}
+
+              <div className="flex-1" />
+              <button onClick={() => { setUnidadeSel(null); setModalOpen(true) }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                <ArrowDownLeft size={15} /> Entrada de estoque
+              </button>
             </div>
-            <select
-              value={filtroMarcaProd}
-              onChange={e => setFiltroMarcaProd(e.target.value)}
-              className="bg-[#0D1824] border border-white/[0.06] rounded-[10px] px-3 py-2 text-xs text-[#8A9BB0] outline-none"
-            >
-              <option value="todas">Todas as marcas</option>
-              {marcas.map(m => <option key={m.id} value={m.nome}>{m.nome}</option>)}
-            </select>
-            <div className="text-xs text-[#5C6E84]">{produtosFiltrados.length} modelos</div>
-          </div>
 
-          {/* Grid Produtos */}
-          <div className="flex-1 overflow-y-auto px-8 pb-6">
-            {produtosFiltrados.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-[#3F516A]">
-                <Tag size={40} className="mb-3 opacity-40" />
-                <p className="text-sm">Nenhum produto encontrado</p>
+            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
+              <div className="grid px-5 py-3 border-b border-white/[0.06]"
+                style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
+                {['Produto','IMEI','Condição','Bateria','Variante','Custo','Venda','Status'].map(h => (
+                  <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
+                ))}
               </div>
-            ) : (
-              <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-white/[0.06]">
-                      {['Modelo', 'Marca', 'Categoria', 'Unidades', ''].map(h => (
-                        <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase px-5 py-3.5">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {produtosFiltrados.map(p => {
-                      const unidadesCount = itens.filter(u => u.produto_id === p.id).length
-                      const dispCount = itens.filter(u => u.produto_id === p.id && u.status === 'disponivel').length
-                      return (
-                        <tr
-                          key={p.id}
-                          onClick={() => { setProdutoSel(p); setModalProduto(true) }}
-                          className="border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-colors"
-                        >
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-[9px] bg-[rgba(107,140,255,0.1)] flex items-center justify-center">
-                                <Package size={14} className="text-[#6B8CFF]" />
-                              </div>
-                              <span className="text-sm font-semibold text-[#E9EEF4]">{p.nome}</span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className="text-sm text-[#8A9BB0]">{p.marca_nome}</span>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className="text-xs text-[#5C6E84]">{p.categoria_nome ?? '—'}</span>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-[#F4F6F9]">{unidadesCount}</span>
-                              {dispCount > 0 && (
-                                <span className="text-[10px] text-[#22C55E] bg-[rgba(34,197,94,0.1)] px-2 py-0.5 rounded-full">
-                                  {dispCount} disp.
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <ChevronRight size={15} className="text-[#3F516A]" />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+
+              {filtrados.length === 0 ? (
+                <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma unidade encontrada</div>
+              ) : filtrados.map(u => {
+                const cond = CONDICAO_STYLE[u.condicao ?? 'novo'] ?? CONDICAO_STYLE.novo
+                const st = STATUS_STYLE[u.status ?? 'disponivel'] ?? STATUS_STYLE.disponivel
+                const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
+                const variante = [u.cor, u.armazenamento].filter(Boolean).join(' · ') || '—'
+                return (
+                  <div key={u.id} onClick={() => { setUnidadeSel(u); setModalOpen(true) }}
+                    className="grid px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors items-center"
+                    style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
+                    <div className="min-w-0">
+                      <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{u.produto_nome}</div>
+                      <div className="text-[11.5px] text-[#6B7C92]">{u.marca_nome}</div>
+                    </div>
+                    <div className="text-[12.5px] text-[#8A9BB0] font-mono">{imeiMask}</div>
+                    <div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span>
+                    </div>
+                    <div className="text-[13px] font-semibold" style={{ color: Number(u.bateria) >= 90 ? '#22C55E' : Number(u.bateria) >= 80 ? '#F59E0B' : '#F0353D' }}>
+                      {u.bateria ? `${u.bateria}%` : '—'}
+                    </div>
+                    <div className="text-[12.5px] text-[#8A9BB0] truncate">{variante}</div>
+                    <div className="text-[13px] text-[#8A9BB0]">{u.preco_custo ? fmt(u.preco_custo) : '—'}</div>
+                    <div className="text-[13.5px] font-bold text-[#F4F6F9]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: st.bg, color: st.color }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />
+                        {st.label}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </>
-      )}
+        )}
 
-      {modalUnidade && (
-        <UnidadeModal unidade={unidadeSel as any} onClose={() => setModalUnidade(false)} />
-      )}
+        {/* ── ENTRADA ── */}
+        {tab === 'entrada' && (
+          <div className="max-w-[700px]">
+            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[20px] overflow-hidden">
+              <div className="flex items-center gap-4 px-6 py-5 border-b border-white/[0.06]">
+                <div className="w-10 h-10 rounded-[12px] bg-[rgba(215,40,47,0.15)] flex items-center justify-center">
+                  <ArrowDownLeft size={18} className="text-[#F0353D]" />
+                </div>
+                <div>
+                  <div className="text-[16px] font-serif text-[#F4F6F9]">Nova entrada de unidade</div>
+                  <div className="text-[12px] text-[#5C6E84]">Cadastre uma unidade física no estoque por IMEI / número de série</div>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <UnidadeInlineForm
+                  produtos={produtos}
+                  onSaved={(u) => {
+                    setItens(prev => [u, ...prev])
+                    setTab('lista')
+                    toast.success('Unidade adicionada ao estoque!')
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
-      {modalProduto && (
-        <ProdutoModal
-          produto={produtoSel}
-          marcas={marcas}
-          categorias={categorias}
-          onClose={() => setModalProduto(false)}
-          onSaved={(p) => setProdutos(prev =>
-            produtoSel ? prev.map(x => x.id === p.id ? p : x) : [...prev, p]
-          )}
-          onDeleted={(id) => setProdutos(prev => prev.filter(x => x.id !== id))}
+        {/* ── HISTÓRICO ── */}
+        {tab === 'historico' && (
+          <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
+            <div className="grid px-5 py-3 border-b border-white/[0.06]"
+              style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
+              {['Data','Movimento','Produto','Qtd','Responsável','Reservação'].map(h => (
+                <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
+              ))}
+            </div>
+            {movimentacoes.length === 0 ? (
+              <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma movimentação registrada</div>
+            ) : movimentacoes.map(m => {
+              const tipo = TIPO_STYLE[m.tipo_movimento] ?? { label: m.tipo_movimento, color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' }
+              return (
+                <div key={m.id} className="grid px-5 py-3.5 border-b border-white/[0.04] items-center"
+                  style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
+                  <div className="text-[12.5px] text-[#8A9BB0] font-mono">{fmtDate(m.created_at)}</div>
+                  <div>
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: tipo.bg, color: tipo.color }}>{tipo.label}</span>
+                  </div>
+                  <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{m.produto_nome}</div>
+                  <div className="text-[13px] font-semibold" style={{ color: m.quantidade > 0 ? '#22C55E' : '#F0353D' }}>
+                    {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
+                  </div>
+                  <div className="text-[13px] text-[#8A9BB0]">{m.usuario_nome ?? '—'}</div>
+                  <div className="text-[12.5px] text-[#6B7C92] truncate">{m.observacoes ?? '—'}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {modalOpen && (
+        <UnidadeModal
+          unidade={unidadeSel}
+          onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
+    </div>
+  )
+}
+
+// ── Formulário inline de entrada ──
+function UnidadeInlineForm({ produtos, onSaved }: {
+  produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  onSaved: (u: Unidade) => void
+}) {
+  const supabase = createClient()
+  const [form, setForm] = useState({
+    produto_id: '', tipo: 'compra', condicao: 'novo', estado: 'lacrado',
+    status: 'disponivel', cor: '', armazenamento: '', imei: '', bateria: '',
+    preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
+  const margem = form.preco_venda && form.preco_custo
+    ? (((Number(form.preco_venda) - custoTotal) / Number(form.preco_venda)) * 100).toFixed(1) : null
+
+  async function salvar() {
+    if (!form.produto_id) { toast.error('Selecione um produto'); return }
+    if (!form.preco_custo) { toast.error('Informe o preço de custo'); return }
+    if (!form.preco_venda) { toast.error('Informe o preço de venda'); return }
+    setSaving(true)
+    const payload = {
+      produto_id: Number(form.produto_id),
+      tipo: form.tipo, condicao: form.condicao, estado: form.estado,
+      status: form.status,
+      cor: form.cor || null, armazenamento: form.armazenamento || null,
+      imei: form.imei || null, bateria: form.bateria || null,
+      preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
+      custo_reparo: Number(form.custo_reparo) || null,
+      observacoes: form.observacoes || null, ativo: true,
+    }
+    const { data, error } = await supabase.from('inventario_unidades').insert(payload).select().single()
+    setSaving(false)
+    if (error) { toast.error('Erro: ' + error.message); return }
+    const prod = produtos.find(p => p.id === Number(form.produto_id))
+    onSaved({ ...data, produto_nome: prod?.nome ?? '', marca_nome: prod?.marca_nome ?? '', fornecedor_nome: null })
+  }
+
+  const field = (label: string, node: React.ReactNode) => (
+    <div>
+      <label className="block text-[10.5px] font-mono text-[#5C6E84] uppercase tracking-[0.12em] mb-1.5">{label}</label>
+      {node}
+    </div>
+  )
+  const inp = (k: string, placeholder?: string, type = 'text') => (
+    <input type={type} value={(form as any)[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder}
+      className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]" />
+  )
+  const btnGroup = (k: string, opts: { v: string; label: string }[]) => (
+    <div className="flex gap-2 flex-wrap">
+      {opts.map(o => (
+        <button key={o.v} type="button" onClick={() => set(k, o.v)}
+          className={cn('px-4 py-2 rounded-[9px] text-[12.5px] font-medium transition-all border',
+            (form as any)[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#8A9BB0] border-white/[0.08] hover:border-white/[0.2]')}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      {field('Produto (Catálogo) *',
+        <select value={form.produto_id} onChange={e => set('produto_id', e.target.value)}
+          className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] outline-none">
+          <option value="">Buscar modelo no catálogo...</option>
+          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
+        </select>
+      )}
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('Tipo de Entrada *', btnGroup('tipo', [{ v:'compra', label:'Compra' }, { v:'consignado', label:'Consignado' }, { v:'troca', label:'Troca' }]))}
+        {field('Condição *', btnGroup('condicao', [{ v:'novo', label:'Novo' }, { v:'usado', label:'Usado' }]))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('Estado *',
+          <select value={form.estado} onChange={e => set('estado', e.target.value)}
+            className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] outline-none">
+            {['lacrado','excelente','bom','regular'].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase()+v.slice(1)}</option>)}
+          </select>
+        )}
+        {field('Status Inicial *', btnGroup('status', [{ v:'disponivel', label:'Disponível' }, { v:'pendente', label:'Pendente' }, { v:'assistencia', label:'Em reparo' }]))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('Cor', inp('cor', 'Titânio Natural'))}
+        {field('Armazenamento', inp('armazenamento', '256GB'))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('IMEI / Número de Série', inp('imei', '354 88•••• ••••'))}
+        {field('Saúde da Bateria', inp('bateria', '100'))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('Preço de Custo *', inp('preco_custo', 'R$ 0,00', 'number'))}
+        {field('Custo de Reparo', inp('custo_reparo', 'R$ 0,00', 'number'))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-5">
+        {field('Custo Total (Auto)',
+          <div className="w-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[#22C55E]">
+            {custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {margem && <span className="ml-2 text-[11px] text-[#22C55E]/70">· margem {margem}%</span>}
+          </div>
+        )}
+        {field('Preço de Venda *', inp('preco_venda', 'R$ 0,00', 'number'))}
+      </div>
+
+      {field('Observações', 
+        <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)}
+          placeholder="Detalhes da unidade, acessórios inclusos, avarias..."
+          rows={3}
+          className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none" />
+      )}
+
+      <div className="flex justify-end pt-2">
+        <button onClick={salvar} disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+          <ArrowDownLeft size={15} />
+          {saving ? 'Salvando...' : 'Registrar entrada'}
+        </button>
+      </div>
     </div>
   )
 }
