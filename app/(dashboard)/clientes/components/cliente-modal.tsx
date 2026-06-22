@@ -54,11 +54,7 @@ function getInitials(name: string) {
 }
 
 function avatarColor(name: string): string {
-  const colors = [
-    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B',
-    '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
-    '#F97316', '#6366F1',
-  ]
+  const colors = ['#D7282F','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981','#F97316','#6366F1']
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
@@ -77,9 +73,20 @@ function fmtUltima(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('pt-BR')
 }
 
-// Inputs: #0D1824 — um toque mais escuro que o modal #122036 para profundidade
-const inputCls = "w-full bg-[#0D1824] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#5C6E84] outline-none focus:border-[#D7282F]/50 transition-colors"
-const labelCls = "block text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase mb-1.5"
+// Cores extraídas diretamente do DOM do modelo:
+// Card:   #0E1A2C  (rgb 14,26,44)
+// Input:  #122036  (rgb 18,32,54) + border rgba(255,255,255,0.08)
+// Label:  #4F6178  (rgb 79,97,120) — 9.5px uppercase mono
+// Text:   #E9EEF4  (rgb 233,238,244)
+// Stats:  rgba(255,255,255,0.03) bg + rgba(255,255,255,0.06) border + 13px radius
+
+const inputCls = [
+  'w-full rounded-[10px] px-3 py-2.5 text-sm outline-none transition-colors',
+  'text-[#E9EEF4] placeholder:text-[#4F6178]',
+  'bg-[#122036] border border-white/[0.08] focus:border-white/20',
+].join(' ')
+
+const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#4F6178] uppercase mb-1.5'
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const supabase = createClient()
@@ -96,7 +103,6 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     setSaving(true)
     const { total_vendas, valor_total, ultima_compra, ...payload } = form
     const data = { ...payload, ativo: true }
-
     if (isNew) {
       const { error } = await supabase.from('clientes').insert(data)
       if (error) { toast.error('Erro ao cadastrar'); setSaving(false); return }
@@ -125,54 +131,59 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      {/* Modal: #122036 — mesmo azul-médio do card da tabela */}
-      <div className="bg-[#122036] border border-white/[0.08] rounded-[20px] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-
+      {/* Card: #0E1A2C + border rgba(255,255,255,0.08) + radius 18px */}
+      <div
+        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-white/[0.08]"
+        style={{ backgroundColor: '#0E1A2C' }}
+      >
         {/* Header */}
-        <div className="flex items-center gap-4 px-6 pt-6 pb-5 shrink-0">
+        <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
             style={{ backgroundColor: color }}
           >
             {getInitials(form.nome || 'CL')}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-[#F4F6F9] truncate">
-                {isNew ? 'Novo Cliente' : (form.nome || 'Cliente')}
-              </h2>
-              {form.tipo_cliente === 'VIP' && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold border border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10 shrink-0">
-                  VIP
-                </span>
-              )}
-            </div>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#E9EEF4] truncate">
+              {isNew ? 'Novo Cliente' : (form.nome || 'Cliente')}
+            </h2>
+            {!isNew && form.ativo !== false && form.tipo_cliente !== 'VIP' && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold text-[#22C55E] bg-[#22C55E]/10 border border-[#22C55E]/20 shrink-0">
+                Ativo
+              </span>
+            )}
+            {form.tipo_cliente === 'VIP' && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10 shrink-0">
+                VIP
+              </span>
+            )}
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0">
-            <X size={18} />
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-[#4F6178] hover:text-[#D4DEEA] transition-colors shrink-0">
+            <X size={16} />
           </button>
         </div>
 
-        {/* Stats — #0A111E mais escuro para contrastar com o modal #122036 */}
+        {/* Stats — rgba(255,255,255,0.03) bg, radius 13px */}
         {!isNew && (
-          <div className="grid grid-cols-3 gap-3 px-6 pb-5 shrink-0">
-            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
-              <div className="text-xl font-bold text-[#F4F6F9] font-mono">{tv}</div>
-              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">compras</div>
+          <div className="grid grid-cols-3 gap-2 px-6 pb-4 shrink-0">
+            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+              <div className="text-lg font-bold text-[#C4CCD6] font-mono">{tv}</div>
+              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">compras</div>
             </div>
-            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
-              <div className="text-base font-bold text-[#22C55E]">{vt > 0 ? fmtBRL(vt) : '—'}</div>
-              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">total gasto</div>
+            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+              <div className="text-sm font-bold text-[#22C55E] leading-tight">{vt > 0 ? fmtBRL(vt) : '—'}</div>
+              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">total gasto</div>
             </div>
-            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
-              <div className="text-base font-bold text-[#F4F6F9]">{fmtUltima(uc)}</div>
-              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">última compra</div>
+            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+              <div className="text-sm font-bold text-[#E9EEF4] leading-tight">{fmtUltima(uc)}</div>
+              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">última compra</div>
             </div>
           </div>
         )}
 
         {/* Form */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
           <div>
             <label className={labelCls}>Nome completo</label>
             <input value={form.nome} onChange={e => set('nome', e.target.value)} className={inputCls} placeholder="Nome completo" />
@@ -201,14 +212,14 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Tipo de cliente</label>
               <select value={form.tipo_cliente ?? 'Novo'} onChange={e => set('tipo_cliente', e.target.value)} className={inputCls}>
-                {['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'].map(t => <option key={t}>{t}</option>)}
+                {['Novo','Ativo','VIP','Recorrente','Inativo'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Estado civil</label>
               <select value={form.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável'].map(t => <option key={t}>{t}</option>)}
+                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Solteiro(a), Casado(a)...</option>
+                {['Solteiro(a)','Casado(a)','Divorciado(a)','Viúvo(a)','União estável'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -230,8 +241,8 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Origem do cliente</label>
               <select value={form.origem_cliente ?? ''} onChange={e => set('origem_cliente', e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {['Instagram', 'WhatsApp', 'Indicação', 'Loja física', 'Facebook', 'Google', 'Marketplace'].map(t => <option key={t}>{t}</option>)}
+                <option value="" style={{ backgroundColor: '#0E1A2C' }}>—</option>
+                {['Instagram','WhatsApp','Indicação','Loja física','Facebook','Google','Marketplace'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -241,7 +252,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
           </div>
           <div>
             <label className={labelCls}>Endereço (Rua / Av.)</label>
-            <input value={form.endereco ?? ''} onChange={e => set('endereco', e.target.value)} className={inputCls} placeholder="Rua..." />
+            <input value={form.endereco ?? ''} onChange={e => set('endereco', e.target.value)} className={inputCls} placeholder="" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -256,35 +267,37 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Bairro</label>
-              <input value={form.bairro ?? ''} onChange={e => set('bairro', e.target.value)} className={inputCls} placeholder="Bairro" />
+              <input value={form.bairro ?? ''} onChange={e => set('bairro', e.target.value)} className={inputCls} placeholder="" />
             </div>
             <div>
               <label className={labelCls}>Cidade</label>
-              <input value={form.cidade ?? ''} onChange={e => set('cidade', e.target.value)} className={inputCls} placeholder="São Paulo" />
+              <input value={form.cidade ?? ''} onChange={e => set('cidade', e.target.value)} className={inputCls} placeholder="" />
             </div>
           </div>
           <div>
             <label className={labelCls}>Estado (UF)</label>
-            <input value={form.estado ?? ''} onChange={e => set('estado', e.target.value)} className={inputCls} placeholder="SP" maxLength={2} />
+            <input value={form.estado ?? ''} onChange={e => set('estado', e.target.value)} className={inputCls} placeholder="" maxLength={2} />
           </div>
           <div>
             <label className={labelCls}>Observações</label>
-            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={3} className={inputCls + ' resize-none'} placeholder="Anotações sobre o cliente..." />
+            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={3}
+              className={inputCls + ' resize-none'} placeholder="Anotações sobre o cliente..." />
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06] shrink-0">
           {!isNew ? (
-            <button onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-semibold transition-colors">
+            <button onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-medium transition-colors">
               Desativar
             </button>
           ) : <div />}
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-[#5C6E84] hover:text-[#D4DEEA] font-semibold transition-colors">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[#4F6178] hover:text-[#D4DEEA] font-medium transition-colors">
               Fechar
             </button>
-            <button onClick={salvar} disabled={saving} className="px-5 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+            <button onClick={salvar} disabled={saving}
+              className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
