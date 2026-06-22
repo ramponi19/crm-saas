@@ -1,292 +1,170 @@
 'use client'
-
-import { useState } from 'react'
-import { X, Save, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-interface Ordem {
+interface OS {
   id?: number
   protocolo: string | null
   tipo: string | null
-  cliente_id: number | null
-  produto_id: number | null
-  responsavel_tecnico_id: string | null
-  imei_serial: string | null
+  status: string | null
   defeito_relatado: string | null
-  estado_entrada: string | null
   parecer_tecnico: string | null
   orcamento_valor: number | null
+  imei_serial: string | null
+  dentro_garantia: boolean | null
+  dias_garantia_restantes: number | null
+  data_entrada: string | null
+  created_at?: string
+  observacoes: string | null
+  estado_entrada: string | null
   celular_reserva_fornecido: boolean | null
   modelo_reserva: string | null
-  dentro_garantia: boolean | null
-  status: string | null
-  observacoes: string | null
+  cliente_id: number | null
+  produto_id: number | null
+  clientes?: { nome: string; telefone: string | null } | null
+  produtos?: { nome: string } | null
+}
+interface Props { os: OS | null; isNew: boolean; onClose: () => void }
+
+const EMPTY: OS = {
+  protocolo: null, tipo: 'assistencia', status: 'em_analise',
+  defeito_relatado: null, parecer_tecnico: null, orcamento_valor: null,
+  imei_serial: null, dentro_garantia: false, dias_garantia_restantes: null,
+  data_entrada: new Date().toISOString().split('T')[0], observacoes: null,
+  estado_entrada: null, celular_reserva_fornecido: false, modelo_reserva: null,
+  cliente_id: null, produto_id: null,
 }
 
-interface Props {
-  ordem: Ordem | null
-  clientes: { id: number; nome: string; telefone: string | null }[]
-  produtos: { id: number; nome: string }[]
-  tecnicos: { id: string; nome: string }[]
-  onClose: () => void
-}
+const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#E9EEF4] placeholder:text-[#4F6178] bg-[#122036] border border-white/[0.08] focus:border-white/20 outline-none transition-colors'
+const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#4F6178] uppercase mb-1.5'
 
-const EMPTY: Ordem = {
-  protocolo: null, tipo: 'reparo', cliente_id: null, produto_id: null,
-  responsavel_tecnico_id: null, imei_serial: null, defeito_relatado: null,
-  estado_entrada: null, parecer_tecnico: null, orcamento_valor: null,
-  celular_reserva_fornecido: false, modelo_reserva: null, dentro_garantia: false,
-  status: 'aguardando', observacoes: null,
-}
+const STATUS_OPTIONS = [
+  { value: 'em_analise', label: 'Em análise' },
+  { value: 'em_reparo', label: 'Em reparo' },
+  { value: 'aguardando_peca', label: 'Aguardando peça' },
+  { value: 'concluido', label: 'Concluído' },
+  { value: 'entregue', label: 'Entregue' },
+  { value: 'reprovado', label: 'Reprovado' },
+]
 
-export default function OSModal({ ordem, clientes, produtos, tecnicos, onClose }: Props) {
+export default function OSModal({ os, isNew, onClose }: Props) {
   const supabase = createClient()
   const router = useRouter()
-  const isNew = !ordem?.id
-  const [form, setForm] = useState<Ordem>(isNew ? EMPTY : { ...EMPTY, ...ordem })
+  const [form, setForm] = useState<OS>(isNew ? EMPTY : { ...EMPTY, ...os })
   const [saving, setSaving] = useState(false)
+  const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
+  const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
 
-  function set(field: keyof Ordem, value: any) {
+  useEffect(() => {
+    supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => setClientes(data ?? []))
+    supabase.from('produtos').select('id, nome').order('nome').then(({ data }) => setProdutos(data ?? []))
+  }, [])
+
+  function set(field: keyof OS, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  function gerarProtocolo() {
-    const ts = Date.now().toString(36).toUpperCase()
-    set('protocolo', `OS-${ts}`)
-  }
-
   async function salvar() {
-    if (!form.cliente_id) { toast.error('Selecione um cliente'); return }
     setSaving(true)
-    const payload = {
-      ...form,
-      data_entrada: isNew ? new Date().toISOString() : undefined,
-    }
-    if (isNew) delete payload.id
-
+    const { clientes: _c, produtos: _p, ...payload } = form as any
+    const data = { ...payload, tipo: 'assistencia', protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
     if (isNew) {
-      if (!form.protocolo) payload.protocolo = `OS-${Date.now().toString(36).toUpperCase()}`
-      const { error } = await supabase.from('garantias_assistencias').insert(payload)
-      if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }
+      const { error } = await supabase.from('garantias_assistencias').insert(data)
+      if (error) { toast.error('Erro ao criar OS'); setSaving(false); return }
       toast.success('OS criada!')
     } else {
-      const { error } = await supabase.from('garantias_assistencias').update(payload).eq('id', ordem!.id!)
-      if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }
-      toast.success('OS atualizada!')
+      const { error } = await supabase.from('garantias_assistencias').update(data).eq('id', os!.id!)
+      if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
+      toast.success('Salvo!')
     }
-    router.refresh()
-    onClose()
+    router.refresh(); onClose()
   }
 
-  const Input = ({ label, field, placeholder, type = 'text' }: { label: string; field: keyof Ordem; placeholder?: string; type?: string }) => (
-    <div>
-      <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">{label}</label>
-      <input
-        type={type}
-        value={(form[field] as string) ?? ''}
-        onChange={e => set(field, e.target.value || null)}
-        placeholder={placeholder}
-        className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-      />
-    </div>
-  )
+  const statusColors: Record<string, string> = {
+    em_analise: '#F59E0B', em_reparo: '#8B5CF6', aguardando_peca: '#3B7DE8',
+    concluido: '#22C55E', entregue: '#5C6E84', reprovado: '#D7282F'
+  }
+  const sc = statusColors[form.status ?? ''] ?? '#5C6E84'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[640px] max-h-[90vh] bg-[#0D1824] border border-white/[0.08] rounded-[20px] flex flex-col overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-[#F4F6F9]">
-              {isNew ? 'Nova OS' : `OS #${form.protocolo ?? ordem?.id}`}
-            </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-white/[0.08]" style={{ backgroundColor: '#0E1A2C' }}>
+        <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-[#E9EEF4]">{isNew ? 'Nova OS' : (form.protocolo ?? `OS #${os?.id}`)}</h2>
+              {!isNew && <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: sc, backgroundColor: `${sc}18`, border: `1px solid ${sc}40` }}>{STATUS_OPTIONS.find(s => s.value === form.status)?.label}</span>}
+            </div>
+            {!isNew && os?.clientes?.nome && <p className="text-[11px] text-[#4F6178] mt-0.5">{os.clientes.nome}</p>}
           </div>
-          <button onClick={onClose} className="text-[#5C6E84] hover:text-[#9FB0C2]"><X size={20} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-[#4F6178] hover:text-[#D4DEEA] transition-colors"><X size={16} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Protocolo */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Protocolo</label>
-              <div className="flex gap-2">
-                <input
-                  value={form.protocolo ?? ''}
-                  onChange={e => set('protocolo', e.target.value || null)}
-                  className="flex-1 bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]"
-                />
-                <button
-                  onClick={gerarProtocolo}
-                  className="px-3 py-2.5 rounded-[9px] bg-white/[0.05] text-xs text-[#8A9BB0] hover:text-[#D4DEEA] whitespace-nowrap"
-                >
-                  Gerar
-                </button>
+        {!isNew && (
+          <div className="grid grid-cols-3 gap-2 px-6 pb-4 shrink-0">
+            {[
+              { label: 'Entrada', value: new Date(os?.data_entrada ?? os?.created_at ?? '').toLocaleDateString('pt-BR') },
+              { label: 'Orçamento', value: os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—' },
+              { label: 'Aparelho', value: os?.produtos?.nome ?? '—' },
+            ].map(s => (
+              <div key={s.label} className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                <div className="text-sm font-bold text-[#E9EEF4] leading-tight truncate">{s.value}</div>
+                <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
               </div>
-            </div>
+            ))}
+          </div>
+        )}
 
-            {/* Tipo */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Tipo</label>
-              <select
-                value={form.tipo ?? 'reparo'}
-                onChange={e => set('tipo', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              >
-                {['reparo', 'troca_tela', 'troca_bateria', 'desbloqueio', 'limpeza', 'diagnostico', 'outro'].map(t => (
-                  <option key={t} value={t}>{t.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())}</option>
-                ))}
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Nº OS</label><input value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} className={inputCls} placeholder="OS-000001" /></div>
+            <div><label className={labelCls}>Status</label>
+              <select value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)} className={inputCls}>
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#0E1A2C' }}>{o.label}</option>)}
               </select>
-            </div>
-
-            {/* Cliente */}
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Cliente *</label>
-              <select
-                value={form.cliente_id ?? ''}
-                onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              >
-                <option value="">Selecionar cliente...</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}{c.telefone ? ` — ${c.telefone}` : ''}</option>)}
-              </select>
-            </div>
-
-            {/* Produto */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Produto</label>
-              <select
-                value={form.produto_id ?? ''}
-                onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              >
-                <option value="">Selecionar...</option>
-                {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-              </select>
-            </div>
-
-            <Input label="IMEI / Série" field="imei_serial" placeholder="IMEI ou número de série" />
-
-            {/* Técnico */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Técnico Responsável</label>
-              <select
-                value={form.responsavel_tecnico_id ?? ''}
-                onChange={e => set('responsavel_tecnico_id', e.target.value || null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              >
-                <option value="">Não atribuído</option>
-                {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-              </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Status</label>
-              <select
-                value={form.status ?? 'aguardando'}
-                onChange={e => set('status', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              >
-                {[
-                  { value: 'aguardando', label: 'Aguardando' },
-                  { value: 'em_reparo', label: 'Em Reparo' },
-                  { value: 'aguard_peca', label: 'Aguardando Peça' },
-                  { value: 'pronto', label: 'Pronto' },
-                  { value: 'entregue', label: 'Entregue' },
-                  { value: 'cancelado', label: 'Cancelado' },
-                ].map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-
-            {/* Orçamento */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Orçamento R$</label>
-              <input
-                type="number"
-                value={form.orcamento_valor ?? ''}
-                onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
-              />
-            </div>
-
-            {/* Checkboxes */}
-            <div className="col-span-2 flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.dentro_garantia ?? false}
-                  onChange={e => set('dentro_garantia', e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#D7282F]"
-                />
-                <span className="text-sm text-[#8A9BB0]">Dentro da Garantia</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.celular_reserva_fornecido ?? false}
-                  onChange={e => set('celular_reserva_fornecido', e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#D7282F]"
-                />
-                <span className="text-sm text-[#8A9BB0]">Celular Reserva Fornecido</span>
-              </label>
-            </div>
-
-            {form.celular_reserva_fornecido && (
-              <div className="col-span-2">
-                <Input label="Modelo do Reserva" field="modelo_reserva" placeholder="Ex: iPhone 11 — IMEI 123..." />
-              </div>
-            )}
-
-            {/* Defeito */}
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Defeito Relatado</label>
-              <textarea
-                value={form.defeito_relatado ?? ''}
-                onChange={e => set('defeito_relatado', e.target.value || null)}
-                rows={2}
-                placeholder="Descreva o problema relatado pelo cliente..."
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none resize-none"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Estado de Entrada</label>
-              <textarea
-                value={form.estado_entrada ?? ''}
-                onChange={e => set('estado_entrada', e.target.value || null)}
-                rows={2}
-                placeholder="Descreva o estado físico do aparelho na entrada..."
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none resize-none"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Parecer Técnico</label>
-              <textarea
-                value={form.parecer_tecnico ?? ''}
-                onChange={e => set('parecer_tecnico', e.target.value || null)}
-                rows={2}
-                placeholder="Diagnóstico e solução aplicada..."
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none resize-none"
-              />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Cliente</label>
+              <select value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
+                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
+                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#0E1A2C' }}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div><label className={labelCls}>Produto</label>
+              <select value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
+                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
+                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#0E1A2C' }}>{p.nome}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>IMEI / Nº série</label><input value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} className={inputCls} placeholder="358000000000000" /></div>
+            <div><label className={labelCls}>Data de entrada</label><input value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} type="date" className={inputCls} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={labelCls}>Origem</label>
+              <select value={form.dentro_garantia ? 'garantia' : 'externo'} onChange={e => set('dentro_garantia', e.target.value === 'garantia')} className={inputCls}>
+                <option value="externo" style={{ backgroundColor: '#0E1A2C' }}>Reparo externo</option>
+                <option value="garantia" style={{ backgroundColor: '#0E1A2C' }}>Garantia</option>
+              </select>
+            </div>
+            <div><label className={labelCls}>Orçamento (R$)</label><input value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} type="number" className={inputCls} placeholder="0,00" /></div>
+          </div>
+          <div><label className={labelCls}>Estado de entrada</label><input value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} className={inputCls} placeholder="Ex: Tela trincada..." /></div>
+          <div><label className={labelCls}>Defeito relatado</label><textarea value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Descreva o problema..." /></div>
+          <div><label className={labelCls}>Parecer técnico</label><textarea value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Diagnóstico..." /></div>
+          <div><label className={labelCls}>Observações</label><textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="..." /></div>
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06] shrink-0">
-          <div />
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#5C6E84] hover:text-[#D4DEEA] transition-colors">
-              Cancelar
-            </button>
-            <button
-              onClick={salvar}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              <Save size={14} />
-              {saving ? 'Salvando...' : 'Salvar OS'}
-            </button>
-          </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/[0.06] shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-[#4F6178] hover:text-[#D4DEEA] font-medium transition-colors">Fechar</button>
+          <button onClick={salvar} disabled={saving} className="px-5 py-2 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+            {saving ? 'Salvando...' : 'Salvar'}
+          </button>
         </div>
       </div>
     </div>
