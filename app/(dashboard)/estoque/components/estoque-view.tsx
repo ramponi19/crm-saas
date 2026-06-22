@@ -25,6 +25,9 @@ interface Unidade {
   status: string | null
   tipo: string | null
   estado: string | null
+  imei2: string | null
+  fornecedor_id: number | null
+  custo_reparo: number | null
   observacoes: string | null
   created_at: string
 }
