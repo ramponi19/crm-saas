@@ -38,8 +38,8 @@ const EMPTY: OS = {
   cliente_id: null, produto_id: null,
 }
 
-const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#E9EEF4] placeholder:text-[#4F6178] bg-[#122036] border border-white/[0.08] focus:border-white/20 outline-none transition-colors'
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#4F6178] uppercase mb-1.5'
+const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#1F2A39] placeholder:text-[#9AA7B6] bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20 outline-none transition-colors'
+const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
 
 const STATUS_OPTIONS = [
   { value: 'em_analise', label: 'Em análise' },
@@ -90,17 +90,17 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const sc = statusColors[form.status ?? ''] ?? '#5C6E84'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-white/[0.08]" style={{ backgroundColor: '#0E1A2C' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+      <div className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-[#16212E]/[0.10]" style={{ backgroundColor: '#FFFFFF' }}>
         <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-[#E9EEF4]">{isNew ? 'Nova OS' : (form.protocolo ?? `OS #${os?.id}`)}</h2>
+              <h2 className="text-base font-semibold text-[#1F2A39]">{isNew ? 'Nova OS' : (form.protocolo ?? `OS #${os?.id}`)}</h2>
               {!isNew && <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: sc, backgroundColor: `${sc}18`, border: `1px solid ${sc}40` }}>{STATUS_OPTIONS.find(s => s.value === form.status)?.label}</span>}
             </div>
-            {!isNew && os?.clientes?.nome && <p className="text-[11px] text-[#4F6178] mt-0.5">{os.clientes.nome}</p>}
+            {!isNew && os?.clientes?.nome && <p className="text-[11px] text-[#9AA7B6] mt-0.5">{os.clientes.nome}</p>}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-[#4F6178] hover:text-[#D4DEEA] transition-colors"><X size={16} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors"><X size={16} /></button>
         </div>
 
         {!isNew && (
@@ -110,9 +110,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
               { label: 'Orçamento', value: os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—' },
               { label: 'Aparelho', value: os?.produtos?.nome ?? '—' },
             ].map(s => (
-              <div key={s.label} className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                <div className="text-sm font-bold text-[#E9EEF4] leading-tight truncate">{s.value}</div>
-                <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
+              <div key={s.label} className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center" style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
+                <div className="text-sm font-bold text-[#1F2A39] leading-tight truncate">{s.value}</div>
+                <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
@@ -123,21 +123,21 @@ export default function OSModal({ os, isNew, onClose }: Props) {
             <div><label className={labelCls}>Nº OS</label><input value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} className={inputCls} placeholder="OS-000001" /></div>
             <div><label className={labelCls}>Status</label>
               <select value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)} className={inputCls}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#0E1A2C' }}>{o.label}</option>)}
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#FFFFFF' }}>{o.label}</option>)}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>Cliente</label>
               <select value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
-                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#0E1A2C' }}>{c.nome}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
+                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#FFFFFF' }}>{c.nome}</option>)}
               </select>
             </div>
             <div><label className={labelCls}>Produto</label>
               <select value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
-                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#0E1A2C' }}>{p.nome}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
+                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#FFFFFF' }}>{p.nome}</option>)}
               </select>
             </div>
           </div>
@@ -148,8 +148,8 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>Origem</label>
               <select value={form.dentro_garantia ? 'garantia' : 'externo'} onChange={e => set('dentro_garantia', e.target.value === 'garantia')} className={inputCls}>
-                <option value="externo" style={{ backgroundColor: '#0E1A2C' }}>Reparo externo</option>
-                <option value="garantia" style={{ backgroundColor: '#0E1A2C' }}>Garantia</option>
+                <option value="externo" style={{ backgroundColor: '#FFFFFF' }}>Reparo externo</option>
+                <option value="garantia" style={{ backgroundColor: '#FFFFFF' }}>Garantia</option>
               </select>
             </div>
             <div><label className={labelCls}>Orçamento (R$)</label><input value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} type="number" className={inputCls} placeholder="0,00" /></div>
@@ -160,8 +160,8 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <div><label className={labelCls}>Observações</label><textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="..." /></div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/[0.06] shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-[#4F6178] hover:text-[#D4DEEA] font-medium transition-colors">Fechar</button>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Fechar</button>
           <button onClick={salvar} disabled={saving} className="px-5 py-2 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
