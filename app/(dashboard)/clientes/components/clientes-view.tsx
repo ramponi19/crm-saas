@@ -28,7 +28,6 @@ interface Cliente {
   nacionalidade: string | null
   ativo: boolean | null
   created_at: string
-  // computed stats (may not exist yet in DB — default to 0)
   total_vendas?: number
   valor_total?: number
   ultima_compra?: string | null
@@ -44,10 +43,11 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-function avatarColor(name: string) {
+function avatarColor(name: string): string {
   const colors = [
-    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B', '#8B5CF6',
-    '#EC4899', '#06B6D4', '#10B981', '#F97316', '#6366F1',
+    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
+    '#F97316', '#6366F1',
   ]
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
@@ -180,7 +180,7 @@ export default function ClientesView({ clientes }: Props) {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-bold text-white shrink-0"
-                          style={{ backgroundColor: color + '33', color }}
+                          style={{ backgroundColor: color }}
                         >
                           {getInitials(c.nome)}
                         </div>
