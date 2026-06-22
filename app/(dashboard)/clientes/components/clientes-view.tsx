@@ -147,10 +147,11 @@ export default function ClientesView({ clientes }: Props) {
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] overflow-hidden">
+        {/* Card da tabela: mesmo fundo da página para as linhas se destacarem pelo hover */}
+        <div className="border border-white/[0.06] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="bg-[#0D1824] border-b border-white/[0.06]">
                 {['Cliente', 'Telefone', 'Cidade', 'Compras', 'Total Gasto', 'Última', 'Status'].map(h => (
                   <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase px-5 py-3.5 whitespace-nowrap">
                     {h}
@@ -160,12 +161,12 @@ export default function ClientesView({ clientes }: Props) {
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
-                <tr>
+                <tr className="bg-[#0D1824]">
                   <td colSpan={7} className="text-center py-16 text-[#3F516A] text-sm">
                     Nenhum cliente encontrado
                   </td>
                 </tr>
-              ) : filtrados.map(c => {
+              ) : filtrados.map((c, i) => {
                 const color = avatarColor(c.nome)
                 const tv = c.total_vendas ?? 0
                 const vt = c.valor_total ?? 0
@@ -173,13 +174,16 @@ export default function ClientesView({ clientes }: Props) {
                   <tr
                     key={c.id}
                     onClick={() => openCliente(c)}
-                    className="border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-colors last:border-0"
+                    className={cn(
+                      'border-b border-white/[0.04] hover:bg-[#0D1824] cursor-pointer transition-colors last:border-0',
+                      i % 2 === 0 ? 'bg-[#0A111E]' : 'bg-[#0B1520]'
+                    )}
                   >
                     {/* Cliente */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
                           style={{ backgroundColor: color }}
                         >
                           {getInitials(c.nome)}
