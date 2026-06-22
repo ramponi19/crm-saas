@@ -80,21 +80,21 @@ export default function AssistenciaView({ ordens }: Props) {
   ]
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-white/[0.06] shrink-0">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">Pós-venda · Ordens de serviço</p>
-          <h1 className="text-xl font-bold text-[#F4F6F9]">Assistência Técnica</h1>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Pós-venda · Ordens de serviço</p>
+          <h1 className="text-xl font-bold text-[#16212E]">Assistência Técnica</h1>
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
         {STATS.map(s => (
-          <div key={s.label} className="bg-[#122036] border border-white/[0.06] rounded-[16px] px-5 py-4 flex items-center gap-4">
+          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4 flex items-center gap-4">
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0" style={{ backgroundColor: s.iconBg, color: s.iconColor }}>{s.icon}</div>
             <div>
-              <div className="text-2xl font-normal text-[#F4F6F9] leading-none">{s.value}</div>
-              <div className="text-[11px] text-[#5C6E84] mt-1">{s.label}</div>
+              <div className="text-2xl font-normal text-[#16212E] leading-none">{s.value}</div>
+              <div className="text-[11px] text-[#788698] mt-1">{s.label}</div>
             </div>
           </div>
         ))}
@@ -104,7 +104,7 @@ export default function AssistenciaView({ ordens }: Props) {
         <div className="flex items-center gap-1">
           {FILTROS.map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key)}
-              className={cn('px-4 py-2 rounded-[8px] text-sm font-medium transition-all', filtro === f.key ? 'text-[#F0656B]' : 'text-[#5C6E84] hover:text-[#8A9BB0]')}
+              className={cn('px-4 py-2 rounded-[8px] text-sm font-medium transition-all', filtro === f.key ? 'text-[#C01F26]' : 'text-[#788698] hover:text-[#788698]')}
               style={filtro === f.key ? { backgroundColor: 'rgba(215,40,47,0.14)' } : { backgroundColor: 'rgba(255,255,255,0.04)' }}>
               {f.label}
             </button>
@@ -117,29 +117,29 @@ export default function AssistenciaView({ ordens }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
+        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-[#16212E]/[0.08]">
                 {['OS', 'Aparelho', 'Origem', 'Defeito', 'Técnico', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-16 text-[#4F6178] text-sm">Nenhuma ordem encontrada</td></tr>
+                <tr><td colSpan={6} className="text-center py-16 text-[#9AA7B6] text-sm">Nenhuma ordem encontrada</td></tr>
               ) : filtrados.map(o => (
                 <tr key={o.id} onClick={() => { setSelecionada(o); setIsNew(false); setModalOpen(true) }}
-                  className="border-b border-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0">
-                  <td className="px-5 py-4"><span className="text-sm font-mono font-semibold text-[#E9EEF4]">{o.protocolo ?? `#OS-${o.id}`}</span></td>
+                  className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
+                  <td className="px-5 py-4"><span className="text-sm font-mono font-semibold text-[#1F2A39]">{o.protocolo ?? `#OS-${o.id}`}</span></td>
                   <td className="px-5 py-4">
-                    <div className="text-sm font-semibold text-[#E9EEF4]">{o.produtos?.nome ?? '—'}</div>
-                    {o.clientes?.nome && <div className="text-[11px] text-[#5C6E84]">{o.clientes.nome}</div>}
+                    <div className="text-sm font-semibold text-[#1F2A39]">{o.produtos?.nome ?? '—'}</div>
+                    {o.clientes?.nome && <div className="text-[11px] text-[#788698]">{o.clientes.nome}</div>}
                   </td>
                   <td className="px-5 py-4"><Badge val={o.dentro_garantia ? 'garantia' : 'reparo_externo'} map={ORIGEM} /></td>
-                  <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{o.defeito_relatado ?? '—'}</span></td>
-                  <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">—</span></td>
+                  <td className="px-5 py-4"><span className="text-sm text-[#788698]">{o.defeito_relatado ?? '—'}</span></td>
+                  <td className="px-5 py-4"><span className="text-sm text-[#788698]">—</span></td>
                   <td className="px-5 py-4"><Badge val={o.status} map={STATUS} /></td>
                 </tr>
               ))}
