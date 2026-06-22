@@ -26,6 +26,7 @@ interface Garantia {
   produto_id: number | null
   clientes?: { nome: string; telefone: string | null } | null
   produtos?: { nome: string } | null
+  created_at?: string
 }
 
 interface Props {
