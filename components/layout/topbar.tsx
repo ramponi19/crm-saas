@@ -147,15 +147,6 @@ export function Topbar({
   const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
 
 
-  // Atualiza o título da aba com contagem de não lidas
-  useEffect(() => {
-    const base = 'JM Store — CRM'
-    if (totalNaoLidas > 0) {
-      document.title = `(${totalNaoLidas}) 🔔 ${base}`
-    } else {
-      document.title = base
-    }
-  }, [totalNaoLidas])
 
   function toggleTheme() { setTheme(isDark ? 'light' : 'dark') }
 
