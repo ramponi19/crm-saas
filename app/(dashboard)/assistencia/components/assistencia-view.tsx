@@ -1,220 +1,154 @@
 'use client'
-
 import { useState, useMemo } from 'react'
-import { Search, Plus, Wrench, Clock, CheckCircle2, AlertCircle, ChevronRight, XCircle } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import OSModal from './os-modal'
 
-interface Ordem {
+interface OS {
   id: number
-  tipo: string | null
   protocolo: string | null
-  cliente_nome: string
-  cliente_telefone: string | null
-  produto_nome: string
-  imei_serial: string | null
+  tipo: string | null
+  status: string | null
   defeito_relatado: string | null
-  estado_entrada: string | null
   parecer_tecnico: string | null
   orcamento_valor: number | null
+  imei_serial: string | null
   dentro_garantia: boolean | null
-  status: string | null
-  data_entrada: string
-  tecnico_nome: string | null
-  cliente_id: number | null
-  produto_id: number | null
-  responsavel_tecnico_id: string | null
+  dias_garantia_restantes: number | null
+  data_entrada: string | null
+  created_at: string
   observacoes: string | null
+  estado_entrada: string | null
   celular_reserva_fornecido: boolean | null
   modelo_reserva: string | null
+  cliente_id: number | null
+  produto_id: number | null
+  clientes: { nome: string; telefone: string | null } | null
+  produtos: { nome: string } | null
+}
+interface Props { ordens: OS[] }
+
+const STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  em_analise:      { label: 'Em análise',      color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
+  em_reparo:       { label: 'Em reparo',        color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)'  },
+  aguardando_peca: { label: 'Aguardando peça',  color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)'  },
+  concluido:       { label: 'Concluído',        color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
+  entregue:        { label: 'Entregue',         color: '#5C6E84', bg: 'rgba(92,110,132,0.12)'  },
+  reprovado:       { label: 'Reprovado',        color: '#D7282F', bg: 'rgba(215,40,47,0.12)'   },
 }
 
-interface Props {
-  ordens: Ordem[]
-  clientes: { id: number; nome: string; telefone: string | null }[]
-  produtos: { id: number; nome: string }[]
-  tecnicos: { id: string; nome: string }[]
+const ORIGEM: Record<string, { label: string; color: string; bg: string }> = {
+  garantia:       { label: 'Garantia',       color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
+  reparo_externo: { label: 'Reparo externo', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
 }
 
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  aguardando:  { label: 'Aguardando',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  icon: Clock },
-  em_reparo:   { label: 'Em Reparo',    color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)', icon: Wrench },
-  aguard_peca: { label: 'Ag. Peça',     color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  icon: AlertCircle },
-  pronto:      { label: 'Pronto',       color: '#22C55E', bg: 'rgba(34,197,94,0.12)',   icon: CheckCircle2 },
-  entregue:    { label: 'Entregue',     color: '#5C6E84', bg: 'rgba(92,110,132,0.12)',  icon: CheckCircle2 },
-  cancelado:   { label: 'Cancelado',    color: '#F0353D', bg: 'rgba(215,40,47,0.12)',   icon: XCircle },
+function Badge({ val, map }: { val: string | null; map: Record<string, { label: string; color: string; bg: string }> }) {
+  const s = map[val ?? ''] ?? { label: val ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
+  return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold" style={{ color: s.color, backgroundColor: s.bg }}>{s.label}</span>
 }
 
-export default function AssistenciaView({ ordens, clientes, produtos, tecnicos }: Props) {
-  const [search, setSearch] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState('todos')
+const FILTROS = [
+  { key: 'todas',           label: 'Todas'            },
+  { key: 'em_analise',      label: 'Em análise'       },
+  { key: 'em_reparo',       label: 'Em reparo'        },
+  { key: 'aguardando_peca', label: 'Aguardando peça'  },
+  { key: 'concluido',       label: 'Concluídas'       },
+]
+
+export default function AssistenciaView({ ordens }: Props) {
+  const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
-  const [selecionada, setSelecionada] = useState<Ordem | null>(null)
+  const [selecionada, setSelecionada] = useState<OS | null>(null)
+  const [isNew, setIsNew] = useState(false)
 
   const stats = useMemo(() => ({
-    total: ordens.length,
-    aguardando: ordens.filter(o => o.status === 'aguardando').length,
-    em_reparo: ordens.filter(o => o.status === 'em_reparo').length,
-    prontos: ordens.filter(o => o.status === 'pronto').length,
-    garantia: ordens.filter(o => o.dentro_garantia).length,
+    emAnalise:      ordens.filter(o => o.status === 'em_analise').length,
+    emReparo:       ordens.filter(o => o.status === 'em_reparo').length,
+    aguardando:     ordens.filter(o => o.status === 'aguardando_peca').length,
+    concluidasMes:  ordens.filter(o => o.status === 'concluido' || o.status === 'entregue').length,
   }), [ordens])
 
-  const filtradas = useMemo(() => ordens.filter(o => {
-    const matchSearch = !search ||
-      o.cliente_nome.toLowerCase().includes(search.toLowerCase()) ||
-      (o.protocolo ?? '').includes(search) ||
-      (o.imei_serial ?? '').includes(search) ||
-      o.produto_nome.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filtroStatus === 'todos' || o.status === filtroStatus
-    return matchSearch && matchStatus
-  }), [ordens, search, filtroStatus])
+  const filtrados = useMemo(() =>
+    filtro === 'todas' ? ordens : ordens.filter(o => o.status === filtro)
+  , [ordens, filtro])
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const fmtData = (d: string) => new Date(d).toLocaleDateString('pt-BR')
-
-  function diasEmAberto(d: string) {
-    const diff = Date.now() - new Date(d).getTime()
-    return Math.floor(diff / 86400000)
-  }
+  const STATS = [
+    { label: 'Em análise',     value: stats.emAnalise,     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#F59E0B', icon: '⏱' },
+    { label: 'Em reparo',      value: stats.emReparo,      iconBg: 'rgba(139,92,246,0.15)', iconColor: '#8B5CF6', icon: '🔧' },
+    { label: 'Aguardando peça',value: stats.aguardando,    iconBg: 'rgba(59,125,232,0.15)', iconColor: '#3B7DE8', icon: '📦' },
+    { label: 'Concluídas no mês',value: stats.concluidasMes,iconBg:'rgba(34,197,94,0.15)',  iconColor: '#22C55E', icon: '✓'  },
+  ]
 
   return (
     <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
-      <div className="flex items-center justify-between px-8 py-6 border-b border-white/[0.06] shrink-0">
+      <div className="flex items-center px-6 py-4 border-b border-white/[0.06] shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-[#F4F6F9]">Assistência</h1>
-          <p className="text-sm text-[#5C6E84] mt-0.5">{ordens.length} ordens de serviço</p>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">Pós-venda · Ordens de serviço</p>
+          <h1 className="text-xl font-bold text-[#F4F6F9]">Assistência Técnica</h1>
         </div>
-        <button
-          onClick={() => { setSelecionada(null); setModalOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          Nova OS
-        </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-5 gap-3 px-8 py-5 shrink-0">
-        {[
-          { label: 'Total', value: stats.total, color: '#6B8CFF' },
-          { label: 'Aguardando', value: stats.aguardando, color: '#F59E0B' },
-          { label: 'Em Reparo', value: stats.em_reparo, color: '#6B8CFF' },
-          { label: 'Prontos', value: stats.prontos, color: '#22C55E' },
-          { label: 'Em Garantia', value: stats.garantia, color: '#D7282F' },
-        ].map(s => (
-          <div key={s.label} className="bg-[#0D1824] border border-white/[0.06] rounded-[14px] px-4 py-4 text-center">
-            <div className="text-[11px] text-[#5C6E84] font-mono tracking-wide uppercase mb-1">{s.label}</div>
-            <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
+      <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
+        {STATS.map(s => (
+          <div key={s.label} className="bg-[#122036] border border-white/[0.06] rounded-[16px] px-5 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0" style={{ backgroundColor: s.iconBg, color: s.iconColor }}>{s.icon}</div>
+            <div>
+              <div className="text-2xl font-normal text-[#F4F6F9] leading-none">{s.value}</div>
+              <div className="text-[11px] text-[#5C6E84] mt-1">{s.label}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-3 px-8 pb-4 shrink-0">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3F516A]" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por cliente, protocolo, IMEI..."
-            className="w-full bg-[#0D1824] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.15]"
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-[#0D1824] border border-white/[0.06] rounded-[10px] p-1">
-          {[
-            { key: 'todos', label: 'Todos' },
-            { key: 'aguardando', label: 'Aguardando' },
-            { key: 'em_reparo', label: 'Em Reparo' },
-            { key: 'pronto', label: 'Pronto' },
-            { key: 'entregue', label: 'Entregue' },
-          ].map(f => (
-            <button
-              key={f.key}
-              onClick={() => setFiltroStatus(f.key)}
-              className={cn(
-                'px-3 py-1.5 rounded-[8px] text-xs font-medium transition-all',
-                filtroStatus === f.key ? 'bg-[rgba(215,40,47,0.15)] text-[#F0353D]' : 'text-[#5C6E84] hover:text-[#8A9BB0]'
-              )}
-            >{f.label}</button>
+      <div className="flex items-center justify-between px-6 pb-4 shrink-0">
+        <div className="flex items-center gap-1">
+          {FILTROS.map(f => (
+            <button key={f.key} onClick={() => setFiltro(f.key)}
+              className={cn('px-4 py-2 rounded-[8px] text-sm font-medium transition-all', filtro === f.key ? 'text-[#F0656B]' : 'text-[#5C6E84] hover:text-[#8A9BB0]')}
+              style={filtro === f.key ? { backgroundColor: 'rgba(215,40,47,0.14)' } : { backgroundColor: 'rgba(255,255,255,0.04)' }}>
+              {f.label}
+            </button>
           ))}
         </div>
+        <button onClick={() => { setSelecionada(null); setIsNew(true); setModalOpen(true) }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold rounded-[10px] transition-colors">
+          <Plus size={15} /> Nova ordem de serviço
+        </button>
       </div>
 
-      {/* Tabela */}
-      <div className="flex-1 overflow-y-auto px-8 pb-6">
-        <div className="bg-[#0D1824] border border-white/[0.06] rounded-[16px] overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/[0.06]">
-                {['Protocolo', 'Cliente', 'Produto / IMEI', 'Defeito', 'Orçamento', 'Status', 'Dias', ''].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase px-4 py-3.5">{h}</th>
+                {['OS', 'Aparelho', 'Origem', 'Defeito', 'Técnico', 'Status'].map(h => (
+                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtradas.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-16 text-[#3F516A] text-sm">Nenhuma OS encontrada</td></tr>
-              ) : filtradas.map(o => {
-                const st = STATUS_CFG[o.status ?? 'aguardando'] ?? STATUS_CFG.aguardando
-                const Icon = st.icon
-                const dias = diasEmAberto(o.data_entrada)
-                return (
-                  <tr
-                    key={o.id}
-                    onClick={() => { setSelecionada(o); setModalOpen(true) }}
-                    className="border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3.5">
-                      <div className="font-mono text-xs text-[#6B8CFF]">#{o.protocolo ?? o.id}</div>
-                      {o.dentro_garantia && (
-                        <div className="text-[9px] text-[#22C55E] font-mono mt-0.5">GARANTIA</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="text-sm font-semibold text-[#E9EEF4]">{o.cliente_nome}</div>
-                      {o.cliente_telefone && <div className="text-xs text-[#5C6E84]">{o.cliente_telefone}</div>}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="text-sm text-[#D4DEEA]">{o.produto_nome}</div>
-                      {o.imei_serial && <div className="font-mono text-[10px] text-[#3F516A]">{o.imei_serial}</div>}
-                    </td>
-                    <td className="px-4 py-3.5 max-w-[180px]">
-                      <div className="text-xs text-[#8A9BB0] truncate">{o.defeito_relatado ?? '—'}</div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-sm font-semibold text-[#F4F6F9]">
-                        {o.orcamento_valor ? fmt(o.orcamento_valor) : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold w-fit px-2.5 py-1 rounded-full" style={{ color: st.color, background: st.bg }}>
-                        <Icon size={11} />
-                        {st.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={cn('font-mono text-xs', dias > 7 ? 'text-[#F0353D]' : dias > 3 ? 'text-[#F59E0B]' : 'text-[#5C6E84]')}>
-                        {dias}d
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5"><ChevronRight size={15} className="text-[#3F516A]" /></td>
-                  </tr>
-                )
-              })}
+              {filtrados.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-16 text-[#4F6178] text-sm">Nenhuma ordem encontrada</td></tr>
+              ) : filtrados.map(o => (
+                <tr key={o.id} onClick={() => { setSelecionada(o); setIsNew(false); setModalOpen(true) }}
+                  className="border-b border-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0">
+                  <td className="px-5 py-4"><span className="text-sm font-mono font-semibold text-[#E9EEF4]">{o.protocolo ?? `#OS-${o.id}`}</span></td>
+                  <td className="px-5 py-4">
+                    <div className="text-sm font-semibold text-[#E9EEF4]">{o.produtos?.nome ?? '—'}</div>
+                    {o.clientes?.nome && <div className="text-[11px] text-[#5C6E84]">{o.clientes.nome}</div>}
+                  </td>
+                  <td className="px-5 py-4"><Badge val={o.dentro_garantia ? 'garantia' : 'reparo_externo'} map={ORIGEM} /></td>
+                  <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{o.defeito_relatado ?? '—'}</span></td>
+                  <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">—</span></td>
+                  <td className="px-5 py-4"><Badge val={o.status} map={STATUS} /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {modalOpen && (
-        <OSModal
-          ordem={selecionada}
-          clientes={clientes}
-          produtos={produtos}
-          tecnicos={tecnicos}
-          onClose={() => setModalOpen(false)}
-        />
-      )}
+      {modalOpen && <OSModal os={isNew ? null : selecionada} isNew={isNew} onClose={() => setModalOpen(false)} />}
     </div>
   )
 }
