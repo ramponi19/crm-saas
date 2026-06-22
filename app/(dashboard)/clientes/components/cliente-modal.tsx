@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Save, Trash2, Phone, Mail, MapPin, User, CreditCard } from 'lucide-react'
+import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,10 @@ interface Cliente {
   estado_civil: string | null
   profissao: string | null
   nacionalidade: string | null
+  ativo?: boolean | null
+  total_vendas?: number
+  valor_total?: number
+  ultima_compra?: string | null
 }
 
 interface Props {
@@ -38,8 +42,34 @@ interface Props {
 const EMPTY: Cliente = {
   nome: '', email: null, telefone: null, cpf_cnpj: null, data_nascimento: null,
   endereco: null, numero: null, complemento: null, bairro: null, cidade: null,
-  estado: null, cep: null, tipo_cliente: null, instagram: null,
-  origem_cliente: null, observacoes: null, estado_civil: null, profissao: null, nacionalidade: null,
+  estado: null, cep: null, tipo_cliente: 'Novo', instagram: null,
+  origem_cliente: null, observacoes: null, estado_civil: null, profissao: null, nacionalidade: 'Brasileiro(a)',
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase() || 'CL'
+}
+
+function avatarColor(name: string) {
+  const colors = ['#D7282F', '#3B7DE8', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#10B981']
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return colors[Math.abs(hash) % colors.length]
+}
+
+function fmtBRL(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function fmtUltima(d: string | null | undefined) {
+  if (!d) return '—'
+  const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
+  if (diff === 0) return 'Hoje'
+  if (diff === 1) return 'Ontem'
+  if (diff < 7) return `${diff} dias`
+  return new Date(d).toLocaleDateString('pt-BR')
 }
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
@@ -47,7 +77,6 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const router = useRouter()
   const [form, setForm] = useState<Cliente>(isNew ? EMPTY : { ...EMPTY, ...cliente })
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'dados' | 'endereco' | 'extra'>('dados')
 
   function set(field: keyof Cliente, value: string) {
     setForm(f => ({ ...f, [field]: value || null }))
@@ -56,16 +85,17 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   async function salvar() {
     if (!form.nome.trim()) { toast.error('Nome é obrigatório'); return }
     setSaving(true)
-    const payload = { ...form, ativo: true }
+    const { total_vendas, valor_total, ultima_compra, ...payload } = form
+    const data = { ...payload, ativo: true }
 
     if (isNew) {
-      const { error } = await supabase.from('clientes').insert(payload)
-      if (error) { toast.error('Erro ao cadastrar cliente'); setSaving(false); return }
+      const { error } = await supabase.from('clientes').insert(data)
+      if (error) { toast.error('Erro ao cadastrar'); setSaving(false); return }
       toast.success('Cliente cadastrado!')
     } else {
-      const { error } = await supabase.from('clientes').update(payload).eq('id', cliente!.id!)
+      const { error } = await supabase.from('clientes').update(data).eq('id', cliente!.id!)
       if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
-      toast.success('Cliente atualizado!')
+      toast.success('Salvo!')
     }
     router.refresh()
     onClose()
@@ -74,145 +104,240 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   async function excluir() {
     if (!confirm('Desativar este cliente?')) return
     await supabase.from('clientes').update({ ativo: false }).eq('id', cliente!.id!)
-    toast.success('Cliente removido')
+    toast.success('Cliente desativado')
     router.refresh()
     onClose()
   }
 
-  const Input = ({ label, field, placeholder, type = 'text' }: { label: string; field: keyof Cliente; placeholder?: string; type?: string }) => (
-    <div>
-      <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">{label}</label>
-      <input
-        type={type}
-        value={(form[field] as string) ?? ''}
-        onChange={e => set(field, e.target.value)}
-        placeholder={placeholder}
-        className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] transition-colors"
-      />
-    </div>
-  )
-
-  const Select = ({ label, field, options }: { label: string; field: keyof Cliente; options: string[] }) => (
-    <div>
-      <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">{label}</label>
-      <select
-        value={(form[field] as string) ?? ''}
-        onChange={e => set(field, e.target.value)}
-        className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2] transition-colors"
-      >
-        <option value="">Selecionar...</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  )
+  const color = avatarColor(form.nome || 'C')
+  const tv = cliente?.total_vendas ?? 0
+  const vt = cliente?.valor_total ?? 0
+  const uc = cliente?.ultima_compra ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[600px] max-h-[85vh] bg-[#0D1824] border border-white/[0.08] rounded-[20px] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#0D1824] border border-white/[0.08] rounded-[20px] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-[#F4F6F9]">
-              {isNew ? 'Novo Cliente' : form.nome || 'Cliente'}
-            </h2>
-            {!isNew && <p className="text-xs text-[#5C6E84] mt-0.5">Editar cadastro</p>}
+        <div className="flex items-center gap-4 px-6 pt-6 pb-5 shrink-0">
+          <div
+            className="w-11 h-11 rounded-[12px] flex items-center justify-center text-sm font-bold shrink-0"
+            style={{ backgroundColor: color + '33', color }}
+          >
+            {getInitials(form.nome || 'CL')}
           </div>
-          <button onClick={onClose} className="text-[#5C6E84] hover:text-[#9FB0C2] transition-colors">
-            <X size={20} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-[#F4F6F9] truncate">
+                {isNew ? 'Novo Cliente' : (form.nome || 'Cliente')}
+              </h2>
+              {form.tipo_cliente === 'VIP' && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold border border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10 shrink-0">
+                  VIP
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0">
+            <X size={18} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 px-6 pt-4 shrink-0">
-          {[
-            { key: 'dados', label: 'Dados Pessoais', icon: User },
-            { key: 'endereco', label: 'Endereço', icon: MapPin },
-            { key: 'extra', label: 'Complementar', icon: CreditCard },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key as typeof tab)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-xs font-medium transition-all ${
-                tab === t.key
-                  ? 'bg-[rgba(215,40,47,0.12)] text-[#F0353D]'
-                  : 'text-[#5C6E84] hover:text-[#8A9BB0]'
-              }`}
-            >
-              <t.icon size={13} />
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {tab === 'dados' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Input label="Nome Completo *" field="nome" placeholder="Nome do cliente" />
-              </div>
-              <Input label="Telefone / WhatsApp" field="telefone" placeholder="(11) 99999-9999" />
-              <Input label="E-mail" field="email" type="email" placeholder="email@exemplo.com" />
-              <Input label="CPF / CNPJ" field="cpf_cnpj" placeholder="000.000.000-00" />
-              <Input label="Data de Nascimento" field="data_nascimento" type="date" />
-              <Input label="Instagram" field="instagram" placeholder="@usuario" />
-              <Select label="Tipo de Cliente" field="tipo_cliente" options={['Pessoa Física', 'Pessoa Jurídica', 'Revendedor']} />
-              <Select label="Origem" field="origem_cliente" options={['Instagram', 'WhatsApp', 'Indicação', 'Google', 'Walk-in', 'Outro']} />
+        {/* Stats (só para cliente existente) */}
+        {!isNew && (
+          <div className="grid grid-cols-3 gap-3 px-6 pb-5 shrink-0">
+            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
+              <div className="text-xl font-bold text-[#F4F6F9] font-mono">{tv}</div>
+              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">compras</div>
             </div>
-          )}
-
-          {tab === 'endereco' && (
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="CEP" field="cep" placeholder="00000-000" />
-              <Input label="Estado" field="estado" placeholder="SP" />
-              <div className="col-span-2">
-                <Input label="Endereço" field="endereco" placeholder="Rua, Avenida..." />
-              </div>
-              <Input label="Número" field="numero" placeholder="123" />
-              <Input label="Complemento" field="complemento" placeholder="Apto, Bloco..." />
-              <Input label="Bairro" field="bairro" placeholder="Bairro" />
-              <Input label="Cidade" field="cidade" placeholder="Cidade" />
+            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
+              <div className="text-base font-bold text-[#22C55E]">{vt > 0 ? fmtBRL(vt) : '—'}</div>
+              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">total gasto</div>
             </div>
-          )}
-
-          {tab === 'extra' && (
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Profissão" field="profissao" placeholder="Profissão" />
-              <Select label="Estado Civil" field="estado_civil" options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável']} />
-              <Input label="Nacionalidade" field="nacionalidade" placeholder="Brasileiro" />
-              <div className="col-span-2">
-                <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Observações</label>
-                <textarea
-                  value={form.observacoes ?? ''}
-                  onChange={e => set('observacoes', e.target.value)}
-                  rows={4}
-                  placeholder="Anotações sobre o cliente..."
-                  className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none"
-                />
-              </div>
+            <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
+              <div className="text-base font-bold text-[#F4F6F9]">{fmtUltima(uc)}</div>
+              <div className="text-[10px] text-[#5C6E84] tracking-wide uppercase font-mono mt-0.5">última compra</div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Form */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-3">
+          {/* Nome */}
+          <div>
+            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nome completo</label>
+            <input value={form.nome} onChange={e => set('nome', e.target.value)}
+              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+              placeholder="Nome completo" />
+          </div>
+
+          {/* Telefone + Email */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Telefone / WhatsApp</label>
+              <input value={form.telefone ?? ''} onChange={e => set('telefone', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="(11) 99999-9999" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">E-mail</label>
+              <input value={form.email ?? ''} onChange={e => set('email', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="email@exemplo.com" />
+            </div>
+          </div>
+
+          {/* CPF + Nascimento */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">CPF / CNPJ</label>
+              <input value={form.cpf_cnpj ?? ''} onChange={e => set('cpf_cnpj', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="000.000.000-00" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Data de nascimento</label>
+              <input value={form.data_nascimento ?? ''} onChange={e => set('data_nascimento', e.target.value)}
+                type="date"
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]" />
+            </div>
+          </div>
+
+          {/* Tipo + Estado civil */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Tipo de cliente</label>
+              <select value={form.tipo_cliente ?? 'Novo'} onChange={e => set('tipo_cliente', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+                {['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Estado civil</label>
+              <select value={form.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+                <option value="">—</option>
+                {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Profissão + Nacionalidade */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Profissão</label>
+              <input value={form.profissao ?? ''} onChange={e => set('profissao', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="Ex: Comerciante" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nacionalidade</label>
+              <input value={form.nacionalidade ?? ''} onChange={e => set('nacionalidade', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="Brasileiro(a)" />
+            </div>
+          </div>
+
+          {/* Instagram + Origem */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Instagram</label>
+              <input value={form.instagram ?? ''} onChange={e => set('instagram', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="@usuario" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Origem do cliente</label>
+              <select value={form.origem_cliente ?? ''} onChange={e => set('origem_cliente', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+                <option value="">—</option>
+                {['Instagram', 'WhatsApp', 'Indicação', 'Loja física', 'Facebook', 'Google', 'Marketplace'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* CEP */}
+          <div>
+            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">CEP</label>
+            <input value={form.cep ?? ''} onChange={e => set('cep', e.target.value)}
+              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+              placeholder="00000-000" />
+          </div>
+
+          {/* Endereço */}
+          <div>
+            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Endereço (Rua / Av.)</label>
+            <input value={form.endereco ?? ''} onChange={e => set('endereco', e.target.value)}
+              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+              placeholder="Rua..." />
+          </div>
+
+          {/* Nº + Complemento */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nº</label>
+              <input value={form.numero ?? ''} onChange={e => set('numero', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="123" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Complemento</label>
+              <input value={form.complemento ?? ''} onChange={e => set('complemento', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="Apto, bloco..." />
+            </div>
+          </div>
+
+          {/* Bairro + Cidade */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Bairro</label>
+              <input value={form.bairro ?? ''} onChange={e => set('bairro', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="Bairro" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Cidade</label>
+              <input value={form.cidade ?? ''} onChange={e => set('cidade', e.target.value)}
+                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                placeholder="São Paulo" />
+            </div>
+          </div>
+
+          {/* Estado */}
+          <div>
+            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Estado (UF)</label>
+            <input value={form.estado ?? ''} onChange={e => set('estado', e.target.value)}
+              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+              placeholder="SP" maxLength={2} />
+          </div>
+
+          {/* Observações */}
+          <div>
+            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Observações</label>
+            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)}
+              rows={3}
+              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none"
+              placeholder="Anotações sobre o cliente..." />
+          </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06] shrink-0">
           {!isNew ? (
-            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#5C6E84] hover:text-[#F0353D] transition-colors">
-              <Trash2 size={14} />
-              Excluir
+            <button onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-semibold transition-colors">
+              Desativar
             </button>
           ) : <div />}
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#5C6E84] hover:text-[#D4DEEA] transition-colors">
-              Cancelar
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[#5C6E84] hover:text-[#D4DEEA] font-semibold transition-colors">
+              Fechar
             </button>
             <button
               onClick={salvar}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors"
             >
-              <Save size={14} />
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
