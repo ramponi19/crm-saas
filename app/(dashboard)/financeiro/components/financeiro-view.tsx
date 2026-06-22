@@ -52,11 +52,11 @@ export default function FinanceiroView({ lancamentos }: Props) {
   const todos    = lancamentos
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-white/[0.06] shrink-0">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">Operação</p>
-          <h1 className="text-xl font-bold text-[#F4F6F9]">Financeiro</h1>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Operação</p>
+          <h1 className="text-xl font-bold text-[#16212E]">Financeiro</h1>
         </div>
       </div>
 
@@ -66,8 +66,8 @@ export default function FinanceiroView({ lancamentos }: Props) {
           <button key={t.key} onClick={() => setTab(t.key)}
             className={cn('flex items-center gap-2 px-4 py-2 rounded-t-[10px] text-sm font-medium transition-all border-b-2',
               tab === t.key
-                ? 'bg-[#122036] text-[#E9EEF4] border-[#D7282F]'
-                : 'text-[#5C6E84] hover:text-[#8A9BB0] border-transparent'
+                ? 'bg-white text-[#1F2A39] border-[#D7282F]'
+                : 'text-[#788698] hover:text-[#788698] border-transparent'
             )}>
             {t.label}
           </button>
@@ -82,13 +82,13 @@ export default function FinanceiroView({ lancamentos }: Props) {
           { label: 'Despesas do mês', value: fmtBRL(stats.despesas),  sub: 'custo operacional', iconBg: 'rgba(59,125,232,0.15)', iconColor: '#3B7DE8', icon: '≡' },
           { label: 'Resultado líquido',value: fmtBRL(stats.resultado),sub: '+12,4% vs mês anterior', iconBg: 'rgba(139,92,246,0.15)', iconColor: '#8B5CF6', icon: '~' },
         ].map(s => (
-          <div key={s.label} className="bg-[#122036] border border-white/[0.06] rounded-[16px] px-5 py-4">
+          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: s.iconBg, color: s.iconColor }}>{s.icon}</div>
-              <span className="text-[10px] font-mono tracking-widest text-[#5C6E84] uppercase">{s.label}</span>
+              <span className="text-[10px] font-mono tracking-widest text-[#788698] uppercase">{s.label}</span>
             </div>
-            <div className="text-xl font-bold text-[#E9EEF4]">{s.value}</div>
-            <div className="text-[11px] text-[#5C6E84] mt-0.5">{s.sub}</div>
+            <div className="text-xl font-bold text-[#1F2A39]">{s.value}</div>
+            <div className="text-[11px] text-[#788698] mt-0.5">{s.sub}</div>
           </div>
         ))}
       </div>
@@ -96,12 +96,12 @@ export default function FinanceiroView({ lancamentos }: Props) {
       {/* Conteúdo da tab */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {tab === 'fluxo' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
               <div>
-                <h2 className="text-base font-semibold text-[#E9EEF4]">Livro-caixa</h2>
-                <p className="text-[11px] text-[#5C6E84] mt-0.5">
-                  Entradas <span className="text-[#22C55E]">+{fmtBRL(aReceber.reduce((s,l)=>s+(l.valor??0),0))}</span>
+                <h2 className="text-base font-semibold text-[#1F2A39]">Livro-caixa</h2>
+                <p className="text-[11px] text-[#788698] mt-0.5">
+                  Entradas <span className="text-[#15986A]">+{fmtBRL(aReceber.reduce((s,l)=>s+(l.valor??0),0))}</span>
                   {' · '}Saídas <span className="text-[#D7282F]">−{fmtBRL(aPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
                 </p>
               </div>
@@ -113,26 +113,26 @@ export default function FinanceiroView({ lancamentos }: Props) {
           </div>
         )}
         {tab === 'pagar' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <h2 className="text-base font-semibold text-[#E9EEF4]">Contas a pagar</h2>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
+              <h2 className="text-base font-semibold text-[#1F2A39]">Contas a pagar</h2>
               <button className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors"><Plus size={13} /> Nova conta</button>
             </div>
             <LancamentosTable lancamentos={aPagar} />
           </div>
         )}
         {tab === 'receber' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <h2 className="text-base font-semibold text-[#E9EEF4]">Contas a receber</h2>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
+              <h2 className="text-base font-semibold text-[#1F2A39]">Contas a receber</h2>
               <button className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors"><Plus size={13} /> Novo título</button>
             </div>
             <LancamentosTable lancamentos={aReceber} />
           </div>
         )}
         {tab === 'dre' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] p-8 text-center">
-            <p className="text-[#5C6E84] text-sm">DRE em desenvolvimento</p>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-8 text-center">
+            <p className="text-[#788698] text-sm">DRE em desenvolvimento</p>
           </div>
         )}
       </div>
@@ -141,13 +141,13 @@ export default function FinanceiroView({ lancamentos }: Props) {
 }
 
 function LancamentosTable({ lancamentos }: { lancamentos: Lancamento[] }) {
-  if (lancamentos.length === 0) return <p className="text-center py-12 text-[#4F6178] text-sm">Nenhum lançamento</p>
+  if (lancamentos.length === 0) return <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum lançamento</p>
   return (
     <table className="w-full">
       <thead>
-        <tr className="border-b border-white/[0.06]">
+        <tr className="border-b border-[#16212E]/[0.08]">
           {['Data','Descrição','Categoria','Tipo','Valor','Status'].map(h => (
-            <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
+            <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
           ))}
         </tr>
       </thead>
@@ -155,10 +155,10 @@ function LancamentosTable({ lancamentos }: { lancamentos: Lancamento[] }) {
         {lancamentos.map(l => {
           const isEntrada = l.tipo === 'entrada'
           return (
-            <tr key={l.id} className="border-b border-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0">
-              <td className="px-5 py-3.5 text-sm text-[#8A9BB0]">{new Date(l.data_venc ?? l.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
-              <td className="px-5 py-3.5 text-sm font-medium text-[#E9EEF4]">{l.descricao ?? '—'}</td>
-              <td className="px-5 py-3.5 text-sm text-[#8A9BB0]">{l.categoria ?? '—'}</td>
+            <tr key={l.id} className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
+              <td className="px-5 py-3.5 text-sm text-[#788698]">{new Date(l.data_venc ?? l.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
+              <td className="px-5 py-3.5 text-sm font-medium text-[#1F2A39]">{l.descricao ?? '—'}</td>
+              <td className="px-5 py-3.5 text-sm text-[#788698]">{l.categoria ?? '—'}</td>
               <td className="px-5 py-3.5">
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: isEntrada ? '#22C55E' : '#D7282F', backgroundColor: isEntrada ? 'rgba(34,197,94,0.12)' : 'rgba(215,40,47,0.12)' }}>
                   {isEntrada ? 'Entrada' : 'Saída'}
@@ -168,7 +168,7 @@ function LancamentosTable({ lancamentos }: { lancamentos: Lancamento[] }) {
                 {isEntrada ? '+' : '−'} {l.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—'}
               </td>
               <td className="px-5 py-3.5">
-                <span className={cn('text-sm font-medium', l.status === 'pago' || l.status === 'recebido' ? 'text-[#22C55E]' : 'text-[#F59E0B]')}>
+                <span className={cn('text-sm font-medium', l.status === 'pago' || l.status === 'recebido' ? 'text-[#15986A]' : 'text-[#B47B12]')}>
                   {l.status === 'pago' || l.status === 'recebido' ? 'Pago' : 'Pendente'}
                 </span>
               </td>
