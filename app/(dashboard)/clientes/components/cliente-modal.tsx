@@ -43,7 +43,8 @@ const EMPTY: Cliente = {
   nome: '', email: null, telefone: null, cpf_cnpj: null, data_nascimento: null,
   endereco: null, numero: null, complemento: null, bairro: null, cidade: null,
   estado: null, cep: null, tipo_cliente: 'Novo', instagram: null,
-  origem_cliente: null, observacoes: null, estado_civil: null, profissao: null, nacionalidade: 'Brasileiro(a)',
+  origem_cliente: null, observacoes: null, estado_civil: null,
+  profissao: null, nacionalidade: 'Brasileiro(a)',
 }
 
 function getInitials(name: string) {
@@ -52,8 +53,12 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase() || 'CL'
 }
 
-function avatarColor(name: string) {
-  const colors = ['#D7282F', '#3B7DE8', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#10B981']
+function avatarColor(name: string): string {
+  const colors = [
+    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
+    '#F97316', '#6366F1',
+  ]
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
@@ -71,6 +76,10 @@ function fmtUltima(d: string | null | undefined) {
   if (diff < 7) return `${diff} dias`
   return new Date(d).toLocaleDateString('pt-BR')
 }
+
+// Input / Select / Textarea com estilo unificado dark
+const inputCls = "w-full bg-[#0D1824] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-[#D7282F]/40 transition-colors"
+const labelCls = "block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5"
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const supabase = createClient()
@@ -109,7 +118,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     onClose()
   }
 
-  const color = avatarColor(form.nome || 'C')
+  const color = avatarColor(form.nome || 'CL')
   const tv = cliente?.total_vendas ?? 0
   const vt = cliente?.valor_total ?? 0
   const uc = cliente?.ultima_compra ?? null
@@ -121,8 +130,8 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center gap-4 px-6 pt-6 pb-5 shrink-0">
           <div
-            className="w-11 h-11 rounded-[12px] flex items-center justify-center text-sm font-bold shrink-0"
-            style={{ backgroundColor: color + '33', color }}
+            className="w-11 h-11 rounded-[12px] flex items-center justify-center text-sm font-bold text-white shrink-0"
+            style={{ backgroundColor: color }}
           >
             {getInitials(form.nome || 'CL')}
           </div>
@@ -138,7 +147,10 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
               )}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0"
+          >
             <X size={18} />
           </button>
         </div>
@@ -163,162 +175,109 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
 
         {/* Form */}
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-3">
-          {/* Nome */}
           <div>
-            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nome completo</label>
-            <input value={form.nome} onChange={e => set('nome', e.target.value)}
-              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-              placeholder="Nome completo" />
+            <label className={labelCls}>Nome completo</label>
+            <input value={form.nome} onChange={e => set('nome', e.target.value)} className={inputCls} placeholder="Nome completo" />
           </div>
-
-          {/* Telefone + Email */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Telefone / WhatsApp</label>
-              <input value={form.telefone ?? ''} onChange={e => set('telefone', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="(11) 99999-9999" />
+              <label className={labelCls}>Telefone / WhatsApp</label>
+              <input value={form.telefone ?? ''} onChange={e => set('telefone', e.target.value)} className={inputCls} placeholder="(11) 99999-9999" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">E-mail</label>
-              <input value={form.email ?? ''} onChange={e => set('email', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="email@exemplo.com" />
+              <label className={labelCls}>E-mail</label>
+              <input value={form.email ?? ''} onChange={e => set('email', e.target.value)} className={inputCls} placeholder="email@exemplo.com" />
             </div>
           </div>
-
-          {/* CPF + Nascimento */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">CPF / CNPJ</label>
-              <input value={form.cpf_cnpj ?? ''} onChange={e => set('cpf_cnpj', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="000.000.000-00" />
+              <label className={labelCls}>CPF / CNPJ</label>
+              <input value={form.cpf_cnpj ?? ''} onChange={e => set('cpf_cnpj', e.target.value)} className={inputCls} placeholder="000.000.000-00" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Data de nascimento</label>
-              <input value={form.data_nascimento ?? ''} onChange={e => set('data_nascimento', e.target.value)}
-                type="date"
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]" />
+              <label className={labelCls}>Data de nascimento</label>
+              <input value={form.data_nascimento ?? ''} onChange={e => set('data_nascimento', e.target.value)} type="date" className={inputCls} />
             </div>
           </div>
-
-          {/* Tipo + Estado civil */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Tipo de cliente</label>
-              <select value={form.tipo_cliente ?? 'Novo'} onChange={e => set('tipo_cliente', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+              <label className={labelCls}>Tipo de cliente</label>
+              <select value={form.tipo_cliente ?? 'Novo'} onChange={e => set('tipo_cliente', e.target.value)} className={inputCls}>
                 {['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Estado civil</label>
-              <select value={form.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+              <label className={labelCls}>Estado civil</label>
+              <select value={form.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
-
-          {/* Profissão + Nacionalidade */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Profissão</label>
-              <input value={form.profissao ?? ''} onChange={e => set('profissao', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="Ex: Comerciante" />
+              <label className={labelCls}>Profissão</label>
+              <input value={form.profissao ?? ''} onChange={e => set('profissao', e.target.value)} className={inputCls} placeholder="Ex: Comerciante" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nacionalidade</label>
-              <input value={form.nacionalidade ?? ''} onChange={e => set('nacionalidade', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="Brasileiro(a)" />
+              <label className={labelCls}>Nacionalidade</label>
+              <input value={form.nacionalidade ?? ''} onChange={e => set('nacionalidade', e.target.value)} className={inputCls} placeholder="Brasileiro(a)" />
             </div>
           </div>
-
-          {/* Instagram + Origem */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Instagram</label>
-              <input value={form.instagram ?? ''} onChange={e => set('instagram', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="@usuario" />
+              <label className={labelCls}>Instagram</label>
+              <input value={form.instagram ?? ''} onChange={e => set('instagram', e.target.value)} className={inputCls} placeholder="@usuario" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Origem do cliente</label>
-              <select value={form.origem_cliente ?? ''} onChange={e => set('origem_cliente', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]">
+              <label className={labelCls}>Origem do cliente</label>
+              <select value={form.origem_cliente ?? ''} onChange={e => set('origem_cliente', e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {['Instagram', 'WhatsApp', 'Indicação', 'Loja física', 'Facebook', 'Google', 'Marketplace'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
-
-          {/* CEP */}
           <div>
-            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">CEP</label>
-            <input value={form.cep ?? ''} onChange={e => set('cep', e.target.value)}
-              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-              placeholder="00000-000" />
+            <label className={labelCls}>CEP</label>
+            <input value={form.cep ?? ''} onChange={e => set('cep', e.target.value)} className={inputCls} placeholder="00000-000" />
           </div>
-
-          {/* Endereço */}
           <div>
-            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Endereço (Rua / Av.)</label>
-            <input value={form.endereco ?? ''} onChange={e => set('endereco', e.target.value)}
-              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-              placeholder="Rua..." />
+            <label className={labelCls}>Endereço (Rua / Av.)</label>
+            <input value={form.endereco ?? ''} onChange={e => set('endereco', e.target.value)} className={inputCls} placeholder="Rua..." />
           </div>
-
-          {/* Nº + Complemento */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Nº</label>
-              <input value={form.numero ?? ''} onChange={e => set('numero', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="123" />
+              <label className={labelCls}>Nº</label>
+              <input value={form.numero ?? ''} onChange={e => set('numero', e.target.value)} className={inputCls} placeholder="123" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Complemento</label>
-              <input value={form.complemento ?? ''} onChange={e => set('complemento', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="Apto, bloco..." />
+              <label className={labelCls}>Complemento</label>
+              <input value={form.complemento ?? ''} onChange={e => set('complemento', e.target.value)} className={inputCls} placeholder="Apto, bloco..." />
             </div>
           </div>
-
-          {/* Bairro + Cidade */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Bairro</label>
-              <input value={form.bairro ?? ''} onChange={e => set('bairro', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="Bairro" />
+              <label className={labelCls}>Bairro</label>
+              <input value={form.bairro ?? ''} onChange={e => set('bairro', e.target.value)} className={inputCls} placeholder="Bairro" />
             </div>
             <div>
-              <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Cidade</label>
-              <input value={form.cidade ?? ''} onChange={e => set('cidade', e.target.value)}
-                className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-                placeholder="São Paulo" />
+              <label className={labelCls}>Cidade</label>
+              <input value={form.cidade ?? ''} onChange={e => set('cidade', e.target.value)} className={inputCls} placeholder="São Paulo" />
             </div>
           </div>
-
-          {/* Estado */}
           <div>
-            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Estado (UF)</label>
-            <input value={form.estado ?? ''} onChange={e => set('estado', e.target.value)}
-              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
-              placeholder="SP" maxLength={2} />
+            <label className={labelCls}>Estado (UF)</label>
+            <input value={form.estado ?? ''} onChange={e => set('estado', e.target.value)} className={inputCls} placeholder="SP" maxLength={2} />
           </div>
-
-          {/* Observações */}
           <div>
-            <label className="block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5">Observações</label>
-            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)}
+            <label className={labelCls}>Observações</label>
+            <textarea
+              value={form.observacoes ?? ''}
+              onChange={e => set('observacoes', e.target.value)}
               rows={3}
-              className="w-full bg-[#0A111E] border border-white/[0.06] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none"
-              placeholder="Anotações sobre o cliente..." />
+              className={inputCls + ' resize-none'}
+              placeholder="Anotações sobre o cliente..."
+            />
           </div>
         </div>
 
