@@ -77,8 +77,9 @@ function fmtUltima(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('pt-BR')
 }
 
-const inputCls = "w-full bg-[#081018] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-[#D7282F]/50 transition-colors"
-const labelCls = "block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5"
+// Inputs: #0D1824 — um toque mais escuro que o modal #122036 para profundidade
+const inputCls = "w-full bg-[#0D1824] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#5C6E84] outline-none focus:border-[#D7282F]/50 transition-colors"
+const labelCls = "block text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase mb-1.5"
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const supabase = createClient()
@@ -123,13 +124,14 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const uc = cliente?.ultima_compra ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#0D1824] border border-white/[0.08] rounded-[20px] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {/* Modal: #122036 — mesmo azul-médio do card da tabela */}
+      <div className="bg-[#122036] border border-white/[0.08] rounded-[20px] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
 
         {/* Header */}
         <div className="flex items-center gap-4 px-6 pt-6 pb-5 shrink-0">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-lg"
+            className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
             style={{ backgroundColor: color }}
           >
             {getInitials(form.nome || 'CL')}
@@ -146,15 +148,12 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0"
-          >
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-[#5C6E84] hover:text-[#D4DEEA] transition-colors shrink-0">
             <X size={18} />
           </button>
         </div>
 
-        {/* Stats (só para cliente existente) */}
+        {/* Stats — #0A111E mais escuro para contrastar com o modal #122036 */}
         {!isNew && (
           <div className="grid grid-cols-3 gap-3 px-6 pb-5 shrink-0">
             <div className="bg-[#0A111E] border border-white/[0.06] rounded-[12px] p-3 text-center">
@@ -270,13 +269,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
           </div>
           <div>
             <label className={labelCls}>Observações</label>
-            <textarea
-              value={form.observacoes ?? ''}
-              onChange={e => set('observacoes', e.target.value)}
-              rows={3}
-              className={inputCls + ' resize-none'}
-              placeholder="Anotações sobre o cliente..."
-            />
+            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={3} className={inputCls + ' resize-none'} placeholder="Anotações sobre o cliente..." />
           </div>
         </div>
 
@@ -291,11 +284,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             <button onClick={onClose} className="px-4 py-2 text-sm text-[#5C6E84] hover:text-[#D4DEEA] font-semibold transition-colors">
               Fechar
             </button>
-            <button
-              onClick={salvar}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors"
-            >
+            <button onClick={salvar} disabled={saving} className="px-5 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
