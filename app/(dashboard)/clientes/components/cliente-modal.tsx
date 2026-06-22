@@ -77,8 +77,7 @@ function fmtUltima(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('pt-BR')
 }
 
-// Input / Select / Textarea com estilo unificado dark
-const inputCls = "w-full bg-[#0D1824] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-[#D7282F]/40 transition-colors"
+const inputCls = "w-full bg-[#081018] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-[#D7282F]/50 transition-colors"
 const labelCls = "block text-[10px] font-mono tracking-[0.15em] text-[#3F516A] uppercase mb-1.5"
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
@@ -124,13 +123,13 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const uc = cliente?.ultima_compra ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-[#0D1824] border border-white/[0.08] rounded-[20px] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
 
         {/* Header */}
         <div className="flex items-center gap-4 px-6 pt-6 pb-5 shrink-0">
           <div
-            className="w-11 h-11 rounded-[12px] flex items-center justify-center text-sm font-bold text-white shrink-0"
+            className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-lg"
             style={{ backgroundColor: color }}
           >
             {getInitials(form.nome || 'CL')}
