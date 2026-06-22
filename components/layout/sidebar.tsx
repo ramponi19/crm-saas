@@ -12,7 +12,6 @@ import {
   Calculator,
   ReceiptText,
   Target,
-  Tags,
   Smartphone,
   Boxes,
   BookOpen,
@@ -43,7 +42,6 @@ const navGroups = [
       { href: '/simular-parcela', label: 'Simular Parcela',  icon: Calculator },
       { href: '/historico',       label: 'Histórico',        icon: ReceiptText },
       { href: '/leads',           label: 'Leads',            icon: Target,    badge: true },
-      { href: '/tabela-precos',   label: 'Tabela de preços', icon: Tags },
     ],
   },
   {
