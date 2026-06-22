@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar'
+import { NotificationProvider } from '@/components/layout/notification-provider'
 import { createClient } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { redirect } from 'next/navigation'
@@ -57,6 +58,7 @@ export default async function DashboardLayout({
           {children}
         </div>
       </div>
+      <NotificationProvider />
     </EmpresaProvider>
   )
 }
