@@ -68,20 +68,20 @@ function fmtUltimaCompra(d: string | null | undefined) {
 function StatusBadge({ tipo, ativo }: { tipo: string | null; ativo: boolean | null }) {
   if (tipo === 'VIP') {
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10">
+      <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border border-[#F59E0B]/40 text-[#B47B12] bg-[#F59E0B]/10">
         VIP
       </span>
     )
   }
   if (ativo === false) {
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#5C6E84] bg-white/[0.05]">
+      <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#788698] bg-white/[0.05]">
         Inativo
       </span>
     )
   }
   return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#22C55E] bg-[#22C55E]/10">
+    <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#15986A] bg-[#22C55E]/10">
       Ativo
     </span>
   )
@@ -116,24 +116,24 @@ export default function ClientesView({ clientes }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       {/* Topbar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">Relacionamento</p>
-          <h1 className="text-xl font-bold text-[#F4F6F9]">Clientes</h1>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Relacionamento</p>
+          <h1 className="text-xl font-bold text-[#16212E]">Clientes</h1>
         </div>
       </div>
 
       {/* Search + Button */}
       <div className="flex items-center gap-3 px-6 py-4 shrink-0">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5C6E84]" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#788698]" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente por nome, e-mail ou telefone..."
-            className="w-full bg-[#122036] border border-white/[0.06] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#5C6E84] outline-none focus:border-white/[0.15] transition-colors"
+            className="w-full bg-white border border-[#16212E]/[0.08] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#56657A] placeholder:text-[#788698] outline-none focus:border-[#16212E]/[0.15] transition-colors"
           />
         </div>
         <button
@@ -147,12 +147,12 @@ export default function ClientesView({ clientes }: Props) {
 
       {/* Table — card azul-médio como no modelo */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
+        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.08]">
+              <tr className="border-b border-[#16212E]/[0.10]">
                 {['Cliente', 'Telefone', 'Cidade', 'Compras', 'Total Gasto', 'Última', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">
+                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -161,7 +161,7 @@ export default function ClientesView({ clientes }: Props) {
             <tbody>
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-[#5C6E84] text-sm">
+                  <td colSpan={7} className="text-center py-16 text-[#788698] text-sm">
                     Nenhum cliente encontrado
                   </td>
                 </tr>
@@ -173,7 +173,7 @@ export default function ClientesView({ clientes }: Props) {
                   <tr
                     key={c.id}
                     onClick={() => openCliente(c)}
-                    className="border-b border-white/[0.05] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0"
+                    className="border-b border-[#16212E]/[0.07] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0"
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -184,40 +184,40 @@ export default function ClientesView({ clientes }: Props) {
                           {getInitials(c.nome)}
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-[#E9EEF4] leading-tight">{c.nome}</div>
+                          <div className="text-sm font-semibold text-[#1F2A39] leading-tight">{c.nome}</div>
                           {c.email && (
-                            <div className="text-[11px] text-[#5C6E84] truncate max-w-[200px]">{c.email}</div>
+                            <div className="text-[11px] text-[#788698] truncate max-w-[200px]">{c.email}</div>
                           )}
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-[#8A9BB0]">{c.telefone ?? '—'}</span>
+                      <span className="text-sm text-[#788698]">{c.telefone ?? '—'}</span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-[#8A9BB0]">
+                      <span className="text-sm text-[#788698]">
                         {c.cidade && c.estado ? `${c.cidade} · ${c.estado}` : c.cidade ?? c.estado ?? '—'}
                       </span>
                     </td>
                     <td className="px-5 py-4">
                       <span className={cn(
                         'text-sm font-semibold font-mono',
-                        tv > 0 ? 'text-[#F4F6F9]' : 'text-[#5C6E84]'
+                        tv > 0 ? 'text-[#16212E]' : 'text-[#788698]'
                       )}>
                         {tv}
                       </span>
                     </td>
                     <td className="px-5 py-4">
                       {vt > 0 ? (
-                        <span className="text-sm font-bold text-[#F4F6F9]">
+                        <span className="text-sm font-bold text-[#16212E]">
                           {vt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       ) : (
-                        <span className="text-[#5C6E84]">—</span>
+                        <span className="text-[#788698]">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-sm text-[#8A9BB0]">{fmtUltimaCompra(c.ultima_compra)}</span>
+                      <span className="text-sm text-[#788698]">{fmtUltimaCompra(c.ultima_compra)}</span>
                     </td>
                     <td className="px-5 py-4">
                       <StatusBadge tipo={c.tipo_cliente} ativo={c.ativo} />
