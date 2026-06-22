@@ -22,7 +22,6 @@ interface Garantia {
   estado_entrada: string | null
   celular_reserva_fornecido: boolean | null
   modelo_reserva: string | null
-  created_at?: string
   cliente_id: number | null
   produto_id: number | null
   clientes?: { nome: string; telefone: string | null } | null
@@ -74,7 +73,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
     supabase.from('produtos').select('id, nome').order('nome').then(({ data }) => setProdutos(data ?? []))
   }, [])
 
-  function set(field: keyof Garantia, value: string | boolean | null) {
+  function set(field: keyof Garantia, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
