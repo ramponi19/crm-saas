@@ -40,19 +40,19 @@ function KpiCard({ label, children, sub, delta, deltaUp, delay = 0 }: {
   delta?: string; deltaUp?: boolean; delay?: number
 }) {
   return (
-    <div className="bg-[#122036] border border-white/[0.06] rounded-[18px] p-[22px] transition-all duration-300 hover:-translate-y-[3px] hover:border-white/[0.18] animate-fade-up"
+    <div className="bg-white border border-[#16212E]/[0.08] rounded-[18px] p-[22px] transition-all duration-300 hover:-translate-y-[3px] hover:border-white/[0.18] animate-fade-up"
       style={{ animationDelay: `${delay}ms` }}>
       <div className="flex justify-between items-start">
         <div />
         {delta && (
-          <span className={cn('flex items-center gap-1 text-[12px] font-bold', deltaUp ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+          <span className={cn('flex items-center gap-1 text-[12px] font-bold', deltaUp ? 'text-[#34D399]' : 'text-[#C01F26]')}>
             <TrendingUp size={14} />{delta}
           </span>
         )}
       </div>
       <div className="font-mono text-[10.5px] tracking-[0.12em] text-[#6B7C92] mt-[18px]">{label}</div>
-      <div className="font-serif font-medium text-[30px] tracking-[-0.02em] text-[#F4F6F9] mt-1">{children}</div>
-      {sub && <div className="text-[12px] text-[#5C6E84] mt-1">{sub}</div>}
+      <div className="font-serif font-medium text-[30px] tracking-[-0.02em] text-[#16212E] mt-1">{children}</div>
+      {sub && <div className="text-[12px] text-[#788698] mt-1">{sub}</div>}
     </div>
   )
 }
@@ -70,7 +70,7 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
   const counts: Record<string, number> = {}
   vendas.forEach(v => { const c = v.canal_venda ?? 'loja_fisica'; counts[c] = (counts[c] ?? 0) + 1 })
   const total = Object.values(counts).reduce((s, v) => s + v, 0)
-  if (!total) return <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem dados ainda.</div>
+  if (!total) return <div className="text-center py-8 text-[#788698] text-[13px]">Sem dados ainda.</div>
   const segs = Object.entries(counts).map(([c, n]) => ({
     label: CANAL_META[c]?.label ?? c, color: CANAL_META[c]?.color ?? '#6B7C92',
     pct: Math.round((n / total) * 100),
@@ -113,7 +113,7 @@ function TopProdutos({ vendas }: { vendas: VendaRecente[] }) {
   // Agrupa por forma_pagamento como proxy (sem dados de produto aqui)
   // Mostra mensagem se não houver dados suficientes
   if (!vendas.length) {
-    return <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem vendas no período.</div>
+    return <div className="text-center py-8 text-[#788698] text-[13px]">Sem vendas no período.</div>
   }
   const rows = vendas.slice(0, 6).map((v, i) => ({
     nome: v.forma_pagamento ?? 'Pix',
@@ -125,7 +125,7 @@ function TopProdutos({ vendas }: { vendas: VendaRecente[] }) {
       {rows.map((r, i) => (
         <div key={i}>
           <div className="flex justify-between mb-[6px]">
-            <span className="text-[12.5px] text-[#C4CCD6] font-medium">Venda #{i + 1} · {r.nome}</span>
+            <span className="text-[12.5px] text-[#16212E] font-medium">Venda #{i + 1} · {r.nome}</span>
             <span className="font-mono text-[12px] text-[#6B7C92]">{formatCurrency(r.val)}</span>
           </div>
           <div className="h-[8px] rounded-[8px] bg-white/[0.05] overflow-hidden">
@@ -182,7 +182,7 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
       desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária`,
     },
     assistenciasAbertas > 0 && {
-      icon: <AlertTriangle size={24} className="text-[#F0656B] flex-none" />,
+      icon: <AlertTriangle size={24} className="text-[#C01F26] flex-none" />,
       bg: 'rgba(215,40,47,.1)', title: 'Assistências abertas',
       desc: `${assistenciasAbertas} ordem(s) em andamento`,
     },
@@ -200,7 +200,7 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
           <TrendingUp size={20} />
         </div>
         <span className="text-[13px] font-semibold">Tudo em ordem!</span>
-        <span className="text-[11px] text-[#5C6E84] text-center">Sem alertas críticos no momento.</span>
+        <span className="text-[11px] text-[#788698] text-center">Sem alertas críticos no momento.</span>
       </div>
     )
   }
@@ -212,7 +212,7 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
           {a.icon}
           <div>
             <div className="text-[13.5px] font-semibold text-[#EAEFF5]">{a.title}</div>
-            <div className="text-[11.5px] text-[#8A9BB0] mt-[2px] leading-[1.4]">{a.desc}</div>
+            <div className="text-[11.5px] text-[#788698] mt-[2px] leading-[1.4]">{a.desc}</div>
           </div>
         </div>
       ))}
@@ -232,7 +232,7 @@ function getInitials(nome: string) {
 function TopVendedores({ vendedores }: {
   vendedores: Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>
 }) {
-  if (!vendedores.length) return <div className="text-center py-6 text-[#5C6E84] text-[13px]">Sem dados.</div>
+  if (!vendedores.length) return <div className="text-center py-6 text-[#788698] text-[13px]">Sem dados.</div>
   const maxTotal = Math.max(...vendedores.map(v => v.total), 1)
 
   return (
@@ -256,7 +256,7 @@ function TopVendedores({ vendedores }: {
                 {getInitials(v.nome)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{v.nome}</div>
+                <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{v.nome}</div>
                 <div className="text-[11.5px] text-[#6B7C92]">
                   {v.qtd} {v.qtd === 1 ? 'venda' : 'vendas'}
                   {pctMeta !== null && (
@@ -266,7 +266,7 @@ function TopVendedores({ vendedores }: {
                   )}
                 </div>
               </div>
-              <div className="text-[13.5px] font-bold text-[#F4F6F9]">{formatCurrency(v.total)}</div>
+              <div className="text-[13.5px] font-bold text-[#16212E]">{formatCurrency(v.total)}</div>
             </div>
             {/* Barra de progresso — meta se tiver, senão relativa ao maior */}
             <div className="h-[6px] rounded-[6px] bg-white/[0.06] overflow-hidden">
@@ -283,8 +283,8 @@ function TopVendedores({ vendedores }: {
             {/* Label da meta se configurada */}
             {v.meta !== null && (
               <div className="flex justify-between mt-[4px]">
-                <span className="font-mono text-[9px] text-[#4F6178]">R$ 0</span>
-                <span className="font-mono text-[9px] text-[#4F6178]">{formatCurrency(v.meta)}</span>
+                <span className="font-mono text-[9px] text-[#9AA7B6]">R$ 0</span>
+                <span className="font-mono text-[9px] text-[#9AA7B6]">{formatCurrency(v.meta)}</span>
               </div>
             )}
           </div>
@@ -344,7 +344,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         <div className="max-w-[1320px] mx-auto space-y-5">
 
           {/* ── HERO ── */}
-          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] bg-hero-gradient border border-white/[0.08] shadow-[0_28px_70px_rgba(0,0,0,0.45)] animate-fade-up">
+          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] bg-hero-gradient border border-[#16212E]/[0.10] shadow-[0_28px_70px_rgba(0,0,0,0.45)] animate-fade-up">
             <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
               <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
               <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#5FE3B5]">SISTEMA ONLINE</span>
@@ -355,7 +355,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               </div>
               <h2 className="mt-2 font-serif font-normal text-[34px] leading-[1.12] tracking-[-0.025em] text-[#F6F8FB]">
                 Boa gestão gera bons resultados. A operação está{' '}
-                <em className="italic text-[#F0656B]">voando alto</em>.
+                <em className="italic text-[#C01F26]">voando alto</em>.
               </h2>
               <div className="flex items-end gap-[18px] mt-[26px]">
                 <div>
@@ -408,11 +408,11 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               { icon: TrendingUp,    color: '#F0656B', val: String(globais.leadsAtivos),          sub: 'leads ativos no funil',     alert: globais.leadsNovos > 20 },
             ].map(({ icon: Icon, color, val, sub, alert }, i) => (
               <div key={i} className={cn('bg-white/[0.025] border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
-                alert ? 'border-[rgba(240,100,107,0.25)]' : 'border-white/[0.05]')}>
+                alert ? 'border-[rgba(240,100,107,0.25)]' : 'border-[#16212E]/[0.07]')}>
                 <Icon size={30} style={{ color }} />
                 <div>
                   <div className="font-serif text-[20px] text-[#EEF2F7]">{val}</div>
-                  <div className="text-[11.5px] text-[#5C6E84] mt-[1px]">{sub}</div>
+                  <div className="text-[11.5px] text-[#788698] mt-[1px]">{sub}</div>
                 </div>
               </div>
             ))}
@@ -420,11 +420,11 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
 
           {/* ── ROW A: Gráfico área (1.85fr) + Donut canais (1fr) ── */}
           <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.85fr 1fr' }}>
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '350ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '350ms' }}>
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESEMPENHO</div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Tendência de faturamento</h3>
+                  <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Tendência de faturamento</h3>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] font-mono text-[10.5px] text-[#9FB0C2]">
                   12 MESES
@@ -432,28 +432,28 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               </div>
               <AreaChart data={faturamentoMensal} />
             </div>
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '420ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '420ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ORIGEM</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-[22px]">Vendas por canal</h3>
+              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-[22px]">Vendas por canal</h3>
               <DonutCanais vendas={vendasRecentes} />
             </div>
           </div>
 
           {/* ── ROW B: Produtos (1fr) + Funil (1fr) + Alertas (1fr) ── */}
           <div className="grid grid-cols-3 gap-[18px]">
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '460ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '460ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">RANKING</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-5">Produtos mais vendidos</h3>
+              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Produtos mais vendidos</h3>
               <TopProdutos vendas={vendasRecentes} />
             </div>
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '500ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '500ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CONVERSÃO</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-5">Funil de leads</h3>
+              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Funil de leads</h3>
               <FunilLeads leadsAtivos={globais.leadsAtivos} leadsNovos={globais.leadsNovos} />
             </div>
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '540ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '540ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ATENÇÃO</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-[18px]">Alertas</h3>
+              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-[18px]">Alertas</h3>
               <Alertas estoqueDisponivel={globais.estoqueDisponivel}
                 leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} />
             </div>
@@ -461,35 +461,35 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
 
           {/* ── ROW C: Vendas recentes (1.7fr) + Top vendedores (1fr) ── */}
           <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.7fr 1fr' }}>
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '580ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '580ms' }}>
               <div className="flex justify-between items-center mb-[18px]">
                 <div>
                   <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">TEMPO REAL</div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Vendas recentes</h3>
+                  <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Vendas recentes</h3>
                 </div>
-                <button className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#C4CCD6] text-[12.5px] font-semibold hover:bg-white/[0.08] transition-colors">
+                <button className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-white/[0.08] transition-colors">
                   Ver todas <ArrowUpRight size={15} />
                 </button>
               </div>
               {/* Cabeçalho da tabela */}
-              <div className="grid gap-[10px] px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
+              <div className="grid gap-[10px] px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
                 <div>DATA</div><div>CLIENTE / PRODUTO</div>
                 <div className="text-right">VALOR</div><div className="text-right w-[96px]">STATUS</div>
               </div>
               {vendasRecentes.length === 0 ? (
-                <div className="text-center py-8 text-[#5C6E84] text-[13px]">Nenhuma venda ainda.</div>
+                <div className="text-center py-8 text-[#788698] text-[13px]">Nenhuma venda ainda.</div>
               ) : vendasRecentes.map((v, i) => {
                 const canal = CANAIS_VENDA.find(c => c.value === v.canal_venda)
                 const avatarColors = ['#34D399', '#7FB0E8', '#D7282F', '#F4B740', '#C6A86A']
                 const color = avatarColors[i % avatarColors.length]
                 const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--/--'
                 return (
-                  <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] transition-colors"
+                  <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-[#16212E]/[0.06] last:border-0 hover:bg-white/[0.025] transition-colors"
                     style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
                     <div className="font-mono text-[12px] text-[#6B7C92]">{data}</div>
                     <div>
-                      <div className="text-[13px] font-semibold text-[#E9EEF4]">{v.cliente_nome ?? '—'}</div>
+                      <div className="text-[13px] font-semibold text-[#1F2A39]">{v.cliente_nome ?? '—'}</div>
                       <div className="text-[11px] text-[#6B7C92]">
                         {v.produto_nome
                           ? <>{v.produto_nome} · {canal?.label ?? 'Loja física'}</>
@@ -497,7 +497,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                         }
                       </div>
                     </div>
-                    <div className="font-serif text-[15px] text-[#F4F6F9] text-right">{formatCurrency(v.valor_venda)}</div>
+                    <div className="font-serif text-[15px] text-[#16212E] text-right">{formatCurrency(v.valor_venda)}</div>
                     <div className="text-right w-[96px]">
                       <span className="font-mono text-[10px] font-semibold px-[8px] py-[3px] rounded-full"
                         style={{ color, background: `${color}22` }}>
@@ -509,9 +509,9 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               })}
             </div>
 
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '620ms' }}>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '620ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESTAQUE</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-[20px]">Top vendedores</h3>
+              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-[20px]">Top vendedores</h3>
               <TopVendedores vendedores={topVendedores} />
             </div>
           </div>
