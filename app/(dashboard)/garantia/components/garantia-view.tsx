@@ -94,28 +94,28 @@ export default function GarantiaView({ garantias }: Props) {
   ]
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       {/* Topbar */}
-      <div className="flex items-center px-6 py-4 border-b border-white/[0.06] shrink-0">
+      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#5C6E84] uppercase mb-0.5">
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">
             Pós-venda · Produtos vendidos
           </p>
-          <h1 className="text-xl font-bold text-[#F4F6F9]">Garantia</h1>
+          <h1 className="text-xl font-bold text-[#16212E]">Garantia</h1>
         </div>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
         {STATS.map(s => (
-          <div key={s.label} className="bg-[#122036] border border-white/[0.06] rounded-[16px] px-5 py-4 flex items-center gap-4">
+          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4 flex items-center gap-4">
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
               style={{ backgroundColor: s.iconBg, color: s.iconColor }}>
               {s.icon}
             </div>
             <div>
-              <div className="text-2xl font-normal text-[#F4F6F9] leading-none">{s.value}</div>
-              <div className="text-[11px] text-[#5C6E84] mt-1">{s.label}</div>
+              <div className="text-2xl font-normal text-[#16212E] leading-none">{s.value}</div>
+              <div className="text-[11px] text-[#788698] mt-1">{s.label}</div>
             </div>
           </div>
         ))}
@@ -127,8 +127,8 @@ export default function GarantiaView({ garantias }: Props) {
           {FILTROS.map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key)}
               className={cn('px-4 py-2 rounded-[8px] text-sm font-medium transition-all', filtro === f.key
-                ? 'text-[#F0656B]'
-                : 'text-[#5C6E84] hover:text-[#8A9BB0]')}
+                ? 'text-[#C01F26]'
+                : 'text-[#788698] hover:text-[#788698]')}
               style={filtro === f.key ? { backgroundColor: 'rgba(215,40,47,0.14)' } : { backgroundColor: 'rgba(255,255,255,0.04)' }}
             >
               {f.label}
@@ -144,12 +144,12 @@ export default function GarantiaView({ garantias }: Props) {
 
       {/* Tabela */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] overflow-hidden">
+        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-[#16212E]/[0.08]">
                 {['Protocolo', 'Cliente / Produto', 'Tipo', 'Prazo', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#5C6E84] uppercase px-5 py-3.5 whitespace-nowrap">
+                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -157,31 +157,31 @@ export default function GarantiaView({ garantias }: Props) {
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-16 text-[#4F6178] text-sm">Nenhuma garantia encontrada</td></tr>
+                <tr><td colSpan={5} className="text-center py-16 text-[#9AA7B6] text-sm">Nenhuma garantia encontrada</td></tr>
               ) : filtrados.map(g => (
                 <tr key={g.id}
                   onClick={() => { setSelecionada(g); setIsNew(false); setModalOpen(true) }}
-                  className="border-b border-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors last:border-0">
+                  className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
                   {/* Protocolo */}
                   <td className="px-5 py-4">
-                    <div className="text-sm font-mono font-semibold text-[#E9EEF4]">{g.protocolo ?? `#GA-${g.id}`}</div>
+                    <div className="text-sm font-mono font-semibold text-[#1F2A39]">{g.protocolo ?? `#GA-${g.id}`}</div>
                   </td>
                   {/* Cliente / Produto */}
                   <td className="px-5 py-4">
-                    <div className="text-sm font-semibold text-[#E9EEF4]">{g.clientes?.nome ?? '—'}</div>
-                    <div className="text-[11px] text-[#5C6E84]">
+                    <div className="text-sm font-semibold text-[#1F2A39]">{g.clientes?.nome ?? '—'}</div>
+                    <div className="text-[11px] text-[#788698]">
                       {g.produtos?.nome ?? '—'}{g.imei_serial ? ` · IMEI ··${g.imei_serial.slice(-4)}` : ''}
                     </div>
                   </td>
                   {/* Tipo */}
                   <td className="px-5 py-4">
-                    <span className={cn('text-sm', g.dentro_garantia ? 'text-[#E9EEF4]' : 'text-[#93A3B6]')}>
+                    <span className={cn('text-sm', g.dentro_garantia ? 'text-[#1F2A39]' : 'text-[#788698]')}>
                       {g.dentro_garantia ? 'Garantia' : 'Assistência'}
                     </span>
                   </td>
                   {/* Prazo */}
                   <td className="px-5 py-4">
-                    <span className={cn('text-sm', g.dias_garantia_restantes != null && g.dias_garantia_restantes < 0 ? 'text-[#D7282F]' : 'text-[#8A9BB0]')}>
+                    <span className={cn('text-sm', g.dias_garantia_restantes != null && g.dias_garantia_restantes < 0 ? 'text-[#D7282F]' : 'text-[#788698]')}>
                       {fmtPrazo(g.dias_garantia_restantes)}
                     </span>
                   </td>
