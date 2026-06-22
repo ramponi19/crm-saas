@@ -74,19 +74,19 @@ function fmtUltima(d: string | null | undefined) {
 }
 
 // Cores extraídas diretamente do DOM do modelo:
-// Card:   #0E1A2C  (rgb 14,26,44)
-// Input:  #122036  (rgb 18,32,54) + border rgba(255,255,255,0.08)
+// Card:   #FFFFFF  (rgb 14,26,44)
+// Input:  #FFFFFF  (rgb 18,32,54) + border rgba(255,255,255,0.08)
 // Label:  #4F6178  (rgb 79,97,120) — 9.5px uppercase mono
 // Text:   #E9EEF4  (rgb 233,238,244)
-// Stats:  rgba(255,255,255,0.03) bg + rgba(255,255,255,0.06) border + 13px radius
+// Stats:  rgba(22,32,46,0.04) bg + rgba(255,255,255,0.06) border + 13px radius
 
 const inputCls = [
   'w-full rounded-[10px] px-3 py-2.5 text-sm outline-none transition-colors',
-  'text-[#E9EEF4] placeholder:text-[#4F6178]',
-  'bg-[#122036] border border-white/[0.08] focus:border-white/20',
+  'text-[#1F2A39] placeholder:text-[#9AA7B6]',
+  'bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20',
 ].join(' ')
 
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#4F6178] uppercase mb-1.5'
+const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
 
 export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const supabase = createClient()
@@ -130,11 +130,11 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   const uc = cliente?.ultima_compra ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      {/* Card: #0E1A2C + border rgba(255,255,255,0.08) + radius 18px */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+      {/* Card: #FFFFFF + border rgba(255,255,255,0.08) + radius 18px */}
       <div
-        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-white/[0.08]"
-        style={{ backgroundColor: '#0E1A2C' }}
+        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-[#16212E]/[0.10]"
+        style={{ backgroundColor: '#FFFFFF' }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
@@ -145,39 +145,39 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             {getInitials(form.nome || 'CL')}
           </div>
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            <h2 className="text-base font-semibold text-[#E9EEF4] truncate">
+            <h2 className="text-base font-semibold text-[#1F2A39] truncate">
               {isNew ? 'Novo Cliente' : (form.nome || 'Cliente')}
             </h2>
             {!isNew && form.ativo !== false && form.tipo_cliente !== 'VIP' && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold text-[#22C55E] bg-[#22C55E]/10 border border-[#22C55E]/20 shrink-0">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold text-[#15986A] bg-[#22C55E]/10 border border-[#22C55E]/20 shrink-0">
                 Ativo
               </span>
             )}
             {form.tipo_cliente === 'VIP' && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10 shrink-0">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border border-[#F59E0B]/40 text-[#B47B12] bg-[#F59E0B]/10 shrink-0">
                 VIP
               </span>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-[#4F6178] hover:text-[#D4DEEA] transition-colors shrink-0">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors shrink-0">
             <X size={16} />
           </button>
         </div>
 
-        {/* Stats — rgba(255,255,255,0.03) bg, radius 13px */}
+        {/* Stats — rgba(22,32,46,0.04) bg, radius 13px */}
         {!isNew && (
           <div className="grid grid-cols-3 gap-2 px-6 pb-4 shrink-0">
-            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-              <div className="text-lg font-bold text-[#C4CCD6] font-mono">{tv}</div>
-              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">compras</div>
+            <div className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center" style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
+              <div className="text-lg font-bold text-[#16212E] font-mono">{tv}</div>
+              <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">compras</div>
             </div>
-            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-              <div className="text-sm font-bold text-[#22C55E] leading-tight">{vt > 0 ? fmtBRL(vt) : '—'}</div>
-              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">total gasto</div>
+            <div className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center" style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
+              <div className="text-sm font-bold text-[#15986A] leading-tight">{vt > 0 ? fmtBRL(vt) : '—'}</div>
+              <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">total gasto</div>
             </div>
-            <div className="rounded-[13px] border border-white/[0.06] p-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-              <div className="text-sm font-bold text-[#E9EEF4] leading-tight">{fmtUltima(uc)}</div>
-              <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">última compra</div>
+            <div className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center" style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
+              <div className="text-sm font-bold text-[#1F2A39] leading-tight">{fmtUltima(uc)}</div>
+              <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">última compra</div>
             </div>
           </div>
         )}
@@ -212,14 +212,14 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Tipo de cliente</label>
               <select value={form.tipo_cliente ?? 'Novo'} onChange={e => set('tipo_cliente', e.target.value)} className={inputCls}>
-                {['Novo','Ativo','VIP','Recorrente','Inativo'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
+                {['Novo','Ativo','VIP','Recorrente','Inativo'].map(t => <option key={t} style={{ backgroundColor: '#FFFFFF' }}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Estado civil</label>
               <select value={form.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Solteiro(a), Casado(a)...</option>
-                {['Solteiro(a)','Casado(a)','Divorciado(a)','Viúvo(a)','União estável'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Solteiro(a), Casado(a)...</option>
+                {['Solteiro(a)','Casado(a)','Divorciado(a)','Viúvo(a)','União estável'].map(t => <option key={t} style={{ backgroundColor: '#FFFFFF' }}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -241,8 +241,8 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Origem do cliente</label>
               <select value={form.origem_cliente ?? ''} onChange={e => set('origem_cliente', e.target.value)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>—</option>
-                {['Instagram','WhatsApp','Indicação','Loja física','Facebook','Google','Marketplace'].map(t => <option key={t} style={{ backgroundColor: '#0E1A2C' }}>{t}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>—</option>
+                {['Instagram','WhatsApp','Indicação','Loja física','Facebook','Google','Marketplace'].map(t => <option key={t} style={{ backgroundColor: '#FFFFFF' }}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -286,14 +286,14 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           {!isNew ? (
             <button onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-medium transition-colors">
               Desativar
             </button>
           ) : <div />}
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-[#4F6178] hover:text-[#D4DEEA] font-medium transition-colors">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
               Fechar
             </button>
             <button onClick={salvar} disabled={saving}
