@@ -22,6 +22,7 @@ interface Garantia {
   estado_entrada: string | null
   celular_reserva_fornecido: boolean | null
   modelo_reserva: string | null
+  created_at?: string
   cliente_id: number | null
   produto_id: number | null
   clientes?: { nome: string; telefone: string | null } | null
