@@ -115,10 +115,10 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-gradient dark:bg-[linear-gradient(180deg,#0C1526_0%,#0A1120_100%)] shrink-0">
+    <aside className="flex flex-col h-screen w-[264px] border-r border-[#16212E]/[0.08] bg-sidebar-gradient shrink-0">
 
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-[22px] border-b border-white/[0.05]">
+      <div className="flex items-center gap-3 px-5 py-[22px] border-b border-[#16212E]/[0.07]">
         {empresaLogo ? (
           <div className="w-[46px] h-[46px] rounded-[13px] bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
             <Image src={empresaLogo} alt="Logo" width={40} height={40} className="object-contain" />
@@ -132,7 +132,7 @@ export function Sidebar({
           </div>
         )}
         <div className="leading-tight overflow-hidden">
-          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-[#F4F6F9] truncate">
+          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-[#16212E] truncate">
             {userEmpresa ?? 'CRM Store'}
           </div>
           <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: empresaCor }}>
@@ -145,7 +145,7 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-4">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#3F516A] uppercase px-[14px] pb-[7px] pt-1">
+            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#9AA7B6] uppercase px-[14px] pb-[7px] pt-1">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -161,8 +161,8 @@ export function Sidebar({
                     className={cn(
                       'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150 group',
                       isActive
-                        ? 'text-[#F4F6F9] font-semibold'
-                        : 'text-[#8A9BB0] hover:bg-white/[0.05] hover:text-[#D4DEEA]'
+                        ? 'text-[#16212E] font-semibold'
+                        : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
                     )}
                     style={isActive ? { background: `${empresaCor}18` } : {}}
                   >
@@ -192,7 +192,7 @@ export function Sidebar({
       </nav>
 
       {/* User */}
-      <div className="px-3 py-3 border-t border-white/[0.05]">
+      <div className="px-3 py-3 border-t border-[#16212E]/[0.07]">
         <div className="flex items-center gap-[11px] px-[11px] py-[9px] rounded-[13px] bg-white/[0.03]">
           <div
             className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[14px] text-white shrink-0"
@@ -201,10 +201,10 @@ export function Sidebar({
             {userName.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{userName}</div>
-            <div className="text-[11px] text-[#5C6E84]">{userRole}</div>
+            <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{userName}</div>
+            <div className="text-[11px] text-[#788698]">{userRole}</div>
           </div>
-          <button className="text-[#5C6E84] hover:text-[#9FB0C2] transition-colors" onClick={handleLogout}>
+          <button className="text-[#788698] hover:text-[#9FB0C2] transition-colors" onClick={handleLogout}>
             <LogOut size={18} />
           </button>
         </div>
