@@ -56,10 +56,10 @@ const STATUS_OPTIONS = [
 // Design tokens do modelo
 const inputCls = [
   'w-full rounded-[10px] px-3 py-2.5 text-sm outline-none transition-colors',
-  'text-[#E9EEF4] placeholder:text-[#4F6178]',
-  'bg-[#122036] border border-white/[0.08] focus:border-white/20',
+  'text-[#1F2A39] placeholder:text-[#9AA7B6]',
+  'bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20',
 ].join(' ')
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#4F6178] uppercase mb-1.5'
+const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
 
 export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const supabase = createClient()
@@ -108,16 +108,16 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const statusColor = statusColors[form.status ?? ''] ?? '#5C6E84'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
       <div
-        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-white/[0.08]"
-        style={{ backgroundColor: '#0E1A2C' }}
+        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-[#16212E]/[0.10]"
+        style={{ backgroundColor: '#FFFFFF' }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-[#E9EEF4]">
+              <h2 className="text-base font-semibold text-[#1F2A39]">
                 {isNew ? 'Novo Protocolo' : (form.protocolo ?? `Protocolo #${garantia?.id}`)}
               </h2>
               {!isNew && (
@@ -128,10 +128,10 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
               )}
             </div>
             {!isNew && garantia?.clientes?.nome && (
-              <p className="text-[11px] text-[#4F6178] mt-0.5">{garantia.clientes.nome}</p>
+              <p className="text-[11px] text-[#9AA7B6] mt-0.5">{garantia.clientes.nome}</p>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-[#4F6178] hover:text-[#D4DEEA] transition-colors shrink-0">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors shrink-0">
             <X size={16} />
           </button>
         </div>
@@ -144,10 +144,10 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
               { label: 'Prazo',    value: garantia?.dias_garantia_restantes != null ? `${garantia.dias_garantia_restantes}d` : '—' },
               { label: 'Orçamento',value: garantia?.orcamento_valor ? `R$ ${Number(garantia.orcamento_valor).toLocaleString('pt-BR')}` : '—' },
             ].map(s => (
-              <div key={s.label} className="rounded-[13px] border border-white/[0.06] p-3 text-center"
-                style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                <div className="text-sm font-bold text-[#E9EEF4] leading-tight">{s.value}</div>
-                <div className="text-[9px] text-[#4F6178] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
+              <div key={s.label} className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center"
+                style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
+                <div className="text-sm font-bold text-[#1F2A39] leading-tight">{s.value}</div>
+                <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
@@ -164,7 +164,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Status</label>
               <select value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)} className={inputCls}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#0E1A2C' }}>{o.label}</option>)}
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#FFFFFF' }}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -173,15 +173,15 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Cliente</label>
               <select value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
-                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#0E1A2C' }}>{c.nome}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
+                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#FFFFFF' }}>{c.nome}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Produto</label>
               <select value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#0E1A2C' }}>Selecionar...</option>
-                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#0E1A2C' }}>{p.nome}</option>)}
+                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
+                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#FFFFFF' }}>{p.nome}</option>)}
               </select>
             </div>
           </div>
@@ -234,8 +234,8 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
             <div>
               <label className={labelCls}>Celular reserva</label>
               <select value={form.celular_reserva_fornecido ? 'sim' : 'nao'} onChange={e => set('celular_reserva_fornecido', e.target.value === 'sim')} className={inputCls}>
-                <option value="nao" style={{ backgroundColor: '#0E1A2C' }}>Não fornecido</option>
-                <option value="sim" style={{ backgroundColor: '#0E1A2C' }}>Fornecido</option>
+                <option value="nao" style={{ backgroundColor: '#FFFFFF' }}>Não fornecido</option>
+                <option value="sim" style={{ backgroundColor: '#FFFFFF' }}>Fornecido</option>
               </select>
             </div>
             <div>
@@ -253,8 +253,8 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/[0.06] shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-[#4F6178] hover:text-[#D4DEEA] font-medium transition-colors">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
             Fechar
           </button>
           <button onClick={salvar} disabled={saving}
