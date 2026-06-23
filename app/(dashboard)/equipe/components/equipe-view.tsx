@@ -47,22 +47,21 @@ export default function EquipeView({ usuarios }: Props) {
   const [tab, setTab] = useState('usuarios')
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
+    <div className="flex flex-col h-full bg-[#0A111E] overflow-hidden">
+      <div className="flex items-center px-6 py-4 border-b border-white/[0.06] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Operação</p>
-          <h1 className="text-xl font-bold text-[#16212E]">Equipe</h1>
+          <p className="text-[10px] font-mono tracking-[0.2em] text-[#8A9BB0] uppercase mb-0.5">Operação</p>
+          <h1 className="text-xl font-bold text-[#F4F6F9]">Equipe</h1>
         </div>
       </div>
 
       {/* Tabs + botão */}
       <div className="flex items-center justify-between px-6 py-4 shrink-0">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={cn('flex items-center gap-2 px-4 py-2 rounded-[8px] text-sm font-medium transition-all',
-                tab === t.key ? 'text-[#C01F26]' : 'text-[#788698] hover:text-[#788698]')}
-              style={tab === t.key ? { backgroundColor: 'rgba(215,40,47,0.14)' } : { backgroundColor: 'rgba(255,255,255,0.04)' }}>
+                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')} : { backgroundColor: 'rgba(255,255,255,0.04)' }}>
               {t.label}
             </button>
           ))}
@@ -75,12 +74,12 @@ export default function EquipeView({ usuarios }: Props) {
       {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {tab === 'usuarios' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+          <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#16212E]/[0.08]">
+                <tr className="border-b border-white/[0.06]">
                   {['Usuário','Módulos de acesso','Perfil','Último acesso','Ação'].map(h => (
-                    <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#8A9BB0] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -93,31 +92,31 @@ export default function EquipeView({ usuarios }: Props) {
                   const rb = ROLE_BADGE[u.role ?? ''] ?? { label: u.role ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.15)' }
                   const modulos = (u.modulos_acesso ?? []).join(' · ') || 'Acesso total'
                   return (
-                    <tr key={u.id} className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] transition-colors last:border-0">
+                    <tr key={u.id} className="border-b border-white/[0.06] hover:bg-[#16212E]/[0.04] transition-colors last:border-0">
                       {/* Usuário */}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: color }}>{initials}</div>
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white"}>{initials}</div>
                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#22C55E] border-2 border-[#FFFFFF]" />
                           </div>
                           <div>
                             <div className="text-sm font-semibold text-[#1F2A39]">{u.nome}</div>
-                            <div className="text-[11px] text-[#788698]">{u.email ?? '—'}</div>
+                            <div className="text-[11px] text-[#8A9BB0]">{u.email ?? '—'}</div>
                           </div>
                         </div>
                       </td>
                       {/* Módulos */}
-                      <td className="px-5 py-4"><span className="text-sm text-[#788698]">{modulos}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{modulos}</span></td>
                       {/* Perfil */}
                       <td className="px-5 py-4">
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold" style={{ color: rb.color, backgroundColor: rb.bg }}>{rb.label}</span>
+                        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold"}>{rb.label}</span>
                       </td>
                       {/* Último acesso */}
-                      <td className="px-5 py-4"><span className="text-sm text-[#788698]">{fmtAcesso(u.ultimo_acesso)}</span></td>
+                      <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{fmtAcesso(u.ultimo_acesso)}</span></td>
                       {/* Ação */}
                       <td className="px-5 py-4">
-                        <button className="px-3 py-1.5 text-xs font-semibold text-[#788698] hover:text-[#1F2A39] bg-white/[0.05] hover:bg-white/[0.08] rounded-[8px] transition-colors">
+                        <button className="px-3 py-1.5 text-xs font-semibold text-[#8A9BB0] hover:text-[#1F2A39] bg-white/[0.05] hover:bg-white/[0.08] rounded-[8px] transition-colors">
                           ✎ Editar
                         </button>
                       </td>
@@ -129,13 +128,13 @@ export default function EquipeView({ usuarios }: Props) {
           </div>
         )}
         {tab === 'metas' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-8 text-center">
-            <p className="text-[#788698] text-sm">Metas em desenvolvimento</p>
+          <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-8 text-center">
+            <p className="text-[#8A9BB0] text-sm">Metas em desenvolvimento</p>
           </div>
         )}
         {tab === 'comissoes' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-8 text-center">
-            <p className="text-[#788698] text-sm">Comissões em desenvolvimento</p>
+          <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-8 text-center">
+            <p className="text-[#8A9BB0] text-sm">Comissões em desenvolvimento</p>
           </div>
         )}
       </div>
