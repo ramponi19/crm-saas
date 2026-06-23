@@ -101,9 +101,36 @@ export default function EmpresaConfigPage() {
   const PLANOS = [
     { id: 'free',    nome: 'Free',    preco: 'Grátis',      cor: '#5C6E84', usuarios: 1,   leads: 100   },
     { id: 'starter', nome: 'Starter', preco: 'R$ 197/mês',  cor: '#6B8CFF', usuarios: 3,   leads: 500   },
-    { id: 'pro',     nome: 'Pro',     preco: 'R$ 397/mês',  cor: '#D7282F'flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all'border-[#D7282F] text-white'
-                  : 'border-transparent text-[#8A9BB0] hover:text-[#8A9BB0]'
-              }`}
+    { id: 'pro',     nome: 'Pro',     preco: 'R$ 397/mês',  cor: '#D7282F', usuarios: 10,  leads: 99999  },
+    { id: 'unlimited',nome: 'Unlimited',preco: 'R$ 697/mês', cor: '#D7282F', usuarios: 999, leads: 99999  },
+  ]
+
+  const planoAtual = PLANOS.find(p => p.id === empresa?.plano) ?? PLANOS[0]
+  const emTrial    = empresa?.em_trial ?? false
+  const diasTrial  = empresa?.trial_termina_em
+    ? Math.max(0, Math.ceil((new Date(empresa.trial_termina_em).getTime() - Date.now()) / 86400000))
+    : 0
+
+  return (
+    <div className="flex flex-col h-full bg-white overflow-hidden">
+      {/* Header */}
+      <div className="px-8 py-5 border-b border-[#16212E]/[0.08] shrink-0">
+        <p className="text-xs font-mono tracking-[0.15em] text-[#788698] uppercase mb-0.5">SISTEMA</p>
+        <h1 className="text-[22px] font-serif font-bold text-[#16212E]">Configurações da empresa</h1>
+        {empresa && <p className="text-sm text-[#788698] mt-0.5">{empresa.nome}</p>}
+      </div>
+
+      {/* Abas — padrão Relatórios */}
+      <div className="px-8 py-4 border-b border-[#16212E]/[0.08] shrink-0">
+        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
+          {ABAS.map(a => (
+            <button key={a.id} onClick={() => setAba(a.id)}
+              className={[
+                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
+                aba === a.id
+                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
+              ].join(' ')}
             >
               {a.icon} {a.label}
             </button>
