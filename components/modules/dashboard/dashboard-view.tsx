@@ -1,5 +1,4 @@
 'use client'
-import { Hero } from './Hero'
 
 import { useState, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
