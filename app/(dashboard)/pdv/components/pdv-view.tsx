@@ -112,8 +112,12 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
     if (carrinho.length === 0) { toast.error('Carrinho vazio'); return }
     setFinalizando(true)
     try {
+      const totalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
       for (const c of carrinho) {
-        const valorItem = (c.item.preco_venda ?? 0) - (carrinho.length === 1 ? descontoNum : 0)
+        const precoCheio = c.item.preco_venda ?? 0
+        // desconto proporcional pelo peso do item no total bruto
+        const descontoItem = totalBruto > 0 ? descontoNum * (precoCheio / totalBruto) : 0
+        const valorItem = precoCheio - descontoItem
         const { data: venda, error } = await supabase
           .from('vendas')
           .insert({
@@ -124,7 +128,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
             forma_pagamento: formaPagamento,
             parcelas: ['credito','link'].includes(formaPagamento) ? parcelas : null,
             canal_venda: 'loja_fisica',
-            desconto_valor: carrinho.length === 1 ? descontoNum : 0,
+            desconto_valor: descontoItem,
             produto_id: c.item.produto_id,
             numero_serie: c.item.imei ?? c.item.numero_serie,
             status: 'concluida',
