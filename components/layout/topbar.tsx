@@ -159,22 +159,43 @@ export function Topbar({
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
     if (!query.trim() || query.length < 2) { setSearchResults([]); setSearchOpen(false); return }
+    setSearchOpen(true)
     searchTimer.current = setTimeout(async () => {
       setSearching(true)
       const supabase = createClient()
       const q = query.trim()
-      const [{ data: clientes }, { data: leads }, { data: estoque }] = await Promise.all([
+      // Busca produtos pelo nome para depois filtrar inventario_unidades
+      const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }] = await Promise.all([
         supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('leads').select('id, nome, produto_interessado').or(`nome.ilike.%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(4),
+        supabase.from('leads').select('id, nome, produto_interessado').ilike('nome', `%${q}%`).eq('ativo', true).limit(4),
+        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(3),
+        supabase.from('produtos').select('id').ilike('nome', `%${q}%`).limit(10),
       ])
+
+      // Busca unidades pelo produto_id encontrado
+      const produtoIds = (produtosMatch ?? []).map((p: any) => p.id)
+      let estoqueNome: any[] = []
+      if (produtoIds.length > 0) {
+        const { data } = await supabase
+          .from('inventario_unidades')
+          .select('id, imei, numero_serie, produtos!produto_id(nome)')
+          .in('produto_id', produtoIds)
+          .eq('ativo', true)
+          .limit(4)
+        estoqueNome = data ?? []
+      }
+
+      // Merge e deduplica por id
+      const allEstoque = [...(estoque ?? []), ...estoqueNome]
+      const seenIds = new Set<number>()
+      const estoqueDedup = allEstoque.filter((u: any) => { if (seenIds.has(u.id)) return false; seenIds.add(u.id); return true }).slice(0, 4)
+
       const results: SearchResult[] = [
         ...(clientes ?? []).map((c: any) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
         ...(leads ?? []).map((l: any) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
-        ...(estoque ?? []).map((u: any) => ({ tipo: 'estoque' as const, id: u.id, titulo: (u.produtos as any)?.nome ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
+        ...estoqueDedup.map((u: any) => ({ tipo: 'estoque' as const, id: u.id, titulo: (u.produtos as any)?.nome ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ]
       setSearchResults(results)
-      setSearchOpen(results.length > 0)
       setSearching(false)
     }, 300)
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
