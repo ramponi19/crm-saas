@@ -39,7 +39,7 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
-      <div className="flex h-screen bg-white dark:bg-[#0A111E] overflow-hidden">
+      <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
           userRole={
