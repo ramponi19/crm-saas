@@ -346,14 +346,45 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
         <div className="max-w-[1320px] mx-auto space-y-5">
 
           {/* ── HERO ── */}
-          <Hero
-            nome={usuarioNome}
-            receita={receita}
-            qtdVendas={qtdVendas}
-            periodLabel={periodLabel}
-            onNovaVenda={() => router.push('/pdv')}
-            onVerEstoque={() => router.push('/estoque')}
-          />
+          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] animate-fade-up"
+            style={{ background: 'radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.24), transparent 52%), linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 55%, #EDF0F5 100%)', border: '1px solid rgba(22,32,46,0.10)', boxShadow: '0 28px 70px rgba(22,32,46,0.12)' }}>
+            <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
+              <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
+              <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#15986A]">SISTEMA ONLINE</span>
+            </div>
+            <div className="relative z-10 max-w-[620px]">
+              <div className="font-mono text-[11px] tracking-[0.16em] text-[#56657A] uppercase opacity-70">
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+              </div>
+              <h2 className="mt-2 font-serif font-normal text-[34px] leading-[1.12] tracking-[-0.025em] text-[#16212E]">
+                Boa gestão gera bons resultados. A operação está{' '}
+                <em className="italic text-[#F0656B]">voando alto</em>.
+              </h2>
+              <div className="flex items-end gap-[18px] mt-[26px]">
+                <div>
+                  <div className="font-mono text-[10px] tracking-[0.18em] text-[#788698]">
+                    FATURAMENTO · {periodLabel.toUpperCase()}
+                  </div>
+                  <AnimatedCurrency value={receita}
+                    className="block font-serif font-medium text-[52px] leading-none tracking-[-0.03em] text-[#16212E] mt-1.5" />
+                </div>
+                <div className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full bg-[rgba(52,211,153,0.14)] mb-2">
+                  <TrendingUp size={15} className="text-[#34D399]" />
+                  <span className="text-[13px] font-bold text-[#34D399]">
+                    <AnimatedInt value={qtdVendas} /> vendas
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-7">
+                <button onClick={() => router.push('/pdv')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(215,40,47,0.38)] hover:-translate-y-[2px] transition-all">
+                  <Zap size={18} /> Nova venda
+                </button>
+                <button onClick={() => router.push('/estoque')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] font-semibold text-[14px] transition-colors" style={{ background: 'rgba(22,32,46,0.08)', border: '1px solid rgba(22,32,46,0.14)', color: '#1F2A39' }}>
+                  <Package size={18} /> Ver estoque
+                </button>
+              </div>
+            </div>
+          </section>
 
           {/* ── KPI GRID — 4 cols ── */}
           <div className="grid grid-cols-4 gap-[18px]">
