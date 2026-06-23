@@ -1,8 +1,7 @@
 'use client'
-import { Hero } from './Hero'
-import { useRouter } from 'next/navigation'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
