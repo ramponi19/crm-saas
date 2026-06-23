@@ -11,9 +11,10 @@ interface KanbanColumnProps {
   usuarios: Usuario[]
   isDragging: boolean
   onLeadClick: (lead: Lead) => void
+  sla?: { verde: number; amarelo: number; vermelho: number }
 }
 
-export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick }: KanbanColumnProps) {
+export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `col-${column.id}`,
     data: { status: column.id },
@@ -51,6 +52,7 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick 
               usuarios={usuarios}
               onClick={() => onLeadClick(lead)}
               barColor={column.color}
+              sla={sla}
             />
           ))}
         </SortableContext>

@@ -11,6 +11,7 @@ interface LeadCardProps {
   onClick: () => void
   isDragging?: boolean
   barColor: string
+  sla?: { verde: number; amarelo: number; vermelho: number }
 }
 
 // Ícones de origem — SVG inline com as cores oficiais (igual modelo)
@@ -37,11 +38,13 @@ const AVATAR_COLORS = ['#D7282F','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f
 const getAvatarColor = (nome: string) => AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length]
 const getInitials    = (nome: string) => nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()
 
-function getSlaColor(date: string | null): string {
+const DEFAULT_SLA = { verde: 15, amarelo: 30, vermelho: 60 }
+
+function getSlaColor(date: string | null, sla = DEFAULT_SLA): string {
   if (!date) return '#6B7C92'
-  const h = (Date.now() - new Date(date).getTime()) / 3_600_000
-  if (h < 4)  return '#34D399'
-  if (h < 24) return '#F4B740'
+  const min = (Date.now() - new Date(date).getTime()) / 60_000
+  if (min < sla.verde)    return '#34D399'
+  if (min < sla.amarelo)  return '#F4B740'
   return '#F0656B'
 }
 
@@ -55,7 +58,7 @@ function formatElapsed(date: string | null): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`
 }
 
-export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor }: LeadCardProps) {
+export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor, sla }: LeadCardProps) {
   const {
     attributes, listeners, setNodeRef, transform, transition,
     isDragging: isSortableDragging,
@@ -66,7 +69,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
   const responsavel = usuarios.find(u => u.id === lead.responsavel_id)
   const temMsgs     = (lead.msgs_nao_lidas ?? 0) > 0
   const lastAt      = lead.ultima_mensagem_at ?? lead.ultima_tratativa
-  const slaColor    = getSlaColor(lastAt)
+  const slaColor    = getSlaColor(lastAt, sla)
   const origem      = ORIGEM_ICONS[lead.origem ?? 'manual'] ?? ORIGEM_ICONS.manual
 
   return (

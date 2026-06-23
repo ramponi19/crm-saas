@@ -16,9 +16,10 @@ interface KanbanBoardProps {
   usuarios: Usuario[]
   onLeadClick: (lead: Lead) => void
   onLeadUpdate: (lead: Lead) => void
+  sla?: { verde: number; amarelo: number; vermelho: number }
 }
 
-export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate }: KanbanBoardProps) {
+export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate, sla }: KanbanBoardProps) {
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
 
@@ -78,13 +79,14 @@ export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate }: Kanb
             usuarios={usuarios}
             isDragging={activeId !== null}
             onLeadClick={onLeadClick}
+            sla={sla}
           />
         ))}
       </div>
       <DragOverlay>
         {activeLead && activeCol && (
           <div className="rotate-1 opacity-90 scale-105">
-            <LeadCard lead={activeLead} usuarios={usuarios} onClick={() => {}} isDragging barColor={activeCol.color} />
+            <LeadCard lead={activeLead} usuarios={usuarios} onClick={() => {}} isDragging barColor={activeCol.color} sla={sla} />
           </div>
         )}
       </DragOverlay>

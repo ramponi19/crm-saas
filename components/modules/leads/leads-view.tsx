@@ -17,6 +17,18 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
+  const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('configuracoes_sistema').select('valor').eq('chave', 'sla_atendimento').single()
+      .then(({ data }) => {
+        if (data?.valor && typeof data.valor === 'object') {
+          const v = data.valor as { verde?: number; amarelo?: number; vermelho?: number }
+          setSla({ verde: v.verde ?? 15, amarelo: v.amarelo ?? 30, vermelho: v.vermelho ?? 60 })
+        }
+      })
+  }, [])
 
   const stats = useMemo(() => {
     const ativos    = leads.filter(l => l.ativo !== false)
@@ -102,6 +114,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
           usuarios={usuarios}
           onLeadClick={setSelectedLead}
           onLeadUpdate={handleLeadUpdate}
+          sla={sla}
         />
       </div>
 
