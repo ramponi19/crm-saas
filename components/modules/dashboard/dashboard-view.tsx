@@ -86,7 +86,7 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
   return (
     <div className="flex items-center gap-[18px]">
       <svg width={140} height={140} viewBox="0 0 140 140" style={{ flex: 'none' }}>
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={15} />
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(22,32,46,0.08)" strokeWidth={15} />
         {rings}
         <text x={cx} y={cy - 3} textAnchor="middle" fill="#F4F6F9" fontSize={23}
           fontFamily="Fraunces, serif" fontWeight={600}>{total}</text>
