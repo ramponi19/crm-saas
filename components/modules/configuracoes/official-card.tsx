@@ -171,7 +171,7 @@ export function OfficialCard({ config, onSaved }: Props) {
           <span className="text-[10px] font-mono tracking-wider text-[#9CC2EE]">URL DO WEBHOOK</span>
         </div>
         <div className="flex items-center gap-2">
-          <code className="flex-1 min-w-0 text-[11px] font-mono text-foreground bg-black/25 border border-white/[0.07] rounded px-2.5 py-2 overflow-x-auto whitespace-nowrap">https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads</code>
+          <code className="flex-1 min-w-0 text-[11px] font-mono text-foreground bg-[#16212E]/[0.06] border border-[#16212E]/[0.08] rounded px-2.5 py-2 overflow-x-auto whitespace-nowrap">https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads</code>
           <button type="button" onClick={() => { navigator.clipboard?.writeText('https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads') }}
             className="px-3 py-2 rounded-lg border border-input bg-background text-xs font-medium text-muted-foreground hover:text-foreground whitespace-nowrap">Copiar</button>
         </div>
