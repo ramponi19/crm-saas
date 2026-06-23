@@ -1,4 +1,6 @@
 'use client'
+import { Hero } from './Hero'
+import { useRouter } from 'next/navigation'
 
 import { useState, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
