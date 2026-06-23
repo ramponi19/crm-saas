@@ -107,5 +107,5 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   const data = await getDashboardData()
-  return <DashboardView data={data} />
+  return <DashboardView data={data} usuarioNome={usuarioNome ?? "Usuário"} />
 }
