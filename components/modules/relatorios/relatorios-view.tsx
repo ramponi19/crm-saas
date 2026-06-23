@@ -146,21 +146,21 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
   const saldo     = entradas - saidas
 
-  const inputCls = "bg-white/[0.04] border border-white/[0.08] rounded-[10px] px-3 py-[9px] text-[#E9EEF4] text-[13px] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors [color-scheme:dark]"
+  const inputCls = "bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[9px] text-[#1F2A39] text-[13px] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors [color-scheme:dark]"
 
   return (
     <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
       <div className="max-w-[1320px] mx-auto animate-fade-up space-y-4">
 
         {/* Tabs */}
-        <div className="flex gap-[4px] bg-[#0E1A2B] border border-white/[0.06] rounded-[13px] p-[5px] w-max overflow-x-auto">
+        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max overflow-x-auto">
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} onClick={() => setAba(id)}
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 aba === id
                   ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
-                  : 'text-[#6B7C92] hover:text-[#C4CCD6] hover:bg-white/[0.04]'
+                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               )}>
               <Icon size={16} /> {label}
             </button>
@@ -170,22 +170,22 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
         {/* ── ABA VENDAS ── */}
         {aba === 'vendas' && (<>
           {/* Filtros */}
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[16px] p-[16px_18px] flex items-end gap-4 flex-wrap">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-[16px_18px] flex items-end gap-4 flex-wrap">
             <div>
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">INÍCIO</div>
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">INÍCIO</div>
               <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">FIM</div>
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">FIM</div>
               <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputCls} />
             </div>
             <div className="flex-1 min-w-[180px]">
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] mb-[6px]">VENDEDOR</div>
+              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">VENDEDOR</div>
               <select value={vendedor} onChange={e => setVendedor(e.target.value)}
                 className={cn(inputCls, 'w-full cursor-pointer')}>
-                <option style={{ background: '#0E1A2C' }}>Todos</option>
+                <option style={{ background: '#FFFFFF' }}>Todos</option>
                 {vendedores.map(v => (
-                  <option key={v} style={{ background: '#0E1A2C' }}>{v}</option>
+                  <option key={v} style={{ background: '#FFFFFF' }}>{v}</option>
                 ))}
               </select>
             </div>
@@ -193,7 +193,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               <Search size={15} /> Gerar
             </button>
             <button onClick={() => exportCSV(vendasFiltradas)}
-              className="flex items-center gap-2 px-[16px] py-[11px] rounded-[10px] border border-white/[0.1] bg-white/[0.04] text-[#C4CCD6] font-semibold text-[13px] hover:bg-white/[0.09] transition-colors">
+              className="flex items-center gap-2 px-[16px] py-[11px] rounded-[10px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] font-semibold text-[13px] hover:bg-[#16212E]/[0.04] transition-colors">
               <Download size={15} /> CSV
             </button>
           </div>
@@ -201,47 +201,47 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           {/* KPI Cards */}
           <div className="grid grid-cols-5 gap-[14px]">
             {kpis.map(k => (
-              <div key={k.l} className="bg-[#122036] border border-white/[0.06] rounded-[14px] p-[16px_18px]"
+              <div key={k.l} className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-[16px_18px]"
                 style={{ borderTop: `3px solid ${k.c}` }}>
-                <div className="font-mono text-[9.5px] tracking-[0.1em] text-[#6B7C92]">{k.l}</div>
+                <div className="font-mono text-[9.5px] tracking-[0.1em] text-[#788698]">{k.l}</div>
                 <div className="font-serif text-[23px] mt-1" style={{ color: k.c }}>{k.v}</div>
               </div>
             ))}
           </div>
 
           {/* Gráfico */}
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[22px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ÚLTIMOS 7 DIAS</div>
-            <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9] mt-[5px] mb-[18px]">Vendas por dia</h3>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[22px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">ÚLTIMOS 7 DIAS</div>
+            <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-[18px]">Vendas por dia</h3>
             <BarChart vendas={vendas} />
           </div>
 
           {/* Tabela */}
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] overflow-x-auto">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] overflow-x-auto">
             <div style={{ minWidth: 920 }}>
-              <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
+              <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
                 <div>DATA</div><div>CLIENTE</div><div>PRODUTO</div><div>VENDEDOR</div>
                 <div>CANAL</div><div className="text-right">VALOR</div>
                 <div className="text-right">DESC.</div><div className="text-right">LUCRO</div>
               </div>
               {vendasFiltradas.length === 0 ? (
-                <div className="text-center py-10 text-[#5C6E84] text-[13px]">Nenhuma venda no período.</div>
+                <div className="text-center py-10 text-[#788698] text-[13px]">Nenhuma venda no período.</div>
               ) : vendasFiltradas.map(v => (
-                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] items-center"
+                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-[#16212E]/[0.08] last:border-0 hover:bg-[#16212E]/[0.04] items-center"
                   style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
-                  <div className="font-mono text-[11px] text-[#8A9BB0]">
+                  <div className="font-mono text-[11px] text-[#788698]">
                     {v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}
                   </div>
-                  <div className="text-[12.5px] font-semibold text-[#E9EEF4] truncate">{v.cliente_nome ?? '—'}</div>
+                  <div className="text-[12.5px] font-semibold text-[#1F2A39] truncate">{v.cliente_nome ?? '—'}</div>
                   <div className="text-[12.5px] text-[#B7C2D0] truncate">{v.produto_nome ?? v.forma_pagamento ?? '—'}</div>
-                  <div className="text-[12px] text-[#8A9BB0]">{v.vendedor_nome ?? '—'}</div>
+                  <div className="text-[12px] text-[#788698]">{v.vendedor_nome ?? '—'}</div>
                   <div>
-                    <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold bg-white/[0.06] text-[#9FB0C2]">
+                    <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold bg-[#16212E]/[0.04] text-[#9FB0C2]">
                       {CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}
                     </span>
                   </div>
-                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#F4F6F9]">{formatCurrency(v.valor_venda)}</div>
+                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#16212E]">{formatCurrency(v.valor_venda)}</div>
                   <div className="text-right font-mono text-[12px] text-[#F0656B]">
                     {v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}
                   </div>
@@ -257,13 +257,13 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
 
         {/* ── ABA ESTOQUE ── */}
         {aba === 'estoque' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">FLUXO FINANCEIRO</div>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">FLUXO FINANCEIRO</div>
             <div className="flex items-center justify-between flex-wrap gap-3 mb-[14px] mt-[5px]">
-              <h3 className="font-serif font-medium text-[19px] text-[#F4F6F9]">
+              <h3 className="font-serif font-medium text-[19px] text-[#16212E]">
                 Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
               </h3>
-              <div className="text-[12px] text-[#6B7C92]">
+              <div className="text-[12px] text-[#788698]">
                 Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
                 {' · '}Saídas <span className="text-[#F0656B] font-bold">{formatCurrency(saidas)}</span>
                 {' · '}Saldo{' '}
@@ -274,24 +274,24 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
             </div>
             <div className="overflow-x-auto">
               <div style={{ minWidth: 720 }}>
-                <div className="grid gap-3 py-[14px] px-[6px] font-mono text-[9.5px] tracking-[0.12em] text-[#5C6E84] border-b border-white/[0.06]"
+                <div className="grid gap-3 py-[14px] px-[6px] font-mono text-[9.5px] tracking-[0.12em] text-[#788698] border-b border-[#16212E]/[0.08]"
                   style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
                   <div>DATA</div><div>DESCRIÇÃO</div><div>CATEGORIA</div>
                   <div>TIPO</div><div className="text-right">VALOR</div><div className="text-right">STATUS</div>
                 </div>
                 {lancMes.length === 0
-                  ? <div className="text-center py-8 text-[#5C6E84] text-[13px]">Sem lançamentos este mês.</div>
+                  ? <div className="text-center py-8 text-[#788698] text-[13px]">Sem lançamentos este mês.</div>
                   : lancMes.map(l => {
                     const isReceit = l.tipo === 'receita'
                     const isPago   = l.status === 'pago'
                     return (
-                      <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]"
+                      <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-[#16212E]/[0.08] last:border-0 hover:bg-[#16212E]/[0.04]"
                         style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
-                        <div className="font-mono text-[11px] text-[#8A9BB0]">
+                        <div className="font-mono text-[11px] text-[#788698]">
                           {new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </div>
-                        <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{l.descricao ?? '—'}</div>
-                        <div className="text-[12px] text-[#8A9BB0]">{l.categoria ?? '—'}</div>
+                        <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{l.descricao ?? '—'}</div>
+                        <div className="text-[12px] text-[#788698]">{l.categoria ?? '—'}</div>
                         <div>
                           <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
                             style={{ background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(240,101,107,0.12)', color: isReceit ? '#34D399' : '#F0656B' }}>
@@ -317,16 +317,16 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
 
         {/* ── ABA CLIENTES ── */}
         {aba === 'clientes' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px] flex items-center justify-center h-[200px]">
-            <div className="text-center text-[#4F6178] font-mono text-[13px]">Relatório de clientes em construção</div>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] flex items-center justify-center h-[200px]">
+            <div className="text-center text-[#9AA7B6] font-mono text-[13px]">Relatório de clientes em construção</div>
           </div>
         )}
 
         {/* ── ABA EXPORTAR ── */}
         {aba === 'exportar' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">EXPORTAÇÕES</div>
-            <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-6">Exportar dados</h3>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
+            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">EXPORTAÇÕES</div>
+            <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-6">Exportar dados</h3>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendas) },
@@ -335,11 +335,11 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                 { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => {} },
               ].map(e => (
                 <button key={e.label} onClick={e.action}
-                  className="flex items-start gap-4 p-[18px_20px] bg-white/[0.03] border border-white/[0.08] rounded-[16px] hover:bg-white/[0.06] hover:border-[rgba(215,40,47,0.3)] transition-all text-left">
+                  className="flex items-start gap-4 p-[18px_20px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[16px] hover:bg-[#16212E]/[0.04] hover:border-[rgba(215,40,47,0.3)] transition-all text-left">
                   <Download size={22} className="text-[#F0656B] mt-[2px] flex-none" />
                   <div>
-                    <div className="text-[13.5px] font-semibold text-[#E9EEF4]">{e.label}</div>
-                    <div className="text-[12px] text-[#6B7C92] mt-[3px]">{e.sub}</div>
+                    <div className="text-[13.5px] font-semibold text-[#1F2A39]">{e.label}</div>
+                    <div className="text-[12px] text-[#788698] mt-[3px]">{e.sub}</div>
                   </div>
                 </button>
               ))}
