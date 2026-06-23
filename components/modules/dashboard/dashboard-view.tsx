@@ -344,7 +344,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         <div className="max-w-[1320px] mx-auto space-y-5">
 
           {/* ── HERO ── */}
-          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] bg-hero-gradient border border-[#16212E]/[0.10] shadow-[0_28px_70px_rgba(0,0,0,0.45)] animate-fade-up">
+          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] bg-hero-gradient border border-white/[0.08] shadow-[0_28px_70px_rgba(0,0,0,0.45)] animate-fade-up">
             <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
               <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
               <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#5FE3B5]">SISTEMA ONLINE</span>
@@ -376,7 +376,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(215,40,47,0.38)] hover:-translate-y-[2px] transition-all">
                   <Zap size={18} /> Nova venda
                 </button>
-                <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-white/[0.06] border border-white/[0.14] text-[#E3E9F0] font-semibold text-[14px] hover:bg-[#16212E]/[0.04] transition-colors">
+                <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-white/[0.06] border border-white/[0.14] text-[#E3E9F0] font-semibold text-[14px] hover:bg-white/[0.10] transition-colors">
                   <Package size={18} /> Ver estoque
                 </button>
               </div>
