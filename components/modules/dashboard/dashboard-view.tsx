@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hero } from './Hero'
 import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
@@ -352,7 +351,7 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
             receita={receita}
             qtdVendas={qtdVendas}
             periodLabel={periodLabel}
-            onNovaVenda={() => setShowPdv(true)}
+            onNovaVenda={() => router.push('/pdv')}
             onVerEstoque={() => router.push('/estoque')}
           />
 
