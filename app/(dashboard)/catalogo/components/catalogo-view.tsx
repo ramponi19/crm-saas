@@ -139,17 +139,17 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#070E18] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       <Topbar eyebrow="Catálogo" title="Catálogo" />
 
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
+        <div className="flex items-center gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[12px] w-fit">
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
-                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
               {t.icon}{t.label}
             </button>
           ))}
@@ -159,10 +159,10 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
         {tab === 'produtos' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[11px]">
+              <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
                 <button onClick={() => setFiltroCategoria('todas')}
                   className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all',
-                    filtroCategoria === 'todas' ? 'bg-[#E03037] text-white' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                    filtroCategoria === 'todas' ? 'bg-[#E03037] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
                   Todos
                 </button>
                 {categsUnicas.map(c => {
@@ -170,7 +170,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   return (
                     <button key={c} onClick={() => setFiltroCategoria(c ?? 'todas')}
                       className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all whitespace-nowrap',
-                        filtroCategoria === c ? 'bg-[#E03037] text-white' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                        filtroCategoria === c ? 'bg-[#E03037] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
                       {clean}
                     </button>
                   )
@@ -183,24 +183,24 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               </button>
             </div>
 
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
-              <div className="grid px-5 py-3 border-b border-white/[0.06]"
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+              <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '1.2fr 1fr 1fr 2fr 1fr 1fr' }}>
                 {['Categoria','Subcategoria','Marca','Nome','Novo','Usado'].map(h => (
                   <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
                 ))}
               </div>
               {prodsFiltrados.length === 0
-                ? <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhum produto encontrado</div>
+                ? <div className="py-14 text-center text-[#788698] text-[13px]">Nenhum produto encontrado</div>
                 : prodsFiltrados.map(p => (
-                  <div key={p.id} className="grid px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors items-center"
+                  <div key={p.id} className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors items-center"
                     style={{ gridTemplateColumns: '1.2fr 1fr 1fr 2fr 1fr 1fr' }}
                     onClick={() => window.location.href = '/produtos'}>
-                    <div className="text-[12.5px] text-[#8A9BB0]">{p.categoria_nome?.replace(/^[^\w]+/, '') ?? '—'}</div>
+                    <div className="text-[12.5px] text-[#788698]">{p.categoria_nome?.replace(/^[^\w]+/, '') ?? '—'}</div>
                     <div className="text-[12.5px] text-[#6B7C92]">{p.subcategoria_nome ?? '—'}</div>
-                    <div className="text-[12.5px] text-[#8A9BB0]">{p.marca_nome}</div>
-                    <div className="text-[13.5px] font-semibold text-[#E9EEF4]">{p.nome}</div>
-                    <div className="text-[13px] font-bold text-[#F4F6F9]">{p.preco_novo ? fmt(p.preco_novo) : '—'}</div>
+                    <div className="text-[12.5px] text-[#788698]">{p.marca_nome}</div>
+                    <div className="text-[13.5px] font-semibold text-[#1F2A39]">{p.nome}</div>
+                    <div className="text-[13px] font-bold text-[#16212E]">{p.preco_novo ? fmt(p.preco_novo) : '—'}</div>
                     <div className="text-[13px] text-[#6B8CFF]">{p.preco_usado ? fmt(p.preco_usado) : '—'}</div>
                   </div>
                 ))}
@@ -215,18 +215,18 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#46586E]" />
               <input value={searchEst} onChange={e => setSearchEst(e.target.value)}
                 placeholder="Buscar por produto, IMEI ou número de série..."
-                className="w-full bg-[#0C1828] border border-white/[0.08] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
+                className="w-full bg-white border border-[#16212E]/[0.10] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
             </div>
 
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
-              <div className="grid px-5 py-3 border-b border-white/[0.06]"
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+              <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '0.8fr 2fr 1.4fr 1fr 1fr 1fr 1fr 1fr' }}>
                 {['Data','Produto','IMEI','Estado','Tipo','Custo Total','Venda','Status'].map(h => (
                   <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
                 ))}
               </div>
               {unidadesFiltradas.length === 0
-                ? <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma unidade encontrada</div>
+                ? <div className="py-14 text-center text-[#788698] text-[13px]">Nenhuma unidade encontrada</div>
                 : unidadesFiltradas.map(u => {
                   const st = STATUS_STYLE[u.status ?? 'disponivel'] ?? STATUS_STYLE.disponivel
                   const cond = COND_STYLE[u.estado ?? 'lacrado'] ?? COND_STYLE.lacrado
@@ -235,15 +235,15 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   const data = new Date(u.created_at)
                   const dataFmt = `${String(data.getDate()).padStart(2,'0')}/${String(data.getMonth()+1).padStart(2,'0')}`
                   return (
-                    <div key={u.id} className="grid px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] items-center"
+                    <div key={u.id} className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] items-center"
                       style={{ gridTemplateColumns: '0.8fr 2fr 1.4fr 1fr 1fr 1fr 1fr 1fr' }}>
                       <div className="text-[12px] text-[#6B7C92] font-mono">{dataFmt}</div>
-                      <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{u.produto_nome}</div>
-                      <div className="text-[12px] text-[#8A9BB0] font-mono">{imei}</div>
+                      <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{u.produto_nome}</div>
+                      <div className="text-[12px] text-[#788698] font-mono">{imei}</div>
                       <div><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span></div>
-                      <div className="text-[12.5px] text-[#8A9BB0] capitalize">{u.tipo ?? '—'}</div>
-                      <div className="text-[13px] text-[#8A9BB0]">{custoTotal > 0 ? fmt(custoTotal) : '—'}</div>
-                      <div className="text-[13.5px] font-bold text-[#F4F6F9]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
+                      <div className="text-[12.5px] text-[#788698] capitalize">{u.tipo ?? '—'}</div>
+                      <div className="text-[13px] text-[#788698]">{custoTotal > 0 ? fmt(custoTotal) : '—'}</div>
+                      <div className="text-[13.5px] font-bold text-[#16212E]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
                       <div><span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: st.bg, color: st.color }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />{st.label}
                       </span></div>
@@ -265,12 +265,12 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             </div>
             <div className="grid grid-cols-4 gap-4">
               {categorias.map(c => (
-                <div key={c.id} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-5 hover:bg-white/[0.03] cursor-pointer transition-colors">
+                <div key={c.id} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors">
                   <div className="w-10 h-10 rounded-[11px] bg-[rgba(215,40,47,0.12)] flex items-center justify-center mb-4">
                     <Package size={18} className="text-[#F0353D]" />
                   </div>
-                  <div className="text-[15px] font-semibold text-[#F4F6F9]">{c.nome}</div>
-                  <div className="text-[12px] text-[#5C6E84] mt-1">{c.total_produtos} produtos</div>
+                  <div className="text-[15px] font-semibold text-[#16212E]">{c.nome}</div>
+                  <div className="text-[12px] text-[#788698] mt-1">{c.total_produtos} produtos</div>
                   {c.subcategorias.length > 0 && (
                     <div className="text-[11.5px] text-[#46586E] mt-2 truncate">
                       Subcategorias: {c.subcategorias.join(' · ')}
@@ -279,7 +279,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                 </div>
               ))}
               {categorias.length === 0 && (
-                <div className="col-span-4 py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma categoria cadastrada</div>
+                <div className="col-span-4 py-14 text-center text-[#788698] text-[13px]">Nenhuma categoria cadastrada</div>
               )}
             </div>
           </div>
@@ -296,16 +296,16 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             </div>
             <div className="grid grid-cols-5 gap-4">
               {marcas.filter(m => m.total_produtos > 0).map(m => (
-                <div key={m.id} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-6 flex flex-col items-center gap-3 hover:bg-white/[0.03] cursor-pointer transition-colors">
+                <div key={m.id} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6 flex flex-col items-center gap-3 hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors">
                   <div className="w-12 h-12 rounded-[13px] bg-white/[0.05] flex items-center justify-center text-[24px] text-[#9FB0C2]">
                     {MARCA_ICON[m.nome.toLowerCase()] ?? '◻'}
                   </div>
-                  <div className="text-[14px] font-semibold text-[#F4F6F9]">{m.nome}</div>
-                  <div className="text-[12px] text-[#5C6E84]">{m.total_produtos} produtos</div>
+                  <div className="text-[14px] font-semibold text-[#16212E]">{m.nome}</div>
+                  <div className="text-[12px] text-[#788698]">{m.total_produtos} produtos</div>
                 </div>
               ))}
               {marcas.filter(m => m.total_produtos > 0).length === 0 && (
-                <div className="col-span-5 py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma marca com produtos</div>
+                <div className="col-span-5 py-14 text-center text-[#788698] text-[13px]">Nenhuma marca com produtos</div>
               )}
             </div>
           </div>
@@ -321,24 +321,24 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               </button>
             </div>
 
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
-              <div className="grid px-5 py-3 border-b border-white/[0.06]"
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+              <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 2fr 0.3fr' }}>
                 {['Modelo','Armazenamento','Condição','Preço Sugerido','Observações',''].map(h => (
                   <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
                 ))}
               </div>
               {tabela.length === 0
-                ? <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhum preço cadastrado. Clique em "+ Novo preço" para começar.</div>
+                ? <div className="py-14 text-center text-[#788698] text-[13px]">Nenhum preço cadastrado. Clique em "+ Novo preço" para começar.</div>
                 : tabela.map(t => {
                   const cond = COND_STYLE[t.condicao] ?? COND_STYLE.lacrado
                   return (
-                    <div key={t.id} className="grid px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] items-center"
+                    <div key={t.id} className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] items-center"
                       style={{ gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 2fr 0.3fr' }}>
-                      <div className="text-[13.5px] font-semibold text-[#E9EEF4]">{t.modelo}</div>
-                      <div className="text-[12.5px] text-[#8A9BB0]">{t.armazenamento ?? '—'}</div>
+                      <div className="text-[13.5px] font-semibold text-[#1F2A39]">{t.modelo}</div>
+                      <div className="text-[12.5px] text-[#788698]">{t.armazenamento ?? '—'}</div>
                       <div><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span></div>
-                      <div className="text-[13.5px] font-bold text-[#F4F6F9]">{fmt(t.preco_sugerido)}</div>
+                      <div className="text-[13.5px] font-bold text-[#16212E]">{fmt(t.preco_sugerido)}</div>
                       <div className="text-[12.5px] text-[#6B7C92] truncate">{t.observacoes ?? '—'}</div>
                       <button className="text-[#46586E] hover:text-[#9FB0C2] transition-colors">
                         <MoreHorizontal size={16} />
@@ -353,11 +353,11 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
       {/* Modal Novo Preço */}
       {modalPreco && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-[460px] bg-[#0D1824] border border-white/[0.08] rounded-[20px] overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
-              <h2 className="text-[16px] font-serif text-[#F4F6F9]">Novo preço de referência</h2>
-              <button onClick={() => setModalPreco(false)} className="text-[#5C6E84] hover:text-[#9FB0C2]"><X size={20} /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="w-[460px] bg-[#F0F2F5] border border-[#16212E]/[0.10] rounded-[20px] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08]">
+              <h2 className="text-[16px] font-serif text-[#16212E]">Novo preço de referência</h2>
+              <button onClick={() => setModalPreco(false)} className="text-[#788698] hover:text-[#9FB0C2]"><X size={20} /></button>
             </div>
             <div className="px-6 py-5 space-y-4">
               {[
@@ -367,28 +367,28 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                 { label: 'Observações', key: 'observacoes', placeholder: 'Ex: Seminovo grade A' },
               ].map(f => (
                 <div key={f.key}>
-                  <label className="block text-[10.5px] font-mono text-[#5C6E84] uppercase tracking-[0.12em] mb-1.5">{f.label}</label>
+                  <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">{f.label}</label>
                   <input type={f.type ?? 'text'} value={(precoForm as any)[f.key]}
                     onChange={e => setPrecoForm(pf => ({ ...pf, [f.key]: e.target.value }))}
                     placeholder={f.placeholder}
-                    className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]" />
+                    className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]" />
                 </div>
               ))}
               <div>
-                <label className="block text-[10.5px] font-mono text-[#5C6E84] uppercase tracking-[0.12em] mb-1.5">Condição</label>
+                <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">Condição</label>
                 <div className="flex gap-2">
                   {['lacrado','excelente','bom','regular'].map(c => (
                     <button key={c} onClick={() => setPrecoForm(pf => ({ ...pf, condicao: c }))}
                       className={cn('px-3 py-2 rounded-[9px] text-[12px] font-medium transition-all border capitalize',
-                        precoForm.condicao === c ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#8A9BB0] border-white/[0.08] hover:border-white/[0.2]')}>
+                        precoForm.condicao === c ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
                       {c}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-white/[0.06]">
-              <button onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#5C6E84] hover:text-[#D4DEEA]">Cancelar</button>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#16212E]/[0.08]">
+              <button onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#788698] hover:text-[#56657A]">Cancelar</button>
               <button onClick={salvarPreco} disabled={saving}
                 className="px-5 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Salvar'}
