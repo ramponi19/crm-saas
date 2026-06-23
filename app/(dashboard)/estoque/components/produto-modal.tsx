@@ -68,54 +68,54 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[460px] bg-[#0D1824] border border-white/[0.08] rounded-[20px] overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
-          <h2 className="text-base font-bold text-[#F4F6F9]">{isNew ? 'Novo Produto' : 'Editar Produto'}</h2>
-          <button onClick={onClose} className="text-[#5C6E84] hover:text-[#9FB0C2]"><X size={20} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div className="w-[460px] bg-[#F0F2F5] border border-[#16212E]/[0.10] rounded-[20px] overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08]">
+          <h2 className="text-base font-bold text-[#16212E]">{isNew ? 'Novo Produto' : 'Editar Produto'}</h2>
+          <button onClick={onClose} className="text-[#788698] hover:text-[#9FB0C2]"><X size={20} /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Nome do Modelo *</label>
+            <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Nome do Modelo *</label>
             <input
               value={form.nome}
               onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
               placeholder="Ex: iPhone 15 Pro Max"
-              className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+              className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Marca *</label>
+            <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Marca *</label>
             <select
               value={form.marca_id}
               onChange={e => setForm(f => ({ ...f, marca_id: e.target.value }))}
-              className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
+              className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none"
             >
               <option value="">Selecionar marca...</option>
               {marcas.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Categoria</label>
+            <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Categoria</label>
             <select
               value={form.categoria_id}
               onChange={e => setForm(f => ({ ...f, categoria_id: e.target.value }))}
-              className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none"
+              className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none"
             >
               <option value="">Sem categoria</option>
               {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
         </div>
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08]">
           {!isNew ? (
-            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#5C6E84] hover:text-[#F0353D] transition-colors">
+            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#F0353D] transition-colors">
               <Trash2 size={14} />
               Remover
             </button>
           ) : <div />}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#5C6E84] hover:text-[#D4DEEA]">Cancelar</button>
+            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#788698] hover:text-[#56657A]">Cancelar</button>
             <button
               onClick={salvar}
               disabled={saving}
