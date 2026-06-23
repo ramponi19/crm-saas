@@ -44,7 +44,7 @@ const ORIGEM: Record<string, { label: string; color: string; bg: string }> = {
 
 function Badge({ val, map }: { val: string | null; map: Record<string, { label: string; color: string; bg: string }> }) {
   const s = map[val ?? ''] ?? { label: val ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
-  return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold"}>{s.label}</span>
+  return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold">{s.label}</span>
 }
 
 const FILTROS = [
