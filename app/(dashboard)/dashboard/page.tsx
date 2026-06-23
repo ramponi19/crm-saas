@@ -27,7 +27,7 @@ async function getDashboardData() {
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
     supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
-    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status').order('created_at', { ascending: false }).limit(5),
+    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, inventario_unidades!inventario_unidade_id(produtos!produto_id(nome))').order('created_at', { ascending: false }).limit(5),
     supabase.from('vendas')
       .select('inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
       .gte('data_venda', startOfMonth.toISOString())
@@ -37,7 +37,15 @@ async function getDashboardData() {
   ])
 
   const vendasMes = (vendasMesRaw ?? []) as Array<{ valor_venda: number; lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null }>
-  const vendasRecentes = (vendasRecentesRaw ?? []) as Array<{ id: number; valor_venda: number; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null; status: string | null }>
+  const vendasRecentes = (vendasRecentesRaw ?? []).map((v: any) => ({
+    id: v.id,
+    valor_venda: v.valor_venda,
+    forma_pagamento: v.forma_pagamento,
+    canal_venda: v.canal_venda,
+    data_venda: v.data_venda,
+    status: v.status,
+    produto_nome: (v.inventario_unidades as any)?.produtos?.nome ?? null,
+  }))
 
   // Top produtos reais
   const produtoCount: Record<string, number> = {}
