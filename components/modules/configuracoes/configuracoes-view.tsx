@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plug, Percent, Timer, Save, X, Link as LinkIcon, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -66,6 +66,68 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [waProvider, setWaProvider] = useState<'evolution' | 'oficial'>('evolution')
+
+  // Taxas — estado controlado
+  const [taxasCred, setTaxasCred] = useState<Record<number, string>>(() => {
+    const m: Record<number, string> = {}
+    taxas.filter(t => t.forma_pagamento === 'maquininha').forEach(t => { m[t.parcelas] = t.percentual_taxa.toFixed(2).replace('.', ',') })
+    return m
+  })
+  const [taxasLink, setTaxasLink] = useState<Record<number, string>>(() => {
+    const m: Record<number, string> = {}
+    taxas.filter(t => t.forma_pagamento === 'link').forEach(t => { m[t.parcelas] = t.percentual_taxa.toFixed(2).replace('.', ',') })
+    return m
+  })
+  const [savingTaxas, setSavingTaxas] = useState(false)
+
+  // SLA — estado controlado
+  const [slaValues, setSlaValues] = useState([15, 30, 60])
+  const [savingSLA, setSavingSLA] = useState(false)
+
+  useEffect(() => {
+    supabase.from('configuracoes_sistema').select('valor').eq('chave', 'sla_atendimento').single()
+      .then(({ data }) => {
+        if (data?.valor && typeof data.valor === 'object') {
+          const v = data.valor as { verde?: number; amarelo?: number; vermelho?: number }
+          setSlaValues([v.verde ?? 15, v.amarelo ?? 30, v.vermelho ?? 60])
+        }
+      })
+  }, [])
+
+  async function salvarTaxas() {
+    setSavingTaxas(true)
+    try {
+      const { data: eu } = await supabase.from('empresa_usuarios').select('empresa_id').single()
+      const empresa_id = eu?.empresa_id
+      if (!empresa_id) { toast.error('Empresa não encontrada'); return }
+
+      await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
+
+      const rows: Array<{ empresa_id: number; forma_pagamento: string; parcelas: number; percentual_taxa: number; ativo: boolean }> = []
+      for (let p = 1; p <= 18; p++) {
+        const cred = taxasCred[p] ? parseFloat(taxasCred[p].replace(',', '.')) : null
+        const link = taxasLink[p] ? parseFloat(taxasLink[p].replace(',', '.')) : null
+        if (cred != null && !isNaN(cred)) rows.push({ empresa_id, forma_pagamento: 'maquininha', parcelas: p, percentual_taxa: cred, ativo: true })
+        if (link != null && !isNaN(link)) rows.push({ empresa_id, forma_pagamento: 'link', parcelas: p, percentual_taxa: link, ativo: true })
+      }
+      if (rows.length > 0) {
+        const { error } = await supabase.from('taxas_pagamento').insert(rows)
+        if (error) { toast.error('Erro ao salvar taxas'); return }
+      }
+      toast.success('Taxas salvas com sucesso!')
+    } finally { setSavingTaxas(false) }
+  }
+
+  async function salvarSLA() {
+    setSavingSLA(true)
+    try {
+      const [verde, amarelo, vermelho] = slaValues
+      const { error } = await supabase.from('configuracoes_sistema')
+        .upsert({ chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'chave' })
+      if (error) { toast.error('Erro ao salvar SLA'); return }
+      toast.success('Regras de SLA salvas!')
+    } finally { setSavingSLA(false) }
+  }
 
   const integracoes: IntegracaoCanal[] = [
     {
@@ -249,8 +311,9 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">MAQUININHA · % POR PARCELA</div>
                 <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Taxas de crédito e link</h3>
               </div>
-              <button className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
-                <Save size={17} /> Salvar taxas
+              <button onClick={salvarTaxas} disabled={savingTaxas}
+                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)] disabled:opacity-50">
+                <Save size={17} /> {savingTaxas ? 'Salvando...' : 'Salvar taxas'}
               </button>
             </div>
             <p className="text-[12.5px] text-[#788698] mb-4">
@@ -265,8 +328,8 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
               <div key={t.n} className="grid gap-3 items-center px-1 py-2 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '.8fr 1fr 1fr' }}>
                 <div className="text-[14px] font-bold text-[#16212E]">{t.n}x</div>
-                <input defaultValue={t.cred != null ? t.cred.toFixed(2).replace('.', ',') : ''} placeholder="—" className={inputCls} />
-                <input defaultValue={t.link != null ? t.link.toFixed(2).replace('.', ',') : ''} placeholder="—" className={inputCls} />
+                <input value={taxasCred[t.n] ?? ''} onChange={e => setTaxasCred(v => ({ ...v, [t.n]: e.target.value }))} placeholder="—" className={inputCls} />
+                <input value={taxasLink[t.n] ?? ''} onChange={e => setTaxasLink(v => ({ ...v, [t.n]: e.target.value }))} placeholder="—" className={inputCls} />
               </div>
             ))}
           </div>
@@ -280,8 +343,9 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">TEMPO DE RESPOSTA · LEADS</div>
                 <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">SLA de atendimento</h3>
               </div>
-              <button className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
-                <Save size={17} /> Salvar regras
+              <button onClick={salvarSLA} disabled={savingSLA}
+                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)] disabled:opacity-50">
+                <Save size={17} /> {savingSLA ? 'Salvando...' : 'Salvar regras'}
               </button>
             </div>
             <p className="text-[12.5px] text-[#788698] mb-[18px] leading-[1.5]">
@@ -297,7 +361,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                     <div className="text-[11.5px] text-[#788698]">{s.desc}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input defaultValue={s.min} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]" />
+                    <input value={slaValues[i]} onChange={e => setSlaValues(v => v.map((x, j) => j === i ? Number(e.target.value) : x))} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]" />
                     <span className="text-[12px] text-[#788698]">min</span>
                   </div>
                 </div>
