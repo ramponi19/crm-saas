@@ -1,6 +1,5 @@
 'use client'
 
-import { Hero } from './Hero'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
@@ -299,7 +298,7 @@ function TopVendedores({ vendedores }: {
 // ─────────────────────────────────────────
 // Dashboard principal
 // ─────────────────────────────────────────
-export function DashboardView({ data: initialData }: { data: DashboardData }) {
+export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: { data: DashboardData; usuarioNome?: string }) {
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
