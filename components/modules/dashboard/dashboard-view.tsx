@@ -376,7 +376,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(215,40,47,0.38)] hover:-translate-y-[2px] transition-all">
                   <Zap size={18} /> Nova venda
                 </button>
-                <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-white/[0.06] border border-white/[0.14] text-[#E3E9F0] font-semibold text-[14px] hover:bg-white/[0.12] transition-colors">
+                <button className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-white/[0.06] border border-white/[0.14] text-[#E3E9F0] font-semibold text-[14px] hover:bg-[#16212E]/[0.04] transition-colors">
                   <Package size={18} /> Ver estoque
                 </button>
               </div>
@@ -467,7 +467,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                   <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">TEMPO REAL</div>
                   <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Vendas recentes</h3>
                 </div>
-                <button className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-white/[0.08] transition-colors">
+                <button className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.06] transition-colors">
                   Ver todas <ArrowUpRight size={15} />
                 </button>
               </div>
@@ -485,7 +485,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 const color = avatarColors[i % avatarColors.length]
                 const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--/--'
                 return (
-                  <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-[#16212E]/[0.06] last:border-0 hover:bg-white/[0.025] transition-colors"
+                  <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-[#16212E]/[0.06] last:border-0 hover:bg-[#16212E]/[0.04] transition-colors"
                     style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
                     <div className="font-mono text-[12px] text-[#6B7C92]">{data}</div>
                     <div>
