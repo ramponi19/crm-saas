@@ -24,7 +24,7 @@ export default async function DashboardLayout({
 
   const { data: usuarioRaw } = await supabase
     .from('usuarios')
-    .select('nome, role')
+    .select('nome')
     .eq('id', user.id)
     .single()
 
@@ -34,8 +34,9 @@ export default async function DashboardLayout({
     .eq('ativo', true)
     .eq('kanban_status', 'novo')
 
-  const usuario = usuarioRaw as unknown as { nome: string; role: string } | null
-  const empresa = (vinculo as unknown as { role: string; empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null }).empresa
+  const usuario = usuarioRaw as unknown as { nome: string } | null
+  const vinculoTyped = vinculo as unknown as { role: string; empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null }
+  const empresa = vinculoTyped.empresa
 
   return (
     <EmpresaProvider>
@@ -43,10 +44,9 @@ export default async function DashboardLayout({
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
           userRole={
-            (vinculo as unknown as { role: string }).role === 'owner'
-              ? 'Proprietário'
-              : usuario?.role === 'admin'
-              ? 'Administrador'
+            vinculoTyped.role === 'owner' ? 'Proprietário'
+              : vinculoTyped.role === 'admin' ? 'Administrador'
+              : vinculoTyped.role === 'tecnico' ? 'Técnico'
               : 'Vendedor'
           }
           userEmpresa={empresa?.nome}
