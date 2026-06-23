@@ -87,7 +87,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
   function abrirEditar(p: Produto) { setProdutoSel(p); setModalOpen(true) }
 
   return (
-    <div className="flex flex-col h-full bg-[#070E18] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       <Topbar eyebrow="Catálogo" title="Produtos" />
 
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
@@ -100,13 +100,13 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
             { icon: <AlertTriangle size={20} />, label: 'Estoque baixo', value: stats.baixo.toString(), color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
             { icon: <XCircle size={20} />, label: 'Esgotados', value: stats.esgotado.toString(), color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
           ].map((c, i) => (
-            <div key={i} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-5 flex items-center gap-4">
+            <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
               <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>
                 {c.icon}
               </div>
               <div>
-                <div className="text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em]">{c.label}</div>
-                <div className="text-[22px] font-serif text-[#F4F6F9] mt-0.5 leading-none">{c.value}</div>
+                <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em]">{c.label}</div>
+                <div className="text-[22px] font-serif text-[#16212E] mt-0.5 leading-none">{c.value}</div>
               </div>
             </div>
           ))}
@@ -120,15 +120,15 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nome, modelo ou marca..."
-              className="w-full bg-[#0C1828] border border-white/[0.08] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-white/[0.2] transition-all"
+              className="w-full bg-white border border-[#16212E]/[0.10] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-white/[0.2] transition-all"
             />
           </div>
 
-          <div className="flex gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[11px]">
+          <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
             <button
               onClick={() => setFiltroCategoria('todas')}
               className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all',
-                filtroCategoria === 'todas' ? 'bg-[#E03037] text-white font-bold' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}
+                filtroCategoria === 'todas' ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
             >
               Todos
             </button>
@@ -137,7 +137,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
                 key={key}
                 onClick={() => setFiltroCategoria(label)}
                 className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all whitespace-nowrap',
-                  filtroCategoria === label ? 'bg-[#E03037] text-white font-bold' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}
+                  filtroCategoria === label ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
               >
                 {key}
               </button>
@@ -155,9 +155,9 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
         </div>
 
         {/* Tabela */}
-        <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
+        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
           {/* Header */}
-          <div className="grid gap-3 px-5 py-3 border-b border-white/[0.06]" style={{ gridTemplateColumns: '2.4fr 1fr 0.9fr 1fr 1fr 0.8fr 1.1fr' }}>
+          <div className="grid gap-3 px-5 py-3 border-b border-[#16212E]/[0.08]" style={{ gridTemplateColumns: '2.4fr 1fr 0.9fr 1fr 1fr 0.8fr 1.1fr' }}>
             {['Produto', 'Condição', 'Estoque', 'Custo', 'Preço', 'Margem', 'Status'].map(h => (
               <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
             ))}
@@ -165,7 +165,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
 
           {/* Linhas */}
           {filtrados.length === 0 ? (
-            <div className="py-16 text-center text-[#5C6E84] text-[13px]">Nenhum produto encontrado</div>
+            <div className="py-16 text-center text-[#788698] text-[13px]">Nenhum produto encontrado</div>
           ) : filtrados.map(p => {
             const margem = p.custo_min && p.preco_max && p.custo_min > 0
               ? Math.round(((p.preco_max - p.custo_min) / p.preco_max) * 100)
@@ -175,7 +175,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
               <div
                 key={p.id}
                 onClick={() => abrirEditar(p)}
-                className="grid gap-3 px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors items-center"
+                className="grid gap-3 px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors items-center"
                 style={{ gridTemplateColumns: '2.4fr 1fr 0.9fr 1fr 1fr 0.8fr 1.1fr' }}
               >
                 {/* Produto */}
@@ -184,7 +184,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
                     {getIcon(p.marca_nome)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{p.nome}</div>
+                    <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{p.nome}</div>
                     <div className="text-[11.5px] text-[#6B7C92]">{p.marca_nome}</div>
                   </div>
                 </div>
@@ -195,15 +195,15 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
                 </div>
 
                 {/* Estoque */}
-                <div className="text-[13px] text-[#C4CCD6] font-semibold">{p.estoque} un</div>
+                <div className="text-[13px] text-[#16212E] font-semibold">{p.estoque} un</div>
 
                 {/* Custo */}
-                <div className="text-[13px] text-[#8A9BB0] text-right">
+                <div className="text-[13px] text-[#788698] text-right">
                   {p.custo_min ? fmt(p.custo_min) : '—'}
                 </div>
 
                 {/* Preço */}
-                <div className="text-[13.5px] text-[#F4F6F9] font-bold text-right">
+                <div className="text-[13.5px] text-[#16212E] font-bold text-right">
                   {p.preco_max ? fmt(p.preco_max) : '—'}
                 </div>
 
