@@ -48,7 +48,7 @@ export function LoginForm() {
       {/* Email */}
       <div>
         <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">E-MAIL</label>
-        <div className={`${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
+        <div className={`jm-field ${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
           <Mail size={19} className="text-[#5A6A7E] shrink-0" />
           <input
             type="email"
@@ -65,7 +65,7 @@ export function LoginForm() {
       {/* Senha */}
       <div>
         <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SENHA</label>
-        <div className={`${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
+        <div className={`jm-field ${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
           <Lock size={19} className="text-[#5A6A7E] shrink-0" />
           <input
             type={showPw ? 'text' : 'password'}

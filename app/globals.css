@@ -99,12 +99,14 @@
 }
 
 /* Remove autofill blue background in all browsers */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #f3f4f5 inset !important;
+.jm-field input:-webkit-autofill,
+.jm-field input:-webkit-autofill:hover,
+.jm-field input:-webkit-autofill:focus,
+.jm-field input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #F2F2F4 inset;
+  box-shadow: 0 0 0 1000px #F2F2F4 inset;
   -webkit-text-fill-color: #16212E !important;
-  transition: background-color 5000s ease-in-out 0s;
   caret-color: #16212E;
+  transition: background-color 9999s ease 0s;
+}
 }
