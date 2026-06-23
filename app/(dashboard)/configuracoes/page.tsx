@@ -17,7 +17,7 @@ async function getConfigs() {
       .in('chave', ['whatsapp_evolution', 'whatsapp_official', 'meta_instagram', 'meta_messenger', 'dados_loja', 'preferencias']),
     supabase
       .from('taxas_pagamento')
-      .select('forma_pagamento, parcelas, percentual_taxa')
+      .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('ativo', true),
   ])
 
@@ -34,7 +34,8 @@ async function getConfigs() {
     instagram, messenger, dadosLoja, preferencias,
     taxas: (taxas ?? []).map((t: any) => ({
       forma_pagamento: t.forma_pagamento,
-      parcelas: t.parcelas,
+      bandeira: t.bandeira as string | null,
+      parcelas: t.parcelas as number,
       percentual_taxa: Number(t.percentual_taxa),
     })),
   }

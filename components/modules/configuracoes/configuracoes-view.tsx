@@ -17,7 +17,7 @@ interface Props {
   messenger: MetaConfig | null
   dadosLoja: any
   preferencias: any
-  taxas: Array<{ forma_pagamento: string; parcelas: number; percentual_taxa: number }>
+  taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
 }
 
 const WEBHOOK_URL = 'https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads'
@@ -67,10 +67,15 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [saving, setSaving] = useState(false)
   const [waProvider, setWaProvider] = useState<'evolution' | 'oficial'>('evolution')
 
-  // Taxas — estado controlado
-  const [taxasCred, setTaxasCred] = useState<Record<number, string>>(() => {
+  // Taxas — estado controlado (visa_master / outros / link)
+  const [taxasVisa, setTaxasVisa] = useState<Record<number, string>>(() => {
     const m: Record<number, string> = {}
-    taxas.filter(t => t.forma_pagamento === 'maquininha').forEach(t => { m[t.parcelas] = t.percentual_taxa.toFixed(2).replace('.', ',') })
+    taxas.filter(t => t.forma_pagamento === 'maquininha' && t.bandeira === 'visa_master').forEach(t => { m[t.parcelas] = t.percentual_taxa.toFixed(2).replace('.', ',') })
+    return m
+  })
+  const [taxasOutros, setTaxasOutros] = useState<Record<number, string>>(() => {
+    const m: Record<number, string> = {}
+    taxas.filter(t => t.forma_pagamento === 'maquininha' && t.bandeira === 'outros').forEach(t => { m[t.parcelas] = t.percentual_taxa.toFixed(2).replace('.', ',') })
     return m
   })
   const [taxasLink, setTaxasLink] = useState<Record<number, string>>(() => {
@@ -97,22 +102,26 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   async function salvarTaxas() {
     setSavingTaxas(true)
     try {
-      const { data: eu } = await supabase.from('empresa_usuarios').select('empresa_id').single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('Não autenticado'); return }
+      const { data: eu } = await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
       const empresa_id = eu?.empresa_id
       if (!empresa_id) { toast.error('Empresa não encontrada'); return }
 
       await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
 
-      const rows: Array<{ empresa_id: number; forma_pagamento: string; parcelas: number; percentual_taxa: number; ativo: boolean }> = []
+      const rows: Array<{ empresa_id: number; forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number; ativo: boolean }> = []
       for (let p = 1; p <= 18; p++) {
-        const cred = taxasCred[p] ? parseFloat(taxasCred[p].replace(',', '.')) : null
-        const link = taxasLink[p] ? parseFloat(taxasLink[p].replace(',', '.')) : null
-        if (cred != null && !isNaN(cred)) rows.push({ empresa_id, forma_pagamento: 'maquininha', parcelas: p, percentual_taxa: cred, ativo: true })
-        if (link != null && !isNaN(link)) rows.push({ empresa_id, forma_pagamento: 'link', parcelas: p, percentual_taxa: link, ativo: true })
+        const visa   = taxasVisa[p]   ? parseFloat(taxasVisa[p].replace(',', '.'))   : null
+        const outros = taxasOutros[p] ? parseFloat(taxasOutros[p].replace(',', '.')) : null
+        const link   = taxasLink[p]   ? parseFloat(taxasLink[p].replace(',', '.'))   : null
+        if (visa   != null && !isNaN(visa))   rows.push({ empresa_id, forma_pagamento: 'maquininha', bandeira: 'visa_master', parcelas: p, percentual_taxa: visa,   ativo: true })
+        if (outros != null && !isNaN(outros)) rows.push({ empresa_id, forma_pagamento: 'maquininha', bandeira: 'outros',      parcelas: p, percentual_taxa: outros, ativo: true })
+        if (link   != null && !isNaN(link))   rows.push({ empresa_id, forma_pagamento: 'link',        bandeira: null,          parcelas: p, percentual_taxa: link,   ativo: true })
       }
       if (rows.length > 0) {
         const { error } = await supabase.from('taxas_pagamento').insert(rows)
-        if (error) { toast.error('Erro ao salvar taxas'); return }
+        if (error) { toast.error('Erro ao salvar taxas: ' + error.message); return }
       }
       toast.success('Taxas salvas com sucesso!')
     } finally { setSavingTaxas(false) }
@@ -243,10 +252,8 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   }
 
   // Taxas 1-18
-  const credMap = Object.fromEntries(taxas.filter(t => t.forma_pagamento === 'maquininha').map(t => [t.parcelas, t.percentual_taxa]))
-  const linkMap = Object.fromEntries(taxas.filter(t => t.forma_pagamento === 'link').map(t => [t.parcelas, t.percentual_taxa]))
-  const maxParc = Math.max(18, ...taxas.map(t => t.parcelas))
-  const taxaRows = Array.from({ length: maxParc }, (_, i) => i + 1).map(n => ({ n, cred: credMap[n], link: linkMap[n] }))
+  const maxParc = Math.max(18, ...taxas.map(t => t.parcelas ?? 1))
+  const taxaRows = Array.from({ length: maxParc }, (_, i) => i + 1)
 
   const slaRows = [
     { label: 'Resposta ideal',   desc: 'Lead respondido dentro deste tempo fica verde', color: '#34D399', min: 15 },
@@ -320,18 +327,26 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
               Estes valores alimentam o <strong className="text-[#16212E]">PDV</strong> e o{' '}
               <strong className="text-[#16212E]">Simulador de Parcelas</strong> em tempo real.
             </p>
-            <div className="grid gap-3 px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
-              style={{ gridTemplateColumns: '.8fr 1fr 1fr' }}>
-              <div>PARCELAS</div><div className="text-center">CRÉDITO (%)</div><div className="text-center">LINK (%)</div>
-            </div>
-            {taxaRows.map(t => (
-              <div key={t.n} className="grid gap-3 items-center px-1 py-2 border-b border-[#16212E]/[0.08]"
-                style={{ gridTemplateColumns: '.8fr 1fr 1fr' }}>
-                <div className="text-[14px] font-bold text-[#16212E]">{t.n}x</div>
-                <input value={taxasCred[t.n] ?? ''} onChange={e => setTaxasCred(v => ({ ...v, [t.n]: e.target.value }))} placeholder="—" className={inputCls} />
-                <input value={taxasLink[t.n] ?? ''} onChange={e => setTaxasLink(v => ({ ...v, [t.n]: e.target.value }))} placeholder="—" className={inputCls} />
+            <div className="overflow-x-auto">
+              <div className="min-w-[520px]">
+                <div className="grid gap-3 px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
+                  style={{ gridTemplateColumns: '.6fr 1fr 1fr 1fr' }}>
+                  <div>PARCELAS</div>
+                  <div className="text-center">VISA / MASTER (%)</div>
+                  <div className="text-center">ELO / AMEX / OUTROS (%)</div>
+                  <div className="text-center">LINK (%)</div>
+                </div>
+                {taxaRows.map(n => (
+                  <div key={n} className="grid gap-3 items-center px-1 py-2 border-b border-[#16212E]/[0.08]"
+                    style={{ gridTemplateColumns: '.6fr 1fr 1fr 1fr' }}>
+                    <div className="text-[14px] font-bold text-[#16212E]">{n}x</div>
+                    <input value={taxasVisa[n] ?? ''}   onChange={e => setTaxasVisa(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
+                    <input value={taxasOutros[n] ?? ''} onChange={e => setTaxasOutros(v => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
+                    <input value={taxasLink[n] ?? ''}   onChange={e => setTaxasLink(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         )}
 
