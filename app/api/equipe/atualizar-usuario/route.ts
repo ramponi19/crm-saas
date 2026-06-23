@@ -12,13 +12,25 @@ export async function PATCH(req: NextRequest) {
 
   const { data: eu } = await supabase
     .from('empresa_usuarios')
-    .select('role')
+    .select('role, empresa_id')
     .eq('usuario_id', user.id)
     .eq('ativo', true)
     .single()
 
   if (!eu || !['owner', 'admin'].includes(eu.role))
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+
+  // Confirm the target user belongs to the same company
+  const { data: alvo } = await supabase
+    .from('empresa_usuarios')
+    .select('usuario_id')
+    .eq('usuario_id', id)
+    .eq('empresa_id', eu.empresa_id)
+    .eq('ativo', true)
+    .single()
+
+  if (!alvo)
+    return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
   const { error } = await supabase.from('usuarios').update({ nome, role }).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
