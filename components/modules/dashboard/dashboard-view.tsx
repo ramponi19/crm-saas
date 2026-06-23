@@ -426,7 +426,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                   <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESEMPENHO</div>
                   <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Tendência de faturamento</h3>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] font-mono text-[10.5px] text-[#9FB0C2]">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#16212E]/[0.05] font-mono text-[10.5px] text-[#9FB0C2]">
                   12 MESES
                 </div>
               </div>
