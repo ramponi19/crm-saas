@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import ProdutosView from './components/produtos-view'
 
 export const metadata = { title: 'Produtos' }
 
 export default async function ProdutosPage() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: produtosRaw }, { data: marcas }, { data: categorias }] = await Promise.all([
     supabase
@@ -14,16 +14,18 @@ export default async function ProdutosPage() {
         marca:marcas_produtos(nome),
         categoria:categorias_produtos(nome)
       `)
+      .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('nome'),
-    supabase.from('marcas_produtos').select('id, nome').order('nome'),
-    supabase.from('categorias_produtos').select('id, nome').order('nome'),
+    supabase.from('marcas_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('categorias_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
   ])
 
   // Busca estoque e preços por produto
   const { data: unidades } = await supabase
     .from('inventario_unidades')
     .select('produto_id, preco_custo, preco_venda, status')
+    .eq('empresa_id', empresaId)
 
   const estoqueMap: Record<number, { estoque: number; custo_min: number | null; preco_max: number | null }> = {}
   for (const u of unidades ?? []) {

@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import { HistoricoView } from '@/components/modules/historico/historico-view'
 
 export const metadata = { title: 'Histórico de Vendas' }
 
 export default async function HistoricoPage() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const { data: vendasRaw } = await supabase
     .from('vendas')
@@ -16,6 +16,7 @@ export default async function HistoricoPage() {
       produtos!produto_id(nome),
       usuarios!vendedor_id(nome)
     `)
+    .eq('empresa_id', empresaId)
     .order('data_venda', { ascending: false })
     .limit(500)
 

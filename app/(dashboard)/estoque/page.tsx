@@ -1,21 +1,22 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
 
 export const metadata = { title: 'Estoque' }
 
 export default async function EstoquePage() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
       .select(`*, produtos!produto_id(nome, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia)`)
+      .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('created_at', { ascending: false }),
-    supabase.from('marcas_produtos').select('*').order('nome'),
-    supabase.from('categorias_produtos').select('*').order('nome'),
-    supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome)`).eq('ativo', true).order('nome'),
-    supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).order('created_at', { ascending: false }).limit(100),
+    supabase.from('marcas_produtos').select('*').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('categorias_produtos').select('*').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
   ])
 
   const itens = (unidades ?? []).map((u: any) => ({

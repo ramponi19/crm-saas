@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
 
 export const metadata = { title: 'PDV' }
 
 export default async function PDVPage() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [
     { data: unidades },
@@ -16,12 +16,14 @@ export default async function PDVPage() {
     supabase
       .from('inventario_unidades')
       .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, produtos!produto_id(nome, marcas_produtos!marca_id(nome))')
+      .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
-    supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('ativo', true).order('nome'),
-    supabase.from('taxas_pagamento').select('*').eq('ativo', true),
+    supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    supabase.from('taxas_pagamento').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas')
       .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
+      .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
   ])
 

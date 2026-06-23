@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
 
 export const metadata = { title: 'Dashboard' }
 
 async function getDashboardData() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
@@ -21,19 +21,20 @@ async function getDashboardData() {
     { data: topProdutosRaw },
     { data: leadsFunilRaw },
   ] = await Promise.all([
-    supabase.from('vendas').select('*').gte('data_venda', startOfMonth.toISOString()).eq('status', 'concluida'),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
-    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
-    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
-    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, inventario_unidades!inventario_unidade_id(produtos!produto_id(nome))').order('created_at', { ascending: false }).limit(5),
+    supabase.from('vendas').select('*').eq('empresa_id', empresaId).gte('data_venda', startOfMonth.toISOString()).eq('status', 'concluida'),
+    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
+    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
+    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluida,cancelada)'),
+    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, inventario_unidades!inventario_unidade_id(produtos!produto_id(nome))').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
     supabase.from('vendas')
       .select('inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
+      .eq('empresa_id', empresaId)
       .gte('data_venda', startOfMonth.toISOString())
       .eq('status', 'concluida')
       .limit(100),
-    supabase.from('leads').select('kanban_status').eq('ativo', true),
+    supabase.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
   const vendasMes = (vendasMesRaw ?? []) as Array<{ valor_venda: number; lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null }>
@@ -47,7 +48,6 @@ async function getDashboardData() {
     produto_nome: (v.inventario_unidades as any)?.produtos?.nome ?? null,
   }))
 
-  // Top produtos reais
   const produtoCount: Record<string, number> = {}
   ;(topProdutosRaw ?? []).forEach((v: any) => {
     const nome = v.inventario_unidades?.produtos?.nome
@@ -58,7 +58,6 @@ async function getDashboardData() {
     .slice(0, 6)
     .map(([nome, qtd]) => ({ nome, qtd }))
 
-  // Funil real por kanban_status
   const funilCount: Record<string, number> = {}
   ;(leadsFunilRaw ?? []).forEach((l: any) => {
     const s = l.kanban_status ?? 'novo'
