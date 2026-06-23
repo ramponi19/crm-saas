@@ -114,7 +114,7 @@ export default function EquipeView({ usuarios }: Props) {
                       <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{modulos}</span></td>
                       {/* Perfil */}
                       <td className="px-5 py-4">
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold"}>{rb.label}</span>
+                        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold">{rb.label}</span>
                       </td>
                       {/* Último acesso */}
                       <td className="px-5 py-4"><span className="text-sm text-[#8A9BB0]">{fmtAcesso(u.ultimo_acesso)}</span></td>
