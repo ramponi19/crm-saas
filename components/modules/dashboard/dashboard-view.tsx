@@ -313,15 +313,21 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const [topVendedores, setTopVendedores] = useState<Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>>([])
 
   useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user
       if (!user) return
-      const meta = user.user_metadata
-      const name: string | undefined = meta?.nome ?? meta?.full_name ?? meta?.name ?? meta?.display_name
-      if (name) {
-        setUserName(name.split(' ')[0])
-      } else if (user.email) {
-        setUserName(user.email.split('@')[0])
+      const { data: perfil } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single()
+      if (perfil?.nome) {
+        setUserName(perfil.nome.trim().split(' ')[0])
+      } else {
+        const meta = user.user_metadata
+        const name: string | undefined = meta?.nome ?? meta?.full_name ?? meta?.name
+        setUserName(name ? name.split(' ')[0] : (user.email?.split('@')[0] ?? null))
       }
     })
   }, [])
