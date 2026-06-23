@@ -151,7 +151,7 @@ export function Topbar({
   function toggleTheme() { setTheme(isDark ? 'light' : 'dark') }
 
   return (
-    <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(10,17,30,0.6)] backdrop-blur-md shrink-0 z-10">
+    <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
 
       <div className="min-w-0">
         {eyebrow && (
@@ -163,7 +163,7 @@ export function Topbar({
       <div className="flex-1" />
 
       {showPeriods && (
-        <div className="flex gap-[3px] p-[3px] rounded-[11px] bg-white/[0.04] border border-[#16212E]/[0.10]">
+        <div className="flex gap-[3px] p-[3px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10]">
           {periods.map((p) => (
             <button key={p.value} onClick={() => onPeriodChange?.(p.value)}
               className={cn('px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
@@ -179,11 +179,11 @@ export function Topbar({
       <div className="relative flex items-center">
         <Search size={17} className="absolute left-3 text-[#46586E] pointer-events-none" />
         <input placeholder="Buscar produto, cliente, IMEI…"
-          className="bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-white/[0.06] transition-all" />
+          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-[#16212E]/[0.05] transition-all" />
       </div>
 
       <button onClick={toggleTheme}
-        className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] hover:text-[#16212E] transition-all"
+        className="w-[42px] h-[42px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] hover:text-[#16212E] transition-all"
         title={isDark ? 'Mudar para claro' : 'Mudar para escuro'}>
         {isDark ? <Moon size={18} /> : <Sun size={18} />}
       </button>
@@ -191,7 +191,7 @@ export function Topbar({
       {/* Notifications */}
       <div className="relative" ref={notifRef}>
         <button onClick={() => setNotifOpen(o => !o)}
-          className="relative w-[42px] h-[42px] rounded-[11px] bg-white/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] transition-colors">
+          className="relative w-[42px] h-[42px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] transition-colors">
           <Bell size={19} />
           {totalNaoLidas > 0 && (
             <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#F0353D] border-2 border-white animate-pulse" />
