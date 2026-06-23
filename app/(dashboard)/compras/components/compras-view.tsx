@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -57,6 +57,16 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   const [fornecedores,   setFornecedores]   = useState(fornecedoresInit)
   const [modalFornecedor, setModalFornecedor] = useState(false)
   const [modalPedido,    setModalPedido]    = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (modalFornecedor) setModalFornecedor(false)
+      else if (modalPedido) setModalPedido(false)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [modalFornecedor, modalPedido])
   const [form,           setForm]           = useState(FORM_VAZIO)
   const [formPedido,     setFormPedido]     = useState(PEDIDO_VAZIO)
   const [salvando,       setSalvando]       = useState(false)

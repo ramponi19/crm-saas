@@ -113,6 +113,12 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
     if (!loadingChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat.length, loadingChat])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function sendMsg() {
     const t = draft.trim(); if (!t) return
     setDraft('')

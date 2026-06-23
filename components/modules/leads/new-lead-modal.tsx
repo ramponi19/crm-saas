@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, KANBAN_COLUMNS } from './types'
@@ -24,6 +24,12 @@ const ORIGENS = [
 
 export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps) {
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
   const [form, setForm] = useState({
     nome: '', telefone: '', instagram: '', origem: '',
     produto_interessado: '', valor_estimado: '',

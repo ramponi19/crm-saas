@@ -57,6 +57,12 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowClientes(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
   const itensFiltrados = useMemo(() => {
     if (!busca) return itensDisponiveis
     const q = busca.toLowerCase()
