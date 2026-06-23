@@ -1,23 +1,23 @@
 /* ============================================================
-   JM Store CRM — Hero do Dashboard (com águia)
+   JM Store CRM — Hero do Dashboard (TEMA CLARO, com águia)
    Next.js 15 (App Router) — CSS Module
    Uso:  import styles from "./Hero.module.css";
    Depende dos tokens de jm-crm-theme.css (opcional — há fallback).
    ============================================================ */
 
-/* -------- HERO container -------- */
+/* -------- HERO container (claro) -------- */
 .hero {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
   padding: 36px 40px;
   margin-bottom: 22px;
-  /* glow vermelho no canto sup. direito + base navy diagonal */
+  /* glow vermelho no canto sup. direito + base clara diagonal */
   background:
     radial-gradient(130% 150% at 88% 0%, rgba(215, 40, 47, .24), transparent 52%),
-    linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%);
-  border: 1px solid rgba(255, 255, 255, .08);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, .45);
+    linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 55%, #EDF0F5 100%);
+  border: 1px solid rgba(22, 32, 46, .10);
+  box-shadow: 0 28px 70px rgba(22, 32, 46, .12);
   animation: heroFadeUp .6s both;
 }
 
@@ -58,7 +58,7 @@
   font-family: var(--jm-font-mono, "JetBrains Mono", monospace);
   font-size: 10.5px;
   letter-spacing: .1em;
-  color: #5FE3B5;
+  color: #15986A;          /* verde-texto sobre claro */
 }
 
 /* -------- Conteúdo -------- */
@@ -71,7 +71,7 @@
   font-family: var(--jm-font-mono, "JetBrains Mono", monospace);
   font-size: 11px;
   letter-spacing: .16em;
-  color: #C9D3DF;
+  color: #56657A;
   text-transform: uppercase;
   opacity: .7;
 }
@@ -82,9 +82,9 @@
   font-size: 34px;
   line-height: 1.12;
   letter-spacing: -.025em;
-  color: #F6F8FB;
+  color: #16212E;
 }
-.heroTitle em {                 /* acento itálico dourado/vermelho */
+.heroTitle em {                 /* acento itálico vermelho */
   font-style: italic;
   color: #F0656B;
 }
@@ -100,7 +100,7 @@
   font-family: var(--jm-font-mono, "JetBrains Mono", monospace);
   font-size: 10px;
   letter-spacing: .18em;
-  color: #7E8EA2;
+  color: #788698;
 }
 .heroMetricValue {
   font-family: var(--jm-font-display, "Fraunces", serif);
@@ -108,7 +108,7 @@
   font-size: 52px;
   line-height: 1;
   letter-spacing: -.03em;
-  color: #fff;
+  color: #16212E;
   margin-top: 6px;
 }
 .heroDelta {
@@ -150,16 +150,16 @@
   transform: translateY(-2px);
   box-shadow: 0 12px 30px rgba(215, 40, 47, .5);
 }
-.heroBtnGhost {
+.heroBtnGhost {                 /* ghost claro */
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 12px 20px;
   border-radius: 12px;
   cursor: pointer;
-  background: rgba(255, 255, 255, .06);
-  border: 1px solid rgba(255, 255, 255, .14);
-  color: #E3E9F0;
+  background: rgba(22, 32, 46, .08);
+  border: 1px solid rgba(22, 32, 46, .14);
+  color: #1F2A39;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--jm-font-sans, "Plus Jakarta Sans", sans-serif);
@@ -167,7 +167,7 @@
   transition: background .2s;
 }
 .heroBtnGhost:hover {
-  background: rgba(255, 255, 255, .12);
+  background: rgba(22, 32, 46, .12);
 }
 
 /* -------- Keyframes -------- */
