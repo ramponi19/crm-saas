@@ -21,29 +21,33 @@ export async function GET() {
   inicio12m.setMonth(inicio12m.getMonth() - 12)
   inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
 
-  // Vendas do ano com cliente e produto
+  // Vendas do ano com cliente e produto via inventario_unidades
   const { data: vendasRaw } = await supabase
     .from('vendas')
-    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, produto_id, vendedor_id')
+    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
     .gte('data_venda', inicio12m.toISOString())
 
-  const vendas = (vendasRaw ?? []) as Array<{
-    id: number; valor_venda: number; lucro: number | null
-    data_venda: string | null; canal_venda: string | null
-    forma_pagamento: string | null; status: string | null
-    cliente_id: number | null; produto_id: number | null; vendedor_id: string | null
-  }>
+  const vendas = (vendasRaw ?? []).map((v: any) => ({
+    id: v.id,
+    valor_venda: v.valor_venda,
+    lucro: v.lucro,
+    data_venda: v.data_venda,
+    canal_venda: v.canal_venda,
+    forma_pagamento: v.forma_pagamento,
+    status: v.status,
+    cliente_id: v.cliente_id,
+    vendedor_id: v.vendedor_id,
+    produto_nome: v.inventario_unidades?.produtos?.nome ?? null,
+  }))
 
   // IDs únicos para joins
   const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))]
-  const produtoIds  = [...new Set(vendas.map(v => v.produto_id).filter(Boolean))]
   const vendedorIds = [...new Set(vendas.map(v => v.vendedor_id).filter(Boolean))]
 
   const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
 
   const [
     { data: clientes },
-    { data: produtos },
     { count: totalClientes },
     { count: leadsAtivos },
     { count: leadsNovos },
@@ -54,9 +58,6 @@ export async function GET() {
   ] = await Promise.all([
     clienteIds.length
       ? supabase.from('clientes').select('id, nome').in('id', clienteIds)
-      : Promise.resolve({ data: [] }),
-    produtoIds.length
-      ? supabase.from('produtos').select('id, nome').in('id', produtoIds)
       : Promise.resolve({ data: [] }),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
@@ -69,7 +70,6 @@ export async function GET() {
 
   // Maps para lookup rápido
   const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))
-  const produtoMap  = Object.fromEntries((produtos ?? []).map((p: { id: number; nome: string }) => [p.id, p.nome]))
   const vendedorMap = Object.fromEntries((vendedoresRaw ?? []).map((u: { id: string; nome: string }) => [u.id, u.nome]))
   const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string; meta_vendas_valor: number }) => [m.usuario_id, m.meta_vendas_valor]))
 
@@ -107,7 +107,7 @@ export async function GET() {
       forma_pagamento: v.forma_pagamento,
       status: v.status,
       cliente_nome: v.cliente_id ? (clienteMap[v.cliente_id] ?? null) : null,
-      produto_nome:  v.produto_id  ? (produtoMap[v.produto_id]  ?? null) : null,
+      produto_nome: v.produto_nome ?? null,
     }))
 
   // Top vendedores do mês com meta
