@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight } from 'lucide-react'
-import { formatCurrency, formatRelativeTime, CANAIS_VENDA } from '@/lib/utils'
+import { formatCurrency, CANAIS_VENDA } from '@/lib/utils'
 import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { AreaChart } from '@/components/ui/area-chart'
 import { cn } from '@/lib/utils'
+import { useEmpresa } from '@/lib/empresa-context'
 
 // ─────────────────────────────────────────
 // Tipos
@@ -26,6 +27,8 @@ interface DashboardData {
   kpis: Kpis
   vendasRecentes: VendaRecente[]
   leadsRecentes: Array<{ id: number; nome: string | null; kanban_status: string | null; created_at: string | null }>
+  topProdutos: Array<{ nome: string; qtd: number }>
+  funilLeads: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number }
 }
 interface PeriodKpis { receita: number; lucro: number; qtdVendas: number; ticketMedio: number }
 
@@ -110,28 +113,22 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
 // ─────────────────────────────────────────
 // Top Produtos (barra horizontal)
 // ─────────────────────────────────────────
-function TopProdutos({ vendas }: { vendas: VendaRecente[] }) {
-  // Agrupa por forma_pagamento como proxy (sem dados de produto aqui)
-  // Mostra mensagem se não houver dados suficientes
-  if (!vendas.length) {
+function TopProdutos({ produtos }: { produtos: Array<{ nome: string; qtd: number }> }) {
+  if (!produtos.length) {
     return <div className="text-center py-8 text-[#788698] text-[13px]">Sem vendas no período.</div>
   }
-  const rows = vendas.slice(0, 6).map((v, i) => ({
-    nome: v.forma_pagamento ?? 'Pix',
-    val: Number(v.valor_venda),
-  }))
-  const maxVal = Math.max(...rows.map(r => r.val), 1)
+  const maxQtd = Math.max(...produtos.map(p => p.qtd), 1)
   return (
     <div className="flex flex-col gap-[15px]">
-      {rows.map((r, i) => (
+      {produtos.map((p, i) => (
         <div key={i}>
           <div className="flex justify-between mb-[6px]">
-            <span className="text-[12.5px] text-[#16212E] font-medium">Venda #{i + 1} · {r.nome}</span>
-            <span className="font-mono text-[12px] text-[#6B7C92]">{formatCurrency(r.val)}</span>
+            <span className="text-[12.5px] text-[#16212E] font-medium">{p.nome}</span>
+            <span className="font-mono text-[12px] text-[#6B7C92]">{p.qtd} {p.qtd === 1 ? 'venda' : 'vendas'}</span>
           </div>
-          <div className="h-[8px] rounded-[8px] bg-white/[0.05] overflow-hidden">
+          <div className="h-[8px] rounded-[8px] bg-[#16212E]/[0.06] overflow-hidden">
             <div className="h-full rounded-[8px]"
-              style={{ width: `${(r.val / maxVal) * 100}%`, background: i === 0 ? 'linear-gradient(90deg,#8E1B20,#F0454D)' : 'linear-gradient(90deg,#3A4A63,#6E8099)' }} />
+              style={{ width: `${(p.qtd / maxQtd) * 100}%`, background: i === 0 ? 'linear-gradient(90deg,#8E1B20,#F0454D)' : 'linear-gradient(90deg,#3A4A63,#6E8099)' }} />
           </div>
         </div>
       ))}
@@ -142,13 +139,12 @@ function TopProdutos({ vendas }: { vendas: VendaRecente[] }) {
 // ─────────────────────────────────────────
 // Funil de leads
 // ─────────────────────────────────────────
-function FunilLeads({ leadsAtivos, leadsNovos }: { leadsAtivos: number; leadsNovos: number }) {
-  const emContato = Math.max(0, leadsAtivos - leadsNovos)
+function FunilLeads({ funil }: { funil: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number } }) {
   const rows = [
-    { label: 'Novos leads',  val: leadsNovos,  color: '#F0454D' },
-    { label: 'Em contato',   val: emContato,   color: '#D7282F' },
-    { label: 'Negociando',   val: Math.round(emContato * 0.5), color: '#B11D24' },
-    { label: 'Convertido',   val: Math.round(emContato * 0.3), color: '#34D399' },
+    { label: 'Novos leads', val: funil.novo,        color: '#7FB0E8' },
+    { label: 'Em contato',  val: funil.em_contato,  color: '#F4B740' },
+    { label: 'Negociando',  val: funil.negociando,  color: '#D7282F' },
+    { label: 'Convertido',  val: funil.convertido,  color: '#34D399' },
   ]
   const maxVal = Math.max(...rows.map(r => r.val), 1)
   return (
@@ -298,7 +294,8 @@ function TopVendedores({ vendedores }: {
 // ─────────────────────────────────────────
 // Dashboard principal
 // ─────────────────────────────────────────
-export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: { data: DashboardData; usuarioNome?: string }) {
+export function DashboardView({ data: initialData }: { data: DashboardData }) {
+  const { empresa } = useEmpresa()
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
@@ -339,7 +336,7 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
 
   return (
     <>
-      <Topbar eyebrow="PAINEL · JM STORE IMPORTADOS" title="Visão geral"
+      <Topbar eyebrow={`PAINEL · ${empresa?.nome?.toUpperCase() ?? 'CRM'}`} title="Visão geral"
         showPeriods activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
 
       <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
@@ -388,16 +385,16 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
 
           {/* ── KPI GRID — 4 cols ── */}
           <div className="grid grid-cols-4 gap-[18px]">
-            <KpiCard label="VENDAS TOTAIS" sub={periodLabel} delta="+18,2%" deltaUp delay={50}>
+            <KpiCard label="VENDAS TOTAIS" sub={periodLabel} delay={50}>
               <AnimatedCurrency value={receita} />
             </KpiCard>
-            <KpiCard label="LUCRO BRUTO" sub={`margem de ${margem}%`} delta="+12,4%" deltaUp delay={120}>
+            <KpiCard label="LUCRO BRUTO" sub={`margem de ${margem}%`} delay={120}>
               <AnimatedCurrency value={lucro} />
             </KpiCard>
-            <KpiCard label="TICKET MÉDIO" sub="por venda fechada" delta="+5,1%" deltaUp delay={190}>
+            <KpiCard label="TICKET MÉDIO" sub="por venda fechada" delay={190}>
               <AnimatedCurrency value={ticketMedio} />
             </KpiCard>
-            <KpiCard label="VENDAS FECHADAS" sub="no período" delta="+8,3%" deltaUp delay={260}>
+            <KpiCard label="VENDAS FECHADAS" sub="no período" delay={260}>
               <AnimatedInt value={qtdVendas} />
             </KpiCard>
           </div>
@@ -447,12 +444,12 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
             <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '460ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">RANKING</div>
               <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Produtos mais vendidos</h3>
-              <TopProdutos vendas={vendasRecentes} />
+              <TopProdutos produtos={initialData.topProdutos} />
             </div>
             <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '500ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CONVERSÃO</div>
               <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Funil de leads</h3>
-              <FunilLeads leadsAtivos={globais.leadsAtivos} leadsNovos={globais.leadsNovos} />
+              <FunilLeads funil={initialData.funilLeads} />
             </div>
             <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '540ms' }}>
               <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ATENÇÃO</div>

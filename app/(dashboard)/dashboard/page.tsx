@@ -10,78 +10,52 @@ async function getDashboardData() {
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const { data: vendasMesRaw } = await supabase
-    .from('vendas')
-    .select('*')
-    .gte('data_venda', startOfMonth.toISOString())
-    .eq('status', 'concluida')
+  const [
+    { data: vendasMesRaw },
+    { count: totalClientes },
+    { count: leadsAtivos },
+    { count: leadsNovos },
+    { count: estoqueDisponivel },
+    { count: assistenciasAbertas },
+    { data: vendasRecentesRaw },
+    { data: topProdutosRaw },
+    { data: leadsFunilRaw },
+  ] = await Promise.all([
+    supabase.from('vendas').select('*').gte('data_venda', startOfMonth.toISOString()).eq('status', 'concluida'),
+    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
+    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
+    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
+    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status').order('created_at', { ascending: false }).limit(5),
+    supabase.from('vendas')
+      .select('inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
+      .gte('data_venda', startOfMonth.toISOString())
+      .eq('status', 'concluida')
+      .limit(100),
+    supabase.from('leads').select('kanban_status').eq('ativo', true),
+  ])
 
-  const { count: totalClientes } = await supabase
-    .from('clientes')
-    .select('*', { count: 'exact', head: true })
-    .eq('ativo', true)
+  const vendasMes = (vendasMesRaw ?? []) as Array<{ valor_venda: number; lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null }>
+  const vendasRecentes = (vendasRecentesRaw ?? []) as Array<{ id: number; valor_venda: number; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null; status: string | null }>
 
-  const { count: leadsAtivos } = await supabase
-    .from('leads')
-    .select('*', { count: 'exact', head: true })
-    .eq('ativo', true)
+  // Top produtos reais
+  const produtoCount: Record<string, number> = {}
+  ;(topProdutosRaw ?? []).forEach((v: any) => {
+    const nome = v.inventario_unidades?.produtos?.nome
+    if (nome) produtoCount[nome] = (produtoCount[nome] ?? 0) + 1
+  })
+  const topProdutos = Object.entries(produtoCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([nome, qtd]) => ({ nome, qtd }))
 
-  const { count: leadsNovos } = await supabase
-    .from('leads')
-    .select('*', { count: 'exact', head: true })
-    .eq('ativo', true)
-    .eq('kanban_status', 'novo')
-
-  const { count: estoqueDisponivel } = await supabase
-    .from('inventario_unidades')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'disponivel')
-    .eq('ativo', true)
-
-  const { count: assistenciasAbertas } = await supabase
-    .from('garantias_assistencias')
-    .select('*', { count: 'exact', head: true })
-    .not('status', 'in', '(concluida,cancelada)')
-
-  const { data: vendasRecentesRaw } = await supabase
-    .from('vendas')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  const { data: leadsRecentesRaw } = await supabase
-    .from('leads')
-    .select('*')
-    .eq('ativo', true)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  const vendasMes = (vendasMesRaw ?? []) as Array<{
-    valor_venda: number
-    lucro: number | null
-    forma_pagamento: string | null
-    canal_venda: string | null
-    data_venda: string | null
-  }>
-
-  const vendasRecentes = (vendasRecentesRaw ?? []) as Array<{
-    id: number
-    valor_venda: number
-    forma_pagamento: string | null
-    canal_venda: string | null
-    data_venda: string | null
-    status: string | null
-  }>
-
-  const leadsRecentes = (leadsRecentesRaw ?? []) as Array<{
-    id: number
-    nome: string | null
-    origem: string | null
-    kanban_status: string | null
-    created_at: string | null
-    produto_interessado: string | null
-    msgs_nao_lidas: number | null
-  }>
+  // Funil real por kanban_status
+  const funilCount: Record<string, number> = {}
+  ;(leadsFunilRaw ?? []).forEach((l: any) => {
+    const s = l.kanban_status ?? 'novo'
+    funilCount[s] = (funilCount[s] ?? 0) + 1
+  })
 
   const receitaMes = vendasMes.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0)
   const lucroMes = vendasMes.reduce((sum, v) => sum + (Number(v.lucro) || 0), 0)
@@ -90,10 +64,7 @@ async function getDashboardData() {
 
   return {
     kpis: {
-      receitaMes,
-      lucroMes,
-      qtdVendasMes,
-      ticketMedio,
+      receitaMes, lucroMes, qtdVendasMes, ticketMedio,
       totalClientes: totalClientes ?? 0,
       leadsAtivos: leadsAtivos ?? 0,
       leadsNovos: leadsNovos ?? 0,
@@ -101,7 +72,15 @@ async function getDashboardData() {
       assistenciasAbertas: assistenciasAbertas ?? 0,
     },
     vendasRecentes,
-    leadsRecentes,
+    leadsRecentes: [],
+    topProdutos,
+    funilLeads: {
+      novo: funilCount['novo'] ?? 0,
+      em_contato: funilCount['em_contato'] ?? 0,
+      negociando: funilCount['negociando'] ?? 0,
+      convertido: funilCount['convertido'] ?? 0,
+      perdido: funilCount['perdido'] ?? 0,
+    },
   }
 }
 
