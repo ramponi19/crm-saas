@@ -71,7 +71,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
         <div className="flex items-center gap-7 flex-wrap">
           {/* Stats */}
           <div>
-            <div className="font-serif text-[25px] text-[#F4F6F9]">{stats.ativos}</div>
+            <div className="font-serif text-[25px] text-[#16212E]">{stats.ativos}</div>
             <div className="text-[11.5px] text-[#6B7C92]">leads ativos</div>
           </div>
           <div>
@@ -79,7 +79,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
             <div className="text-[11.5px] text-[#6B7C92]">taxa de conversão</div>
           </div>
           <div>
-            <div className="font-serif text-[25px] text-[#F4F6F9]">{fmtK(stats.negoc)}</div>
+            <div className="font-serif text-[25px] text-[#16212E]">{fmtK(stats.negoc)}</div>
             <div className="text-[11.5px] text-[#6B7C92]">em negociação</div>
           </div>
 
