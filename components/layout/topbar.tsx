@@ -1,7 +1,6 @@
 'use client'
 
-import { Bell, Search, Moon, Sun, X } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { Bell, Search, X } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -42,15 +41,11 @@ export function Topbar({
   activePeriod = 'mes',
   onPeriodChange,
 }: TopbarProps) {
-  const { setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotifLead[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { setMounted(true) }, [])
 
   // Pede permissão para notificações do navegador
   useEffect(() => {
@@ -143,12 +138,7 @@ export function Topbar({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const isDark = !mounted || resolvedTheme === 'dark'
   const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
-
-
-
-  function toggleTheme() { setTheme(isDark ? 'light' : 'dark') }
 
   return (
     <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
@@ -181,12 +171,6 @@ export function Topbar({
         <input placeholder="Buscar produto, cliente, IMEI…"
           className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-[#16212E]/[0.05] transition-all" />
       </div>
-
-      <button onClick={toggleTheme}
-        className="w-[42px] h-[42px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] hover:text-[#16212E] transition-all"
-        title={isDark ? 'Mudar para claro' : 'Mudar para escuro'}>
-        {isDark ? <Moon size={18} /> : <Sun size={18} />}
-      </button>
 
       {/* Notifications */}
       <div className="relative" ref={notifRef}>

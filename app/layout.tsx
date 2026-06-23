@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -17,23 +16,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR">
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-                    disableTransitionOnChange
-        >
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              classNames: {
-                toast: 'font-sans text-sm',
-              },
-            }}
-          />
-        </ThemeProvider>
+        {children}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              toast: 'font-sans text-sm',
+            },
+          }}
+        />
       </body>
     </html>
   )
