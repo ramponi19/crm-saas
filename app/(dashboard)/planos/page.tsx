@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Check, Loader2, ExternalLink, Zap, Shield, Rocket } from 'lucide-react'
 
+const PAGAMENTOS_ATIVO = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
 const PLANOS = [
   {
     id: 'free',
@@ -75,7 +77,7 @@ export default function PlanosPage() {
   const temAssinatura = !!empresa?.stripe_customer_id
 
   async function assinar(planoId: string) {
-    if (planoId === 'free' || planoId === planoAtual) return
+    if (!PAGAMENTOS_ATIVO || planoId === 'free' || planoId === planoAtual) return
     setLoadingPlano(planoId)
     try {
       const res = await fetch('/api/stripe/checkout', {
@@ -85,21 +87,22 @@ export default function PlanosPage() {
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
-    } catch (err) {
-      console.error(err)
+    } catch {
+      // silently handled — UI shows loading=false
     } finally {
       setLoadingPlano(null)
     }
   }
 
   async function abrirPortal() {
+    if (!PAGAMENTOS_ATIVO) return
     setLoadingPortal(true)
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' })
       const data = await res.json()
       if (data.url) window.location.href = data.url
-    } catch (err) {
-      console.error(err)
+    } catch {
+      // silently handled
     } finally {
       setLoadingPortal(false)
     }
@@ -110,6 +113,94 @@ export default function PlanosPage() {
     ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000))
     : 0
   const emTrial = diasTrial > 0
+
+  // Pagamentos não configurados — exibe página informativa
+  if (!PAGAMENTOS_ATIVO) {
+    return (
+      <div className="flex flex-col h-full bg-[#F4F6F9] overflow-y-auto">
+        <div className="px-8 pt-8 pb-12">
+          <div className="text-center mb-10">
+            <h1 className="text-2xl font-bold text-[#1F2A39]">Planos e preços</h1>
+            <p className="text-[#788698] text-sm mt-2">
+              14 dias grátis em qualquer plano pago. Cancele quando quiser.
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto grid grid-cols-3 gap-6">
+            {PLANOS.map(p => {
+              const Icone = p.icone
+              const ativo = planoAtual === p.id
+              return (
+                <div
+                  key={p.id}
+                  className={`relative flex flex-col rounded-[20px] border p-6 ${
+                    p.destaque
+                      ? 'border-[#6B8CFF]/40 bg-[rgba(107,140,255,0.05)]'
+                      : 'border-[#16212E]/[0.08] bg-[#F0F2F5]'
+                  }`}
+                >
+                  {p.destaque && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="bg-[#6B8CFF] text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-wide">
+                        POPULAR
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-[10px] flex items-center justify-center"
+                      style={{ background: `${p.cor}18` }}>
+                      <Icone size={18} style={{ color: p.cor }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#1F2A39]">{p.nome}</p>
+                      <p className="text-xs text-[#788698]">{p.descricao}</p>
+                    </div>
+                  </div>
+                  <div className="mb-6">
+                    <span className="text-3xl font-extrabold text-[#1F2A39]">{p.preco}</span>
+                    <span className="text-sm text-[#788698]">{p.periodo}</span>
+                  </div>
+                  <div className="flex-1 space-y-2 mb-6">
+                    {p.features.map(f => (
+                      <div key={f} className="flex items-center gap-2 text-xs text-[#788698]">
+                        <Check size={12} className="text-[#15986A] shrink-0" />
+                        {f}
+                      </div>
+                    ))}
+                    {p.nao_inclui.map(f => (
+                      <div key={f} className="flex items-center gap-2 text-xs text-[#9AA7B6] line-through">
+                        <div className="w-3 h-3 rounded-full border border-[#3F516A]/40 shrink-0" />
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                  {ativo ? (
+                    <div className="w-full py-2.5 text-center text-sm font-semibold rounded-[10px] bg-white/[0.06] text-[#788698]">
+                      Plano atual
+                    </div>
+                  ) : (
+                    <div className="w-full py-2.5 text-center text-sm rounded-[10px] bg-[#16212E]/[0.04] text-[#9AA7B6] border border-[#16212E]/[0.06]">
+                      Em breve
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="max-w-4xl mx-auto mt-8 p-5 bg-[#FEF9EC] border border-[#FBBF24]/30 rounded-[16px] flex items-start gap-3">
+            <span className="text-xl">⚙️</span>
+            <div>
+              <p className="text-sm font-semibold text-[#78350F]">Pagamentos em configuração</p>
+              <p className="text-xs text-[#92400E] mt-0.5">
+                A cobrança automática será ativada em breve. Para assinar um plano, entre em contato com o suporte.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-y-auto">

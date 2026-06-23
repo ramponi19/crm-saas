@@ -35,7 +35,6 @@ export default function CheckoutSucessoPage() {
           onClick={() => router.push('/dashboard')}
           className="flex items-center gap-2 mx-auto bg-[#D7282F] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
         >
-          <Loader2 size={14} className="animate-spin" />
           Ir para o dashboard
         </button>
       </div>
