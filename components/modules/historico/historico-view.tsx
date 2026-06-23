@@ -84,9 +84,9 @@ export function HistoricoView({ vendas }: Props) {
             { label: 'LUCRO BRUTO',       val: formatCurrency(stats.lucro)  },
             { label: 'CANCELADAS',        val: String(stats.canceladas)      },
           ].map(s => (
-            <div key={s.label} className="bg-white/[0.025] border border-white/[0.05] rounded-[14px] px-5 py-4">
-              <div className="font-mono text-[10px] tracking-[0.1em] text-[#6B7C92]">{s.label}</div>
-              <div className="font-serif text-[24px] text-[#F4F6F9] mt-1">{s.val}</div>
+            <div key={s.label} className="bg-white/[0.025] border border-[#16212E]/[0.08] rounded-[14px] px-5 py-4">
+              <div className="font-mono text-[10px] tracking-[0.1em] text-[#788698]">{s.label}</div>
+              <div className="font-serif text-[24px] text-[#16212E] mt-1">{s.val}</div>
             </div>
           ))}
         </div>
@@ -100,7 +100,7 @@ export function HistoricoView({ vendas }: Props) {
                   'px-[14px] py-[8px] rounded-[10px] text-[13px] font-semibold border transition-all',
                   filtro === c.key
                     ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white border-transparent shadow-[0_4px_14px_rgba(215,40,47,0.32)]'
-                    : 'bg-white/[0.03] border-white/[0.08] text-[#8A9BB0] hover:bg-white/[0.06] hover:text-[#D4DEEA]'
+                    : 'bg-[#16212E]/[0.04] border-[#16212E]/[0.08] text-[#788698] hover:bg-[#16212E]/[0.04] hover:text-[#56657A]'
                 )}>
                 {c.label}
               </button>
@@ -108,16 +108,16 @@ export function HistoricoView({ vendas }: Props) {
           </div>
           <div className="flex-1" />
           <button onClick={() => exportCSV(filtered)}
-            className="flex items-center gap-2 px-[16px] py-[10px] rounded-[11px] bg-white/[0.04] border border-white/[0.08] text-[#C4CCD6] text-[13px] font-semibold hover:bg-white/[0.08] transition-colors">
+            className="flex items-center gap-2 px-[16px] py-[10px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] text-[#16212E] text-[13px] font-semibold hover:bg-[#16212E]/[0.04] transition-colors">
             <Download size={16} /> Exportar
           </button>
         </div>
 
         {/* Tabela */}
-        <div className="bg-[#122036] border border-white/[0.06] rounded-[18px] overflow-x-auto">
+        <div className="bg-white border border-[#16212E]/[0.08] rounded-[18px] overflow-x-auto">
           <div style={{ minWidth: 880 }}>
             {/* Header */}
-            <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
+            <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
               style={{ gridTemplateColumns: '1.1fr 1.5fr 1.7fr 1fr 1fr 1fr .9fr' }}>
               <div>DATA</div>
               <div>CLIENTE</div>
@@ -130,7 +130,7 @@ export function HistoricoView({ vendas }: Props) {
 
             {/* Rows */}
             {filtered.length === 0 ? (
-              <div className="text-center py-16 text-[#5C6E84] text-[13px]">
+              <div className="text-center py-16 text-[#788698] text-[13px]">
                 Nenhuma venda encontrada.
               </div>
             ) : filtered.map(v => {
@@ -143,16 +143,16 @@ export function HistoricoView({ vendas }: Props) {
 
               return (
                 <div key={v.id}
-                  className="grid gap-3 px-6 py-[13px] border-b border-white/[0.04] last:border-0 items-center cursor-pointer hover:bg-white/[0.025] transition-colors"
+                  className="grid gap-3 px-6 py-[13px] border-b border-[#16212E]/[0.08] last:border-0 items-center cursor-pointer hover:bg-[#16212E]/[0.04] transition-colors"
                   style={{ gridTemplateColumns: '1.1fr 1.5fr 1.7fr 1fr 1fr 1fr .9fr' }}>
 
                   {/* Data */}
-                  <div className="font-mono text-[11px] text-[#8A9BB0]">
+                  <div className="font-mono text-[11px] text-[#788698]">
                     {v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}
                   </div>
 
                   {/* Cliente */}
-                  <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">
+                  <div className="text-[13px] font-semibold text-[#1F2A39] truncate">
                     {v.cliente_nome ?? '—'}
                   </div>
 
@@ -162,18 +162,18 @@ export function HistoricoView({ vendas }: Props) {
                   </div>
 
                   {/* Vendedor */}
-                  <div className="text-[12.5px] text-[#8A9BB0] truncate">
+                  <div className="text-[12.5px] text-[#788698] truncate">
                     {v.vendedor_nome ?? '—'}
                   </div>
 
                   {/* Pagamento + Canal */}
                   <div className="flex items-center gap-[7px] min-w-0">
-                    <span className="text-[12px] text-[#8A9BB0] truncate">{pgto || '—'}</span>
+                    <span className="text-[12px] text-[#788698] truncate">{pgto || '—'}</span>
                   </div>
 
                   {/* Valor + Lucro */}
                   <div className="text-right">
-                    <div className="text-[13.5px] font-bold text-[#F4F6F9]">
+                    <div className="text-[13.5px] font-bold text-[#16212E]">
                       {formatCurrency(v.valor_venda)}
                     </div>
                     {v.lucro != null && (
