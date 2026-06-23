@@ -61,17 +61,20 @@ export default function FinanceiroView({ lancamentos }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-6 pt-4 pb-0 shrink-0">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn('flex items-center gap-2 px-4 py-2 rounded-t-[10px] text-sm font-medium transition-all border-b-2',
-              tab === t.key
-                ? 'bg-white text-[#1F2A39] border-[#D7282F]'
-                : 'text-[#788698] hover:text-[#788698] border-transparent'
-            )}>
-            {t.label}
-          </button>
-        ))}
+      <div className="px-6 pt-4 pb-0 shrink-0">
+        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={cn(
+                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
+                tab === t.key
+                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
+              )}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats */}
