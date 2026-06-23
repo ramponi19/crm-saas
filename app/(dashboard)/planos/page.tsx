@@ -112,13 +112,13 @@ export default function PlanosPage() {
   const emTrial = diasTrial > 0
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-y-auto">
       <div className="px-8 pt-8 pb-12">
 
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-[#E9EEF4]">Planos e preços</h1>
-          <p className="text-[#5C6E84] text-sm mt-2">
+          <h1 className="text-2xl font-bold text-[#1F2A39]">Planos e preços</h1>
+          <p className="text-[#788698] text-sm mt-2">
             14 dias grátis em qualquer plano pago. Cancele quando quiser.
           </p>
 
@@ -132,8 +132,8 @@ export default function PlanosPage() {
           )}
 
           {/* Plano atual */}
-          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full ml-2">
-            <span className="text-xs text-[#8A9BB0]">Plano atual:</span>
+          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-white/[0.04] border border-[#16212E]/[0.08] rounded-full ml-2">
+            <span className="text-xs text-[#788698]">Plano atual:</span>
             <span className="text-xs font-semibold text-white capitalize">{planoAtual}</span>
           </div>
         </div>
@@ -151,7 +151,7 @@ export default function PlanosPage() {
                 className={`relative flex flex-col rounded-[20px] border p-6 transition-all ${
                   p.destaque
                     ? 'border-[#6B8CFF]/40 bg-[rgba(107,140,255,0.05)]'
-                    : 'border-white/[0.06] bg-[#0D1824]'
+                    : 'border-[#16212E]/[0.08] bg-[#F0F2F5]'
                 }`}
               >
                 {/* Badge popular */}
@@ -171,29 +171,29 @@ export default function PlanosPage() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-white">{p.nome}</p>
-                    <p className="text-xs text-[#5C6E84]">{p.descricao}</p>
+                    <p className="text-xs text-[#788698]">{p.descricao}</p>
                   </div>
                 </div>
 
                 {/* Preço */}
                 <div className="mb-6">
                   <span className="text-3xl font-extrabold text-white">{p.preco}</span>
-                  <span className="text-sm text-[#5C6E84]">{p.periodo}</span>
+                  <span className="text-sm text-[#788698]">{p.periodo}</span>
                   {p.id !== 'free' && (
-                    <p className="text-[10px] text-[#3F516A] mt-1">14 dias grátis, depois cobra</p>
+                    <p className="text-[10px] text-[#9AA7B6] mt-1">14 dias grátis, depois cobra</p>
                   )}
                 </div>
 
                 {/* Features */}
                 <div className="flex-1 space-y-2 mb-6">
                   {p.features.map(f => (
-                    <div key={f} className="flex items-center gap-2 text-xs text-[#8A9BB0]">
-                      <Check size={12} className="text-[#22C55E] shrink-0" />
+                    <div key={f} className="flex items-center gap-2 text-xs text-[#788698]">
+                      <Check size={12} className="text-[#15986A] shrink-0" />
                       {f}
                     </div>
                   ))}
                   {p.nao_inclui.map(f => (
-                    <div key={f} className="flex items-center gap-2 text-xs text-[#3F516A] line-through">
+                    <div key={f} className="flex items-center gap-2 text-xs text-[#9AA7B6] line-through">
                       <div className="w-3 h-3 rounded-full border border-[#3F516A]/40 shrink-0" />
                       {f}
                     </div>
@@ -202,11 +202,11 @@ export default function PlanosPage() {
 
                 {/* Botão */}
                 {ativo ? (
-                  <div className="w-full py-2.5 text-center text-sm font-semibold rounded-[10px] bg-white/[0.06] text-[#8A9BB0]">
+                  <div className="w-full py-2.5 text-center text-sm font-semibold rounded-[10px] bg-white/[0.06] text-[#788698]">
                     Plano atual
                   </div>
                 ) : p.id === 'free' ? (
-                  <div className="w-full py-2.5 text-center text-sm text-[#3F516A] rounded-[10px] border border-white/[0.04]">
+                  <div className="w-full py-2.5 text-center text-sm text-[#9AA7B6] rounded-[10px] border border-[#16212E]/[0.06]">
                     Disponível no downgrade
                   </div>
                 ) : (
@@ -230,17 +230,17 @@ export default function PlanosPage() {
 
         {/* Gerenciar assinatura */}
         {temAssinatura && (
-          <div className="max-w-4xl mx-auto mt-8 p-5 bg-[#0D1824] border border-white/[0.06] rounded-[16px] flex items-center justify-between">
+          <div className="max-w-4xl mx-auto mt-8 p-5 bg-[#F0F2F5] border border-[#16212E]/[0.08] rounded-[16px] flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-white">Gerenciar assinatura</p>
-              <p className="text-xs text-[#5C6E84] mt-0.5">
+              <p className="text-xs text-[#788698] mt-0.5">
                 Altere o método de pagamento, veja faturas ou cancele.
               </p>
             </div>
             <button
               onClick={abrirPortal}
               disabled={loadingPortal}
-              className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.1] text-sm text-[#D4DEEA] font-medium px-4 py-2 rounded-[10px] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 bg-white/[0.06] hover:bg-[#16212E]/[0.04] text-sm text-[#56657A] font-medium px-4 py-2 rounded-[10px] transition-colors disabled:opacity-50"
             >
               {loadingPortal
                 ? <Loader2 size={14} className="animate-spin" />
@@ -258,9 +258,9 @@ export default function PlanosPage() {
             { q: 'Meus dados ficam salvos se cancelar?', r: 'Sim, você tem 30 dias para reativar antes de qualquer exclusão.' },
             { q: 'Aceita boleto ou PIX?', r: 'Por enquanto apenas cartão. Boleto/PIX em breve.' },
           ].map(item => (
-            <div key={item.q} className="p-4 bg-[#0D1824] border border-white/[0.06] rounded-[12px]">
-              <p className="text-xs font-semibold text-[#D4DEEA] mb-1">{item.q}</p>
-              <p className="text-xs text-[#5C6E84]">{item.r}</p>
+            <div key={item.q} className="p-4 bg-[#F0F2F5] border border-[#16212E]/[0.08] rounded-[12px]">
+              <p className="text-xs font-semibold text-[#56657A] mb-1">{item.q}</p>
+              <p className="text-xs text-[#788698]">{item.r}</p>
             </div>
           ))}
         </div>
