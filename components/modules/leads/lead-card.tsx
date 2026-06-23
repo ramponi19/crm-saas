@@ -73,9 +73,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
       onClick={onClick} className="cursor-pointer select-none">
       <div
-        className="rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] border border-white/[0.06]"
+        className="rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] border border-[#16212E]/[0.08]"
         style={{
-          background: '#122036',
+          background: '#FFFFFF',
           borderLeft: `3px solid ${barColor}`,
           opacity: isSortableDragging || isDragging ? 0.4 : 1,
         }}
@@ -88,7 +88,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
               {(lead.msgs_nao_lidas ?? 0) > 99 ? '99+' : lead.msgs_nao_lidas}
             </span>
           )}
-          <div className="flex-1 text-[14px] font-semibold text-[#E9EEF4] truncate">
+          <div className="flex-1 text-[14px] font-semibold text-[#1F2A39] truncate">
             {lead.nome ?? 'Lead sem nome'}
           </div>
           <svg width={18} height={18} viewBox="0 0 24 24" className="flex-none" style={{ color: origem.color }}>
@@ -110,7 +110,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
               {formatElapsed(lastAt)}
             </span>
             <span className="flex-1" />
-            <span className="font-mono text-[9.5px] text-[#5C6E84]">
+            <span className="font-mono text-[9.5px] text-[#788698]">
               {new Date(lastAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
             </span>
           </div>
@@ -118,7 +118,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
 
         {/* Linha 3: valor + avatar */}
         <div className="flex items-center justify-between mt-[11px]">
-          <span className="text-[13.5px] font-bold text-[#F4F6F9]">
+          <span className="text-[13.5px] font-bold text-[#16212E]">
             {lead.valor_estimado
               ? lead.valor_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
               : '—'}
