@@ -22,6 +22,14 @@ interface NotifLead {
   nao_lidas: number
 }
 
+interface SearchResult {
+  tipo: 'cliente' | 'lead' | 'estoque'
+  id: number | string
+  titulo: string
+  sub: string
+  href: string
+}
+
 const periods = [
   { value: 'hoje', label: 'Hoje'   },
   { value: '7d',   label: '7 dias' },
@@ -46,6 +54,13 @@ export function Topbar({
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotifLead[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
+
+  const [query, setQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Pede permissão para notificações do navegador
   useEffect(() => {
@@ -140,6 +155,43 @@ export function Topbar({
 
   const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
 
+  // Busca global com debounce
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (!query.trim() || query.length < 2) { setSearchResults([]); setSearchOpen(false); return }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true)
+      const supabase = createClient()
+      const q = query.trim()
+      const [{ data: clientes }, { data: leads }, { data: estoque }] = await Promise.all([
+        supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).limit(4),
+        supabase.from('leads').select('id, nome, produto_interessado').or(`nome.ilike.%${q}%`).eq('ativo', true).limit(4),
+        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(4),
+      ])
+      const results: SearchResult[] = [
+        ...(clientes ?? []).map((c: any) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
+        ...(leads ?? []).map((l: any) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
+        ...(estoque ?? []).map((u: any) => ({ tipo: 'estoque' as const, id: u.id, titulo: (u.produtos as any)?.nome ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
+      ]
+      setSearchResults(results)
+      setSearchOpen(results.length > 0)
+      setSearching(false)
+    }, 300)
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+  }, [query])
+
+  // Fecha busca ao clicar fora
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }
+  const TIPO_COLOR: Record<string, string> = { cliente: '#3B7DE8', lead: '#F59E0B', estoque: '#22C55E' }
+
   return (
     <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
 
@@ -166,10 +218,43 @@ export function Topbar({
         </div>
       )}
 
-      <div className="relative flex items-center">
-        <Search size={17} className="absolute left-3 text-[#46586E] pointer-events-none" />
-        <input placeholder="Buscar produto, cliente, IMEI…"
-          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-[#16212E]/[0.05] transition-all" />
+      <div className="relative flex items-center" ref={searchRef}>
+        <Search size={17} className="absolute left-3 text-[#46586E] pointer-events-none z-10" />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onFocus={() => { if (searchResults.length > 0) setSearchOpen(true) }}
+          placeholder="Buscar produto, cliente, IMEI…"
+          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-[#16212E]/[0.05] transition-all"
+        />
+        {query && (
+          <button onClick={() => { setQuery(''); setSearchResults([]); setSearchOpen(false) }}
+            className="absolute right-3 text-[#788698] hover:text-[#1F2A39]">
+            <X size={14} />
+          </button>
+        )}
+        {searchOpen && (
+          <div className="absolute top-[48px] left-0 w-[380px] bg-white border border-[#16212E]/[0.10] rounded-[14px] shadow-[0_16px_48px_rgba(22,32,46,0.16)] z-50 overflow-hidden">
+            {searching ? (
+              <div className="px-4 py-3 text-[12px] text-[#788698]">Buscando…</div>
+            ) : searchResults.map((r, i) => (
+              <button key={i} onClick={() => { router.push(r.href); setSearchOpen(false); setQuery('') }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#16212E]/[0.03] transition-colors border-b border-[#16212E]/[0.05] last:border-0 text-left">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                  style={{ color: TIPO_COLOR[r.tipo], backgroundColor: `${TIPO_COLOR[r.tipo]}18` }}>
+                  {TIPO_LABEL[r.tipo]}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{r.titulo}</div>
+                  <div className="text-[11px] text-[#788698] truncate">{r.sub}</div>
+                </div>
+              </button>
+            ))}
+            {!searching && searchResults.length === 0 && (
+              <div className="px-4 py-3 text-[12px] text-[#788698]">Nenhum resultado para "{query}"</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notifications */}
