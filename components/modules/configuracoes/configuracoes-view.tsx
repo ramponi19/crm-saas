@@ -191,19 +191,19 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     { label: 'Atraso crítico',   desc: 'Bolinha vermelha: SLA estourado',                color: '#F0656B', min: 60 },
   ]
 
-  const inputCls = "w-full text-center bg-white/[0.04] border border-white/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#E9EEF4] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]"
+  const inputCls = "w-full text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]"
 
   return (
     <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
       <div className="max-w-[980px] mx-auto animate-fade-up space-y-4">
 
         {/* Tabs */}
-        <div className="flex gap-[5px] bg-[#0E1A2B] border border-white/[0.06] rounded-[13px] p-[5px] w-max overflow-x-auto">
+        <div className="flex gap-[5px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max overflow-x-auto">
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} onClick={() => setAba(id)}
               className={cn('flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 aba === id ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
-                           : 'text-[#6B7C92] hover:text-[#C4CCD6] hover:bg-white/[0.04]')}>
+                           : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]')}>
               <Icon size={16} /> {label}
             </button>
           ))}
@@ -211,27 +211,27 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── INTEGRAÇÕES ── */}
         {aba === 'integracoes' && (
-            <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CANAIS DE ATENDIMENTO</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px] mb-1">Integrações</h3>
-              <p className="text-[12.5px] text-[#8A9BB0] mb-[18px]">
-                WhatsApp via <strong className="text-[#C4CCD6]">Evolution API</strong>; Instagram e Messenger via Meta.
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
+              <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">CANAIS DE ATENDIMENTO</div>
+              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-1">Integrações</h3>
+              <p className="text-[12.5px] text-[#788698] mb-[18px]">
+                WhatsApp via <strong className="text-[#16212E]">Evolution API</strong>; Instagram e Messenger via Meta.
                 Conecte cada canal para a caixa de entrada unificada dos leads.
               </p>
               <div className="flex flex-col gap-3">
                 {integracoes.map(i => (
-                  <div key={i.id} className="flex items-center gap-[14px] p-[14px_16px] rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
+                  <div key={i.id} className="flex items-center gap-[14px] p-[14px_16px] rounded-[14px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08]">
                     <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[14px] font-semibold text-[#E9EEF4]">{i.nome}</div>
-                      <div className="text-[11.5px] text-[#6B7C92]">{i.desc}</div>
+                      <div className="text-[14px] font-semibold text-[#1F2A39]">{i.nome}</div>
+                      <div className="text-[11.5px] text-[#788698]">{i.desc}</div>
                     </div>
                     <span className="px-[11px] py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
                       style={{ background: i.ativo ? 'rgba(52,211,153,0.13)' : 'rgba(107,124,146,0.18)', color: i.ativo ? '#34D399' : '#8A9BB0' }}>
                       {i.ativo ? 'Conectado' : 'Inativo'}
                     </span>
                     <button onClick={() => openModal(i)}
-                      className="px-[14px] py-2 rounded-[10px] bg-white/[0.05] border border-white/[0.1] text-[#C4CCD6] text-[12.5px] font-semibold hover:bg-white/[0.1] transition-colors whitespace-nowrap">
+                      className="px-[14px] py-2 rounded-[10px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.04] transition-colors whitespace-nowrap">
                       Configurar
                     </button>
                   </div>
@@ -242,28 +242,28 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── TAXAS ── */}
         {aba === 'taxas' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
             <div className="flex items-start justify-between gap-3 flex-wrap mb-[6px]">
               <div>
-                <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">MAQUININHA · % POR PARCELA</div>
-                <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">Taxas de crédito e link</h3>
+                <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">MAQUININHA · % POR PARCELA</div>
+                <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Taxas de crédito e link</h3>
               </div>
               <button className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
                 <Save size={17} /> Salvar taxas
               </button>
             </div>
-            <p className="text-[12.5px] text-[#8A9BB0] mb-4">
-              Estes valores alimentam o <strong className="text-[#C4CCD6]">PDV</strong> e o{' '}
-              <strong className="text-[#C4CCD6]">Simulador de Parcelas</strong> em tempo real.
+            <p className="text-[12.5px] text-[#788698] mb-4">
+              Estes valores alimentam o <strong className="text-[#16212E]">PDV</strong> e o{' '}
+              <strong className="text-[#16212E]">Simulador de Parcelas</strong> em tempo real.
             </p>
-            <div className="grid gap-3 px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#4F6178] border-b border-white/[0.06]"
+            <div className="grid gap-3 px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
               style={{ gridTemplateColumns: '.8fr 1fr 1fr' }}>
               <div>PARCELAS</div><div className="text-center">CRÉDITO (%)</div><div className="text-center">LINK (%)</div>
             </div>
             {taxaRows.map(t => (
-              <div key={t.n} className="grid gap-3 items-center px-1 py-2 border-b border-white/[0.04]"
+              <div key={t.n} className="grid gap-3 items-center px-1 py-2 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '.8fr 1fr 1fr' }}>
-                <div className="text-[14px] font-bold text-[#F4F6F9]">{t.n}x</div>
+                <div className="text-[14px] font-bold text-[#16212E]">{t.n}x</div>
                 <input defaultValue={t.cred != null ? t.cred.toFixed(2).replace('.', ',') : ''} placeholder="—" className={inputCls} />
                 <input defaultValue={t.link != null ? t.link.toFixed(2).replace('.', ',') : ''} placeholder="—" className={inputCls} />
               </div>
@@ -273,31 +273,31 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── SLA ── */}
         {aba === 'sla' && (
-          <div className="bg-[#122036] border border-white/[0.06] rounded-[20px] p-[24px_26px]">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
             <div className="flex items-start justify-between gap-3 flex-wrap mb-[6px]">
               <div>
-                <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">TEMPO DE RESPOSTA · LEADS</div>
-                <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9] mt-[5px]">SLA de atendimento</h3>
+                <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">TEMPO DE RESPOSTA · LEADS</div>
+                <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">SLA de atendimento</h3>
               </div>
               <button className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
                 <Save size={17} /> Salvar regras
               </button>
             </div>
-            <p className="text-[12.5px] text-[#8A9BB0] mb-[18px] leading-[1.5]">
-              Define a cor da <strong className="text-[#C4CCD6]">bolinha de status</strong> em cada card de lead no Kanban,
+            <p className="text-[12.5px] text-[#788698] mb-[18px] leading-[1.5]">
+              Define a cor da <strong className="text-[#16212E]">bolinha de status</strong> em cada card de lead no Kanban,
               conforme o tempo de espera sem resposta.
             </p>
             <div className="flex flex-col gap-3">
               {slaRows.map((s, i) => (
-                <div key={i} className="flex items-center gap-4 p-[16px_18px] rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
+                <div key={i} className="flex items-center gap-4 p-[16px_18px] rounded-[14px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08]">
                   <span className="w-[16px] h-[16px] rounded-full flex-none" style={{ background: s.color, boxShadow: `0 0 12px ${s.color}` }} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-[#E9EEF4]">{s.label}</div>
-                    <div className="text-[11.5px] text-[#6B7C92]">{s.desc}</div>
+                    <div className="text-[14px] font-semibold text-[#1F2A39]">{s.label}</div>
+                    <div className="text-[11.5px] text-[#788698]">{s.desc}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input defaultValue={s.min} className="w-[64px] text-center bg-white/[0.04] border border-white/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#E9EEF4] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]" />
-                    <span className="text-[12px] text-[#8A9BB0]">min</span>
+                    <input defaultValue={s.min} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]" />
+                    <span className="text-[12px] text-[#788698]">min</span>
                   </div>
                 </div>
               ))}
@@ -313,14 +313,14 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
           className="fixed inset-0 z-[80] flex items-center justify-center p-6" style={{ background: 'rgba(5,9,16,0.62)' }}>
           <div onClick={e => e.stopPropagation()}
             className="w-[480px] max-w-[94vw] max-h-[90vh] overflow-y-auto scrollbar-thin p-6 rounded-[18px]"
-            style={{ background: '#0E1A2C', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'popIn 0.3s ease' }}>
+            style={{ background: '#FFFFFF', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'popIn 0.3s ease' }}>
             <div className="flex items-start justify-between gap-3 mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center flex-none" style={{ background: modalCanal.color + '22' }}>
                   <svg width={26} height={26} viewBox="0 0 24 24" style={{ color: modalCanal.color }}>{modalCanal.svg}</svg>
                 </div>
                 <div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9]">Configurar {modalCanal.nome}</h3>
+                  <h3 className="font-serif font-medium text-[20px] text-[#16212E]">Configurar {modalCanal.nome}</h3>
                   <div className="text-[12px] text-[#7E8EA2] mt-[2px]">
                     {modalCanal.id === 'whatsapp'
                       ? (waProvider === 'evolution' ? 'Evolution API' : 'Meta Cloud API (oficial)')
@@ -329,21 +329,21 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 </div>
               </div>
               <button onClick={() => setModalCanal(null)}
-                className="w-[34px] h-[34px] rounded-[9px] bg-white/[0.05] border border-white/[0.08] text-[#9FB0C2] flex items-center justify-center flex-none hover:bg-white/[0.1] transition-colors">
+                className="w-[34px] h-[34px] rounded-[9px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] text-[#9FB0C2] flex items-center justify-center flex-none hover:bg-[#16212E]/[0.04] transition-colors">
                 <X size={18} />
               </button>
             </div>
 
             {/* Seletor de provider — só WhatsApp */}
             {modalCanal.id === 'whatsapp' && (
-              <div className="flex gap-2 mb-4 p-1 bg-white/[0.04] rounded-[11px] border border-white/[0.06]">
+              <div className="flex gap-2 mb-4 p-1 bg-[#16212E]/[0.04] rounded-[11px] border border-[#16212E]/[0.08]">
                 {([
                   { k: 'evolution', label: 'Evolution API', tag: 'Legado' },
                   { k: 'oficial',   label: 'API Oficial',   tag: 'Recomendado' },
                 ] as const).map(opt => (
                   <button key={opt.k} onClick={() => setWaProvider(opt.k)}
                     className={cn('flex-1 flex items-center justify-center gap-2 py-[9px] rounded-[8px] text-[12.5px] font-semibold transition-all',
-                      waProvider === opt.k ? 'bg-white/[0.08] text-[#F4F6F9]' : 'text-[#6B7C92] hover:text-[#C4CCD6]')}>
+                      waProvider === opt.k ? 'bg-[#16212E]/[0.04] text-[#16212E]' : 'text-[#788698] hover:text-[#16212E]')}>
                     {opt.label}
                     <span className="text-[9px] font-mono px-[6px] py-[2px] rounded-full"
                       style={{ background: opt.k === 'oficial' ? 'rgba(52,211,153,0.15)' : 'rgba(244,183,64,0.15)',
@@ -358,10 +358,10 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             <div className="flex flex-col gap-4">
               {(PROVIDER_FIELDS[modalCanal.id === 'whatsapp' ? waProvider : modalCanal.provider]).map(f => (
                 <div key={f.key}>
-                  <label className="font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block">{f.label}</label>
+                  <label className="font-mono text-[10px] tracking-[0.12em] text-[#788698] uppercase mb-[6px] block">{f.label}</label>
                   <input value={modalValues[f.key] ?? ''} placeholder={f.placeholder}
                     onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/[0.1] rounded-[10px] px-3 py-[10px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors" />
+                    className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#9AA7B6] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors" />
                 </div>
               ))}
             </div>
@@ -373,11 +373,11 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#9CC2EE]">URL DO WEBHOOK</span>
               </div>
               <div className="flex items-center gap-[10px]">
-                <code className="flex-1 min-w-0 font-mono text-[12px] text-[#E9EEF4] bg-black/25 border border-white/[0.07] rounded-[8px] px-3 py-[9px] overflow-x-auto whitespace-nowrap">
+                <code className="flex-1 min-w-0 font-mono text-[12px] text-[#1F2A39] bg-[#16212E]/[0.06] border border-[#16212E]/[0.08] rounded-[8px] px-3 py-[9px] overflow-x-auto whitespace-nowrap">
                   {WEBHOOK_URL}
                 </code>
                 <button onClick={copyWebhook}
-                  className="flex items-center gap-[6px] px-[13px] py-[9px] rounded-[9px] border border-white/[0.1] bg-white/[0.05] text-[#C4CCD6] text-[12px] font-semibold hover:bg-white/[0.1] transition-colors flex-none">
+                  className="flex items-center gap-[6px] px-[13px] py-[9px] rounded-[9px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] text-[12px] font-semibold hover:bg-[#16212E]/[0.04] transition-colors flex-none">
                   <Copy size={14} /> Copiar
                 </button>
               </div>
@@ -388,7 +388,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
             <div className="flex gap-3 mt-6">
               <button onClick={() => setModalCanal(null)}
-                className="flex-1 py-[11px] rounded-[11px] border border-white/[0.1] bg-white/[0.04] text-[#C4CCD6] font-semibold text-[13.5px] hover:bg-white/[0.08] transition-colors">
+                className="flex-1 py-[11px] rounded-[11px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] font-semibold text-[13.5px] hover:bg-[#16212E]/[0.04] transition-colors">
                 Cancelar
               </button>
               <button onClick={saveModal} disabled={saving}
