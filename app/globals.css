@@ -97,3 +97,14 @@
   0%, 100% { box-shadow: 0 0 0 1px rgba(240,101,107,0.25), 0 0 14px rgba(240,101,107,0.15); }
   50%      { box-shadow: 0 0 0 1px rgba(240,101,107,0.45), 0 0 22px rgba(240,101,107,0.30); }
 }
+
+/* Remove autofill blue background in all browsers */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(22, 32, 46, 0.05) inset !important;
+  -webkit-text-fill-color: #16212E !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: #16212E;
+}
