@@ -404,14 +404,14 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
             {[
               { icon: Package,       color: '#F4B740', val: `${globais.estoqueDisponivel} un`, sub: 'disponíveis em estoque',   alert: globais.estoqueDisponivel < 5 },
               { icon: Users,         color: '#7FB0E8', val: String(globais.totalClientes),       sub: 'clientes cadastrados',      alert: false },
-              { icon: AlertTriangle, color: '#C4CCD6', val: String(globais.assistenciasAbertas), sub: 'assistências abertas',      alert: globais.assistenciasAbertas > 0 },
+              { icon: AlertTriangle, color: '#788698', val: String(globais.assistenciasAbertas), sub: 'assistências abertas',      alert: globais.assistenciasAbertas > 0 },
               { icon: TrendingUp,    color: '#F0656B', val: String(globais.leadsAtivos),          sub: 'leads ativos no funil',     alert: globais.leadsNovos > 20 },
             ].map(({ icon: Icon, color, val, sub, alert }, i) => (
-              <div key={i} className={cn('bg-white/[0.025] border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
+              <div key={i} className={cn('bg-white border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
                 alert ? 'border-[rgba(240,100,107,0.25)]' : 'border-[#16212E]/[0.07]')}>
                 <Icon size={30} style={{ color }} />
                 <div>
-                  <div className="font-serif text-[20px] text-[#EEF2F7]">{val}</div>
+                  <div className="font-serif text-[20px] text-[#16212E]">{val}</div>
                   <div className="text-[11.5px] text-[#788698] mt-[1px]">{sub}</div>
                 </div>
               </div>
