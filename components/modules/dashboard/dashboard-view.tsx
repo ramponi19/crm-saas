@@ -297,7 +297,7 @@ function TopVendedores({ vendedores }: {
 // ─────────────────────────────────────────
 // Dashboard principal
 // ─────────────────────────────────────────
-export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: { data: DashboardData; usuarioNome?: string }) {
+export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
@@ -342,7 +342,9 @@ export function DashboardView({ data: initialData, usuarioNome = "Usuário" }: {
         showPeriods activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
 
       <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
-        <div className="max-w-[1320px] mx-auto space-y-5">          {/* ── HERO ── */}
+        <div className="max-w-[1320px] mx-auto space-y-5">
+
+          {/* ── HERO ── */}
           <Hero
             nome={usuarioNome}
             receita={receita}
