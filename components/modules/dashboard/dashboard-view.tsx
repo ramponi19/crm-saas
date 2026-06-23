@@ -344,7 +344,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
         <div className="max-w-[1320px] mx-auto space-y-5">
 
           {/* ── HERO ── */}
-          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] border border-white/[0.08] shadow-[0_28px_70px_rgba(0,0,0,0.55)] animate-fade-up" style={{ background: "radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.24), transparent 52%), linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%)" }}>
+          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] bg-hero-gradient border border-[#16212E]/[0.10] shadow-[0_28px_70px_rgba(0,0,0,0.45)] animate-fade-up">
             <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
               <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
               <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#5FE3B5]">SISTEMA ONLINE</span>
