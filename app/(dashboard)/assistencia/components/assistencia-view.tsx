@@ -115,7 +115,7 @@ export default function AssistenciaView({ ordens }: Props) {
           ))}
         </div>
         <button onClick={() => { setSelecionada(null); setIsNew(true); setModalOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold rounded-[10px] transition-colors">
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors">
           <Plus size={15} /> Nova ordem de serviço
         </button>
       </div>

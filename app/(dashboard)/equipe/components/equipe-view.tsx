@@ -70,7 +70,7 @@ export default function EquipeView({ usuarios }: Props) {
             </button>
           ))}
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold rounded-[10px] transition-colors">
+        <button className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors">
           <UserPlus size={15} /> Novo usuário
         </button>
       </div>

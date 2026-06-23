@@ -178,7 +178,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               </div>
               <div className="flex-1" />
               <button onClick={() => window.location.href = '/produtos'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
                 <Plus size={15} /> Cadastrar produto
               </button>
             </div>
@@ -259,7 +259,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => window.location.href = '/configuracoes'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
                 <Plus size={15} /> Nova categoria
               </button>
             </div>
@@ -290,7 +290,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => window.location.href = '/configuracoes'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
                 <Plus size={15} /> Nova marca
               </button>
             </div>
@@ -316,7 +316,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => setModalPreco(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
                 <Plus size={15} /> Novo preço
               </button>
             </div>
@@ -390,7 +390,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#16212E]/[0.08]">
               <button onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#788698] hover:text-[#56657A]">Cancelar</button>
               <button onClick={salvarPreco} disabled={saving}
-                className="px-5 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold disabled:opacity-50">
+                className="px-5 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

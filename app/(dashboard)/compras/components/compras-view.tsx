@@ -131,7 +131,7 @@ export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }:
         <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
             <h2 className="text-base font-semibold text-[#1F2A39]">Pedidos de compra</h2>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
               <Plus size={13} /> Novo pedido
             </button>
           </div>
@@ -162,7 +162,7 @@ export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }:
             <h2 className="text-base font-semibold text-[#1F2A39]">Fornecedores</h2>
             <button
               onClick={() => { setForm(FORM_VAZIO); setErro(null); setModalFornecedor(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors"
             >
               <Plus size={13} /> Novo
             </button>
@@ -234,7 +234,7 @@ export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }:
               <button
                 onClick={salvarFornecedor}
                 disabled={salvando}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C0232A] rounded-[10px] transition-colors disabled:opacity-60"
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60"
               >
                 {salvando ? 'Salvando...' : 'Salvar fornecedor'}
               </button>

@@ -298,7 +298,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
               Fechar
             </button>
             <button onClick={salvar} disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+              className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

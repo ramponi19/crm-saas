@@ -119,7 +119,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
             <button
               onClick={salvar}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold disabled:opacity-50"
             >
               <Save size={14} />
               {saving ? 'Salvando...' : 'Salvar'}

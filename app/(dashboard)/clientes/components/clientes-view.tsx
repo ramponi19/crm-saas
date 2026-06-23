@@ -138,7 +138,7 @@ export default function ClientesView({ clientes }: Props) {
         </div>
         <button
           onClick={openNovo}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
         >
           <UserPlus size={15} />
           Novo cliente

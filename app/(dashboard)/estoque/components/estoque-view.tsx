@@ -210,7 +210,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
 
               <div className="flex-1" />
               <button onClick={() => { setUnidadeSel(null); setModalOpen(true) }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
                 <ArrowDownLeft size={15} /> Entrada de estoque
               </button>
             </div>
@@ -452,7 +452,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
 
       <div className="flex justify-end pt-2">
         <button onClick={salvar} disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
           <ArrowDownLeft size={15} />
           {saving ? 'Salvando...' : 'Registrar entrada'}
         </button>

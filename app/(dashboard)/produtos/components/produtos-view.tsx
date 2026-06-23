@@ -147,7 +147,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
           <div className="flex-1" />
           <button
             onClick={abrirNovo}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]"
           >
             <Plus size={16} />
             Novo produto

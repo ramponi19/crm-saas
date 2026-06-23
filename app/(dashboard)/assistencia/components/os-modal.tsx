@@ -164,7 +164,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Fechar</button>
-          <button onClick={salvar} disabled={saving} className="px-5 py-2 bg-[#D7282F] hover:bg-[#C0232A] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+          <button onClick={salvar} disabled={saving} className="px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>

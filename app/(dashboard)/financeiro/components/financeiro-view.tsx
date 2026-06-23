@@ -205,7 +205,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
                   {' · '}Saídas <span className="text-[#D7282F]">−{fmtBRL(listaPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
                 </p>
               </div>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Novo lançamento
               </button>
             </div>
@@ -216,7 +216,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
           <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
               <h2 className="text-base font-semibold text-[#1F2A39]">Contas a pagar</h2>
-              <button onClick={() => abrirNovo('despesa')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('despesa')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Nova conta
               </button>
             </div>
@@ -227,7 +227,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
           <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
               <h2 className="text-base font-semibold text-[#1F2A39]">Contas a receber</h2>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C0232A] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Novo título
               </button>
             </div>
@@ -353,7 +353,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
                   Cancelar
                 </button>
                 <button onClick={salvar} disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C0232A] rounded-[10px] transition-colors disabled:opacity-60">
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
                   <Save size={13} />
                   {saving ? 'Salvando...' : 'Salvar'}
                 </button>

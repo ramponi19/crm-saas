@@ -9,6 +9,7 @@ import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { AreaChart } from '@/components/ui/area-chart'
 import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
+import { createClient } from '@/lib/supabase/client'
 
 // ─────────────────────────────────────────
 // Tipos
@@ -92,7 +93,7 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
       <svg width={140} height={140} viewBox="0 0 140 140" style={{ flex: 'none' }}>
         <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(22,32,46,0.08)" strokeWidth={15} />
         {rings}
-        <text x={cx} y={cy - 3} textAnchor="middle" fill="#F4F6F9" fontSize={23}
+        <text x={cx} y={cy - 3} textAnchor="middle" fill="#16212E" fontSize={23}
           fontFamily="Fraunces, serif" fontWeight={600}>{total}</text>
         <text x={cx} y={cy + 15} textAnchor="middle" fill="#5C6E84" fontSize={9}
           fontFamily="JetBrains Mono, monospace" letterSpacing="1.5">VENDAS</text>
@@ -102,7 +103,7 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
           <div key={i} className="flex items-center gap-[10px]">
             <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s.color }} />
             <span className="text-[13px] text-[#9FB0C2] flex-1">{s.label}</span>
-            <span className="font-mono text-[13px] font-bold text-[#EEF2F7]">{s.pct}%</span>
+            <span className="font-mono text-[13px] font-bold text-[#56657A]">{s.pct}%</span>
           </div>
         ))}
       </div>
@@ -151,7 +152,7 @@ function FunilLeads({ funil }: { funil: { novo: number; em_contato: number; nego
     <div className="flex flex-col gap-[12px]">
       {rows.map((r, i) => (
         <div key={i} className="flex items-center gap-[12px]">
-          <div className="flex-1 h-[38px] rounded-[10px] bg-white/[0.04] overflow-hidden relative">
+          <div className="flex-1 h-[38px] rounded-[10px] bg-[#16212E]/[0.06] overflow-hidden relative">
             <div className="h-full rounded-[10px] flex items-center px-3"
               style={{ width: `${Math.max((r.val / maxVal) * 100, 8)}%`, background: r.color }}>
               <span className={cn('text-[12.5px] font-semibold whitespace-nowrap', i === 3 ? 'text-[#06281C]' : 'text-white')}>
@@ -159,7 +160,7 @@ function FunilLeads({ funil }: { funil: { novo: number; em_contato: number; nego
               </span>
             </div>
           </div>
-          <span className="font-mono text-[14px] font-bold text-[#EEF2F7] w-8 text-right">{r.val}</span>
+          <span className="font-mono text-[14px] font-bold text-[#16212E] w-8 text-right">{r.val}</span>
         </div>
       ))}
     </div>
@@ -266,7 +267,7 @@ function TopVendedores({ vendedores }: {
               <div className="text-[13.5px] font-bold text-[#16212E]">{formatCurrency(v.total)}</div>
             </div>
             {/* Barra de progresso — meta se tiver, senão relativa ao maior */}
-            <div className="h-[6px] rounded-[6px] bg-white/[0.06] overflow-hidden">
+            <div className="h-[6px] rounded-[6px] bg-[#16212E]/[0.06] overflow-hidden">
               <div
                 className="h-full rounded-[6px] transition-all duration-700"
                 style={{
@@ -297,6 +298,7 @@ function TopVendedores({ vendedores }: {
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const { empresa } = useEmpresa()
   const router = useRouter()
+  const [userName, setUserName] = useState<string | null>(null)
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
   const [faturamentoMensal, setFaturamentoMensal] = useState<Array<{ mes: string; total: number }>>([])
@@ -309,6 +311,14 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   })
   const [vendasRecentes, setVendasRecentes] = useState<VendaRecente[]>(initialData.vendasRecentes)
   const [topVendedores, setTopVendedores] = useState<Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>>([])
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata
+      const name: string | undefined = meta?.full_name ?? meta?.name ?? meta?.display_name
+      if (name) setUserName(name.split(' ')[0])
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -354,8 +364,9 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
               </div>
               <h2 className="mt-2 font-serif font-normal text-[34px] leading-[1.12] tracking-[-0.025em] text-[#16212E]">
-                Boa gestão gera bons resultados. A operação está{' '}
-                <em className="italic text-[#F0656B]">voando alto</em>.
+                Bom te ver{userName ? `, ${userName}` : ''}.
+                <br />
+                Boa gestão gera bons resultados.
               </h2>
               <div className="flex items-end gap-[18px] mt-[26px]">
                 <div>

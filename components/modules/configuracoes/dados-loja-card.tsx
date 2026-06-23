@@ -131,7 +131,7 @@ export function DadosLojaCard({ config, onSaved }: Props) {
         <button
           onClick={salvar}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C0232A] text-white text-sm font-semibold transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold transition-colors disabled:opacity-50"
         >
           <Save size={14} />
           {loading ? 'Salvando…' : 'Salvar dados'}
