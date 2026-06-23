@@ -57,7 +57,7 @@ export function LoginForm() {
             placeholder="voce@jmstore.com.br"
             autoComplete="username"
             required
-            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"
+            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none autofill:shadow-[0_0_0px_1000px_rgba(22,32,46,0.05)_inset] autofill:[--tw-shadow-color:transparent] [-webkit-text-fill-color:#16212E]"
           />
         </div>
       </div>
@@ -74,7 +74,7 @@ export function LoginForm() {
             placeholder="••••••••"
             autoComplete="current-password"
             required
-            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"
+            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none autofill:shadow-[0_0_0px_1000px_rgba(22,32,46,0.05)_inset] autofill:[--tw-shadow-color:transparent] [-webkit-text-fill-color:#16212E]"
           />
           <button type="button" onClick={() => setShowPw(s => !s)} className="text-[#5A6A7E] hover:text-[#F0656B] transition-colors shrink-0">
             {showPw ? <EyeOff size={19} /> : <Eye size={19} />}
