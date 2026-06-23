@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -69,14 +70,15 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   async function salvar() {
     setSaving(true)
-    const { clientes: _c, produtos: _p, ...payload } = form as any
-    const data = { ...payload, tipo: 'assistencia', protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { clientes: _c, produtos: _p, ...payload } = form
+    const base = { ...payload, tipo: 'assistencia' as const, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
     if (isNew) {
-      const { error } = await supabase.from('garantias_assistencias').insert(data)
+      const { error } = await supabase.from('garantias_assistencias').insert(base as TablesInsert<'garantias_assistencias'>)
       if (error) { toast.error('Erro ao criar OS'); setSaving(false); return }
       toast.success('OS criada!')
     } else {
-      const { error } = await supabase.from('garantias_assistencias').update(data).eq('id', os!.id!)
+      const { error } = await supabase.from('garantias_assistencias').update(base as TablesUpdate<'garantias_assistencias'>).eq('id', os!.id!)
       if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
       toast.success('Salvo!')
     }
