@@ -43,7 +43,7 @@ const STATUS: Record<string, { label: string; color: string; bg: string }> = {
 function StatusBadge({ status }: { status: string | null }) {
   const s = STATUS[status ?? ''] ?? { label: status ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
   return (
-    <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold"}>
+    <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold">
       {s.label}
     </span>
   )
@@ -108,7 +108,7 @@ export default function GarantiaView({ garantias }: Props) {
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
         {STATS.map(s => (
           <div key={s.label} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0">
               {s.icon}
             </div>
             <div>
