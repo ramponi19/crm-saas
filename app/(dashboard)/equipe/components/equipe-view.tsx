@@ -57,11 +57,15 @@ export default function EquipeView({ usuarios }: Props) {
 
       {/* Tabs + botão */}
       <div className="flex items-center justify-between px-6 py-4 shrink-0">
-        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
+        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn('flex items-center gap-2 px-4 py-2 rounded-[8px] text-sm font-medium transition-all',
-                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')} : { backgroundColor: 'rgba(255,255,255,0.04)' }}>
+              className={cn(
+                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
+                tab === t.key
+                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
+              )}>
               {t.label}
             </button>
           ))}
