@@ -36,10 +36,10 @@ export default async function LeadsPage() {
       .eq('ativo', true)
       .order('ultima_mensagem_at', { ascending: false, nullsFirst: false }),
     supabase
-      .from('usuarios')
-      .select('id, nome, role')
+      .from('empresa_usuarios')
+      .select('usuario_id, role, usuarios!usuario_id(id, nome)')
       .eq('empresa_id', empresaId)
-      .order('nome'),
+      .eq('ativo', true),
     // Contagem real de não-lidas — apenas leads desta empresa
     supabase
       .from('lead_mensagens')
@@ -65,7 +65,7 @@ export default async function LeadsPage() {
   return (
     <LeadsView
       initialLeads={leadsComContagem}
-      usuarios={usuarios ?? []}
+      usuarios={(usuarios ?? []).map((eu: any) => ({ id: eu.usuario_id, nome: eu.usuarios?.nome ?? '', role: eu.role }))}
     />
   )
 }
