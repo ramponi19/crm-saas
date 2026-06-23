@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { Plus, X, Save, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import type { TablesInsert } from '@/types/database'
 
 interface Lancamento {
   id: number
@@ -15,13 +16,13 @@ interface Lancamento {
   categoria: string | null
   forma_pgto: string | null
   observacoes: string | null
-  created_at: string
+  created_at: string | null
 }
 interface Categoria {
   id: number
   nome: string
   tipo: string
-  cor: string
+  cor: string | null
 }
 interface Props { lancamentos: Lancamento[]; categorias: Categoria[] }
 
@@ -129,7 +130,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
       if (error) { setErro('Erro ao atualizar. Tente novamente.'); setSaving(false); return }
       setLancamentos(prev => prev.map(l => l.id === editId ? { ...l, ...payload } : l))
     } else {
-      const { data, error } = await supabase.from('lancamentos_financeiros').insert(payload).select().single()
+      const { data, error } = await supabase.from('lancamentos_financeiros').insert(payload as TablesInsert<'lancamentos_financeiros'>).select().single()
       if (error) { setErro('Erro ao salvar. Tente novamente.'); setSaving(false); return }
       setLancamentos(prev => [data as Lancamento, ...prev])
     }

@@ -10,7 +10,7 @@ interface Usuario {
   role: string | null
   modulos_acesso: string[] | null
   ultimo_acesso: string | null
-  created_at: string
+  created_at: string | null
 }
 interface Props { usuarios: Usuario[] }
 

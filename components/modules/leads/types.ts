@@ -23,7 +23,7 @@ export interface Lead {
 export interface Usuario {
   id: string
   nome: string
-  role: 'admin' | 'vendedor' | 'tecnico'
+  role: string
 }
 
 export interface KanbanColumn {

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { TablesInsert } from '@/types/database'
 import { Building2, User, Lock, ChevronRight, Check, Loader2, Smartphone } from 'lucide-react'
 
 type Step = 'empresa' | 'usuario' | 'plano'
@@ -101,7 +102,7 @@ export default function RegisterPage() {
         .single()
       if (empresaError) throw new Error('Erro ao criar empresa: ' + empresaError.message)
 
-      const empresaId = empresaData.id
+      const empresaId = empresaData!.id
 
       // 3. Cria perfil na tabela usuarios
       await supabase.from('usuarios').insert({
@@ -110,7 +111,7 @@ export default function RegisterPage() {
         email: form.email,
         role: 'admin',
         empresa_id: empresaId,
-      })
+      } as TablesInsert<'usuarios'>)
 
       // 4. Vincula usuário à empresa como owner
       await supabase.from('empresa_usuarios').insert({

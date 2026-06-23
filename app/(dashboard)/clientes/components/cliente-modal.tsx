@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 interface Cliente {
   id?: number
@@ -104,11 +105,11 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     const { total_vendas, valor_total, ultima_compra, ...payload } = form
     const data = { ...payload, ativo: true }
     if (isNew) {
-      const { error } = await supabase.from('clientes').insert(data)
+      const { error } = await supabase.from('clientes').insert(data as TablesInsert<'clientes'>)
       if (error) { toast.error('Erro ao cadastrar'); setSaving(false); return }
       toast.success('Cliente cadastrado!')
     } else {
-      const { error } = await supabase.from('clientes').update(data).eq('id', cliente!.id!)
+      const { error } = await supabase.from('clientes').update(data as TablesUpdate<'clientes'>).eq('id', cliente!.id!)
       if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
       toast.success('Salvo!')
     }

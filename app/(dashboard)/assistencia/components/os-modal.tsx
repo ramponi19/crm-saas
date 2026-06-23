@@ -18,7 +18,7 @@ interface OS {
   dentro_garantia: boolean | null
   dias_garantia_restantes: number | null
   data_entrada: string | null
-  created_at?: string
+  created_at?: string | null
   observacoes: string | null
   estado_entrada: string | null
   celular_reserva_fornecido: boolean | null

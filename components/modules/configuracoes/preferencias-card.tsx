@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Save, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import type { Json } from '@/types/database'
 
 interface Preferencias {
   meta_vendas_mes: number
@@ -35,7 +36,7 @@ export function PreferenciasCard({ config, onSaved }: Props) {
     setLoading(true)
     const { error } = await supabase
       .from('configuracoes_sistema')
-      .upsert({ chave: 'preferencias', valor: form }, { onConflict: 'chave' })
+      .upsert({ chave: 'preferencias', valor: form as unknown as Json }, { onConflict: 'chave' })
     setLoading(false)
     if (error) { toast.error('Erro ao salvar preferências'); return }
     toast.success('Preferências salvas')

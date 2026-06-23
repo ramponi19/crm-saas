@@ -7,6 +7,7 @@ import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import type { TablesInsert } from '@/types/database'
 
 interface Unidade {
   id: number
@@ -29,7 +30,7 @@ interface Unidade {
   fornecedor_id: number | null
   custo_reparo: number | null
   observacoes: string | null
-  created_at: string
+  created_at: string | null
 }
 
 interface Movimentacao {
@@ -363,11 +364,11 @@ function UnidadeInlineForm({ produtos, onSaved }: {
       custo_reparo: Number(form.custo_reparo) || null,
       observacoes: form.observacoes || null, ativo: true,
     }
-    const { data, error } = await supabase.from('inventario_unidades').insert(payload).select().single()
+    const { data, error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>).select().single()
     setSaving(false)
     if (error) { toast.error('Erro: ' + error.message); return }
     const prod = produtos.find(p => p.id === Number(form.produto_id))
-    onSaved({ ...data, produto_nome: prod?.nome ?? '', marca_nome: prod?.marca_nome ?? '', fornecedor_nome: null })
+    onSaved({ ...data, produto_id: data.produto_id!, produto_nome: prod?.nome ?? '', marca_nome: prod?.marca_nome ?? '', fornecedor_nome: null })
   }
 
   const field = (label: string, node: React.ReactNode) => (

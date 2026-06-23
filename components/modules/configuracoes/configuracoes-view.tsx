@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
+import type { Json } from '@/types/database'
 
 interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
 
@@ -137,11 +138,11 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             instance: modalValues.inst ?? '',
           }
           await supabase.from('configuracoes_sistema')
-            .upsert({ chave: 'whatsapp_evolution', valor: cfg }, { onConflict: 'chave' })
+            .upsert({ chave: 'whatsapp_evolution', valor: cfg as unknown as Json }, { onConflict: 'chave' })
           // Desativa oficial
           if (official) {
             await supabase.from('configuracoes_sistema')
-              .upsert({ chave: 'whatsapp_official', valor: { ...official, ativo: false } }, { onConflict: 'chave' })
+              .upsert({ chave: 'whatsapp_official', valor: { ...official, ativo: false } as unknown as Json }, { onConflict: 'chave' })
           }
         } else {
           const cfg: OfficialConfig = {
@@ -155,7 +156,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             api_url: official?.api_url ?? 'https://graph.facebook.com',
           }
           await supabase.from('configuracoes_sistema')
-            .upsert({ chave: 'whatsapp_official', valor: cfg }, { onConflict: 'chave' })
+            .upsert({ chave: 'whatsapp_official', valor: cfg as unknown as Json }, { onConflict: 'chave' })
           // Desativa evolution
           if (evolution) {
             await supabase.from('configuracoes_sistema')

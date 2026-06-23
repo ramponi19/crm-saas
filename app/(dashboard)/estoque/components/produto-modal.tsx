@@ -47,7 +47,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
       const marca = marcas.find(m => m.id === Number(form.marca_id))
       const cat = categorias.find(c => c.id === Number(form.categoria_id))
       toast.success('Produto cadastrado!')
-      onSaved({ ...data, marca_nome: marca?.nome ?? '', categoria_nome: cat?.nome ?? null })
+      onSaved({ ...data, ativo: data.ativo ?? true, marca_nome: marca?.nome ?? '', categoria_nome: cat?.nome ?? null })
     } else {
       const { error } = await supabase.from('produtos').update(payload).eq('id', produto!.id!)
       if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }

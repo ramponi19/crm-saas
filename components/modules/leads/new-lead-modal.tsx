@@ -5,6 +5,7 @@ import { X, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, KANBAN_COLUMNS } from './types'
 import { toast } from 'sonner'
+import type { TablesInsert } from '@/types/database'
 
 interface NewLeadModalProps {
   usuarios: Usuario[]
@@ -46,7 +47,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
       responsavel_id: form.responsavel_id || null,
       observacoes: form.observacoes.trim() || null,
       ativo: true, msgs_nao_lidas: 0,
-    }).select().single()
+    } as TablesInsert<'leads'>).select().single()
 
     if (error) { toast.error('Erro ao criar lead'); setLoading(false); return }
     toast.success('Lead criado'); onCreate(data as Lead); setLoading(false)

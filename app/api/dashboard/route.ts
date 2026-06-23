@@ -71,7 +71,7 @@ export async function GET() {
   // Maps para lookup rápido
   const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))
   const vendedorMap = Object.fromEntries((vendedoresRaw ?? []).map((u: { id: string; nome: string }) => [u.id, u.nome]))
-  const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string; meta_vendas_valor: number }) => [m.usuario_id, m.meta_vendas_valor]))
+  const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string | null; meta_vendas_valor: number | null }) => [m.usuario_id, m.meta_vendas_valor]))
 
   // KPIs por período (só concluídas)
   const concluidas = vendas.filter(v => v.status === 'concluida')

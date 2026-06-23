@@ -9,7 +9,7 @@ interface Pedido {
   valor_total: number | null
   status: string | null
   data_pedido: string | null
-  created_at: string
+  created_at: string | null
   observacoes: string | null
   fornecedor_id: number | null
   fornecedores: { nome_fantasia: string; contato: string | null; telefone: string | null } | null
@@ -22,7 +22,7 @@ interface Fornecedor {
   contato: string | null
   telefone: string | null
   email: string | null
-  created_at: string
+  created_at: string | null
 }
 interface Props { pedidos: Pedido[]; fornecedores: Fornecedor[] }
 

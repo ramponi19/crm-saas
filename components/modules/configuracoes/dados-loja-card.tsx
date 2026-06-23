@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Save, Store, MapPin, Phone, Mail, Globe } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import type { Json } from '@/types/database'
 
 interface DadosLoja {
   nome: string
@@ -45,7 +46,7 @@ export function DadosLojaCard({ config, onSaved }: Props) {
     setLoading(true)
     const { error } = await supabase
       .from('configuracoes_sistema')
-      .upsert({ chave: 'dados_loja', valor: form }, { onConflict: 'chave' })
+      .upsert({ chave: 'dados_loja', valor: form as unknown as Json }, { onConflict: 'chave' })
     setLoading(false)
     if (error) { toast.error('Erro ao salvar dados da loja'); return }
     toast.success('Dados da loja salvos')

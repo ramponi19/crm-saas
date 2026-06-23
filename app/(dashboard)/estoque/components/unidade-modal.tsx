@@ -5,6 +5,7 @@ import { X, Save, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 interface Unidade {
   id?: number
@@ -72,11 +73,11 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
     const payload = { ...form, ativo: true }
 
     if (isNew) {
-      const { error } = await supabase.from('inventario_unidades').insert(payload)
+      const { error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>)
       if (error) { toast.error('Erro ao cadastrar: ' + error.message); setSaving(false); return }
       toast.success('Unidade adicionada ao estoque!')
     } else {
-      const { error } = await supabase.from('inventario_unidades').update(payload).eq('id', unidade!.id!)
+      const { error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!)
       if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
       toast.success('Unidade atualizada!')
     }

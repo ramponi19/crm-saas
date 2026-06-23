@@ -3,6 +3,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 
+type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
+
 export const metadata = { title: 'Configurações' }
 
 async function getConfigs() {
@@ -21,8 +23,8 @@ async function getConfigs() {
 
   const evolution    = configs?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
   const official     = configs?.find(d => d.chave === 'whatsapp_official')?.valor as OfficialConfig | undefined
-  const instagram    = configs?.find(d => d.chave === 'meta_instagram')?.valor ?? null
-  const messenger    = configs?.find(d => d.chave === 'meta_messenger')?.valor ?? null
+  const instagram    = (configs?.find(d => d.chave === 'meta_instagram')?.valor ?? null) as MetaConfig | null
+  const messenger    = (configs?.find(d => d.chave === 'meta_messenger')?.valor ?? null) as MetaConfig | null
   const dadosLoja    = configs?.find(d => d.chave === 'dados_loja')?.valor ?? null
   const preferencias = configs?.find(d => d.chave === 'preferencias')?.valor ?? null
 

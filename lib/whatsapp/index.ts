@@ -10,7 +10,7 @@ async function getConfig<T>(chave: string): Promise<T | null> {
     .select('valor')
     .eq('chave', chave)
     .single()
-  return data?.valor ?? null
+  return (data?.valor ?? null) as T | null
 }
 
 export async function getActiveProvider(): Promise<WhatsAppProvider | null> {

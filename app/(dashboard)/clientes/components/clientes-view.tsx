@@ -27,7 +27,7 @@ interface Cliente {
   profissao: string | null
   nacionalidade: string | null
   ativo: boolean | null
-  created_at: string
+  created_at: string | null
   total_vendas?: number
   valor_total?: number
   ultima_compra?: string | null

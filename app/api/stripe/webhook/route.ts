@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import Stripe from 'stripe'
+import type { Json } from '@/types/database'
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
       id: event.id,
       tipo: event.type,
       empresa_id: null,
-      payload: event.data.object as unknown as Record<string, unknown>,
+      payload: event.data.object as unknown as Json,
     })
 
     return NextResponse.json({ ok: true })
