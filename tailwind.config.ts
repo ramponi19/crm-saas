@@ -30,7 +30,7 @@ const config: Config = {
       },
       backgroundImage: {
         'hero-gradient':
-          'radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.14), transparent 52%), linear-gradient(135deg, #EEF1F5 0%, #E8ECF2 55%, #DFE5ED 100%)',
+          'radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.24), transparent 52%), linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%)',
         'sidebar-gradient':
           'linear-gradient(180deg, #FFFFFF 0%, #F4F6F9 100%)',
       },
