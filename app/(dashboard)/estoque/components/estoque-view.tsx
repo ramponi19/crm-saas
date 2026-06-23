@@ -121,17 +121,17 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
   ]
 
   return (
-    <div className="flex flex-col h-full bg-[#070E18] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       <Topbar eyebrow="Catálogo · Controle de Unidades" title="Estoque" />
 
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
+        <div className="flex items-center gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[12px] w-fit">
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
-                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
               {t.icon}{t.label}
             </button>
           ))}
@@ -147,18 +147,18 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
                 { icon: <Clock size={20}/>, label: 'Reservadas', value: stats.reservados, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
                 { icon: <Wrench size={20}/>, label: 'Em reparo', value: stats.reparo, color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
               ].map((c, i) => (
-                <div key={i} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-5 flex items-center gap-4">
+                <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
                   <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>{c.icon}</div>
                   <div>
-                    <div className="text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em]">{c.label}</div>
-                    <div className="text-[26px] font-serif text-[#F4F6F9] leading-none mt-1">{c.value}</div>
+                    <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em]">{c.label}</div>
+                    <div className="text-[26px] font-serif text-[#16212E] leading-none mt-1">{c.value}</div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] p-6 space-y-4">
-              <div className="text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.12em]">Distribuição por Status</div>
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6 space-y-4">
+              <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.12em]">Distribuição por Status</div>
               {[
                 { label: 'Disponíveis', count: stats.disponiveis, color: '#22C55E' },
                 { label: 'Reservadas',  count: stats.reservados,  color: '#F59E0B' },
@@ -166,12 +166,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
                 { label: 'Vendidas (total)', count: stats.vendidos, color: '#5C6E84' },
               ].map(r => (
                 <div key={r.label} className="flex items-center gap-4">
-                  <div className="w-32 text-[13px] text-[#8A9BB0]">{r.label}</div>
+                  <div className="w-32 text-[13px] text-[#788698]">{r.label}</div>
                   <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700"
                       style={{ width: stats.total ? `${(r.count / stats.total) * 100}%` : '0%', background: r.color }} />
                   </div>
-                  <div className="w-8 text-[13px] text-[#C4CCD6] font-semibold text-right">{r.count}</div>
+                  <div className="w-8 text-[13px] text-[#16212E] font-semibold text-right">{r.count}</div>
                 </div>
               ))}
             </div>
@@ -186,14 +186,14 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#46586E]" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Buscar por IMEI, número de série..."
-                  className="w-full bg-[#0C1828] border border-white/[0.08] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
+                  className="w-full bg-white border border-[#16212E]/[0.10] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
               </div>
 
-              <div className="flex gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[11px]">
+              <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
                 {['todos','disponivel','reservado','assistencia','vendido'].map(s => (
                   <button key={s} onClick={() => setFiltroStatus(s)}
                     className={cn('px-3 py-1.5 rounded-[8px] text-[12px] font-medium capitalize transition-all',
-                      filtroStatus === s ? 'bg-[#E03037] text-white font-bold' : 'text-[#8A9BB0] hover:text-[#D4DEEA]')}>
+                      filtroStatus === s ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}>
                     {s === 'todos' ? 'Todos' : STATUS_STYLE[s]?.label ?? s}
                   </button>
                 ))}
@@ -201,7 +201,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
 
               {marcasUnicas.length > 0 && (
                 <select value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}
-                  className="bg-[#0C1828] border border-white/[0.08] rounded-[11px] px-3 py-2.5 text-[13px] text-[#8A9BB0] outline-none">
+                  className="bg-white border border-[#16212E]/[0.10] rounded-[11px] px-3 py-2.5 text-[13px] text-[#788698] outline-none">
                   <option value="todas">Todas as marcas</option>
                   {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
@@ -214,8 +214,8 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
               </button>
             </div>
 
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
-              <div className="grid px-5 py-3 border-b border-white/[0.06]"
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+              <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
                 style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
                 {['Produto','IMEI','Condição','Bateria','Variante','Custo','Venda','Status'].map(h => (
                   <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
@@ -223,7 +223,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
               </div>
 
               {filtrados.length === 0 ? (
-                <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma unidade encontrada</div>
+                <div className="py-14 text-center text-[#788698] text-[13px]">Nenhuma unidade encontrada</div>
               ) : filtrados.map(u => {
                 const cond = CONDICAO_STYLE[u.condicao ?? 'novo'] ?? CONDICAO_STYLE.novo
                 const st = STATUS_STYLE[u.status ?? 'disponivel'] ?? STATUS_STYLE.disponivel
@@ -231,22 +231,22 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
                 const variante = [u.cor, u.armazenamento].filter(Boolean).join(' · ') || '—'
                 return (
                   <div key={u.id} onClick={() => { setUnidadeSel(u); setModalOpen(true) }}
-                    className="grid px-5 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors items-center"
+                    className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors items-center"
                     style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
                     <div className="min-w-0">
-                      <div className="text-[13.5px] font-semibold text-[#E9EEF4] truncate">{u.produto_nome}</div>
+                      <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{u.produto_nome}</div>
                       <div className="text-[11.5px] text-[#6B7C92]">{u.marca_nome}</div>
                     </div>
-                    <div className="text-[12.5px] text-[#8A9BB0] font-mono">{imeiMask}</div>
+                    <div className="text-[12.5px] text-[#788698] font-mono">{imeiMask}</div>
                     <div>
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span>
                     </div>
                     <div className="text-[13px] font-semibold" style={{ color: Number(u.bateria) >= 90 ? '#22C55E' : Number(u.bateria) >= 80 ? '#F59E0B' : '#F0353D' }}>
                       {u.bateria ? `${u.bateria}%` : '—'}
                     </div>
-                    <div className="text-[12.5px] text-[#8A9BB0] truncate">{variante}</div>
-                    <div className="text-[13px] text-[#8A9BB0]">{u.preco_custo ? fmt(u.preco_custo) : '—'}</div>
-                    <div className="text-[13.5px] font-bold text-[#F4F6F9]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
+                    <div className="text-[12.5px] text-[#788698] truncate">{variante}</div>
+                    <div className="text-[13px] text-[#788698]">{u.preco_custo ? fmt(u.preco_custo) : '—'}</div>
+                    <div className="text-[13.5px] font-bold text-[#16212E]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
                     <div>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: st.bg, color: st.color }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />
@@ -263,14 +263,14 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
         {/* ── ENTRADA ── */}
         {tab === 'entrada' && (
           <div className="max-w-[700px]">
-            <div className="bg-[#0C1828] border border-white/[0.06] rounded-[20px] overflow-hidden">
-              <div className="flex items-center gap-4 px-6 py-5 border-b border-white/[0.06]">
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] overflow-hidden">
+              <div className="flex items-center gap-4 px-6 py-5 border-b border-[#16212E]/[0.08]">
                 <div className="w-10 h-10 rounded-[12px] bg-[rgba(215,40,47,0.15)] flex items-center justify-center">
                   <ArrowDownLeft size={18} className="text-[#F0353D]" />
                 </div>
                 <div>
-                  <div className="text-[16px] font-serif text-[#F4F6F9]">Nova entrada de unidade</div>
-                  <div className="text-[12px] text-[#5C6E84]">Cadastre uma unidade física no estoque por IMEI / número de série</div>
+                  <div className="text-[16px] font-serif text-[#16212E]">Nova entrada de unidade</div>
+                  <div className="text-[12px] text-[#788698]">Cadastre uma unidade física no estoque por IMEI / número de série</div>
                 </div>
               </div>
               <div className="px-6 py-5">
@@ -289,29 +289,29 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, c
 
         {/* ── HISTÓRICO ── */}
         {tab === 'historico' && (
-          <div className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] overflow-hidden">
-            <div className="grid px-5 py-3 border-b border-white/[0.06]"
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+            <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
               style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
               {['Data','Movimento','Produto','Qtd','Responsável','Reservação'].map(h => (
                 <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
               ))}
             </div>
             {movimentacoes.length === 0 ? (
-              <div className="py-14 text-center text-[#5C6E84] text-[13px]">Nenhuma movimentação registrada</div>
+              <div className="py-14 text-center text-[#788698] text-[13px]">Nenhuma movimentação registrada</div>
             ) : movimentacoes.map(m => {
               const tipo = TIPO_STYLE[m.tipo_movimento] ?? { label: m.tipo_movimento, color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' }
               return (
-                <div key={m.id} className="grid px-5 py-3.5 border-b border-white/[0.04] items-center"
+                <div key={m.id} className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] items-center"
                   style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
-                  <div className="text-[12.5px] text-[#8A9BB0] font-mono">{fmtDate(m.created_at)}</div>
+                  <div className="text-[12.5px] text-[#788698] font-mono">{fmtDate(m.created_at)}</div>
                   <div>
                     <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: tipo.bg, color: tipo.color }}>{tipo.label}</span>
                   </div>
-                  <div className="text-[13px] font-semibold text-[#E9EEF4] truncate">{m.produto_nome}</div>
+                  <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{m.produto_nome}</div>
                   <div className="text-[13px] font-semibold" style={{ color: m.quantidade > 0 ? '#22C55E' : '#F0353D' }}>
                     {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
                   </div>
-                  <div className="text-[13px] text-[#8A9BB0]">{m.usuario_nome ?? '—'}</div>
+                  <div className="text-[13px] text-[#788698]">{m.usuario_nome ?? '—'}</div>
                   <div className="text-[12.5px] text-[#6B7C92] truncate">{m.observacoes ?? '—'}</div>
                 </div>
               )
@@ -372,20 +372,20 @@ function UnidadeInlineForm({ produtos, onSaved }: {
 
   const field = (label: string, node: React.ReactNode) => (
     <div>
-      <label className="block text-[10.5px] font-mono text-[#5C6E84] uppercase tracking-[0.12em] mb-1.5">{label}</label>
+      <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">{label}</label>
       {node}
     </div>
   )
   const inp = (k: string, placeholder?: string, type = 'text') => (
     <input type={type} value={(form as any)[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder}
-      className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]" />
+      className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]" />
   )
   const btnGroup = (k: string, opts: { v: string; label: string }[]) => (
     <div className="flex gap-2 flex-wrap">
       {opts.map(o => (
         <button key={o.v} type="button" onClick={() => set(k, o.v)}
           className={cn('px-4 py-2 rounded-[9px] text-[12.5px] font-medium transition-all border',
-            (form as any)[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#8A9BB0] border-white/[0.08] hover:border-white/[0.2]')}>
+            (form as any)[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
           {o.label}
         </button>
       ))}
@@ -396,7 +396,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
     <div className="space-y-5">
       {field('Produto (Catálogo) *',
         <select value={form.produto_id} onChange={e => set('produto_id', e.target.value)}
-          className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] outline-none">
+          className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] outline-none">
           <option value="">Buscar modelo no catálogo...</option>
           {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
         </select>
@@ -410,7 +410,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
       <div className="grid grid-cols-2 gap-5">
         {field('Estado *',
           <select value={form.estado} onChange={e => set('estado', e.target.value)}
-            className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] outline-none">
+            className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] outline-none">
             {['lacrado','excelente','bom','regular'].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase()+v.slice(1)}</option>)}
           </select>
         )}
@@ -434,9 +434,9 @@ function UnidadeInlineForm({ produtos, onSaved }: {
 
       <div className="grid grid-cols-2 gap-5">
         {field('Custo Total (Auto)',
-          <div className="w-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[#22C55E]">
+          <div className="w-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[#15986A]">
             {custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            {margem && <span className="ml-2 text-[11px] text-[#22C55E]/70">· margem {margem}%</span>}
+            {margem && <span className="ml-2 text-[11px] text-[#15986A]/70">· margem {margem}%</span>}
           </div>
         )}
         {field('Preço de Venda *', inp('preco_venda', 'R$ 0,00', 'number'))}
@@ -446,7 +446,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
         <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)}
           placeholder="Detalhes da unidade, acessórios inclusos, avarias..."
           rows={3}
-          className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-[13px] text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none" />
+          className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] resize-none" />
       )}
 
       <div className="flex justify-end pt-2">
