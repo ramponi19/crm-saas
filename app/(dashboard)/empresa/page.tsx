@@ -152,7 +152,7 @@ export default function EmpresaConfigPage() {
           {(aba === 'visual') && (
             <>
               <div>
-                <label className="block text-xs font-medium text-[#8A9BB0] mb-2">Cor primária</label>
+                <label className="block text-xs font-medium text-[#788698] mb-2">Cor primária</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
@@ -163,19 +163,19 @@ export default function EmpresaConfigPage() {
                   <input
                     value={form.wl_cor}
                     onChange={e => setForm(f => ({ ...f, wl_cor: e.target.value }))}
-                    className="flex-1 bg-[#0C1828] border border-white/[0.06] rounded-[10px] px-4 py-2.5 text-sm text-[#56657A] outline-none font-mono"
+                    className="flex-1 bg-white border border-[#16212E]/[0.08] rounded-[10px] px-4 py-2.5 text-sm text-[#788698] outline-none font-mono"
                   />
                   <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-xs font-bold"
                     style={{ background: form.wl_cor }}>A</div>
                 </div>
-                <p className="text-xs text-[#3F516A] mt-1.5">Aplicada em botões, destaques e ícones do sistema.</p>
+                <p className="text-xs text-[#9FB0C2] mt-1.5">Aplicada em botões, destaques e ícones do sistema.</p>
               </div>
               <Campo label="URL do logo (PNG ou SVG)" value={form.wl_logo_url}
                 onChange={v => setForm(f => ({ ...f, wl_logo_url: v }))}
                 placeholder="https://suaempresa.com/logo.png" />
               {form.wl_logo_url && (
-                <div className="p-4 bg-[#0C1828] border border-white/[0.06] rounded-[12px]">
-                  <p className="text-xs text-[#8A9BB0] mb-2">Preview do logo:</p>
+                <div className="p-4 bg-white border border-[#16212E]/[0.08] rounded-[12px]">
+                  <p className="text-xs text-[#788698] mb-2">Preview do logo:</p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={form.wl_logo_url} alt="Logo preview" className="h-10 object-contain" />
                 </div>
@@ -185,23 +185,23 @@ export default function EmpresaConfigPage() {
 
           {(aba === 'plano') && (
             <div className="space-y-4">
-              <div className="p-5 bg-[#0C1828] border border-white/[0.06] rounded-[16px]">
+              <div className="p-5 bg-white border border-[#16212E]/[0.08] rounded-[16px]">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="text-xs text-[#8A9BB0]">Plano atual</p>
+                    <p className="text-xs text-[#788698]">Plano atual</p>
                     <p className="text-lg font-bold text-white flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full inline-block" style={{ background: planoAtual.cor }} />
                       {planoAtual.nome}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-[#8A9BB0]">{planoAtual.preco}</p>
+                  <p className="text-sm font-semibold text-[#788698]">{planoAtual.preco}</p>
                 </div>
                 {emTrial && (
                   <div className="p-3 bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.2)] rounded-[10px]">
                     <p className="text-xs text-[#FBBF24]">✨ Trial gratuito — {diasTrial} dia{diasTrial !== 1 ? 's' : ''} restante{diasTrial !== 1 ? 's' : ''}</p>
                   </div>
                 )}
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#8A9BB0]">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#788698]">
                   <span>👥 Até {planoAtual.usuarios === 999 ? 'ilimitados' : planoAtual.usuarios} usuário{planoAtual.usuarios !== 1 ? 's' : ''}</span>
                   <span>📋 Até {planoAtual.leads === 99999 ? 'ilimitados' : planoAtual.leads} leads</span>
                 </div>
@@ -209,7 +209,7 @@ export default function EmpresaConfigPage() {
               {empresa?.plano !== 'pro' && (
                 <div className="p-5 bg-[rgba(215,40,47,0.05)] border border-[rgba(215,40,47,0.15)] rounded-[16px]">
                   <p className="text-sm font-semibold text-white mb-1">Fazer upgrade</p>
-                  <p className="text-xs text-[#8A9BB0] mb-4">Desbloqueie mais usuários, leads ilimitados e white-label completo.</p>
+                  <p className="text-xs text-[#788698] mb-4">Desbloqueie mais usuários, leads ilimitados e white-label completo.</p>
                   <a href="https://wa.me/5519999999999?text=Quero+fazer+upgrade+do+meu+plano"
                     target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 bg-[#D7282F] text-white text-sm font-semibold px-4 py-2 rounded-[10px] hover:bg-[#B91C1C] transition-colors">
@@ -223,17 +223,17 @@ export default function EmpresaConfigPage() {
           {(aba === 'equipe') && (
             <div className="space-y-3">
               {membros.length === 0 ? (
-                <p className="text-sm text-[#8A9BB0]">Nenhum membro encontrado.</p>
+                <p className="text-sm text-[#788698]">Nenhum membro encontrado.</p>
               ) : membros.map(m => (
-                <div key={m.usuario_id} className="flex items-center justify-between p-4 bg-[#0C1828] border border-white/[0.06] rounded-[12px]">
+                <div key={m.usuario_id} className="flex items-center justify-between p-4 bg-white border border-[#16212E]/[0.08] rounded-[12px]">
                   <div>
-                    <p className="text-sm font-semibold text-[#1F2A39]">{getNomeUsuario(m)}</p>
-                    <p className="text-xs text-[#8A9BB0]">{getEmailUsuario(m)}</p>
+                    <p className="text-sm font-semibold text-[#16212E]">{getNomeUsuario(m)}</p>
+                    <p className="text-xs text-[#788698]">{getEmailUsuario(m)}</p>
                   </div>
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#16212E]/[0.04] text-[#8A9BB0] capitalize">{m.role}</span>
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#16212E]/[0.04] text-[#788698] capitalize">{m.role}</span>
                 </div>
               ))}
-              <p className="text-xs text-[#3F516A] pt-2">
+              <p className="text-xs text-[#9FB0C2] pt-2">
                 {membros.length}/{planoAtual.usuarios === 999 ? '∞' : planoAtual.usuarios} usuários no plano {planoAtual.nome}.
                 {empresa?.plano !== 'pro' && ' Faça upgrade para adicionar mais.'}
               </p>
@@ -258,9 +258,9 @@ function Campo({ label, value, onChange, placeholder }: {
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-[#8A9BB0] mb-1.5">{label}</label>
+      <label className="block text-xs font-medium text-[#788698] mb-1.5">{label}</label>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full bg-[#0C1828] border border-white/[0.06] rounded-[10px] px-4 py-2.5 text-sm text-[#56657A] placeholder:text-[#3F516A] outline-none focus:border-white/[0.06] transition-colors" />
+        className="w-full bg-white border border-[#16212E]/[0.08] rounded-[10px] px-4 py-2.5 text-sm text-[#788698] placeholder:text-[#9FB0C2] outline-none focus:border-[#16212E]/[0.08] transition-colors" />
     </div>
   )
 }
