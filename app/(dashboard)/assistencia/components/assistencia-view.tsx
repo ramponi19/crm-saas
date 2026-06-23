@@ -91,7 +91,7 @@ export default function AssistenciaView({ ordens }: Props) {
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
         {STATS.map(s => (
           <div key={s.label} className="bg-[#0C1828] border border-white/[0.06] rounded-[16px] px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"}>{s.icon}</div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0">{s.icon}</div>
             <div>
               <div className="text-2xl font-normal text-[#F4F6F9] leading-none">{s.value}</div>
               <div className="text-[11px] text-[#8A9BB0] mt-1">{s.label}</div>
