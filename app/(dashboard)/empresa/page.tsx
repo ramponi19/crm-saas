@@ -106,10 +106,10 @@ export default function EmpresaConfigPage() {
   ]
 
   const planoAtual = PLANOS.find(p => p.id === empresa?.plano) ?? PLANOS[0]
-  const emTrial    = empresa?.em_trial ?? false
-  const diasTrial  = empresa?.trial_termina_em
-    ? Math.max(0, Math.ceil((new Date(empresa.trial_termina_em).getTime() - Date.now()) / 86400000))
+  const diasTrial  = empresa?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000))
     : 0
+  const emTrial    = diasTrial > 0
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
