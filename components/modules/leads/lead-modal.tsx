@@ -177,22 +177,22 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
   }
 
   const labelCls = "font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block"
-  const inputCls = "w-full bg-white/[0.04] border border-white/[0.08] rounded-[9px] px-[11px] py-[9px] text-[13px] text-[#E9EEF4] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors box-border"
+  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[9px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors box-border"
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-[80] flex items-center justify-center p-6"
       style={{ background: 'rgba(5,9,16,0.62)' }}>
       <div onClick={e => e.stopPropagation()}
         className="w-[1000px] max-w-[96vw] h-[620px] max-h-[90vh] flex flex-col rounded-[18px] overflow-hidden"
-        style={{ background: '#0E1A2C', border: '1px solid rgba(255,255,255,0.08)',
+        style={{ background: '#FFFFFF', border: '1px solid rgba(22,32,46,0.08)',
           boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'popIn 0.3s ease' }}>
 
         {/* Header */}
-        <div className="flex items-center gap-3 px-[22px] py-4 border-b border-white/[0.07] flex-wrap">
+        <div className="flex items-center gap-3 px-[22px] py-4 border-b border-[#16212E]/[0.08] flex-wrap">
           <div className="w-[40px] h-[40px] rounded-[11px] bg-white/[0.06] flex items-center justify-center flex-none">
             <UserRound size={22} className="text-[#9FB0C2]" />
           </div>
-          <h3 className="font-serif font-medium text-[20px] text-[#F4F6F9]">{form.nome || 'Lead'}</h3>
+          <h3 className="font-serif font-medium text-[20px] text-[#16212E]">{form.nome || 'Lead'}</h3>
           <span className="font-mono text-[10px] tracking-[0.1em] text-[#34D399] bg-[rgba(52,211,153,0.13)] px-[10px] py-1 rounded-full">
             {canalNome}
           </span>
@@ -202,11 +202,11 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
             <UserCheck size={15} /> Converter em cliente
           </button>
           <button onClick={handleDelete} disabled={saving}
-            className="flex items-center gap-[7px] px-[14px] py-2 rounded-[10px] bg-[rgba(215,40,47,0.14)] text-[#F0656B] text-[12.5px] font-semibold hover:bg-[rgba(215,40,47,0.22)] transition-colors">
+            className="flex items-center gap-[7px] px-[14px] py-2 rounded-[10px] bg-[rgba(215,40,47,0.14)] text-[#C01F26] text-[12.5px] font-semibold hover:bg-[rgba(215,40,47,0.22)] transition-colors">
             <Trash2 size={15} /> Excluir
           </button>
           <button onClick={onClose}
-            className="w-[34px] h-[34px] rounded-[9px] bg-white/[0.05] border border-white/[0.08] text-[#9FB0C2] flex items-center justify-center hover:bg-white/[0.1] transition-colors">
+            className="w-[34px] h-[34px] rounded-[9px] bg-white/[0.05] border border-[#16212E]/[0.10] text-[#9FB0C2] flex items-center justify-center hover:bg-[#16212E]/[0.04] transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -215,7 +215,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
         <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: '330px 1fr' }}>
 
           {/* Coluna esquerda — form */}
-          <div className="p-[20px_22px] overflow-y-auto scrollbar-thin border-r border-white/[0.07] flex flex-col gap-[13px]">
+          <div className="p-[20px_22px] overflow-y-auto scrollbar-thin border-r border-[#16212E]/[0.08] flex flex-col gap-[13px]">
             <div><label className={labelCls}>Nome</label>
               <input value={form.nome} onChange={e => set('nome', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Telefone / WhatsApp</label>
@@ -228,12 +228,12 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
               <input value={form.canal} onChange={e => set('canal', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Status no funil</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} className={`${inputCls} cursor-pointer`}>
-                {KANBAN_COLUMNS.map(c => <option key={c.id} style={{ background: '#0E1A2C' }}>{c.label}</option>)}
+                {KANBAN_COLUMNS.map(c => <option key={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
               </select></div>
             <div><label className={labelCls}>Responsável</label>
               <select value={form.responsavel} onChange={e => set('responsavel', e.target.value)} className={`${inputCls} cursor-pointer`}>
-                <option value="" style={{ background: '#0E1A2C' }}>Sem responsável</option>
-                {usuarios.map(u => <option key={u.id} style={{ background: '#0E1A2C' }}>{u.nome}</option>)}
+                <option value="" style={{ background: '#FFFFFF' }}>Sem responsável</option>
+                {usuarios.map(u => <option key={u.id} style={{ background: '#FFFFFF' }}>{u.nome}</option>)}
               </select></div>
             <div><label className={labelCls}>Observações</label>
               <textarea value={form.obs} onChange={e => set('obs', e.target.value)} rows={3}
@@ -246,17 +246,17 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
           {/* Coluna direita — chat */}
           <div className="flex flex-col overflow-hidden">
-            <div className="px-5 py-[14px] font-mono text-[10px] tracking-[0.14em] text-[#6B7C92] border-b border-white/[0.05]">
+            <div className="px-5 py-[14px] font-mono text-[10px] tracking-[0.14em] text-[#6B7C92] border-b border-[#16212E]/[0.07]">
               HISTÓRICO DE MENSAGENS
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-[18px_20px] flex flex-col gap-[10px]" style={{ background: 'rgba(0,0,0,0.18)' }}>
               {loadingChat ? (
-                <div className="flex items-center justify-center h-full text-[#5C6E84] text-[13px]">Carregando mensagens…</div>
+                <div className="flex items-center justify-center h-full text-[#788698] text-[13px]">Carregando mensagens…</div>
               ) : chat.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center text-[#5C6E84] gap-2 py-10">
+                <div className="flex flex-col items-center justify-center h-full text-center text-[#788698] gap-2 py-10">
                   <Send size={28} className="opacity-30" />
                   <p className="text-[13px]">Nenhuma mensagem ainda.</p>
-                  <p className="text-[11.5px] text-[#4F6178]">As conversas deste canal aparecerão aqui.</p>
+                  <p className="text-[11.5px] text-[#9AA7B6]">As conversas deste canal aparecerão aqui.</p>
                 </div>
               ) : chat.map((m, i) => {
                 const isLoja = m.from === 'loja'
@@ -264,7 +264,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
                   <div key={i} className={`flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
                     <div className="max-w-[72%] px-[14px] py-[10px] rounded-[14px] text-[13px]"
                       style={{
-                        background: isLoja ? 'linear-gradient(180deg,#E03037,#C01F26)' : 'rgba(255,255,255,0.06)',
+                        background: isLoja ? 'linear-gradient(180deg,#E03037,#C01F26)' : 'rgba(22,32,46,0.06)',
                         color: isLoja ? '#fff' : '#E9EEF4',
                         borderBottomRightRadius: isLoja ? 4 : 14,
                         borderBottomLeftRadius: isLoja ? 14 : 4,
@@ -277,11 +277,11 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
               })}
               <div ref={chatEndRef} />
             </div>
-            <div className="flex gap-2 px-5 py-[14px] border-t border-white/[0.06]">
+            <div className="flex gap-2 px-5 py-[14px] border-t border-[#16212E]/[0.08]">
               <input value={draft} onChange={e => setDraft(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMsg()}
                 placeholder="Digite uma mensagem…"
-                className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-[11px] px-[13px] py-[11px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] min-w-0" />
+                className="flex-1 bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[11px] px-[13px] py-[11px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] min-w-0" />
               <button onClick={sendMsg}
                 className="w-[46px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white flex items-center justify-center flex-none hover:-translate-y-[1px] transition-all">
                 <Send size={18} />
