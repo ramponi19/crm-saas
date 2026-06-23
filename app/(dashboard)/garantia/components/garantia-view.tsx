@@ -121,13 +121,15 @@ export default function GarantiaView({ garantias }: Props) {
 
       {/* Filtros + botão */}
       <div className="flex items-center justify-between px-6 pb-4 shrink-0">
-        <div className="flex items-center gap-1 p-1 bg-[#0C1828] border border-white/[0.06] rounded-[12px] w-fit">
+        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
           {FILTROS.map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key)}
-              className={cn('px-4 py-2 rounded-[8px] text-sm font-medium transition-all', filtro === f.key
-                ? 'text-[#C01F26]'
-                : 'text-[#8A9BB0] hover:text-[#8A9BB0]')} : { backgroundColor: 'rgba(255,255,255,0.04)' }}
-            >
+              className={cn(
+                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
+                filtro === f.key
+                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
+              )}>
               {f.label}
             </button>
           ))}
