@@ -52,7 +52,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
     toast.success('Lead criado'); onCreate(data as Lead); setLoading(false)
   }
 
-  const inputCls = "w-full bg-white/[0.04] border border-white/[0.1] rounded-[10px] px-3 py-[10px] text-[13px] text-[#E9EEF4] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors"
+  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors"
   const labelCls = "font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block"
 
   return (
@@ -61,7 +61,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
       <div onClick={e => e.stopPropagation()}
         className="w-[480px] max-w-[94vw] max-h-[90vh] overflow-y-auto scrollbar-thin p-6 rounded-[18px]"
         style={{
-          background: '#0E1A2C', border: '1px solid rgba(255,255,255,0.08)',
+          background: '#FFFFFF', border: '1px solid rgba(22,32,46,0.08)',
           boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'popIn 0.3s ease',
         }}>
 
@@ -72,12 +72,12 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
               <UserPlus size={22} className="text-white" />
             </div>
             <div>
-              <h3 className="font-serif font-medium text-[21px] text-[#F4F6F9]">Novo lead</h3>
+              <h3 className="font-serif font-medium text-[21px] text-[#16212E]">Novo lead</h3>
               <div className="text-[12.5px] text-[#7E8EA2] mt-[2px]">Cadastre um novo contato no funil</div>
             </div>
           </div>
           <button onClick={onClose}
-            className="w-[34px] h-[34px] rounded-[9px] bg-white/[0.05] border border-white/[0.08] text-[#9FB0C2] flex items-center justify-center flex-none hover:bg-white/[0.1] transition-colors">
+            className="w-[34px] h-[34px] rounded-[9px] bg-white/[0.05] border border-[#16212E]/[0.10] text-[#9FB0C2] flex items-center justify-center flex-none hover:bg-[#16212E]/[0.04] transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -103,15 +103,15 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
             <label className={labelCls}>Origem</label>
             <select value={form.origem} onChange={e => set('origem', e.target.value)}
               className={`${inputCls} cursor-pointer`}>
-              <option value="" style={{ background: '#0E1A2C' }}>Selecionar</option>
-              {ORIGENS.map(o => <option key={o.value} value={o.value} style={{ background: '#0E1A2C' }}>{o.label}</option>)}
+              <option value="" style={{ background: '#FFFFFF' }}>Selecionar</option>
+              {ORIGENS.map(o => <option key={o.value} value={o.value} style={{ background: '#FFFFFF' }}>{o.label}</option>)}
             </select>
           </div>
           <div>
             <label className={labelCls}>Status inicial</label>
             <select value={form.kanban_status} onChange={e => set('kanban_status', e.target.value)}
               className={`${inputCls} cursor-pointer`}>
-              {KANBAN_COLUMNS.map(c => <option key={c.id} value={c.id} style={{ background: '#0E1A2C' }}>{c.label}</option>)}
+              {KANBAN_COLUMNS.map(c => <option key={c.id} value={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
             </select>
           </div>
           <div>
@@ -128,8 +128,8 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
             <label className={labelCls}>Responsável</label>
             <select value={form.responsavel_id} onChange={e => set('responsavel_id', e.target.value)}
               className={`${inputCls} cursor-pointer`}>
-              <option value="" style={{ background: '#0E1A2C' }}>Sem responsável</option>
-              {usuarios.map(u => <option key={u.id} value={u.id} style={{ background: '#0E1A2C' }}>{u.nome}</option>)}
+              <option value="" style={{ background: '#FFFFFF' }}>Sem responsável</option>
+              {usuarios.map(u => <option key={u.id} value={u.id} style={{ background: '#FFFFFF' }}>{u.nome}</option>)}
             </select>
           </div>
           <div className="col-span-2">
@@ -142,7 +142,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
         {/* Footer */}
         <div className="flex gap-3 mt-6">
           <button onClick={onClose}
-            className="flex-1 py-[11px] rounded-[11px] border border-white/[0.1] bg-white/[0.04] text-[#C4CCD6] font-semibold text-[13.5px] hover:bg-white/[0.08] transition-colors">
+            className="flex-1 py-[11px] rounded-[11px] border border-[#16212E]/[0.10] bg-white/[0.04] text-[#16212E] font-semibold text-[13.5px] hover:bg-[#16212E]/[0.06] transition-colors">
             Cancelar
           </button>
           <button onClick={handleSubmit} disabled={loading || !form.nome.trim()}
