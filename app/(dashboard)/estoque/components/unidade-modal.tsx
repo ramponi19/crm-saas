@@ -94,24 +94,24 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
 
   const Input = ({ label, field, placeholder, type = 'text' }: { label: string; field: keyof Unidade; placeholder?: string; type?: string }) => (
     <div>
-      <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">{label}</label>
+      <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">{label}</label>
       <input
         type={type}
         value={(form[field] as string) ?? ''}
         onChange={e => set(field, e.target.value || null)}
         placeholder={placeholder}
-        className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] transition-colors"
+        className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] transition-colors"
       />
     </div>
   )
 
   const Sel = ({ label, field, options }: { label: string; field: keyof Unidade; options: { value: string; label: string }[] }) => (
     <div>
-      <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">{label}</label>
+      <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">{label}</label>
       <select
         value={(form[field] as string) ?? ''}
         onChange={e => set(field, e.target.value || null)}
-        className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2] transition-colors"
+        className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2] transition-colors"
       >
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -119,26 +119,26 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[600px] max-h-[88vh] bg-[#0D1824] border border-white/[0.08] rounded-[20px] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div className="w-[600px] max-h-[88vh] bg-[#F0F2F5] border border-[#16212E]/[0.10] rounded-[20px] flex flex-col overflow-hidden shadow-2xl">
 
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08] shrink-0">
           <div>
-            <h2 className="text-base font-bold text-[#F4F6F9]">{isNew ? 'Adicionar Unidade' : 'Editar Unidade'}</h2>
-            {!isNew && <p className="text-xs text-[#5C6E84] mt-0.5">ID #{unidade?.id}</p>}
+            <h2 className="text-base font-bold text-[#16212E]">{isNew ? 'Adicionar Unidade' : 'Editar Unidade'}</h2>
+            {!isNew && <p className="text-xs text-[#788698] mt-0.5">ID #{unidade?.id}</p>}
           </div>
-          <button onClick={onClose} className="text-[#5C6E84] hover:text-[#9FB0C2] transition-colors"><X size={20} /></button>
+          <button onClick={onClose} className="text-[#788698] hover:text-[#9FB0C2] transition-colors"><X size={20} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="grid grid-cols-2 gap-4">
             {/* Produto */}
             <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Produto *</label>
+              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Produto *</label>
               <select
                 value={form.produto_id ?? ''}
                 onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]"
+                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2]"
               >
                 <option value="">Selecionar produto...</option>
                 {produtos.map(p => (
@@ -182,36 +182,36 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
 
             {/* Preços */}
             <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Preço de Custo</label>
+              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Preço de Custo</label>
               <input
                 type="number"
                 value={form.preco_custo ?? ''}
                 onChange={e => set('preco_custo', e.target.value ? Number(e.target.value) : null)}
                 placeholder="0,00"
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">
+              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">
                 Preço de Venda
-                {margem && <span className="ml-2 text-[#22C55E] normal-case font-sans">{margem}% margem</span>}
+                {margem && <span className="ml-2 text-[#15986A] normal-case font-sans">{margem}% margem</span>}
               </label>
               <input
                 type="number"
                 value={form.preco_venda ?? ''}
                 onChange={e => set('preco_venda', e.target.value ? Number(e.target.value) : null)}
                 placeholder="0,00"
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2]"
+                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]"
               />
             </div>
 
             {/* Fornecedor */}
             <div>
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Fornecedor</label>
+              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Fornecedor</label>
               <select
                 value={form.fornecedor_id ?? ''}
                 onChange={e => set('fornecedor_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] outline-none focus:border-white/[0.2]"
+                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2]"
               >
                 <option value="">Nenhum</option>
                 {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
@@ -221,27 +221,27 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
             <Input label="Custo de Reparo" field="custo_reparo" type="number" placeholder="0,00" />
 
             <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#5C6E84] uppercase tracking-[0.1em] mb-1.5">Observações</label>
+              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Observações</label>
               <textarea
                 value={form.observacoes ?? ''}
                 onChange={e => set('observacoes', e.target.value || null)}
                 rows={3}
                 placeholder="Defeitos, histórico, detalhes..."
-                className="w-full bg-[#0A111E] border border-white/[0.08] rounded-[9px] px-3 py-2.5 text-sm text-[#D4DEEA] placeholder:text-[#3F516A] outline-none focus:border-white/[0.2] resize-none"
+                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] resize-none"
               />
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           {!isNew ? (
-            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#5C6E84] hover:text-[#F0353D] transition-colors">
+            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#F0353D] transition-colors">
               <Trash2 size={14} />
               Remover
             </button>
           ) : <div />}
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#5C6E84] hover:text-[#D4DEEA] transition-colors">
+            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#788698] hover:text-[#56657A] transition-colors">
               Cancelar
             </button>
             <button
