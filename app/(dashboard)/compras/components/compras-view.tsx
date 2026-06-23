@@ -50,13 +50,41 @@ function fmtData(d: string | null) {
 }
 
 const FORM_VAZIO = { nome_fantasia: '', razao_social: '', cnpj: '', contato: '', telefone: '', email: '' }
+const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor_total: '', data_pedido: '', observacoes: '', status: 'aberto' }
 
-export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }: Props) {
-  const [fornecedores, setFornecedores] = useState(fornecedoresInit)
+export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit }: Props) {
+  const [pedidos,        setPedidos]        = useState(pedidosInit)
+  const [fornecedores,   setFornecedores]   = useState(fornecedoresInit)
   const [modalFornecedor, setModalFornecedor] = useState(false)
-  const [form, setForm] = useState(FORM_VAZIO)
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [modalPedido,    setModalPedido]    = useState(false)
+  const [form,           setForm]           = useState(FORM_VAZIO)
+  const [formPedido,     setFormPedido]     = useState(PEDIDO_VAZIO)
+  const [salvando,       setSalvando]       = useState(false)
+  const [salvandoPedido, setSalvandoPedido] = useState(false)
+  const [erro,           setErro]           = useState<string | null>(null)
+  const [erroPedido,     setErroPedido]     = useState<string | null>(null)
+
+  async function salvarPedido() {
+    if (!formPedido.descricao.trim()) { setErroPedido('Descrição é obrigatória'); return }
+    setSalvandoPedido(true)
+    setErroPedido(null)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('pedidos_compra')
+      .insert({
+        descricao:     formPedido.descricao.trim(),
+        fornecedor_id: formPedido.fornecedor_id ? Number(formPedido.fornecedor_id) : null,
+        valor_total:   formPedido.valor_total ? parseFloat(formPedido.valor_total.replace(',', '.')) : null,
+        data_pedido:   formPedido.data_pedido || null,
+        observacoes:   formPedido.observacoes.trim() || null,
+        status:        formPedido.status,
+      })
+      .select('*, fornecedores(nome_fantasia, contato, telefone)')
+      .single()
+    if (error) { setErroPedido('Erro ao salvar. Tente novamente.') }
+    else { setPedidos(p => [data as Pedido, ...p]); setModalPedido(false); setFormPedido(PEDIDO_VAZIO) }
+    setSalvandoPedido(false)
+  }
 
   const stats = {
     abertos:    pedidos.filter(p => p.status === 'aberto').length,
@@ -131,7 +159,9 @@ export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }:
         <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
             <h2 className="text-base font-semibold text-[#1F2A39]">Pedidos de compra</h2>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
+            <button
+              onClick={() => { setFormPedido(PEDIDO_VAZIO); setErroPedido(null); setModalPedido(true) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
               <Plus size={13} /> Novo pedido
             </button>
           </div>
@@ -237,6 +267,71 @@ export default function ComprasView({ pedidos, fornecedores: fornecedoresInit }:
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60"
               >
                 {salvando ? 'Salvando...' : 'Salvar fornecedor'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal novo pedido */}
+      {modalPedido && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08]">
+              <h2 className="text-base font-bold text-[#1F2A39]">Novo pedido de compra</h2>
+              <button onClick={() => setModalPedido(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors"><X size={20} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
+                <input value={formPedido.descricao} onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
+                  placeholder="Ex: Reposição de estoque smartphones"
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Fornecedor</label>
+                <select value={formPedido.fornecedor_id} onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                  <option value="">— Selecionar —</option>
+                  {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Valor total (R$)</label>
+                  <input value={formPedido.valor_total} onChange={e => setFormPedido(f => ({ ...f, valor_total: e.target.value }))}
+                    placeholder="0,00"
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Data do pedido</label>
+                  <input type="date" value={formPedido.data_pedido} onChange={e => setFormPedido(f => ({ ...f, data_pedido: e.target.value }))}
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Status</label>
+                <select value={formPedido.status} onChange={e => setFormPedido(f => ({ ...f, status: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                  {Object.entries(STATUS_PEDIDO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Observações</label>
+                <textarea value={formPedido.observacoes} onChange={e => setFormPedido(f => ({ ...f, observacoes: e.target.value }))}
+                  rows={2} placeholder="Informações adicionais..."
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors resize-none" />
+              </div>
+              {erroPedido && <p className="text-xs text-[#D7282F]">{erroPedido}</p>}
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setModalPedido(false)}
+                className="flex-1 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors">
+                Cancelar
+              </button>
+              <button onClick={salvarPedido} disabled={salvandoPedido}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
+                {salvandoPedido ? 'Salvando...' : 'Criar pedido'}
               </button>
             </div>
           </div>
