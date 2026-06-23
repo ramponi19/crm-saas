@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 
 export const metadata = {
@@ -7,6 +8,20 @@ export const metadata = {
 
 export default async function LeadsPage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: vinculo } = await supabase
+    .from('empresa_usuarios')
+    .select('empresa_id')
+    .eq('usuario_id', user.id)
+    .eq('ativo', true)
+    .single()
+
+  if (!vinculo) redirect('/login')
+
+  const empresaId = vinculo.empresa_id
 
   const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }] = await Promise.all([
     supabase
@@ -17,16 +32,19 @@ export default async function LeadsPage() {
         primeira_msg, msgs_nao_lidas, ultima_tratativa,
         ultima_mensagem_at, produto_interessado, convertido_em
       `)
+      .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('ultima_mensagem_at', { ascending: false, nullsFirst: false }),
     supabase
       .from('usuarios')
       .select('id, nome, role')
+      .eq('empresa_id', empresaId)
       .order('nome'),
-    // Contagem real de não-lidas (recebidas e ainda não lidas)
+    // Contagem real de não-lidas — apenas leads desta empresa
     supabase
       .from('lead_mensagens')
-      .select('lead_id')
+      .select('lead_id, leads!inner(empresa_id)')
+      .eq('leads.empresa_id', empresaId)
       .eq('lida', false)
       .eq('direcao', 'recebida'),
   ])
