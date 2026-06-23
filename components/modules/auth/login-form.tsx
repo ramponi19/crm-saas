@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Mail, Lock, Check, Package, ShoppingCart, Users, BarChart2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -17,6 +17,13 @@ export function LoginForm() {
   const [showPw, setShowPw]     = useState(false)
   const [remember, setRemember] = useState(false)
   const [loading, setLoading]   = useState(false)
+
+  // Clear any leftover Supabase tokens from localStorage (from before this change)
+  useEffect(() => {
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('sb-')) localStorage.removeItem(k)
+    })
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
