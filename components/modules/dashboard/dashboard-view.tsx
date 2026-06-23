@@ -314,9 +314,15 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => {
-      const meta = data.user?.user_metadata
-      const name: string | undefined = meta?.full_name ?? meta?.name ?? meta?.display_name
-      if (name) setUserName(name.split(' ')[0])
+      const user = data.user
+      if (!user) return
+      const meta = user.user_metadata
+      const name: string | undefined = meta?.nome ?? meta?.full_name ?? meta?.name ?? meta?.display_name
+      if (name) {
+        setUserName(name.split(' ')[0])
+      } else if (user.email) {
+        setUserName(user.email.split('@')[0])
+      }
     })
   }, [])
 
