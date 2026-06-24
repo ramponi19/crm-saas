@@ -39,8 +39,9 @@ const EMPTY: Unidade = {
   estado: 'lacrado', custo_reparo: null,
 }
 
+const supabase = createClient()
+
 export default function UnidadeModal({ unidade, onClose }: Props) {
-  const supabase = createClient()
   const router = useRouter()
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })

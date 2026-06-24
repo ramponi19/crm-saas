@@ -137,7 +137,7 @@ export function Topbar({
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [router])
 
   // Fecha painel ao clicar fora
   useEffect(() => {

@@ -177,11 +177,12 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
 
 // ─── Aba Metas ────────────────────────────────────────────────────────────────
 
+const supabase = createClient()
+
 function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
   const [metas, setMetas] = useState<Record<string, Meta & { _dirty?: boolean }>>({})
   const [saving, setSaving] = useState<string | null>(null)
-  const supabase = createClient()
 
   const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 
@@ -310,7 +311,6 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
   const [metas, setMetas] = useState<Array<Meta & { empresa_id: number }>>([])
   const [pagas, setPagas] = useState<ComissaoPaga[]>([])
   const [quitando, setQuitando] = useState<string | null>(null)
-  const supabase = createClient()
 
   const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 

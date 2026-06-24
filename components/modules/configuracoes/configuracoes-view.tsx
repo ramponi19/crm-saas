@@ -59,8 +59,9 @@ const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeh
   ],
 }
 
+const supabase = createClient()
+
 export function ConfiguracoesView({ evolution, official, instagram, messenger, taxas }: Props) {
-  const supabase = createClient()
   const [aba, setAba]       = useState('integracoes')
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})

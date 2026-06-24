@@ -51,8 +51,9 @@ const STATUS_OPTIONS = [
   { value: 'reprovado', label: 'Reprovado' },
 ]
 
+const supabase = createClient()
+
 export default function OSModal({ os, isNew, onClose }: Props) {
-  const supabase = createClient()
   const router = useRouter()
   const [form, setForm] = useState<OS>(isNew ? EMPTY : { ...EMPTY, ...os })
   const [saving, setSaving] = useState(false)

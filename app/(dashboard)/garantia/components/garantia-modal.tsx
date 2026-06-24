@@ -61,8 +61,9 @@ const inputCls = [
 ].join(' ')
 const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
 
+const supabase = createClient()
+
 export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
-  const supabase = createClient()
   const router = useRouter()
   const [form, setForm] = useState<Garantia>(isNew ? EMPTY : { ...EMPTY, ...garantia })
   const [saving, setSaving] = useState(false)
