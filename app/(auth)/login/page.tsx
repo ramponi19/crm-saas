@@ -1,5 +1,4 @@
 import { LoginForm } from '@/components/modules/auth/login-form'
-import Image from 'next/image'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Entrar' }
@@ -30,29 +29,29 @@ export default function LoginPage() {
       />
 
       <div className="relative z-10 w-full max-w-[412px] flex flex-col items-center">
-        {/* Emblema */}
+        {/* Emblema neutro do CRM */}
         <div className="relative w-[120px] h-[120px] flex items-center justify-center mb-5">
-          <div className="absolute rounded-full border border-dashed border-[rgba(198,168,106,.4)] animate-spin"
+          <div className="absolute rounded-full border border-dashed border-[rgba(120,134,150,.35)] animate-spin"
             style={{ inset: '-14px', animationDuration: '26s' }} />
-          <div className="absolute rounded-full border border-dashed border-[rgba(240,101,107,.22)] animate-spin"
+          <div className="absolute rounded-full border border-dashed border-[rgba(120,134,150,.2)] animate-spin"
             style={{ inset: '-26px', animationDuration: '38s', animationDirection: 'reverse' }} />
           <div
-            className="w-[100px] h-[100px] rounded-full flex items-center justify-center animate-[jmBob_6s_ease-in-out_infinite]"
+            className="w-[100px] h-[100px] rounded-[28px] flex items-center justify-center animate-[jmBob_6s_ease-in-out_infinite]"
             style={{
-              background: 'radial-gradient(125% 125% at 32% 22%, #FBF8F0, #DBD4C4)',
-              boxShadow: '0 18px 50px rgba(22,32,46,.14), 0 0 70px rgba(215,40,47,.32)',
+              background: 'radial-gradient(125% 125% at 32% 22%, #1F2A39, #0E1620)',
+              boxShadow: '0 18px 50px rgba(22,32,46,.18)',
             }}
           >
-            <Image src="/eagle-mark.png" alt="JM Store" width={68} height={68} className="drop-shadow-md" />
+            <span className="font-serif font-medium text-[40px] text-white leading-none tracking-tight">C</span>
           </div>
         </div>
 
-        {/* Wordmark */}
+        {/* Wordmark do produto */}
         <div className="text-center mb-6">
           <div className="font-serif font-medium text-[34px] tracking-[-0.02em] text-[#16212E] leading-none">
-            JM Store <span className="italic text-[#F0656B]">Importados</span>
+            CRM
           </div>
-          <div className="font-mono text-[10.5px] tracking-[0.42em] text-[#788698] mt-3 pl-[0.42em]">PAINEL DE GESTÃO</div>
+          <div className="font-mono text-[10.5px] tracking-[0.42em] text-[#788698] mt-3 pl-[0.42em]">PLATAFORMA DE GESTÃO</div>
         </div>
 
         {/* Card */}

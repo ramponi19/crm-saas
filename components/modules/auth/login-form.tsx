@@ -39,7 +39,7 @@ export function LoginForm() {
       return
     }
     toast.success('Acesso autorizado!')
-    router.push('/dashboard')
+    router.push('/entrar')
     router.refresh()
   }
 
@@ -54,7 +54,7 @@ export function LoginForm() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="voce@jmstore.com.br"
+            placeholder="voce@suaempresa.com.br"
             autoComplete="username"
             required
             className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"

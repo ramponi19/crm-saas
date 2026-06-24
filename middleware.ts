@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isAuthRoute) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/entrar', request.url))
   }
 
   // Guarda de /superadmin: além da checagem no layout (defesa em profundidade),
