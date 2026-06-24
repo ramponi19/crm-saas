@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { verificarLimite } from '@/lib/limites'
 
 // Papéis que podem ser atribuídos por esta rota. 'owner' é definido apenas
@@ -19,18 +19,32 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { data: eu } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id, role')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
+  // Resolve empresa_id respeitando impersonação (super admin não tem empresa_usuarios)
+  const empresaId = await getEmpresaId()
+
+  // Verifica se é super admin (tem permissão total durante impersonação)
+  const { data: usuarioAtual } = await supabase
+    .from('usuarios')
+    .select('is_super_admin')
+    .eq('id', user.id)
     .single()
 
-  if (!eu || !['owner', 'admin'].includes(eu.role))
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  if (!usuarioAtual?.is_super_admin) {
+    // Usuário normal: verifica vínculo e papel
+    const { data: eu } = await supabase
+      .from('empresa_usuarios')
+      .select('role')
+      .eq('usuario_id', user.id)
+      .eq('empresa_id', empresaId)
+      .eq('ativo', true)
+      .single()
+
+    if (!eu || !['owner', 'admin'].includes(eu.role))
+      return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
 
   // Enforcement de limite de usuários do plano
-  const limite = await verificarLimite(eu.empresa_id, 'usuarios')
+  const limite = await verificarLimite(empresaId, 'usuarios')
   if (!limite.permitido) {
     return NextResponse.json(
       { error: `Limite de usuários do plano atingido (${limite.usoAtual}/${limite.limite}). Faça upgrade para adicionar mais.` },
@@ -69,7 +83,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { error: vErr } = await supabase.from('empresa_usuarios').insert({
-    empresa_id: eu.empresa_id,
+    empresa_id: empresaId,
     usuario_id: userId,
     role,
     ativo: true,
