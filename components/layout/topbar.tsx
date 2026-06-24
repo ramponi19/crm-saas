@@ -135,12 +135,7 @@ export function Topbar({
           }
         }
       })
-      .subscribe((status) => {
-        // Diagnóstico: confirma que o canal realmente conectou.
-        // Se não aparecer "SUBSCRIBED" no console, o Realtime não está chegando
-        // ao navegador (ver Database → Replication no Supabase).
-        console.log('[topbar] realtime lead_mensagens status:', status)
-      })
+      .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
 
