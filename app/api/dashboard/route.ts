@@ -24,7 +24,7 @@ export async function GET() {
   // Vendas do ano com cliente e produto via inventario_unidades
   const { data: vendasRaw } = await supabase
     .from('vendas')
-    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
+    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
     .gte('data_venda', inicio12m.toISOString())
 
   const vendas = (vendasRaw ?? []).map((v: any) => ({
@@ -37,7 +37,7 @@ export async function GET() {
     status: v.status,
     cliente_id: v.cliente_id,
     vendedor_id: v.vendedor_id,
-    produto_nome: v.inventario_unidades?.produtos?.nome ?? null,
+    produto_nome: v.produtos?.nome ?? null,
   }))
 
   // IDs únicos para joins

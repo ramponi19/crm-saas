@@ -27,9 +27,9 @@ async function getDashboardData() {
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
     supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluida,cancelada)'),
-    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, inventario_unidades!inventario_unidade_id(produtos!produto_id(nome))').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
+    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, produtos!produto_id(nome)').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
     supabase.from('vendas')
-      .select('inventario_unidades!inventario_unidade_id(produto_id, produtos!produto_id(nome))')
+      .select('produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .gte('data_venda', startOfMonth.toISOString())
       .eq('status', 'concluida')
@@ -45,12 +45,12 @@ async function getDashboardData() {
     canal_venda: v.canal_venda,
     data_venda: v.data_venda,
     status: v.status,
-    produto_nome: (v.inventario_unidades as any)?.produtos?.nome ?? null,
+    produto_nome: (v.produtos as any)?.nome ?? null,
   }))
 
   const produtoCount: Record<string, number> = {}
   ;(topProdutosRaw ?? []).forEach((v: any) => {
-    const nome = v.inventario_unidades?.produtos?.nome
+    const nome = v.produtos?.nome
     if (nome) produtoCount[nome] = (produtoCount[nome] ?? 0) + 1
   })
   const topProdutos = Object.entries(produtoCount)
