@@ -42,7 +42,21 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
     if (!form.nome.trim()) { toast.error('Nome é obrigatório'); return }
     setLoading(true)
     const supabase = createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { toast.error('Não autenticado'); setLoading(false); return }
+
+    const { data: vinculo } = await supabase
+      .from('empresa_usuarios')
+      .select('empresa_id')
+      .eq('usuario_id', user.id)
+      .eq('ativo', true)
+      .single()
+
+    if (!vinculo) { toast.error('Empresa não encontrada'); setLoading(false); return }
+
     const { data, error } = await supabase.from('leads').insert({
+      empresa_id: vinculo.empresa_id,
       nome: form.nome.trim(),
       telefone: form.telefone.trim() || null,
       instagram: form.instagram.trim() || null,

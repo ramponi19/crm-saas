@@ -118,6 +118,19 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
     if (carrinho.length === 0) { toast.error('Carrinho vazio'); return }
     setFinalizando(true)
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: vinculo } = await supabase
+        .from('empresa_usuarios')
+        .select('empresa_id')
+        .eq('usuario_id', user.id)
+        .eq('ativo', true)
+        .single()
+
+      if (!vinculo) throw new Error('Empresa não encontrada')
+      const empresaId = vinculo.empresa_id
+
       const totalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
       for (const c of carrinho) {
         const precoCheio = c.item.preco_venda ?? 0
@@ -127,6 +140,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
         const { data: venda, error } = await supabase
           .from('vendas')
           .insert({
+            empresa_id: empresaId,
             cliente_id: clienteSelecionado?.id ?? null,
             valor_venda: valorItem,
             valor_custo: c.item.preco_custo ?? 0,
