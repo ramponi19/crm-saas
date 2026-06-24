@@ -9,5 +9,6 @@ export default async function PlanosAdminPage() {
     .from('planos_config')
     .select('*')
     .order('ordem')
-  return <PlanosAdminView planos={planos ?? []} />
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <PlanosAdminView planos={(planos ?? []) as any} />
 }
