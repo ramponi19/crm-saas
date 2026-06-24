@@ -1542,6 +1542,54 @@ export type Database = {
           },
         ]
       }
+      planos_config: {
+        Row: {
+          ativo: boolean
+          cor: string
+          descricao: string | null
+          destaque: boolean
+          features: Json
+          id: string
+          limite_leads: number
+          limite_usuarios: number
+          nome: string
+          ordem: number
+          preco_centavos: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          descricao?: string | null
+          destaque?: boolean
+          features?: Json
+          id: string
+          limite_leads?: number
+          limite_usuarios?: number
+          nome: string
+          ordem?: number
+          preco_centavos?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          descricao?: string | null
+          destaque?: boolean
+          features?: Json
+          id?: string
+          limite_leads?: number
+          limite_usuarios?: number
+          nome?: string
+          ordem?: number
+          preco_centavos?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pre_vendas: {
         Row: {
           canal_venda: string | null
@@ -2414,3 +2462,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
