@@ -1801,11 +1801,54 @@ export type Database = {
           },
         ]
       }
+      superadmin_logs: {
+        Row: {
+          acao: string
+          admin_user_id: string
+          created_at: string
+          detalhes: Json | null
+          empresa_id: number | null
+          id: number
+        }
+        Insert: {
+          acao: string
+          admin_user_id: string
+          created_at?: string
+          detalhes?: Json | null
+          empresa_id?: number | null
+          id?: never
+        }
+        Update: {
+          acao?: string
+          admin_user_id?: string
+          created_at?: string
+          detalhes?: Json | null
+          empresa_id?: number | null
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "superadmin_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "superadmin_logs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       usuarios: {
         Row: {
           created_at: string | null
           email: string | null
           id: string
+          is_super_admin: boolean
           modulos_acesso: string[] | null
           nome: string
           permissoes: Json | null
@@ -1816,6 +1859,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id: string
+          is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome: string
           permissoes?: Json | null
@@ -1826,6 +1870,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome?: string
           permissoes?: Json | null

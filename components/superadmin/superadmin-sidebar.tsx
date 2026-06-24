@@ -1,0 +1,125 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import {
+  LayoutDashboard,
+  Building2,
+  LineChart,
+  ScrollText,
+  ArrowLeft,
+  LogOut,
+  ShieldAlert,
+} from 'lucide-react'
+
+const ADMIN_COR = '#7C3AED'
+
+const navItems = [
+  { href: '/superadmin',          label: 'Visão geral', icon: LayoutDashboard, exact: true },
+  { href: '/superadmin/empresas', label: 'Empresas',    icon: Building2 },
+  { href: '/superadmin/metricas', label: 'Métricas',    icon: LineChart },
+  { href: '/superadmin/logs',     label: 'Logs',        icon: ScrollText },
+]
+
+interface SuperAdminSidebarProps {
+  userName?: string
+}
+
+export function SuperAdminSidebar({ userName = 'Super Admin' }: SuperAdminSidebarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  return (
+    <aside className="flex flex-col h-screen w-[264px] border-r border-[#16212E]/[0.08] bg-white shrink-0">
+
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-5 py-[22px] border-b border-[#16212E]/[0.07]">
+        <div
+          className="w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 shadow-[0_6px_18px_rgba(124,58,237,0.35)]"
+          style={{ background: `linear-gradient(135deg, ${ADMIN_COR}, ${ADMIN_COR}88)` }}
+        >
+          <ShieldAlert size={22} className="text-white" />
+        </div>
+        <div className="leading-tight overflow-hidden">
+          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-[#16212E] truncate">
+            Super Admin
+          </div>
+          <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: ADMIN_COR }}>
+            PAINEL GLOBAL
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
+        {navItems.map((item) => {
+          const isActive = item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + '/')
+          const Icon = item.icon
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150',
+                isActive
+                  ? 'text-[#16212E] font-semibold'
+                  : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
+              )}
+              style={isActive ? { background: `${ADMIN_COR}18` } : {}}
+            >
+              <span
+                className={cn(
+                  'absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200',
+                  isActive ? 'opacity-100' : 'opacity-0'
+                )}
+                style={{ background: ADMIN_COR }}
+              />
+              <Icon size={19} className="shrink-0" />
+              <span className="flex-1 truncate">{item.label}</span>
+            </Link>
+          )
+        })}
+
+        <div className="pt-4 mt-4 border-t border-[#16212E]/[0.07]">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A] transition-all duration-150"
+          >
+            <ArrowLeft size={19} className="shrink-0" />
+            <span className="flex-1 truncate">Voltar ao CRM</span>
+          </Link>
+        </div>
+      </nav>
+
+      {/* User */}
+      <div className="px-3 py-3 border-t border-[#16212E]/[0.07]">
+        <div className="flex items-center gap-[11px] px-[11px] py-[9px] rounded-[13px] bg-[#16212E]/[0.02]">
+          <div
+            className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[14px] text-white shrink-0"
+            style={{ background: `linear-gradient(135deg, ${ADMIN_COR}, ${ADMIN_COR}88)` }}
+          >
+            {userName.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{userName}</div>
+            <div className="text-[11px] text-[#788698]">Super administrador</div>
+          </div>
+          <button className="text-[#788698] hover:text-[#9FB0C2] transition-colors" onClick={handleLogout} aria-label="Sair">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </div>
+    </aside>
+  )
+}

@@ -41,6 +41,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Guarda de /superadmin: além da checagem no layout (defesa em profundidade),
+  // bloqueia o acesso à rota já no middleware para quem não é super admin.
+  if (user && request.nextUrl.pathname.startsWith('/superadmin')) {
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('is_super_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario?.is_super_admin) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
   return supabaseResponse
 }
 

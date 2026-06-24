@@ -25,6 +25,7 @@ import {
   Building2,
   CreditCard,
   LogOut,
+  ShieldAlert,
 } from 'lucide-react'
 
 const navGroups = [
@@ -86,6 +87,7 @@ interface SidebarProps {
   garantiasCount?: number
   empresaCor?: string
   empresaLogo?: string | null
+  isSuperAdmin?: boolean
 }
 
 export function Sidebar({
@@ -96,6 +98,7 @@ export function Sidebar({
   garantiasCount = 0,
   empresaCor = '#D7282F',
   empresaLogo = null,
+  isSuperAdmin = false,
 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -190,6 +193,20 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+
+      {/* Super Admin (somente para super admins) */}
+      {isSuperAdmin && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/superadmin"
+            className="relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] font-semibold text-white transition-all duration-150"
+            style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)' }}
+          >
+            <ShieldAlert size={19} className="shrink-0" />
+            <span className="flex-1 truncate">Painel Super Admin</span>
+          </Link>
+        </div>
+      )}
 
       {/* User */}
       <div className="px-3 py-3 border-t border-[#16212E]/[0.07]">

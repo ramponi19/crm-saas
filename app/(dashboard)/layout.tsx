@@ -24,7 +24,7 @@ export default async function DashboardLayout({
 
   const { data: usuarioRaw } = await supabase
     .from('usuarios')
-    .select('nome')
+    .select('nome, is_super_admin')
     .eq('id', user.id)
     .single()
 
@@ -34,7 +34,7 @@ export default async function DashboardLayout({
     .eq('ativo', true)
     .eq('kanban_status', 'novo')
 
-  const usuario = usuarioRaw as unknown as { nome: string } | null
+  const usuario = usuarioRaw as unknown as { nome: string; is_super_admin: boolean } | null
   const vinculoTyped = vinculo as unknown as { role: string; empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null }
   const empresa = vinculoTyped.empresa
 
@@ -53,6 +53,7 @@ export default async function DashboardLayout({
           leadsCount={leadsCount ?? 0}
           empresaCor={empresa?.wl_cor ?? '#D7282F'}
           empresaLogo={empresa?.wl_logo_url ?? null}
+          isSuperAdmin={usuario?.is_super_admin ?? false}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {children}
