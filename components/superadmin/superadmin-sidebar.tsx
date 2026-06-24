@@ -9,6 +9,7 @@ import {
   Building2,
   LineChart,
   ScrollText,
+  ShieldCheck,
   ArrowLeft,
   LogOut,
   ShieldAlert,
@@ -17,10 +18,11 @@ import {
 const ADMIN_COR = '#7C3AED'
 
 const navItems = [
-  { href: '/superadmin',          label: 'Visão geral', icon: LayoutDashboard, exact: true },
-  { href: '/superadmin/empresas', label: 'Empresas',    icon: Building2 },
-  { href: '/superadmin/metricas', label: 'Métricas',    icon: LineChart },
-  { href: '/superadmin/logs',     label: 'Logs',        icon: ScrollText },
+  { href: '/superadmin',          label: 'Visão geral',     icon: LayoutDashboard, exact: true },
+  { href: '/superadmin/empresas', label: 'Empresas',        icon: Building2 },
+  { href: '/superadmin/metricas', label: 'Métricas',        icon: LineChart },
+  { href: '/superadmin/admins',   label: 'Administradores', icon: ShieldCheck },
+  { href: '/superadmin/logs',     label: 'Logs',            icon: ScrollText },
 ]
 
 interface SuperAdminSidebarProps {
