@@ -1,26 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import ClientesView from './components/clientes-view'
 
 export default async function ClientesPage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: vinculo } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
-    .single()
-
-  if (!vinculo) redirect('/login')
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const { data: clientesRaw } = await supabase
     .from('clientes')
     .select('*')
-    .eq('empresa_id', vinculo.empresa_id)
+    .eq('empresa_id', empresaId)
     .order('nome')
 
   return <ClientesView clientes={clientesRaw ?? []} />

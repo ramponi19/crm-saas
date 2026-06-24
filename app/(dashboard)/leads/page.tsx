@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead } from '@/components/modules/leads/types'
 
@@ -8,21 +7,7 @@ export const metadata = {
 }
 
 export default async function LeadsPage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: vinculo } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
-    .single()
-
-  if (!vinculo) redirect('/login')
-
-  const empresaId = vinculo.empresa_id
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }] = await Promise.all([
     supabase

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import CatalogoView from './components/catalogo-view'
 
 export const metadata = { title: 'Catálogo' }
@@ -37,7 +37,7 @@ interface SubcategoriaRow { id: number; nome: string; categoria_id: number | nul
 interface MarcaRow { id: number; nome: string }
 
 export default async function CatalogoPage() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: produtosRaw }, { data: unidadesRaw }, { data: categsRaw }, { data: subcatsRaw }, { data: marcasRaw }] = await Promise.all([
     supabase.from('produtos').select(`
@@ -45,15 +45,15 @@ export default async function CatalogoPage() {
       marcas_produtos!marca_id(nome),
       categorias_produtos!categoria_id(nome),
       subcategorias_produtos!subcategoria_id(nome)
-    `).eq('ativo', true).order('nome'),
+    `).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('inventario_unidades').select(`
       id, produto_id, imei, numero_serie, estado, tipo, condicao,
       preco_custo, custo_reparo, preco_venda, status, created_at,
       produtos!produto_id(nome)
-    `).eq('ativo', true).order('created_at', { ascending: false }),
-    supabase.from('categorias_produtos').select('id, nome').order('nome'),
-    supabase.from('subcategorias_produtos').select('id, nome, categoria_id').order('nome'),
-    supabase.from('marcas_produtos').select('id, nome').order('nome'),
+    `).eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }),
+    supabase.from('categorias_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('subcategorias_produtos').select('id, nome, categoria_id').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('marcas_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
   ])
 
   const produtosList = (produtosRaw ?? []) as unknown as ProdutoRow[]
