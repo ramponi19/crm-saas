@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         if (!empresaId) break
         empresaIdEvento = empresaId
         const priceId = sub.items.data[0]?.price?.id ?? null
-        const { plano, status, stripe_status } = stripeStatusToPlano(sub.status, priceId)
+        const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
         await supabase.from('empresas').update({
           plano, status, stripe_status,
           stripe_subscription_id: sub.id,

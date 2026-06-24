@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { getStripe, PLANOS, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
+import { getStripe, getPlanos, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,9 +9,10 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
     const { planoId } = await req.json() as { planoId: PlanoId }
-    const plano = PLANOS[planoId]
+    const planos = await getPlanos()
+    const plano = planos.find(p => p.id === planoId)
 
-    if (!plano || plano.preco === 0 || !plano.priceId) {
+    if (!plano || plano.preco_centavos === 0 || !plano.stripe_price_id) {
       return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
     }
 
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [{ price: plano.priceId as string, quantity: 1 }],
+      line_items: [{ price: plano.stripe_price_id, quantity: 1 }],
       subscription_data: {
         trial_period_days: 14,
         metadata: { empresa_id: String(empresaId) },

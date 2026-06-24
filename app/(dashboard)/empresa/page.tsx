@@ -7,6 +7,15 @@ import { Building2, Palette, CreditCard, Users, Check, Loader2, Upload } from 'l
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
 
+interface PlanoConfig {
+  id: string
+  nome: string
+  preco_centavos: number
+  cor: string
+  limite_usuarios: number
+  limite_leads: number
+}
+
 interface MembroEquipe {
   usuario_id: string
   role: string
@@ -20,6 +29,7 @@ export default function EmpresaConfigPage() {
   const [loading, setLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
   const [membros, setMembros] = useState<MembroEquipe[]>([])
+  const [planosConfig, setPlanosConfig] = useState<PlanoConfig[]>([])
 
   const [form, setForm] = useState({
     nome: '',
@@ -43,6 +53,7 @@ export default function EmpresaConfigPage() {
 
   useEffect(() => {
     if (aba === 'equipe') carregarEquipe()
+    if (aba === 'plano' && planosConfig.length === 0) carregarPlanos()
   }, [aba])
 
   async function carregarEquipe() {
@@ -52,6 +63,16 @@ export default function EmpresaConfigPage() {
       .select('usuario_id, role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(nome, email, role)')
       .eq('ativo', true)
     if (data) setMembros(data as unknown as MembroEquipe[])
+  }
+
+  async function carregarPlanos() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('planos_config')
+      .select('id, nome, preco_centavos, cor, limite_usuarios, limite_leads')
+      .eq('ativo', true)
+      .order('ordem')
+    if (data) setPlanosConfig(data as PlanoConfig[])
   }
 
   async function salvar() {
@@ -98,14 +119,15 @@ export default function EmpresaConfigPage() {
     { id: 'equipe', label: 'Equipe',                icon: <Users size={15} /> },
   ]
 
-  const PLANOS = [
-    { id: 'free',    nome: 'Free',    preco: 'Grátis',      cor: '#5C6E84', usuarios: 1,   leads: 100   },
-    { id: 'starter', nome: 'Starter', preco: 'R$ 197/mês',  cor: '#6B8CFF', usuarios: 3,   leads: 500   },
-    { id: 'pro',     nome: 'Pro',     preco: 'R$ 397/mês',  cor: '#D7282F', usuarios: 10,  leads: 99999  },
-    { id: 'unlimited',nome: 'Unlimited',preco: 'R$ 697/mês', cor: '#D7282F', usuarios: 999, leads: 99999  },
-  ]
+  function fmtPreco(centavos: number) {
+    if (centavos === 0) return 'Grátis'
+    return `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}/mês`
+  }
 
-  const planoAtual = PLANOS.find(p => p.id === empresa?.plano) ?? PLANOS[0]
+  const planoAtualConfig = planosConfig.find(p => p.id === empresa?.plano)
+  const planoAtual = planoAtualConfig
+    ? { nome: planoAtualConfig.nome, preco: fmtPreco(planoAtualConfig.preco_centavos), cor: planoAtualConfig.cor, usuarios: planoAtualConfig.limite_usuarios, leads: planoAtualConfig.limite_leads }
+    : { nome: empresa?.plano ?? 'Free', preco: '–', cor: '#5C6E84', usuarios: 1, leads: 100 }
   const diasTrial  = empresa?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000))
     : 0

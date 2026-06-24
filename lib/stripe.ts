@@ -16,29 +16,19 @@ export function getStripe(): Stripe {
   return _stripe
 }
 
-// ─── IDs dos produtos/preços no Stripe ───────────────────────
-export const PLANOS = {
-  free: {
-    nome: 'Free',
-    preco: 0,
-    priceId: null as string | null,
-    limites: { usuarios: 1, leads: 100 },
-  },
-  starter: {
-    nome: 'Starter',
-    preco: 19700,
-    get priceId() { return process.env.STRIPE_PRICE_STARTER ?? '' },
-    limites: { usuarios: 3, leads: 500 },
-  },
-  pro: {
-    nome: 'Pro',
-    preco: 39700,
-    get priceId() { return process.env.STRIPE_PRICE_PRO ?? '' },
-    limites: { usuarios: 999, leads: 99999 },
-  },
-} as const
+export type PlanoId = string
 
-export type PlanoId = keyof typeof PLANOS
+// ─── Busca planos do banco ────────────────────────────────────
+export async function getPlanos() {
+  const { createClient } = await import('@/lib/supabase/server')
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('planos_config')
+    .select('id, nome, preco_centavos, stripe_price_id, limite_usuarios, limite_leads')
+    .eq('ativo', true)
+    .order('ordem')
+  return data ?? []
+}
 
 // ─── Criar ou recuperar customer Stripe ──────────────────────
 export async function getOrCreateCustomer(empresaId: number, nome: string, email: string) {
@@ -71,14 +61,17 @@ export async function getOrCreateCustomer(empresaId: number, nome: string, email
 }
 
 // ─── Mapeia stripe_status → plano ────────────────────────────
-export function stripeStatusToPlano(
+export async function stripeStatusToPlano(
   stripeStatus: string,
   priceId: string | null
-): { plano: PlanoId; status: string; stripe_status: string } {
+): Promise<{ plano: PlanoId; status: string; stripe_status: string }> {
   if (stripeStatus === 'active' || stripeStatus === 'trialing') {
-    const plano = priceId === PLANOS.pro.priceId ? 'pro'
-                : priceId === PLANOS.starter.priceId ? 'starter'
-                : 'free'
+    let plano: PlanoId = 'free'
+    if (priceId) {
+      const planos = await getPlanos()
+      const found = planos.find(p => p.stripe_price_id === priceId)
+      if (found) plano = found.id
+    }
     return { plano, status: 'ativo', stripe_status: stripeStatus }
   }
   if (stripeStatus === 'past_due') {
