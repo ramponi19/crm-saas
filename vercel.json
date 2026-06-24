@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/arquivar-eventos",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-stripe",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

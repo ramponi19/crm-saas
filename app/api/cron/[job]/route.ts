@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -49,9 +50,30 @@ export async function GET(
       }
 
       case 'sync-stripe': {
-        // Placeholder de reconciliação Stripe→Supabase.
-        // Implementação completa depende dos produtos Stripe configurados (C1).
-        return NextResponse.json({ ok: true, job, nota: 'sync pendente de produtos Stripe' })
+        // Reconcilia assinaturas Stripe → empresas: atualiza plano/status para
+        // empresas com stripe_subscription_id, corrigindo divergências causadas
+        // por webhooks perdidos ou falhas transitórias.
+        if (!process.env.STRIPE_SECRET_KEY) {
+          return NextResponse.json({ ok: true, job, nota: 'Stripe não configurado' })
+        }
+        const stripe = getStripe()
+        const { data: empresas, error: eErr } = await supabase
+          .from('empresas')
+          .select('id, stripe_subscription_id')
+          .not('stripe_subscription_id', 'is', null)
+        if (eErr) throw eErr
+
+        let atualizadas = 0
+        for (const emp of empresas ?? []) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(emp.stripe_subscription_id as string)
+            const priceId = sub.items.data[0]?.price?.id ?? null
+            const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
+            await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+            atualizadas++
+          } catch { /* assinatura cancelada ou inválida — ignora */ }
+        }
+        return NextResponse.json({ ok: true, job, atualizadas })
       }
 
       default:

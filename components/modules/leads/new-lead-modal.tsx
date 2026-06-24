@@ -56,6 +56,17 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
 
     if (!vinculo) { toast.error('Empresa não encontrada'); setLoading(false); return }
 
+    const { data: empresa } = await supabase
+      .from('empresas').select('limite_leads').eq('id', vinculo.empresa_id).single()
+    const { count: totalLeads } = await supabase
+      .from('leads').select('*', { count: 'exact', head: true })
+      .eq('empresa_id', vinculo.empresa_id).eq('ativo', true)
+    const limiteLeads = empresa?.limite_leads ?? 0
+    if (limiteLeads > 0 && (totalLeads ?? 0) >= limiteLeads) {
+      toast.error(`Limite de leads atingido (${totalLeads}/${limiteLeads}). Faça upgrade para continuar.`)
+      setLoading(false); return
+    }
+
     const { data, error } = await supabase.from('leads').insert({
       empresa_id: vinculo.empresa_id,
       nome: form.nome.trim(),
