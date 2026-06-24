@@ -3,6 +3,25 @@ import ProdutosView from './components/produtos-view'
 
 export const metadata = { title: 'Produtos' }
 
+type Rel = { nome: string | null } | { nome: string | null }[] | null
+const relNome = (r: Rel): string | null => (Array.isArray(r) ? r[0]?.nome : r?.nome) ?? null
+
+interface ProdutoRow {
+  id: number
+  nome: string
+  marca_id: number | null
+  categoria_id: number | null
+  ativo: boolean | null
+  marca: Rel
+  categoria: Rel
+}
+interface UnidadeRow {
+  produto_id: number | null
+  preco_custo: number | null
+  preco_venda: number | null
+  status: string | null
+}
+
 export default async function ProdutosPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
@@ -27,14 +46,16 @@ export default async function ProdutosPage() {
     .select('produto_id, preco_custo, preco_venda, status')
     .eq('empresa_id', empresaId)
 
+  const unidadesList = (unidades ?? []) as unknown as UnidadeRow[]
   const estoqueMap: Record<number, { estoque: number; custo_min: number | null; preco_max: number | null }> = {}
-  for (const u of unidades ?? []) {
-    const pid = (u as any).produto_id as number
+  for (const u of unidadesList) {
+    if (u.produto_id == null) continue
+    const pid = u.produto_id
     if (!estoqueMap[pid]) estoqueMap[pid] = { estoque: 0, custo_min: null, preco_max: null }
-    if ((u as any).status === 'disponivel') {
+    if (u.status === 'disponivel') {
       estoqueMap[pid].estoque++
-      const custo = (u as any).preco_custo
-      const preco = (u as any).preco_venda
+      const custo = u.preco_custo
+      const preco = u.preco_venda
       if (custo && (estoqueMap[pid].custo_min === null || custo < estoqueMap[pid].custo_min!))
         estoqueMap[pid].custo_min = custo
       if (preco && (estoqueMap[pid].preco_max === null || preco > estoqueMap[pid].preco_max!))
@@ -42,14 +63,14 @@ export default async function ProdutosPage() {
     }
   }
 
-  const produtos = (produtosRaw ?? []).map((p: any) => ({
+  const produtos = ((produtosRaw ?? []) as unknown as ProdutoRow[]).map(p => ({
     id: p.id,
     nome: p.nome,
     marca_id: p.marca_id,
     categoria_id: p.categoria_id,
-    marca_nome: p.marca?.nome ?? '',
-    categoria_nome: p.categoria?.nome ?? null,
-    ativo: p.ativo,
+    marca_nome: relNome(p.marca) ?? '',
+    categoria_nome: relNome(p.categoria),
+    ativo: p.ativo ?? false,
     estoque: estoqueMap[p.id]?.estoque ?? 0,
     custo_min: estoqueMap[p.id]?.custo_min ?? null,
     preco_max: estoqueMap[p.id]?.preco_max ?? null,

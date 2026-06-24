@@ -32,7 +32,13 @@ export async function GET() {
     .eq('empresa_id', empresaId)
     .gte('data_venda', inicio12m.toISOString())
 
-  const vendas = (vendasRaw ?? []).map((v: any) => ({
+  type VendaRow = {
+    id: number; valor_venda: number; lucro: number | null; data_venda: string | null
+    canal_venda: string | null; forma_pagamento: string | null; status: string | null
+    cliente_id: number | null; vendedor_id: string | null
+    produtos: { nome: string | null } | { nome: string | null }[] | null
+  }
+  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(v => ({
     id: v.id,
     valor_venda: v.valor_venda,
     lucro: v.lucro,
@@ -42,11 +48,11 @@ export async function GET() {
     status: v.status,
     cliente_id: v.cliente_id,
     vendedor_id: v.vendedor_id,
-    produto_nome: v.produtos?.nome ?? null,
+    produto_nome: (Array.isArray(v.produtos) ? v.produtos[0]?.nome : v.produtos?.nome) ?? null,
   }))
 
   // IDs únicos para joins
-  const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))]
+  const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter((id): id is number => id != null))]
 
   const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
 
@@ -73,9 +79,10 @@ export async function GET() {
   ])
 
   // Normaliza vendedores (vêm via empresa_usuarios -> usuarios)
-  const vendedores = (vendedoresRaw ?? [])
-    .map((eu: any) => eu.usuarios)
-    .filter((u: any): u is { id: string; nome: string } => Boolean(u?.id))
+  type EmpresaUsuarioRow = { usuarios: { id: string; nome: string } | { id: string; nome: string }[] | null }
+  const vendedores = ((vendedoresRaw ?? []) as unknown as EmpresaUsuarioRow[])
+    .map(eu => (Array.isArray(eu.usuarios) ? eu.usuarios[0] : eu.usuarios))
+    .filter((u): u is { id: string; nome: string } => Boolean(u?.id))
 
   // Maps para lookup rápido
   const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))

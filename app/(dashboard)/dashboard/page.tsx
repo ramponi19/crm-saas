@@ -38,19 +38,29 @@ async function getDashboardData() {
   ])
 
   const vendasMes = (vendasMesRaw ?? []) as Array<{ valor_venda: number; lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null }>
-  const vendasRecentes = (vendasRecentesRaw ?? []).map((v: any) => ({
+  const relNome = (r: unknown): string | null => {
+    const rel = Array.isArray(r) ? r[0] : r
+    return (rel as { nome?: string | null } | null)?.nome ?? null
+  }
+
+  type VendaRecenteRow = {
+    id: number; valor_venda: number; forma_pagamento: string | null
+    canal_venda: string | null; data_venda: string | null; status: string | null
+    produtos: unknown
+  }
+  const vendasRecentes = ((vendasRecentesRaw ?? []) as unknown as VendaRecenteRow[]).map(v => ({
     id: v.id,
     valor_venda: v.valor_venda,
     forma_pagamento: v.forma_pagamento,
     canal_venda: v.canal_venda,
     data_venda: v.data_venda,
     status: v.status,
-    produto_nome: (v.produtos as any)?.nome ?? null,
+    produto_nome: relNome(v.produtos),
   }))
 
   const produtoCount: Record<string, number> = {}
-  ;(topProdutosRaw ?? []).forEach((v: any) => {
-    const nome = v.produtos?.nome
+  ;((topProdutosRaw ?? []) as unknown as Array<{ produtos: unknown }>).forEach(v => {
+    const nome = relNome(v.produtos)
     if (nome) produtoCount[nome] = (produtoCount[nome] ?? 0) + 1
   })
   const topProdutos = Object.entries(produtoCount)
@@ -59,7 +69,7 @@ async function getDashboardData() {
     .map(([nome, qtd]) => ({ nome, qtd }))
 
   const funilCount: Record<string, number> = {}
-  ;(leadsFunilRaw ?? []).forEach((l: any) => {
+  ;((leadsFunilRaw ?? []) as Array<{ kanban_status: string | null }>).forEach(l => {
     const s = l.kanban_status ?? 'novo'
     funilCount[s] = (funilCount[s] ?? 0) + 1
   })
