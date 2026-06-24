@@ -76,6 +76,9 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
 
   async function salvarPedido() {
     if (!formPedido.descricao.trim()) { setErroPedido('Descrição é obrigatória'); return }
+    if (formPedido.valor_total && isNaN(parseFloat(formPedido.valor_total.replace(',', '.')))) {
+      setErroPedido('Valor total inválido'); return
+    }
     setSalvandoPedido(true)
     setErroPedido(null)
     const supabase = createClient()

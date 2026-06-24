@@ -116,6 +116,9 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
 
   async function finalizarVenda() {
     if (carrinho.length === 0) { toast.error('Carrinho vazio'); return }
+    const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
+    if (descontoNum < 0) { toast.error('Desconto não pode ser negativo'); return }
+    if (descontoNum > subtotalBruto) { toast.error('Desconto maior que o valor total'); return }
     setFinalizando(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()

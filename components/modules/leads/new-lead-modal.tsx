@@ -40,6 +40,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
 
   async function handleSubmit() {
     if (!form.nome.trim()) { toast.error('Nome é obrigatório'); return }
+    if (!form.origem) { toast.error('Selecione a origem do lead'); return }
     setLoading(true)
     const supabase = createClient()
 
