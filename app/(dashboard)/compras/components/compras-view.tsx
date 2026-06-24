@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/utils'
 
 interface Pedido {
   id: number
@@ -39,10 +40,7 @@ function avatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length]
 }
 
-function fmtBRL(v: number | null) {
-  if (!v) return '—'
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
+const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 
 function fmtData(d: string | null) {
   if (!d) return '—'

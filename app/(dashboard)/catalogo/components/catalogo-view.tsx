@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Plus, Tag, Package, MoreHorizontal, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { toast } from 'sonner'
 
@@ -64,7 +64,7 @@ interface Props {
 
 type Tab = 'produtos' | 'estoque' | 'categorias' | 'marcas' | 'tabela'
 
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmt = (v: number) => formatCurrency(v)
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   disponivel: { label: 'Disponível', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },

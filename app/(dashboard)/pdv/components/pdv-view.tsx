@@ -5,7 +5,7 @@ import { ScanBarcode, Plus, Minus, ChevronDown, UserPlus, CheckCircle, RefreshCw
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 
 interface ItemEstoque {
   id: number; produto_id: number; produto_nome: string; marca_nome: string
@@ -30,7 +30,7 @@ const FORMAS_PAG = [
 const AVATAR_COLORS = ['#D7282F','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7','#ec4899']
 const getAvatarColor = (str: string) => AVATAR_COLORS[str.charCodeAt(0) % AVATAR_COLORS.length]
 const getInitials    = (nome: string) => nome.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmt = (v: number) => formatCurrency(v)
 
 export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
   const supabase = createClient()

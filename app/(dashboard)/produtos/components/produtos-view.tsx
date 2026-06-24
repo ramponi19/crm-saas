@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Plus, Package, TrendingUp, AlertTriangle, XCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
 import { Topbar } from '@/components/layout/topbar'
 
@@ -50,7 +50,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
   const [modalOpen, setModalOpen] = useState(false)
   const [produtoSel, setProdutoSel] = useState<Produto | null>(null)
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const fmt = (v: number) => formatCurrency(v)
 
   // Cards de summary
   const stats = useMemo(() => {

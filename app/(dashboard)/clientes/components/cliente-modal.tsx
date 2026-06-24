@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
@@ -61,9 +62,7 @@ function avatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length]
 }
 
-function fmtBRL(v: number) {
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
+const fmtBRL = (v: number) => formatCurrency(v)
 
 function fmtUltima(d: string | null | undefined) {
   if (!d) return '—'

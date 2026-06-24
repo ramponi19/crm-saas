@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Package, CheckCircle, Clock, Wrench, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
@@ -73,7 +73,7 @@ const TIPO_STYLE: Record<string, { label: string; color: string; bg: string }> =
   venda:    { label: 'Saída',    color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
 }
 
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const fmt = (v: number) => formatCurrency(v)
 const fmtDate = (s: string) => {
   const d = new Date(s)
   return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
@@ -436,7 +436,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
       <div className="grid grid-cols-2 gap-5">
         {field('Custo Total (Auto)',
           <div className="w-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[#15986A]">
-            {custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {formatCurrency(custoTotal)}
             {margem && <span className="ml-2 text-[11px] text-[#15986A]/70">· margem {margem}%</span>}
           </div>
         )}

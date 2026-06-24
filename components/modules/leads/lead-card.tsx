@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock } from 'lucide-react'
 import { Lead, Usuario } from './types'
+import { formatCurrency } from '@/lib/utils'
 
 interface LeadCardProps {
   lead: Lead
@@ -122,9 +123,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
         {/* Linha 3: valor + avatar */}
         <div className="flex items-center justify-between mt-[11px]">
           <span className="text-[13.5px] font-bold text-[#16212E]">
-            {lead.valor_estimado
-              ? lead.valor_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-              : '—'}
+            {lead.valor_estimado ? formatCurrency(lead.valor_estimado) : '—'}
           </span>
           {responsavel ? (
             <div className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[10.5px] font-bold text-white"

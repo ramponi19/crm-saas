@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Lead, Usuario } from './types'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
@@ -73,7 +74,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
   const fmtK = (v: number) =>
     v >= 1000
       ? `R$ ${(v / 1000).toFixed(1).replace('.', ',')}k`
-      : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : formatCurrency(v)
 
   return (
     <div className="flex flex-col h-full min-h-0">

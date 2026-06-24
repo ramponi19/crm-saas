@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { Plus, X, Save, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/types/database'
 
@@ -51,10 +51,7 @@ const EMPTY_FORM = {
   observacoes: '',
 }
 
-function fmtBRL(v: number | null) {
-  if (!v) return '—'
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
+const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 
 export default function FinanceiroView({ lancamentos: initial, categorias }: Props) {
   const supabase = createClient()
@@ -458,7 +455,7 @@ function LancamentosTable({ lancamentos, onEditar }: { lancamentos: Lancamento[]
                 </span>
               </td>
               <td className="px-5 py-3.5 text-sm font-bold" style={{ color: isReceita ? '#22C55E' : '#D7282F' }}>
-                {isReceita ? '+' : '−'} {l.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—'}
+                {isReceita ? '+' : '−'} {l.valor != null ? formatCurrency(l.valor) : '—'}
               </td>
               <td className="px-5 py-3.5">
                 <span className={cn('text-sm font-medium', l.status === 'pago' ? 'text-[#15986A]' : l.status === 'atrasado' ? 'text-[#D7282F]' : 'text-[#B47B12]')}>

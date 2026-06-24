@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, UserPlus } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import ClienteModal from './cliente-modal'
 
 interface Cliente {
@@ -210,7 +210,7 @@ export default function ClientesView({ clientes }: Props) {
                     <td className="px-5 py-4">
                       {vt > 0 ? (
                         <span className="text-sm font-bold text-[#16212E]">
-                          {vt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatCurrency(vt)}
                         </span>
                       ) : (
                         <span className="text-[#788698]">—</span>
