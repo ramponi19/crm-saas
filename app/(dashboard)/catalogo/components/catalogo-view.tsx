@@ -87,9 +87,9 @@ const MARCA_ICON: Record<string, string> = {
 
 export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit }: Props) {
   const [tab, setTab] = useState<Tab>('produtos')
-  const [produtos] = useState(produtosInit)
+  const produtos = produtosInit
   const [tabela, setTabela] = useState(tabelaInit)
-  const [searchProd] = useState('')
+  const searchProd = ''
   const [searchEst, setSearchEst] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todas')
   const [modalPreco, setModalPreco] = useState(false)
