@@ -17,6 +17,9 @@ const config = [
         argsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'react/no-unescaped-entities': 'warn',
+      'prefer-const': 'warn',
     },
   },
 ]
