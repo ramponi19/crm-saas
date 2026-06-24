@@ -89,7 +89,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const [tab, setTab] = useState<Tab>('produtos')
   const produtos = produtosInit
   const [tabela, setTabela] = useState(tabelaInit)
-  const searchProd = ''
+  const searchProd: string = ''
   const [searchEst, setSearchEst] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todas')
   const [modalPreco, setModalPreco] = useState(false)
