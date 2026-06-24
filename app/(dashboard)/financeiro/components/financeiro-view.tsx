@@ -80,6 +80,30 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
   const listaPagar   = lancamentos.filter(l => l.tipo === 'despesa' && l.status === 'pendente')
   const todos        = lancamentos
 
+  // DRE — Demonstração do Resultado: receita bruta, despesas agrupadas por
+  // categoria e resultado líquido com margem.
+  const dre = useMemo(() => {
+    const receitaBruta = lancamentos
+      .filter(l => l.tipo === 'receita')
+      .reduce((s, l) => s + (l.valor ?? 0), 0)
+
+    const porCategoria = new Map<string, number>()
+    for (const l of lancamentos) {
+      if (l.tipo !== 'despesa') continue
+      const cat = l.categoria?.trim() || 'Sem categoria'
+      porCategoria.set(cat, (porCategoria.get(cat) ?? 0) + (l.valor ?? 0))
+    }
+    const despesas = [...porCategoria.entries()]
+      .map(([categoria, valor]) => ({ categoria, valor }))
+      .sort((a, b) => b.valor - a.valor)
+
+    const totalDespesas = despesas.reduce((s, d) => s + d.valor, 0)
+    const resultado = receitaBruta - totalDespesas
+    const margem = receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0
+
+    return { receitaBruta, despesas, totalDespesas, resultado, margem }
+  }, [lancamentos])
+
   function abrirNovo(tipoInicial: string) {
     setForm({ ...EMPTY_FORM, tipo: tipoInicial })
     setEditId(null)
@@ -235,8 +259,49 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
           </div>
         )}
         {tab === 'dre' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-8 text-center">
-            <p className="text-[#788698] text-sm">DRE em desenvolvimento</p>
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#16212E]/[0.08]">
+              <h2 className="text-base font-semibold text-[#1F2A39]">Demonstração do Resultado</h2>
+              <p className="text-[11px] text-[#788698] mt-0.5">Receitas, despesas por categoria e resultado líquido</p>
+            </div>
+            {lancamentos.length === 0 ? (
+              <div className="p-8 text-center text-[#788698] text-sm">Nenhum lançamento registrado.</div>
+            ) : (
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between py-2.5 border-b border-[#16212E]/[0.06]">
+                  <span className="text-[13.5px] font-semibold text-[#1F2A39]">Receita bruta</span>
+                  <span className="text-[13.5px] font-semibold text-[#15986A] tabular-nums">+{fmtBRL(dre.receitaBruta)}</span>
+                </div>
+
+                <div className="pt-3 pb-1">
+                  <span className="text-[10px] font-mono tracking-widest text-[#788698] uppercase">(−) Despesas por categoria</span>
+                </div>
+                {dre.despesas.length === 0 ? (
+                  <div className="py-2 text-[13px] text-[#788698]">Nenhuma despesa registrada.</div>
+                ) : (
+                  dre.despesas.map(d => (
+                    <div key={d.categoria} className="flex items-center justify-between py-2 border-b border-[#16212E]/[0.04]">
+                      <span className="text-[13px] text-[#56657A]">{d.categoria}</span>
+                      <span className="text-[13px] text-[#D7282F] tabular-nums">−{fmtBRL(d.valor)}</span>
+                    </div>
+                  ))
+                )}
+                <div className="flex items-center justify-between py-2.5 border-b border-[#16212E]/[0.06]">
+                  <span className="text-[13.5px] font-semibold text-[#1F2A39]">Total de despesas</span>
+                  <span className="text-[13.5px] font-semibold text-[#D7282F] tabular-nums">−{fmtBRL(dre.totalDespesas)}</span>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 mt-1">
+                  <div>
+                    <span className="text-[15px] font-bold text-[#1F2A39]">Resultado líquido</span>
+                    <span className="block text-[11px] text-[#788698]">margem {dre.margem.toFixed(1)}%</span>
+                  </div>
+                  <span className={cn('text-[18px] font-bold tabular-nums', dre.resultado >= 0 ? 'text-[#15986A]' : 'text-[#D7282F]')}>
+                    {dre.resultado >= 0 ? '+' : '−'}{fmtBRL(Math.abs(dre.resultado))}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
