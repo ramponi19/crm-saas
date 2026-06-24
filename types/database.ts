@@ -384,7 +384,43 @@ export type Database = {
           vencimento?: string | null
           venda_id?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "garantias_assistencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       comissoes: {
         Row: {
@@ -688,6 +724,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_usuarios_usuario_public_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -1765,6 +1808,55 @@ export type Database = {
           },
         ]
       }
+      superadmin_logs: {
+        Row: {
+          acao: string
+          admin_user_id: string
+          created_at: string
+          detalhes: Json | null
+          empresa_id: number | null
+          id: number
+        }
+        Insert: {
+          acao: string
+          admin_user_id: string
+          created_at?: string
+          detalhes?: Json | null
+          empresa_id?: number | null
+          id?: never
+        }
+        Update: {
+          acao?: string
+          admin_user_id?: string
+          created_at?: string
+          detalhes?: Json | null
+          empresa_id?: number | null
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "superadmin_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "superadmin_logs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "superadmin_logs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tabela_precos: {
         Row: {
           armazenamento: string | null
@@ -1867,48 +1959,6 @@ export type Database = {
           },
         ]
       }
-      superadmin_logs: {
-        Row: {
-          acao: string
-          admin_user_id: string
-          created_at: string
-          detalhes: Json | null
-          empresa_id: number | null
-          id: number
-        }
-        Insert: {
-          acao: string
-          admin_user_id: string
-          created_at?: string
-          detalhes?: Json | null
-          empresa_id?: number | null
-          id?: never
-        }
-        Update: {
-          acao?: string
-          admin_user_id?: string
-          created_at?: string
-          detalhes?: Json | null
-          empresa_id?: number | null
-          id?: never
-        }
-        Relationships: [
-          {
-            foreignKeyName: "superadmin_logs_admin_user_id_fkey"
-            columns: ["admin_user_id"]
-            isOneToOne: false
-            referencedRelation: "usuarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "superadmin_logs_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       tenant_payment_config: {
         Row: {
           ativo: boolean
@@ -1941,7 +1991,14 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "empresas"
             referencedColumns: ["id"]
-          }
+          },
+          {
+            foreignKeyName: "tenant_payment_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
         ]
       }
       usuarios: {
@@ -1981,7 +2038,22 @@ export type Database = {
           role?: string
           ultimo_acesso?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "usuarios_impersonando_empresa_id_fkey"
+            columns: ["impersonando_empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuarios_impersonando_empresa_id_fkey"
+            columns: ["impersonando_empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendas: {
         Row: {
@@ -2208,6 +2280,7 @@ export type Database = {
         Args: { lead_id_param: number }
         Returns: undefined
       }
+      is_super_admin: { Args: never; Returns: boolean }
       refresh_status_atrasados: { Args: never; Returns: undefined }
     }
     Enums: {

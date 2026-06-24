@@ -15,7 +15,7 @@ export default async function EquipePage() {
   const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }] = await Promise.all([
     supabase
       .from('empresa_usuarios')
-      .select('role, ativo, usuarios!usuario_id(*)')
+      .select('role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(*)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('usuario_id'),

@@ -23,7 +23,7 @@ export default async function LeadsPage() {
       .order('ultima_mensagem_at', { ascending: false, nullsFirst: false }),
     supabase
       .from('empresa_usuarios')
-      .select('usuario_id, role, usuarios!usuario_id(id, nome)')
+      .select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(id, nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
     // Contagem real de não-lidas — apenas leads desta empresa

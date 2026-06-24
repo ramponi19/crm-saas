@@ -30,7 +30,7 @@ export default async function RelatoriosPage() {
       .limit(200),
     supabase
       .from('empresa_usuarios')
-      .select('usuarios!usuario_id(nome)')
+      .select('usuarios!empresa_usuarios_usuario_public_fkey(nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
   ])
