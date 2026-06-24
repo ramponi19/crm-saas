@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getStripe, PLANOS, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
@@ -15,17 +15,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
     }
 
-    const { data: vinculo } = await supabase
-      .from('empresa_usuarios')
-      .select('empresa_id, empresas(id, nome, stripe_customer_id)')
-      .eq('usuario_id', user.id)
-      .eq('ativo', true)
+    const { data: empresaData } = await supabase
+      .from('empresas')
+      .select('id, nome, stripe_customer_id')
+      .eq('id', empresaId)
       .single()
 
-    if (!vinculo) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
+    if (!empresaData) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
-    const empresaData = (vinculo as unknown as { empresas: { id: number; nome: string; stripe_customer_id: string | null } }).empresas
-    const empresaId = empresaData.id
     const customerId = await getOrCreateCustomer(empresaId, empresaData.nome, user.email!)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
     const stripe = getStripe()

@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getStripe } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-    const { data: vinculo } = await supabase
-      .from('empresa_usuarios')
-      .select('empresa_id, empresas(stripe_customer_id)')
-      .eq('usuario_id', user.id)
-      .eq('ativo', true)
+    const { data: empresa } = await supabase
+      .from('empresas')
+      .select('stripe_customer_id')
+      .eq('id', empresaId)
       .single()
 
-    const customerId = (vinculo as unknown as { empresas: { stripe_customer_id: string | null } })?.empresas?.stripe_customer_id
+    const customerId = empresa?.stripe_customer_id
 
     if (!customerId) {
       return NextResponse.json({ error: 'Sem assinatura ativa' }, { status: 400 })

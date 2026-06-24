@@ -49,7 +49,8 @@ export default function EmpresaConfigPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('empresa_usuarios')
-      .select('usuario_id, role, ativo, usuarios(nome, email, role)')
+      .select('usuario_id, role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(nome, email, role)')
+      .eq('ativo', true)
     if (data) setMembros(data as unknown as MembroEquipe[])
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest) {
   const { id, nome, role } = await req.json()
@@ -10,22 +10,33 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { data: eu } = await supabase
-    .from('empresa_usuarios')
-    .select('role, empresa_id')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
+  const empresaId = await getEmpresaId()
+
+  const { data: usuarioAtual } = await supabase
+    .from('usuarios')
+    .select('is_super_admin')
+    .eq('id', user.id)
     .single()
 
-  if (!eu || !['owner', 'admin'].includes(eu.role))
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  if (!usuarioAtual?.is_super_admin) {
+    const { data: eu } = await supabase
+      .from('empresa_usuarios')
+      .select('role')
+      .eq('usuario_id', user.id)
+      .eq('empresa_id', empresaId)
+      .eq('ativo', true)
+      .single()
+
+    if (!eu || !['owner', 'admin'].includes(eu.role))
+      return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
 
   // Confirm the target user belongs to the same company
   const { data: alvo } = await supabase
     .from('empresa_usuarios')
     .select('usuario_id')
     .eq('usuario_id', id)
-    .eq('empresa_id', eu.empresa_id)
+    .eq('empresa_id', empresaId)
     .eq('ativo', true)
     .single()
 
