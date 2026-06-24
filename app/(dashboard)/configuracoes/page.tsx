@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
@@ -8,16 +8,18 @@ type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
 export const metadata = { title: 'Configurações' }
 
 async function getConfigs() {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: configs }, { data: taxas }] = await Promise.all([
     supabase
       .from('configuracoes_sistema')
       .select('chave, valor')
+      .eq('empresa_id', empresaId)
       .in('chave', ['whatsapp_evolution', 'whatsapp_official', 'meta_instagram', 'meta_messenger', 'dados_loja', 'preferencias']),
     supabase
       .from('taxas_pagamento')
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
+      .eq('empresa_id', empresaId)
       .eq('ativo', true),
   ])
 

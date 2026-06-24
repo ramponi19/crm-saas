@@ -66,6 +66,15 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [waProvider, setWaProvider] = useState<'evolution' | 'oficial'>('evolution')
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
+        .then(({ data }) => { if (data) setEmpresaId(data.empresa_id) })
+    })
+  }, [])
 
   // Taxas — estado controlado (visa_master / outros / link)
   const [taxasVisa, setTaxasVisa] = useState<Record<number, string>>(() => {
@@ -90,23 +99,21 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [savingSLA, setSavingSLA] = useState(false)
 
   useEffect(() => {
-    supabase.from('configuracoes_sistema').select('valor').eq('chave', 'sla_atendimento').single()
+    if (!empresaId) return
+    supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'sla_atendimento').single()
       .then(({ data }) => {
         if (data?.valor && typeof data.valor === 'object') {
           const v = data.valor as { verde?: number; amarelo?: number; vermelho?: number }
           setSlaValues([v.verde ?? 15, v.amarelo ?? 30, v.vermelho ?? 60])
         }
       })
-  }, [])
+  }, [empresaId])
 
   async function salvarTaxas() {
+    if (!empresaId) { toast.error('Empresa não carregada'); return }
+    const empresa_id = empresaId
     setSavingTaxas(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { toast.error('Não autenticado'); return }
-      const { data: eu } = await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      const empresa_id = eu?.empresa_id
-      if (!empresa_id) { toast.error('Empresa não encontrada'); return }
 
       await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
 
@@ -128,11 +135,12 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   }
 
   async function salvarSLA() {
+    if (!empresaId) { toast.error('Empresa não carregada'); return }
     setSavingSLA(true)
     try {
       const [verde, amarelo, vermelho] = slaValues
       const { error } = await supabase.from('configuracoes_sistema')
-        .upsert({ chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'chave' })
+        .upsert({ empresa_id: empresaId, chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'empresa_id,chave' })
       if (error) { toast.error('Erro ao salvar SLA'); return }
       toast.success('Regras de SLA salvas!')
     } finally { setSavingSLA(false) }
@@ -198,7 +206,11 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
   async function saveModal() {
     if (!modalCanal) return
+    if (!empresaId) { toast.error('Empresa não carregada'); return }
     setSaving(true)
+    const upsert = (chave: string, valor: unknown) =>
+      supabase.from('configuracoes_sistema')
+        .upsert({ empresa_id: empresaId, chave, valor: valor as Json }, { onConflict: 'empresa_id,chave' })
     try {
       if (modalCanal.id === 'whatsapp') {
         if (waProvider === 'evolution') {
@@ -208,13 +220,8 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             api_key: modalValues.apikey ?? '',
             instance: modalValues.inst ?? '',
           }
-          await supabase.from('configuracoes_sistema')
-            .upsert({ chave: 'whatsapp_evolution', valor: cfg as unknown as Json }, { onConflict: 'chave' })
-          // Desativa oficial
-          if (official) {
-            await supabase.from('configuracoes_sistema')
-              .upsert({ chave: 'whatsapp_official', valor: { ...official, ativo: false } as unknown as Json }, { onConflict: 'chave' })
-          }
+          await upsert('whatsapp_evolution', cfg)
+          if (official) await upsert('whatsapp_official', { ...official, ativo: false })
         } else {
           const cfg: OfficialConfig = {
             ativo: true,
@@ -226,20 +233,13 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             api_version: official?.api_version ?? 'v19.0',
             api_url: official?.api_url ?? 'https://graph.facebook.com',
           }
-          await supabase.from('configuracoes_sistema')
-            .upsert({ chave: 'whatsapp_official', valor: cfg as unknown as Json }, { onConflict: 'chave' })
-          // Desativa evolution
-          if (evolution) {
-            await supabase.from('configuracoes_sistema')
-              .upsert({ chave: 'whatsapp_evolution', valor: { ...evolution, ativo: false } }, { onConflict: 'chave' })
-          }
+          await upsert('whatsapp_official', cfg)
+          if (evolution) await upsert('whatsapp_evolution', { ...evolution, ativo: false })
         }
       } else {
-        // Meta — Instagram/Messenger
-        await supabase.from('configuracoes_sistema')
-          .upsert({ chave: `meta_${modalCanal.id}`, valor: {
-            ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
-          } }, { onConflict: 'chave' })
+        await upsert(`meta_${modalCanal.id}`, {
+          ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
+        })
       }
       toast.success(`${modalCanal.nome} configurado!`)
       setModalCanal(null)
