@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { Plus, X, Save, Trash2 } from 'lucide-react'
+import { Plus, X, Save, Trash2, Copy, Check, ExternalLink } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/types/database'
@@ -24,13 +24,31 @@ interface Categoria {
   tipo: string
   cor: string | null
 }
-interface Props { lancamentos: Lancamento[]; categorias: Categoria[] }
+interface Cobranca {
+  id: number
+  tipo: string | null
+  valor: number | null
+  status: string | null
+  descricao: string | null
+  created_at: string | null
+  link_pagamento: string | null
+  qr_code: string | null
+  linha_digitavel: string | null
+  vencimento: string | null
+  provider: string | null
+  os_id: number | null
+  venda_id: number | null
+  cliente_id: number | null
+  clientes?: { nome: string } | { nome: string }[] | null
+}
+interface Props { lancamentos: Lancamento[]; categorias: Categoria[]; cobrancas: Cobranca[] }
 
 const TABS = [
-  { key: 'fluxo',   label: 'Fluxo de Caixa'  },
-  { key: 'pagar',   label: 'Contas a Pagar'   },
-  { key: 'receber', label: 'Contas a Receber' },
-  { key: 'dre',     label: 'DRE'              },
+  { key: 'fluxo',      label: 'Fluxo de Caixa'  },
+  { key: 'pagar',      label: 'Contas a Pagar'   },
+  { key: 'receber',    label: 'Contas a Receber' },
+  { key: 'cobrancas',  label: 'Cobranças'        },
+  { key: 'dre',        label: 'DRE'              },
 ]
 
 const FORMAS = ['pix','dinheiro','credito','debito','transferencia','boleto']
@@ -53,10 +71,12 @@ const EMPTY_FORM = {
 
 const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 
-export default function FinanceiroView({ lancamentos: initial, categorias }: Props) {
+export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas }: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState('fluxo')
   const [lancamentos, setLancamentos] = useState(initial)
+  const [cobrancas, setCobrancas] = useState(initialCobrancas)
+  const [copiado, setCopiado] = useState<number | null>(null)
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editId, setEditId] = useState<number | null>(null)
@@ -169,6 +189,34 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
 
   const catsFiltradas = categorias.filter(c => c.tipo === form.tipo || c.tipo === 'ambos')
 
+  async function marcarPago(id: number) {
+    const { error } = await supabase.from('cobrancas').update({ status: 'pago' }).eq('id', id)
+    if (error) return
+    setCobrancas(prev => prev.map(c => c.id === id ? { ...c, status: 'pago' } : c))
+  }
+
+  async function copiarChave(c: Cobranca) {
+    const chave = c.linha_digitavel ?? c.qr_code ?? c.link_pagamento ?? ''
+    if (!chave) return
+    await navigator.clipboard.writeText(chave)
+    setCopiado(c.id)
+    setTimeout(() => setCopiado(null), 2000)
+  }
+
+  function getNomeCliente(c: Cobranca): string {
+    if (!c.clientes) return '—'
+    if (Array.isArray(c.clientes)) return c.clientes[0]?.nome ?? '—'
+    return c.clientes.nome
+  }
+
+  const cobrancasStats = useMemo(() => {
+    const pendentes = cobrancas.filter(c => c.status === 'pendente')
+    const pagas     = cobrancas.filter(c => c.status === 'pago')
+    const totalPendente = pendentes.reduce((s, c) => s + (c.valor ?? 0), 0)
+    const totalPago     = pagas.reduce((s, c) => s + (c.valor ?? 0), 0)
+    return { pendentes: pendentes.length, pagas: pagas.length, totalPendente, totalPago }
+  }, [cobrancas])
+
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
       <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
@@ -255,6 +303,99 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
             <LancamentosTable lancamentos={listaReceber} onEditar={abrirEditar} />
           </div>
         )}
+        {tab === 'cobrancas' && (
+          <div className="space-y-4">
+            {/* Stats das cobranças */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Aguardando pagamento', value: fmtBRL(cobrancasStats.totalPendente), sub: `${cobrancasStats.pendentes} cobranças`, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+                { label: 'Recebido via cobrança', value: fmtBRL(cobrancasStats.totalPago),    sub: `${cobrancasStats.pagas} confirmadas`,  color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
+              ].map(s => (
+                <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4">
+                  <div className="text-[10px] font-mono tracking-widest text-[#788698] uppercase mb-1.5">{s.label}</div>
+                  <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[11px] text-[#788698] mt-0.5">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabela de cobranças */}
+            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#16212E]/[0.08]">
+                <h2 className="text-base font-semibold text-[#1F2A39]">Conciliação de Cobranças</h2>
+                <p className="text-[11px] text-[#788698] mt-0.5">Cobranças Pix geradas via OS e PDV</p>
+              </div>
+              {cobrancas.length === 0 ? (
+                <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhuma cobrança gerada ainda.</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[#16212E]/[0.08]">
+                      {['Data','Descrição','Cliente','Tipo','Valor','Status','Ações'].map(h => (
+                        <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cobrancas.map(c => {
+                      const statusColor = c.status === 'pago' ? '#22C55E' : c.status === 'expirado' ? '#D7282F' : '#F59E0B'
+                      const statusBg    = c.status === 'pago' ? 'rgba(34,197,94,0.1)' : c.status === 'expirado' ? 'rgba(215,40,47,0.1)' : 'rgba(245,158,11,0.1)'
+                      const statusLabel = c.status === 'pago' ? 'Pago' : c.status === 'expirado' ? 'Expirado' : 'Pendente'
+                      const origem = c.os_id ? `OS #${c.os_id}` : c.venda_id ? `Venda #${c.venda_id}` : '—'
+                      return (
+                        <tr key={c.id} className="border-b border-[#16212E]/[0.06] last:border-0 hover:bg-[#16212E]/[0.02] transition-colors">
+                          <td className="px-5 py-3.5 text-sm text-[#788698] whitespace-nowrap">
+                            {new Date(c.created_at ?? '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                          </td>
+                          <td className="px-5 py-3.5 text-sm text-[#1F2A39]">
+                            <div>{c.descricao ?? '—'}</div>
+                            <div className="text-[10px] text-[#9AA7B6]">{origem}</div>
+                          </td>
+                          <td className="px-5 py-3.5 text-sm text-[#788698]">{getNomeCliente(c)}</td>
+                          <td className="px-5 py-3.5">
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[rgba(22,33,46,0.06)] text-[#56657A] uppercase">{c.tipo ?? 'pix'}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-sm font-bold text-[#1F2A39] tabular-nums">
+                            {c.valor != null ? formatCurrency(c.valor) : '—'}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ color: statusColor, backgroundColor: statusBg }}>
+                              {statusLabel}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2">
+                              {(c.linha_digitavel ?? c.qr_code ?? c.link_pagamento) && (
+                                <button onClick={() => copiarChave(c)}
+                                  className="flex items-center gap-1 text-[11px] text-[#788698] hover:text-[#1F2A39] transition-colors"
+                                  title="Copiar chave Pix">
+                                  {copiado === c.id ? <Check size={13} className="text-[#22C55E]" /> : <Copy size={13} />}
+                                </button>
+                              )}
+                              {c.link_pagamento && (
+                                <a href={c.link_pagamento} target="_blank" rel="noopener noreferrer"
+                                  className="text-[#788698] hover:text-[#1F2A39] transition-colors" title="Abrir link">
+                                  <ExternalLink size={13} />
+                                </a>
+                              )}
+                              {c.status !== 'pago' && (
+                                <button onClick={() => marcarPago(c.id)}
+                                  className="text-[11px] font-semibold text-[#22C55E] hover:underline whitespace-nowrap">
+                                  Marcar pago
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
         {tab === 'dre' && (
           <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
             <div className="px-5 py-4 border-b border-[#16212E]/[0.08]">
