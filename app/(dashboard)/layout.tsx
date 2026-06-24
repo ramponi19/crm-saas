@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
+import { LimiteBanner } from '@/components/layout/limite-banner'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
@@ -86,6 +87,7 @@ export default async function DashboardLayout({
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
+          <LimiteBanner />
           {children}
         </div>
       </div>

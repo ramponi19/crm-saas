@@ -104,6 +104,23 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     const { total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
     const data = { ...payload, ativo: true }
     if (isNew) {
+      // Verifica limite de leads/clientes do plano
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: vinculo } = await supabase
+          .from('empresa_usuarios').select('empresa_id, empresas(limite_leads)')
+          .eq('usuario_id', user.id).eq('ativo', true).single()
+        const limite = (vinculo?.empresas as unknown as { limite_leads: number } | null)?.limite_leads ?? 0
+        if (limite > 0) {
+          const { count } = await supabase.from('clientes')
+            .select('*', { count: 'exact', head: true })
+            .eq('empresa_id', (vinculo as { empresa_id: number }).empresa_id).eq('ativo', true)
+          if ((count ?? 0) >= limite) {
+            toast.error(`Limite de clientes atingido (${count}/${limite}). Faça upgrade para continuar.`)
+            setSaving(false); return
+          }
+        }
+      }
       const { error } = await supabase.from('clientes').insert(data as TablesInsert<'clientes'>)
       if (error) { toast.error('Erro ao cadastrar'); setSaving(false); return }
       toast.success('Cliente cadastrado!')

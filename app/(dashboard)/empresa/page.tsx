@@ -30,6 +30,7 @@ export default function EmpresaConfigPage() {
   const [sucesso, setSucesso] = useState(false)
   const [membros, setMembros] = useState<MembroEquipe[]>([])
   const [planosConfig, setPlanosConfig] = useState<PlanoConfig[]>([])
+  const [usoAtual, setUsoAtual] = useState<{ leads: number; usuarios: number } | null>(null)
 
   const [form, setForm] = useState({
     nome: '',
@@ -54,6 +55,7 @@ export default function EmpresaConfigPage() {
   useEffect(() => {
     if (aba === 'equipe') carregarEquipe()
     if (aba === 'plano' && planosConfig.length === 0) carregarPlanos()
+    if (aba === 'plano') carregarUso()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba])
 
@@ -64,6 +66,16 @@ export default function EmpresaConfigPage() {
       .select('usuario_id, role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(nome, email, role)')
       .eq('ativo', true)
     if (data) setMembros(data as unknown as MembroEquipe[])
+  }
+
+  async function carregarUso() {
+    if (!empresa) return
+    const supabase = createClient()
+    const [{ count: leads }, { count: usuarios }] = await Promise.all([
+      supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('ativo', true),
+      supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('ativo', true),
+    ])
+    setUsoAtual({ leads: leads ?? 0, usuarios: usuarios ?? 0 })
   }
 
   async function carregarPlanos() {
@@ -224,9 +236,31 @@ export default function EmpresaConfigPage() {
                     <p className="text-xs text-[#FBBF24]">✨ Trial gratuito — {diasTrial} dia{diasTrial !== 1 ? 's' : ''} restante{diasTrial !== 1 ? 's' : ''}</p>
                   </div>
                 )}
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#788698]">
-                  <span>👥 Até {planoAtual.usuarios === 999 ? 'ilimitados' : planoAtual.usuarios} usuário{planoAtual.usuarios !== 1 ? 's' : ''}</span>
-                  <span>📋 Até {planoAtual.leads === 99999 ? 'ilimitados' : planoAtual.leads} leads</span>
+                <div className="mt-4 space-y-3">
+                  {[
+                    { label: 'Leads', uso: usoAtual?.leads ?? 0, limite: planoAtual.leads, icon: '📋' },
+                    { label: 'Usuários', uso: usoAtual?.usuarios ?? 0, limite: planoAtual.usuarios, icon: '👥' },
+                  ].map(({ label, uso, limite, icon }) => {
+                    const ilimitado = limite >= 99999
+                    const pct = ilimitado ? 0 : Math.min(100, (uso / limite) * 100)
+                    const cor = pct >= 100 ? '#D7282F' : pct >= 80 ? '#FBBF24' : '#15986A'
+                    return (
+                      <div key={label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-[#788698]">{icon} {label}</span>
+                          <span className="text-xs font-semibold text-[#56657A]">
+                            {usoAtual ? `${uso} / ${ilimitado ? '∞' : limite}` : '…'}
+                          </span>
+                        </div>
+                        {!ilimitado && (
+                          <div className="h-1.5 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%`, background: cor }} />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
               {empresa?.plano !== 'pro' && (
