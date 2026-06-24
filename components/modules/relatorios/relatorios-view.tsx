@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { TrendingUp, Boxes, Users, Download, Search } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 interface Venda {
   id: number
@@ -46,19 +48,84 @@ const TABS = [
   { id: 'exportar',  label: 'Exportar', Icon: Download   },
 ]
 
-function exportCSV(rows: Venda[]) {
-  const header = 'Data,Cliente,Produto,Vendedor,Canal,Valor,Desconto,Lucro'
-  const lines = rows.map(v => [
-    v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
-    v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
-    CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
-    v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
-  ].join(','))
-  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+// Escapa um campo CSV: envolve em aspas quando contém vírgula, aspas ou quebra.
+function csvCell(v: string | number | null | undefined): string {
+  const s = String(v ?? '')
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function downloadCSV(filename: string, header: string[], rows: (string | number | null)[][]) {
+  const content = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\n')
+  // BOM para o Excel reconhecer UTF-8 (acentos)
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `vendas_${new Date().toISOString().slice(0,10)}.csv`
+  a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+function exportCSV(rows: Venda[]) {
+  if (rows.length === 0) { toast.info('Nenhuma venda para exportar'); return }
+  downloadCSV(
+    'vendas',
+    ['Data', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro'],
+    rows.map(v => [
+      v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
+      v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
+      CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
+      v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
+    ])
+  )
+}
+
+function exportFinanceiro(rows: Lancamento[]) {
+  if (rows.length === 0) { toast.info('Nenhum lançamento para exportar'); return }
+  downloadCSV(
+    'financeiro',
+    ['Vencimento', 'Descrição', 'Categoria', 'Tipo', 'Valor', 'Status'],
+    rows.map(l => [
+      l.data_venc ? new Date(l.data_venc).toLocaleDateString('pt-BR') : '',
+      l.descricao ?? '', l.categoria ?? '', l.tipo, l.valor, l.status,
+    ])
+  )
+}
+
+async function exportClientes() {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('nome, telefone, email, cidade, estado, created_at')
+    .order('nome')
+  if (error || !data) { toast.error('Erro ao exportar clientes'); return }
+  if (data.length === 0) { toast.info('Nenhum cliente para exportar'); return }
+  downloadCSV(
+    'clientes',
+    ['Nome', 'Telefone', 'E-mail', 'Cidade', 'Estado', 'Cadastro'],
+    data.map((c: any) => [
+      c.nome ?? '', c.telefone ?? '', c.email ?? '', c.cidade ?? '', c.estado ?? '',
+      c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '',
+    ])
+  )
+}
+
+async function exportEstoque() {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('inventario_unidades')
+    .select('imei, numero_serie, estado, status, preco_custo, preco_venda, produtos!produto_id(nome)')
+    .eq('ativo', true)
+    .order('id', { ascending: false })
+  if (error || !data) { toast.error('Erro ao exportar estoque'); return }
+  if (data.length === 0) { toast.info('Nenhuma unidade para exportar'); return }
+  downloadCSV(
+    'estoque',
+    ['Produto', 'IMEI', 'Nº Série', 'Estado', 'Status', 'Custo', 'Venda'],
+    data.map((u: any) => [
+      u.produtos?.nome ?? '', u.imei ?? '', u.numero_serie ?? '', u.estado ?? '',
+      u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
+    ])
+  )
 }
 
 function BarChart({ vendas }: { vendas: Venda[] }) {
@@ -189,7 +256,9 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                 ))}
               </select>
             </div>
-            <button className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+            <button
+              onClick={() => toast.success(`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? 'venda' : 'vendas'} no período selecionado`)}
+              className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
               <Search size={15} /> Gerar
             </button>
             <button onClick={() => exportCSV(vendasFiltradas)}
@@ -329,10 +398,10 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
             <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-6">Exportar dados</h3>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendas) },
-                { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => {} },
-                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => {} },
-                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => {} },
+                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas) },
+                { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: exportClientes },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: exportEstoque },
+                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos) },
               ].map(e => (
                 <button key={e.label} onClick={e.action}
                   className="flex items-start gap-4 p-[18px_20px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[16px] hover:bg-[#16212E]/[0.04] hover:border-[rgba(215,40,47,0.3)] transition-all text-left">
