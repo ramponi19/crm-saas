@@ -34,10 +34,10 @@ async function getConfigs() {
     evolution: evolution ?? null,
     official: official ?? null,
     instagram, messenger, dadosLoja, preferencias,
-    taxas: (taxas ?? []).map((t: any) => ({
+    taxas: ((taxas ?? []) as Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>).map(t => ({
       forma_pagamento: t.forma_pagamento,
-      bandeira: t.bandeira as string | null,
-      parcelas: t.parcelas as number,
+      bandeira: t.bandeira,
+      parcelas: t.parcelas,
       percentual_taxa: Number(t.percentual_taxa),
     })),
   }

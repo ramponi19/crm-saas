@@ -1,5 +1,9 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EquipeView from './components/equipe-view'
+import type { Tables } from '@/types/database'
+
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function EquipePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -30,10 +34,13 @@ export default async function EquipePage() {
       .eq('status', 'pago'),
   ])
 
-  const usuariosMapped = (usuarios ?? []).map((eu: any) => ({
-    ...eu.usuarios,
-    role: eu.role,
-  }))
+  type VinculoRow = { role: string | null; ativo: boolean | null; usuarios: Embed<Tables<'usuarios'>> }
+  const usuariosMapped = ((usuarios ?? []) as unknown as VinculoRow[])
+    .map(eu => {
+      const u = one(eu.usuarios)
+      return u ? { ...u, role: eu.role } : null
+    })
+    .filter((u): u is NonNullable<typeof u> => u !== null)
 
   return (
     <EquipeView

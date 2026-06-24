@@ -1,8 +1,12 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
+import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Relatórios' }
+
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function RelatoriosPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -31,16 +35,24 @@ export default async function RelatoriosPage() {
       .eq('ativo', true),
   ])
 
-  const vendas = (vendasRaw ?? []).map((v: any) => ({
+  type VendaRow = Tables<'vendas'> & {
+    clientes: Embed<{ nome: string | null }>
+    produtos: Embed<{ nome: string | null }>
+    usuarios: Embed<{ nome: string | null }>
+  }
+  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(v => ({
     ...v,
-    cliente_nome:  v.clientes?.nome ?? null,
-    produto_nome:  v.produtos?.nome ?? null,
-    vendedor_nome: v.usuarios?.nome ?? null,
+    cliente_nome:  one(v.clientes)?.nome ?? null,
+    produto_nome:  one(v.produtos)?.nome ?? null,
+    vendedor_nome: one(v.usuarios)?.nome ?? null,
   }))
 
   // Deduplica e filtra nulos
+  type VendedorRow = { usuarios: Embed<{ nome: string | null }> }
   const vendedores = [...new Set(
-    (vendedoresRaw ?? []).map((eu: any) => eu.usuarios?.nome as string).filter(Boolean)
+    ((vendedoresRaw ?? []) as unknown as VendedorRow[])
+      .map(eu => one(eu.usuarios)?.nome)
+      .filter((n): n is string => Boolean(n))
   )]
 
   return (

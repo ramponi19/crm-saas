@@ -4,6 +4,9 @@ import { HistoricoView } from '@/components/modules/historico/historico-view'
 
 export const metadata = { title: 'Histórico de Vendas' }
 
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
+
 export default async function HistoricoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
@@ -20,7 +23,14 @@ export default async function HistoricoPage() {
     .order('data_venda', { ascending: false })
     .limit(500)
 
-  const vendas = (vendasRaw ?? []).map((v: any) => ({
+  type VendaRow = {
+    id: number; data_venda: string | null; valor_venda: number; lucro: number | null
+    forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
+    clientes: Embed<{ nome: string | null }>
+    produtos: Embed<{ nome: string | null }>
+    usuarios: Embed<{ nome: string | null }>
+  }
+  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(v => ({
     id:            v.id,
     data_venda:    v.data_venda,
     valor_venda:   Number(v.valor_venda),
@@ -29,9 +39,9 @@ export default async function HistoricoPage() {
     canal_venda:   v.canal_venda,
     status:        v.status,
     parcelas:      v.parcelas,
-    cliente_nome:  v.clientes?.nome  ?? null,
-    produto_nome:  v.produtos?.nome  ?? null,
-    vendedor_nome: v.usuarios?.nome  ?? null,
+    cliente_nome:  one(v.clientes)?.nome  ?? null,
+    produto_nome:  one(v.produtos)?.nome  ?? null,
+    vendedor_nome: one(v.usuarios)?.nome  ?? null,
   }))
 
   return (

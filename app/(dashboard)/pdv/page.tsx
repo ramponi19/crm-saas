@@ -1,8 +1,12 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
+import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'PDV' }
+
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function PDVPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -27,16 +31,29 @@ export default async function PDVPage() {
       .order('data_venda', { ascending: false }).limit(20),
   ])
 
-  const itens = (unidades ?? []).map((u: any) => ({
-    ...u,
-    produto_nome: u.produtos?.nome ?? '—',
-    marca_nome: u.produtos?.marcas_produtos?.nome ?? '—',
-  }))
+  type UnidadeRow = Tables<'inventario_unidades'> & {
+    produtos: Embed<{ nome: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
+  }
+  const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
+    const prod = one(u.produtos)
+    return {
+      ...u,
+      produto_id: u.produto_id ?? 0,
+      status: u.status ?? 'disponivel',
+      produto_nome: prod?.nome ?? '—',
+      marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
+    }
+  })
 
-  const vendasFmt = (vendasRecentes ?? []).map((v: any) => ({
+  type VendaRow = Tables<'vendas'> & {
+    clientes: Embed<{ nome: string | null }>
+    produtos: Embed<{ nome: string | null }>
+  }
+  const vendasFmt = ((vendasRecentes ?? []) as unknown as VendaRow[]).map(v => ({
     ...v,
-    cliente_nome: v.clientes?.nome ?? 'Sem cliente',
-    produto_nome: v.produtos?.nome ?? '—',
+    data_venda: v.data_venda ?? '',
+    cliente_nome: one(v.clientes)?.nome ?? 'Sem cliente',
+    produto_nome: one(v.produtos)?.nome ?? '—',
   }))
 
   return (
