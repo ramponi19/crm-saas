@@ -30,7 +30,8 @@ export async function PATCH(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('planos_config')
-    .update(payload)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(payload as any)
     .eq('id', id)
     .select()
     .single()
