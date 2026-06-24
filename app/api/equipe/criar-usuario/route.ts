@@ -53,7 +53,15 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id
 
-  const { error: uErr } = await supabase.from('usuarios').insert({ id: userId, nome, email, role })
+  // O trigger on_auth_user_created (handle_new_user) já insere a linha em
+  // public.usuarios com role 'vendedor' assim que o usuário é criado no Auth.
+  // Portanto NÃO inserimos de novo (causaria duplicate key na pkey) — apenas
+  // atualizamos nome e role para os valores desejados. Usamos o service client
+  // para não depender de timing de RLS logo após a criação.
+  const { error: uErr } = await service
+    .from('usuarios')
+    .update({ nome, email, role })
+    .eq('id', userId)
   if (uErr) {
     // Desfaz o usuário recém-criado no Auth para não deixar órfãos.
     await service.auth.admin.deleteUser(userId)
@@ -67,7 +75,7 @@ export async function POST(req: NextRequest) {
     ativo: true,
   })
   if (vErr) {
-    await supabase.from('usuarios').delete().eq('id', userId)
+    await service.from('usuarios').delete().eq('id', userId)
     await service.auth.admin.deleteUser(userId)
     return NextResponse.json({ error: vErr.message }, { status: 400 })
   }
