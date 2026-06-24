@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
 
   if (jaProcessado) return NextResponse.json({ ok: true, duplicado: true })
 
+  // empresa_id é resolvido por tipo de evento e persistido no log (corrige bug
+  // anterior em que stripe_eventos.empresa_id era sempre null).
+  let empresaIdEvento: number | null = null
+
   try {
     switch (event.type) {
       case 'customer.subscription.created':
@@ -36,6 +40,7 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription
         const empresaId = Number(sub.metadata?.empresa_id)
         if (!empresaId) break
+        empresaIdEvento = empresaId
         const priceId = sub.items.data[0]?.price?.id ?? null
         const { plano, status, stripe_status } = stripeStatusToPlano(sub.status, priceId)
         await supabase.from('empresas').update({
@@ -50,6 +55,7 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription
         const empresaId = Number(sub.metadata?.empresa_id)
         if (!empresaId) break
+        empresaIdEvento = empresaId
         await supabase.from('empresas').update({
           plano: 'free', status: 'ativo', stripe_status: 'canceled',
           stripe_subscription_id: null, stripe_price_id: null,
@@ -58,20 +64,29 @@ export async function POST(req: NextRequest) {
       }
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
-        await supabase.from('empresas').update({ stripe_status: 'active', status: 'ativo' })
+        const { data: emp } = await supabase.from('empresas')
+          .update({ stripe_status: 'active', status: 'ativo' })
           .eq('stripe_customer_id', invoice.customer as string)
+          .select('id')
+          .single()
+        empresaIdEvento = emp?.id ?? null
         break
       }
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-        await supabase.from('empresas').update({ stripe_status: 'past_due' })
+        const { data: emp } = await supabase.from('empresas')
+          .update({ stripe_status: 'past_due' })
           .eq('stripe_customer_id', invoice.customer as string)
+          .select('id')
+          .single()
+        empresaIdEvento = emp?.id ?? null
         break
       }
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const empresaId = Number(session.metadata?.empresa_id)
         if (empresaId && session.customer) {
+          empresaIdEvento = empresaId
           await supabase.from('empresas').update({ stripe_customer_id: session.customer as string }).eq('id', empresaId)
         }
         break
@@ -81,7 +96,7 @@ export async function POST(req: NextRequest) {
     await supabase.from('stripe_eventos').insert({
       id: event.id,
       tipo: event.type,
-      empresa_id: null,
+      empresa_id: empresaIdEvento,
       payload: event.data.object as unknown as Json,
     })
 

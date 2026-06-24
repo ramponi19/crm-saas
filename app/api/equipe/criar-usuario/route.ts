@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
+import { verificarLimite } from '@/lib/limites'
 
 // Papéis que podem ser atribuídos por esta rota. 'owner' é definido apenas
 // na criação da empresa e não pode ser concedido aqui.
@@ -27,6 +28,15 @@ export async function POST(req: NextRequest) {
 
   if (!eu || !['owner', 'admin'].includes(eu.role))
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+
+  // Enforcement de limite de usuários do plano
+  const limite = await verificarLimite(eu.empresa_id, 'usuarios')
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { error: `Limite de usuários do plano atingido (${limite.usoAtual}/${limite.limite}). Faça upgrade para adicionar mais.` },
+      { status: 402 }
+    )
+  }
 
   // Service client reservado exclusivamente para a criação do usuário no Auth,
   // operação administrativa que exige a service role. Todas as demais escritas

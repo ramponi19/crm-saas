@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plug, Percent, Timer, Save, X, Link as LinkIcon, Copy } from 'lucide-react'
+import { Plug, Percent, Timer, Save, X, Link as LinkIcon, Copy, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { MeiosPagamentoCard } from './meios-pagamento-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -24,6 +25,7 @@ const WEBHOOK_URL = 'https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webho
 
 const TABS = [
   { id: 'integracoes', label: 'Integrações',     Icon: Plug    },
+  { id: 'pagamentos',  label: 'Meios de pagamento', Icon: Wallet },
   { id: 'taxas',       label: 'Taxas',            Icon: Percent },
   { id: 'sla',         label: 'SLA atendimento',  Icon: Timer   },
 ]
@@ -310,6 +312,9 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
               </div>
             </div>
         )}
+
+        {/* ── MEIOS DE PAGAMENTO ── */}
+        {aba === 'pagamentos' && <MeiosPagamentoCard />}
 
         {/* ── TAXAS ── */}
         {aba === 'taxas' && (

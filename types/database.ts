@@ -320,6 +320,72 @@ export type Database = {
           },
         ]
       }
+      cobrancas: {
+        Row: {
+          cliente_id: number | null
+          created_at: string
+          descricao: string | null
+          empresa_id: number
+          id: number
+          linha_digitavel: string | null
+          link_pagamento: string | null
+          metadata: Json | null
+          os_id: number | null
+          pago_em: string | null
+          provider: string
+          provider_ref: string | null
+          qr_code: string | null
+          qr_code_base64: string | null
+          status: string
+          tipo: string
+          valor: number
+          vencimento: string | null
+          venda_id: number | null
+        }
+        Insert: {
+          cliente_id?: number | null
+          created_at?: string
+          descricao?: string | null
+          empresa_id: number
+          id?: never
+          linha_digitavel?: string | null
+          link_pagamento?: string | null
+          metadata?: Json | null
+          os_id?: number | null
+          pago_em?: string | null
+          provider: string
+          provider_ref?: string | null
+          qr_code?: string | null
+          qr_code_base64?: string | null
+          status?: string
+          tipo: string
+          valor: number
+          vencimento?: string | null
+          venda_id?: number | null
+        }
+        Update: {
+          cliente_id?: number | null
+          created_at?: string
+          descricao?: string | null
+          empresa_id?: number
+          id?: never
+          linha_digitavel?: string | null
+          link_pagamento?: string | null
+          metadata?: Json | null
+          os_id?: number | null
+          pago_em?: string | null
+          provider?: string
+          provider_ref?: string | null
+          qr_code?: string | null
+          qr_code_base64?: string | null
+          status?: string
+          tipo?: string
+          valor?: number
+          vencimento?: string | null
+          venda_id?: number | null
+        }
+        Relationships: []
+      }
       comissoes: {
         Row: {
           created_at: string | null
@@ -1838,6 +1904,41 @@ export type Database = {
             foreignKeyName: "superadmin_logs_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tenant_payment_config: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          credenciais_cipher: string | null
+          empresa_id: number
+          modo: string
+          provider: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          credenciais_cipher?: string | null
+          empresa_id: number
+          modo?: string
+          provider?: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          credenciais_cipher?: string | null
+          empresa_id?: number
+          modo?: string
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_payment_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           }
