@@ -102,7 +102,7 @@ async function exportClientes() {
   downloadCSV(
     'clientes',
     ['Nome', 'Telefone', 'E-mail', 'Cidade', 'Estado', 'Cadastro'],
-    data.map((c: any) => [
+    (data as Array<{ nome: string | null; telefone: string | null; email: string | null; cidade: string | null; estado: string | null; created_at: string | null }>).map(c => [
       c.nome ?? '', c.telefone ?? '', c.email ?? '', c.cidade ?? '', c.estado ?? '',
       c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '',
     ])
@@ -121,10 +121,13 @@ async function exportEstoque() {
   downloadCSV(
     'estoque',
     ['Produto', 'IMEI', 'Nº Série', 'Estado', 'Status', 'Custo', 'Venda'],
-    data.map((u: any) => [
-      u.produtos?.nome ?? '', u.imei ?? '', u.numero_serie ?? '', u.estado ?? '',
-      u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
-    ])
+    (data as Array<{ imei: string | null; numero_serie: string | null; estado: string | null; status: string | null; preco_custo: number | null; preco_venda: number | null; produtos: { nome: string | null } | { nome: string | null }[] | null }>).map(u => {
+      const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
+      return [
+        prod?.nome ?? '', u.imei ?? '', u.numero_serie ?? '', u.estado ?? '',
+        u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
+      ]
+    })
   )
 }
 

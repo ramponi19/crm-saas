@@ -15,8 +15,8 @@ interface Props {
   official: OfficialConfig | null
   instagram: MetaConfig | null
   messenger: MetaConfig | null
-  dadosLoja: any
-  preferencias: any
+  dadosLoja: unknown
+  preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
 }
 

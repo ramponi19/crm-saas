@@ -367,7 +367,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">{f.label}</label>
-                  <input type={f.type ?? 'text'} value={(precoForm as any)[f.key]}
+                  <input type={f.type ?? 'text'} value={(precoForm as Record<string, string>)[f.key]}
                     onChange={e => setPrecoForm(pf => ({ ...pf, [f.key]: e.target.value }))}
                     placeholder={f.placeholder}
                     className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]" />

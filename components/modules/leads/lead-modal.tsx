@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Send, UserRound, UserCheck, Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, KANBAN_COLUMNS, STATUS_LABELS } from './types'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -56,7 +57,8 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
-      const msgs: ChatMsg[] = (data ?? []).map((m: any) => ({
+      type MsgRow = { direcao: string | null; conteudo: string | null; created_at: string }
+      const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map(m => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
         text: m.conteudo ?? '',
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
@@ -79,8 +81,8 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
       .channel(`lead_msgs_${lead.id}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
-        (payload: any) => {
-          const m = payload.new
+        (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null }>) => {
+          const m = payload.new as { id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null }
           // Evita duplicar mensagens que o próprio vendedor acabou de enviar (otimista)
           setChat(prev => {
             const novaMsg: ChatMsg = {

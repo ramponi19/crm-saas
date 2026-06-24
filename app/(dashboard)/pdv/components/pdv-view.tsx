@@ -172,8 +172,8 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
       toast.success('Venda finalizada!')
       setCarrinho([]); setClienteSelecionado(null); setDesconto(''); setParcelas(1)
       router.refresh()
-    } catch (e: any) {
-      toast.error('Erro: ' + e.message)
+    } catch (e) {
+      toast.error('Erro: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setFinalizando(false)
     }

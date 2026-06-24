@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Lead, Usuario } from './types'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
@@ -48,8 +49,8 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
       .channel('kanban_msgs')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lead_mensagens' },
-        (payload: any) => {
-          const m = payload.new
+        (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; created_at: string }>) => {
+          const m = payload.new as { direcao: string; lead_id: number; created_at: string }
           if (m.direcao !== 'recebida') return
           setLeads(prev => prev.map(l =>
             l.id === m.lead_id

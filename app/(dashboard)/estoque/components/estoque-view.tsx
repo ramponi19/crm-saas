@@ -343,7 +343,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
     preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor',
   })
   const [saving, setSaving] = useState(false)
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
   const margem = form.preco_venda && form.preco_custo
@@ -377,16 +377,16 @@ function UnidadeInlineForm({ produtos, onSaved }: {
       {node}
     </div>
   )
-  const inp = (k: string, placeholder?: string, type = 'text') => (
-    <input type={type} value={(form as any)[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder}
+  const inp = (k: keyof typeof form, placeholder?: string, type = 'text') => (
+    <input type={type} value={form[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder}
       className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]" />
   )
-  const btnGroup = (k: string, opts: { v: string; label: string }[]) => (
+  const btnGroup = (k: keyof typeof form, opts: { v: string; label: string }[]) => (
     <div className="flex gap-2 flex-wrap">
       {opts.map(o => (
         <button key={o.v} type="button" onClick={() => set(k, o.v)}
           className={cn('px-4 py-2 rounded-[9px] text-[12.5px] font-medium transition-all border',
-            (form as any)[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
+            form[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
           {o.label}
         </button>
       ))}

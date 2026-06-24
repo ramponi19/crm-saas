@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import type { TablesInsert } from '@/types/database'
 
 interface Garantia {
   id?: number
@@ -81,12 +82,12 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
   async function salvar() {
     setSaving(true)
-    const { clientes: _c, produtos: _p, ...payload } = form as any
+    const { clientes: _c, produtos: _p, id: _id, ...payload } = form
     const data = {
       ...payload,
       tipo: 'garantia',
       protocolo: payload.protocolo || `GAR-${Date.now().toString().slice(-6)}`,
-    }
+    } as TablesInsert<'garantias_assistencias'>
 
     if (isNew) {
       const { error } = await supabase.from('garantias_assistencias').insert(data)

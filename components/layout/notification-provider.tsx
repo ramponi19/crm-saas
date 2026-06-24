@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { X, Bell } from 'lucide-react'
 
 interface ToastNotif {
@@ -48,29 +49,30 @@ export function NotificationProvider() {
         event: 'INSERT',
         schema: 'public',
         table: 'lead_mensagens',
-      }, async (payload: any) => {
-        if (payload.new?.direcao !== 'recebida') return
+      }, async (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; lead_id: number; conteudo: string | null }>) => {
+        const novo = payload.new as { id: number; direcao: string; lead_id: number; conteudo: string | null }
+        if (novo.direcao !== 'recebida') return
 
         updateTitle()
 
         // Busca nome do lead
         let titulo = 'Nova mensagem'
-        const corpo = payload.new.conteudo?.slice(0, 100) ?? ''
+        const corpo = novo.conteudo?.slice(0, 100) ?? ''
         try {
           const { data } = await supabase
             .from('leads')
             .select('nome, origem')
-            .eq('id', payload.new.lead_id)
+            .eq('id', novo.lead_id)
             .maybeSingle()
           if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
         } catch {}
 
         // Toast in-app
         addToast({
-          id: `${payload.new.id}-${Date.now()}`,
+          id: `${novo.id}-${Date.now()}`,
           titulo,
           corpo,
-          leadId: payload.new.lead_id,
+          leadId: novo.lead_id,
         })
       })
       .subscribe()

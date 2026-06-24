@@ -52,9 +52,11 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
   useEffect(() => {
     supabase.from('produtos').select('id, nome, marcas_produtos!marca_id(nome)').eq('ativo', true).order('nome')
       .then(({ data }) => {
-        setProdutos((data ?? []).map((p: any) => ({
-          id: p.id, nome: p.nome, marca_nome: p.marcas_produtos?.nome ?? '',
-        })))
+        type ProdRow = { id: number; nome: string; marcas_produtos: { nome: string | null } | { nome: string | null }[] | null }
+        setProdutos(((data ?? []) as unknown as ProdRow[]).map(p => {
+          const m = Array.isArray(p.marcas_produtos) ? p.marcas_produtos[0] : p.marcas_produtos
+          return { id: p.id, nome: p.nome, marca_nome: m?.nome ?? '' }
+        }))
       })
     supabase.from('fornecedores').select('id, nome_fantasia').eq('ativo', true).order('nome_fantasia')
       .then(({ data }) => setFornecedores(data ?? []))
