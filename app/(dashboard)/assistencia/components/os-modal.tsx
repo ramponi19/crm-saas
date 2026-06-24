@@ -1,10 +1,19 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, QrCode, Send, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+
+interface Cobranca {
+  id: number
+  qr_code: string | null
+  qr_code_base64: string | null
+  linha_digitavel: string | null
+  link_pagamento: string | null
+  status: string
+}
 
 interface OS {
   id?: number
@@ -59,6 +68,10 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const [saving, setSaving] = useState(false)
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
+  const [cobrando, setCobrando] = useState(false)
+  const [cobranca, setCobranca] = useState<Cobranca | null>(null)
+  const [copiado, setCopiado] = useState(false)
+  const [enviandoWpp, setEnviandoWpp] = useState(false)
 
   useEffect(() => {
     supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => setClientes(data ?? []))
@@ -67,6 +80,60 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   function set(field: keyof OS, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  async function cobrar() {
+    if (!os?.id || !form.orcamento_valor) return
+    setCobrando(true)
+    try {
+      const res = await fetch('/api/payments/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'pix',
+          valor: form.orcamento_valor,
+          osId: os.id,
+          descricao: `OS ${form.protocolo ?? `#${os.id}`}`,
+          pagador: os.clientes ? { nome: os.clientes.nome, telefone: os.clientes.telefone ?? undefined } : undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao gerar cobrança')
+      setCobranca(json.cobranca)
+      toast.success('Cobrança gerada!')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+    } finally {
+      setCobrando(false)
+    }
+  }
+
+  async function copiarPix() {
+    const texto = cobranca?.linha_digitavel ?? cobranca?.qr_code ?? ''
+    if (!texto) return
+    await navigator.clipboard.writeText(texto)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
+  async function enviarWhatsApp() {
+    if (!os?.clientes?.telefone || !cobranca) return
+    setEnviandoWpp(true)
+    const chave = cobranca.linha_digitavel ?? cobranca.qr_code ?? cobranca.link_pagamento ?? ''
+    const msg = `Olá ${os.clientes.nome}! Segue o Pix para pagamento da OS *${form.protocolo ?? `#${os.id}`}* no valor de *R$ ${Number(form.orcamento_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*:\n\n${chave}`
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: os.clientes.telefone, message: msg }),
+      })
+      if (!res.ok) throw new Error('Falha ao enviar')
+      toast.success('WhatsApp enviado!')
+    } catch {
+      toast.error('Erro ao enviar WhatsApp')
+    } finally {
+      setEnviandoWpp(false)
+    }
   }
 
   async function salvar() {
@@ -162,6 +229,51 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <div><label className={labelCls}>Parecer técnico</label><textarea value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Diagnóstico..." /></div>
           <div><label className={labelCls}>Observações</label><textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="..." /></div>
         </div>
+
+        {/* Cobrança Pix */}
+        {!isNew && !!form.orcamento_valor && form.status !== 'reprovado' && (
+          <div className="px-6 pb-4 shrink-0 space-y-3">
+            <div className="h-px bg-[#16212E]/[0.08]" />
+            {!cobranca ? (
+              <button type="button" onClick={cobrar} disabled={cobrando}
+                className="flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-[10px] text-sm font-semibold bg-[#0e9f6e]/10 text-[#0e9f6e] border border-[#0e9f6e]/20 hover:bg-[#0e9f6e]/20 disabled:opacity-50 transition-colors">
+                <QrCode size={15} />
+                {cobrando ? 'Gerando cobrança...' : `Cobrar R$ ${Number(form.orcamento_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              </button>
+            ) : (
+              <div className="rounded-[13px] border border-[#0e9f6e]/20 bg-[#0e9f6e]/[0.04] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-[#0e9f6e]">Pix gerado</p>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0e9f6e]/10 text-[#0e9f6e] font-mono">{cobranca.status}</span>
+                </div>
+                {cobranca.qr_code_base64 && (
+                  <div className="flex justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`data:image/png;base64,${cobranca.qr_code_base64}`} alt="QR Code Pix" className="w-36 h-36 rounded-[8px]" />
+                  </div>
+                )}
+                {(cobranca.linha_digitavel ?? cobranca.qr_code) && (
+                  <div className="flex gap-2">
+                    <input readOnly value={cobranca.linha_digitavel ?? cobranca.qr_code ?? ''}
+                      className="flex-1 rounded-[8px] px-3 py-2 text-[11px] font-mono text-[#56657A] bg-white border border-[#16212E]/[0.08] outline-none truncate" />
+                    <button type="button" onClick={copiarPix}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] bg-white border border-[#16212E]/[0.08] text-[11px] font-semibold text-[#56657A] hover:bg-[#16212E]/[0.04] transition-colors shrink-0">
+                      {copiado ? <Check size={13} className="text-[#0e9f6e]" /> : <Copy size={13} />}
+                      {copiado ? 'Copiado' : 'Copiar'}
+                    </button>
+                  </div>
+                )}
+                {os?.clientes?.telefone && (
+                  <button type="button" onClick={enviarWhatsApp} disabled={enviandoWpp}
+                    className="flex items-center gap-2 w-full justify-center px-4 py-2 rounded-[10px] text-sm font-semibold bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 hover:bg-[#25D366]/20 disabled:opacity-50 transition-colors">
+                    <Send size={13} />
+                    {enviandoWpp ? 'Enviando...' : 'Enviar via WhatsApp'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Fechar</button>
