@@ -4,6 +4,7 @@ import { Bell, Search, X } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 
 interface TopbarProps {
@@ -80,8 +81,8 @@ export function Topbar({
         .eq('direcao', 'recebida')
       if (!msgs) return
       const contagem: Record<number, number> = {}
-      for (const m of msgs) {
-        const id = (m as any).lead_id as number
+      for (const m of msgs as Array<{ lead_id: number | null }>) {
+        const id = m.lead_id
         if (id != null) contagem[id] = (contagem[id] ?? 0) + 1
       }
       const ids = Object.keys(contagem).map(Number)
@@ -91,7 +92,8 @@ export function Topbar({
         .select('id, nome, produto_interessado, origem')
         .in('id', ids)
         .eq('ativo', true)
-      const list: NotifLead[] = (leads ?? []).map((l: any) => ({
+      type LeadNotifRow = { id: number; nome: string | null; produto_interessado: string | null; origem: string | null }
+      const list: NotifLead[] = ((leads ?? []) as LeadNotifRow[]).map(l => ({
         id: l.id, nome: l.nome, produto_interessado: l.produto_interessado,
         origem: l.origem, nao_lidas: contagem[l.id] ?? 0,
       })).sort((a, b) => b.nao_lidas - a.nao_lidas)
@@ -102,7 +104,7 @@ export function Topbar({
     // Realtime: recarrega notificações + dispara notificação do navegador
     const channel = supabase
       .channel(`topbar_notifs_${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; conteudo: string | null }>) => {
         load()
         // Notificação do navegador apenas para mensagens NOVAS recebidas
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
@@ -168,8 +170,9 @@ export function Topbar({
       ])
 
       // Busca unidades pelo produto_id encontrado
-      const produtoIds = (produtosMatch ?? []).map((p: any) => p.id)
-      let estoqueNome: any[] = []
+      type EstoqueRow = { id: number; imei: string | null; numero_serie: string | null; produtos: { nome: string | null } | { nome: string | null }[] | null }
+      const produtoIds = ((produtosMatch ?? []) as Array<{ id: number }>).map(p => p.id)
+      let estoqueNome: EstoqueRow[] = []
       if (produtoIds.length > 0) {
         const { data } = await supabase
           .from('inventario_unidades')
@@ -177,18 +180,19 @@ export function Topbar({
           .in('produto_id', produtoIds)
           .eq('ativo', true)
           .limit(4)
-        estoqueNome = data ?? []
+        estoqueNome = (data ?? []) as unknown as EstoqueRow[]
       }
 
       // Merge e deduplica por id
-      const allEstoque = [...(estoque ?? []), ...estoqueNome]
+      const allEstoque = [...((estoque ?? []) as unknown as EstoqueRow[]), ...estoqueNome]
       const seenIds = new Set<number>()
-      const estoqueDedup = allEstoque.filter((u: any) => { if (seenIds.has(u.id)) return false; seenIds.add(u.id); return true }).slice(0, 4)
+      const estoqueDedup = allEstoque.filter(u => { if (seenIds.has(u.id)) return false; seenIds.add(u.id); return true }).slice(0, 4)
+      const estNome = (r: EstoqueRow['produtos']): string | null => (Array.isArray(r) ? r[0]?.nome : r?.nome) ?? null
 
       const results: SearchResult[] = [
-        ...(clientes ?? []).map((c: any) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
-        ...(leads ?? []).map((l: any) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
-        ...estoqueDedup.map((u: any) => ({ tipo: 'estoque' as const, id: u.id, titulo: (u.produtos as any)?.nome ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
+        ...((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>).map(c => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
+        ...((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null }>).map(l => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
+        ...estoqueDedup.map(u => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ]
       setSearchResults(results)
       setSearching(false)

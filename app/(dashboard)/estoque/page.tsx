@@ -1,7 +1,11 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
+import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Estoque' }
+
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function EstoquePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -19,29 +23,46 @@ export default async function EstoquePage() {
     supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
   ])
 
-  const itens = (unidades ?? []).map((u: any) => ({
-    ...u,
-    produto_nome: u.produtos?.nome ?? '—',
-    marca_nome: u.produtos?.marcas_produtos?.nome ?? '—',
-    fornecedor_nome: u.fornecedores?.nome_fantasia ?? null,
-  }))
+  type UnidadeRow = Tables<'inventario_unidades'> & {
+    produtos: Embed<{ nome: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
+    fornecedores: Embed<{ nome_fantasia: string | null }>
+  }
+  const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
+    const prod = one(u.produtos)
+    return {
+      ...u,
+      produto_id: u.produto_id ?? 0,
+      produto_nome: prod?.nome ?? '—',
+      marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
+      fornecedor_nome: one(u.fornecedores)?.nome_fantasia ?? null,
+    }
+  })
 
-  const produtos = (produtosRaw ?? []).map((p: any) => ({
+  type ProdutoRow = {
+    id: number; nome: string; marca_id: number | null; categoria_id: number | null; ativo: boolean | null
+    marcas_produtos: Embed<{ nome: string | null }>
+    categorias_produtos: Embed<{ nome: string | null }>
+  }
+  const produtos = ((produtosRaw ?? []) as unknown as ProdutoRow[]).map(p => ({
     id: p.id, nome: p.nome, marca_id: p.marca_id,
-    marca_nome: p.marcas_produtos?.nome ?? '—',
+    marca_nome: one(p.marcas_produtos)?.nome ?? '—',
     categoria_id: p.categoria_id,
-    categoria_nome: p.categorias_produtos?.nome ?? null,
-    ativo: p.ativo,
+    categoria_nome: one(p.categorias_produtos)?.nome ?? null,
+    ativo: p.ativo ?? false,
   }))
 
-  const movimentacoes = (movsRaw ?? []).map((m: any) => ({
+  type MovRow = Tables<'movimentacao_estoque'> & {
+    produtos: Embed<{ nome: string | null }>
+    usuarios: Embed<{ nome: string | null }>
+  }
+  const movimentacoes = ((movsRaw ?? []) as unknown as MovRow[]).map(m => ({
     id: m.id,
-    produto_nome: m.produtos?.nome ?? '—',
+    produto_nome: one(m.produtos)?.nome ?? '—',
     tipo_movimento: m.tipo_movimento,
     quantidade: m.quantidade,
     observacoes: m.observacoes ?? null,
-    created_at: m.created_at,
-    usuario_nome: m.usuarios?.nome ?? null,
+    created_at: m.created_at ?? '',
+    usuario_nome: one(m.usuarios)?.nome ?? null,
   }))
 
   return (

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { LeadsView } from '@/components/modules/leads/leads-view'
+import type { Lead } from '@/components/modules/leads/types'
 
 export const metadata = {
   title: 'Leads — CRM SaaS',
@@ -51,21 +52,27 @@ export default async function LeadsPage() {
 
   // Agrupa não-lidas por lead_id
   const contagem: Record<number, number> = {}
-  for (const m of msgsNaoLidas ?? []) {
-    const id = (m as any).lead_id as number
+  for (const m of (msgsNaoLidas ?? []) as Array<{ lead_id: number | null }>) {
+    const id = m.lead_id
     if (id != null) contagem[id] = (contagem[id] ?? 0) + 1
   }
 
   // Sobrescreve msgs_nao_lidas de cada lead com a contagem real
-  const leadsComContagem = (leads ?? []).map((l: any) => ({
+  const leadsComContagem = ((leads ?? []) as unknown as Lead[]).map(l => ({
     ...l,
     msgs_nao_lidas: contagem[l.id] ?? 0,
   }))
 
+  type UsuarioVinculoRow = { usuario_id: string; role: string | null; usuarios: { id: string; nome: string } | { id: string; nome: string }[] | null }
+  const usuariosMapped = ((usuarios ?? []) as unknown as UsuarioVinculoRow[]).map(eu => {
+    const u = Array.isArray(eu.usuarios) ? eu.usuarios[0] : eu.usuarios
+    return { id: eu.usuario_id, nome: u?.nome ?? '', role: eu.role ?? '' }
+  })
+
   return (
     <LeadsView
       initialLeads={leadsComContagem}
-      usuarios={(usuarios ?? []).map((eu: any) => ({ id: eu.usuario_id, nome: eu.usuarios?.nome ?? '', role: eu.role }))}
+      usuarios={usuariosMapped}
     />
   )
 }

@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { TablesInsert } from '@/types/database'
 
-interface Unidade {
+export interface Unidade {
   id: number
   produto_id: number
   produto_nome: string
@@ -33,7 +33,7 @@ interface Unidade {
   created_at: string | null
 }
 
-interface Movimentacao {
+export interface Movimentacao {
   id: number
   produto_nome: string
   tipo_movimento: string
