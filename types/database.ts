@@ -464,23 +464,41 @@ export type Database = {
       configuracoes_sistema: {
         Row: {
           chave: string
+          empresa_id: number
           id: number
           updated_at: string | null
           valor: Json | null
         }
         Insert: {
           chave: string
+          empresa_id: number
           id?: never
           updated_at?: string | null
           valor?: Json | null
         }
         Update: {
           chave?: string
+          empresa_id?: number
           id?: never
           updated_at?: string | null
           valor?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_sistema_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracoes_sistema_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contas_a_receber: {
         Row: {
