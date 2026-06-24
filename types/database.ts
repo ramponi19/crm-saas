@@ -1848,6 +1848,7 @@ export type Database = {
           forma_pagamento: string | null
           id: number
           lucro: number | null
+          numero_serie: string | null
           observacoes: string | null
           parcelas: number | null
           produto_id: number | null
@@ -1870,6 +1871,7 @@ export type Database = {
           forma_pagamento?: string | null
           id?: never
           lucro?: number | null
+          numero_serie?: string | null
           observacoes?: string | null
           parcelas?: number | null
           produto_id?: number | null
@@ -1892,6 +1894,7 @@ export type Database = {
           forma_pagamento?: string | null
           id?: never
           lucro?: number | null
+          numero_serie?: string | null
           observacoes?: string | null
           parcelas?: number | null
           produto_id?: number | null

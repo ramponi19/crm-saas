@@ -3,7 +3,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { ScanBarcode, Plus, Minus, ChevronDown, UserPlus, CheckCircle, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { TablesInsert } from '@/types/database'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -156,7 +155,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
             numero_serie: c.item.imei ?? c.item.numero_serie,
             status: 'concluida',
             data_venda: new Date().toISOString(),
-          } as TablesInsert<'vendas'>)
+          })
           .select().single()
         if (error) throw new Error(error.message)
         await supabase.from('vendas_pagamentos').insert({
