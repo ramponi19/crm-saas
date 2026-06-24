@@ -1949,6 +1949,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          impersonando_empresa_id: number | null
           is_super_admin: boolean
           modulos_acesso: string[] | null
           nome: string
@@ -1960,6 +1961,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id: string
+          impersonando_empresa_id?: number | null
           is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome: string
@@ -1971,6 +1973,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          impersonando_empresa_id?: number | null
           is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome?: string

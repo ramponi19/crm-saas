@@ -3,8 +3,6 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { Database } from '@/types/database'
 
-const IMPERSONATE_COOKIE = 'impersonating_empresa_id'
-
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
 export async function createClient() {
@@ -31,27 +29,21 @@ export async function createClient() {
 }
 
 /** Returns the empresa_id for the current authenticated user, redirecting to /login if not found.
- *  If the user is a super admin and an impersonation cookie is set, returns the impersonated empresa_id. */
+ *  If the user is a super admin impersonating, returns the impersonated empresa_id. */
 export async function getEmpresaId(): Promise<number> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Impersonação: super admin pode operar como uma empresa específica.
-  // O cookie só tem efeito se o usuário for de fato super admin (revalidado a cada request).
-  const cookieStore = await cookies()
-  const impersonateId = cookieStore.get(IMPERSONATE_COOKIE)?.value
-  if (impersonateId) {
-    const { data: usuario } = await supabase
-      .from('usuarios')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single()
+  // Fonte de verdade da impersonação: coluna persistida (compatível com RLS).
+  const { data: usuario } = await supabase
+    .from('usuarios')
+    .select('is_super_admin, impersonando_empresa_id')
+    .eq('id', user.id)
+    .single()
 
-    if (usuario?.is_super_admin) {
-      const id = Number(impersonateId)
-      if (Number.isFinite(id)) return id
-    }
+  if (usuario?.is_super_admin && usuario.impersonando_empresa_id) {
+    return usuario.impersonando_empresa_id
   }
 
   const { data: vinculo } = await supabase
@@ -67,30 +59,26 @@ export async function getEmpresaId(): Promise<number> {
 
 /** Returns the impersonated empresa info if the current super admin is impersonating, else null. */
 export async function getImpersonation(): Promise<{ empresaId: number; nome: string } | null> {
-  const cookieStore = await cookies()
-  const impersonateId = cookieStore.get(IMPERSONATE_COOKIE)?.value
-  if (!impersonateId) return null
-
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
   const { data: usuario } = await supabase
     .from('usuarios')
-    .select('is_super_admin')
+    .select('is_super_admin, impersonando_empresa_id')
     .eq('id', user.id)
     .single()
 
-  if (!usuario?.is_super_admin) return null
-
-  const id = Number(impersonateId)
-  if (!Number.isFinite(id)) return null
+  if (!usuario?.is_super_admin || !usuario.impersonando_empresa_id) return null
 
   const { data: empresa } = await supabase
     .from('empresas')
     .select('nome')
-    .eq('id', id)
+    .eq('id', usuario.impersonando_empresa_id)
     .single()
 
-  return { empresaId: id, nome: empresa?.nome ?? `Empresa #${id}` }
+  return {
+    empresaId: usuario.impersonando_empresa_id,
+    nome: empresa?.nome ?? `Empresa #${usuario.impersonando_empresa_id}`,
+  }
 }

@@ -47,6 +47,13 @@ export async function POST(
     detalhes: { empresa_nome: empresa.nome },
   })
 
+  // Persistir a empresa impersonada na coluna do usuário — é a fonte de verdade
+  // para o RLS (get_empresa_id considera isto quando o usuário é super admin).
+  await supabase
+    .from('usuarios')
+    .update({ impersonando_empresa_id: empresaId })
+    .eq('id', user.id)
+
   const res = NextResponse.json({ ok: true, empresa: empresa.nome })
   res.cookies.set(IMPERSONATE_COOKIE, String(empresaId), {
     httpOnly: true,
@@ -60,6 +67,15 @@ export async function POST(
 
 // Encerrar impersonação
 export async function DELETE() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase
+      .from('usuarios')
+      .update({ impersonando_empresa_id: null })
+      .eq('id', user.id)
+  }
+
   const res = NextResponse.json({ ok: true })
   res.cookies.set(IMPERSONATE_COOKIE, '', {
     httpOnly: true,
