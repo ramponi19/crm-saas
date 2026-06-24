@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/types/database'
-import { Building2, User, Lock, ChevronRight, Check, Loader2, Smartphone } from 'lucide-react'
+import { Building2, User, ChevronRight, Check, Loader2, Smartphone } from 'lucide-react'
 
 type Step = 'empresa' | 'usuario' | 'plano'
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Package, CheckCircle, Clock, Wrench, TrendingUp, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
+import { Search, Package, CheckCircle, Clock, Wrench, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
@@ -81,7 +81,7 @@ const fmtDate = (s: string) => {
 
 type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas, categorias, produtos }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos }: Props) {
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')

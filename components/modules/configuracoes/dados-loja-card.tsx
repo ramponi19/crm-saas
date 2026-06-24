@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Store, MapPin, Phone, Mail, Globe } from 'lucide-react'
+import { Save, Store } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { Json } from '@/types/database'

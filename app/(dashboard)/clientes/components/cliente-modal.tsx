@@ -102,7 +102,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   async function salvar() {
     if (!form.nome.trim()) { toast.error('Nome é obrigatório'); return }
     setSaving(true)
-    const { total_vendas, valor_total, ultima_compra, ...payload } = form
+    const { total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
     const data = { ...payload, ativo: true }
     if (isNew) {
       const { error } = await supabase.from('clientes').insert(data as TablesInsert<'clientes'>)

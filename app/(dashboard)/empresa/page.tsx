@@ -43,7 +43,6 @@ export default function EmpresaConfigPage() {
 
   useEffect(() => {
     if (aba === 'equipe') carregarEquipe()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba])
 
   async function carregarEquipe() {

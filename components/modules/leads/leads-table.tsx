@@ -1,7 +1,7 @@
 'use client'
 
 import { Phone, Instagram, MessageCircle, ChevronRight, User } from 'lucide-react'
-import { Lead, Usuario, STATUS_LABELS, KANBAN_COLUMNS } from './types'
+import { Lead, Usuario, KANBAN_COLUMNS } from './types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 

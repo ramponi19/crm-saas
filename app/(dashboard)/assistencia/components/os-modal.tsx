@@ -70,7 +70,6 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   async function salvar() {
     setSaving(true)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { clientes: _c, produtos: _p, ...payload } = form
     const base = { ...payload, tipo: 'assistencia' as const, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
     if (isNew) {

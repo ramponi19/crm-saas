@@ -144,7 +144,7 @@ export function SimularParcelaView() {
           ) : rows.length === 0 ? (
             <div className="text-center py-12 text-[#788698] font-mono text-[12px]">Sem taxas cadastradas para esta modalidade.</div>
           ) : (
-            rows.map((r, i) => (
+            rows.map((r, _i) => (
               <div
                 key={r.parcelas}
                 className={cn(

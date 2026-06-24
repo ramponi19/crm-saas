@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react'
 import { Search, Plus, Tag, Package, MoreHorizontal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 interface Produto {
@@ -90,7 +89,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const [tab, setTab] = useState<Tab>('produtos')
   const [produtos] = useState(produtosInit)
   const [tabela, setTabela] = useState(tabelaInit)
-  const [searchProd, setSearchProd] = useState('')
+  const [searchProd] = useState('')
   const [searchEst, setSearchEst] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todas')
   const [modalPreco, setModalPreco] = useState(false)
@@ -120,7 +119,6 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   async function salvarPreco() {
     if (!precoForm.modelo || !precoForm.preco_sugerido) { toast.error('Modelo e preço são obrigatórios'); return }
     setSaving(true)
-    const supabase = createClient()
     // Tabela de preços usa inventario_unidades de referência ou uma tabela dedicada
     // Usamos a tabela tabelaprecos se existir, senão só atualiza localmente
     const novo: TabelaPreco = {
@@ -329,7 +327,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                 ))}
               </div>
               {tabela.length === 0
-                ? <div className="py-14 text-center text-[#788698] text-[13px]">Nenhum preço cadastrado. Clique em "+ Novo preço" para começar.</div>
+                ? <div className="py-14 text-center text-[#788698] text-[13px]">Nenhum preço cadastrado. Clique em &quot;+ Novo preço&quot; para começar.</div>
                 : tabela.map(t => {
                   const cond = COND_STYLE[t.condicao] ?? COND_STYLE.lacrado
                   return (

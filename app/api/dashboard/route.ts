@@ -42,7 +42,6 @@ export async function GET() {
 
   // IDs únicos para joins
   const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))]
-  const vendedorIds = [...new Set(vendas.map(v => v.vendedor_id).filter(Boolean))]
 
   const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
 

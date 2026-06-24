@@ -117,8 +117,6 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
     } finally { setSaving(false) }
   }
 
-  const roleInfo = ROLES.find(r => r.value === form.role)
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white rounded-[18px] border border-[#16212E]/[0.10] shadow-2xl">
@@ -200,7 +198,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
 
   async function salvarMeta(uid: string) {
     setSaving(uid)
-    const { data: eu } = await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', uid).single()
+    await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', uid).single()
     // fallback: get empresa_id from any empresa_usuario of current session
     const { data: euMe } = await supabase.from('empresa_usuarios').select('empresa_id').single()
     const empresa_id = euMe?.empresa_id

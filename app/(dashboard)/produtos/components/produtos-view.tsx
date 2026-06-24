@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Package, TrendingUp, AlertTriangle, XCircle, ChevronRight } from 'lucide-react'
+import { Search, Plus, Package, TrendingUp, AlertTriangle, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
 import { Topbar } from '@/components/layout/topbar'

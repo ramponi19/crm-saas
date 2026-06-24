@@ -272,7 +272,7 @@ export function Topbar({
               </button>
             ))}
             {!searching && searchResults.length === 0 && (
-              <div className="px-4 py-3 text-[12px] text-[#788698]">Nenhum resultado para "{query}"</div>
+              <div className="px-4 py-3 text-[12px] text-[#788698]">Nenhum resultado para &quot;{query}&quot;</div>
             )}
           </div>
         )}

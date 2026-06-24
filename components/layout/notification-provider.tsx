@@ -55,7 +55,7 @@ export function NotificationProvider() {
 
         // Busca nome do lead
         let titulo = 'Nova mensagem'
-        let corpo = payload.new.conteudo?.slice(0, 100) ?? ''
+        const corpo = payload.new.conteudo?.slice(0, 100) ?? ''
         try {
           const { data } = await supabase
             .from('leads')
