@@ -9,5 +9,6 @@ export default async function PlanosPage() {
     supabase.from('planos_config').select('*').eq('ativo', true).order('ordem'),
   ])
 
-  return <PlanosView empresa={empresa} planos={planos ?? []} />
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <PlanosView empresa={empresa} planos={(planos ?? []) as any} />
 }

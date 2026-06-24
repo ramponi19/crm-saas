@@ -54,6 +54,7 @@ export default function EmpresaConfigPage() {
   useEffect(() => {
     if (aba === 'equipe') carregarEquipe()
     if (aba === 'plano' && planosConfig.length === 0) carregarPlanos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba])
 
   async function carregarEquipe() {
