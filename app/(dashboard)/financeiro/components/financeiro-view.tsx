@@ -315,11 +315,12 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
               <button onClick={() => setModal(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors"><X size={20} /></button>
             </div>
 
+            <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
               {/* Tipo */}
               <div className="grid grid-cols-2 gap-2">
                 {(['receita','despesa'] as const).map(t => (
-                  <button key={t} onClick={() => set('tipo', t)}
+                  <button type="button" key={t} onClick={() => set('tipo', t)}
                     className={cn(
                       'py-2.5 rounded-[10px] text-sm font-semibold transition-all border',
                       form.tipo === t
@@ -408,22 +409,23 @@ export default function FinanceiroView({ lancamentos: initial, categorias }: Pro
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
               {editId ? (
-                <button onClick={excluir} className="flex items-center gap-1.5 text-xs text-[#788698] hover:text-[#D7282F] transition-colors">
+                <button type="button" onClick={excluir} className="flex items-center gap-1.5 text-xs text-[#788698] hover:text-[#D7282F] transition-colors">
                   <Trash2 size={13} /> Remover
                 </button>
               ) : <div />}
               <div className="flex gap-2">
-                <button onClick={() => setModal(false)}
+                <button type="button" onClick={() => setModal(false)}
                   className="px-4 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors">
                   Cancelar
                 </button>
-                <button onClick={salvar} disabled={saving}
+                <button type="submit" disabled={saving}
                   className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
                   <Save size={13} />
                   {saving ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </div>
+            </form>
           </div>
         </div>
       )}

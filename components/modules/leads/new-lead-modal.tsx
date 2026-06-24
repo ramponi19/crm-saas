@@ -105,6 +105,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
         </div>
 
         {/* Form */}
+        <form onSubmit={e => { e.preventDefault(); handleSubmit() }}>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className={labelCls}>Nome *</label>
@@ -163,15 +164,16 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
 
         {/* Footer */}
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose}
+          <button type="button" onClick={onClose}
             className="flex-1 py-[11px] rounded-[11px] border border-[#16212E]/[0.10] bg-white/[0.04] text-[#16212E] font-semibold text-[13.5px] hover:bg-[#16212E]/[0.06] transition-colors">
             Cancelar
           </button>
-          <button onClick={handleSubmit} disabled={loading || !form.nome.trim()}
+          <button type="submit" disabled={loading || !form.nome.trim()}
             className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 disabled:transform-none shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
             {loading ? 'Criando…' : 'Criar lead'}
           </button>
         </div>
+        </form>
       </div>
     </div>
   )

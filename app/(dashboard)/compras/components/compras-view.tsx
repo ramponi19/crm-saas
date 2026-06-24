@@ -243,6 +243,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               </button>
             </div>
 
+            <form onSubmit={e => { e.preventDefault(); salvarFornecedor() }}>
             <div className="px-6 py-5 space-y-4">
               {[
                 { label: 'Nome fantasia *', key: 'nome_fantasia', placeholder: 'Ex: Distribuidora ABC' },
@@ -269,19 +270,21 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
 
             <div className="flex gap-3 px-6 pb-6">
               <button
+                type="button"
                 onClick={() => setModalFornecedor(false)}
                 className="flex-1 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors"
               >
                 Cancelar
               </button>
               <button
-                onClick={salvarFornecedor}
+                type="submit"
                 disabled={salvando}
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60"
               >
                 {salvando ? 'Salvando...' : 'Salvar fornecedor'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
@@ -294,6 +297,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               <h2 className="text-base font-bold text-[#1F2A39]">Novo pedido de compra</h2>
               <button onClick={() => setModalPedido(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors"><X size={20} /></button>
             </div>
+            <form onSubmit={e => { e.preventDefault(); salvarPedido() }}>
             <div className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
@@ -338,15 +342,16 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               {erroPedido && <p className="text-xs text-[#D7282F]">{erroPedido}</p>}
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              <button onClick={() => setModalPedido(false)}
+              <button type="button" onClick={() => setModalPedido(false)}
                 className="flex-1 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors">
                 Cancelar
               </button>
-              <button onClick={salvarPedido} disabled={salvandoPedido}
+              <button type="submit" disabled={salvandoPedido}
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
                 {salvandoPedido ? 'Salvando...' : 'Criar pedido'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

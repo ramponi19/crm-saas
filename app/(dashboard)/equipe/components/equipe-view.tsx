@@ -125,6 +125,7 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] transition-colors"><X size={16} /></button>
         </div>
 
+        <form onSubmit={e => { e.preventDefault(); salvar() }}>
         <div className="px-6 py-4 space-y-3">
           <div>
             <label className={labelCls}>Nome completo</label>
@@ -146,7 +147,7 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
             <label className={labelCls}>Perfil de acesso</label>
             <div className="grid grid-cols-2 gap-2 mt-1">
               {ROLES.filter(r => r.value !== 'owner').map(r => (
-                <button key={r.value} onClick={() => set('role', r.value)}
+                <button type="button" key={r.value} onClick={() => set('role', r.value)}
                   className={cn('px-3 py-2 rounded-[10px] text-[13px] font-semibold border transition-all text-left', form.role === r.value ? 'border-transparent' : 'border-[#16212E]/[0.09] text-[#788698] bg-transparent')}
                   style={form.role === r.value ? { background: r.bg, color: r.color, border: `1px solid ${r.color}33` } : {}}>
                   {r.label}
@@ -162,12 +163,13 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.07]">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Cancelar</button>
-          <button onClick={salvar} disabled={saving}
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Cancelar</button>
+          <button type="submit" disabled={saving}
             className="px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : isNew ? 'Criar usuário' : 'Salvar'}
           </button>
         </div>
+        </form>
       </div>
     </div>
   )

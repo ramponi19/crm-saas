@@ -74,6 +74,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
           <h2 className="text-base font-bold text-[#16212E]">{isNew ? 'Novo Produto' : 'Editar Produto'}</h2>
           <button onClick={onClose} className="text-[#788698] hover:text-[#9FB0C2]"><X size={20} /></button>
         </div>
+        <form onSubmit={e => { e.preventDefault(); salvar() }}>
         <div className="px-6 py-5 space-y-4">
           <div>
             <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Nome do Modelo *</label>
@@ -109,15 +110,15 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
         </div>
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08]">
           {!isNew ? (
-            <button onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#F0353D] transition-colors">
+            <button type="button" onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#F0353D] transition-colors">
               <Trash2 size={14} />
               Remover
             </button>
           ) : <div />}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#788698] hover:text-[#56657A]">Cancelar</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#788698] hover:text-[#56657A]">Cancelar</button>
             <button
-              onClick={salvar}
+              type="submit"
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold disabled:opacity-50"
             >
@@ -126,6 +127,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
             </button>
           </div>
         </div>
+        </form>
       </div>
     </div>
   )

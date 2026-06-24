@@ -154,6 +154,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
         )}
 
         {/* Form */}
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -254,14 +255,15 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
             Fechar
           </button>
-          <button onClick={salvar} disabled={saving}
+          <button type="submit" disabled={saving}
             className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
+        </form>
       </div>
     </div>
   )

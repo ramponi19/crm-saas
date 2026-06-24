@@ -357,6 +357,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               <h2 className="text-[16px] font-serif text-[#16212E]">Novo preço de referência</h2>
               <button onClick={() => setModalPreco(false)} className="text-[#788698] hover:text-[#9FB0C2]"><X size={20} /></button>
             </div>
+            <form onSubmit={e => { e.preventDefault(); salvarPreco() }}>
             <div className="px-6 py-5 space-y-4">
               {[
                 { label: 'Modelo *', key: 'modelo', placeholder: 'Ex: iPhone 15 Pro Max' },
@@ -376,7 +377,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                 <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">Condição</label>
                 <div className="flex gap-2">
                   {['lacrado','excelente','bom','regular'].map(c => (
-                    <button key={c} onClick={() => setPrecoForm(pf => ({ ...pf, condicao: c }))}
+                    <button type="button" key={c} onClick={() => setPrecoForm(pf => ({ ...pf, condicao: c }))}
                       className={cn('px-3 py-2 rounded-[9px] text-[12px] font-medium transition-all border capitalize',
                         precoForm.condicao === c ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
                       {c}
@@ -386,12 +387,13 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               </div>
             </div>
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#16212E]/[0.08]">
-              <button onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#788698] hover:text-[#56657A]">Cancelar</button>
-              <button onClick={salvarPreco} disabled={saving}
+              <button type="button" onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#788698] hover:text-[#56657A]">Cancelar</button>
+              <button type="submit" disabled={saving}
                 className="px-5 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}

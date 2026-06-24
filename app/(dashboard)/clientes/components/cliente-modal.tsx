@@ -160,7 +160,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
               </span>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors shrink-0">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors shrink-0">
             <X size={16} />
           </button>
         </div>
@@ -184,6 +184,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         )}
 
         {/* Form */}
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
           <div>
             <label className={labelCls}>Nome completo</label>
@@ -289,20 +290,21 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           {!isNew ? (
-            <button onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-medium transition-colors">
+            <button type="button" onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-medium transition-colors">
               Desativar
             </button>
           ) : <div />}
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
               Fechar
             </button>
-            <button onClick={salvar} disabled={saving}
+            <button type="submit" disabled={saving}
               className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>
+        </form>
       </div>
     </div>
   )
