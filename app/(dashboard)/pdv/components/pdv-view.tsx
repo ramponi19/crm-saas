@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { ScanBarcode, Plus, Minus, ChevronDown, UserPlus, CheckCircle, RefreshCw } from 'lucide-react'
+import { ScanBarcode, Plus, Minus, ChevronDown, UserPlus, CheckCircle, RefreshCw, QrCode, Copy, Check, Send, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -16,6 +16,7 @@ interface ItemEstoque {
 interface ClienteSimples { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
 interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
+interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number }
 
@@ -46,6 +47,9 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
   const [bandeira,           setBandeira]           = useState<'visa_master'|'outros'>('visa_master')
   const [desconto,           setDesconto]           = useState('')
   const [finalizando,        setFinalizando]        = useState(false)
+  const [pixCobranca,        setPixCobranca]        = useState<CobrancaPix | null>(null)
+  const [pixCopiado,         setPixCopiado]         = useState(false)
+  const [enviandoWpp,        setEnviandoWpp]        = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -169,8 +173,28 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
           .update({ status: 'vendido', cliente_id: clienteSelecionado?.id ?? null })
           .eq('id', c.item.id)
       }
+      if (formaPagamento === 'pix' && totais.total > 0) {
+        try {
+          const lastVendaId = (await supabase.from('vendas').select('id').eq('empresa_id', empresaId).order('id', { ascending: false }).limit(1).single()).data?.id
+          const res = await fetch('/api/payments/charge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'pix',
+              valor: totais.total,
+              vendaId: lastVendaId,
+              descricao: `Venda PDV`,
+              pagador: clienteSelecionado ? { nome: clienteSelecionado.nome, telefone: clienteSelecionado.telefone ?? undefined } : undefined,
+            }),
+          })
+          const json = await res.json()
+          if (res.ok && json.cobranca) setPixCobranca(json.cobranca)
+        } catch { /* não bloqueia a venda */ }
+      }
+
       toast.success('Venda finalizada!')
-      setCarrinho([]); setClienteSelecionado(null); setDesconto(''); setParcelas(1)
+      setCarrinho([]); setDesconto(''); setParcelas(1)
+      if (formaPagamento !== 'pix') setClienteSelecionado(null)
       router.refresh()
     } catch (e) {
       toast.error('Erro: ' + (e instanceof Error ? e.message : String(e)))
@@ -179,10 +203,89 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
     }
   }
 
+  async function copiarPix() {
+    const txt = pixCobranca?.linha_digitavel ?? pixCobranca?.qr_code ?? ''
+    if (!txt) return
+    await navigator.clipboard.writeText(txt)
+    setPixCopiado(true)
+    setTimeout(() => setPixCopiado(false), 2000)
+  }
+
+  async function enviarWhatsApp() {
+    if (!clienteSelecionado?.telefone || !pixCobranca) return
+    setEnviandoWpp(true)
+    const chave = pixCobranca.linha_digitavel ?? pixCobranca.qr_code ?? pixCobranca.link_pagamento ?? ''
+    const msg = `Olá ${clienteSelecionado.nome}! Segue o Pix para pagamento da sua compra no valor de *${fmt(totais.total)}*:\n\n${chave}`
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: clienteSelecionado.telefone, message: msg }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('WhatsApp enviado!')
+    } catch { toast.error('Erro ao enviar WhatsApp') }
+    finally { setEnviandoWpp(false) }
+  }
+
   const clienteIni = clienteSelecionado ? getInitials(clienteSelecionado.nome) : '?'
   const clienteBg  = clienteSelecionado ? getAvatarColor(clienteSelecionado.nome) : '#3A4A63'
 
   return (
+    <>
+    {pixCobranca && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+        <div className="w-full max-w-sm bg-white rounded-[20px] border border-[#16212E]/[0.10] shadow-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <QrCode size={18} className="text-[#0e9f6e]" />
+              <h3 className="text-base font-semibold text-[#1F2A39]">Pix gerado</h3>
+            </div>
+            <button onClick={() => { setPixCobranca(null); setClienteSelecionado(null) }}
+              className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="rounded-[13px] bg-[#0e9f6e]/[0.05] border border-[#0e9f6e]/20 p-4 text-center">
+            <p className="text-xs text-[#788698] mb-1">Valor a pagar</p>
+            <p className="text-2xl font-bold text-[#1F2A39]">{fmt(totais.total)}</p>
+          </div>
+
+          {pixCobranca.qr_code_base64 && (
+            <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`data:image/png;base64,${pixCobranca.qr_code_base64}`} alt="QR Code Pix" className="w-44 h-44 rounded-[10px]" />
+            </div>
+          )}
+
+          {(pixCobranca.linha_digitavel ?? pixCobranca.qr_code) && (
+            <div className="flex gap-2">
+              <input readOnly value={pixCobranca.linha_digitavel ?? pixCobranca.qr_code ?? ''}
+                className="flex-1 rounded-[8px] px-3 py-2 text-[11px] font-mono text-[#56657A] bg-white border border-[#16212E]/[0.08] outline-none truncate" />
+              <button onClick={copiarPix}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] bg-white border border-[#16212E]/[0.08] text-[11px] font-semibold text-[#56657A] hover:bg-[#16212E]/[0.04] transition-colors shrink-0">
+                {pixCopiado ? <Check size={13} className="text-[#0e9f6e]" /> : <Copy size={13} />}
+                {pixCopiado ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+          )}
+
+          {clienteSelecionado?.telefone && (
+            <button onClick={enviarWhatsApp} disabled={enviandoWpp}
+              className="flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-[10px] text-sm font-semibold bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 hover:bg-[#25D366]/20 disabled:opacity-50 transition-colors">
+              <Send size={14} />
+              {enviandoWpp ? 'Enviando...' : `Enviar via WhatsApp para ${clienteSelecionado.nome}`}
+            </button>
+          )}
+
+          <button onClick={() => { setPixCobranca(null); setClienteSelecionado(null) }}
+            className="w-full py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
+            Fechar
+          </button>
+        </div>
+      </div>
+    )}
+
     <div className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
       <div className="max-w-[1320px] mx-auto animate-fade-up"
         style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 20, alignItems: 'start' }}>
@@ -406,5 +509,6 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
         </div>
       </div>
     </div>
+    </>
   )
 }
