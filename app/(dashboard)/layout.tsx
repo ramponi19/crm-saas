@@ -1,6 +1,8 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
+import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { createClient } from '@/lib/supabase/server'
+import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { redirect } from 'next/navigation'
 
@@ -38,6 +40,8 @@ export default async function DashboardLayout({
   const vinculoTyped = vinculo as unknown as { role: string; empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null }
   const empresa = vinculoTyped.empresa
 
+  const impersonation = await getImpersonation()
+
   return (
     <EmpresaProvider>
       <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
@@ -56,6 +60,7 @@ export default async function DashboardLayout({
           isSuperAdmin={usuario?.is_super_admin ?? false}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {children}
         </div>
       </div>
