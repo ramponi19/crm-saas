@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 function getPeriodStarts(): Record<string, Date> {
@@ -16,6 +16,10 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  // Isolamento explícito por empresa (defesa em profundidade — o RLS também
+  // aplica o escopo, mas mantemos o filtro consistente com o resto do app).
+  const empresaId = await getEmpresaId()
+
   const starts = getPeriodStarts()
   const inicio12m = new Date()
   inicio12m.setMonth(inicio12m.getMonth() - 12)
@@ -25,6 +29,7 @@ export async function GET() {
   const { data: vendasRaw } = await supabase
     .from('vendas')
     .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
+    .eq('empresa_id', empresaId)
     .gte('data_venda', inicio12m.toISOString())
 
   const vendas = (vendasRaw ?? []).map((v: any) => ({
@@ -56,20 +61,25 @@ export async function GET() {
     { data: metasRaw },
   ] = await Promise.all([
     clienteIds.length
-      ? supabase.from('clientes').select('id, nome').in('id', clienteIds)
+      ? supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).in('id', clienteIds)
       : Promise.resolve({ data: [] }),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true).eq('kanban_status', 'novo'),
-    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('status', 'disponivel').eq('ativo', true),
-    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).not('status', 'in', '(concluida,cancelada)'),
-    supabase.from('usuarios').select('id, nome'),
-    supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('mes_ano', mesAtual),
+    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
+    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
+    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluida,cancelada)'),
+    supabase.from('empresa_usuarios').select('usuario_id, usuarios!usuario_id(id, nome)').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('empresa_id', empresaId).eq('mes_ano', mesAtual),
   ])
+
+  // Normaliza vendedores (vêm via empresa_usuarios -> usuarios)
+  const vendedores = (vendedoresRaw ?? [])
+    .map((eu: any) => eu.usuarios)
+    .filter((u: any): u is { id: string; nome: string } => Boolean(u?.id))
 
   // Maps para lookup rápido
   const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))
-  const vendedorMap = Object.fromEntries((vendedoresRaw ?? []).map((u: { id: string; nome: string }) => [u.id, u.nome]))
+  const vendedorMap = Object.fromEntries(vendedores.map((u: { id: string; nome: string }) => [u.id, u.nome]))
   const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string | null; meta_vendas_valor: number | null }) => [m.usuario_id, m.meta_vendas_valor]))
 
   // KPIs por período (só concluídas)
@@ -115,7 +125,7 @@ export async function GET() {
   const vendedorStats: Record<string, { nome: string; total: number; qtd: number; meta: number | null }> = {}
 
   // Incluir todos os usuários mesmo sem venda
-  ;(vendedoresRaw ?? []).forEach((u: { id: string; nome: string }) => {
+  ;vendedores.forEach((u: { id: string; nome: string }) => {
     vendedorStats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaMap[u.id] ?? null }
   })
   vendasMes.forEach(v => {
