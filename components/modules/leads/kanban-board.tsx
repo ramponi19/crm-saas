@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
   PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
@@ -23,7 +23,7 @@ export function KanbanBoard({ leads, usuarios, onLeadClick, onLeadUpdate, sla }:
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
 
-  if (leads !== localLeads && !activeId) setLocalLeads(leads)
+  useEffect(() => { if (!activeId) setLocalLeads(leads) }, [leads, activeId])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
