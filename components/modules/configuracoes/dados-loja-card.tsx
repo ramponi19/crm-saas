@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Save, Store, MapPin, Phone, Mail, Globe } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -39,14 +39,30 @@ export function DadosLojaCard({ config, onSaved }: Props) {
     descricao:  config?.descricao ?? '',
   })
   const [loading, setLoading] = useState(false)
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: vinculo } = await supabase
+        .from('empresa_usuarios')
+        .select('empresa_id')
+        .eq('usuario_id', user.id)
+        .eq('ativo', true)
+        .single()
+      if (vinculo) setEmpresaId(vinculo.empresa_id)
+    })()
+  }, [supabase])
 
   const set = (k: keyof DadosLoja, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   async function salvar() {
+    if (!empresaId) { toast.error('Empresa não identificada'); return }
     setLoading(true)
     const { error } = await supabase
       .from('configuracoes_sistema')
-      .upsert({ chave: 'dados_loja', valor: form as unknown as Json }, { onConflict: 'chave' })
+      .upsert({ chave: 'dados_loja', valor: form as unknown as Json, empresa_id: empresaId }, { onConflict: 'empresa_id,chave' })
     setLoading(false)
     if (error) { toast.error('Erro ao salvar dados da loja'); return }
     toast.success('Dados da loja salvos')

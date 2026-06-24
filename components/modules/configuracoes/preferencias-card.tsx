@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Save, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -29,14 +29,30 @@ export function PreferenciasCard({ config, onSaved }: Props) {
     fuso_horario:         config?.fuso_horario         ?? 'America/Sao_Paulo',
   })
   const [loading, setLoading] = useState(false)
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: vinculo } = await supabase
+        .from('empresa_usuarios')
+        .select('empresa_id')
+        .eq('usuario_id', user.id)
+        .eq('ativo', true)
+        .single()
+      if (vinculo) setEmpresaId(vinculo.empresa_id)
+    })()
+  }, [supabase])
 
   const set = (k: keyof Preferencias, v: string | number) => setForm(p => ({ ...p, [k]: v }))
 
   async function salvar() {
+    if (!empresaId) { toast.error('Empresa não identificada'); return }
     setLoading(true)
     const { error } = await supabase
       .from('configuracoes_sistema')
-      .upsert({ chave: 'preferencias', valor: form as unknown as Json }, { onConflict: 'chave' })
+      .upsert({ chave: 'preferencias', valor: form as unknown as Json, empresa_id: empresaId }, { onConflict: 'empresa_id,chave' })
     setLoading(false)
     if (error) { toast.error('Erro ao salvar preferências'); return }
     toast.success('Preferências salvas')

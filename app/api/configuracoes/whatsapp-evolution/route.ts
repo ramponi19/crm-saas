@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const supabase = await createClient()
+    const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
     const { error } = await supabase
       .from('configuracoes_sistema')
-      .update({ valor: body, updated_at: new Date().toISOString() })
-      .eq('chave', 'whatsapp_evolution')
+      .upsert(
+        { chave: 'whatsapp_evolution', valor: body, empresa_id: empresaId, updated_at: new Date().toISOString() },
+        { onConflict: 'empresa_id,chave' }
+      )
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
