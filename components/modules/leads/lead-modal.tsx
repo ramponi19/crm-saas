@@ -161,15 +161,40 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
   async function handleConvert() {
     setSaving(true)
-    const { error } = await supabase.from('clientes').insert({
-      nome: form.nome.trim(), telefone: form.tel.trim() || null,
-      instagram: form.ig.trim() || null, ativo: true,
-    })
-    if (!error) await supabase.from('leads').update({ kanban_status: 'convertido' }).eq('id', lead.id)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { toast.error('Não autenticado'); setSaving(false); return }
+
+    const { data: vinculo } = await supabase
+      .from('empresa_usuarios')
+      .select('empresa_id')
+      .eq('usuario_id', user.id)
+      .eq('ativo', true)
+      .single()
+    if (!vinculo) { toast.error('Empresa não encontrada'); setSaving(false); return }
+
+    const { data: cliente, error } = await supabase
+      .from('clientes')
+      .insert({
+        empresa_id: vinculo.empresa_id,
+        nome: form.nome.trim(),
+        telefone: form.tel.trim() || null,
+        instagram: form.ig.trim() || null,
+        ativo: true,
+      })
+      .select('id')
+      .single()
+
+    if (error || !cliente) { toast.error('Erro ao converter'); setSaving(false); return }
+
+    await supabase
+      .from('leads')
+      .update({ kanban_status: 'convertido', convertido_em: cliente.id })
+      .eq('id', lead.id)
+
     setSaving(false)
-    if (error) { toast.error('Erro ao converter'); return }
     toast.success('Lead convertido em cliente!')
-    onUpdate({ ...lead, kanban_status: 'convertido' })
+    onUpdate({ ...lead, kanban_status: 'convertido', convertido_em: cliente.id })
     onClose()
   }
 
