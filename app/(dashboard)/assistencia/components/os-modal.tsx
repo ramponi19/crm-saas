@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { X, QrCode, Send, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -64,6 +65,8 @@ const supabase = createClient()
 
 export default function OSModal({ os, isNew, onClose }: Props) {
   const router = useRouter()
+  const { empresa } = useEmpresa()
+  const empresaId = empresa?.id
   const [form, setForm] = useState<OS>(isNew ? EMPTY : { ...EMPTY, ...os })
   const [saving, setSaving] = useState(false)
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
@@ -74,9 +77,10 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const [enviandoWpp, setEnviandoWpp] = useState(false)
 
   useEffect(() => {
-    supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => setClientes(data ?? []))
-    supabase.from('produtos').select('id, nome').order('nome').then(({ data }) => setProdutos(data ?? []))
-  }, [])
+    if (!empresaId) return
+    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(data ?? []))
+    supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
+  }, [empresaId])
 
   function set(field: keyof OS, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
@@ -139,7 +143,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   async function salvar() {
     setSaving(true)
     const { clientes: _c, produtos: _p, ...payload } = form
-    const base = { ...payload, tipo: 'assistencia' as const, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
+    const base = { ...payload, tipo: 'assistencia' as const, empresa_id: empresaId, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
     if (isNew) {
       const { error } = await supabase.from('garantias_assistencias').insert(base as TablesInsert<'garantias_assistencias'>)
       if (error) { toast.error('Erro ao criar OS'); setSaving(false); return }

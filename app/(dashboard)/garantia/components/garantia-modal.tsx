@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import type { TablesInsert } from '@/types/database'
@@ -66,15 +67,18 @@ const supabase = createClient()
 
 export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const router = useRouter()
+  const { empresa } = useEmpresa()
+  const empresaId = empresa?.id
   const [form, setForm] = useState<Garantia>(isNew ? EMPTY : { ...EMPTY, ...garantia })
   const [saving, setSaving] = useState(false)
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
 
   useEffect(() => {
-    supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => setClientes(data ?? []))
-    supabase.from('produtos').select('id, nome').order('nome').then(({ data }) => setProdutos(data ?? []))
-  }, [])
+    if (!empresaId) return
+    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(data ?? []))
+    supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
+  }, [empresaId])
 
   function set(field: keyof Garantia, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
@@ -86,6 +90,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
     const data = {
       ...payload,
       tipo: 'garantia',
+      empresa_id: empresaId,
       protocolo: payload.protocolo || `GAR-${Date.now().toString().slice(-6)}`,
     } as TablesInsert<'garantias_assistencias'>
 
