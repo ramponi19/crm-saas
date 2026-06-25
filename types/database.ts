@@ -500,69 +500,6 @@ export type Database = {
           },
         ]
       }
-      configuracoes: {
-        Row: {
-          id: number
-          instagram_ativo: boolean | null
-          instagram_page_id: string | null
-          instagram_token: string | null
-          messenger_ativo: boolean | null
-          messenger_page_id: string | null
-          messenger_token: string | null
-          updated_at: string | null
-          wl_cor: string | null
-          wl_empresa: string | null
-          wl_logo_url: string | null
-          wl_slogan: string | null
-          wl_whatsapp: string | null
-          zapi_api_url: string | null
-          zapi_ativo: boolean | null
-          zapi_client_token: string | null
-          zapi_instance_id: string | null
-          zapi_token: string | null
-        }
-        Insert: {
-          id?: never
-          instagram_ativo?: boolean | null
-          instagram_page_id?: string | null
-          instagram_token?: string | null
-          messenger_ativo?: boolean | null
-          messenger_page_id?: string | null
-          messenger_token?: string | null
-          updated_at?: string | null
-          wl_cor?: string | null
-          wl_empresa?: string | null
-          wl_logo_url?: string | null
-          wl_slogan?: string | null
-          wl_whatsapp?: string | null
-          zapi_api_url?: string | null
-          zapi_ativo?: boolean | null
-          zapi_client_token?: string | null
-          zapi_instance_id?: string | null
-          zapi_token?: string | null
-        }
-        Update: {
-          id?: never
-          instagram_ativo?: boolean | null
-          instagram_page_id?: string | null
-          instagram_token?: string | null
-          messenger_ativo?: boolean | null
-          messenger_page_id?: string | null
-          messenger_token?: string | null
-          updated_at?: string | null
-          wl_cor?: string | null
-          wl_empresa?: string | null
-          wl_logo_url?: string | null
-          wl_slogan?: string | null
-          wl_whatsapp?: string | null
-          zapi_api_url?: string | null
-          zapi_ativo?: boolean | null
-          zapi_client_token?: string | null
-          zapi_instance_id?: string | null
-          zapi_token?: string | null
-        }
-        Relationships: []
-      }
       configuracoes_sistema: {
         Row: {
           chave: string
