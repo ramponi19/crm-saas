@@ -18,11 +18,20 @@ export async function POST(req: NextRequest) {
 
     const { data: empresaData } = await supabase
       .from('empresas')
-      .select('id, nome, stripe_customer_id')
+      .select('id, nome, stripe_customer_id, stripe_subscription_id, stripe_status')
       .eq('id', empresaId)
       .single()
 
     if (!empresaData) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
+
+    // Block duplicate subscriptions — active or trialing subscriptions must be managed via the portal
+    const activeStatuses = ['active', 'trialing', 'past_due']
+    if (empresaData.stripe_subscription_id && activeStatuses.includes(empresaData.stripe_status ?? '')) {
+      return NextResponse.json(
+        { error: 'Sua empresa já possui uma assinatura ativa. Use o portal de cobrança para fazer alterações.' },
+        { status: 409 }
+      )
+    }
 
     const customerId = await getOrCreateCustomer(empresaId, empresaData.nome, user.email!)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
