@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { Building2, Palette, CreditCard, Users, Check, Loader2, Upload } from 'lucide-react'
+import { Building2, Palette, CreditCard, Users, Check, Loader2, Lock } from 'lucide-react'
+import { planoTemAcesso } from '@/lib/acesso'
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
 
@@ -90,6 +91,7 @@ export default function EmpresaConfigPage() {
 
   async function salvar() {
     if (!empresa) return
+    const temWL = planoTemAcesso(empresa.plano, 'white_label')
     setLoading(true)
     setSucesso(false)
     const supabase = createClient()
@@ -97,11 +99,14 @@ export default function EmpresaConfigPage() {
     await supabase
       .from('empresas')
       .update({
-        nome:         form.nome,
-        wl_slogan:    form.wl_slogan   || null,
-        wl_whatsapp:  form.wl_whatsapp || null,
-        wl_cor:       form.wl_cor,
-        wl_logo_url:  form.wl_logo_url || null,
+        nome:        form.nome,
+        // White-label fields only saved for plans that include the module
+        ...(temWL ? {
+          wl_slogan:   form.wl_slogan   || null,
+          wl_whatsapp: form.wl_whatsapp || null,
+          wl_cor:      form.wl_cor,
+          wl_logo_url: form.wl_logo_url || null,
+        } : {}),
       })
       .eq('id', empresa.id)
 
@@ -182,6 +187,17 @@ export default function EmpresaConfigPage() {
               <Campo label="Slogan" value={form.wl_slogan} onChange={v => setForm(f => ({ ...f, wl_slogan: v }))} placeholder="Ex: Importados com qualidade" />
               <Campo label="WhatsApp (com DDI)" value={form.wl_whatsapp} onChange={v => setForm(f => ({ ...f, wl_whatsapp: v }))} placeholder="5511999999999" />
             </>
+          )}
+
+          {(aba === 'visual') && !planoTemAcesso(empresa?.plano, 'white_label') && (
+            <div className="flex items-center gap-3 p-4 rounded-[12px] border border-[#E03037]/30 bg-[#E03037]/5">
+              <Lock size={18} className="text-[#E03037] shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-[#16212E]">Recurso exclusivo do plano Pro</p>
+                <p className="text-xs text-[#788698] mt-0.5">Faça upgrade para personalizar cores, logo e slogan da sua loja.</p>
+              </div>
+              <a href="/planos?upgrade=white_label" className="ml-auto text-xs font-semibold text-[#E03037] hover:underline whitespace-nowrap">Ver planos →</a>
+            </div>
           )}
 
           {(aba === 'visual') && (

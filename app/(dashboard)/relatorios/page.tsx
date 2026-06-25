@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
+import { exigirPlano } from '@/lib/acesso'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Relatórios' }
@@ -9,6 +10,7 @@ type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function RelatoriosPage() {
+  await exigirPlano('bi')
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [

@@ -27,8 +27,9 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null = null
+  let empresa: { nome: string; plano?: string | null; wl_cor: string | null; wl_logo_url: string | null } | null = null
   let role = 'owner'
+  let plano: string | undefined
 
   if (impersonation) {
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
@@ -56,10 +57,11 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; wl_cor: string | null; wl_logo_url: string | null } | null
+      empresa: { nome: string; plano: string | null; wl_cor: string | null; wl_logo_url: string | null } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
+    plano = vinculoTyped.empresa?.plano ?? undefined
   }
 
   const { count: leadsCount } = await supabase
@@ -84,6 +86,7 @@ export default async function DashboardLayout({
           empresaCor={empresa?.wl_cor ?? '#D7282F'}
           empresaLogo={empresa?.wl_logo_url ?? null}
           isSuperAdmin={usuario?.is_super_admin ?? false}
+          plano={plano}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}

@@ -26,14 +26,16 @@ import {
   CreditCard,
   LogOut,
   ShieldAlert,
+  Lock,
 } from 'lucide-react'
+import { planoTemAcesso, type ModuloPlano } from '@/lib/acesso'
 
 const navGroups = [
   {
     label: 'Visão Geral',
     items: [
       { href: '/dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
-      { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+      { href: '/relatorios', label: 'Relatórios', icon: BarChart3, modulo: 'bi' as ModuloPlano },
     ],
   },
   {
@@ -66,7 +68,7 @@ const navGroups = [
     items: [
       { href: '/compras',    label: 'Compras',    icon: ShoppingCart },
       { href: '/financeiro', label: 'Financeiro', icon: Wallet },
-      { href: '/equipe',     label: 'Equipe',     icon: UserCog },
+      { href: '/equipe',     label: 'Equipe',     icon: UserCog, modulo: 'multi_usuario' as ModuloPlano },
     ],
   },
   {
@@ -88,6 +90,7 @@ interface SidebarProps {
   empresaCor?: string
   empresaLogo?: string | null
   isSuperAdmin?: boolean
+  plano?: string
 }
 
 export function Sidebar({
@@ -99,6 +102,7 @@ export function Sidebar({
   empresaCor = '#D7282F',
   empresaLogo = null,
   isSuperAdmin = false,
+  plano,
 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -153,19 +157,25 @@ export function Sidebar({
             </p>
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                const locked = !isSuperAdmin && 'modulo' in item && item.modulo
+                  ? !planoTemAcesso(plano, item.modulo)
+                  : false
+                const isActive = !locked && (pathname === item.href || pathname.startsWith(item.href + '/'))
                 const Icon = item.icon
-                const badge = getBadge(item)
+                const badge = locked ? null : getBadge(item)
+                const href = locked ? `/planos?upgrade=${(item as { modulo: ModuloPlano }).modulo}` : item.href
 
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={href}
                     className={cn(
                       'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150 group',
-                      isActive
-                        ? 'text-[#16212E] font-semibold'
-                        : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
+                      locked
+                        ? 'text-[#9AA7B6] opacity-60 hover:opacity-80'
+                        : isActive
+                          ? 'text-[#16212E] font-semibold'
+                          : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
                     )}
                     style={isActive ? { background: `${empresaCor}18` } : {}}
                   >
@@ -178,14 +188,17 @@ export function Sidebar({
                     />
                     <Icon size={19} className="shrink-0" />
                     <span className="flex-1 truncate">{item.label}</span>
-                    {badge && (
-                      <span
-                        className="font-mono text-[10px] font-semibold px-[7px] py-[2px] rounded-full"
-                        style={{ color: empresaCor, background: `${empresaCor}22` }}
-                      >
-                        {badge}
-                      </span>
-                    )}
+                    {locked
+                      ? <Lock size={13} className="shrink-0 opacity-60" />
+                      : badge && (
+                        <span
+                          className="font-mono text-[10px] font-semibold px-[7px] py-[2px] rounded-full"
+                          style={{ color: empresaCor, background: `${empresaCor}22` }}
+                        >
+                          {badge}
+                        </span>
+                      )
+                    }
                   </Link>
                 )
               })}
