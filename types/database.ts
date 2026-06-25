@@ -114,48 +114,6 @@ export type Database = {
           },
         ]
       }
-      categorias_financeiras: {
-        Row: {
-          cor: string | null
-          created_at: string | null
-          empresa_id: number
-          id: number
-          nome: string
-          tipo: string
-        }
-        Insert: {
-          cor?: string | null
-          created_at?: string | null
-          empresa_id: number
-          id?: number
-          nome: string
-          tipo: string
-        }
-        Update: {
-          cor?: string | null
-          created_at?: string | null
-          empresa_id?: number
-          id?: number
-          nome?: string
-          tipo?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "categorias_financeiras_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "categorias_financeiras_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "v_empresas_plano"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       categorias_produtos: {
         Row: {
           ativo: boolean | null
