@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Eye, EyeOff, Loader2, Mail, Lock, Package, ShoppingCart, Users, BarChart2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
@@ -13,10 +14,11 @@ const FIELD_FOCUS = 'focus-within:border-[rgba(240,101,107,.55)] focus-within:bg
 
 export function LoginForm() {
   const router = useRouter()
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [showPw, setShowPw]     = useState(false)
-  const [loading, setLoading]   = useState(false)
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [showPw, setShowPw]       = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   // Clear any leftover Supabase tokens from localStorage (from before this change)
   useEffect(() => {
@@ -24,6 +26,18 @@ export function LoginForm() {
       if (k.startsWith('sb-')) localStorage.removeItem(k)
     })
   }, [])
+
+  async function handleReset() {
+    if (!email) { toast.error('Digite seu e-mail primeiro.'); return }
+    setResetLoading(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-senha`,
+    })
+    setResetLoading(false)
+    if (error) toast.error('Erro ao enviar e-mail: ' + error.message)
+    else toast.success('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -85,8 +99,8 @@ export function LoginForm() {
 
       {/* Esqueci */}
       <div className="flex justify-end">
-        <button type="button" className="text-[12.5px] font-semibold text-[#5A6A7E] hover:text-[#F0656B] transition-colors">
-          Esqueci a senha
+        <button type="button" onClick={handleReset} disabled={resetLoading} className="text-[12.5px] font-semibold text-[#5A6A7E] hover:text-[#F0656B] transition-colors disabled:opacity-50">
+          {resetLoading ? 'Enviando…' : 'Esqueci a senha'}
         </button>
       </div>
 
@@ -98,6 +112,14 @@ export function LoginForm() {
       >
         {loading ? <><Loader2 size={19} className="animate-spin" /> Entrando…</> : 'Entrar'}
       </button>
+
+      {/* Cadastro */}
+      <p className="text-center text-[13px] text-[#5A6A7E]">
+        Sua primeira vez aqui?{' '}
+        <Link href="/register" className="font-semibold text-[#D7282F] hover:text-[#A8161D] transition-colors">
+          Criar uma conta
+        </Link>
+      </p>
 
       {/* Recursos */}
       <div className="pt-1">
