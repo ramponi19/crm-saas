@@ -12,5 +12,5 @@ export default async function FinanceiroPage() {
       .order('created_at', { ascending: false })
       .limit(200),
   ])
-  return <FinanceiroView lancamentos={lancamentos ?? []} categorias={categorias ?? []} cobrancas={cobrancas ?? []} />
+  return <FinanceiroView lancamentos={lancamentos ?? []} categorias={categorias ?? []} cobrancas={cobrancas ?? []} empresaId={empresaId!} />
 }

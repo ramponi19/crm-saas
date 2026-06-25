@@ -49,6 +49,7 @@ interface Props {
   marcas: { id: number; nome: string }[]
   categorias: { id: number; nome: string }[]
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  empresaId: number
 }
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
@@ -81,7 +82,7 @@ const fmtDate = (s: string) => {
 
 type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, empresaId }: Props) {
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')
@@ -277,6 +278,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
               <div className="px-6 py-5">
                 <UnidadeInlineForm
                   produtos={produtos}
+                  empresaId={empresaId}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
                     setTab('lista')
@@ -324,6 +326,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
       {modalOpen && (
         <UnidadeModal
           unidade={unidadeSel}
+          empresaId={empresaId}
           onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
@@ -332,8 +335,9 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, onSaved }: {
+function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  empresaId: number
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
@@ -355,6 +359,7 @@ function UnidadeInlineForm({ produtos, onSaved }: {
     if (!form.preco_venda) { toast.error('Informe o preço de venda'); return }
     setSaving(true)
     const payload = {
+      empresa_id: empresaId,
       produto_id: Number(form.produto_id),
       tipo: form.tipo, condicao: form.condicao, estado: form.estado,
       status: form.status,

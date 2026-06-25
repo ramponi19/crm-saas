@@ -29,6 +29,7 @@ interface Unidade {
 
 interface Props {
   unidade: Unidade | null
+  empresaId: number
   onClose: () => void
 }
 
@@ -41,7 +42,7 @@ const EMPTY: Unidade = {
 
 const supabase = createClient()
 
-export default function UnidadeModal({ unidade, onClose }: Props) {
+export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
   const router = useRouter()
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
@@ -73,7 +74,7 @@ export default function UnidadeModal({ unidade, onClose }: Props) {
   async function salvar() {
     if (!form.produto_id) { toast.error('Selecione um produto'); return }
     setSaving(true)
-    const payload = { ...form, ativo: true }
+    const payload = { ...form, ativo: true, empresa_id: empresaId }
 
     if (isNew) {
       const { error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>)

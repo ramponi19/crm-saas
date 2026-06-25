@@ -72,6 +72,7 @@ export default async function EstoquePage() {
       marcas={marcas ?? []}
       categorias={categorias ?? []}
       produtos={produtos}
+      empresaId={empresaId!}
     />
   )
 }

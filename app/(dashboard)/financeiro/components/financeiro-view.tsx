@@ -41,7 +41,7 @@ interface Cobranca {
   cliente_id: number | null
   clientes?: { nome: string } | { nome: string }[] | null
 }
-interface Props { lancamentos: Lancamento[]; categorias: Categoria[]; cobrancas: Cobranca[] }
+interface Props { lancamentos: Lancamento[]; categorias: Categoria[]; cobrancas: Cobranca[]; empresaId: number }
 
 const TABS = [
   { key: 'fluxo',      label: 'Fluxo de Caixa'  },
@@ -71,7 +71,7 @@ const EMPTY_FORM = {
 
 const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 
-export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas }: Props) {
+export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId }: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState('fluxo')
   const [lancamentos, setLancamentos] = useState(initial)
@@ -171,7 +171,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
       if (error) { setErro('Erro ao atualizar. Tente novamente.'); setSaving(false); return }
       setLancamentos(prev => prev.map(l => l.id === editId ? { ...l, ...payload } : l))
     } else {
-      const { data, error } = await supabase.from('lancamentos_financeiros').insert(payload as TablesInsert<'lancamentos_financeiros'>).select().single()
+      const { data, error } = await supabase.from('lancamentos_financeiros').insert({ ...payload, empresa_id: empresaId } as TablesInsert<'lancamentos_financeiros'>).select().single()
       if (error) { setErro('Erro ao salvar. Tente novamente.'); setSaving(false); return }
       setLancamentos(prev => [data as Lancamento, ...prev])
     }
