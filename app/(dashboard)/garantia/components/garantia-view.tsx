@@ -174,8 +174,8 @@ export default function GarantiaView({ garantias }: Props) {
                   </td>
                   {/* Tipo */}
                   <td className="px-5 py-4">
-                    <span className={cn('text-sm', g.dentro_garantia ? 'text-[#16212E]' : 'text-[#788698]')}>
-                      {g.dentro_garantia ? 'Garantia' : 'Assistência'}
+                    <span className="text-sm text-[#16212E]">
+                      {g.tipo ? g.tipo.charAt(0).toUpperCase() + g.tipo.slice(1) : '—'}
                     </span>
                   </td>
                   {/* Prazo */}
