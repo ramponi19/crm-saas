@@ -50,10 +50,13 @@ export async function POST(
 
   // Persistir a empresa impersonada na coluna do usuário — é a fonte de verdade
   // para o RLS (get_empresa_id considera isto quando o usuário é super admin).
+  const TTL_SECONDS = 60 * 60 * 4 // 4 horas — deve coincidir com maxAge do cookie
+  const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString()
+
   const serviceClient = createServiceClient()
   await serviceClient
     .from('usuarios')
-    .update({ impersonando_empresa_id: empresaId })
+    .update({ impersonando_empresa_id: empresaId, impersonando_expires_at: expiresAt })
     .eq('id', user.id)
 
   const res = NextResponse.json({ ok: true, empresa: empresa.nome })
@@ -62,7 +65,7 @@ export async function POST(
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 4, // 4 horas
+    maxAge: TTL_SECONDS,
   })
   return res
 }
@@ -75,7 +78,7 @@ export async function DELETE() {
     const serviceClient = createServiceClient()
     await serviceClient
       .from('usuarios')
-      .update({ impersonando_empresa_id: null })
+      .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
       .eq('id', user.id)
   }
 
