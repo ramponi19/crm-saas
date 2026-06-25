@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Loader2, Mail, Lock, Check, Package, ShoppingCart, Users, BarChart2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Mail, Lock, Package, ShoppingCart, Users, BarChart2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { markSessionActive } from '@/components/layout/session-guard'
 import { toast } from 'sonner'
 
 const FIELD_BASE = 'flex items-center gap-2.5 px-[14px] py-3 rounded-[12px] transition-all border'
@@ -15,7 +16,6 @@ export function LoginForm() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw]     = useState(false)
-  const [remember, setRemember] = useState(false)
   const [loading, setLoading]   = useState(false)
 
   // Clear any leftover Supabase tokens from localStorage (from before this change)
@@ -38,6 +38,7 @@ export function LoginForm() {
       else toast.error(error.message)
       return
     }
+    markSessionActive()
     toast.success('Acesso autorizado!')
     router.push('/entrar')
     router.refresh()
@@ -82,22 +83,8 @@ export function LoginForm() {
         </div>
       </div>
 
-      {/* Lembrar / Esqueci */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setRemember(s => !s)}
-          className="flex items-center gap-2 text-[12.5px] text-[#56657A] select-none cursor-pointer"
-        >
-          <div
-            className={`w-[18px] h-[18px] rounded-[6px] border-[1.5px] flex items-center justify-center transition-all ${
-              remember ? 'bg-[#D7282F] border-[#D7282F]' : 'border-[rgba(22,32,46,.28)]'
-            }`}
-          >
-            {remember && <Check size={11} strokeWidth={3} className="text-white" />}
-          </div>
-          Lembrar de mim
-        </button>
+      {/* Esqueci */}
+      <div className="flex justify-end">
         <button type="button" className="text-[12.5px] font-semibold text-[#5A6A7E] hover:text-[#F0656B] transition-colors">
           Esqueci a senha
         </button>

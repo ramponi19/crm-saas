@@ -5,6 +5,7 @@ import { LimiteBanner } from '@/components/layout/limite-banner'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
+import { SessionGuard } from '@/components/layout/session-guard'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -95,6 +96,7 @@ export default async function DashboardLayout({
         </div>
       </div>
       <NotificationProvider />
+      <SessionGuard />
     </EmpresaProvider>
   )
 }
