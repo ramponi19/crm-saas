@@ -67,10 +67,13 @@ export async function POST(
       .eq('empresa_id', cobranca.empresa_id)
       .single()
 
-    let credenciais: Record<string, string> = {}
-    if (config?.credenciais_cipher) {
-      try { credenciais = decryptCredenciais(config.credenciais_cipher) } catch {}
+    if (!config?.credenciais_cipher) {
+      console.error(`[webhook/${provider}] tenant sem credenciais configuradas — empresa_id ${cobranca.empresa_id}`)
+      return NextResponse.json({ error: 'Configuração de pagamento ausente' }, { status: 500 })
     }
+    // Deixa lançar: falha na decriptação (chave errada, dado corrompido) deve
+    // abortar o processamento — não processar webhook com credenciais vazias.
+    const credenciais = decryptCredenciais(config.credenciais_cipher)
 
     const adapter = buildProvider(provider as ProviderId, credenciais, config?.modo ?? 'producao')
     // processarWebhook lança se a assinatura for inválida

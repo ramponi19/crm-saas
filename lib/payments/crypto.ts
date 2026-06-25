@@ -7,12 +7,23 @@ import crypto from 'crypto'
 // ============================================================
 
 function getKey(): Buffer {
-  const raw = process.env.PAYMENT_ENCRYPTION_KEY
+  const raw = process.env.PAYMENT_ENCRYPTION_KEY?.trim()
   if (!raw) throw new Error('PAYMENT_ENCRYPTION_KEY não configurada')
-  // Aceita hex (64 chars) ou base64
-  const key = raw.length === 64 ? Buffer.from(raw, 'hex') : Buffer.from(raw, 'base64')
+
+  let key: Buffer
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+    // Exactly 64 valid hex chars → 32 bytes
+    key = Buffer.from(raw, 'hex')
+  } else {
+    // Assume base64; length check below validates result
+    key = Buffer.from(raw, 'base64')
+  }
+
   if (key.length !== 32) {
-    throw new Error('PAYMENT_ENCRYPTION_KEY deve ter 32 bytes (64 hex ou base64 equivalente)')
+    throw new Error(
+      `PAYMENT_ENCRYPTION_KEY inválida: esperado 32 bytes, obtido ${key.length}. ` +
+      'Use 64 chars hex ou base64 de 32 bytes.'
+    )
   }
   return key
 }
