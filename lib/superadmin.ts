@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
 
@@ -69,7 +70,9 @@ export async function isSuperAdmin(): Promise<boolean> {
 
 /**
  * Registra uma ação administrativa no log de auditoria.
- * Falhas de log nunca devem quebrar a operação principal — apenas logamos o erro.
+ * Usa service client (bypassa RLS) para garantir que o insert sempre ocorre.
+ * Falhas de log nunca devem quebrar a operação principal, mas são registradas
+ * explicitamente — tanto erros de rede (catch) quanto erros de DB ({ error }).
  */
 export async function logSuperAdminAction(params: {
   adminUserId: string
@@ -78,14 +81,17 @@ export async function logSuperAdminAction(params: {
   detalhes?: Record<string, unknown>
 }): Promise<void> {
   try {
-    const supabase = await createClient()
-    await supabase.from('superadmin_logs').insert({
+    const supabase = createServiceClient()
+    const { error } = await supabase.from('superadmin_logs').insert({
       admin_user_id: params.adminUserId,
       empresa_id: params.empresaId ?? null,
       acao: params.acao,
       detalhes: (params.detalhes ?? {}) as never,
     })
+    if (error) {
+      console.error('[audit] falha ao registrar log de super admin:', error.message, { params })
+    }
   } catch (err) {
-    console.error('Falha ao registrar log de super admin:', err)
+    console.error('[audit] exceção ao registrar log de super admin:', err, { params })
   }
 }
