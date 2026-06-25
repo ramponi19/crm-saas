@@ -143,11 +143,25 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
         // desconto proporcional pelo peso do item no total bruto
         const descontoItem = totalBruto > 0 ? descontoNum * (precoCheio / totalBruto) : 0
         const valorItem = precoCheio - descontoItem
+
+        // Optimistic lock: claim the unit atomically before creating the sale.
+        // If status != 'disponivel' another concurrent request already sold it.
+        const { data: claimed } = await supabase
+          .from('inventario_unidades')
+          .update({ status: 'vendido', cliente_id: clienteSelecionado?.id ?? null })
+          .eq('id', c.item.id)
+          .eq('status', 'disponivel')
+          .select('id')
+          .single()
+        if (!claimed) throw new Error(`"${c.item.produto_nome}" não está mais disponível`)
+
         const { data: venda, error } = await supabase
           .from('vendas')
           .insert({
             empresa_id: empresaId,
             cliente_id: clienteSelecionado?.id ?? null,
+            vendedor_id: user.id,
+            usuario_id: user.id,
             valor_venda: valorItem,
             valor_custo: c.item.preco_custo ?? 0,
             lucro: valorItem - (c.item.preco_custo ?? 0),
@@ -169,9 +183,6 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
           parcelas: ['credito','link'].includes(formaPagamento) ? parcelas : null,
           valor_com_juros: totais.totalComTaxa !== totais.total ? totais.totalComTaxa : null,
         })
-        await supabase.from('inventario_unidades')
-          .update({ status: 'vendido', cliente_id: clienteSelecionado?.id ?? null })
-          .eq('id', c.item.id)
       }
       if (formaPagamento === 'pix' && totais.total > 0) {
         try {
