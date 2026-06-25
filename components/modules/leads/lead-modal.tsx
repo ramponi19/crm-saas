@@ -146,7 +146,6 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
   async function sendMsg() {
     const t = draft.trim(); if (!t) return
-    if (!empresa?.id) { toast.error('Empresa não encontrada'); return }
     const canal = lead.origem ?? 'manual'
     setDraft('')
     // Otimista: mostra na hora; o realtime substitui pela linha real (dedup acima).
@@ -171,6 +170,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
         await entregarViaEdge('send', { number: lead.telefone, text: t, leadId: lead.id })
       } else {
         // Sem canal externo (loja/site/manual): registra como nota interna.
+        if (!empresa?.id) throw new Error('Empresa não encontrada')
         const { error } = await supabase.from('lead_mensagens').insert({
           empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
           conteudo: t, origem: canal, lida: true,
