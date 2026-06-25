@@ -8,6 +8,7 @@ import {
   TrendingUp,
   ArrowUpRight,
 } from 'lucide-react'
+import { SyncStripeButton } from '@/components/superadmin/sync-stripe-button'
 
 const ADMIN_COR = '#7C3AED'
 
@@ -74,9 +75,12 @@ export default async function SuperAdminDashboard() {
         <p className="font-mono text-[10px] tracking-[0.25em] uppercase mb-1" style={{ color: ADMIN_COR }}>
           Painel global
         </p>
-        <h1 className="font-sans font-extrabold text-[26px] text-[#16212E] tracking-tight">
-          Visão geral
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="font-sans font-extrabold text-[26px] text-[#16212E] tracking-tight">
+            Visão geral
+          </h1>
+          <SyncStripeButton />
+        </div>
         <p className="text-[14px] text-[#788698] mt-1">
           Métricas consolidadas de todos os tenants do CRM
         </p>
