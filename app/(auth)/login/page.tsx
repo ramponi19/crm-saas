@@ -35,14 +35,8 @@ export default function LoginPage() {
             style={{ inset: '-14px', animationDuration: '26s' }} />
           <div className="absolute rounded-full border border-dashed border-[rgba(120,134,150,.2)] animate-spin"
             style={{ inset: '-26px', animationDuration: '38s', animationDirection: 'reverse' }} />
-          <div
-            className="w-[100px] h-[100px] rounded-[28px] flex items-center justify-center animate-[jmBob_6s_ease-in-out_infinite]"
-            style={{
-              background: 'radial-gradient(125% 125% at 32% 22%, #1F2A39, #0E1620)',
-              boxShadow: '0 18px 50px rgba(22,32,46,.18)',
-            }}
-          >
-            <span className="font-serif font-medium text-[40px] text-white leading-none tracking-tight">C</span>
+          <div className="w-[100px] h-[100px] animate-[jmBob_6s_ease-in-out_infinite]">
+            <img src="/eagle-mark.png" alt="Logo" className="w-full h-full object-contain drop-shadow-xl" />
           </div>
         </div>
 
