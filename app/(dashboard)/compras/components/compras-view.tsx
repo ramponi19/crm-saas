@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 
 interface Pedido {
@@ -51,6 +52,8 @@ const FORM_VAZIO = { nome_fantasia: '', razao_social: '', cnpj: '', contato: '',
 const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor_total: '', data_pedido: '', observacoes: '', status: 'aberto' }
 
 export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit }: Props) {
+  const { empresa } = useEmpresa()
+  const empresaId = empresa?.id
   const [pedidos,        setPedidos]        = useState(pedidosInit)
   const [fornecedores,   setFornecedores]   = useState(fornecedoresInit)
   const [modalFornecedor, setModalFornecedor] = useState(false)
@@ -83,6 +86,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     const { data, error } = await supabase
       .from('pedidos_compra')
       .insert({
+        empresa_id:    empresaId,
         descricao:     formPedido.descricao.trim(),
         fornecedor_id: formPedido.fornecedor_id ? Number(formPedido.fornecedor_id) : null,
         valor_total:   formPedido.valor_total ? parseFloat(formPedido.valor_total.replace(',', '.')) : null,
@@ -116,6 +120,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     const { data, error } = await supabase
       .from('fornecedores')
       .insert({
+        empresa_id:    empresaId,
         nome_fantasia: form.nome_fantasia.trim(),
         razao_social:  form.razao_social.trim() || null,
         cnpj:          form.cnpj.trim() || null,
