@@ -81,7 +81,14 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
       ativo: true, msgs_nao_lidas: 0,
     } as TablesInsert<'leads'>).select().single()
 
-    if (error) { toast.error('Erro ao criar lead'); setLoading(false); return }
+    if (error) {
+      const msg = error.message?.includes('LEAD_LIMIT_REACHED')
+        ? `Limite de leads atingido. Faça upgrade para continuar.`
+        : 'Erro ao criar lead'
+      toast.error(msg)
+      setLoading(false)
+      return
+    }
     toast.success('Lead criado'); onCreate(data as Lead); setLoading(false)
   }
 
