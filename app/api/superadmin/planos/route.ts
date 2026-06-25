@@ -16,7 +16,6 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   await requireSuperAdmin()
-  const supabase = await createClient()
   const body = await req.json()
   const { id, ...fields } = body
 
