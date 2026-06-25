@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto'
 import type {
   PaymentProvider,
   CriarCobrancaInput,
@@ -131,12 +132,28 @@ export class EfiBankProvider implements PaymentProvider {
     return { status: 'estornado', raw: data }
   }
 
-  async processarWebhook(rawBody: string): Promise<WebhookResult> {
+  async processarWebhook(rawBody: string, headers: Record<string, string>): Promise<WebhookResult> {
+    // Efí Bank envia x-gw-signature: HMAC-SHA256(rawBody, clientSecret) em hex
+    const sig = headers['x-gw-signature']
+    if (sig) {
+      const expected = createHmac('sha256', this.clientSecret).update(rawBody).digest('hex')
+      try {
+        if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) {
+          throw new Error('Efí Bank: assinatura inválida')
+        }
+      } catch (e) {
+        if ((e as Error).message === 'Efí Bank: assinatura inválida') throw e
+        // Buffer de tamanho diferente — assinatura inválida
+        throw new Error('Efí Bank: assinatura inválida')
+      }
+    } else {
+      console.warn('[efibank] x-gw-signature ausente — validação de assinatura ignorada')
+    }
+
     let body: { pix?: Array<{ txid?: string; horario?: string }> }
     try { body = JSON.parse(rawBody) } catch { return { providerRef: null, status: null } }
     const pix = body.pix?.[0]
     if (!pix?.txid) return { providerRef: null, status: null }
-    // Notificação de Pix recebido = confirmado
     return {
       providerRef: pix.txid,
       status: 'confirmado',

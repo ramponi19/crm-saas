@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto'
 import type {
   PaymentProvider,
   CriarCobrancaInput,
@@ -26,10 +27,12 @@ function mapStatus(mpStatus: string): StatusCobranca {
 export class MercadoPagoProvider implements PaymentProvider {
   readonly id = 'mercadopago' as const
   private accessToken: string
+  private webhookSecret: string | null
 
   constructor(cred: Credenciais) {
     if (!cred.access_token) throw new Error('Mercado Pago: access_token ausente')
     this.accessToken = cred.access_token
+    this.webhookSecret = cred.webhook_secret ?? null
   }
 
   private headers() {
@@ -112,7 +115,36 @@ export class MercadoPagoProvider implements PaymentProvider {
     return { status: 'estornado', raw: data }
   }
 
-  async processarWebhook(rawBody: string): Promise<WebhookResult> {
+  async processarWebhook(rawBody: string, headers: Record<string, string>): Promise<WebhookResult> {
+    // MP assina com x-signature: "ts=<timestamp>,v1=<hmac>"
+    // Template: "id:<data_id>;request-id:<x-request-id>;ts:<timestamp>;"
+    if (this.webhookSecret) {
+      const xSig = headers['x-signature'] ?? ''
+      const xReqId = headers['x-request-id'] ?? ''
+      const tsMatch = xSig.match(/ts=([^,]+)/)
+      const v1Match = xSig.match(/v1=([^,]+)/)
+      if (!tsMatch || !v1Match) throw new Error('Mercado Pago: x-signature ausente ou malformado')
+
+      const ts = tsMatch[1]
+      const v1 = v1Match[1]
+
+      let dataId = ''
+      try { dataId = String((JSON.parse(rawBody) as { data?: { id?: string } }).data?.id ?? '') } catch {}
+
+      const template = `id:${dataId};request-id:${xReqId};ts:${ts};`
+      const expected = createHmac('sha256', this.webhookSecret).update(template).digest('hex')
+      try {
+        if (!timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(expected, 'hex'))) {
+          throw new Error('Mercado Pago: assinatura inválida')
+        }
+      } catch (e) {
+        if ((e as Error).message === 'Mercado Pago: assinatura inválida') throw e
+        throw new Error('Mercado Pago: assinatura inválida')
+      }
+    } else {
+      console.warn('[mercadopago] webhook_secret não configurado — validação de assinatura ignorada')
+    }
+
     // MP envia { type, data: { id } }. Consultamos o pagamento para obter status atual.
     let body: { type?: string; action?: string; data?: { id?: string } }
     try { body = JSON.parse(rawBody) } catch { return { providerRef: null, status: null } }

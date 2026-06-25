@@ -36,7 +36,19 @@ export async function POST(
       return NextResponse.json({ ok: true, ignorado: true })
     }
 
-    // 2) Localizar a cobrança e o tenant
+    // 2) Idempotência: rejeitar duplicatas silenciosamente
+    const { data: jaProcessado } = await supabase
+      .from('payment_webhook_eventos')
+      .select('id')
+      .eq('provider', provider)
+      .eq('provider_ref', refPreliminar)
+      .maybeSingle()
+
+    if (jaProcessado) {
+      return NextResponse.json({ ok: true, duplicado: true })
+    }
+
+    // 3) Localizar a cobrança e o tenant
     const { data: cobranca } = await supabase
       .from('cobrancas')
       .select('id, empresa_id, status')
@@ -48,7 +60,7 @@ export async function POST(
       return NextResponse.json({ ok: true, naoEncontrada: true })
     }
 
-    // 3) Carregar credenciais do tenant para validar/consultar
+    // 4) Carregar credenciais do tenant para validar/consultar
     const { data: config } = await supabase
       .from('tenant_payment_config')
       .select('credenciais_cipher, modo')
@@ -61,7 +73,14 @@ export async function POST(
     }
 
     const adapter = buildProvider(provider as ProviderId, credenciais, config?.modo ?? 'producao')
+    // processarWebhook lança se a assinatura for inválida
     const result = await adapter.processarWebhook(rawBody, headers)
+
+    // Registrar idempotência antes de qualquer efeito colateral
+    await supabase
+      .from('payment_webhook_eventos')
+      .insert({ provider, provider_ref: refPreliminar })
+      .throwOnError()
 
     if (result.status && result.status !== cobranca.status) {
       await supabase
@@ -72,7 +91,6 @@ export async function POST(
         })
         .eq('id', cobranca.id)
 
-      // Conciliação automática no Financeiro quando confirmado
       if (result.status === 'confirmado') {
         await registrarLancamentoFinanceiro(supabase, cobranca.empresa_id, cobranca.id)
       }

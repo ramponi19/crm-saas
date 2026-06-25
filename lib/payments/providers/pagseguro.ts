@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto'
 import type {
   PaymentProvider,
   CriarCobrancaInput,
@@ -29,11 +30,13 @@ export class PagSeguroProvider implements PaymentProvider {
   readonly id = 'pagseguro' as const
   private token: string
   private base: string
+  private webhookSecret: string | null
 
   constructor(cred: Credenciais, modo: string = 'producao') {
     if (!cred.token) throw new Error('PagSeguro: token ausente')
     this.token = cred.token
     this.base = apiBase(modo)
+    this.webhookSecret = cred.webhook_secret ?? null
   }
 
   private headers() {
@@ -111,7 +114,23 @@ export class PagSeguroProvider implements PaymentProvider {
     return { status: 'estornado', raw: data }
   }
 
-  async processarWebhook(rawBody: string): Promise<WebhookResult> {
+  async processarWebhook(rawBody: string, headers: Record<string, string>): Promise<WebhookResult> {
+    // PagSeguro envia x-pagseguro-signature: HMAC-SHA256(rawBody, webhookSecret) em hex
+    if (this.webhookSecret) {
+      const sig = headers['x-pagseguro-signature'] ?? ''
+      const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest('hex')
+      try {
+        if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) {
+          throw new Error('PagSeguro: assinatura inválida')
+        }
+      } catch (e) {
+        if ((e as Error).message === 'PagSeguro: assinatura inválida') throw e
+        throw new Error('PagSeguro: assinatura inválida')
+      }
+    } else {
+      console.warn('[pagseguro] webhook_secret não configurado — validação de assinatura ignorada')
+    }
+
     let body: { id?: string; charges?: Array<{ status?: string; paid_at?: string }> }
     try { body = JSON.parse(rawBody) } catch { return { providerRef: null, status: null } }
     if (!body.id) return { providerRef: null, status: null }

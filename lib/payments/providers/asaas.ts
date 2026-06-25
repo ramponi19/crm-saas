@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import type {
   PaymentProvider,
   CriarCobrancaInput,
@@ -7,6 +8,14 @@ import type {
   WebhookResult,
   Credenciais,
 } from '../types'
+
+function safeEqual(a: string, b: string): boolean {
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+  } catch {
+    return false
+  }
+}
 
 function apiBase(modo: string) {
   return modo === 'sandbox'
@@ -37,11 +46,13 @@ export class AsaasProvider implements PaymentProvider {
   readonly id = 'asaas' as const
   private apiKey: string
   private base: string
+  private webhookToken: string | null
 
   constructor(cred: Credenciais, modo: string = 'producao') {
     if (!cred.api_key) throw new Error('Asaas: api_key ausente')
     this.apiKey = cred.api_key
     this.base = apiBase(modo)
+    this.webhookToken = cred.webhook_token ?? null
   }
 
   private headers() {
@@ -121,7 +132,16 @@ export class AsaasProvider implements PaymentProvider {
     return { status: 'estornado', raw: data }
   }
 
-  async processarWebhook(rawBody: string): Promise<WebhookResult> {
+  async processarWebhook(rawBody: string, headers: Record<string, string>): Promise<WebhookResult> {
+    if (this.webhookToken) {
+      const received = headers['asaas-access-token'] ?? ''
+      if (!safeEqual(received, this.webhookToken)) {
+        throw new Error('Asaas: assinatura inválida')
+      }
+    } else {
+      console.warn('[asaas] webhook_token não configurado — validação de assinatura ignorada')
+    }
+
     let body: { event?: string; payment?: { id?: string; status?: string; paymentDate?: string } }
     try { body = JSON.parse(rawBody) } catch { return { providerRef: null, status: null } }
 
