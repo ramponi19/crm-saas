@@ -138,6 +138,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
       const empresaId = vinculo.empresa_id
 
       const totalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
+      let primeiraVendaId: number | null = null
       for (const c of carrinho) {
         const precoCheio = c.item.preco_venda ?? 0
         // desconto proporcional pelo peso do item no total bruto
@@ -180,6 +181,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
           })
           .select().single()
         if (error) throw new Error(error.message)
+        if (primeiraVendaId === null) primeiraVendaId = venda.id
         await supabase.from('vendas_pagamentos').insert({
           venda_id: venda.id, forma_pagamento: formaPagamento,
           valor_pago: valorItem,
@@ -190,14 +192,13 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
       }
       if (formaPagamento === 'pix' && totais.total > 0) {
         try {
-          const lastVendaId = (await supabase.from('vendas').select('id').eq('empresa_id', empresaId).order('id', { ascending: false }).limit(1).single()).data?.id
           const res = await fetch('/api/payments/charge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tipo: 'pix',
               valor: totais.total,
-              vendaId: lastVendaId,
+              vendaId: primeiraVendaId,
               descricao: `Venda PDV`,
               pagador: clienteSelecionado ? { nome: clienteSelecionado.nome, telefone: clienteSelecionado.telefone ?? undefined } : undefined,
             }),
