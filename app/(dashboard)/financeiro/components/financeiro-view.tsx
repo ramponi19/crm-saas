@@ -587,7 +587,7 @@ function LancamentosTable({ lancamentos, onEditar }: { lancamentos: Lancamento[]
           const isReceita = l.tipo === 'receita'
           return (
             <tr key={l.id} onClick={() => onEditar(l)} className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
-              <td className="px-5 py-3.5 text-sm text-[#788698]">{new Date((l.data_venc ?? l.created_at) + 'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
+              <td className="px-5 py-3.5 text-sm text-[#788698]">{new Date(l.data_venc ? l.data_venc + 'T00:00:00' : l.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
               <td className="px-5 py-3.5 text-sm font-medium text-[#1F2A39]">{l.descricao ?? '—'}</td>
               <td className="px-5 py-3.5 text-sm text-[#788698]">{l.categoria ?? '—'}</td>
               <td className="px-5 py-3.5">
