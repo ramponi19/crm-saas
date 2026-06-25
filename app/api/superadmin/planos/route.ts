@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { requireSuperAdmin } from '@/lib/superadmin'
 
 export async function GET() {
@@ -28,7 +29,8 @@ export async function PATCH(req: NextRequest) {
     Object.entries(fields).filter(([k]) => allowed.includes(k))
   )
 
-  const { data, error } = await supabase
+  const serviceClient = createServiceClient()
+  const { data, error } = await serviceClient
     .from('planos_config')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update(payload as any)
