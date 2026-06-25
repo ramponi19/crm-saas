@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Save, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import { toast } from 'sonner'
 
 interface Produto {
@@ -23,6 +24,7 @@ interface Props {
 
 export default function ProdutoModal({ produto, marcas, categorias, onClose, onSaved, onDeleted }: Props) {
   const supabase = createClient()
+  const { empresa } = useEmpresa()
   const isNew = !produto?.id
   const [form, setForm] = useState({
     nome: produto?.nome ?? '',
@@ -34,6 +36,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   async function salvar() {
     if (!form.nome.trim()) { toast.error('Nome é obrigatório'); return }
     if (!form.marca_id) { toast.error('Marca é obrigatória'); return }
+    if (!empresa?.id) { toast.error('Empresa não encontrada'); return }
     setSaving(true)
     const payload = {
       nome: form.nome.trim(),
@@ -42,7 +45,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
       ativo: true,
     }
     if (isNew) {
-      const { data, error } = await supabase.from('produtos').insert(payload).select().single()
+      const { data, error } = await supabase.from('produtos').insert({ ...payload, empresa_id: empresa.id }).select().single()
       if (error) { toast.error('Erro: ' + error.message); setSaving(false); return }
       const marca = marcas.find(m => m.id === Number(form.marca_id))
       const cat = categorias.find(c => c.id === Number(form.categoria_id))

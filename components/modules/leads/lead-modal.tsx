@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Send, UserRound, UserCheck, Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, KANBAN_COLUMNS, STATUS_LABELS } from './types'
 import { toast } from 'sonner'
@@ -23,6 +24,7 @@ interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string }
 
 export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps) {
   const supabase = createClient()
+  const { empresa } = useEmpresa()
   const router   = useRouter()
   const [saving, setSaving] = useState(false)
   const [draft, setDraft]   = useState('')
@@ -123,9 +125,11 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
   async function sendMsg() {
     const t = draft.trim(); if (!t) return
+    if (!empresa?.id) { toast.error('Empresa não encontrada'); return }
     setDraft('')
     setChat(prev => [...prev, { from: 'loja', text: t, time: 'agora' }])
     const { error } = await supabase.from('lead_mensagens').insert({
+      empresa_id: empresa.id,
       lead_id: lead.id,
       direcao: 'enviada',
       conteudo: t,

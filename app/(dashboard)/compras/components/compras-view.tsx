@@ -76,6 +76,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   const [erroPedido,     setErroPedido]     = useState<string | null>(null)
 
   async function salvarPedido() {
+    if (!empresaId) { setErroPedido('Empresa não encontrada'); return }
     if (!formPedido.descricao.trim()) { setErroPedido('Descrição é obrigatória'); return }
     if (formPedido.valor_total && isNaN(parseFloat(formPedido.valor_total.replace(',', '.')))) {
       setErroPedido('Valor total inválido'); return
@@ -113,6 +114,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   }
 
   async function salvarFornecedor() {
+    if (!empresaId) { setErro('Empresa não encontrada'); return }
     if (!form.nome_fantasia.trim()) { setErro('Nome fantasia é obrigatório'); return }
     setSalvando(true)
     setErro(null)

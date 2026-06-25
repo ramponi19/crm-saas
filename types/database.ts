@@ -28,7 +28,7 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           nome: string
           ordem?: number | null
@@ -110,7 +110,7 @@ export type Database = {
           created_at?: string | null
           data_nascimento?: string | null
           email?: string | null
-          empresa_id?: number
+          empresa_id: number
           endereco?: string | null
           estado?: string | null
           estado_civil?: string | null
@@ -297,7 +297,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           data_pagamento?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           percentual?: number | null
           status?: string | null
@@ -529,7 +529,7 @@ export type Database = {
           contato?: string | null
           created_at?: string | null
           email?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           nome_fantasia: string
           observacoes?: string | null
@@ -598,7 +598,7 @@ export type Database = {
           defeito_relatado?: string | null
           dentro_garantia?: boolean | null
           dias_garantia_restantes?: number | null
-          empresa_id?: number
+          empresa_id: number
           estado_entrada?: string | null
           id?: never
           imei_serial?: string | null
@@ -882,7 +882,7 @@ export type Database = {
           conteudo: string
           created_at?: string | null
           direcao: string
-          empresa_id?: number
+          empresa_id: number
           id?: never
           lead_id?: number | null
           lida?: boolean | null
@@ -944,13 +944,14 @@ export type Database = {
           telefone: string | null
           ultima_mensagem_at: string | null
           ultima_tratativa: string | null
+          valor_estimado: number | null
         }
         Insert: {
           ativo?: boolean | null
           convertido_em?: number | null
           created_at?: string | null
           data_transferencia_funil?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           instagram?: string | null
           kanban_ordem?: number | null
@@ -966,6 +967,7 @@ export type Database = {
           telefone?: string | null
           ultima_mensagem_at?: string | null
           ultima_tratativa?: string | null
+          valor_estimado?: number | null
         }
         Update: {
           ativo?: boolean | null
@@ -988,6 +990,7 @@ export type Database = {
           telefone?: string | null
           ultima_mensagem_at?: string | null
           ultima_tratativa?: string | null
+          valor_estimado?: number | null
         }
         Relationships: [
           {
@@ -1032,7 +1035,7 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           nome: string
           ordem?: number | null
@@ -1075,7 +1078,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           mes_ano: string
           meta_vendas_qtd?: number | null
@@ -1130,7 +1133,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           observacoes?: string | null
           produto_id?: number | null
@@ -1220,7 +1223,7 @@ export type Database = {
           created_at?: string | null
           data_pedido?: string | null
           descricao?: string | null
-          empresa_id?: number
+          empresa_id: number
           fornecedor_id?: number | null
           id?: never
           observacoes?: string | null
@@ -1340,7 +1343,7 @@ export type Database = {
           canal_venda?: string | null
           created_at?: string | null
           desconto_valor?: number | null
-          empresa_id?: number
+          empresa_id: number
           grupo_id?: string | null
           id?: never
           inventario_unidade_id?: number | null
@@ -1384,28 +1387,28 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pre_vendas_new_inventario_unidade_id_fkey"
+            foreignKeyName: "pre_vendas_inventario_unidade_id_fkey"
             columns: ["inventario_unidade_id"]
             isOneToOne: false
             referencedRelation: "inventario_unidades"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pre_vendas_new_usuario_id_fkey"
+            foreignKeyName: "pre_vendas_usuario_id_fkey"
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pre_vendas_new_venda_id_fkey"
+            foreignKeyName: "pre_vendas_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
             referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pre_vendas_new_vendedor_id_fkey"
+            foreignKeyName: "pre_vendas_vendedor_id_fkey"
             columns: ["vendedor_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
@@ -1436,7 +1439,7 @@ export type Database = {
           codigos?: string | null
           cores?: string[] | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: number
           marca_id?: number | null
           nome: string
@@ -1458,24 +1461,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "modelos_produtos_categoria_id_fkey"
+            foreignKeyName: "produtos_categoria_id_fkey"
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias_produtos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "modelos_produtos_marca_id_fkey"
-            columns: ["marca_id"]
-            isOneToOne: false
-            referencedRelation: "marcas_produtos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "modelos_produtos_subcategoria_id_fkey"
-            columns: ["subcategoria_id"]
-            isOneToOne: false
-            referencedRelation: "subcategorias_produtos"
             referencedColumns: ["id"]
           },
           {
@@ -1490,6 +1479,20 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "marcas_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -1547,7 +1550,7 @@ export type Database = {
           ativo?: boolean | null
           categoria_id?: number | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           id?: never
           nome: string
           ordem?: number | null
@@ -1649,7 +1652,7 @@ export type Database = {
           ativo?: boolean | null
           bandeira?: string | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           forma_pagamento: string
           id?: never
           parcelas?: number | null
@@ -1814,7 +1817,7 @@ export type Database = {
           desconto_aprovado_por?: string | null
           desconto_motivo?: string | null
           desconto_valor?: number | null
-          empresa_id?: number
+          empresa_id: number
           forma_pagamento?: string | null
           id?: never
           lucro?: number | null
@@ -1918,7 +1921,7 @@ export type Database = {
         Insert: {
           bandeira_cartao?: string | null
           created_at?: string | null
-          empresa_id?: number
+          empresa_id: number
           forma_pagamento: string
           id?: never
           parcelas?: number | null
@@ -2140,4 +2143,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

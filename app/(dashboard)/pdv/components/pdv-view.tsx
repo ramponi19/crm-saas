@@ -183,6 +183,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
         if (error) throw new Error(error.message)
         if (primeiraVendaId === null) primeiraVendaId = venda.id
         await supabase.from('vendas_pagamentos').insert({
+          empresa_id: empresaId,
           venda_id: venda.id, forma_pagamento: formaPagamento,
           valor_pago: valorItem,
           bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
