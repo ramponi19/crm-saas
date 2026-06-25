@@ -20,6 +20,27 @@ const CANAL_NOME: Record<string, string> = {
   whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', site: 'Site', manual: 'Loja',
 }
 
+// Entrega real acontece na Edge Function (Graph API / Evolution).
+// Canais externos: whatsapp, instagram, messenger. site/manual/null → nota interna.
+const FUNCTIONS_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
+
+// Chama a Edge Function que entrega na Meta/Evolution E grava em lead_mensagens.
+// Lança erro com a mensagem da API quando a entrega falha (ex.: fora da janela de 24h).
+async function entregarViaEdge(action: 'send' | 'send_meta', payload: Record<string, unknown>) {
+  const res = await fetch(`${FUNCTIONS_URL}?action=${action}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+    },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json().catch(() => ({} as Record<string, unknown>))
+  if (!res.ok || (data as { error?: string }).error) {
+    throw new Error((data as { error?: string }).error ?? 'Falha ao enviar a mensagem')
+  }
+}
+
 interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string }
 
 export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps) {
@@ -126,18 +147,41 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
   async function sendMsg() {
     const t = draft.trim(); if (!t) return
     if (!empresa?.id) { toast.error('Empresa não encontrada'); return }
+    const canal = lead.origem ?? 'manual'
     setDraft('')
+    // Otimista: mostra na hora; o realtime substitui pela linha real (dedup acima).
     setChat(prev => [...prev, { from: 'loja', text: t, time: 'agora' }])
-    const { error } = await supabase.from('lead_mensagens').insert({
-      empresa_id: empresa.id,
-      lead_id: lead.id,
-      direcao: 'enviada',
-      conteudo: t,
-      origem: lead.origem ?? 'manual',
-      lida: true,
-    })
-    if (error) toast.error('Erro ao enviar mensagem')
-    else await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
+
+    // Desfaz o otimista e devolve o texto ao vendedor quando a entrega falha.
+    const rollback = () => {
+      setChat(prev => {
+        const idx = prev.findIndex(x => x.from === 'loja' && x.text === t && x.time === 'agora')
+        if (idx < 0) return prev
+        const copy = [...prev]; copy.splice(idx, 1); return copy
+      })
+      setDraft(t)
+    }
+
+    try {
+      if (canal === 'instagram' || canal === 'messenger') {
+        // Edge Function entrega na Graph API E grava em lead_mensagens.
+        await entregarViaEdge('send_meta', { leadId: lead.id, texto: t, canal })
+      } else if (canal === 'whatsapp') {
+        if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
+        await entregarViaEdge('send', { number: lead.telefone, text: t, leadId: lead.id })
+      } else {
+        // Sem canal externo (loja/site/manual): registra como nota interna.
+        const { error } = await supabase.from('lead_mensagens').insert({
+          empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
+          conteudo: t, origem: canal, lida: true,
+        })
+        if (error) throw new Error(error.message)
+      }
+      await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
+    } catch (e) {
+      rollback()
+      toast.error(e instanceof Error ? e.message : 'Erro ao enviar mensagem')
+    }
   }
 
   async function handleSave() {
