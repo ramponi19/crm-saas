@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { logSuperAdminAction } from '@/lib/superadmin'
 
 const IMPERSONATE_COOKIE = 'impersonating_empresa_id'
@@ -49,7 +50,8 @@ export async function POST(
 
   // Persistir a empresa impersonada na coluna do usuário — é a fonte de verdade
   // para o RLS (get_empresa_id considera isto quando o usuário é super admin).
-  await supabase
+  const serviceClient = createServiceClient()
+  await serviceClient
     .from('usuarios')
     .update({ impersonando_empresa_id: empresaId })
     .eq('id', user.id)
@@ -70,7 +72,8 @@ export async function DELETE() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    await supabase
+    const serviceClient = createServiceClient()
+    await serviceClient
       .from('usuarios')
       .update({ impersonando_empresa_id: null })
       .eq('id', user.id)

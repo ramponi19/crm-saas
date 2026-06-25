@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { logSuperAdminAction } from '@/lib/superadmin'
 
 // Promover (por email) ou revogar (por id) super admins.
@@ -43,7 +44,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Este usuário já é super admin.' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const serviceClient = createServiceClient()
+  const { error } = await serviceClient
     .from('usuarios')
     .update({ is_super_admin: true })
     .eq('id', alvo.id)
@@ -89,7 +91,8 @@ export async function DELETE(req: NextRequest) {
     .eq('id', id)
     .single()
 
-  const { error } = await supabase
+  const serviceClient = createServiceClient()
+  const { error } = await serviceClient
     .from('usuarios')
     .update({ is_super_admin: false })
     .eq('id', id)
