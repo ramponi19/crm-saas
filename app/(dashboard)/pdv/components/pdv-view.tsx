@@ -155,6 +155,10 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
           .single()
         if (!claimed) throw new Error(`"${c.item.produto_nome}" não está mais disponível`)
 
+        // Proportional fee: apply the same multiplier as the full cart total.
+        const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
+        const valorItemComTaxa = valorItem * taxaMultiplier
+
         const { data: venda, error } = await supabase
           .from('vendas')
           .insert({
@@ -181,7 +185,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
           valor_pago: valorItem,
           bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
           parcelas: ['credito','link'].includes(formaPagamento) ? parcelas : null,
-          valor_com_juros: totais.totalComTaxa !== totais.total ? totais.totalComTaxa : null,
+          valor_com_juros: totais.totalComTaxa !== totais.total ? valorItemComTaxa : null,
         })
       }
       if (formaPagamento === 'pix' && totais.total > 0) {
