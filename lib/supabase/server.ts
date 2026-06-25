@@ -19,9 +19,12 @@ export async function createClient() {
         },
         setAll(cookiesToSet: CookieToSet[]) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
+            cookiesToSet.forEach(({ name, value, options }) => {
+              // Strip persistence so auth cookies become session cookies —
+              // they are cleared when the browser closes.
+              const { maxAge: _m, expires: _e, ...sessionOptions } = options ?? {}
+              cookieStore.set(name, value, sessionOptions)
+            })
           } catch {}
         },
       },
