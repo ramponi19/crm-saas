@@ -26,7 +26,7 @@ async function getDashboardData() {
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
-    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluida,cancelada)'),
+    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
     supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, produtos!produto_id(nome)').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
     supabase.from('vendas')
       .select('produtos!produto_id(nome)')
