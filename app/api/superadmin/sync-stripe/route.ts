@@ -10,7 +10,7 @@ export async function POST() {
   if (ctx.error) return ctx.error
 
   if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ ok: true, nota: 'Stripe não configurado' })
+    return NextResponse.json({ ok: true, atualizadas: 0, erros: [], nota: 'Stripe não configurado' })
   }
 
   const supabase = createServiceClient()
