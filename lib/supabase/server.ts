@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { Database } from '@/types/database'
+import { createServiceClient } from '@/lib/supabase/service'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -38,12 +39,20 @@ export async function getEmpresaId(): Promise<number> {
   // Fonte de verdade da impersonação: coluna persistida (compatível com RLS).
   const { data: usuario } = await supabase
     .from('usuarios')
-    .select('is_super_admin, impersonando_empresa_id')
+    .select('is_super_admin, impersonando_empresa_id, impersonando_expires_at')
     .eq('id', user.id)
     .single()
 
   if (usuario?.is_super_admin && usuario.impersonando_empresa_id) {
-    return usuario.impersonando_empresa_id
+    if (usuario.impersonando_expires_at && new Date(usuario.impersonando_expires_at) > new Date()) {
+      return usuario.impersonando_empresa_id
+    }
+    // TTL expirado: zera a impersonação no DB
+    createServiceClient()
+      .from('usuarios')
+      .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
+      .eq('id', user.id)
+      .then(() => {/* fire-and-forget */})
   }
 
   const { data: vinculo } = await supabase
@@ -65,11 +74,12 @@ export async function getImpersonation(): Promise<{ empresaId: number; nome: str
 
   const { data: usuario } = await supabase
     .from('usuarios')
-    .select('is_super_admin, impersonando_empresa_id')
+    .select('is_super_admin, impersonando_empresa_id, impersonando_expires_at')
     .eq('id', user.id)
     .single()
 
   if (!usuario?.is_super_admin || !usuario.impersonando_empresa_id) return null
+  if (usuario.impersonando_expires_at && new Date(usuario.impersonando_expires_at) <= new Date()) return null
 
   const { data: empresa } = await supabase
     .from('empresas')

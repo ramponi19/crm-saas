@@ -66,10 +66,22 @@ export async function DELETE() {
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const serviceClient = createServiceClient()
+    const { data: usuario } = await serviceClient
+      .from('usuarios')
+      .select('impersonando_empresa_id')
+      .eq('id', user.id)
+      .single()
+
     await serviceClient
       .from('usuarios')
       .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
       .eq('id', user.id)
+
+    await logSuperAdminAction({
+      adminUserId: user.id,
+      empresaId: usuario?.impersonando_empresa_id ?? null,
+      acao: 'encerrar_impersonacao',
+    })
   }
 
   const res = NextResponse.json({ ok: true })
