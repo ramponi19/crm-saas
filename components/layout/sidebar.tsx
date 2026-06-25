@@ -28,7 +28,7 @@ import {
   ShieldAlert,
   Lock,
 } from 'lucide-react'
-import { planoTemAcesso, type ModuloPlano } from '@/lib/acesso'
+import { planoTemAcesso, type ModuloPlano } from '@/lib/plano'
 
 const navGroups = [
   {
