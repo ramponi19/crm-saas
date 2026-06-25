@@ -457,6 +457,8 @@ export type Database = {
           slug: string
           status: string
           stripe_customer_id: string | null
+          cnpj: string | null
+          telefone: string | null
           stripe_price_id: string | null
           stripe_status: string | null
           stripe_subscription_id: string | null
@@ -468,6 +470,8 @@ export type Database = {
           wl_whatsapp: string | null
         }
         Insert: {
+          cnpj?: string | null
+          telefone?: string | null
           created_at?: string | null
           id?: number
           limite_leads?: number | null
@@ -488,6 +492,8 @@ export type Database = {
           wl_whatsapp?: string | null
         }
         Update: {
+          cnpj?: string | null
+          telefone?: string | null
           created_at?: string | null
           id?: number
           limite_leads?: number | null
