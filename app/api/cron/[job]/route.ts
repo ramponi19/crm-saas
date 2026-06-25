@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
+import { timingSafeEqual } from 'crypto'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -8,12 +9,21 @@ import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 // Jobs: expirar-trials | arquivar-eventos | sync-stripe
 // ============================================================
 
+function verificarCronSecret(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  // Falha segura: se a variável não estiver configurada, bloqueia tudo
+  if (!secret) return false
+  const expected = `Bearer ${secret}`
+  const received = req.headers.get('authorization') ?? ''
+  if (received.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(received), Buffer.from(expected))
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ job: string }> }
 ) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verificarCronSecret(req)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
