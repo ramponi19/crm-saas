@@ -1179,6 +1179,30 @@ export type Database = {
           },
         ]
       }
+      payment_webhook_eventos: {
+        Row: {
+          event_type: string | null
+          id: number
+          processado_em: string
+          provider: string
+          provider_ref: string
+        }
+        Insert: {
+          event_type?: string | null
+          id?: never
+          processado_em?: string
+          provider: string
+          provider_ref: string
+        }
+        Update: {
+          event_type?: string | null
+          id?: never
+          processado_em?: string
+          provider?: string
+          provider_ref?: string
+        }
+        Relationships: []
+      }
       pedidos_compra: {
         Row: {
           created_at: string | null
@@ -1706,6 +1730,7 @@ export type Database = {
           email: string | null
           id: string
           impersonando_empresa_id: number | null
+          impersonando_expires_at: string | null
           is_super_admin: boolean
           modulos_acesso: string[] | null
           nome: string
@@ -1718,6 +1743,7 @@ export type Database = {
           email?: string | null
           id: string
           impersonando_empresa_id?: number | null
+          impersonando_expires_at?: string | null
           is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome: string
@@ -1730,6 +1756,7 @@ export type Database = {
           email?: string | null
           id?: string
           impersonando_empresa_id?: number | null
+          impersonando_expires_at?: string | null
           is_super_admin?: boolean
           modulos_acesso?: string[] | null
           nome?: string

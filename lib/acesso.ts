@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { planoTemAcesso, type ModuloPlano } from '@/lib/plano'
 export type { ModuloPlano, Plano } from '@/lib/plano'
 export { planoTemAcesso } from '@/lib/plano'
 

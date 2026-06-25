@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireSuperAdmin } from '@/lib/superadmin'
+import type { Database } from '@/types/database'
+
+type PlanoUpdate = Database['public']['Tables']['planos_config']['Update']
 
 export async function GET() {
   await requireSuperAdmin()
@@ -66,7 +69,7 @@ export async function PATCH(req: NextRequest) {
   const serviceClient = createServiceClient()
   const { data, error } = await serviceClient
     .from('planos_config')
-    .update(payload)
+    .update(payload as PlanoUpdate)
     .eq('id', id)
     .select()
     .single()
