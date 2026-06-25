@@ -120,19 +120,7 @@ export default function RegisterPage() {
         role: 'owner',
       })
 
-      // 5. Seed: cria categorias financeiras padrão para essa empresa
-      const categoriasSeed = [
-        { nome: 'Vendas de produtos',   tipo: 'receita', cor: '#34D399', empresa_id: empresaId },
-        { nome: 'Serviços/Assistência', tipo: 'receita', cor: '#6B8CFF', empresa_id: empresaId },
-        { nome: 'Outras receitas',      tipo: 'receita', cor: '#F4B740', empresa_id: empresaId },
-        { nome: 'Fornecedores',         tipo: 'despesa', cor: '#F0353D', empresa_id: empresaId },
-        { nome: 'Salários',             tipo: 'despesa', cor: '#EC4899', empresa_id: empresaId },
-        { nome: 'Aluguel',              tipo: 'despesa', cor: '#F59E0B', empresa_id: empresaId },
-        { nome: 'Outras despesas',      tipo: 'despesa', cor: '#94A3B8', empresa_id: empresaId },
-      ]
-      await supabase.from('categorias_financeiras').insert(categoriasSeed)
-
-      // 6. Redireciona ao dashboard
+      // 5. Redireciona ao dashboard
       router.push('/dashboard')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')

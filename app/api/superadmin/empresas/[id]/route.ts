@@ -77,7 +77,7 @@ export async function POST(
   }
 
   await logSuperAdminAction({
-    adminUserId: user.id,
+    adminUserId: ctx.userId,
     empresaId,
     acao: logAcao,
     detalhes: logDetalhes,

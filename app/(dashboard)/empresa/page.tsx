@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { Building2, Palette, CreditCard, Users, Check, Loader2, Lock } from 'lucide-react'
+import { Building2, Palette, CreditCard, Users, Check, Loader2, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/acesso'
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
