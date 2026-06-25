@@ -868,7 +868,6 @@ export type Database = {
           estado_entrada: string | null
           id: number
           imei_serial: string | null
-          inventario_unidade_id: string | null
           modelo_reserva: string | null
           observacoes: string | null
           orcamento_valor: number | null
@@ -892,7 +891,6 @@ export type Database = {
           estado_entrada?: string | null
           id?: never
           imei_serial?: string | null
-          inventario_unidade_id?: string | null
           modelo_reserva?: string | null
           observacoes?: string | null
           orcamento_valor?: number | null
@@ -916,7 +914,6 @@ export type Database = {
           estado_entrada?: string | null
           id?: never
           imei_serial?: string | null
-          inventario_unidade_id?: string | null
           modelo_reserva?: string | null
           observacoes?: string | null
           orcamento_valor?: number | null
@@ -989,7 +986,6 @@ export type Database = {
           fornecedor_id: number | null
           fotos_urls: string | null
           id: number
-          imagem_url: string | null
           imei: string | null
           imei2: string | null
           numero_serie: string | null
@@ -1016,7 +1012,6 @@ export type Database = {
           fornecedor_id?: number | null
           fotos_urls?: string | null
           id?: number
-          imagem_url?: string | null
           imei?: string | null
           imei2?: string | null
           numero_serie?: string | null
@@ -1043,7 +1038,6 @@ export type Database = {
           fornecedor_id?: number | null
           fotos_urls?: string | null
           id?: number
-          imagem_url?: string | null
           imei?: string | null
           imei2?: string | null
           numero_serie?: string | null
