@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { logSuperAdminAction } from '@/lib/superadmin'
+import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 import type { Database } from '@/types/database'
 
 type EmpresaUpdate = Database['public']['Tables']['empresas']['Update']
@@ -23,20 +22,9 @@ export async function POST(
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
-  // Verificação de super admin (RLS também protege, mas validamos aqui antes de agir)
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!usuario?.is_super_admin) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
-  }
+  const ctx = await requireSuperAdminApi()
+  if (ctx.error) return ctx.error
+  const { supabase } = ctx
 
   const acao = (await req.json()) as Acao
 

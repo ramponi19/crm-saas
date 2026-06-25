@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { logSuperAdminAction } from '@/lib/superadmin'
+import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 
 const IMPERSONATE_COOKIE = 'impersonating_empresa_id'
 
@@ -16,19 +15,9 @@ export async function POST(
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!usuario?.is_super_admin) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
-  }
+  const ctx = await requireSuperAdminApi()
+  if (ctx.error) return ctx.error
+  const { userId, supabase } = ctx
 
   // Confirmar que a empresa existe (RLS de super admin permite a leitura)
   const { data: empresa } = await supabase
@@ -42,7 +31,7 @@ export async function POST(
   }
 
   await logSuperAdminAction({
-    adminUserId: user.id,
+    adminUserId: userId,
     empresaId,
     acao: 'impersonar',
     detalhes: { empresa_nome: empresa.nome },
@@ -57,7 +46,7 @@ export async function POST(
   await serviceClient
     .from('usuarios')
     .update({ impersonando_empresa_id: empresaId, impersonando_expires_at: expiresAt })
-    .eq('id', user.id)
+    .eq('id', userId)
 
   const res = NextResponse.json({ ok: true, empresa: empresa.nome })
   res.cookies.set(IMPERSONATE_COOKIE, String(empresaId), {

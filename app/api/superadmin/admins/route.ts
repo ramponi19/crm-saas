@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { logSuperAdminAction } from '@/lib/superadmin'
+import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 
 // Promover (por email) ou revogar (por id) super admins.
 // Só super admins podem chamar.
 
-async function exigirSuperAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { erro: NextResponse.json({ error: 'Não autenticado' }, { status: 401 }) }
-  const { data: u } = await supabase
-    .from('usuarios')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-  if (!u?.is_super_admin) return { erro: NextResponse.json({ error: 'Sem permissão' }, { status: 403 }) }
-  return { supabase, userId: user.id }
-}
-
 // Promover um usuário existente (por email) a super admin
 export async function POST(req: NextRequest) {
-  const ctx = await exigirSuperAdmin()
-  if ('erro' in ctx) return ctx.erro
+  const ctx = await requireSuperAdminApi()
+  if (ctx.error) return ctx.error
   const { supabase, userId } = ctx
 
   const { email } = await req.json() as { email: string }
@@ -63,8 +49,8 @@ export async function POST(req: NextRequest) {
 
 // Revogar super admin de um usuário (por id)
 export async function DELETE(req: NextRequest) {
-  const ctx = await exigirSuperAdmin()
-  if ('erro' in ctx) return ctx.erro
+  const ctx = await requireSuperAdminApi()
+  if (ctx.error) return ctx.error
   const { supabase, userId } = ctx
 
   const { id } = await req.json() as { id: string }
