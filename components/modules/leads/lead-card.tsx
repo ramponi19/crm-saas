@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock } from 'lucide-react'
@@ -66,6 +67,13 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
   } = useSortable({ id: lead.id, data: { leadId: lead.id } })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
+
+  // Faz o relógio de SLA andar sozinho (re-render a cada segundo)
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => (t + 1) % 3600), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const responsavel = usuarios.find(u => u.id === lead.responsavel_id)
   const temMsgs     = (lead.msgs_nao_lidas ?? 0) > 0
