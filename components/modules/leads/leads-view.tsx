@@ -42,7 +42,8 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
     return { ativos: ativos.length, taxa, negoc }
   }, [leads])
 
-  // Realtime: novas mensagens recebidas incrementam o badge do card
+  // Realtime: novas mensagens recebidas incrementam o badge do card,
+  // e leads novos (conversas que ainda não estão na tela) entram sozinhos.
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
@@ -57,6 +58,16 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
               ? { ...l, msgs_nao_lidas: (l.msgs_nao_lidas ?? 0) + 1, ultima_mensagem_at: m.created_at }
               : l
           ))
+        })
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'leads' },
+        (payload: RealtimePostgresChangesPayload<Lead>) => {
+          const novo = payload.new as Lead
+          if (novo.ativo === false) return
+          setLeads(prev =>
+            prev.some(l => l.id === novo.id)
+              ? prev
+              : [{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev])
         })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
