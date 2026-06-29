@@ -69,6 +69,23 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
               ? prev
               : [{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev])
         })
+      // Lead atualizado: reflete na hora; se foi desativado (excluído), some da lista
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads' },
+        (payload: RealtimePostgresChangesPayload<Lead>) => {
+          const l = payload.new as Lead
+          setLeads(prev =>
+            l.ativo === false
+              ? prev.filter(x => x.id !== l.id)
+              : prev.map(x => x.id === l.id ? { ...x, ...l } : x))
+        })
+      // Lead removido do banco: some da lista na hora
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'leads' },
+        (payload: RealtimePostgresChangesPayload<{ id: number }>) => {
+          const old = payload.old as { id: number }
+          setLeads(prev => prev.filter(x => x.id !== old.id))
+        })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
