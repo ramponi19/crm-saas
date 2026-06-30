@@ -30,7 +30,13 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
                       request.nextUrl.pathname.startsWith('/register')
 
-  if (!user && !isAuthRoute && request.nextUrl.pathname !== '/') {
+  const isPublicRoute = request.nextUrl.pathname === '/' ||
+                        request.nextUrl.pathname.startsWith('/privacy') ||
+                        request.nextUrl.pathname.startsWith('/entrar') ||
+                        request.nextUrl.pathname.startsWith('/register') ||
+                        request.nextUrl.pathname.startsWith('/reset-senha')
+
+  if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
