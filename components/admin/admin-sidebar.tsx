@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   LogOut,
   Crown,
+  Plug,
 } from 'lucide-react'
 
 // Dourado ÁPICE (identidade evoluída) — distingue o painel do dono do superadmin (roxo)
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin',               label: 'Visão geral',   icon: LayoutDashboard, exact: true },
   { href: '/admin/empresa',       label: 'Minha empresa', icon: Building2 },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
+  { href: '/admin/integracoes',   label: 'Integrações',   icon: Plug },
   { href: '/admin/equipe',        label: 'Equipe',        icon: UserCog },
   { href: '/planos',              label: 'Planos',        icon: CreditCard },
 ]

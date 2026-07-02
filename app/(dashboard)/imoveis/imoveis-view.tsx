@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
-import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Tables, TablesInsert } from '@/types/database'
 
@@ -47,7 +47,7 @@ const vazio = {
 }
 type FormT = typeof vazio
 
-export default function ImoveisView({ inicial, proprietarios, empresaId, slug, leadsToken }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; empresaId: number; slug: string; leadsToken: string }) {
+export default function ImoveisView({ inicial, proprietarios, empresaId, slug }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; empresaId: number; slug: string }) {
   const supabase = createClient()
   const [lista, setLista] = useState<Imovel[]>(inicial)
   const [busca, setBusca] = useState('')
@@ -85,55 +85,6 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug, l
     }
   }
 
-  async function copiarFeed() {
-    const url = `${window.location.origin}/api/portais/${slug}`
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success('URL do feed copiada! Cole no painel do portal (ZAP/VivaReal/OLX).')
-    } catch {
-      window.open(url, '_blank')
-    }
-  }
-
-  async function copiarSite() {
-    const url = `${window.location.origin}/imob/${slug}`
-    try { await navigator.clipboard.writeText(url); toast.success('Link do site copiado!') }
-    catch { window.open(url, '_blank') }
-  }
-
-  async function copiarSnippet() {
-    const endpoint = `${window.location.origin}/api/imob/${slug}/lead?token=${leadsToken}`
-    const snippet = `<!-- Formulário de contato — envia leads pro CRM ÁPICE -->
-<form id="apice-lead">
-  <input name="nome" placeholder="Seu nome" required />
-  <input name="telefone" placeholder="WhatsApp" required />
-  <input name="email" placeholder="E-mail" />
-  <textarea name="mensagem" placeholder="Mensagem"></textarea>
-  <input type="hidden" name="imovel" value="" /><!-- opcional: código do imóvel -->
-  <button type="submit">Enviar</button>
-</form>
-<script>
-document.getElementById('apice-lead').addEventListener('submit', async function (e) {
-  e.preventDefault();
-  const dados = Object.fromEntries(new FormData(this).entries());
-  await fetch('${endpoint}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
-  alert('Recebemos seu contato! Em breve retornaremos.');
-  this.reset();
-});
-</script>`
-    try { await navigator.clipboard.writeText(snippet); toast.success('Código do formulário copiado! Cole no site da imobiliária.') }
-    catch { toast.error('Não foi possível copiar') }
-  }
-
-  async function copiarLeadsUrl() {
-    const url = `${window.location.origin}/api/portais/${slug}/leads?token=${leadsToken}`
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success('URL de leads copiada! Cole no Canal Pro (Integrações → Receber leads no CRM).')
-    } catch {
-      window.open(url, '_blank')
-    }
-  }
   const str = (k: keyof FormT) => (v: string) => set(k, v)
   const n = (v: string) => (v.trim() === '' ? null : Number(v))
   const i = (v: string) => (v.trim() === '' ? null : parseInt(v, 10))
@@ -217,36 +168,17 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9AA7B6]" />
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por título, código, bairro, cidade..." className={`${INPUT} pl-9`} />
           </div>
-          <button onClick={abrirNovo} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] transition-colors shrink-0">
-            <Plus size={17} /> Novo imóvel
-          </button>
-        </div>
-
-        {slug && (
-          <div className="mb-5 bg-[#C9A24B]/[0.08] border border-[#C9A24B]/25 rounded-[10px] px-3 py-2 space-y-1.5">
-            <div className="flex items-center gap-2 text-[12.5px]">
-              <span className="font-semibold text-[#8A6D2B] shrink-0">🌐 Site público:</span>
-              <code className="truncate text-[#56657A]">/imob/{slug}</code>
-              <a href={`/imob/${slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Abrir</a>
-              <button onClick={copiarSite} className="text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
-            </div>
-            <div className="flex items-center gap-2 text-[12.5px] border-t border-[#C9A24B]/20 pt-1.5">
-              <span className="font-semibold text-[#8A6D2B] shrink-0">📤 Feed de imóveis (portais):</span>
-              <code className="truncate text-[#56657A]">/api/portais/{slug}</code>
-              <button onClick={copiarFeed} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
-            </div>
-            <div className="flex items-center gap-2 text-[12.5px] border-t border-[#C9A24B]/20 pt-1.5">
-              <span className="font-semibold text-[#8A6D2B] shrink-0">📥 Receber leads (Canal Pro):</span>
-              <code className="truncate text-[#56657A]">/api/portais/{slug}/leads?token=•••</code>
-              <button onClick={copiarLeadsUrl} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
-            </div>
-            <div className="flex items-center gap-2 text-[12.5px] border-t border-[#C9A24B]/20 pt-1.5">
-              <span className="font-semibold text-[#8A6D2B] shrink-0">📝 Formulário no site próprio:</span>
-              <code className="truncate text-[#56657A]">cola no site → leads caem no CRM</code>
-              <button onClick={copiarSnippet} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar código</button>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {slug && (
+              <a href={`/imob/${slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#16212E] border border-[#16212E]/[0.15] hover:bg-[#16212E]/[0.03] transition-colors">
+                <Globe size={16} /> Site
+              </a>
+            )}
+            <button onClick={abrirNovo} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] transition-colors">
+              <Plus size={17} /> Novo imóvel
+            </button>
           </div>
-        )}
+        </div>
 
         {filtrada.length === 0 ? (
           <div className="text-center py-20 text-[#788698]">

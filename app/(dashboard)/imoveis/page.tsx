@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/service'
 import { normalizarSegmento } from '@/lib/segmentos'
-import { getOrCreatePortalToken } from '@/lib/portal-token'
 import ImoveisView from './imoveis-view'
 
 export const metadata = { title: 'Imóveis' }
@@ -18,16 +16,12 @@ export default async function ImoveisPage() {
     supabase.from('proprietarios').select('id, nome').eq('empresa_id', empresaId).order('nome'),
   ])
 
-  // token do webhook de leads dos portais (gerado sob demanda)
-  const leadsToken = await getOrCreatePortalToken(createServiceClient(), empresaId)
-
   return (
     <ImoveisView
       inicial={imoveis ?? []}
       proprietarios={proprietarios ?? []}
       empresaId={empresaId}
       slug={empresa?.slug ?? ''}
-      leadsToken={leadsToken}
     />
   )
 }
