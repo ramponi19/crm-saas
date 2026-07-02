@@ -261,7 +261,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   }
 
   const labelCls = "font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block"
-  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[9px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors box-border"
+  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[9px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors box-border"
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-[80] flex items-center justify-center p-6"
@@ -286,7 +286,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <UserCheck size={15} /> Converter em cliente
           </button>
           <button onClick={handleDelete} disabled={saving}
-            className="flex items-center gap-[7px] px-[14px] py-2 rounded-[10px] bg-[rgba(215,40,47,0.14)] text-[#C01F26] text-[12.5px] font-semibold hover:bg-[rgba(215,40,47,0.22)] transition-colors">
+            className="flex items-center gap-[7px] px-[14px] py-2 rounded-[10px] bg-[rgba(220,38,38,0.12)] text-[#DC2626] text-[12.5px] font-semibold hover:bg-[rgba(220,38,38,0.20)] transition-colors">
             <Trash2 size={15} /> Excluir
           </button>
           <button onClick={onClose}
@@ -326,7 +326,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} segmento={segmento} />}
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             <button onClick={handleSave} disabled={saving}
-              className="flex items-center justify-center gap-2 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 mt-1">
+              className="flex items-center justify-center gap-2 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 mt-1">
               <Save size={17} /> {saving ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
@@ -351,7 +351,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                   <div key={i} className={`flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
                     <div className="max-w-[72%] px-[14px] py-[10px] rounded-[14px] text-[13px]"
                       style={{
-                        background: isLoja ? 'linear-gradient(180deg,#E03037,#C01F26)' : 'rgba(22,32,46,0.06)',
+                        background: isLoja ? 'linear-gradient(180deg,#22303F,#16212E)' : 'rgba(22,32,46,0.06)',
                         color: isLoja ? '#fff' : '#E9EEF4',
                         borderBottomRightRadius: isLoja ? 4 : 14,
                         borderBottomLeftRadius: isLoja ? 14 : 4,
@@ -368,9 +368,9 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               <input value={draft} onChange={e => setDraft(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMsg()}
                 placeholder="Digite uma mensagem…"
-                className="flex-1 bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[11px] px-[13px] py-[11px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] min-w-0" />
+                className="flex-1 bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[11px] px-[13px] py-[11px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)] min-w-0" />
               <button onClick={sendMsg}
-                className="w-[46px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white flex items-center justify-center flex-none hover:-translate-y-[1px] transition-all">
+                className="w-[46px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white flex items-center justify-center flex-none hover:-translate-y-[1px] transition-all">
                 <Send size={18} />
               </button>
             </div>

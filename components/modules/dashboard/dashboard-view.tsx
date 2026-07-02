@@ -51,7 +51,7 @@ function KpiCard({ label, children, sub, delta, deltaUp, delay = 0 }: {
       <div className="flex justify-between items-start">
         <div />
         {delta && (
-          <span className={cn('flex items-center gap-1 text-[12px] font-bold', deltaUp ? 'text-[#34D399]' : 'text-[#C01F26]')}>
+          <span className={cn('flex items-center gap-1 text-[12px] font-bold', deltaUp ? 'text-[#34D399]' : 'text-[#DC2626]')}>
             <TrendingUp size={14} />{delta}
           </span>
         )}
@@ -68,7 +68,7 @@ function KpiCard({ label, children, sub, delta, deltaUp, delay = 0 }: {
 // ─────────────────────────────────────────
 const CANAL_META: Record<string, { color: string; label: string }> = {
   whatsapp:    { color: '#34D399', label: 'WhatsApp' },
-  instagram:   { color: '#F0454D', label: 'Instagram' },
+  instagram:   { color: '#DD2A7B', label: 'Instagram' },
   loja_fisica: { color: '#AEB8C6', label: 'Loja física' },
   site:        { color: '#7FB0E8', label: 'Site' },
 }
@@ -130,7 +130,7 @@ function TopProdutos({ produtos }: { produtos: Array<{ nome: string; qtd: number
           </div>
           <div className="h-[8px] rounded-[8px] bg-[#16212E]/[0.06] overflow-hidden">
             <div className="h-full rounded-[8px]"
-              style={{ width: `${(p.qtd / maxQtd) * 100}%`, background: i === 0 ? 'linear-gradient(90deg,#8E1B20,#F0454D)' : 'linear-gradient(90deg,#3A4A63,#6E8099)' }} />
+              style={{ width: `${(p.qtd / maxQtd) * 100}%`, background: i === 0 ? 'linear-gradient(90deg,#A8884A,#C9A24B)' : 'linear-gradient(90deg,#3A4A63,#6E8099)' }} />
           </div>
         </div>
       ))}
@@ -145,7 +145,7 @@ function FunilLeads({ funil }: { funil: { novo: number; em_contato: number; nego
   const rows = [
     { label: 'Novos leads', val: funil.novo,        color: '#7FB0E8' },
     { label: 'Em contato',  val: funil.em_contato,  color: '#F4B740' },
-    { label: 'Negociando',  val: funil.negociando,  color: '#D7282F' },
+    { label: 'Negociando',  val: funil.negociando,  color: '#C9A24B' },
     { label: 'Convertido',  val: funil.convertido,  color: '#34D399' },
   ]
   const maxVal = Math.max(...rows.map(r => r.val), 1)
@@ -181,8 +181,8 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
       desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária`,
     },
     assistenciasAbertas > 0 && {
-      icon: <AlertTriangle size={24} className="text-[#C01F26] flex-none" />,
-      bg: 'rgba(215,40,47,.1)', title: 'Assistências abertas',
+      icon: <AlertTriangle size={24} className="text-[#DC2626] flex-none" />,
+      bg: 'rgba(220,38,38,.1)', title: 'Assistências abertas',
       desc: `${assistenciasAbertas} ordem(s) em andamento`,
     },
     leadsNovos > 20 && {
@@ -222,7 +222,7 @@ function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
 // ─────────────────────────────────────────
 // Top Vendedores — dados reais com meta
 // ─────────────────────────────────────────
-const AVATAR_COLORS = ['#D7282F', '#7FB0E8', '#34D399', '#F4B740', '#C6A86A']
+const AVATAR_COLORS = ['#16212E', '#7FB0E8', '#34D399', '#F4B740', '#C6A86A']
 
 function getInitials(nome: string) {
   return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
@@ -275,7 +275,7 @@ function TopVendedores({ vendedores }: {
                   width: `${pctMeta ?? pctBar}%`,
                   background: pctMeta !== null && pctMeta >= 100
                     ? 'linear-gradient(90deg, #16a34a, #34D399)'
-                    : 'linear-gradient(90deg, #8E1B20, #F0353D)',
+                    : 'linear-gradient(90deg, #A8884A, #C9A24B)',
                 }}
               />
             </div>
@@ -327,7 +327,7 @@ function FollowupsCard() {
       <div className="flex justify-between items-center mb-4">
         <div>
           <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">A FAZER</div>
-          <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] inline-flex items-center gap-2"><CheckSquare size={17} className="text-[#C01F26]" /> Meus follow-ups</h3>
+          <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] inline-flex items-center gap-2"><CheckSquare size={17} className="text-[#A8884A]" /> Meus follow-ups</h3>
         </div>
         <Link href="/tarefas" className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.06] transition-colors">
           Ver tarefas <ArrowUpRight size={15} />
@@ -338,9 +338,9 @@ function FollowupsCard() {
           const atrasada = t.vencimento && new Date(t.vencimento).getTime() < nowMs
           return (
             <div key={t.id} className="flex items-center gap-2 py-[9px] border-b border-[#16212E]/[0.06]">
-              {atrasada ? <CircleAlert size={15} className="text-[#C01F26] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#7FB0E8]" />}
+              {atrasada ? <CircleAlert size={15} className="text-[#DC2626] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#7FB0E8]" />}
               <span className="text-[13px] text-[#16212E] truncate flex-1">{t.titulo}{t.lead_nome ? <span className="text-[#9AA7B6]"> · {t.lead_nome}</span> : ''}</span>
-              {t.vencimento && <span className={`text-[11px] shrink-0 ${atrasada ? 'text-[#C01F26] font-semibold' : 'text-[#9AA7B6]'}`}>{diaMes(t.vencimento)}</span>}
+              {t.vencimento && <span className={`text-[11px] shrink-0 ${atrasada ? 'text-[#DC2626] font-semibold' : 'text-[#9AA7B6]'}`}>{diaMes(t.vencimento)}</span>}
             </div>
           )
         })}
@@ -423,7 +423,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
 
           {/* ── HERO ── */}
           <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] animate-fade-up"
-            style={{ background: 'radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.24), transparent 52%), linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 55%, #EDF0F5 100%)', border: '1px solid rgba(22,32,46,0.10)', boxShadow: '0 28px 70px rgba(22,32,46,0.12)' }}>
+            style={{ background: 'radial-gradient(130% 150% at 88% 0%, rgba(201,162,75,0.20), transparent 52%), linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 55%, #EDF0F5 100%)', border: '1px solid rgba(22,32,46,0.10)', boxShadow: '0 28px 70px rgba(22,32,46,0.12)' }}>
             <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
               <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
               <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#15986A]">SISTEMA ONLINE</span>
@@ -453,7 +453,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 </div>
               </div>
               <div className="flex gap-3 mt-7">
-                <button onClick={() => router.push('/pdv')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(215,40,47,0.38)] hover:-translate-y-[2px] transition-all">
+                <button onClick={() => router.push('/pdv')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(22,33,46,0.32)] hover:-translate-y-[2px] transition-all">
                   <Zap size={18} /> Nova venda
                 </button>
                 <button onClick={() => router.push('/estoque')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] font-semibold text-[14px] transition-colors" style={{ background: 'rgba(22,32,46,0.08)', border: '1px solid rgba(22,32,46,0.14)', color: '#1F2A39' }}>
@@ -485,7 +485,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               { icon: Package,       color: '#F4B740', val: `${globais.estoqueDisponivel} un`, sub: 'disponíveis em estoque',   alert: globais.estoqueDisponivel < 5 },
               { icon: Users,         color: '#7FB0E8', val: String(globais.totalClientes),       sub: 'clientes cadastrados',      alert: false },
               { icon: AlertTriangle, color: '#788698', val: String(globais.assistenciasAbertas), sub: 'assistências abertas',      alert: globais.assistenciasAbertas > 0 },
-              { icon: TrendingUp,    color: '#F0656B', val: String(globais.leadsAtivos),          sub: 'leads ativos no funil',     alert: globais.leadsNovos > 20 },
+              { icon: TrendingUp,    color: '#C9A24B', val: String(globais.leadsAtivos),          sub: 'leads ativos no funil',     alert: globais.leadsNovos > 20 },
             ].map(({ icon: Icon, color, val, sub, alert }, i) => (
               <div key={i} className={cn('bg-white border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
                 alert ? 'border-[rgba(240,100,107,0.25)]' : 'border-[#16212E]/[0.07]')}>
@@ -564,7 +564,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 <div className="text-center py-8 text-[#788698] text-[13px]">Nenhuma venda ainda.</div>
               ) : vendasRecentes.map((v, i) => {
                 const canal = CANAIS_VENDA.find(c => c.value === v.canal_venda)
-                const avatarColors = ['#34D399', '#7FB0E8', '#D7282F', '#F4B740', '#C6A86A']
+                const avatarColors = ['#34D399', '#7FB0E8', '#16212E', '#F4B740', '#C6A86A']
                 const color = avatarColors[i % avatarColors.length]
                 const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--/--'
                 return (
