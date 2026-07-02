@@ -255,7 +255,7 @@ export default function EmpresaConfigPage() {
                   ].map(({ label, uso, limite, icon }) => {
                     const ilimitado = limite >= 99999
                     const pct = ilimitado ? 0 : Math.min(100, (uso / limite) * 100)
-                    const cor = pct >= 100 ? '#16212E' : pct >= 80 ? '#FBBF24' : '#15986A'
+                    const cor = pct >= 100 ? '#DC2626' : pct >= 80 ? '#FBBF24' : '#15986A'
                     return (
                       <div key={label}>
                         <div className="flex items-center justify-between mb-1">
@@ -277,11 +277,11 @@ export default function EmpresaConfigPage() {
               </div>
               {empresa?.plano !== 'pro' && (
                 <div className="p-5 bg-[rgba(22,33,46,0.05)] border border-[rgba(22,33,46,0.15)] rounded-[16px]">
-                  <p className="text-sm font-semibold text-white mb-1">Fazer upgrade</p>
+                  <p className="text-sm font-semibold text-[#16212E] mb-1">Fazer upgrade</p>
                   <p className="text-xs text-[#788698] mb-4">Desbloqueie mais usuários, leads ilimitados e white-label completo.</p>
                   <a href="https://wa.me/5519999999999?text=Quero+fazer+upgrade+do+meu+plano"
                     target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[#16212E] text-white text-sm font-semibold px-4 py-2 rounded-[10px] hover:bg-[#B91C1C] transition-colors">
+                    className="inline-flex items-center gap-2 bg-[#16212E] text-white text-sm font-semibold px-4 py-2 rounded-[10px] hover:bg-[#22303F] transition-colors">
                     Falar com suporte
                   </a>
                 </div>
@@ -311,7 +311,7 @@ export default function EmpresaConfigPage() {
 
           {(aba === 'loja' || aba === 'visual') && (
             <button onClick={salvar} disabled={loading}
-              className="flex items-center gap-2 bg-[#16212E] hover:bg-[#B91C1C] disabled:opacity-50 text-white font-semibold rounded-[10px] px-6 py-2.5 text-sm transition-colors">
+              className="flex items-center gap-2 bg-[#16212E] hover:bg-[#22303F] disabled:opacity-50 text-white font-semibold rounded-[10px] px-6 py-2.5 text-sm transition-colors">
               {loading ? <Loader2 size={15} className="animate-spin" /> : sucesso ? <Check size={15} /> : <Upload size={15} />}
               {sucesso ? 'Salvo!' : 'Salvar alterações'}
             </button>

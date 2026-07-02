@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/superadmin'
 import { GestaoSuperAdmins } from '@/components/superadmin/gestao-super-admins'
 
-const ADMIN_COR = '#7C3AED'
 
 export default async function AdminsPage() {
   const userId = await requireSuperAdmin()

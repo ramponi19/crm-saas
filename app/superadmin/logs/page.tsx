@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 
-const ADMIN_COR = '#7C3AED'
 
 function fmtDataHora(d: string) {
   return new Date(d).toLocaleString('pt-BR', {
