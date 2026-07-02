@@ -2,11 +2,15 @@ import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getKanbanColumns } from '@/components/modules/leads/types'
 import { Topbar } from '@/components/layout/topbar'
-import { Target, CalendarCheck, Sparkles, Handshake, Home, ArrowUpRight } from 'lucide-react'
+import { Target, CalendarCheck, Sparkles, Handshake, Home, ArrowUpRight, Clock, CircleAlert, CheckSquare } from 'lucide-react'
 
 const GOLD = '#C9A24B'
 
 type LeadRow = { nome: string | null; kanban_status: string | null; origem: string | null; responsavel_id: string | null; ultima_mensagem_at: string | null; created_at: string | null }
+type Embed<T> = T | T[] | null
+const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
+const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
 /** Dashboard operacional do corretor (segmento imobiliária). Pessoal p/ corretor,
  *  visão da equipe p/ dono/admin. Foco: meus leads, visitas, funil. */
@@ -24,11 +28,33 @@ export default async function DashboardImob() {
     .select('nome, kanban_status, origem, responsavel_id, ultima_mensagem_at, created_at')
     .eq('empresa_id', empresaId).eq('ativo', true)
   if (!isGestor && user) q = q.eq('responsavel_id', user.id)
-  const [{ data: leadsRaw }, { count: imoveisDisp }] = await Promise.all([
+
+  // janela de "hoje" (local) para as visitas do cockpit
+  const agora = new Date()
+  const iniHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString()
+  const fimHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1).toISOString()
+
+  let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome)')
+    .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimHoje).order('data_hora')
+  if (!isGestor && user) vq = vq.eq('corretor_id', user.id)
+
+  let tq = supabase.from('tarefas').select('id, titulo, vencimento, leads(nome)')
+    .eq('empresa_id', empresaId).eq('concluida', false).order('vencimento', { nullsFirst: false }).limit(8)
+  if (!isGestor && user) tq = tq.eq('responsavel_id', user.id)
+
+  const [{ data: leadsRaw }, { count: imoveisDisp }, { data: visitasRaw }, { data: tarefasRaw }] = await Promise.all([
     q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(400),
     supabase.from('imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
+    vq,
+    tq,
   ])
   const leads = (leadsRaw ?? []) as LeadRow[]
+
+  type VisitaRow = { id: number; data_hora: string; status: string; leads: Embed<{ nome: string | null }> }
+  type TarefaRow = { id: number; titulo: string; vencimento: string | null; leads: Embed<{ nome: string | null }> }
+  const visitasHoje = ((visitasRaw ?? []) as unknown as VisitaRow[]).map(v => ({ ...v, lead_nome: one(v.leads)?.nome ?? null }))
+  const tarefasPend = ((tarefasRaw ?? []) as unknown as TarefaRow[]).map(t => ({ ...t, lead_nome: one(t.leads)?.nome ?? null }))
+  const nowMs = agora.getTime()
 
   const colunas = getKanbanColumns('imobiliaria')
   const porEtapa = (id: string) => leads.filter(l => (l.kanban_status ?? 'novo') === id).length
@@ -66,6 +92,52 @@ export default async function DashboardImob() {
               </div>
             )
           })}
+        </div>
+
+        {/* Cockpit do dia: visitas de hoje + follow-ups pendentes */}
+        <div className="grid lg:grid-cols-2 gap-5 mb-5">
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-bold text-[#16212E] inline-flex items-center gap-2"><Clock size={16} style={{ color: GOLD }} /> Visitas de hoje</h3>
+              <Link href="/agenda" className="text-[12px] font-semibold inline-flex items-center gap-1" style={{ color: GOLD }}>Agenda <ArrowUpRight size={13} /></Link>
+            </div>
+            {visitasHoje.length === 0 ? (
+              <p className="text-[13px] text-[#9AA7B6] py-2">Nenhuma visita agendada para hoje.</p>
+            ) : (
+              <div className="space-y-1">
+                {visitasHoje.map(v => (
+                  <div key={v.id} className="flex items-center gap-3 py-2 border-b border-[#16212E]/[0.05] last:border-0">
+                    <span className="text-[13px] font-extrabold text-[#16212E] w-[46px] shrink-0">{hora(v.data_hora)}</span>
+                    <span className="text-[13px] text-[#16212E] truncate flex-1">{v.lead_nome || 'Visita'}</span>
+                    {v.status !== 'agendada' && <span className="text-[10.5px] text-[#788698] shrink-0 capitalize">{v.status}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-bold text-[#16212E] inline-flex items-center gap-2"><CheckSquare size={16} style={{ color: GOLD }} /> Follow-ups pendentes</h3>
+              <Link href="/tarefas" className="text-[12px] font-semibold inline-flex items-center gap-1" style={{ color: GOLD }}>Tarefas <ArrowUpRight size={13} /></Link>
+            </div>
+            {tarefasPend.length === 0 ? (
+              <p className="text-[13px] text-[#9AA7B6] py-2">Tudo em dia. 🎯</p>
+            ) : (
+              <div className="space-y-1">
+                {tarefasPend.map(t => {
+                  const atrasada = t.vencimento && new Date(t.vencimento).getTime() < nowMs
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 py-2 border-b border-[#16212E]/[0.05] last:border-0">
+                      {atrasada ? <CircleAlert size={15} className="text-[#DC2626] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: GOLD }} />}
+                      <span className="text-[13px] text-[#16212E] truncate flex-1">{t.titulo}{t.lead_nome ? <span className="text-[#9AA7B6]"> · {t.lead_nome}</span> : ''}</span>
+                      {t.vencimento && <span className={`text-[11px] shrink-0 ${atrasada ? 'text-[#DC2626] font-semibold' : 'text-[#9AA7B6]'}`}>{diaMes(t.vencimento)}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-5">
