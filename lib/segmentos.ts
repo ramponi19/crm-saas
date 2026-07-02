@@ -65,12 +65,13 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     descricao: 'Imóveis, proprietários, captação e visitas.',
     emoji: '🏠',
     // esconde tudo de varejo/assistência; o módulo "Imóveis" chega na fase profunda
-    hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
+    hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras', '/relatorios'],
     labelOverrides: {},
     funil: ['Lead novo', 'Contato feito', 'Visita agendada', 'Visita realizada', 'Proposta', 'Análise de crédito', 'Fechamento'],
     modulosExtra: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home' },
       { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound' },
+      { href: '/relatorios-imob', label: 'Relatórios', icon: 'BarChart3' },
     ],
   },
   saude: {

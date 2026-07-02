@@ -36,7 +36,7 @@ import { planoTemAcesso, type ModuloPlano } from '@/lib/plano'
 import { moduloVisivel, labelDoItem, normalizarSegmento, SEGMENTOS, type Segmento } from '@/lib/segmentos'
 
 // mapa de ícones para os módulos exclusivos de cada segmento (fase profunda)
-const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound }
+const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound, BarChart3 }
 
 const navGroups = [
   {
