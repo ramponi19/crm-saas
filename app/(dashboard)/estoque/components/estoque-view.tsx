@@ -63,15 +63,15 @@ const CONDICAO_STYLE: Record<string, { label: string; color: string; bg: string 
   novo:      { label: 'Novo',       color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
   seminovo:  { label: 'Seminovo',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
   usado:     { label: 'Usado',      color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' },
-  defeito:   { label: 'Com defeito',color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+  defeito:   { label: 'Com defeito',color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
 }
 
 const TIPO_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   entrada:  { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  saida:    { label: 'Saída',    color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+  saida:    { label: 'Saída',    color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
   ajuste:   { label: 'Ajuste',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
   compra:   { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  venda:    { label: 'Saída',    color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+  venda:    { label: 'Saída',    color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
 }
 
 const fmt = (v: number) => formatCurrency(v)
@@ -133,7 +133,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
-                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
+                tab === t.key ? 'bg-[#22303F] text-white font-bold shadow-[0_4px_12px_rgba(22,33,46,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
               {t.icon}{t.label}
             </button>
           ))}
@@ -147,7 +147,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                 { icon: <Package size={20}/>, label: 'Unidades ativas', value: stats.total, color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
                 { icon: <CheckCircle size={20}/>, label: 'Disponíveis', value: stats.disponiveis, color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
                 { icon: <Clock size={20}/>, label: 'Reservadas', value: stats.reservados, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-                { icon: <Wrench size={20}/>, label: 'Em reparo', value: stats.reparo, color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+                { icon: <Wrench size={20}/>, label: 'Em reparo', value: stats.reparo, color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
               ].map((c, i) => (
                 <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
                   <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>{c.icon}</div>
@@ -195,7 +195,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                 {['todos','disponivel','reservado','assistencia','vendido'].map(s => (
                   <button key={s} onClick={() => setFiltroStatus(s)}
                     className={cn('px-3 py-1.5 rounded-[8px] text-[12px] font-medium capitalize transition-all',
-                      filtroStatus === s ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}>
+                      filtroStatus === s ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}>
                     {s === 'todos' ? 'Todos' : STATUS_STYLE[s]?.label ?? s}
                   </button>
                 ))}
@@ -211,7 +211,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 
               <div className="flex-1" />
               <button onClick={() => { setUnidadeSel(null); setModalOpen(true) }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
                 <ArrowDownLeft size={15} /> Entrada de estoque
               </button>
             </div>
@@ -243,7 +243,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     <div>
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span>
                     </div>
-                    <div className="text-[13px] font-semibold" style={{ color: Number(u.bateria) >= 90 ? '#22C55E' : Number(u.bateria) >= 80 ? '#F59E0B' : '#F0353D' }}>
+                    <div className="text-[13px] font-semibold" style={{ color: Number(u.bateria) >= 90 ? '#22C55E' : Number(u.bateria) >= 80 ? '#F59E0B' : '#DC2626' }}>
                       {u.bateria ? `${u.bateria}%` : '—'}
                     </div>
                     <div className="text-[12.5px] text-[#788698] truncate">{variante}</div>
@@ -267,8 +267,8 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           <div className="max-w-[700px]">
             <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] overflow-hidden">
               <div className="flex items-center gap-4 px-6 py-5 border-b border-[#16212E]/[0.08]">
-                <div className="w-10 h-10 rounded-[12px] bg-[rgba(215,40,47,0.15)] flex items-center justify-center">
-                  <ArrowDownLeft size={18} className="text-[#F0353D]" />
+                <div className="w-10 h-10 rounded-[12px] bg-[rgba(22,33,46,0.15)] flex items-center justify-center">
+                  <ArrowDownLeft size={18} className="text-[#DC2626]" />
                 </div>
                 <div>
                   <div className="text-[16px] font-serif text-[#16212E]">Nova entrada de unidade</div>
@@ -311,7 +311,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: tipo.bg, color: tipo.color }}>{tipo.label}</span>
                   </div>
                   <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{m.produto_nome}</div>
-                  <div className="text-[13px] font-semibold" style={{ color: m.quantidade > 0 ? '#22C55E' : '#F0353D' }}>
+                  <div className="text-[13px] font-semibold" style={{ color: m.quantidade > 0 ? '#22C55E' : '#DC2626' }}>
                     {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
                   </div>
                   <div className="text-[13px] text-[#788698]">{m.usuario_nome ?? '—'}</div>
@@ -391,7 +391,7 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
       {opts.map(o => (
         <button key={o.v} type="button" onClick={() => set(k, o.v)}
           className={cn('px-4 py-2 rounded-[9px] text-[12.5px] font-medium transition-all border',
-            form[k] === o.v ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
+            form[k] === o.v ? 'bg-[#16212E] text-white border-[#16212E]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
           {o.label}
         </button>
       ))}
@@ -457,7 +457,7 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
 
       <div className="flex justify-end pt-2">
         <button onClick={salvar} disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
           <ArrowDownLeft size={15} />
           {saving ? 'Salvando...' : 'Registrar entrada'}
         </button>

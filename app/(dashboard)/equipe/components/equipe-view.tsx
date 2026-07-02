@@ -40,7 +40,7 @@ const TABS = [
 ]
 
 const ROLES = [
-  { value: 'admin',    label: 'Administrador', color: '#D7282F', bg: 'rgba(215,40,47,0.12)'  },
+  { value: 'admin',    label: 'Administrador', color: '#16212E', bg: 'rgba(22,33,46,0.12)'  },
   { value: 'vendedor', label: 'Vendedor',       color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
   { value: 'tecnico',  label: 'Técnico',         color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)' },
   { value: 'owner',    label: 'Proprietário',    color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
@@ -50,7 +50,7 @@ const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#1F2A39] place
 const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
 
 function avatarColor(name: string) {
-  const colors = ['#D7282F','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4']
+  const colors = ['#16212E','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4']
   let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
   return colors[Math.abs(h) % colors.length]
 }
@@ -165,7 +165,7 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.07]">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Cancelar</button>
           <button type="submit" disabled={saving}
-            className="px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+            className="px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : isNew ? 'Criar usuário' : 'Salvar'}
           </button>
         </div>
@@ -289,7 +289,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
                   </td>
                   <td className="px-5 py-4">
                     <button onClick={() => salvarMeta(u.id)} disabled={saving === u.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-xs font-semibold rounded-[8px] transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-xs font-semibold rounded-[8px] transition-colors">
                       {saving === u.id ? '...' : <><Save size={12} /> Salvar</>}
                     </button>
                   </td>
@@ -377,7 +377,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-4">
           <div className="text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase">A pagar</div>
-          <div className="text-2xl font-bold text-[#D7282F] mt-1">{formatCurrency(totalAPagar)}</div>
+          <div className="text-2xl font-bold text-[#16212E] mt-1">{formatCurrency(totalAPagar)}</div>
         </div>
         <div className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-4">
           <div className="text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase">Já pago</div>
@@ -481,7 +481,7 @@ export default function EquipeView({ usuarios }: Props) {
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 tab === t.key
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                   : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               )}>
               {t.label}
@@ -490,7 +490,7 @@ export default function EquipeView({ usuarios }: Props) {
         </div>
         {tab === 'usuarios' && (
           <button onClick={() => setModal({ open: true, usuario: null })}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors">
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors">
             <UserPlus size={15} /> Novo usuário
           </button>
         )}

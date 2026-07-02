@@ -259,10 +259,10 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const slaRows = [
     { label: 'Resposta ideal',   desc: 'Lead respondido dentro deste tempo fica verde', color: '#34D399', min: 15 },
     { label: 'Alerta de atraso', desc: 'Bolinha amarela: atenção, lead esperando',      color: '#F4B740', min: 30 },
-    { label: 'Atraso crítico',   desc: 'Bolinha vermelha: SLA estourado',                color: '#F0656B', min: 60 },
+    { label: 'Atraso crítico',   desc: 'Bolinha vermelha: SLA estourado',                color: '#DC2626', min: 60 },
   ]
 
-  const inputCls = "w-full text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]"
+  const inputCls = "w-full text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]"
 
   return (
     <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
@@ -273,7 +273,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} onClick={() => setAba(id)}
               className={cn('flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                aba === id ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                aba === id ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                            : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]')}>
               <Icon size={16} /> {label}
             </button>
@@ -323,7 +323,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Taxas de crédito e link</h3>
               </div>
               <button onClick={salvarTaxas} disabled={savingTaxas}
-                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)] disabled:opacity-50">
+                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(22,33,46,0.32)] disabled:opacity-50">
                 <Save size={17} /> {savingTaxas ? 'Salvando...' : 'Salvar taxas'}
               </button>
             </div>
@@ -363,7 +363,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">SLA de atendimento</h3>
               </div>
               <button onClick={salvarSLA} disabled={savingSLA}
-                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(215,40,47,0.32)] disabled:opacity-50">
+                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(22,33,46,0.32)] disabled:opacity-50">
                 <Save size={17} /> {savingSLA ? 'Salvando...' : 'Salvar regras'}
               </button>
             </div>
@@ -380,7 +380,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                     <div className="text-[11.5px] text-[#788698]">{s.desc}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input value={slaValues[i]} onChange={e => setSlaValues(v => v.map((x, j) => j === i ? Number(e.target.value) : x))} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]" />
+                    <input value={slaValues[i]} onChange={e => setSlaValues(v => v.map((x, j) => j === i ? Number(e.target.value) : x))} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]" />
                     <span className="text-[12px] text-[#788698]">min</span>
                   </div>
                 </div>
@@ -436,7 +436,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                   <label className="font-mono text-[10px] tracking-[0.12em] text-[#788698] uppercase mb-[6px] block">{f.label}</label>
                   <input value={modalValues[f.key] ?? ''} placeholder={f.placeholder}
                     onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
-                    className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#9AA7B6] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors" />
+                    className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#9AA7B6] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors" />
                 </div>
               ))}
             </div>
@@ -467,7 +467,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                 Cancelar
               </button>
               <button onClick={saveModal} disabled={saving}
-                className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
+                className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 shadow-[0_6px_18px_rgba(22,33,46,0.32)]">
                 {saving ? 'Salvando…' : 'Salvar'}
               </button>
             </div>

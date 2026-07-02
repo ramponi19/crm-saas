@@ -51,8 +51,8 @@ export default function CheckoutSucessoPage() {
     return (
       <div className="flex flex-col h-full bg-[#0A111E] items-center justify-center">
         <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-[rgba(215,40,47,0.1)] flex items-center justify-center mx-auto mb-6">
-            <XCircle size={36} className="text-[#D7282F]" />
+          <div className="w-16 h-16 rounded-full bg-[rgba(22,33,46,0.1)] flex items-center justify-center mx-auto mb-6">
+            <XCircle size={36} className="text-[#16212E]" />
           </div>
           <h1 className="text-xl font-bold text-white mb-2">Não foi possível confirmar</h1>
           <p className="text-sm text-[#5C6E84] mb-6">
@@ -60,7 +60,7 @@ export default function CheckoutSucessoPage() {
           </p>
           <button
             onClick={() => router.push('/planos')}
-            className="flex items-center gap-2 mx-auto bg-[#D7282F] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
+            className="flex items-center gap-2 mx-auto bg-[#16212E] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
           >
             Voltar aos planos
           </button>
@@ -81,7 +81,7 @@ export default function CheckoutSucessoPage() {
         </p>
         <button
           onClick={() => router.push('/dashboard')}
-          className="flex items-center gap-2 mx-auto bg-[#D7282F] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
+          className="flex items-center gap-2 mx-auto bg-[#16212E] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
         >
           Ir para o dashboard
         </button>

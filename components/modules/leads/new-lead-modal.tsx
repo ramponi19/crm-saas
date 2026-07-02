@@ -93,7 +93,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadMo
     toast.success('Lead criado'); onCreate(data as Lead); setLoading(false)
   }
 
-  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors"
+  const inputCls = "w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors"
   const labelCls = "font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block"
 
   return (
@@ -109,7 +109,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadMo
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-[44px] h-[44px] rounded-[12px] bg-gradient-to-br from-[#E03037] to-[#8E1B20] flex items-center justify-center flex-none">
+            <div className="w-[44px] h-[44px] rounded-[12px] bg-gradient-to-br from-[#22303F] to-[#16212E] flex items-center justify-center flex-none">
               <UserPlus size={22} className="text-white" />
             </div>
             <div>
@@ -188,7 +188,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadMo
             Cancelar
           </button>
           <button type="submit" disabled={loading || !form.nome.trim()}
-            className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 disabled:transform-none shadow-[0_6px_18px_rgba(215,40,47,0.32)]">
+            className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 disabled:transform-none shadow-[0_6px_18px_rgba(22,33,46,0.32)]">
             {loading ? 'Criando…' : 'Criar lead'}
           </button>
         </div>

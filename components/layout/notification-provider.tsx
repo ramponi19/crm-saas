@@ -94,8 +94,8 @@ export function NotificationProvider() {
           className="pointer-events-auto flex items-start gap-3 w-[320px] bg-[#0E1A2C] border border-white/[0.12] rounded-[14px] p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
           style={{ animation: 'slideInRight 0.22s ease' }}
         >
-          <div className="w-8 h-8 rounded-[9px] bg-[rgba(215,40,47,0.18)] flex items-center justify-center flex-none mt-0.5">
-            <Bell size={15} className="text-[#F0353D]" />
+          <div className="w-8 h-8 rounded-[9px] bg-[rgba(22,33,46,0.18)] flex items-center justify-center flex-none mt-0.5">
+            <Bell size={15} className="text-[#C9A24B]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold text-[#F4F6F9] truncate">{t.titulo}</div>
@@ -105,7 +105,7 @@ export function NotificationProvider() {
             {t.leadId && (
               <button
                 onClick={() => { router.push('/leads'); removeToast(t.id) }}
-                className="text-[11.5px] text-[#F0656B] font-semibold mt-1.5 hover:text-[#FF7A80] transition-colors"
+                className="text-[11.5px] text-[#C9A24B] font-semibold mt-1.5 hover:text-[#D9B871] transition-colors"
               >
                 Abrir lead →
               </button>

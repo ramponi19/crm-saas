@@ -34,7 +34,7 @@ const STATUS: Record<string, { label: string; color: string; bg: string }> = {
   aguardando_peca: { label: 'Aguardando peça',  color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)'  },
   concluido:       { label: 'Concluído',        color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
   entregue:        { label: 'Entregue',         color: '#5C6E84', bg: 'rgba(92,110,132,0.12)'  },
-  reprovado:       { label: 'Reprovado',        color: '#D7282F', bg: 'rgba(215,40,47,0.12)'   },
+  reprovado:       { label: 'Reprovado',        color: '#16212E', bg: 'rgba(22,33,46,0.12)'   },
 }
 
 const ORIGEM: Record<string, { label: string; color: string; bg: string }> = {
@@ -107,7 +107,7 @@ export default function AssistenciaView({ ordens }: Props) {
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 filtro === f.key
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                   : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               )}>
               {f.label}
@@ -115,7 +115,7 @@ export default function AssistenciaView({ ordens }: Props) {
           ))}
         </div>
         <button onClick={() => { setSelecionada(null); setIsNew(true); setModalOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors">
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors">
           <Plus size={15} /> Nova ordem de serviço
         </button>
       </div>

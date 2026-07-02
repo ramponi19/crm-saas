@@ -40,7 +40,7 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
   { id: 'em_contato', label: 'Em contato', color: '#C6A86A' },
   { id: 'negociando', label: 'Negociando', color: '#F4B740', tipo: 'negociacao' },
   { id: 'convertido', label: 'Convertido', color: '#34D399', tipo: 'ganho' },
-  { id: 'perdido',    label: 'Perdido',    color: '#F0656B', tipo: 'perdido' },
+  { id: 'perdido',    label: 'Perdido',    color: '#DC2626', tipo: 'perdido' },
 ]
 
 // Funil imobiliário (segmento 'imobiliaria').
@@ -52,7 +52,7 @@ const KANBAN_IMOBILIARIA: KanbanColumn[] = [
   { id: 'proposta',         label: 'Proposta',           color: '#F4B740', tipo: 'negociacao' },
   { id: 'credito',          label: 'Análise de crédito', color: '#FB923C' },
   { id: 'fechamento',       label: 'Fechamento',         color: '#34D399', tipo: 'ganho' },
-  { id: 'perdido',          label: 'Perdido',            color: '#F0656B', tipo: 'perdido' },
+  { id: 'perdido',          label: 'Perdido',            color: '#DC2626', tipo: 'perdido' },
 ]
 
 const KANBAN_POR_SEGMENTO: Record<string, KanbanColumn[]> = {

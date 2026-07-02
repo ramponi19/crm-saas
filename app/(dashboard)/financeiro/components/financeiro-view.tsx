@@ -234,7 +234,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 tab === t.key
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                   : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               )}>
               {t.label}
@@ -271,10 +271,10 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <h2 className="text-base font-semibold text-[#1F2A39]">Livro-caixa</h2>
                 <p className="text-[11px] text-[#788698] mt-0.5">
                   Entradas <span className="text-[#15986A]">+{fmtBRL(listaReceber.reduce((s,l)=>s+(l.valor??0),0))}</span>
-                  {' · '}Saídas <span className="text-[#D7282F]">−{fmtBRL(listaPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
+                  {' · '}Saídas <span className="text-[#16212E]">−{fmtBRL(listaPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
                 </p>
               </div>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Novo lançamento
               </button>
             </div>
@@ -285,7 +285,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
               <h2 className="text-base font-semibold text-[#1F2A39]">Contas a pagar</h2>
-              <button onClick={() => abrirNovo('despesa')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('despesa')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Nova conta
               </button>
             </div>
@@ -296,7 +296,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
               <h2 className="text-base font-semibold text-[#1F2A39]">Contas a receber</h2>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
                 <Plus size={13} /> Novo título
               </button>
             </div>
@@ -338,8 +338,8 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                   </thead>
                   <tbody>
                     {cobrancas.map(c => {
-                      const statusColor = c.status === 'pago' ? '#22C55E' : c.status === 'expirado' ? '#D7282F' : '#F59E0B'
-                      const statusBg    = c.status === 'pago' ? 'rgba(34,197,94,0.1)' : c.status === 'expirado' ? 'rgba(215,40,47,0.1)' : 'rgba(245,158,11,0.1)'
+                      const statusColor = c.status === 'pago' ? '#22C55E' : c.status === 'expirado' ? '#16212E' : '#F59E0B'
+                      const statusBg    = c.status === 'pago' ? 'rgba(34,197,94,0.1)' : c.status === 'expirado' ? 'rgba(22,33,46,0.1)' : 'rgba(245,158,11,0.1)'
                       const statusLabel = c.status === 'pago' ? 'Pago' : c.status === 'expirado' ? 'Expirado' : 'Pendente'
                       const origem = c.os_id ? `OS #${c.os_id}` : c.venda_id ? `Venda #${c.venda_id}` : '—'
                       return (
@@ -420,13 +420,13 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                   dre.despesas.map(d => (
                     <div key={d.categoria} className="flex items-center justify-between py-2 border-b border-[#16212E]/[0.04]">
                       <span className="text-[13px] text-[#56657A]">{d.categoria}</span>
-                      <span className="text-[13px] text-[#D7282F] tabular-nums">−{fmtBRL(d.valor)}</span>
+                      <span className="text-[13px] text-[#16212E] tabular-nums">−{fmtBRL(d.valor)}</span>
                     </div>
                   ))
                 )}
                 <div className="flex items-center justify-between py-2.5 border-b border-[#16212E]/[0.06]">
                   <span className="text-[13.5px] font-semibold text-[#1F2A39]">Total de despesas</span>
-                  <span className="text-[13.5px] font-semibold text-[#D7282F] tabular-nums">−{fmtBRL(dre.totalDespesas)}</span>
+                  <span className="text-[13.5px] font-semibold text-[#16212E] tabular-nums">−{fmtBRL(dre.totalDespesas)}</span>
                 </div>
 
                 <div className="flex items-center justify-between pt-4 mt-1">
@@ -434,7 +434,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                     <span className="text-[15px] font-bold text-[#1F2A39]">Resultado líquido</span>
                     <span className="block text-[11px] text-[#788698]">margem {dre.margem.toFixed(1)}%</span>
                   </div>
-                  <span className={cn('text-[18px] font-bold tabular-nums', dre.resultado >= 0 ? 'text-[#15986A]' : 'text-[#D7282F]')}>
+                  <span className={cn('text-[18px] font-bold tabular-nums', dre.resultado >= 0 ? 'text-[#15986A]' : 'text-[#16212E]')}>
                     {dre.resultado >= 0 ? '+' : '−'}{fmtBRL(Math.abs(dre.resultado))}
                   </span>
                 </div>
@@ -464,7 +464,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                       form.tipo === t
                         ? t === 'receita'
                           ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.3)] text-[#15986A]'
-                          : 'bg-[rgba(215,40,47,0.1)] border-[rgba(215,40,47,0.3)] text-[#D7282F]'
+                          : 'bg-[rgba(22,33,46,0.1)] border-[rgba(22,33,46,0.3)] text-[#16212E]'
                         : 'bg-transparent border-[#16212E]/[0.1] text-[#788698] hover:border-[#16212E]/20'
                     )}>
                     {t === 'receita' ? '↑ Receita' : '↓ Despesa'}
@@ -477,7 +477,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
                 <input value={form.descricao} onChange={e => set('descricao', e.target.value)}
                   placeholder="Ex: Pagamento fornecedor, Venda à vista..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
               </div>
 
               {/* Valor + Vencimento */}
@@ -486,12 +486,12 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Valor (R$) *</label>
                   <input type="number" step="0.01" min="0" value={form.valor} onChange={e => set('valor', e.target.value)}
                     placeholder="0,00"
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Vencimento *</label>
                   <input type="date" value={form.data_venc} onChange={e => set('data_venc', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
                 </div>
               </div>
 
@@ -500,7 +500,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Categoria</label>
                   <select value={form.categoria} onChange={e => set('categoria', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
                     <option value="">— Selecionar —</option>
                     {catsFiltradas.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                   </select>
@@ -508,7 +508,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Forma de pagamento</label>
                   <select value={form.forma_pgto} onChange={e => set('forma_pgto', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
                     <option value="">— Selecionar —</option>
                     {FORMAS.map(f => <option key={f} value={f}>{FORMAS_LABEL[f]}</option>)}
                   </select>
@@ -520,7 +520,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Status</label>
                   <select value={form.status} onChange={e => set('status', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
                     <option value="pendente">Pendente</option>
                     <option value="pago">Pago</option>
                     <option value="atrasado">Atrasado</option>
@@ -530,7 +530,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Data de pagamento</label>
                   <input type="date" value={form.data_pgto} onChange={e => set('data_pgto', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
                 </div>
               </div>
 
@@ -539,15 +539,15 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Observações</label>
                 <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)}
                   rows={2} placeholder="Notas adicionais..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors resize-none" />
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors resize-none" />
               </div>
 
-              {erro && <p className="text-xs text-[#D7282F]">{erro}</p>}
+              {erro && <p className="text-xs text-[#16212E]">{erro}</p>}
             </div>
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
               {editId ? (
-                <button type="button" onClick={excluir} className="flex items-center gap-1.5 text-xs text-[#788698] hover:text-[#D7282F] transition-colors">
+                <button type="button" onClick={excluir} className="flex items-center gap-1.5 text-xs text-[#788698] hover:text-[#16212E] transition-colors">
                   <Trash2 size={13} /> Remover
                 </button>
               ) : <div />}
@@ -557,7 +557,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60">
                   <Save size={13} />
                   {saving ? 'Salvando...' : 'Salvar'}
                 </button>
@@ -591,15 +591,15 @@ function LancamentosTable({ lancamentos, onEditar }: { lancamentos: Lancamento[]
               <td className="px-5 py-3.5 text-sm font-medium text-[#1F2A39]">{l.descricao ?? '—'}</td>
               <td className="px-5 py-3.5 text-sm text-[#788698]">{l.categoria ?? '—'}</td>
               <td className="px-5 py-3.5">
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: isReceita ? '#22C55E' : '#D7282F', backgroundColor: isReceita ? 'rgba(34,197,94,0.12)' : 'rgba(215,40,47,0.12)' }}>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: isReceita ? '#22C55E' : '#16212E', backgroundColor: isReceita ? 'rgba(34,197,94,0.12)' : 'rgba(22,33,46,0.12)' }}>
                   {isReceita ? 'Receita' : 'Despesa'}
                 </span>
               </td>
-              <td className="px-5 py-3.5 text-sm font-bold" style={{ color: isReceita ? '#22C55E' : '#D7282F' }}>
+              <td className="px-5 py-3.5 text-sm font-bold" style={{ color: isReceita ? '#22C55E' : '#16212E' }}>
                 {isReceita ? '+' : '−'} {l.valor != null ? formatCurrency(l.valor) : '—'}
               </td>
               <td className="px-5 py-3.5">
-                <span className={cn('text-sm font-medium', l.status === 'pago' ? 'text-[#15986A]' : l.status === 'atrasado' ? 'text-[#D7282F]' : 'text-[#B47B12]')}>
+                <span className={cn('text-sm font-medium', l.status === 'pago' ? 'text-[#15986A]' : l.status === 'atrasado' ? 'text-[#16212E]' : 'text-[#B47B12]')}>
                   {l.status === 'pago' ? 'Pago' : l.status === 'atrasado' ? 'Atrasado' : 'Pendente'}
                 </span>
               </td>

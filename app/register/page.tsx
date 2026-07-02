@@ -387,8 +387,8 @@ export default function RegisterPage() {
 
           {/* Erro */}
           {erro && (
-            <div className="mt-4 p-3 bg-[rgba(215,40,47,.08)] border border-[rgba(215,40,47,.20)] rounded-[10px]">
-              <p className="text-[12px] text-[#D7282F]">{erro}</p>
+            <div className="mt-4 p-3 bg-[rgba(22,33,46,.08)] border border-[rgba(22,33,46,.20)] rounded-[10px]">
+              <p className="text-[12px] text-[#16212E]">{erro}</p>
             </div>
           )}
 

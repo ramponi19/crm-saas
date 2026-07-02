@@ -45,7 +45,7 @@ function getInitials(name: string) {
 
 function avatarColor(name: string): string {
   const colors = [
-    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B',
+    '#16212E', '#3B7DE8', '#22C55E', '#F59E0B',
     '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
     '#F97316', '#6366F1',
   ]
@@ -138,7 +138,7 @@ export default function ClientesView({ clientes }: Props) {
         </div>
         <button
           onClick={openNovo}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
         >
           <UserPlus size={15} />
           Novo cliente

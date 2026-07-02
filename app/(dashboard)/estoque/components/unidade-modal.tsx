@@ -241,7 +241,7 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           {!isNew ? (
-            <button type="button" onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#F0353D] transition-colors">
+            <button type="button" onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#DC2626] transition-colors">
               <Trash2 size={14} />
               Remover
             </button>
@@ -253,7 +253,7 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold transition-colors disabled:opacity-50"
             >
               <Save size={14} />
               {saving ? 'Salvando...' : 'Salvar'}

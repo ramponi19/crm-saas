@@ -28,7 +28,7 @@ const FORMAS_PAG = [
   { key: 'link',     label: 'Link'     },
 ]
 
-const AVATAR_COLORS = ['#D7282F','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7','#ec4899']
+const AVATAR_COLORS = ['#16212E','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7','#ec4899']
 const getAvatarColor = (str: string) => AVATAR_COLORS[str.charCodeAt(0) % AVATAR_COLORS.length]
 const getInitials    = (nome: string) => nome.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
@@ -315,7 +315,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
               value={busca}
               onChange={e => setBusca(e.target.value)}
               placeholder="Escaneie o código de barras ou busque um produto…"
-              className="w-full bg-white border border-[#16212E]/[0.10] rounded-[12px] py-[13px] pl-[44px] pr-4 text-[14px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors"
+              className="w-full bg-white border border-[#16212E]/[0.10] rounded-[12px] py-[13px] pl-[44px] pr-4 text-[14px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors"
             />
           </div>
 
@@ -332,8 +332,8 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
                   <div key={item.id} onClick={() => !noCarrinho && adicionarItem(item)}
                     className={cn(
                       'bg-white border border-[#16212E]/[0.08] rounded-[16px] p-[18px] transition-all duration-200',
-                      noCarrinho ? 'opacity-60 cursor-default border-[rgba(215,40,47,0.3)]'
-                                 : 'cursor-pointer hover:-translate-y-[3px] hover:border-[rgba(215,40,47,0.3)]'
+                      noCarrinho ? 'opacity-60 cursor-default border-[rgba(22,33,46,0.3)]'
+                                 : 'cursor-pointer hover:-translate-y-[3px] hover:border-[rgba(22,33,46,0.3)]'
                     )}>
                     <div className="w-[46px] h-[46px] rounded-[12px] bg-white/[0.05] flex items-center justify-center mb-[14px] text-[22px]">📱</div>
                     <div className="text-[13.5px] font-semibold text-[#1F2A39] leading-[1.3] min-h-[36px]">
@@ -347,7 +347,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
                       <span className="text-[16px] font-bold text-[#16212E]">{fmt(item.preco_venda ?? 0)}</span>
                       <div className={cn('w-[32px] h-[32px] rounded-[9px] flex items-center justify-center',
                         noCarrinho ? 'bg-[rgba(52,211,153,0.15)]'
-                                   : 'bg-gradient-to-b from-[#E03037] to-[#C01F26] shadow-[0_4px_12px_rgba(215,40,47,0.3)]')}>
+                                   : 'bg-gradient-to-b from-[#22303F] to-[#16212E] shadow-[0_4px_12px_rgba(22,33,46,0.3)]')}>
                         {noCarrinho ? <CheckCircle size={17} className="text-[#34D399]" /> : <Plus size={18} className="text-white" />}
                       </div>
                     </div>
@@ -386,10 +386,10 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
                 <div className="p-1 pb-2">
                   <input value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
                     placeholder="Buscar cliente pelo nome…" autoFocus
-                    className="w-full bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[8px] px-3 py-2 text-[12.5px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)]" />
+                    className="w-full bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[8px] px-3 py-2 text-[12.5px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)]" />
                 </div>
                 <div onClick={() => { toast.info('Cadastro rápido em breve'); setShowClientes(false) }}
-                  className="flex items-center gap-[10px] px-[10px] py-[9px] rounded-[9px] cursor-pointer text-[#C01F26] hover:bg-[rgba(215,40,47,0.08)] transition-colors">
+                  className="flex items-center gap-[10px] px-[10px] py-[9px] rounded-[9px] cursor-pointer text-[#16212E] hover:bg-[rgba(22,33,46,0.08)] transition-colors">
                   <UserPlus size={18} />
                   <span className="text-[12.5px] font-semibold">Cadastrar novo cliente</span>
                 </div>
@@ -421,7 +421,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
                   <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{item.produto_nome}</div>
                   <div className="flex items-center gap-2 mt-[5px]">
                     <button onClick={() => removerItem(item.id)}
-                      className="w-[22px] h-[22px] rounded-[6px] border border-[#16212E]/[0.10] bg-white/[0.04] text-[#C01F26] flex items-center justify-center hover:bg-[#16212E]/[0.04] transition-colors">
+                      className="w-[22px] h-[22px] rounded-[6px] border border-[#16212E]/[0.10] bg-white/[0.04] text-[#16212E] flex items-center justify-center hover:bg-[#16212E]/[0.04] transition-colors">
                       <Minus size={13} />
                     </button>
                     <span className="font-mono text-[12.5px] font-bold text-[#1F2A39]">1</span>
@@ -444,9 +444,9 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
             <div className="flex justify-between items-center">
               <span className="text-[13px] text-[#788698]">Desconto</span>
               <div className="flex items-center gap-[5px]">
-                <span className="text-[#C01F26] text-[13px]">− R$</span>
+                <span className="text-[#16212E] text-[13px]">− R$</span>
                 <input value={desconto} onChange={e => setDesconto(e.target.value.replace(/[^0-9.,]/g,''))}
-                  className="w-[66px] bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[8px] px-2 py-[5px] text-[#C01F26] text-[13px] font-bold text-right outline-none focus:border-[rgba(240,101,107,0.5)]"
+                  className="w-[66px] bg-white/[0.05] border border-[#16212E]/[0.10] rounded-[8px] px-2 py-[5px] text-[#16212E] text-[13px] font-bold text-right outline-none focus:border-[rgba(220,38,38,0.5)]"
                   placeholder="0" />
               </div>
             </div>
@@ -465,10 +465,10 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
               return (
                 <div key={pg.key} onClick={() => { setFormaPagamento(pg.key); setParcelas(1) }}
                   className={cn('flex items-center gap-[9px] px-[13px] py-[11px] rounded-[11px] cursor-pointer border transition-all duration-150',
-                    ativo ? 'bg-[rgba(215,40,47,0.12)] border-[rgba(215,40,47,0.4)]'
+                    ativo ? 'bg-[rgba(22,33,46,0.12)] border-[rgba(22,33,46,0.4)]'
                            : 'bg-transparent border-[#16212E]/[0.10] hover:bg-[#16212E]/[0.04]')}>
                   <span className="text-[18px]">{emoji}</span>
-                  <span className={cn('text-[13px] font-semibold', ativo ? 'text-[#C01F26]' : 'text-[#788698]')}>{pg.label}</span>
+                  <span className={cn('text-[13px] font-semibold', ativo ? 'text-[#16212E]' : 'text-[#788698]')}>{pg.label}</span>
                 </div>
               )
             })}
@@ -494,21 +494,21 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
                 {(parcelasOpts.length > 0 ? parcelasOpts : [1,2,3,4,5,6,7,8,9,10,11,12]).map(p => (
                   <div key={p} onClick={() => setParcelas(p)}
                     className={cn('text-center py-[9px] rounded-[9px] text-[13px] font-bold cursor-pointer border transition-all',
-                      parcelas === p ? 'bg-[rgba(215,40,47,0.15)] border-[rgba(215,40,47,0.4)] text-[#C01F26]'
+                      parcelas === p ? 'bg-[rgba(22,33,46,0.15)] border-[rgba(22,33,46,0.4)] text-[#16212E]'
                                      : 'bg-white/[0.03] border-[#16212E]/[0.08] text-[#788698] hover:bg-[#16212E]/[0.06]')}>
                     {p}x
                   </div>
                 ))}
               </div>
               {totais.total > 0 && (
-                <div className="flex justify-between items-center mt-3 p-[11px_13px] rounded-[11px] bg-[rgba(215,40,47,0.08)] border border-[rgba(215,40,47,0.2)]">
+                <div className="flex justify-between items-center mt-3 p-[11px_13px] rounded-[11px] bg-[rgba(22,33,46,0.08)] border border-[rgba(22,33,46,0.2)]">
                   <div>
                     <div className="text-[11px] text-[#788698]">{parcelas}x de</div>
                     <div className="text-[16px] font-bold text-[#16212E]">{fmt(totais.totalComTaxa / parcelas)}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[11px] text-[#788698]">com juros · {totais.taxaPct.toFixed(2)}%</div>
-                    <div className="text-[16px] font-bold text-[#C01F26]">{fmt(totais.totalComTaxa)}</div>
+                    <div className="text-[16px] font-bold text-[#16212E]">{fmt(totais.totalComTaxa)}</div>
                   </div>
                 </div>
               )}
@@ -517,7 +517,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
 
           {/* Botão finalizar */}
           <button onClick={finalizarVenda} disabled={carrinho.length === 0 || finalizando}
-            className="w-full flex items-center justify-center gap-[10px] py-[15px] rounded-[13px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-bold text-[15px] shadow-[0_10px_26px_rgba(215,40,47,0.4)] hover:-translate-y-[2px] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none">
+            className="w-full flex items-center justify-center gap-[10px] py-[15px] rounded-[13px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-bold text-[15px] shadow-[0_10px_26px_rgba(22,33,46,0.4)] hover:-translate-y-[2px] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none">
             {finalizando
               ? <><RefreshCw size={19} className="animate-spin" /> Finalizando...</>
               : <><CheckCircle size={21} /> Finalizar venda · {fmt(totais.totalComTaxa || totais.total)}</>

@@ -136,7 +136,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
           {/* Novo lead */}
           <button
             onClick={() => setShowNewLead(true)}
-            className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] shadow-[0_6px_18px_rgba(215,40,47,0.32)] hover:-translate-y-[2px] transition-all"
+            className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] shadow-[0_6px_18px_rgba(22,33,46,0.32)] hover:-translate-y-[2px] transition-all"
           >
             <Plus size={17} /> Novo lead
           </button>

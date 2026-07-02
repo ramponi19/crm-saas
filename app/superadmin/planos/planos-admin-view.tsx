@@ -225,7 +225,7 @@ export default function PlanosAdminView({ planos: initial }: { planos: Plano[] }
                   {editing.features.map((f, i) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2 bg-[#F4F6F9] rounded-[8px]">
                       <span className="flex-1 text-sm text-[#1F2A39]">{f}</span>
-                      <button onClick={() => removeFeature(i)} className="text-[#9AA7B6] hover:text-[#D7282F] transition-colors">
+                      <button onClick={() => removeFeature(i)} className="text-[#9AA7B6] hover:text-[#16212E] transition-colors">
                         <X size={13} />
                       </button>
                     </div>

@@ -133,7 +133,7 @@ export default async function AdminOverviewPage() {
                 <span className="font-semibold text-[#16212E]">{u.used}{u.limit ? ` / ${u.limit}` : ''}</span>
               </div>
               <div className="h-2 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${u.pct}%`, background: u.pct > 90 ? '#E0564C' : GOLD }} />
+                <div className="h-full rounded-full" style={{ width: `${u.pct}%`, background: u.pct > 90 ? '#DC2626' : GOLD }} />
               </div>
             </div>
           ))}
