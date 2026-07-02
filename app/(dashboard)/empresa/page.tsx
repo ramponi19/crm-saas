@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Building2, Palette, CreditCard, Users, Check, Loader2, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/plano'
+import { Topbar } from '@/components/layout/topbar'
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
 
@@ -153,11 +154,7 @@ export default function EmpresaConfigPage() {
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      {/* Header */}
-      <div className="px-8 py-5 border-b border-[#16212E]/[0.08] bg-white shrink-0">
-        <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Configurações da empresa</h1>
-        {empresa && <p className="text-sm text-[#788698] mt-0.5">{empresa.nome}</p>}
-      </div>
+      <Topbar title="Minha empresa" />
 
       {/* Abas — padrão Relatórios */}
       <div className="px-8 py-4 border-b border-[#16212E]/[0.08] shrink-0">
