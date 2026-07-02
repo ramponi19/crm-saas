@@ -83,8 +83,7 @@ export default function AssistenciaView({ ordens }: Props) {
     <div className="flex flex-col h-full bg-white overflow-hidden">
       <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
         <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Pós-venda · Ordens de serviço</p>
-          <h1 className="text-xl font-bold text-[#16212E]">Assistência Técnica</h1>
+          <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Assistência Técnica</h1>
         </div>
       </div>
 

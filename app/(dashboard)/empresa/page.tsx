@@ -155,8 +155,7 @@ export default function EmpresaConfigPage() {
     <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Header */}
       <div className="px-8 py-5 border-b border-[#16212E]/[0.08] shrink-0">
-        <p className="text-xs font-mono tracking-[0.15em] text-[#788698] uppercase mb-0.5">SISTEMA</p>
-        <h1 className="text-[22px] font-serif font-bold text-[#16212E]">Configurações da empresa</h1>
+        <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Configurações da empresa</h1>
         {empresa && <p className="text-sm text-[#788698] mt-0.5">{empresa.nome}</p>}
       </div>
 
