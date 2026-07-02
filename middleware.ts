@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/privacy') ||
                         request.nextUrl.pathname.startsWith('/entrar') ||
                         request.nextUrl.pathname.startsWith('/register') ||
-                        request.nextUrl.pathname.startsWith('/reset-senha')
+                        request.nextUrl.pathname.startsWith('/reset-senha') ||
+                        request.nextUrl.pathname.startsWith('/api/planos-publicos')
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {

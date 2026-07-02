@@ -4,11 +4,23 @@ import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { LogIn, ArrowUpRight } from 'lucide-react'
+import { gsap } from 'gsap'
+import { SplitText } from 'gsap/SplitText'
 import styles from './Landing.module.css'
+import { useSmoothScroll } from './hooks/useSmoothScroll'
+import HeroShowcase from './HeroShowcase'
+import Sections, { type PlanData } from './Sections'
 
-export default function Landing() {
+export default function Landing({ plans }: { plans?: PlanData[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
+  // smooth scroll cinematográfico (Lenis + GSAP ticker)
+  useSmoothScroll()
+
+  /* ------------------------------------------------------------------ */
+  /*  Canvas ambiente — linhas de fluxo de dados (fundo)                */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
     const cv = canvasRef.current
     if (!cv) return
@@ -42,14 +54,93 @@ export default function Landing() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
 
+  /* ------------------------------------------------------------------ */
+  /*  Grid prismático interativo — brilho de luz que segue o mouse      */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    if (!window.matchMedia('(hover: hover)').matches) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const onMove = (e: MouseEvent) => {
+      // atualiza a máscara do grid luminoso que segue o cursor (refração de luz)
+      root.style.setProperty('--mx', `${e.clientX}px`)
+      root.style.setProperty('--my', `${e.clientY}px`)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [])
+
+  /* ------------------------------------------------------------------ */
+  /*  Timeline de entrada (stagger cinematográfico)                     */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let cancelled = false
+    let split: SplitText | null = null
+
+    const build = () => {
+      if (cancelled) return
+      gsap.registerPlugin(SplitText)
+
+      const ctx = gsap.context(() => {
+        const h1 = root.querySelector<HTMLElement>(`.${styles.h1}`)
+
+        if (reduce) {
+          gsap.set(`[data-reveal]`, { opacity: 1, y: 0 })
+          return
+        }
+
+        split = h1 ? new SplitText(h1, { type: 'lines', mask: 'lines', linesClass: 'lineChild' }) : null
+
+        const tl = gsap.timeline({ defaults: { ease: 'power4.out' } })
+
+        if (split) {
+          tl.from(split.lines, {
+            yPercent: 115, opacity: 0, duration: 1.25, stagger: 0.12,
+          })
+        }
+
+        tl.from('[data-reveal="lede"]', { y: 24, opacity: 0, duration: 1.1 }, split ? '-=0.7' : 0)
+          // anima o CONTAINER dos CTAs (não cada botão) — o transform dos botões
+          // fica sob controle exclusivo do hook magnético, sem conflito.
+          .from('[data-reveal="cta"]', { y: 22, opacity: 0, duration: 1 }, '-=0.85')
+          .from('[data-reveal="eagle"]', { opacity: 0, scale: 0.92, duration: 1.6, ease: 'power3.out' }, '-=1.4')
+      }, root)
+
+      // guarda o revert para cleanup
+      cleanup = () => { split?.revert(); ctx.revert() }
+    }
+
+    let cleanup = () => {}
+    // espera as fontes carregarem para o SplitText quebrar as linhas certo
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(build)
+    } else {
+      build()
+    }
+
+    return () => { cancelled = true; cleanup() }
+  }, [])
+
   const logoSrc = '/eagle-navy.png'
 
   return (
-    <div className={styles.page}>
-      <div className={styles.blobGold} />
-      <div className={styles.blobNavy} />
-      <div className={styles.grid} />
-      <canvas ref={canvasRef} className={styles.flow} />
+    <div className={styles.page} ref={rootRef}>
+      <div className={styles.grain} />
+      <div className={styles.gridGlow} />
+      {/* fundo do hero, contido na primeira dobra */}
+      <div className={styles.heroBg}>
+        <div className={styles.blobGold} />
+        <div className={styles.blobNavy} />
+        <div className={styles.grid} />
+        <canvas ref={canvasRef} className={styles.flow} />
+      </div>
 
       {/* nav */}
       <nav className={styles.nav}>
@@ -75,38 +166,29 @@ export default function Landing() {
       {/* hero */}
       <div className={styles.hero}>
         <div className={styles.copy}>
-          <div className={styles.eyebrow}>
-            <span className={styles.dot} />
-            PLATAFORMA DE CRM · FEITA NO BRASIL
-          </div>
           <h1 className={styles.h1}>
             O CRM do empreendedor <em>está aqui.</em>
           </h1>
-          <p className={styles.lede}>
+          <p className={styles.lede} data-reveal="lede">
             Vendas, atendimento e operação num só núcleo. Menos improviso, mais
             decisão — para quem leva o próprio negócio a sério.
           </p>
-          <div className={styles.ctaRow}>
+          <div className={styles.ctaRow} data-reveal="cta">
             <Link href="/register" className={styles.btnPrimary}>
-              Se cadastre aqui
-              <ArrowUpRight size={18} />
+              <span className={styles.btnShine} aria-hidden />
+              <span className={styles.btnLabel}>
+                Se cadastre aqui
+                <ArrowUpRight size={18} />
+              </span>
             </Link>
-            <a href="#funcionalidades" className={styles.btnGhost}>Ver funcionalidades</a>
-          </div>
-          <div className={styles.trust}>
-            <div className={styles.avatars}><span /><span /><span /></div>
-            <div className={styles.trustText}>
-              <b>+1.200 empreendedores</b><br />já operam no controle, não no improviso.
-            </div>
+            <a href="#funcionalidades" className={styles.btnGhost}>
+              <span className={styles.btnLabel}>Ver funcionalidades</span>
+            </a>
           </div>
         </div>
 
-        <div className={styles.eagleWrap}>
-          <div className={styles.eagleAura} />
-          <div className={styles.eagleOrbit} />
-          <div className={styles.eagleRing} />
-          <Image src={logoSrc} alt="Águia" width={420} height={302} className={styles.eagleImg} priority />
-          <div className={styles.eagleCaption}>VISÃO DE ÁGUIA<br /><b>SOBRE TODA A OPERAÇÃO</b></div>
+        <div className={styles.heroRight} data-reveal="eagle">
+          <HeroShowcase />
         </div>
       </div>
 
@@ -124,6 +206,9 @@ export default function Landing() {
           ))}
         </div>
       </div>
+
+      {/* seções abaixo do hero */}
+      <Sections plans={plans} />
     </div>
   )
 }
