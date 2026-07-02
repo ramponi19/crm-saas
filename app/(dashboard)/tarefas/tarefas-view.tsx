@@ -103,7 +103,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
 
   return (
     <>
-      <Topbar eyebrow="IMOBILIÁRIA" title="Tarefas" />
+      <Topbar eyebrow="PRODUTIVIDADE" title="Tarefas" />
       <div className="p-6 max-w-[820px]">
         <div className="flex justify-end mb-4">
           <button onClick={() => setModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f]">

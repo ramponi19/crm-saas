@@ -69,6 +69,7 @@ const navGroups = [
     label: 'Relacionamento',
     items: [
       { href: '/clientes',    label: 'Clientes',    icon: Users },
+      { href: '/tarefas',     label: 'Tarefas',     icon: CheckSquare },
       { href: '/garantia',    label: 'Garantia',    icon: ShieldCheck, badge: true },
       { href: '/assistencia', label: 'Assistência', icon: Wrench },
     ],

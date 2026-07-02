@@ -1,6 +1,4 @@
-import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { normalizarSegmento } from '@/lib/segmentos'
 import TarefasView from './tarefas-view'
 import type { Tables } from '@/types/database'
 
@@ -9,12 +7,10 @@ export const metadata = { title: 'Tarefas' }
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
+// Tarefas é módulo de núcleo: disponível em todos os segmentos.
 export default async function TarefasPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
-  if (normalizarSegmento(empresa?.segmento) !== 'imobiliaria') redirect('/dashboard')
 
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user!.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')
