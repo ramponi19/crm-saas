@@ -40,6 +40,10 @@ import { moduloVisivel, labelDoItem, normalizarSegmento, SEGMENTOS, type Segment
 // mapa de ícones para os módulos exclusivos de cada segmento (fase profunda)
 const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound, BarChart3, Calendar, CheckSquare }
 
+// Sistema ÁPICE: barra navy escura, dourado no estado ativo. Cor fixa (não usa mais empresaCor).
+const GOLD = '#C9A24B'
+const ACTIVE_BG = 'linear-gradient(90deg, rgba(201,162,75,0.20), rgba(201,162,75,0.05))'
+
 const navGroups = [
   {
     label: 'Visão Geral',
@@ -112,7 +116,6 @@ export function Sidebar({
   userEmpresa,
   leadsCount = 0,
   garantiasCount = 0,
-  empresaCor = '#D7282F',
   empresaLogo = null,
   isSuperAdmin = false,
   isEmpresaAdmin = false,
@@ -138,28 +141,28 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex flex-col h-screen w-[264px] border-r border-[#16212E]/[0.08] bg-sidebar-gradient shrink-0">
+    <aside className="flex flex-col h-screen w-[264px] border-r border-white/[0.06] bg-sidebar-navy shrink-0">
 
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-[22px] border-b border-[#16212E]/[0.07]">
+      <div className="flex items-center gap-3 px-5 py-[22px] border-b border-white/[0.07]">
         {empresaLogo ? (
           <div className="w-[46px] h-[46px] rounded-[13px] bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
             <Image src={empresaLogo} alt="Logo" width={40} height={40} className="object-contain" />
           </div>
         ) : (
           <div
-            className="w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 shadow-[0_6px_18px_rgba(0,0,0,0.4)]"
-            style={{ background: `linear-gradient(135deg, ${empresaCor}CC, ${empresaCor}66)` }}
+            className="w-[46px] h-[46px] rounded-[13px] flex items-center justify-center shrink-0 shadow-[0_6px_18px_rgba(201,162,75,0.35)]"
+            style={{ background: 'linear-gradient(135deg, #C9A24B, #A8884A)' }}
           >
-            <span className="font-sans font-extrabold text-[15px] text-white tracking-tight">{iniciais}</span>
+            <span className="font-sans font-extrabold text-[15px] text-[#16212E] tracking-tight">{iniciais}</span>
           </div>
         )}
         <div className="leading-tight overflow-hidden">
-          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-[#16212E] truncate">
+          <div className="font-sans font-extrabold text-[15px] tracking-[0.01em] text-white truncate">
             {userEmpresa ?? 'CRM Store'}
           </div>
-          <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: empresaCor }}>
-            SISTEMA
+          <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: GOLD }}>
+            ÁPICE CRM
           </div>
         </div>
       </div>
@@ -175,7 +178,7 @@ export function Sidebar({
           if (items.length === 0) return null
           return (
           <div key={group.label}>
-            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#9AA7B6] uppercase px-[14px] pb-[7px] pt-1">
+            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#5E6E82] uppercase px-[14px] pb-[7px] pt-1">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -195,19 +198,19 @@ export function Sidebar({
                     className={cn(
                       'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150 group',
                       locked
-                        ? 'text-[#9AA7B6] opacity-60 hover:opacity-80'
+                        ? 'text-[#6E7E92] opacity-70 hover:opacity-90'
                         : isActive
-                          ? 'text-[#16212E] font-semibold'
-                          : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
+                          ? 'text-white font-semibold'
+                          : 'text-[#AEB9C7] hover:bg-white/[0.05] hover:text-[#E6ECF3]'
                     )}
-                    style={isActive ? { background: `${empresaCor}18` } : {}}
+                    style={isActive ? { background: ACTIVE_BG } : {}}
                   >
                     <span
                       className={cn(
                         'absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200',
                         isActive ? 'opacity-100' : 'opacity-0'
                       )}
-                      style={{ background: empresaCor }}
+                      style={{ background: GOLD }}
                     />
                     <Icon size={19} className="shrink-0" />
                     <span className="flex-1 truncate">{labelDoItem(seg, item.href, item.label)}</span>
@@ -216,7 +219,7 @@ export function Sidebar({
                       : badge && (
                         <span
                           className="font-mono text-[10px] font-semibold px-[7px] py-[2px] rounded-full"
-                          style={{ color: empresaCor, background: `${empresaCor}22` }}
+                          style={{ color: '#16212E', background: GOLD }}
                         >
                           {badge}
                         </span>
@@ -232,7 +235,7 @@ export function Sidebar({
 
         {SEGMENTOS[seg].modulosExtra && SEGMENTOS[seg].modulosExtra!.length > 0 && (
           <div>
-            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#9AA7B6] uppercase px-[14px] pb-[7px] pt-1">
+            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#5E6E82] uppercase px-[14px] pb-[7px] pt-1">
               {SEGMENTOS[seg].label}
             </p>
             <div className="space-y-0.5">
@@ -245,13 +248,13 @@ export function Sidebar({
                     href={item.href}
                     className={cn(
                       'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150',
-                      isActive ? 'text-[#16212E] font-semibold' : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
+                      isActive ? 'text-white font-semibold' : 'text-[#AEB9C7] hover:bg-white/[0.05] hover:text-[#E6ECF3]'
                     )}
-                    style={isActive ? { background: `${empresaCor}18` } : {}}
+                    style={isActive ? { background: ACTIVE_BG } : {}}
                   >
                     <span
                       className={cn('absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200', isActive ? 'opacity-100' : 'opacity-0')}
-                      style={{ background: empresaCor }}
+                      style={{ background: GOLD }}
                     />
                     <Icon size={19} className="shrink-0" />
                     <span className="flex-1 truncate">{item.label}</span>
@@ -268,7 +271,7 @@ export function Sidebar({
         <div className="px-3 pb-1">
           <Link
             href="/admin"
-            className="relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] font-semibold text-white transition-all duration-150 hover:brightness-105"
+            className="relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] font-semibold text-[#16212E] transition-all duration-150 hover:brightness-105"
             style={{ background: 'linear-gradient(135deg, #C9A24B, #A8884A)' }}
           >
             <Crown size={19} className="shrink-0" />
@@ -277,7 +280,7 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Super Admin (somente para super admins) */}
+      {/* Super Admin (somente para super admins) — mantém o roxo como marca de "modo plataforma" */}
       {isSuperAdmin && (
         <div className="px-3 pb-1">
           <Link
@@ -292,19 +295,19 @@ export function Sidebar({
       )}
 
       {/* User */}
-      <div className="px-3 py-3 border-t border-[#16212E]/[0.07]">
-        <div className="flex items-center gap-[11px] px-[11px] py-[9px] rounded-[13px] bg-white/[0.03]">
+      <div className="px-3 py-3 border-t border-white/[0.07]">
+        <div className="flex items-center gap-[11px] px-[11px] py-[9px] rounded-[13px] bg-white/[0.04]">
           <div
             className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[14px] text-white shrink-0"
-            style={{ background: `linear-gradient(135deg, ${empresaCor}, ${empresaCor}88)` }}
+            style={{ background: 'linear-gradient(135deg, #3A4B63, #22303F)' }}
           >
             {userName.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{userName}</div>
-            <div className="text-[11px] text-[#788698]">{userRole}</div>
+            <div className="text-[13.5px] font-semibold text-[#E6ECF3] truncate">{userName}</div>
+            <div className="text-[11px] text-[#8A97A8]">{userRole}</div>
           </div>
-          <button className="text-[#788698] hover:text-[#9FB0C2] transition-colors" onClick={handleLogout}>
+          <button className="text-[#8A97A8] hover:text-[#C3CDDA] transition-colors" onClick={handleLogout}>
             <LogOut size={18} />
           </button>
         </div>
