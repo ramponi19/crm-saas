@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -32,9 +33,14 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const empresaId = Number(id)
   if (!Number.isFinite(empresaId)) notFound()
 
-  const supabase = await createClient()
+  await createClient() // mantém a sessão do superadmin válida
+  // Service role: o superadmin precisa enxergar dados de QUALQUER empresa, e as
+  // policies de RLS (empresa_usuarios, leads, vendas, clientes) escopam por
+  // empresa do usuário logado. O acesso à rota já é trancado em layout.tsx
+  // (requireSuperAdmin), então ler via service role aqui é seguro.
+  const svc = createServiceClient()
 
-  const { data: empresa } = await supabase
+  const { data: empresa } = await svc
     .from('empresas')
     .select('*')
     .eq('id', empresaId)
@@ -43,7 +49,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   if (!empresa) notFound()
 
   // Usuários membros
-  const { data: membrosRaw } = await supabase
+  const { data: membrosRaw } = await svc
     .from('empresa_usuarios')
     .select('role, ativo, usuario:usuarios(nome, email)')
     .eq('empresa_id', empresaId)
@@ -56,9 +62,9 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
   // Contadores de uso
   const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }] = await Promise.all([
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    supabase.from('vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
   ])
 
   const usuariosAtivos = membros.filter(m => m.ativo).length

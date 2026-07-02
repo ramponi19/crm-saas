@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { normalizarSegmento } from '@/lib/segmentos'
+import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
 import {
   Users, Target, Package, Wallet, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp,
@@ -20,7 +22,7 @@ export default async function AdminOverviewPage() {
   const [
     empresaRes, clientesRes, leadsRes, produtosRes, usuariosRes, vendasRes, planoRes,
   ] = await Promise.all([
-    supabase.from('empresas').select('nome, plano, status, trial_ends_at, limite_leads, limite_usuarios').eq('id', empresaId).single(),
+    supabase.from('empresas').select('nome, plano, status, trial_ends_at, limite_leads, limite_usuarios, segmento').eq('id', empresaId).single(),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('produtos').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
@@ -53,6 +55,12 @@ export default async function AdminOverviewPage() {
   const trialDias = empresa?.trial_ends_at
     ? Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000)
     : null
+
+  // Régua de follow-up: default ligada (ausência de config = ativa). Só desliga com {ativo:false}.
+  const { data: reguaCfg } = await supabase
+    .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'regua_followup').maybeSingle()
+  const reguaAtiva = (reguaCfg?.valor as { ativo?: boolean } | null)?.ativo !== false
+  const isImob = normalizarSegmento(empresa?.segmento) === 'imobiliaria'
 
   const stats = [
     { label: 'Faturamento no mês', value: brl(faturamentoMes), icon: TrendingUp, sub: `${qtdVendas} venda${qtdVendas === 1 ? '' : 's'} concluída${qtdVendas === 1 ? '' : 's'}` },
@@ -130,6 +138,12 @@ export default async function AdminOverviewPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Automação */}
+      <div className="mb-6">
+        <div className="font-mono text-[10px] tracking-[0.2em] text-[#9AA7B6] uppercase mb-2">Automação</div>
+        <ReguaFollowupCard inicialAtivo={reguaAtiva} isImob={isImob} />
       </div>
 
       {/* Atalhos de administração */}
