@@ -71,7 +71,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     modulosExtra: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home' },
       { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound' },
-      { href: '/relatorios-imob', label: 'Relatórios', icon: 'BarChart3' },
     ],
   },
   saude: {

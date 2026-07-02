@@ -43,7 +43,7 @@ const navGroups = [
     label: 'Visão Geral',
     items: [
       { href: '/dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
-      { href: '/relatorios', label: 'Relatórios', icon: BarChart3, modulo: 'bi' as ModuloPlano },
+      { href: '/relatorios', label: 'Relatórios', icon: BarChart3, modulo: 'bi' as ModuloPlano, adminOnly: true },
     ],
   },
   {
@@ -164,9 +164,10 @@ export function Sidebar({
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-4">
         {navGroups.map((group) => {
+          // itens de GESTÃO (adminOnly) não aparecem no CRM — vivem só no /admin
           const items = group.items.filter((item) =>
             moduloVisivel(seg, item.href) &&
-            (isEmpresaAdmin || !('adminOnly' in item && item.adminOnly))
+            !('adminOnly' in item && item.adminOnly)
           )
           if (items.length === 0) return null
           return (
