@@ -101,6 +101,30 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug, l
     catch { window.open(url, '_blank') }
   }
 
+  async function copiarSnippet() {
+    const endpoint = `${window.location.origin}/api/imob/${slug}/lead?token=${leadsToken}`
+    const snippet = `<!-- Formulário de contato — envia leads pro CRM ÁPICE -->
+<form id="apice-lead">
+  <input name="nome" placeholder="Seu nome" required />
+  <input name="telefone" placeholder="WhatsApp" required />
+  <input name="email" placeholder="E-mail" />
+  <textarea name="mensagem" placeholder="Mensagem"></textarea>
+  <input type="hidden" name="imovel" value="" /><!-- opcional: código do imóvel -->
+  <button type="submit">Enviar</button>
+</form>
+<script>
+document.getElementById('apice-lead').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const dados = Object.fromEntries(new FormData(this).entries());
+  await fetch('${endpoint}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
+  alert('Recebemos seu contato! Em breve retornaremos.');
+  this.reset();
+});
+</script>`
+    try { await navigator.clipboard.writeText(snippet); toast.success('Código do formulário copiado! Cole no site da imobiliária.') }
+    catch { toast.error('Não foi possível copiar') }
+  }
+
   async function copiarLeadsUrl() {
     const url = `${window.location.origin}/api/portais/${slug}/leads?token=${leadsToken}`
     try {
@@ -215,6 +239,11 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug, l
               <span className="font-semibold text-[#8A6D2B] shrink-0">📥 Receber leads (Canal Pro):</span>
               <code className="truncate text-[#56657A]">/api/portais/{slug}/leads?token=•••</code>
               <button onClick={copiarLeadsUrl} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
+            </div>
+            <div className="flex items-center gap-2 text-[12.5px] border-t border-[#C9A24B]/20 pt-1.5">
+              <span className="font-semibold text-[#8A6D2B] shrink-0">📝 Formulário no site próprio:</span>
+              <code className="truncate text-[#56657A]">cola no site → leads caem no CRM</code>
+              <button onClick={copiarSnippet} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar código</button>
             </div>
           </div>
         )}
