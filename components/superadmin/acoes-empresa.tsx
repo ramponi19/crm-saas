@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { CreditCard, Power, CalendarClock, Eye, X, Check } from 'lucide-react'
+import { CreditCard, Power, CalendarClock, Eye, X, Check, Shapes } from 'lucide-react'
+import { SEGMENTOS_LISTA } from '@/lib/segmentos'
 
 const ADMIN_COR = '#7C3AED'
 
@@ -11,11 +12,12 @@ interface Props {
   empresaNome: string
   planoAtual: string
   statusAtual: string
+  segmentoAtual: string
 }
 
-type ModalTipo = 'plano' | 'status' | 'trial' | null
+type ModalTipo = 'plano' | 'status' | 'trial' | 'segmento' | null
 
-export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }: Props) {
+export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, segmentoAtual }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalTipo>(null)
   const [loading, setLoading] = useState(false)
@@ -25,6 +27,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
   const [novoPlano, setNovoPlano] = useState(planoAtual)
   const [novoStatus, setNovoStatus] = useState(statusAtual)
   const [diasTrial, setDiasTrial] = useState(14)
+  const [novoSegmento, setNovoSegmento] = useState(segmentoAtual)
 
   async function executar(body: Record<string, unknown>) {
     setLoading(true)
@@ -66,6 +69,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
 
   const botoes = [
     { tipo: 'plano' as const, label: 'Trocar plano', icon: CreditCard, cor: '#7C3AED' },
+    { tipo: 'segmento' as const, label: 'Trocar segmento', icon: Shapes, cor: '#0D9488' },
     { tipo: 'status' as const, label: 'Alterar status', icon: Power, cor: '#DC2626' },
     { tipo: 'trial' as const, label: 'Estender trial', icon: CalendarClock, cor: '#D97706' },
   ]
@@ -108,6 +112,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-sans font-bold text-[17px] text-[#16212E]">
                 {modal === 'plano' && 'Trocar plano'}
+                {modal === 'segmento' && 'Trocar segmento'}
                 {modal === 'status' && 'Alterar status'}
                 {modal === 'trial' && 'Estender trial'}
               </h3>
@@ -130,6 +135,25 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
                   >
                     {p}
                     {novoPlano === p && <Check size={17} />}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {modal === 'segmento' && (
+              <div className="grid grid-cols-2 gap-2 mb-5">
+                {SEGMENTOS_LISTA.map(({ id, config }) => (
+                  <button
+                    key={id}
+                    onClick={() => setNovoSegmento(id)}
+                    className="flex items-center gap-2 px-3 py-3 rounded-[11px] border text-[13px] font-semibold text-left transition-all"
+                    style={novoSegmento === id
+                      ? { borderColor: ADMIN_COR, background: `${ADMIN_COR}0A`, color: ADMIN_COR }
+                      : { borderColor: '#16212E14', color: '#56657A' }}
+                  >
+                    <span className="text-[16px]">{config.emoji}</span>
+                    <span className="flex-1">{config.label}</span>
+                    {novoSegmento === id && <Check size={16} />}
                   </button>
                 ))}
               </div>
@@ -197,6 +221,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
               <button
                 onClick={() => {
                   if (modal === 'plano') executar({ tipo: 'trocar_plano', plano: novoPlano })
+                  if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoSegmento })
                   if (modal === 'status') executar({ tipo: 'alterar_status', status: novoStatus })
                   if (modal === 'trial') executar({ tipo: 'estender_trial', dias: diasTrial })
                 }}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import { Lead, Usuario } from './types'
+import { Lead, Usuario, getKanbanColumns, ganhoColId } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
@@ -13,34 +13,40 @@ import { NewLeadModal } from './new-lead-modal'
 interface LeadsViewProps {
   initialLeads: Lead[]
   usuarios: Usuario[]
+  empresaId: number
+  segmento?: string | null
 }
 
-export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
   const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
 
+  const columns = useMemo(() => getKanbanColumns(segmento), [segmento])
+
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('configuracoes_sistema').select('valor').eq('chave', 'sla_atendimento').single()
+    supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'sla_atendimento').maybeSingle()
       .then(({ data }) => {
         if (data?.valor && typeof data.valor === 'object') {
           const v = data.valor as { verde?: number; amarelo?: number; vermelho?: number }
           setSla({ verde: v.verde ?? 15, amarelo: v.amarelo ?? 30, vermelho: v.vermelho ?? 60 })
         }
       })
-  }, [])
+  }, [empresaId])
 
   const stats = useMemo(() => {
+    const ganhoId   = ganhoColId(columns)
+    const negocIds  = columns.filter(c => c.tipo === 'negociacao').map(c => c.id)
     const ativos    = leads.filter(l => l.ativo !== false)
-    const conv      = ativos.filter(l => l.kanban_status === 'convertido').length
+    const conv      = ativos.filter(l => l.kanban_status === ganhoId).length
     const taxa      = ativos.length > 0 ? Math.round((conv / ativos.length) * 100) : 0
     const negoc     = ativos
-      .filter(l => l.kanban_status === 'negociando')
+      .filter(l => negocIds.includes(l.kanban_status ?? ''))
       .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
     return { ativos: ativos.length, taxa, negoc }
-  }, [leads])
+  }, [leads, columns])
 
   // Realtime: novas mensagens recebidas incrementam o badge do card,
   // e leads novos (conversas que ainda não estão na tela) entram sozinhos.
@@ -142,6 +148,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
         <KanbanBoard
           leads={leads}
           usuarios={usuarios}
+          columns={columns}
           onLeadClick={setSelectedLead}
           onLeadUpdate={handleLeadUpdate}
           sla={sla}
@@ -153,6 +160,8 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
         <LeadModal
           lead={selectedLead}
           usuarios={usuarios}
+          columns={columns}
+          segmento={segmento}
           onClose={() => setSelectedLead(null)}
           onUpdate={handleLeadUpdate}
         />
@@ -160,6 +169,7 @@ export function LeadsView({ initialLeads, usuarios }: LeadsViewProps) {
       {showNewLead && (
         <NewLeadModal
           usuarios={usuarios}
+          columns={columns}
           onClose={() => setShowNewLead(false)}
           onCreate={handleLeadCreate}
         />

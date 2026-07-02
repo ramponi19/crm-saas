@@ -454,6 +454,7 @@ export type Database = {
           limite_usuarios: number | null
           nome: string
           plano: string
+          segmento: string
           slug: string
           status: string
           stripe_customer_id: string | null
@@ -478,6 +479,7 @@ export type Database = {
           limite_usuarios?: number | null
           nome: string
           plano?: string
+          segmento?: string
           slug: string
           status?: string
           stripe_customer_id?: string | null
@@ -500,6 +502,7 @@ export type Database = {
           limite_usuarios?: number | null
           nome?: string
           plano?: string
+          segmento?: string
           slug?: string
           status?: string
           stripe_customer_id?: string | null
@@ -512,6 +515,330 @@ export type Database = {
           wl_logo_url?: string | null
           wl_slogan?: string | null
           wl_whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      proprietarios: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          cpf_cnpj: string | null
+          telefone: string | null
+          email: string | null
+          observacoes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          nome: string
+          cpf_cnpj?: string | null
+          telefone?: string | null
+          email?: string | null
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          nome?: string
+          cpf_cnpj?: string | null
+          telefone?: string | null
+          email?: string | null
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      imoveis: {
+        Row: {
+          id: number
+          empresa_id: number
+          proprietario_id: number | null
+          codigo: string | null
+          titulo: string | null
+          tipo: string
+          finalidade: string
+          status: string
+          descricao: string | null
+          valor_venda: number | null
+          valor_locacao: number | null
+          valor_condominio: number | null
+          valor_iptu: number | null
+          iptu_periodicidade: string | null
+          area_util: number | null
+          area_total: number | null
+          quartos: number | null
+          suites: number | null
+          banheiros: number | null
+          vagas: number | null
+          matricula: string | null
+          status_chaves: string | null
+          aceita_permuta: boolean | null
+          aceita_financiamento: boolean | null
+          publicar_portais: boolean | null
+          cep: string | null
+          logradouro: string | null
+          numero: string | null
+          complemento: string | null
+          bairro: string | null
+          cidade: string | null
+          uf: string | null
+          latitude: number | null
+          longitude: number | null
+          ocultar_numero_publico: boolean | null
+          fotos: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          proprietario_id?: number | null
+          codigo?: string | null
+          titulo?: string | null
+          tipo?: string
+          finalidade?: string
+          status?: string
+          descricao?: string | null
+          valor_venda?: number | null
+          valor_locacao?: number | null
+          valor_condominio?: number | null
+          valor_iptu?: number | null
+          iptu_periodicidade?: string | null
+          area_util?: number | null
+          area_total?: number | null
+          quartos?: number | null
+          suites?: number | null
+          banheiros?: number | null
+          vagas?: number | null
+          matricula?: string | null
+          status_chaves?: string | null
+          aceita_permuta?: boolean | null
+          aceita_financiamento?: boolean | null
+          publicar_portais?: boolean | null
+          cep?: string | null
+          logradouro?: string | null
+          numero?: string | null
+          complemento?: string | null
+          bairro?: string | null
+          cidade?: string | null
+          uf?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          ocultar_numero_publico?: boolean | null
+          fotos?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          proprietario_id?: number | null
+          codigo?: string | null
+          titulo?: string | null
+          tipo?: string
+          finalidade?: string
+          status?: string
+          descricao?: string | null
+          valor_venda?: number | null
+          valor_locacao?: number | null
+          valor_condominio?: number | null
+          valor_iptu?: number | null
+          iptu_periodicidade?: string | null
+          area_util?: number | null
+          area_total?: number | null
+          quartos?: number | null
+          suites?: number | null
+          banheiros?: number | null
+          vagas?: number | null
+          matricula?: string | null
+          status_chaves?: string | null
+          aceita_permuta?: boolean | null
+          aceita_financiamento?: boolean | null
+          publicar_portais?: boolean | null
+          cep?: string | null
+          logradouro?: string | null
+          numero?: string | null
+          complemento?: string | null
+          bairro?: string | null
+          cidade?: string | null
+          uf?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          ocultar_numero_publico?: boolean | null
+          fotos?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lead_perfil_busca: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number
+          finalidade: string | null
+          tipos: string[]
+          cidades: string[]
+          bairros: string[]
+          preco_min: number | null
+          preco_max: number | null
+          quartos_min: number | null
+          vagas_min: number | null
+          ativo: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id: number
+          finalidade?: string | null
+          tipos?: string[]
+          cidades?: string[]
+          bairros?: string[]
+          preco_min?: number | null
+          preco_max?: number | null
+          quartos_min?: number | null
+          vagas_min?: number | null
+          ativo?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number
+          finalidade?: string | null
+          tipos?: string[]
+          cidades?: string[]
+          bairros?: string[]
+          preco_min?: number | null
+          preco_max?: number | null
+          quartos_min?: number | null
+          vagas_min?: number | null
+          ativo?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      visitas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          imovel_id: number | null
+          corretor_id: string | null
+          data_hora: string
+          status: string
+          observacoes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          corretor_id?: string | null
+          data_hora: string
+          status?: string
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          corretor_id?: string | null
+          data_hora?: string
+          status?: string
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tarefas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          imovel_id: number | null
+          responsavel_id: string | null
+          titulo: string
+          descricao: string | null
+          tipo: string
+          vencimento: string | null
+          concluida: boolean
+          concluida_em: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          responsavel_id?: string | null
+          titulo: string
+          descricao?: string | null
+          tipo?: string
+          vencimento?: string | null
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          responsavel_id?: string | null
+          titulo?: string
+          descricao?: string | null
+          tipo?: string
+          vencimento?: string | null
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      followups_gerados: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          tarefa_id: number | null
+          regra: string
+          chave: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          tarefa_id?: number | null
+          regra: string
+          chave: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          tarefa_id?: number | null
+          regra?: string
+          chave?: string
+          created_at?: string
         }
         Relationships: []
       }

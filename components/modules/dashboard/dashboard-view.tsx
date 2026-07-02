@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight } from 'lucide-react'
+import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight, CheckSquare, CircleAlert } from 'lucide-react'
+import Link from 'next/link'
 import { formatCurrency, CANAIS_VENDA } from '@/lib/utils'
 import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { AreaChart } from '@/components/ui/area-chart'
@@ -293,6 +294,62 @@ function TopVendedores({ vendedores }: {
 }
 
 // ─────────────────────────────────────────
+// Follow-ups pendentes (tarefas do usuário) — auto-contido; some quando vazio
+// ─────────────────────────────────────────
+function FollowupsCard() {
+  type Task = { id: number; titulo: string; vencimento: string | null; lead_nome: string | null }
+  const [tarefas, setTarefas] = useState<Task[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
+      const user = data.user
+      if (!user) { setLoaded(true); return }
+      const { data: rows } = await supabase
+        .from('tarefas')
+        .select('id, titulo, vencimento, leads(nome)')
+        .eq('concluida', false).eq('responsavel_id', user.id)
+        .order('vencimento', { nullsFirst: false }).limit(6)
+      type Row = { id: number; titulo: string; vencimento: string | null; leads: { nome: string | null } | { nome: string | null }[] | null }
+      const one = (r: Row['leads']) => (Array.isArray(r) ? r[0] ?? null : r)
+      setTarefas(((rows ?? []) as unknown as Row[]).map(t => ({ id: t.id, titulo: t.titulo, vencimento: t.vencimento, lead_nome: one(t.leads)?.nome ?? null })))
+      setLoaded(true)
+    })
+  }, [])
+
+  if (!loaded || tarefas.length === 0) return null
+  const nowMs = Date.now()
+  const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+
+  return (
+    <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">A FAZER</div>
+          <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] inline-flex items-center gap-2"><CheckSquare size={17} className="text-[#C01F26]" /> Meus follow-ups</h3>
+        </div>
+        <Link href="/tarefas" className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.06] transition-colors">
+          Ver tarefas <ArrowUpRight size={15} />
+        </Link>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-x-6">
+        {tarefas.map(t => {
+          const atrasada = t.vencimento && new Date(t.vencimento).getTime() < nowMs
+          return (
+            <div key={t.id} className="flex items-center gap-2 py-[9px] border-b border-[#16212E]/[0.06]">
+              {atrasada ? <CircleAlert size={15} className="text-[#C01F26] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#7FB0E8]" />}
+              <span className="text-[13px] text-[#16212E] truncate flex-1">{t.titulo}{t.lead_nome ? <span className="text-[#9AA7B6]"> · {t.lead_nome}</span> : ''}</span>
+              {t.vencimento && <span className={`text-[11px] shrink-0 ${atrasada ? 'text-[#C01F26] font-semibold' : 'text-[#9AA7B6]'}`}>{diaMes(t.vencimento)}</span>}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────
 // Dashboard principal
 // ─────────────────────────────────────────
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
@@ -440,6 +497,9 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               </div>
             ))}
           </div>
+
+          {/* ── Meus follow-ups (some quando não há tarefas) ── */}
+          <FollowupsCard />
 
           {/* ── ROW A: Gráfico área (1.85fr) + Donut canais (1fr) ── */}
           <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.85fr 1fr' }}>

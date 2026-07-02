@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { X, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { Lead, Usuario, KANBAN_COLUMNS } from './types'
+import { Lead, Usuario, type KanbanColumn } from './types'
 import { toast } from 'sonner'
 import type { TablesInsert } from '@/types/database'
 
 interface NewLeadModalProps {
   usuarios: Usuario[]
+  columns: KanbanColumn[]
   onClose: () => void
   onCreate: (lead: Lead) => void
 }
@@ -22,7 +23,7 @@ const ORIGENS = [
   { value: 'manual',    label: 'Loja física' },
 ]
 
-export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps) {
+export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadModalProps) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export function NewLeadModal({ usuarios, onClose, onCreate }: NewLeadModalProps)
             <label className={labelCls}>Status inicial</label>
             <select value={form.kanban_status} onChange={e => set('kanban_status', e.target.value)}
               className={`${inputCls} cursor-pointer`}>
-              {KANBAN_COLUMNS.map(c => <option key={c.id} value={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
+              {columns.map(c => <option key={c.id} value={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
             </select>
           </div>
           <div>

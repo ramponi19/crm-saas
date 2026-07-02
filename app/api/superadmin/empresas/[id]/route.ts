@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
+import { SEGMENTOS } from '@/lib/segmentos'
 import type { Database } from '@/types/database'
 
 type EmpresaUpdate = Database['public']['Tables']['empresas']['Update']
@@ -11,6 +12,7 @@ type Acao =
   | { tipo: 'trocar_plano'; plano: string }
   | { tipo: 'alterar_status'; status: string }
   | { tipo: 'estender_trial'; dias: number }
+  | { tipo: 'alterar_segmento'; segmento: string }
 
 export async function POST(
   req: NextRequest,
@@ -61,6 +63,15 @@ export async function POST(
       update = { trial_ends_at: novoFim.toISOString() }
       logAcao = 'estender_trial'
       logDetalhes = { dias, trial_ends_at: novoFim.toISOString() }
+      break
+    }
+    case 'alterar_segmento': {
+      if (!(acao.segmento in SEGMENTOS)) {
+        return NextResponse.json({ error: 'Segmento inválido' }, { status: 400 })
+      }
+      update = { segmento: acao.segmento }
+      logAcao = 'alterar_segmento'
+      logDetalhes = { segmento: acao.segmento }
       break
     }
     default:

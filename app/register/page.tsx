@@ -1,44 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
-import type { TablesInsert } from '@/types/database'
 import { Check, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react'
+import { SEGMENTOS_LISTA } from '@/lib/segmentos'
 
 type Step = 'plano' | 'loja' | 'conta'
 
-const PLANOS = [
-  {
-    id: 'free',
-    nome: 'Free',
-    preco: 'Grátis',
-    descricao: 'Para começar sem custo',
-    cor: '#5C6E84',
-    features: ['1 usuário', '100 leads', 'PDV básico', 'Estoque'],
-    destaque: false,
-  },
-  {
-    id: 'starter',
-    nome: 'Starter',
-    preco: 'R$ 197/mês',
-    descricao: 'Para lojas em crescimento',
-    cor: '#2E73C4',
-    features: ['3 usuários', '500 leads', 'Todos os módulos', 'BI e Relatórios', 'WhatsApp integrado'],
-    destaque: true,
-  },
-  {
-    id: 'pro',
-    nome: 'Pro',
-    preco: 'R$ 397/mês',
-    descricao: 'Para redes de lojas',
-    cor: '#D7282F',
-    features: ['Usuários ilimitados', 'Leads ilimitados', 'White-label', 'API acesso', 'Suporte prioritário'],
-    destaque: false,
-  },
+type PlanoCard = {
+  id: string
+  nome: string
+  preco_centavos: number
+  descricao: string
+  features: string[]
+  destaque: boolean
+}
+
+// Fallback caso a API não responda — mantém o cadastro sempre utilizável.
+const FALLBACK_PLANOS: PlanoCard[] = [
+  { id: 'starter', nome: 'Starter', preco_centavos: 19700, descricao: 'Para pequenas equipes', features: ['3 usuários', '500 leads', 'PDV completo', 'Relatórios', 'Integrações básicas'], destaque: false },
+  { id: 'pro', nome: 'Pro', preco_centavos: 39700, descricao: 'Para negócios em crescimento', features: ['10 usuários', 'Leads ilimitados', 'Tudo do Starter', 'White-label', 'Suporte prioritário'], destaque: true },
+  { id: 'unlimited', nome: 'Unlimited', preco_centavos: 69700, descricao: 'Sem limites', features: ['Usuários ilimitados', 'Leads ilimitados', 'Tudo do Pro', 'API dedicada', 'SLA garantido'], destaque: false },
 ]
+
+const fmtPreco = (c: number) =>
+  'R$ ' + (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '/mês'
 
 const STEPS: { id: Step; label: string }[] = [
   { id: 'plano', label: 'Plano' },
@@ -46,7 +35,7 @@ const STEPS: { id: Step; label: string }[] = [
   { id: 'conta', label: 'Sua conta' },
 ]
 
-const FIELD = 'w-full bg-[rgba(22,32,46,.05)] border border-[rgba(22,32,46,.12)] rounded-[12px] px-[14px] py-3 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none focus:border-[rgba(215,40,47,.45)] transition-colors'
+const FIELD = 'w-full bg-[rgba(22,32,46,.05)] border border-[rgba(22,32,46,.12)] rounded-[12px] px-[14px] py-3 text-[14px] text-[#141E2C] placeholder:text-[#8A96A6] outline-none focus:border-[rgba(201,162,75,.5)] transition-colors'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -54,9 +43,11 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [showPw, setShowPw] = useState(false)
+  const [planos, setPlanos] = useState<PlanoCard[]>(FALLBACK_PLANOS)
 
   const [form, setForm] = useState({
-    plano: 'starter',
+    plano: 'pro',
+    segmento: 'varejo',
     nomeEmpresa: '',
     cnpj: '',
     telefone: '',
@@ -66,17 +57,36 @@ export default function RegisterPage() {
     confirmaSenha: '',
   })
 
+  // planos vêm da mesma fonte da vitrine/checkout (planos_config, via API pública)
+  useEffect(() => {
+    let active = true
+    fetch('/api/planos-publicos')
+      .then((r) => r.json())
+      .then((d) => {
+        if (!active || !Array.isArray(d?.plans) || d.plans.length === 0) return
+        const mapped: PlanoCard[] = d.plans.map((p: PlanoCard) => ({
+          id: p.id,
+          nome: p.nome,
+          preco_centavos: p.preco_centavos,
+          descricao: p.descricao ?? '',
+          features: Array.isArray(p.features) ? p.features : [],
+          destaque: !!p.destaque,
+        }))
+        setPlanos(mapped)
+        // garante que o plano selecionado exista na lista carregada
+        setForm((f) => {
+          if (mapped.some((m) => m.id === f.plano)) return f
+          const def = mapped.find((m) => m.destaque) ?? mapped[0]
+          return def ? { ...f, plano: def.id } : f
+        })
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
   function set(campo: string, valor: string) {
     setForm(f => ({ ...f, [campo]: valor }))
     setErro(null)
-  }
-
-  function slugify(text: string) {
-    return text
-      .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
   }
 
   const stepIdx = STEPS.findIndex(s => s.id === step)
@@ -108,49 +118,35 @@ export default function RegisterPage() {
     const supabase = createClient()
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // 1) cria usuário + empresa + vínculo (owner) no servidor via Admin API
+      //    (sem envio de e-mail e sem o rate limit do signUp público)
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.senha,
+          nomeUsuario: form.nomeUsuario,
+          nomeEmpresa: form.nomeEmpresa,
+          cnpj: form.cnpj,
+          telefone: form.telefone,
+          plano: form.plano,
+          segmento: form.segmento,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || 'Erro ao criar conta')
+
+      // 2) faz login para estabelecer a sessão no navegador
+      const { error: signErr } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.senha,
-        options: { data: { nome: form.nomeUsuario } },
       })
-      if (authError) throw new Error(authError.message)
-      const userId = authData.user?.id
-      if (!userId) throw new Error('Erro ao criar usuário')
-
-      const slug = slugify(form.nomeEmpresa) + '-' + Math.random().toString(36).slice(2, 6)
-      const { data: empresaData, error: empresaError } = await supabase
-        .from('empresas')
-        .insert({
-          nome: form.nomeEmpresa,
-          slug,
-          plano: form.plano,
-          cnpj: form.cnpj || null,
-          telefone: form.telefone || null,
-          wl_whatsapp: form.telefone || null,
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('id')
-        .single()
-      if (empresaError) throw new Error('Erro ao criar empresa: ' + empresaError.message)
-
-      const empresaId = empresaData!.id
-
-      await supabase.from('usuarios').insert({
-        id: userId,
-        nome: form.nomeUsuario,
-        email: form.email,
-        role: 'admin',
-        empresa_id: empresaId,
-      } as TablesInsert<'usuarios'>)
-
-      await supabase.from('empresa_usuarios').insert({
-        empresa_id: empresaId,
-        usuario_id: userId,
-        role: 'owner',
-      })
+      if (signErr) throw new Error(signErr.message)
 
       markSessionActive()
-      router.push('/dashboard')
+      // Novo cadastro cria o dono (owner) → abre direto no painel de administração.
+      router.push('/admin')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
@@ -161,13 +157,13 @@ export default function RegisterPage() {
   return (
     <div
       className="fixed inset-0 overflow-auto flex items-center justify-center p-6"
-      style={{ background: 'radial-gradient(130% 120% at 50% -10%, #FFFFFF 0%, #F3F1EB 45%, #E9ECF1 100%)' }}
+      style={{ background: 'radial-gradient(130% 120% at 50% -10%, #FFFFFF 0%, #F7F4EC 45%, #EFE9DC 100%)' }}
     >
-      {/* Aurora blobs */}
+      {/* Aurora blobs — gold / navy (identidade ÁPICE) */}
       <div className="fixed top-[-12%] left-[8%] w-[520px] h-[520px] rounded-full pointer-events-none blur-[36px] animate-[jmDrift1_16s_ease-in-out_infinite]"
-        style={{ background: 'radial-gradient(circle, rgba(215,40,47,.28), transparent 68%)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(201,162,75,.28), transparent 68%)' }} />
       <div className="fixed bottom-[-18%] right-[6%] w-[600px] h-[600px] rounded-full pointer-events-none blur-[44px] animate-[jmDrift2_21s_ease-in-out_infinite]"
-        style={{ background: 'radial-gradient(circle, rgba(46,115,196,.14), transparent 66%)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(20,30,44,.10), transparent 66%)' }} />
 
       {/* Grid overlay */}
       <div className="fixed inset-0 pointer-events-none" style={{
@@ -182,12 +178,12 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-7">
           <div className="relative w-[80px] h-[80px] flex items-center justify-center mb-4">
-            <div className="absolute rounded-full border border-dashed border-[rgba(120,134,150,.30)] animate-spin"
+            <div className="absolute rounded-full border border-dashed border-[rgba(201,162,75,.35)] animate-spin"
               style={{ inset: '-10px', animationDuration: '26s' }} />
-            <img src="/eagle-mark.png" alt="Logo" className="w-[72px] h-[72px] object-contain drop-shadow-lg" />
+            <img src="/eagle-navy.png" alt="ÁPICE" className="w-[72px] h-[72px] object-contain drop-shadow-lg" />
           </div>
-          <div className="font-serif font-medium text-[26px] tracking-[-0.02em] text-[#16212E] leading-none">CRM</div>
-          <div className="font-mono text-[9px] tracking-[0.42em] text-[#788698] mt-2 pl-[0.42em]">PLATAFORMA DE GESTÃO</div>
+          <div className="font-serif font-medium text-[28px] tracking-[-0.01em] text-[#141E2C] leading-none">ÁPICE</div>
+          <div className="font-mono text-[9px] tracking-[0.36em] text-[#7A6A45] mt-2 pl-[0.36em]">O CRM DO EMPREENDEDOR</div>
         </div>
 
         {/* Steps */}
@@ -198,7 +194,7 @@ export default function RegisterPage() {
                 i < stepIdx
                   ? 'bg-[rgba(34,197,94,.12)] text-[#16A34A]'
                   : i === stepIdx
-                  ? 'bg-[rgba(215,40,47,.10)] text-[#D7282F]'
+                  ? 'bg-[rgba(201,162,75,.14)] text-[#A8884A]'
                   : 'bg-[rgba(22,32,46,.06)] text-[#788698]'
               }`}>
                 {i < stepIdx ? <Check size={11} strokeWidth={2.5} /> : <span className="w-[14px] text-center">{i + 1}</span>}
@@ -226,32 +222,32 @@ export default function RegisterPage() {
                 <p className="text-[13px] text-[#5A6A7E] mt-1">14 dias grátis em qualquer plano. Sem cartão agora.</p>
               </div>
               <div className="space-y-2.5">
-                {PLANOS.map(p => (
+                {planos.map(p => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => set('plano', p.id)}
                     className={`w-full text-left p-4 rounded-[14px] border transition-all ${
                       form.plano === p.id
-                        ? 'border-[rgba(215,40,47,.40)] bg-[rgba(215,40,47,.04)]'
+                        ? 'border-[rgba(201,162,75,.5)] bg-[rgba(201,162,75,.06)]'
                         : 'border-[rgba(22,32,46,.10)] hover:border-[rgba(22,32,46,.20)] bg-transparent'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all ${
-                          form.plano === p.id ? 'border-[#D7282F]' : 'border-[rgba(22,32,46,.25)]'
+                          form.plano === p.id ? 'border-[#C9A24B]' : 'border-[rgba(22,32,46,.25)]'
                         }`}>
-                          {form.plano === p.id && <div className="w-1.5 h-1.5 rounded-full bg-[#D7282F]" />}
+                          {form.plano === p.id && <div className="w-1.5 h-1.5 rounded-full bg-[#C9A24B]" />}
                         </div>
                         <span className="text-[14px] font-semibold text-[#16212E]">{p.nome}</span>
                         {p.destaque && (
-                          <span className="text-[10px] bg-[rgba(46,115,196,.12)] text-[#2E73C4] px-2 py-0.5 rounded-full font-medium">
+                          <span className="text-[10px] bg-[rgba(201,162,75,.16)] text-[#A8884A] px-2 py-0.5 rounded-full font-medium">
                             Popular
                           </span>
                         )}
                       </div>
-                      <span className="text-[13px] font-bold text-[#16212E]">{p.preco}</span>
+                      <span className="text-[13px] font-bold text-[#141E2C]">{fmtPreco(p.preco_centavos)}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 pl-[22px]">
                       {p.features.map(f => (
@@ -273,6 +269,30 @@ export default function RegisterPage() {
                 <h2 className="text-[18px] font-bold text-[#16212E]">Sobre sua loja</h2>
                 <p className="text-[13px] text-[#5A6A7E] mt-1">Configure seu sistema em menos de 2 minutos.</p>
               </div>
+
+              <div>
+                <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SEGMENTO DO NEGÓCIO *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SEGMENTOS_LISTA.map(({ id, config }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => set('segmento', id)}
+                      className={`text-left p-3 rounded-[12px] border transition-all ${
+                        form.segmento === id
+                          ? 'border-[rgba(201,162,75,.5)] bg-[rgba(201,162,75,.06)]'
+                          : 'border-[rgba(22,32,46,.10)] hover:border-[rgba(22,32,46,.20)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-[16px]">{config.emoji}</span>
+                        <span className="text-[13px] font-semibold text-[#141E2C]">{config.label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-3.5">
                 <div>
                   <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">NOME DA LOJA *</label>
@@ -345,7 +365,7 @@ export default function RegisterPage() {
                       className={FIELD + ' pr-11'}
                     />
                     <button type="button" onClick={() => setShowPw(s => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#788698] hover:text-[#D7282F] transition-colors">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#788698] hover:text-[#C9A24B] transition-colors">
                       {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
                   </div>
@@ -387,7 +407,7 @@ export default function RegisterPage() {
               type="button"
               onClick={avancar}
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 py-[14px] rounded-[13px] bg-gradient-to-b from-[#D12830] to-[#A8161D] text-white text-[14.5px] font-bold shadow-[0_6px_16px_rgba(168,22,29,.28)] hover:-translate-y-[1px] hover:shadow-[0_10px_22px_rgba(168,22,29,.36)] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
+              className="flex-1 flex items-center justify-center gap-2 py-[14px] rounded-[13px] bg-gradient-to-b from-[#D9BC7A] to-[#C9A24B] text-[#0B1119] text-[14.5px] font-bold shadow-[0_6px_16px_rgba(201,162,75,.32)] hover:-translate-y-[1px] hover:shadow-[0_10px_22px_rgba(201,162,75,.45)] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
             >
               {loading
                 ? <><Loader2 size={18} className="animate-spin" /> Criando conta…</>
@@ -401,7 +421,7 @@ export default function RegisterPage() {
           {step === 'plano' && (
             <p className="text-center text-[13px] text-[#788698] mt-4">
               Já tem conta?{' '}
-              <Link href="/login" className="font-semibold text-[#D7282F] hover:text-[#A8161D] transition-colors">
+              <Link href="/login" className="font-semibold text-[#C9A24B] hover:text-[#A8884A] transition-colors">
                 Entrar
               </Link>
             </p>

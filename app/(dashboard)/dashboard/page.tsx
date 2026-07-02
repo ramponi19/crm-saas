@@ -1,5 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
+import { normalizarSegmento } from '@/lib/segmentos'
+import DashboardImob from './dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
 
@@ -102,6 +104,11 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
+  if (normalizarSegmento(empresa?.segmento) === 'imobiliaria') {
+    return <DashboardImob />
+  }
   const data = await getDashboardData()
   return <DashboardView data={data} />
 }
