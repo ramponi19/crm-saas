@@ -119,11 +119,17 @@ export async function GET(
             .upsert({ empresa_id: args.empresaId, lead_id: args.leadId, regra: args.regra, chave: args.chave }, { onConflict: 'chave', ignoreDuplicates: true })
             .select('id').maybeSingle()
           if (!marca) return 0 // chave já existia → nada a fazer
-          const { data: tarefa } = await supabase
+          const { data: tarefa, error: tErr } = await supabase
             .from('tarefas')
             .insert({ empresa_id: args.empresaId, lead_id: args.leadId, responsavel_id: args.responsavelId, titulo: args.titulo, tipo: 'ligacao', vencimento: nowIso })
             .select('id').single()
-          if (tarefa) await supabase.from('followups_gerados').update({ tarefa_id: tarefa.id }).eq('id', marca.id)
+          if (tErr || !tarefa) {
+            // Falha ao criar a tarefa → remove a marca pra tentar de novo no próximo cron
+            // (evita perda silenciosa: a chave ficaria gravada bloqueando o retry pra sempre).
+            await supabase.from('followups_gerados').delete().eq('id', marca.id)
+            return 0
+          }
+          await supabase.from('followups_gerados').update({ tarefa_id: tarefa.id }).eq('id', marca.id)
           return 1
         }
 
@@ -156,7 +162,7 @@ export async function GET(
           if (jaAvancou.includes(lead.kanban_status ?? '')) continue
           criadas += await gerar({
             empresaId: v.empresa_id, leadId: v.lead_id, responsavelId: lead.responsavel_id ?? v.corretor_id,
-            regra: 'pos_visita', chave: `pos_visita:visita:${v.id}`,
+            regra: 'pos_visita', chave: `pos_visita:lead:${v.lead_id}`,
             titulo: `Retomar ${lead.nome ?? 'cliente'} após a visita (enviar proposta)`,
           })
         }

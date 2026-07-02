@@ -57,16 +57,16 @@ export function LimiteBanner() {
     <div
       className="flex items-center gap-3 px-5 py-2.5 text-sm shrink-0"
       style={{
-        background: critico ? 'rgba(215,40,47,0.08)' : 'rgba(251,191,36,0.08)',
-        borderBottom: `1px solid ${critico ? 'rgba(215,40,47,0.2)' : 'rgba(251,191,36,0.2)'}`,
+        background: critico ? 'rgba(22,33,46,0.08)' : 'rgba(251,191,36,0.08)',
+        borderBottom: `1px solid ${critico ? 'rgba(22,33,46,0.2)' : 'rgba(251,191,36,0.2)'}`,
       }}
     >
       <AlertTriangle
         size={14}
         className="shrink-0"
-        style={{ color: critico ? '#D7282F' : '#FBBF24' }}
+        style={{ color: critico ? '#16212E' : '#FBBF24' }}
       />
-      <span className="flex-1 text-xs" style={{ color: critico ? '#D7282F' : '#92400E' }}>
+      <span className="flex-1 text-xs" style={{ color: critico ? '#16212E' : '#92400E' }}>
         {avisos.map((a, i) => (
           <span key={a.label}>
             {i > 0 && ' · '}
@@ -78,7 +78,7 @@ export function LimiteBanner() {
       <Link
         href="/planos"
         className="flex items-center gap-1 text-xs font-semibold shrink-0 hover:underline"
-        style={{ color: critico ? '#D7282F' : '#92400E' }}
+        style={{ color: critico ? '#16212E' : '#92400E' }}
       >
         Fazer upgrade <ArrowUpRight size={12} />
       </Link>

@@ -20,28 +20,32 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
     data: { status: column.id },
   })
 
+  const emptyMsg =
+    column.tipo === 'ganho'   ? 'Suas vendas fechadas aparecem aqui. 🎯' :
+    column.tipo === 'perdido' ? 'Nada perdido — bom sinal.' :
+    'Arraste um lead aqui.'
+
   return (
-    <div className="flex flex-col flex-none w-[286px]">
+    <div className="flex flex-col flex-none w-[296px] h-full bg-[rgba(22,33,46,0.025)] border border-[#16212E]/[0.05] rounded-[16px] p-3">
       {/* Header da coluna */}
-      <div className="flex items-center gap-[9px] px-1 pb-[14px]">
+      <div className="flex items-center gap-[9px] px-1 pb-3 shrink-0">
         <span
           className="w-[9px] h-[9px] rounded-full flex-none"
           style={{ background: column.color }}
         />
-        <span className="text-[13.5px] font-bold text-[#1F2A39]">{column.label}</span>
-        <span className="font-mono text-[11px] text-[#6B7C92] bg-white/[0.05] px-[8px] py-[2px] rounded-full">
+        <span className="text-[13px] font-bold text-[#1F2A39] flex-1 truncate">{column.label}</span>
+        <span className="font-mono text-[11px] text-[#6B7C92] bg-white border border-[#16212E]/[0.08] px-[8px] py-[2px] rounded-full">
           {leads.length}
         </span>
       </div>
 
-      {/* Drop zone */}
+      {/* Drop zone — rola por coluna */}
       <div
         ref={setNodeRef}
-        className="flex flex-col gap-[11px] min-h-[90px] rounded-[13px] transition-colors duration-150"
+        className="flex flex-col gap-[9px] flex-1 min-h-[90px] overflow-y-auto scrollbar-thin rounded-[12px] transition-colors duration-150 p-0.5"
         style={{
-          background: isOver ? `${column.color}08` : 'transparent',
-          outline: isOver ? `1px dashed ${column.color}44` : 'none',
-          padding: isOver ? '8px' : '0',
+          background: isOver ? `${column.color}0F` : 'transparent',
+          outline: isOver ? `1px dashed ${column.color}55` : 'none',
         }}
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
@@ -58,9 +62,9 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
         </SortableContext>
 
         {leads.length === 0 && (
-          <div className="flex-1 min-h-[80px] flex items-center justify-center rounded-[13px] border border-dashed border-[#16212E]/[0.08]">
-            <p className="text-[12px] text-[#9AA7B6]">
-              {isDragging ? 'Soltar aqui' : 'Nenhum lead'}
+          <div className="flex-1 min-h-[80px] flex items-center justify-center rounded-[12px] border border-dashed border-[#16212E]/[0.10] px-3 text-center">
+            <p className="text-[12px] text-[#9AA7B6] leading-relaxed">
+              {isDragging ? 'Soltar aqui' : emptyMsg}
             </p>
           </div>
         )}

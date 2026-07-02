@@ -99,7 +99,7 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
 
   const agora = Date.now()
   const labelCls = 'font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block'
-  const inputCls = 'w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[8px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors box-border'
+  const inputCls = 'w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[8px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors box-border'
 
   return (
     <div className="border-t border-[#16212E]/[0.08] pt-[13px]">

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Building2, Palette, CreditCard, Users, Check, Loader2, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/plano'
+import { Topbar } from '@/components/layout/topbar'
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
 
@@ -37,7 +38,7 @@ export default function EmpresaConfigPage() {
     nome: '',
     wl_slogan: '',
     wl_whatsapp: '',
-    wl_cor: '#D7282F',
+    wl_cor: '#16212E',
     wl_logo_url: '',
   })
 
@@ -47,7 +48,7 @@ export default function EmpresaConfigPage() {
         nome:          empresa.nome         ?? '',
         wl_slogan:     empresa.wl_slogan    ?? '',
         wl_whatsapp:   empresa.wl_whatsapp  ?? '',
-        wl_cor:        empresa.wl_cor       ?? '#D7282F',
+        wl_cor:        empresa.wl_cor       ?? '#16212E',
         wl_logo_url:   empresa.wl_logo_url  ?? '',
       })
     }
@@ -152,13 +153,8 @@ export default function EmpresaConfigPage() {
   const emTrial    = diasTrial > 0
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-8 py-5 border-b border-[#16212E]/[0.08] shrink-0">
-        <p className="text-xs font-mono tracking-[0.15em] text-[#788698] uppercase mb-0.5">SISTEMA</p>
-        <h1 className="text-[22px] font-serif font-bold text-[#16212E]">Configurações da empresa</h1>
-        {empresa && <p className="text-sm text-[#788698] mt-0.5">{empresa.nome}</p>}
-      </div>
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+      <Topbar title="Minha empresa" />
 
       {/* Abas — padrão Relatórios */}
       <div className="px-8 py-4 border-b border-[#16212E]/[0.08] shrink-0">
@@ -168,7 +164,7 @@ export default function EmpresaConfigPage() {
               className={[
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 aba === a.id
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                   : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               ].join(' ')}
             >
@@ -190,13 +186,13 @@ export default function EmpresaConfigPage() {
           )}
 
           {(aba === 'visual') && !planoTemAcesso(empresa?.plano, 'white_label') && (
-            <div className="flex items-center gap-3 p-4 rounded-[12px] border border-[#E03037]/30 bg-[#E03037]/5">
-              <Lock size={18} className="text-[#E03037] shrink-0" />
+            <div className="flex items-center gap-3 p-4 rounded-[12px] border border-[#22303F]/30 bg-[#22303F]/5">
+              <Lock size={18} className="text-[#22303F] shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-[#16212E]">Recurso exclusivo do plano Pro</p>
                 <p className="text-xs text-[#788698] mt-0.5">Faça upgrade para personalizar cores, logo e slogan da sua loja.</p>
               </div>
-              <a href="/planos?upgrade=white_label" className="ml-auto text-xs font-semibold text-[#E03037] hover:underline whitespace-nowrap">Ver planos →</a>
+              <a href="/planos?upgrade=white_label" className="ml-auto text-xs font-semibold text-[#22303F] hover:underline whitespace-nowrap">Ver planos →</a>
             </div>
           )}
 
@@ -259,7 +255,7 @@ export default function EmpresaConfigPage() {
                   ].map(({ label, uso, limite, icon }) => {
                     const ilimitado = limite >= 99999
                     const pct = ilimitado ? 0 : Math.min(100, (uso / limite) * 100)
-                    const cor = pct >= 100 ? '#D7282F' : pct >= 80 ? '#FBBF24' : '#15986A'
+                    const cor = pct >= 100 ? '#DC2626' : pct >= 80 ? '#FBBF24' : '#15986A'
                     return (
                       <div key={label}>
                         <div className="flex items-center justify-between mb-1">
@@ -280,12 +276,12 @@ export default function EmpresaConfigPage() {
                 </div>
               </div>
               {empresa?.plano !== 'pro' && (
-                <div className="p-5 bg-[rgba(215,40,47,0.05)] border border-[rgba(215,40,47,0.15)] rounded-[16px]">
-                  <p className="text-sm font-semibold text-white mb-1">Fazer upgrade</p>
+                <div className="p-5 bg-[rgba(22,33,46,0.05)] border border-[rgba(22,33,46,0.15)] rounded-[16px]">
+                  <p className="text-sm font-semibold text-[#16212E] mb-1">Fazer upgrade</p>
                   <p className="text-xs text-[#788698] mb-4">Desbloqueie mais usuários, leads ilimitados e white-label completo.</p>
                   <a href="https://wa.me/5519999999999?text=Quero+fazer+upgrade+do+meu+plano"
                     target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[#D7282F] text-white text-sm font-semibold px-4 py-2 rounded-[10px] hover:bg-[#B91C1C] transition-colors">
+                    className="inline-flex items-center gap-2 bg-[#16212E] text-white text-sm font-semibold px-4 py-2 rounded-[10px] hover:bg-[#22303F] transition-colors">
                     Falar com suporte
                   </a>
                 </div>
@@ -315,7 +311,7 @@ export default function EmpresaConfigPage() {
 
           {(aba === 'loja' || aba === 'visual') && (
             <button onClick={salvar} disabled={loading}
-              className="flex items-center gap-2 bg-[#D7282F] hover:bg-[#B91C1C] disabled:opacity-50 text-white font-semibold rounded-[10px] px-6 py-2.5 text-sm transition-colors">
+              className="flex items-center gap-2 bg-[#16212E] hover:bg-[#22303F] disabled:opacity-50 text-white font-semibold rounded-[10px] px-6 py-2.5 text-sm transition-colors">
               {loading ? <Loader2 size={15} className="animate-spin" /> : sucesso ? <Check size={15} /> : <Upload size={15} />}
               {sucesso ? 'Salvo!' : 'Salvar alterações'}
             </button>

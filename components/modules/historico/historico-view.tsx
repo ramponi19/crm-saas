@@ -23,7 +23,7 @@ interface Props { vendas: Venda[] }
 const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
   concluida:  { label: 'Concluída',  bg: 'rgba(52,211,153,0.12)',  color: '#34D399' },
   pendente:   { label: 'Pendente',   bg: 'rgba(244,183,64,0.12)',  color: '#F4B740' },
-  cancelada:  { label: 'Cancelada',  bg: 'rgba(240,101,107,0.12)', color: '#F0656B' },
+  cancelada:  { label: 'Cancelada',  bg: 'rgba(220,38,38,0.12)', color: '#DC2626' },
   devolvido:  { label: 'Devolvido',  bg: 'rgba(127,176,232,0.12)', color: '#7FB0E8' },
 }
 
@@ -99,7 +99,7 @@ export function HistoricoView({ vendas }: Props) {
                 className={cn(
                   'px-[14px] py-[8px] rounded-[10px] text-[13px] font-semibold border transition-all',
                   filtro === c.key
-                    ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white border-transparent shadow-[0_4px_14px_rgba(215,40,47,0.32)]'
+                    ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white border-transparent shadow-[0_4px_14px_rgba(22,33,46,0.32)]'
                     : 'bg-[#16212E]/[0.04] border-[#16212E]/[0.08] text-[#788698] hover:bg-[#16212E]/[0.04] hover:text-[#56657A]'
                 )}>
                 {c.label}
@@ -177,7 +177,7 @@ export function HistoricoView({ vendas }: Props) {
                       {formatCurrency(v.valor_venda)}
                     </div>
                     {v.lucro != null && (
-                      <div className={cn('text-[11px] font-semibold', lucroPos ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                      <div className={cn('text-[11px] font-semibold', lucroPos ? 'text-[#34D399]' : 'text-[#DC2626]')}>
                         {lucroPos ? '+' : ''}{formatCurrency(v.lucro)}
                       </div>
                     )}

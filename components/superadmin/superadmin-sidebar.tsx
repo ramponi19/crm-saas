@@ -10,7 +10,6 @@ import {
   LineChart,
   ScrollText,
   ShieldCheck,
-  ArrowLeft,
   LogOut,
   ShieldAlert,
   CreditCard,
@@ -94,16 +93,6 @@ export function SuperAdminSidebar({ userName = 'Super Admin' }: SuperAdminSideba
             </Link>
           )
         })}
-
-        <div className="pt-4 mt-4 border-t border-[#16212E]/[0.07]">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A] transition-all duration-150"
-          >
-            <ArrowLeft size={19} className="shrink-0" />
-            <span className="flex-1 truncate">Voltar ao CRM</span>
-          </Link>
-        </div>
       </nav>
 
       {/* User */}

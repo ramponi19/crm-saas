@@ -55,8 +55,8 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
 
 // Cores por status do lead
 export const LEAD_STATUS_COLORS: Record<string, string> = {
-  novo: '#F0656B',
-  contato: '#7FB0E8',
+  novo: '#7FB0E8',
+  contato: '#6E8BA8',
   proposta: '#C6A86A',
   negociacao: '#F4B740',
   convertido: '#34D399',

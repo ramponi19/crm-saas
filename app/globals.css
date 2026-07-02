@@ -13,7 +13,8 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 358 72% 51%;
+    /* ── ÁPICE: navy = primária, dourado = accent, vermelho = só perigo ── */
+    --primary: 213 35% 13%;          /* navy #16212E */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
@@ -21,12 +22,21 @@
     --muted-foreground: 215 16% 40%;
     --accent: 214 32% 84%;
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;        /* #DC2626 — perigo/alerta */
     --destructive-foreground: 0 0% 98%;
     --border: 214 32% 82%;
     --input: 214 32% 82%;
-    --ring: 358 72% 51%;
+    --ring: 41 54% 54%;              /* gold #C9A24B (foco) */
     --radius: 0.75rem;
+
+    /* Tokens ÁPICE (hex diretos, p/ uso em CSS/inline) */
+    --navy: #16212E;
+    --navy-soft: #22303F;
+    --gold: #C9A24B;
+    --gold-deep: #A8884A;
+    --danger: #DC2626;
+    --ink-2: #55647A;
+    --ink-3: #8A97A8;
   }
 
   
@@ -94,8 +104,8 @@
 }
 
 @keyframes unreadPulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(240,101,107,0.25), 0 0 14px rgba(240,101,107,0.15); }
-  50%      { box-shadow: 0 0 0 1px rgba(240,101,107,0.45), 0 0 22px rgba(240,101,107,0.30); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(201,162,75,0.25), 0 0 14px rgba(201,162,75,0.15); }
+  50%      { box-shadow: 0 0 0 1px rgba(201,162,75,0.45), 0 0 22px rgba(201,162,75,0.30); }
 }
 
 /* Remove autofill blue background in all browsers */

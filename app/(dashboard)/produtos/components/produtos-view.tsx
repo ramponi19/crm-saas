@@ -38,7 +38,7 @@ function getIcon(marca: string) {
 }
 
 function getStatusLabel(estoque: number): { label: string; color: string; bg: string } {
-  if (estoque === 0) return { label: 'Esgotado', color: '#F0353D', bg: 'rgba(240,53,61,0.12)' }
+  if (estoque === 0) return { label: 'Esgotado', color: '#DC2626', bg: 'rgba(220,38,38,0.12)' }
   if (estoque <= 2) return { label: 'Estoque baixo', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' }
   return { label: 'Em estoque', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' }
 }
@@ -98,7 +98,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
             { icon: <Package size={20} />, label: 'Produtos ativos', value: stats.total.toString(), color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
             { icon: <TrendingUp size={20} />, label: 'Valor em estoque', value: fmt(stats.valorEstoque), color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
             { icon: <AlertTriangle size={20} />, label: 'Estoque baixo', value: stats.baixo.toString(), color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-            { icon: <XCircle size={20} />, label: 'Esgotados', value: stats.esgotado.toString(), color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+            { icon: <XCircle size={20} />, label: 'Esgotados', value: stats.esgotado.toString(), color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
           ].map((c, i) => (
             <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
               <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>
@@ -128,7 +128,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
             <button
               onClick={() => setFiltroCategoria('todas')}
               className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all',
-                filtroCategoria === 'todas' ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
+                filtroCategoria === 'todas' ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
             >
               Todos
             </button>
@@ -137,7 +137,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
                 key={key}
                 onClick={() => setFiltroCategoria(label)}
                 className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all whitespace-nowrap',
-                  filtroCategoria === label ? 'bg-[#E03037] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
+                  filtroCategoria === label ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
               >
                 {key}
               </button>
@@ -147,7 +147,7 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
           <div className="flex-1" />
           <button
             onClick={abrirNovo}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]"
           >
             <Plus size={16} />
             Novo produto

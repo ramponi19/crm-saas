@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Check, Loader2, ExternalLink } from 'lucide-react'
+import { Topbar } from '@/components/layout/topbar'
 
 interface PlanoConfig {
   id: string
@@ -83,11 +84,13 @@ export default function PlanosView({ empresa, planos }: Props) {
   const gridCols = planos.length === 2 ? 'grid-cols-2' : planos.length >= 3 ? 'grid-cols-3' : 'grid-cols-1'
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#F4F6F9]">
+      <Topbar title="Planos" />
+      <div className="flex-1 overflow-y-auto">
       <div className="px-8 pt-8 pb-12">
 
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-[#1F2A39]">Planos e preços</h1>
+          <h1 className="font-serif font-medium text-[28px] text-[#1F2A39]">Planos e preços</h1>
           <p className="text-[#788698] text-sm mt-2">
             14 dias grátis em qualquer plano pago. Cancele quando quiser.
           </p>
@@ -232,6 +235,7 @@ export default function PlanosView({ empresa, planos }: Props) {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

@@ -35,7 +35,7 @@ export default function ResetSenhaPage() {
     router.replace('/login')
   }
 
-  const FIELD = 'flex items-center gap-2.5 px-[14px] py-3 rounded-[12px] transition-all border bg-[rgba(22,32,46,.05)] border-[rgba(22,32,46,.12)] focus-within:border-[rgba(240,101,107,.55)] focus-within:bg-[rgba(22,32,46,.035)]'
+  const FIELD = 'flex items-center gap-2.5 px-[14px] py-3 rounded-[12px] transition-all border bg-[rgba(22,32,46,.05)] border-[rgba(22,32,46,.12)] focus-within:border-[rgba(201,162,75,.55)] focus-within:bg-[rgba(22,32,46,.035)]'
 
   return (
     <div
@@ -71,7 +71,7 @@ export default function ResetSenhaPage() {
                     required
                     className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"
                   />
-                  <button type="button" onClick={() => setShowPw(s => !s)} className="text-[#5A6A7E] hover:text-[#F0656B] transition-colors shrink-0">
+                  <button type="button" onClick={() => setShowPw(s => !s)} className="text-[#5A6A7E] hover:text-[#A8884A] transition-colors shrink-0">
                     {showPw ? <EyeOff size={19} /> : <Eye size={19} />}
                   </button>
                 </div>
@@ -93,7 +93,7 @@ export default function ResetSenhaPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2.5 py-[14px] rounded-[13px] bg-gradient-to-b from-[#D12830] to-[#A8161D] text-white text-[14.5px] font-bold shadow-[0_6px_16px_rgba(168,22,29,.28)] hover:-translate-y-[2px] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full flex items-center justify-center gap-2.5 py-[14px] rounded-[13px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white text-[14.5px] font-bold shadow-[0_6px_16px_rgba(22,33,46,.28)] hover:-translate-y-[2px] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {loading ? <><Loader2 size={19} className="animate-spin" /> Salvando…</> : 'Salvar nova senha'}
               </button>

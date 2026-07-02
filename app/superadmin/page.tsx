@@ -72,11 +72,8 @@ export default async function SuperAdminDashboard() {
     <div className="px-8 py-7 max-w-[1400px]">
       {/* Header */}
       <div className="mb-7">
-        <p className="font-mono text-[10px] tracking-[0.25em] uppercase mb-1" style={{ color: ADMIN_COR }}>
-          Painel global
-        </p>
         <div className="flex items-center justify-between">
-          <h1 className="font-sans font-extrabold text-[26px] text-[#16212E] tracking-tight">
+          <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
             Visão geral
           </h1>
           <SyncStripeButton />

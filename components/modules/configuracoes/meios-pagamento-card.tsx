@@ -106,13 +106,13 @@ export function MeiosPagamentoCard() {
             className={cn(
               'text-left p-[12px_14px] rounded-[13px] border transition-all',
               provider === p.id
-                ? 'border-[#D7282F] bg-[#D7282F]/[0.04]'
+                ? 'border-[#16212E] bg-[#16212E]/[0.04]'
                 : 'border-[#16212E]/[0.08] hover:bg-[#16212E]/[0.02]'
             )}
           >
             <div className="flex items-center justify-between">
               <span className="text-[13.5px] font-semibold text-[#1F2A39]">{p.nome}</span>
-              {provider === p.id && <Check size={15} className="text-[#D7282F]" />}
+              {provider === p.id && <Check size={15} className="text-[#16212E]" />}
             </div>
             <p className="text-[11px] text-[#788698] mt-1 leading-snug">{p.desc}</p>
           </button>
@@ -137,7 +137,7 @@ export function MeiosPagamentoCard() {
                 placeholder={c.placeholder}
                 value={credenciais[c.key] ?? ''}
                 onChange={e => setCredenciais(v => ({ ...v, [c.key]: e.target.value }))}
-                className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3.5 py-[10px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(215,40,47,0.5)]"
+                className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3.5 py-[10px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]"
               />
             </div>
           ))}
@@ -170,7 +170,7 @@ export function MeiosPagamentoCard() {
       <button
         onClick={salvar}
         disabled={loading}
-        className="px-[18px] py-[10px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white text-[13.5px] font-semibold shadow-[0_4px_14px_rgba(215,40,47,0.35)] hover:opacity-95 disabled:opacity-60 transition-all"
+        className="px-[18px] py-[10px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white text-[13.5px] font-semibold shadow-[0_4px_14px_rgba(22,33,46,0.35)] hover:opacity-95 disabled:opacity-60 transition-all"
       >
         {loading ? 'Salvando...' : 'Salvar configuração'}
       </button>

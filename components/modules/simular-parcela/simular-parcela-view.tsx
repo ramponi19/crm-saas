@@ -79,7 +79,7 @@ export function SimularParcelaView() {
                 value={valor}
                 onChange={e => setValor(e.target.value.replace(/[^0-9.,]/g, ''))}
                 placeholder="0,00"
-                className="flex-1 bg-transparent border-none border-b-2 border-[rgba(215,40,47,0.4)] text-[#16212E] font-serif text-[34px] outline-none pb-[2px] min-w-0 focus:border-[#F0656B] transition-colors placeholder:text-[#3A4A63]"
+                className="flex-1 bg-transparent border-none border-b-2 border-[rgba(22,33,46,0.4)] text-[#16212E] font-serif text-[34px] outline-none pb-[2px] min-w-0 focus:border-[#DC2626] transition-colors placeholder:text-[#3A4A63]"
               />
             </div>
           </div>
@@ -99,7 +99,7 @@ export function SimularParcelaView() {
               className={cn(
                 'flex-1 py-[13px] px-4 rounded-[13px] border text-[13.5px] font-semibold transition-all duration-150',
                 tipo === t.id
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] border-transparent text-white shadow-[0_6px_18px_rgba(215,40,47,0.32)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] border-transparent text-white shadow-[0_6px_18px_rgba(22,33,46,0.32)]'
                   : 'bg-[#16212E]/[0.04] border-[#16212E]/[0.08] text-[#788698] hover:bg-[#16212E]/[0.04] hover:text-[#56657A]'
               )}
             >
@@ -174,7 +174,7 @@ export function SimularParcelaView() {
                 </div>
 
                 {/* Total com juros */}
-                <div className="text-right text-[13.5px] font-bold text-[#F0656B]">
+                <div className="text-right text-[13.5px] font-bold text-[#DC2626]">
                   {valorNum > 0 ? formatCurrency(r.totalJuros) : '—'}
                 </div>
               </div>

@@ -77,7 +77,7 @@ const COND_STYLE: Record<string, { label: string; color: string; bg: string }> =
   lacrado:    { label: 'Lacrado',   color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
   excelente:  { label: 'Excelente', color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
   bom:        { label: 'Bom',       color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  regular:    { label: 'Regular',   color: '#F0353D', bg: 'rgba(240,53,61,0.12)' },
+  regular:    { label: 'Regular',   color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
 }
 
 const MARCA_ICON: Record<string, string> = {
@@ -147,7 +147,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
-                tab === t.key ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
+                tab === t.key ? 'bg-[#22303F] text-white font-bold shadow-[0_4px_12px_rgba(22,33,46,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
               {t.icon}{t.label}
             </button>
           ))}
@@ -160,7 +160,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
                 <button onClick={() => setFiltroCategoria('todas')}
                   className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all',
-                    filtroCategoria === 'todas' ? 'bg-[#E03037] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
+                    filtroCategoria === 'todas' ? 'bg-[#22303F] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
                   Todos
                 </button>
                 {categsUnicas.map(c => {
@@ -168,7 +168,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   return (
                     <button key={c} onClick={() => setFiltroCategoria(c ?? 'todas')}
                       className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all whitespace-nowrap',
-                        filtroCategoria === c ? 'bg-[#E03037] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
+                        filtroCategoria === c ? 'bg-[#22303F] text-white' : 'text-[#788698] hover:text-[#56657A]')}>
                       {clean}
                     </button>
                   )
@@ -176,7 +176,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
               </div>
               <div className="flex-1" />
               <button onClick={() => window.location.href = '/produtos'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
                 <Plus size={15} /> Cadastrar produto
               </button>
             </div>
@@ -257,15 +257,15 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => window.location.href = '/configuracoes'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
                 <Plus size={15} /> Nova categoria
               </button>
             </div>
             <div className="grid grid-cols-4 gap-4">
               {categorias.map(c => (
                 <div key={c.id} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors">
-                  <div className="w-10 h-10 rounded-[11px] bg-[rgba(215,40,47,0.12)] flex items-center justify-center mb-4">
-                    <Package size={18} className="text-[#F0353D]" />
+                  <div className="w-10 h-10 rounded-[11px] bg-[rgba(22,33,46,0.12)] flex items-center justify-center mb-4">
+                    <Package size={18} className="text-[#DC2626]" />
                   </div>
                   <div className="text-[15px] font-semibold text-[#16212E]">{c.nome}</div>
                   <div className="text-[12px] text-[#788698] mt-1">{c.total_produtos} produtos</div>
@@ -288,7 +288,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => window.location.href = '/configuracoes'}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
                 <Plus size={15} /> Nova marca
               </button>
             </div>
@@ -314,7 +314,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           <div className="space-y-4">
             <div className="flex justify-end">
               <button onClick={() => setModalPreco(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
                 <Plus size={15} /> Novo preço
               </button>
             </div>
@@ -379,7 +379,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   {['lacrado','excelente','bom','regular'].map(c => (
                     <button type="button" key={c} onClick={() => setPrecoForm(pf => ({ ...pf, condicao: c }))}
                       className={cn('px-3 py-2 rounded-[9px] text-[12px] font-medium transition-all border capitalize',
-                        precoForm.condicao === c ? 'bg-[#D7282F] text-white border-[#D7282F]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
+                        precoForm.condicao === c ? 'bg-[#16212E] text-white border-[#16212E]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
                       {c}
                     </button>
                   ))}
@@ -389,7 +389,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#16212E]/[0.08]">
               <button type="button" onClick={() => setModalPreco(false)} className="px-4 py-2 text-[13px] text-[#788698] hover:text-[#56657A]">Cancelar</button>
               <button type="submit" disabled={saving}
-                className="px-5 py-2 rounded-[9px] bg-[#D7282F] hover:bg-[#C01F26] text-white text-[13px] font-semibold disabled:opacity-50">
+                className="px-5 py-2 rounded-[9px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

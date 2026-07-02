@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
+import { Topbar } from '@/components/layout/topbar'
 
 interface Pedido {
   id: number
@@ -32,11 +33,11 @@ const STATUS_PEDIDO: Record<string, { label: string; color: string; bg: string }
   aberto:      { label: 'Aberto',       color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)'  },
   em_transito: { label: 'Em trânsito',  color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
   recebido:    { label: 'Recebido',     color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
-  cancelado:   { label: 'Cancelado',    color: '#D7282F', bg: 'rgba(215,40,47,0.12)'   },
+  cancelado:   { label: 'Cancelado',    color: '#16212E', bg: 'rgba(22,33,46,0.12)'   },
 }
 
 function avatarColor(name: string) {
-  const colors = ['#D7282F','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981']
+  const colors = ['#16212E','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981']
   let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
 }
@@ -146,12 +147,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Operação</p>
-          <h1 className="text-xl font-bold text-[#16212E]">Compras</h1>
-        </div>
-      </div>
+      <Topbar title="Compras" />
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
@@ -179,7 +175,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
             <h2 className="text-base font-semibold text-[#1F2A39]">Pedidos de compra</h2>
             <button
               onClick={() => { setFormPedido(PEDIDO_VAZIO); setErroPedido(null); setModalPedido(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
               <Plus size={13} /> Novo pedido
             </button>
           </div>
@@ -210,7 +206,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
             <h2 className="text-base font-semibold text-[#1F2A39]">Fornecedores</h2>
             <button
               onClick={() => { setForm(FORM_VAZIO); setErro(null); setModalFornecedor(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-xs font-semibold rounded-[8px] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors"
             >
               <Plus size={13} /> Novo
             </button>
@@ -265,12 +261,12 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                     value={form[key as keyof typeof FORM_VAZIO]}
                     onChange={e => set(key as keyof typeof FORM_VAZIO, e.target.value)}
                     placeholder={placeholder}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors"
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors"
                   />
                 </div>
               ))}
 
-              {erro && <p className="text-xs text-[#D7282F]">{erro}</p>}
+              {erro && <p className="text-xs text-[#16212E]">{erro}</p>}
             </div>
 
             <div className="flex gap-3 px-6 pb-6">
@@ -284,7 +280,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               <button
                 type="submit"
                 disabled={salvando}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60"
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60"
               >
                 {salvando ? 'Salvando...' : 'Salvar fornecedor'}
               </button>
@@ -308,12 +304,12 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
                 <input value={formPedido.descricao} onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
                   placeholder="Ex: Reposição de estoque smartphones"
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Fornecedor</label>
                 <select value={formPedido.fornecedor_id} onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
                   <option value="">— Selecionar —</option>
                   {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
                 </select>
@@ -323,18 +319,18 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Valor total (R$)</label>
                   <input value={formPedido.valor_total} onChange={e => setFormPedido(f => ({ ...f, valor_total: e.target.value }))}
                     placeholder="0,00"
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Data do pedido</label>
                   <input type="date" value={formPedido.data_pedido} onChange={e => setFormPedido(f => ({ ...f, data_pedido: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors" />
+                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
                 </div>
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Status</label>
                 <select value={formPedido.status} onChange={e => setFormPedido(f => ({ ...f, status: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors">
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
                   {Object.entries(STATUS_PEDIDO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
@@ -342,9 +338,9 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                 <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Observações</label>
                 <textarea value={formPedido.observacoes} onChange={e => setFormPedido(f => ({ ...f, observacoes: e.target.value }))}
                   rows={2} placeholder="Informações adicionais..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#D7282F]/50 transition-colors resize-none" />
+                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors resize-none" />
               </div>
-              {erroPedido && <p className="text-xs text-[#D7282F]">{erroPedido}</p>}
+              {erroPedido && <p className="text-xs text-[#16212E]">{erroPedido}</p>}
             </div>
             <div className="flex gap-3 px-6 pb-6">
               <button type="button" onClick={() => setModalPedido(false)}
@@ -352,7 +348,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                 Cancelar
               </button>
               <button type="submit" disabled={salvandoPedido}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#D7282F] hover:bg-[#C01F26] rounded-[10px] transition-colors disabled:opacity-60">
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60">
                 {salvandoPedido ? 'Salvando...' : 'Criar pedido'}
               </button>
             </div>

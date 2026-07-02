@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Globe, Rss, Code2, DownloadCloud, Loader2, Copy, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
+import { Globe, Rss, Code2, DownloadCloud, Loader2, Copy, ExternalLink, MessageCircle, Instagram, Facebook, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { Topbar } from '@/components/layout/topbar'
 
 const GOLD = '#C9A24B'
 
@@ -86,15 +88,31 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
 });
 </script>`
 
+  const isImob = segmento === 'imobiliaria'
+
   return (
-    <div className="px-8 py-8 max-w-[860px]">
-      <div className="mb-7">
-        <div className="font-mono text-[10px] tracking-[0.28em] mb-2" style={{ color: GOLD }}>ADMINISTRAÇÃO</div>
-        <h1 className="text-[26px] font-extrabold text-[#16212E] leading-tight">Integrações</h1>
-        <p className="text-[14px] text-[#788698] mt-1">Conecte seu site, os portais e capte leads — sem o corretor precisar mexer nisso.</p>
-      </div>
+    <div className="flex flex-col h-full">
+      <Topbar title="Integrações" />
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="px-8 py-8 max-w-[860px]">
+      <p className="text-[14px] text-[#788698] mb-6">
+        {isImob ? 'Conecte seus canais, seu site e os portais — capte leads de todos os lados.' : 'Conecte seus canais de atendimento ao CRM.'}
+      </p>
 
       <div className="space-y-4">
+        {/* Canais de atendimento — todos os segmentos */}
+        <Card icon={MessageCircle} titulo="Canais de atendimento" desc="WhatsApp, Instagram e Facebook — receba e responda mensagens dentro do CRM.">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(37,211,102,0.12)', color: '#128C4B' }}><MessageCircle size={14} /> WhatsApp</span>
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(221,42,123,0.12)', color: '#C1256B' }}><Instagram size={14} /> Instagram</span>
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(10,124,255,0.12)', color: '#0A66C2' }}><Facebook size={14} /> Facebook</span>
+            <Link href="/admin/configuracoes" className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[12.5px] font-semibold text-white" style={{ background: 'linear-gradient(135deg, #C9A24B, #A8884A)' }}>
+              Configurar canais <ArrowUpRight size={14} />
+            </Link>
+          </div>
+        </Card>
+
+        {isImob && (<>
         {/* Importar imóveis do site */}
         <Card icon={DownloadCloud} titulo="Conectar seu site (importar imóveis)" desc="Seu site continua o dono dos imóveis; o CRM importa o acervo do XML que ele já gera pros portais.">
           <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">URL DO FEED XML DE IMÓVEIS</label>
@@ -135,7 +153,9 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
             <button onClick={() => copiar(siteUrl, 'Link do site copiado!')} className="text-[#788698] hover:text-[#16212E] shrink-0" aria-label="Copiar"><Copy size={14} /></button>
           </div>
         </Card>
-        {segmento !== 'imobiliaria' && <p className="text-[12px] text-[#9AA7B6]">Obs: estas integrações são do segmento imobiliária.</p>}
+        </>)}
+      </div>
+    </div>
       </div>
     </div>
   )

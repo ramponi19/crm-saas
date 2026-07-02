@@ -57,7 +57,7 @@ export function AreaChart({ data }: AreaChartProps) {
   // Linhas de grade horizontais
   const gridLines = [0, 1, 2, 3, 4].map(g => {
     const yy = pt + (g / 4) * ih
-    return <line key={g} x1={pl} x2={W - pr} y1={yy} y2={yy} stroke="rgba(255,255,255,0.045)" />
+    return <line key={g} x1={pl} x2={W - pr} y1={yy} y2={yy} stroke="rgba(22,33,46,0.06)" />
   })
 
   // Labels dos meses
@@ -92,8 +92,8 @@ export function AreaChart({ data }: AreaChartProps) {
       >
         <defs>
           <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#D7282F" stopOpacity={0.34} />
-            <stop offset="100%" stopColor="#D7282F" stopOpacity={0} />
+            <stop offset="0%" stopColor="#C9A24B" stopOpacity={0.28} />
+            <stop offset="100%" stopColor="#C9A24B" stopOpacity={0} />
           </linearGradient>
         </defs>
         {gridLines}
@@ -101,7 +101,7 @@ export function AreaChart({ data }: AreaChartProps) {
         <path
           d={linePath}
           fill="none"
-          stroke="#F0454D"
+          stroke="#16212E"
           strokeWidth={2.6}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -111,15 +111,15 @@ export function AreaChart({ data }: AreaChartProps) {
           cx={X(lastIdx)}
           cy={Y(lastVal)}
           r={5}
-          fill="#F0454D"
-          stroke="#0A111E"
+          fill="#C9A24B"
+          stroke="#FFFFFF"
           strokeWidth={2.5}
         />
         {/* Tooltip acima do ponto */}
         <text
           x={X(lastIdx)}
           y={Y(lastVal) - 12}
-          fill="#F4F6F9"
+          fill="#16212E"
           fontSize={10}
           textAnchor="middle"
           fontFamily="JetBrains Mono, monospace"

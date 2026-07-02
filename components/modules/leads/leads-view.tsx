@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
+import { Topbar } from '@/components/layout/topbar'
 
 interface LeadsViewProps {
   initialLeads: Lead[]
@@ -45,7 +46,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
     const negoc     = ativos
       .filter(l => negocIds.includes(l.kanban_status ?? ''))
       .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
-    return { ativos: ativos.length, taxa, negoc }
+    const precisam  = ativos.filter(l => (l.msgs_nao_lidas ?? 0) > 0).length
+    return { ativos: ativos.length, taxa, negoc, precisam }
   }, [leads, columns])
 
   // Realtime: novas mensagens recebidas incrementam o badge do card,
@@ -114,6 +116,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
   return (
     <div className="flex flex-col h-full min-h-0">
 
+      <Topbar title="Leads" />
+
       {/* Header */}
       <div className="px-[30px] pt-[22px] pb-5">
         <div className="flex items-center gap-7 flex-wrap">
@@ -121,6 +125,10 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
           <div>
             <div className="font-serif text-[25px] text-[#16212E]">{stats.ativos}</div>
             <div className="text-[11.5px] text-[#6B7C92]">leads ativos</div>
+          </div>
+          <div>
+            <div className="font-serif text-[25px]" style={{ color: stats.precisam > 0 ? '#A8884A' : '#16212E' }}>{stats.precisam}</div>
+            <div className="text-[11.5px] text-[#6B7C92]">precisam de resposta</div>
           </div>
           <div>
             <div className="font-serif text-[25px] text-[#34D399]">{stats.taxa}%</div>
@@ -136,7 +144,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
           {/* Novo lead */}
           <button
             onClick={() => setShowNewLead(true)}
-            className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] shadow-[0_6px_18px_rgba(215,40,47,0.32)] hover:-translate-y-[2px] transition-all"
+            className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] shadow-[0_6px_18px_rgba(22,33,46,0.32)] hover:-translate-y-[2px] transition-all"
           >
             <Plus size={17} /> Novo lead
           </button>

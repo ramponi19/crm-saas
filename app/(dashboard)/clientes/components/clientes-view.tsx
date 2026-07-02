@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Search, UserPlus } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import ClienteModal from './cliente-modal'
+import { Topbar } from '@/components/layout/topbar'
 
 interface Cliente {
   id: number
@@ -45,7 +46,7 @@ function getInitials(name: string) {
 
 function avatarColor(name: string): string {
   const colors = [
-    '#D7282F', '#3B7DE8', '#22C55E', '#F59E0B',
+    '#16212E', '#3B7DE8', '#22C55E', '#F59E0B',
     '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
     '#F97316', '#6366F1',
   ]
@@ -117,13 +118,7 @@ export default function ClientesView({ clientes }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <p className="text-[10px] font-mono tracking-[0.2em] text-[#788698] uppercase mb-0.5">Relacionamento</p>
-          <h1 className="text-xl font-bold text-[#16212E]">Clientes</h1>
-        </div>
-      </div>
+      <Topbar title="Clientes" />
 
       {/* Search + Button */}
       <div className="flex items-center gap-3 px-6 py-4 shrink-0">
@@ -138,7 +133,7 @@ export default function ClientesView({ clientes }: Props) {
         </div>
         <button
           onClick={openNovo}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#D7282F] hover:bg-[#C01F26] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
         >
           <UserPlus size={15} />
           Novo cliente

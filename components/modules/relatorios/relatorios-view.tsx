@@ -149,8 +149,8 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
     <svg viewBox={`0 0 ${W} ${H + pb}`} width="100%" style={{ display: 'block' }}>
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F0454D" stopOpacity={0.9} />
-          <stop offset="100%" stopColor="#8E1B20" stopOpacity={0.7} />
+          <stop offset="0%" stopColor="#C9A24B" stopOpacity={0.9} />
+          <stop offset="100%" stopColor="#16212E" stopOpacity={0.7} />
         </linearGradient>
       </defs>
       {days.map((d, i) => {
@@ -202,7 +202,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     const ticket   = qtd > 0 ? receita / qtd : 0
     const descontos = conc.reduce((s, v) => s + (v.desconto_valor ?? 0), 0)
     return [
-      { l: 'TOTAL VENDAS',  v: formatCurrency(receita),  c: '#F0656B' },
+      { l: 'TOTAL VENDAS',  v: formatCurrency(receita),  c: '#DC2626' },
       { l: 'LUCRO TOTAL',   v: formatCurrency(lucro),    c: '#34D399' },
       { l: 'TICKET MÉDIO',  v: formatCurrency(ticket),   c: '#7FB0E8' },
       { l: 'DESCONTOS',     v: formatCurrency(descontos),c: '#F4B740' },
@@ -216,7 +216,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
   const saldo     = entradas - saidas
 
-  const inputCls = "bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[9px] text-[#1F2A39] text-[13px] outline-none focus:border-[rgba(215,40,47,0.5)] transition-colors [color-scheme:dark]"
+  const inputCls = "bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[9px] text-[#1F2A39] text-[13px] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors [color-scheme:dark]"
 
   return (
     <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
@@ -229,7 +229,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               className={cn(
                 'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
                 aba === id
-                  ? 'bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white shadow-[0_4px_14px_rgba(215,40,47,0.35)]'
+                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
                   : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
               )}>
               <Icon size={16} /> {label}
@@ -261,7 +261,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
             </div>
             <button
               onClick={() => toast.success(`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? 'venda' : 'vendas'} no período selecionado`)}
-              className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(215,40,47,0.3)]">
+              className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
               <Search size={15} /> Gerar
             </button>
             <button onClick={() => exportCSV(vendasFiltradas)}
@@ -314,11 +314,11 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                     </span>
                   </div>
                   <div className="text-right font-mono text-[12.5px] font-semibold text-[#16212E]">{formatCurrency(v.valor_venda)}</div>
-                  <div className="text-right font-mono text-[12px] text-[#F0656B]">
+                  <div className="text-right font-mono text-[12px] text-[#DC2626]">
                     {v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}
                   </div>
                   <div className={cn('text-right font-mono text-[12.5px] font-bold',
-                    (v.lucro ?? 0) > 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                    (v.lucro ?? 0) > 0 ? 'text-[#34D399]' : 'text-[#DC2626]')}>
                     {v.lucro != null ? formatCurrency(v.lucro) : '—'}
                   </div>
                 </div>
@@ -337,9 +337,9 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               </h3>
               <div className="text-[12px] text-[#788698]">
                 Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
-                {' · '}Saídas <span className="text-[#F0656B] font-bold">{formatCurrency(saidas)}</span>
+                {' · '}Saídas <span className="text-[#DC2626] font-bold">{formatCurrency(saidas)}</span>
                 {' · '}Saldo{' '}
-                <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#DC2626]')}>
                   {formatCurrency(saldo)}
                 </span>
               </div>
@@ -366,11 +366,11 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                         <div className="text-[12px] text-[#788698]">{l.categoria ?? '—'}</div>
                         <div>
                           <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
-                            style={{ background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(240,101,107,0.12)', color: isReceit ? '#34D399' : '#F0656B' }}>
+                            style={{ background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(220,38,38,0.12)', color: isReceit ? '#34D399' : '#DC2626' }}>
                             {isReceit ? 'Entrada' : 'Saída'}
                           </span>
                         </div>
-                        <div className={cn('text-right font-mono text-[13px] font-semibold', isReceit ? 'text-[#34D399]' : 'text-[#F0656B]')}>
+                        <div className={cn('text-right font-mono text-[13px] font-semibold', isReceit ? 'text-[#34D399]' : 'text-[#DC2626]')}>
                           {isReceit ? '+' : '−'} {formatCurrency(l.valor)}
                         </div>
                         <div className="text-right">
@@ -407,8 +407,8 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                 { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos) },
               ].map(e => (
                 <button key={e.label} onClick={e.action}
-                  className="flex items-start gap-4 p-[18px_20px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[16px] hover:bg-[#16212E]/[0.04] hover:border-[rgba(215,40,47,0.3)] transition-all text-left">
-                  <Download size={22} className="text-[#F0656B] mt-[2px] flex-none" />
+                  className="flex items-start gap-4 p-[18px_20px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[16px] hover:bg-[#16212E]/[0.04] hover:border-[rgba(22,33,46,0.3)] transition-all text-left">
+                  <Download size={22} className="text-[#DC2626] mt-[2px] flex-none" />
                   <div>
                     <div className="text-[13.5px] font-semibold text-[#1F2A39]">{e.label}</div>
                     <div className="text-[12px] text-[#788698] mt-[3px]">{e.sub}</div>

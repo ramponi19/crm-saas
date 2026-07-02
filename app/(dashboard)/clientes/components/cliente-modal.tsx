@@ -56,7 +56,7 @@ function getInitials(name: string) {
 }
 
 function avatarColor(name: string): string {
-  const colors = ['#D7282F','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981','#F97316','#6366F1']
+  const colors = ['#16212E','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981','#F97316','#6366F1']
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
@@ -306,7 +306,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
           {!isNew ? (
-            <button type="button" onClick={excluir} className="text-[#D7282F] hover:text-red-400 text-sm font-medium transition-colors">
+            <button type="button" onClick={excluir} className="text-[#16212E] hover:text-red-400 text-sm font-medium transition-colors">
               Desativar
             </button>
           ) : <div />}
@@ -315,7 +315,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
               Fechar
             </button>
             <button type="submit" disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+              className="flex items-center gap-2 px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

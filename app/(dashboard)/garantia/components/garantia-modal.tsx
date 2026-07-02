@@ -110,7 +110,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const statusLabel = STATUS_OPTIONS.find(s => s.value === form.status)?.label ?? form.status ?? '—'
   const statusColors: Record<string, string> = {
     em_analise: '#F59E0B', aprovado: '#3B7DE8', em_reparo: '#8B5CF6',
-    concluido: '#22C55E', entregue: '#5C6E84', recusado: '#D7282F'
+    concluido: '#22C55E', entregue: '#5C6E84', recusado: '#16212E'
   }
   const statusColor = statusColors[form.status ?? ''] ?? '#5C6E84'
 
@@ -266,7 +266,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
             Fechar
           </button>
           <button type="submit" disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 bg-[#D7282F] hover:bg-[#C01F26] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
+            className="flex items-center gap-2 px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>

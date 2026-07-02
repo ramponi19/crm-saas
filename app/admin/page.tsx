@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
+import { Topbar } from '@/components/layout/topbar'
 import {
   Users, Target, Package, Wallet, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp,
@@ -73,17 +74,15 @@ export default async function AdminOverviewPage() {
     { href: '/admin/empresa', label: 'Minha empresa', desc: 'Identidade, marca e white-label', icon: Building2 },
     { href: '/admin/configuracoes', label: 'Configurações', desc: 'Integrações, pagamentos e taxas', icon: Settings },
     { href: '/admin/equipe', label: 'Equipe', desc: 'Usuários, metas e comissões', icon: UserCog },
-    { href: '/planos', label: 'Planos', desc: 'Assinatura e upgrade', icon: CreditCard },
+    { href: '/admin/planos', label: 'Planos', desc: 'Assinatura e upgrade', icon: CreditCard },
   ]
 
   return (
-    <div className="px-8 py-8 max-w-[1100px]">
-      {/* header */}
-      <div className="mb-8">
-        <div className="font-mono text-[10px] tracking-[0.28em] mb-2" style={{ color: GOLD }}>ADMINISTRAÇÃO</div>
-        <h1 className="text-[26px] font-extrabold text-[#16212E] leading-tight">Visão geral · {empresa?.nome}</h1>
-        <p className="text-[14px] text-[#788698] mt-1">A saúde da sua operação num só lugar.</p>
-      </div>
+    <div className="flex flex-col h-full">
+      <Topbar title="Visão geral" />
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="px-8 py-8 max-w-[1100px]">
+      <p className="text-[14px] text-[#788698] mb-6">A saúde da sua operação num só lugar.</p>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -110,7 +109,7 @@ export default async function AdminOverviewPage() {
               <div className="text-[12.5px] text-[#788698]">Plano atual</div>
               <div className="text-[20px] font-extrabold text-[#16212E] capitalize">{planoCfg?.nome ?? empresa?.plano ?? '—'}</div>
             </div>
-            <Link href="/planos" className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${GOLD}, #A8884A)` }}>
+            <Link href="/admin/planos" className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${GOLD}, #A8884A)` }}>
               Fazer upgrade <ArrowUpRight size={15} />
             </Link>
           </div>
@@ -133,7 +132,7 @@ export default async function AdminOverviewPage() {
                 <span className="font-semibold text-[#16212E]">{u.used}{u.limit ? ` / ${u.limit}` : ''}</span>
               </div>
               <div className="h-2 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${u.pct}%`, background: u.pct > 90 ? '#E0564C' : GOLD }} />
+                <div className="h-full rounded-full" style={{ width: `${u.pct}%`, background: u.pct > 90 ? '#DC2626' : GOLD }} />
               </div>
             </div>
           ))}
@@ -163,6 +162,8 @@ export default async function AdminOverviewPage() {
             </Link>
           )
         })}
+      </div>
+      </div>
       </div>
     </div>
   )

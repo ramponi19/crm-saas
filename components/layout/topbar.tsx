@@ -44,7 +44,6 @@ const ORIGEM_EMOJI: Record<string, string> = {
 }
 
 export function Topbar({
-  eyebrow,
   title = '',
   showPeriods = false,
   activePeriod = 'mes',
@@ -216,10 +215,7 @@ export function Topbar({
     <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
 
       <div className="min-w-0">
-        {eyebrow && (
-          <div className="font-mono text-[10px] tracking-[0.18em] text-[#F0353D] uppercase">{eyebrow}</div>
-        )}
-        <h1 className="font-serif font-normal text-[25px] tracking-[-0.02em] text-[#16212E] mt-[3px] whitespace-nowrap">{title}</h1>
+        <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E] whitespace-nowrap leading-tight">{title}</h1>
       </div>
 
       <div className="flex-1" />
@@ -230,7 +226,7 @@ export function Topbar({
             <button key={p.value} onClick={() => onPeriodChange?.(p.value)}
               className={cn('px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
                 activePeriod === p.value
-                  ? 'bg-[#E03037] text-white font-bold shadow-[0_4px_12px_rgba(215,40,47,0.35)]'
+                  ? 'bg-[#16212E] text-white font-bold shadow-[0_4px_12px_rgba(22,33,46,0.28)]'
                   : 'text-[#788698] hover:text-[#56657A] hover:bg-[#16212E]/[0.06]')}>
               {p.label}
             </button>
@@ -245,7 +241,7 @@ export function Topbar({
           onChange={e => setQuery(e.target.value)}
           onFocus={() => { if (searchResults.length > 0) setSearchOpen(true) }}
           placeholder="Buscar produto, cliente, IMEI…"
-          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(215,40,47,0.5)] focus:bg-[#16212E]/[0.05] transition-all"
+          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)] focus:bg-[#16212E]/[0.05] transition-all"
         />
         {query && (
           <button onClick={() => { setQuery(''); setSearchResults([]); setSearchOpen(false) }}
@@ -283,7 +279,7 @@ export function Topbar({
           className="relative w-[42px] h-[42px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] transition-colors">
           <Bell size={19} />
           {totalNaoLidas > 0 && (
-            <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#F0353D] border-2 border-white animate-pulse" />
+            <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#C9A24B] border-2 border-white animate-pulse" />
           )}
         </button>
 
@@ -293,7 +289,7 @@ export function Topbar({
             <div className="flex items-center justify-between px-[17px] py-[15px] border-b border-[#16212E]/[0.08]">
               <span className="font-serif text-[16px] text-[#16212E]">Notificações</span>
               {totalNaoLidas > 0 && (
-                <span className="font-mono text-[10px] text-[#C01F26] bg-[rgba(215,40,47,0.12)] px-[8px] py-[2px] rounded-full">
+                <span className="font-mono text-[10px] text-[#A8884A] bg-[rgba(201,162,75,0.14)] px-[8px] py-[2px] rounded-full">
                   {totalNaoLidas} não lidas
                 </span>
               )}
@@ -305,7 +301,7 @@ export function Topbar({
                 <button key={n.id}
                   onClick={() => { setNotifOpen(false); router.push('/leads') }}
                   className="w-full flex items-center gap-[11px] px-[17px] py-[13px] border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] transition-colors text-left">
-                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[rgba(215,40,47,0.14)] flex items-center justify-center flex-none text-[16px]">
+                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[rgba(201,162,75,0.14)] flex items-center justify-center flex-none text-[16px]">
                     {ORIGEM_EMOJI[n.origem ?? 'manual'] ?? '👤'}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -315,14 +311,14 @@ export function Topbar({
                       {n.produto_interessado ? ` · ${n.produto_interessado}` : ''}
                     </div>
                   </div>
-                  <span className="min-w-[20px] h-[20px] px-[5px] rounded-full bg-[#D7282F] text-white font-mono text-[10px] font-bold flex items-center justify-center flex-none">
+                  <span className="min-w-[20px] h-[20px] px-[5px] rounded-full bg-[#C9A24B] text-[#16212E] font-mono text-[10px] font-bold flex items-center justify-center flex-none">
                     {n.nao_lidas > 99 ? '99+' : n.nao_lidas}
                   </span>
                 </button>
               ))}
             </div>
             <button onClick={() => { setNotifOpen(false); router.push('/leads') }}
-              className="w-full py-[13px] bg-[rgba(215,40,47,0.1)] text-[#C01F26] text-[13px] font-semibold hover:bg-[rgba(215,40,47,0.16)] transition-colors">
+              className="w-full py-[13px] bg-[rgba(201,162,75,0.12)] text-[#A8884A] text-[13px] font-semibold hover:bg-[rgba(201,162,75,0.20)] transition-colors">
               Ver todos os leads
             </button>
             <button

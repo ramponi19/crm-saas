@@ -36,9 +36,15 @@ const ORIGEM_ICONS: Record<string, { color: string; svg: React.ReactNode }> = {
   },
 }
 
-const AVATAR_COLORS = ['#D7282F','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7']
+const AVATAR_COLORS = ['#16212E','#7FB0E8','#34D399','#F4B740','#C6A86A','#a855f7']
 const getAvatarColor = (nome: string) => AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length]
 const getInitials    = (nome: string) => nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()
+
+// Fallback humano quando o lead ainda não tem nome (comum em Instagram/Messenger)
+const CANAL_FALLBACK: Record<string, string> = {
+  whatsapp: 'Contato do WhatsApp', instagram: 'Contato do Instagram',
+  messenger: 'Contato do Messenger', manual: 'Novo contato',
+}
 
 const DEFAULT_SLA = { verde: 15, amarelo: 30, vermelho: 60 }
 
@@ -47,17 +53,19 @@ function getSlaColor(date: string | null, sla = DEFAULT_SLA): string {
   const min = (Date.now() - new Date(date).getTime()) / 60_000
   if (min < sla.verde)    return '#34D399'
   if (min < sla.amarelo)  return '#F4B740'
-  return '#F0656B'
+  return '#DC2626'   // perigo: lead esfriando
 }
 
-// Relógio em h:m:s desde a última atividade
-function formatElapsed(date: string | null): string {
-  if (!date) return '00:00:00'
-  let s = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000))
-  const h = Math.floor(s / 3600); s -= h * 3600
-  const m = Math.floor(s / 60);   s -= m * 60
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(h)}:${pad(m)}:${pad(s)}`
+// Tempo humano desde a última atividade ("há 12 min", "parado há 3 dias")
+function humanElapsed(date: string | null): string {
+  if (!date) return ''
+  const min = Math.floor((Date.now() - new Date(date).getTime()) / 60_000)
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h}h`
+  const d = Math.floor(h / 24)
+  return `parado há ${d} ${d > 1 ? 'dias' : 'dia'}`
 }
 
 export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor, sla }: LeadCardProps) {
@@ -88,20 +96,22 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
         className="rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] border border-[#16212E]/[0.08]"
         style={{
           background: '#FFFFFF',
-          borderLeft: `3px solid ${barColor}`,
+          // barra de severidade: cor do SLA (verde/âmbar/vermelho) quando há atividade;
+          // cor da etapa como fallback quando o lead ainda não teve mensagem.
+          borderLeft: `4px solid ${lastAt ? slaColor : barColor}`,
           opacity: isSortableDragging || isDragging ? 0.4 : 1,
         }}
       >
         {/* Linha 1: badge msgs + nome + ícone origem */}
         <div className="flex items-center gap-[9px] mb-[7px]">
           {temMsgs && (
-            <span className="min-w-[22px] h-[22px] px-[6px] rounded-full flex items-center justify-center font-mono text-[11px] font-bold text-white flex-none"
-              style={{ background: '#D7282F' }}>
+            <span className="min-w-[22px] h-[22px] px-[6px] rounded-full flex items-center justify-center font-mono text-[11px] font-bold text-[#16212E] flex-none"
+              style={{ background: '#C9A24B' }}>
               {(lead.msgs_nao_lidas ?? 0) > 99 ? '99+' : lead.msgs_nao_lidas}
             </span>
           )}
-          <div className="flex-1 text-[14px] font-semibold text-[#1F2A39] truncate">
-            {lead.nome ?? 'Lead sem nome'}
+          <div className={`flex-1 text-[14px] truncate ${lead.nome ? 'font-semibold text-[#1F2A39]' : 'font-medium text-[#7E8EA2]'}`}>
+            {lead.nome || CANAL_FALLBACK[lead.origem ?? 'manual'] || 'Novo contato'}
           </div>
           <svg width={18} height={18} viewBox="0 0 24 24" className="flex-none" style={{ color: origem.color }}>
             {origem.svg}
@@ -116,10 +126,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
         {/* Linha de espera (SLA) — relógio h:m:s */}
         {lastAt && (
           <div className="flex items-center gap-[6px] mb-[9px]">
-            <span className="w-[8px] h-[8px] rounded-full flex-none" style={{ background: slaColor, boxShadow: `0 0 7px ${slaColor}` }} />
             <Clock size={13} style={{ color: slaColor }} />
-            <span className="font-mono text-[11px] font-semibold" style={{ color: slaColor }}>
-              {formatElapsed(lastAt)}
+            <span className="text-[11.5px] font-semibold" style={{ color: slaColor }}>
+              {humanElapsed(lastAt)}
             </span>
             <span className="flex-1" />
             <span className="font-mono text-[9.5px] text-[#788698]">

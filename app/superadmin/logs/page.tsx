@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 
-const ADMIN_COR = '#7C3AED'
 
 function fmtDataHora(d: string) {
   return new Date(d).toLocaleString('pt-BR', {
@@ -38,10 +37,7 @@ export default async function LogsPage() {
   return (
     <div className="px-8 py-7 max-w-[1400px]">
       <div className="mb-6">
-        <p className="font-mono text-[10px] tracking-[0.25em] uppercase mb-1" style={{ color: ADMIN_COR }}>
-          Painel global
-        </p>
-        <h1 className="font-sans font-extrabold text-[26px] text-[#16212E] tracking-tight">
+        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
           Logs de atividade
         </h1>
         <p className="text-[14px] text-[#788698] mt-1">

@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
+import { Topbar } from '@/components/layout/topbar'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 
 type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
@@ -47,14 +48,17 @@ export default async function AdminConfiguracoesPage() {
   const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas } = await getConfigs()
 
   return (
-    <ConfiguracoesView
-      evolution={evolution}
-      official={official}
-      instagram={instagram}
-      messenger={messenger}
-      dadosLoja={dadosLoja}
-      preferencias={preferencias}
-      taxas={taxas}
-    />
+    <div className="flex flex-col h-full">
+      <Topbar title="Configurações" />
+      <ConfiguracoesView
+        evolution={evolution}
+        official={official}
+        instagram={instagram}
+        messenger={messenger}
+        dadosLoja={dadosLoja}
+        preferencias={preferencias}
+        taxas={taxas}
+      />
+    </div>
   )
 }

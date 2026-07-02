@@ -16,14 +16,35 @@ const config: Config = {
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
-        // Design tokens do CRM — mesmos do Claude Design original
+        // ── Sistema ÁPICE: navy = primária, dourado = accent, vermelho = só perigo ──
+        navy: {
+          DEFAULT: '#16212E',
+          soft: '#22303F',
+          900: '#111A24',
+        },
+        gold: {
+          DEFAULT: '#C9A24B',
+          deep: '#A8884A',
+          wash: 'rgba(201,162,75,0.14)',
+        },
+        danger: {
+          DEFAULT: '#DC2626',
+          soft: '#F0656B',
+          dark: '#B91C1C',
+        },
+        ink: {
+          DEFAULT: '#16212E',
+          2: '#55647A',
+          3: '#8A97A8',
+        },
+        // `brand` mantido como apelido → agora aponta pra navy (compat durante a migração)
         brand: {
-          DEFAULT: '#D7282F',
-          light: '#F0656B',
-          dark: '#A8161D',
+          DEFAULT: '#16212E',
+          light: '#22303F',
+          dark: '#111A24',
         },
         surface: {
-          DEFAULT: '#F4F6F9',
+          DEFAULT: '#EEF1F5',
           card: '#FFFFFF',
           raised: '#F6F8FB',
           border: 'rgba(22,32,46,0.08)',
@@ -31,9 +52,11 @@ const config: Config = {
       },
       backgroundImage: {
         'hero-gradient':
-          'radial-gradient(130% 150% at 88% 0%, rgba(215,40,47,0.24), transparent 52%), linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%)',
+          'radial-gradient(130% 150% at 88% 0%, rgba(201,162,75,0.20), transparent 52%), linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%)',
         'sidebar-gradient':
           'linear-gradient(180deg, #FFFFFF 0%, #F4F6F9 100%)',
+        'sidebar-navy':
+          'radial-gradient(120% 60% at 50% -10%, rgba(201,162,75,0.10), transparent 60%), linear-gradient(180deg, #16212E 0%, #111A24 100%)',
       },
       animation: {
         'fade-up': 'fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both',
