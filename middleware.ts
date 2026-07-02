@@ -35,7 +35,10 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/entrar') ||
                         request.nextUrl.pathname.startsWith('/register') ||
                         request.nextUrl.pathname.startsWith('/reset-senha') ||
-                        request.nextUrl.pathname.startsWith('/api/planos-publicos')
+                        request.nextUrl.pathname.startsWith('/api/planos-publicos') ||
+                        request.nextUrl.pathname.startsWith('/api/register') ||
+                        request.nextUrl.pathname.startsWith('/api/portais/') ||
+                        request.nextUrl.pathname.startsWith('/imovel/')
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {

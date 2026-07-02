@@ -27,8 +27,16 @@ import {
   LogOut,
   ShieldAlert,
   Lock,
+  Crown,
+  Home,
+  KeyRound,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { planoTemAcesso, type ModuloPlano } from '@/lib/plano'
+import { moduloVisivel, labelDoItem, normalizarSegmento, SEGMENTOS, type Segmento } from '@/lib/segmentos'
+
+// mapa de ícones para os módulos exclusivos de cada segmento (fase profunda)
+const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound }
 
 const navGroups = [
   {
@@ -67,16 +75,16 @@ const navGroups = [
     label: 'Operação',
     items: [
       { href: '/compras',    label: 'Compras',    icon: ShoppingCart },
-      { href: '/financeiro', label: 'Financeiro', icon: Wallet },
-      { href: '/equipe',     label: 'Equipe',     icon: UserCog, modulo: 'multi_usuario' as ModuloPlano },
+      { href: '/financeiro', label: 'Financeiro', icon: Wallet, adminOnly: true },
+      { href: '/equipe',     label: 'Equipe',     icon: UserCog, modulo: 'multi_usuario' as ModuloPlano, adminOnly: true },
     ],
   },
   {
     label: 'Sistema',
     items: [
-      { href: '/configuracoes', label: 'Configurações', icon: Settings },
-      { href: '/empresa',       label: 'Minha empresa', icon: Building2 },
-      { href: '/planos',        label: 'Planos',        icon: CreditCard },
+      { href: '/configuracoes', label: 'Configurações', icon: Settings,    adminOnly: true },
+      { href: '/empresa',       label: 'Minha empresa', icon: Building2,   adminOnly: true },
+      { href: '/planos',        label: 'Planos',        icon: CreditCard,  adminOnly: true },
     ],
   },
 ]
@@ -90,7 +98,9 @@ interface SidebarProps {
   empresaCor?: string
   empresaLogo?: string | null
   isSuperAdmin?: boolean
+  isEmpresaAdmin?: boolean
   plano?: string
+  segmento?: Segmento
 }
 
 export function Sidebar({
@@ -102,8 +112,11 @@ export function Sidebar({
   empresaCor = '#D7282F',
   empresaLogo = null,
   isSuperAdmin = false,
+  isEmpresaAdmin = false,
   plano,
+  segmento = 'varejo',
 }: SidebarProps) {
+  const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -150,13 +163,19 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-4">
-        {navGroups.map((group) => (
+        {navGroups.map((group) => {
+          const items = group.items.filter((item) =>
+            moduloVisivel(seg, item.href) &&
+            (isEmpresaAdmin || !('adminOnly' in item && item.adminOnly))
+          )
+          if (items.length === 0) return null
+          return (
           <div key={group.label}>
             <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#9AA7B6] uppercase px-[14px] pb-[7px] pt-1">
               {group.label}
             </p>
             <div className="space-y-0.5">
-              {group.items.map((item) => {
+              {items.map((item) => {
                 const locked = !isSuperAdmin && 'modulo' in item && item.modulo
                   ? !planoTemAcesso(plano, item.modulo)
                   : false
@@ -187,7 +206,7 @@ export function Sidebar({
                       style={{ background: empresaCor }}
                     />
                     <Icon size={19} className="shrink-0" />
-                    <span className="flex-1 truncate">{item.label}</span>
+                    <span className="flex-1 truncate">{labelDoItem(seg, item.href, item.label)}</span>
                     {locked
                       ? <Lock size={13} className="shrink-0 opacity-60" />
                       : badge && (
@@ -204,8 +223,55 @@ export function Sidebar({
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
+
+        {SEGMENTOS[seg].modulosExtra && SEGMENTOS[seg].modulosExtra!.length > 0 && (
+          <div>
+            <p className="font-mono text-[9.5px] tracking-[0.2em] text-[#9AA7B6] uppercase px-[14px] pb-[7px] pt-1">
+              {SEGMENTOS[seg].label}
+            </p>
+            <div className="space-y-0.5">
+              {SEGMENTOS[seg].modulosExtra!.map((item) => {
+                const Icon = ICON_EXTRA[item.icon] ?? Home
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] transition-all duration-150',
+                      isActive ? 'text-[#16212E] font-semibold' : 'text-[#788698] hover:bg-[#16212E]/[0.05] hover:text-[#56657A]'
+                    )}
+                    style={isActive ? { background: `${empresaCor}18` } : {}}
+                  >
+                    <span
+                      className={cn('absolute left-0 top-2 bottom-2 w-[3px] rounded-r-[4px] transition-opacity duration-200', isActive ? 'opacity-100' : 'opacity-0')}
+                      style={{ background: empresaCor }}
+                    />
+                    <Icon size={19} className="shrink-0" />
+                    <span className="flex-1 truncate">{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </nav>
+
+      {/* Administração (dono/admin da empresa) */}
+      {isEmpresaAdmin && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/admin"
+            className="relative flex items-center gap-[11px] px-[14px] py-[11px] rounded-[11px] text-[13.5px] font-semibold text-white transition-all duration-150 hover:brightness-105"
+            style={{ background: 'linear-gradient(135deg, #C9A24B, #A8884A)' }}
+          >
+            <Crown size={19} className="shrink-0" />
+            <span className="flex-1 truncate">Administração</span>
+          </Link>
+        </div>
+      )}
 
       {/* Super Admin (somente para super admins) */}
       {isSuperAdmin && (

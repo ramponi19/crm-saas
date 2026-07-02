@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead } from '@/components/modules/leads/types'
+import { normalizarSegmento } from '@/lib/segmentos'
 
 export const metadata = {
   title: 'Leads — CRM SaaS',
@@ -9,7 +10,7 @@ export const metadata = {
 export default async function LeadsPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }] = await Promise.all([
+  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }] = await Promise.all([
     supabase
       .from('leads')
       .select(`
@@ -33,6 +34,7 @@ export default async function LeadsPage() {
       .eq('leads.empresa_id', empresaId)
       .eq('lida', false)
       .eq('direcao', 'recebida'),
+    supabase.from('empresas').select('segmento').eq('id', empresaId).single(),
   ])
 
   // Agrupa não-lidas por lead_id
@@ -58,6 +60,8 @@ export default async function LeadsPage() {
     <LeadsView
       initialLeads={leadsComContagem}
       usuarios={usuariosMapped}
+      empresaId={empresaId}
+      segmento={normalizarSegmento(empresa?.segmento)}
     />
   )
 }

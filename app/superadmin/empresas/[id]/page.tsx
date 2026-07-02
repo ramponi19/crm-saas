@@ -156,6 +156,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaNome={empresa.nome}
           planoAtual={empresa.plano}
           statusAtual={empresa.status}
+          segmentoAtual={empresa.segmento}
         />
       </div>
 

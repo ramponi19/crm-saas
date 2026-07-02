@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
-import type { TablesInsert } from '@/types/database'
 import { Check, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react'
+import { SEGMENTOS_LISTA } from '@/lib/segmentos'
 
 type Step = 'plano' | 'loja' | 'conta'
 
@@ -47,6 +47,7 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState({
     plano: 'pro',
+    segmento: 'varejo',
     nomeEmpresa: '',
     cnpj: '',
     telefone: '',
@@ -88,14 +89,6 @@ export default function RegisterPage() {
     setErro(null)
   }
 
-  function slugify(text: string) {
-    return text
-      .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-  }
-
   const stepIdx = STEPS.findIndex(s => s.id === step)
 
   function avancar() {
@@ -125,49 +118,35 @@ export default function RegisterPage() {
     const supabase = createClient()
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // 1) cria usuário + empresa + vínculo (owner) no servidor via Admin API
+      //    (sem envio de e-mail e sem o rate limit do signUp público)
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.senha,
+          nomeUsuario: form.nomeUsuario,
+          nomeEmpresa: form.nomeEmpresa,
+          cnpj: form.cnpj,
+          telefone: form.telefone,
+          plano: form.plano,
+          segmento: form.segmento,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || 'Erro ao criar conta')
+
+      // 2) faz login para estabelecer a sessão no navegador
+      const { error: signErr } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.senha,
-        options: { data: { nome: form.nomeUsuario } },
       })
-      if (authError) throw new Error(authError.message)
-      const userId = authData.user?.id
-      if (!userId) throw new Error('Erro ao criar usuário')
-
-      const slug = slugify(form.nomeEmpresa) + '-' + Math.random().toString(36).slice(2, 6)
-      const { data: empresaData, error: empresaError } = await supabase
-        .from('empresas')
-        .insert({
-          nome: form.nomeEmpresa,
-          slug,
-          plano: form.plano,
-          cnpj: form.cnpj || null,
-          telefone: form.telefone || null,
-          wl_whatsapp: form.telefone || null,
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('id')
-        .single()
-      if (empresaError) throw new Error('Erro ao criar empresa: ' + empresaError.message)
-
-      const empresaId = empresaData!.id
-
-      await supabase.from('usuarios').insert({
-        id: userId,
-        nome: form.nomeUsuario,
-        email: form.email,
-        role: 'admin',
-        empresa_id: empresaId,
-      } as TablesInsert<'usuarios'>)
-
-      await supabase.from('empresa_usuarios').insert({
-        empresa_id: empresaId,
-        usuario_id: userId,
-        role: 'owner',
-      })
+      if (signErr) throw new Error(signErr.message)
 
       markSessionActive()
-      router.push('/dashboard')
+      // Novo cadastro cria o dono (owner) → abre direto no painel de administração.
+      router.push('/admin')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
@@ -290,6 +269,30 @@ export default function RegisterPage() {
                 <h2 className="text-[18px] font-bold text-[#16212E]">Sobre sua loja</h2>
                 <p className="text-[13px] text-[#5A6A7E] mt-1">Configure seu sistema em menos de 2 minutos.</p>
               </div>
+
+              <div>
+                <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SEGMENTO DO NEGÓCIO *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SEGMENTOS_LISTA.map(({ id, config }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => set('segmento', id)}
+                      className={`text-left p-3 rounded-[12px] border transition-all ${
+                        form.segmento === id
+                          ? 'border-[rgba(201,162,75,.5)] bg-[rgba(201,162,75,.06)]'
+                          : 'border-[rgba(22,32,46,.10)] hover:border-[rgba(22,32,46,.20)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-[16px]">{config.emoji}</span>
+                        <span className="text-[13px] font-semibold text-[#141E2C]">{config.label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-3.5">
                 <div>
                   <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">NOME DA LOJA *</label>

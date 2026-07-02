@@ -5,13 +5,16 @@ import { X, Send, UserRound, UserCheck, Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { Lead, Usuario, KANBAN_COLUMNS, STATUS_LABELS } from './types'
+import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
+import { LeadMatchPanel } from './lead-match-panel'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
 interface LeadModalProps {
   lead: Lead
   usuarios: Usuario[]
+  columns: KanbanColumn[]
+  segmento?: string | null
   onClose: () => void
   onUpdate: (lead: Lead) => void
 }
@@ -43,7 +46,7 @@ async function entregarViaEdge(action: 'send' | 'send_meta', payload: Record<str
 
 interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string }
 
-export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps) {
+export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate }: LeadModalProps) {
   const supabase = createClient()
   const { empresa } = useEmpresa()
   const router   = useRouter()
@@ -59,7 +62,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
     ig:          lead.instagram ?? '',
     produto:     lead.produto_interessado ?? '',
     canal:       canalNome,
-    status:      STATUS_LABELS[lead.kanban_status ?? 'novo'],
+    status:      lead.kanban_status ?? 'novo',
     responsavel: responsavelInicial,
     obs:         lead.observacoes ?? '',
   })
@@ -186,8 +189,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
   async function handleSave() {
     setSaving(true)
-    const statusKey = (Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>)
-      .find(k => STATUS_LABELS[k] === form.status) ?? lead.kanban_status ?? 'novo'
+    const statusKey = form.status || lead.kanban_status || 'novo'
     const respId = usuarios.find(u => u.nome === form.responsavel)?.id ?? lead.responsavel_id
 
     const { error } = await supabase.from('leads').update({
@@ -237,12 +239,12 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
 
     await supabase
       .from('leads')
-      .update({ kanban_status: 'convertido', convertido_em: cliente.id })
+      .update({ kanban_status: ganhoColId(columns), convertido_em: cliente.id })
       .eq('id', lead.id)
 
     setSaving(false)
     toast.success('Lead convertido em cliente!')
-    onUpdate({ ...lead, kanban_status: 'convertido', convertido_em: cliente.id })
+    onUpdate({ ...lead, kanban_status: ganhoColId(columns), convertido_em: cliente.id })
     onClose()
   }
 
@@ -309,7 +311,7 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
               <input value={form.canal} onChange={e => set('canal', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Status no funil</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} className={`${inputCls} cursor-pointer`}>
-                {KANBAN_COLUMNS.map(c => <option key={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
+                {columns.map(c => <option key={c.id} value={c.id} style={{ background: '#FFFFFF' }}>{c.label}</option>)}
               </select></div>
             <div><label className={labelCls}>Responsável</label>
               <select value={form.responsavel} onChange={e => set('responsavel', e.target.value)} className={`${inputCls} cursor-pointer`}>
@@ -319,6 +321,8 @@ export function LeadModal({ lead, usuarios, onClose, onUpdate }: LeadModalProps)
             <div><label className={labelCls}>Observações</label>
               <textarea value={form.obs} onChange={e => set('obs', e.target.value)} rows={3}
                 placeholder="Produto de interesse, contexto…" className={`${inputCls} resize-none`} /></div>
+
+            {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             <button onClick={handleSave} disabled={saving}
               className="flex items-center justify-center gap-2 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 mt-1">
               <Save size={17} /> {saving ? 'Salvando…' : 'Salvar'}

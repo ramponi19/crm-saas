@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { SessionGuard } from '@/components/layout/session-guard'
+import { normalizarSegmento } from '@/lib/segmentos'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -28,7 +29,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; wl_cor: string | null; wl_logo_url: string | null } | null = null
+  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null } | null = null
   let role = 'owner'
   let plano: string | undefined
 
@@ -36,7 +37,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, wl_cor, wl_logo_url')
+      .select('nome, segmento, wl_cor, wl_logo_url')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -45,7 +46,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, wl_cor, wl_logo_url)')
+      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -58,7 +59,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; wl_cor: string | null; wl_logo_url: string | null } | null
+      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -87,7 +88,9 @@ export default async function DashboardLayout({
           empresaCor={empresa?.wl_cor ?? '#D7282F'}
           empresaLogo={empresa?.wl_logo_url ?? null}
           isSuperAdmin={usuario?.is_super_admin ?? false}
+          isEmpresaAdmin={role === 'owner' || role === 'admin' || (usuario?.is_super_admin ?? false)}
           plano={plano}
+          segmento={normalizarSegmento(empresa?.segmento)}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
