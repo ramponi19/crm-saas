@@ -73,7 +73,7 @@ export default async function AdminOverviewPage() {
     { href: '/admin/empresa', label: 'Minha empresa', desc: 'Identidade, marca e white-label', icon: Building2 },
     { href: '/admin/configuracoes', label: 'Configurações', desc: 'Integrações, pagamentos e taxas', icon: Settings },
     { href: '/admin/equipe', label: 'Equipe', desc: 'Usuários, metas e comissões', icon: UserCog },
-    { href: '/planos', label: 'Planos', desc: 'Assinatura e upgrade', icon: CreditCard },
+    { href: '/admin/planos', label: 'Planos', desc: 'Assinatura e upgrade', icon: CreditCard },
   ]
 
   return (
@@ -109,7 +109,7 @@ export default async function AdminOverviewPage() {
               <div className="text-[12.5px] text-[#788698]">Plano atual</div>
               <div className="text-[20px] font-extrabold text-[#16212E] capitalize">{planoCfg?.nome ?? empresa?.plano ?? '—'}</div>
             </div>
-            <Link href="/planos" className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${GOLD}, #A8884A)` }}>
+            <Link href="/admin/planos" className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${GOLD}, #A8884A)` }}>
               Fazer upgrade <ArrowUpRight size={15} />
             </Link>
           </div>

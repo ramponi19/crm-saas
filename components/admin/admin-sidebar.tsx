@@ -31,7 +31,7 @@ const navItems = [
   { href: '/admin/empresa',       label: 'Minha empresa', icon: Building2 },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
   { href: '/admin/integracoes',   label: 'Integrações',   icon: Plug },
-  { href: '/planos',              label: 'Planos',        icon: CreditCard },
+  { href: '/admin/planos',        label: 'Planos',        icon: CreditCard },
 ]
 
 interface AdminSidebarProps {
