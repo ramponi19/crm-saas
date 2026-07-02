@@ -728,6 +728,90 @@ export type Database = {
         }
         Relationships: []
       }
+      visitas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          imovel_id: number | null
+          corretor_id: string | null
+          data_hora: string
+          status: string
+          observacoes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          corretor_id?: string | null
+          data_hora: string
+          status?: string
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          corretor_id?: string | null
+          data_hora?: string
+          status?: string
+          observacoes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tarefas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          imovel_id: number | null
+          responsavel_id: string | null
+          titulo: string
+          descricao: string | null
+          tipo: string
+          vencimento: string | null
+          concluida: boolean
+          concluida_em: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          responsavel_id?: string | null
+          titulo: string
+          descricao?: string | null
+          tipo?: string
+          vencimento?: string | null
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          imovel_id?: number | null
+          responsavel_id?: string | null
+          titulo?: string
+          descricao?: string | null
+          tipo?: string
+          vencimento?: string | null
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       fornecedores: {
         Row: {
           ativo: boolean | null

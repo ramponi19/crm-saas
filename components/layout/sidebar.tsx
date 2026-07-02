@@ -30,13 +30,15 @@ import {
   Crown,
   Home,
   KeyRound,
+  Calendar,
+  CheckSquare,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { planoTemAcesso, type ModuloPlano } from '@/lib/plano'
 import { moduloVisivel, labelDoItem, normalizarSegmento, SEGMENTOS, type Segmento } from '@/lib/segmentos'
 
 // mapa de ícones para os módulos exclusivos de cada segmento (fase profunda)
-const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound, BarChart3 }
+const ICON_EXTRA: Record<string, LucideIcon> = { Home, KeyRound, BarChart3, Calendar, CheckSquare }
 
 const navGroups = [
   {
