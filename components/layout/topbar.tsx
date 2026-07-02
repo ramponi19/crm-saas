@@ -44,7 +44,6 @@ const ORIGEM_EMOJI: Record<string, string> = {
 }
 
 export function Topbar({
-  eyebrow,
   title = '',
   showPeriods = false,
   activePeriod = 'mes',
@@ -216,10 +215,7 @@ export function Topbar({
     <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
 
       <div className="min-w-0">
-        {eyebrow && (
-          <div className="font-mono text-[10px] tracking-[0.18em] text-[#A8884A] uppercase">{eyebrow}</div>
-        )}
-        <h1 className="font-serif font-normal text-[25px] tracking-[-0.02em] text-[#16212E] mt-[3px] whitespace-nowrap">{title}</h1>
+        <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E] whitespace-nowrap leading-tight">{title}</h1>
       </div>
 
       <div className="flex-1" />

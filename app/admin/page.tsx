@@ -80,8 +80,7 @@ export default async function AdminOverviewPage() {
     <div className="px-8 py-8 max-w-[1100px]">
       {/* header */}
       <div className="mb-8">
-        <div className="font-mono text-[10px] tracking-[0.28em] mb-2" style={{ color: GOLD }}>ADMINISTRAÇÃO</div>
-        <h1 className="text-[26px] font-extrabold text-[#16212E] leading-tight">Visão geral · {empresa?.nome}</h1>
+        <h1 className="font-serif font-medium text-[26px] tracking-[-0.02em] text-[#16212E] leading-tight">Visão geral · {empresa?.nome}</h1>
         <p className="text-[14px] text-[#788698] mt-1">A saúde da sua operação num só lugar.</p>
       </div>
 

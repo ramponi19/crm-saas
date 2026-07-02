@@ -17,10 +17,7 @@ export default async function AdminsPage() {
   return (
     <div className="px-8 py-7 max-w-[800px]">
       <div className="mb-6">
-        <p className="font-mono text-[10px] tracking-[0.25em] uppercase mb-1" style={{ color: ADMIN_COR }}>
-          Painel global
-        </p>
-        <h1 className="font-sans font-extrabold text-[26px] text-[#16212E] tracking-tight">
+        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
           Administradores
         </h1>
         <p className="text-[14px] text-[#788698] mt-1">

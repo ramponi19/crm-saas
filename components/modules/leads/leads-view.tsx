@@ -45,7 +45,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
     const negoc     = ativos
       .filter(l => negocIds.includes(l.kanban_status ?? ''))
       .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
-    return { ativos: ativos.length, taxa, negoc }
+    const precisam  = ativos.filter(l => (l.msgs_nao_lidas ?? 0) > 0).length
+    return { ativos: ativos.length, taxa, negoc, precisam }
   }, [leads, columns])
 
   // Realtime: novas mensagens recebidas incrementam o badge do card,
@@ -121,6 +122,10 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
           <div>
             <div className="font-serif text-[25px] text-[#16212E]">{stats.ativos}</div>
             <div className="text-[11.5px] text-[#6B7C92]">leads ativos</div>
+          </div>
+          <div>
+            <div className="font-serif text-[25px]" style={{ color: stats.precisam > 0 ? '#A8884A' : '#16212E' }}>{stats.precisam}</div>
+            <div className="text-[11.5px] text-[#6B7C92]">precisam de resposta</div>
           </div>
           <div>
             <div className="font-serif text-[25px] text-[#34D399]">{stats.taxa}%</div>

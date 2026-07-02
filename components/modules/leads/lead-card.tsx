@@ -96,7 +96,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
         className="rounded-[13px] p-[14px_15px] transition-transform duration-200 hover:-translate-y-[2px] border border-[#16212E]/[0.08]"
         style={{
           background: '#FFFFFF',
-          borderLeft: `3px solid ${barColor}`,
+          // barra de severidade: cor do SLA (verde/âmbar/vermelho) quando há atividade;
+          // cor da etapa como fallback quando o lead ainda não teve mensagem.
+          borderLeft: `4px solid ${lastAt ? slaColor : barColor}`,
           opacity: isSortableDragging || isDragging ? 0.4 : 1,
         }}
       >
@@ -124,7 +126,6 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, barColor
         {/* Linha de espera (SLA) — relógio h:m:s */}
         {lastAt && (
           <div className="flex items-center gap-[6px] mb-[9px]">
-            <span className="w-[8px] h-[8px] rounded-full flex-none" style={{ background: slaColor, boxShadow: `0 0 7px ${slaColor}` }} />
             <Clock size={13} style={{ color: slaColor }} />
             <span className="text-[11.5px] font-semibold" style={{ color: slaColor }}>
               {humanElapsed(lastAt)}

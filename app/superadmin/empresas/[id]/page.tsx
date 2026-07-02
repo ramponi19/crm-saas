@@ -104,7 +104,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
             <Building2 size={26} style={{ color: empresa.wl_cor ?? ADMIN_COR }} />
           </div>
           <div>
-            <h1 className="font-sans font-extrabold text-[24px] text-[#16212E] tracking-tight">{empresa.nome}</h1>
+            <h1 className="font-serif font-medium text-[24px] text-[#16212E] tracking-[-0.02em]">{empresa.nome}</h1>
             <p className="text-[13px] text-[#9AA7B6] font-mono">{empresa.slug}</p>
           </div>
         </div>
