@@ -7,6 +7,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
 import { LeadMatchPanel } from './lead-match-panel'
+import { LeadAcoesPanel } from './lead-acoes-panel'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -322,6 +323,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               <textarea value={form.obs} onChange={e => set('obs', e.target.value)} rows={3}
                 placeholder="Produto de interesse, contexto…" className={`${inputCls} resize-none`} /></div>
 
+            {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} segmento={segmento} />}
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             <button onClick={handleSave} disabled={saving}
               className="flex items-center justify-center gap-2 py-[11px] rounded-[11px] bg-gradient-to-b from-[#E03037] to-[#C01F26] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 mt-1">
