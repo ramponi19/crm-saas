@@ -812,6 +812,36 @@ export type Database = {
         }
         Relationships: []
       }
+      followups_gerados: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          tarefa_id: number | null
+          regra: string
+          chave: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          lead_id?: number | null
+          tarefa_id?: number | null
+          regra: string
+          chave: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          lead_id?: number | null
+          tarefa_id?: number | null
+          regra?: string
+          chave?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       fornecedores: {
         Row: {
           ativo: boolean | null
