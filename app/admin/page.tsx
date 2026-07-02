@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
+import { Topbar } from '@/components/layout/topbar'
 import {
   Users, Target, Package, Wallet, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp,
@@ -77,12 +78,11 @@ export default async function AdminOverviewPage() {
   ]
 
   return (
-    <div className="px-8 py-8 max-w-[1100px]">
-      {/* header */}
-      <div className="mb-8">
-        <h1 className="font-serif font-medium text-[26px] tracking-[-0.02em] text-[#16212E] leading-tight">Visão geral · {empresa?.nome}</h1>
-        <p className="text-[14px] text-[#788698] mt-1">A saúde da sua operação num só lugar.</p>
-      </div>
+    <div className="flex flex-col h-full">
+      <Topbar title="Visão geral" />
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="px-8 py-8 max-w-[1100px]">
+      <p className="text-[14px] text-[#788698] mb-6">A saúde da sua operação num só lugar.</p>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -162,6 +162,8 @@ export default async function AdminOverviewPage() {
             </Link>
           )
         })}
+      </div>
+      </div>
       </div>
     </div>
   )

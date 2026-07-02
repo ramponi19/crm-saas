@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Globe, Rss, Code2, DownloadCloud, Loader2, Copy, ExternalLink, MessageCircle, Instagram, Facebook, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { Topbar } from '@/components/layout/topbar'
 
 const GOLD = '#C9A24B'
 
@@ -90,13 +91,13 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
   const isImob = segmento === 'imobiliaria'
 
   return (
-    <div className="px-8 py-8 max-w-[860px]">
-      <div className="mb-7">
-        <h1 className="font-serif font-medium text-[26px] tracking-[-0.02em] text-[#16212E] leading-tight">Integrações</h1>
-        <p className="text-[14px] text-[#788698] mt-1">
-          {isImob ? 'Conecte seus canais, seu site e os portais — capte leads de todos os lados.' : 'Conecte seus canais de atendimento ao CRM.'}
-        </p>
-      </div>
+    <div className="flex flex-col h-full">
+      <Topbar title="Integrações" />
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="px-8 py-8 max-w-[860px]">
+      <p className="text-[14px] text-[#788698] mb-6">
+        {isImob ? 'Conecte seus canais, seu site e os portais — capte leads de todos os lados.' : 'Conecte seus canais de atendimento ao CRM.'}
+      </p>
 
       <div className="space-y-4">
         {/* Canais de atendimento — todos os segmentos */}
@@ -153,6 +154,8 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
           </div>
         </Card>
         </>)}
+      </div>
+    </div>
       </div>
     </div>
   )
