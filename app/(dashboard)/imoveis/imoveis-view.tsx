@@ -95,6 +95,12 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug, l
     }
   }
 
+  async function copiarSite() {
+    const url = `${window.location.origin}/imob/${slug}`
+    try { await navigator.clipboard.writeText(url); toast.success('Link do site copiado!') }
+    catch { window.open(url, '_blank') }
+  }
+
   async function copiarLeadsUrl() {
     const url = `${window.location.origin}/api/portais/${slug}/leads?token=${leadsToken}`
     try {
@@ -195,6 +201,12 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug, l
         {slug && (
           <div className="mb-5 bg-[#C9A24B]/[0.08] border border-[#C9A24B]/25 rounded-[10px] px-3 py-2 space-y-1.5">
             <div className="flex items-center gap-2 text-[12.5px]">
+              <span className="font-semibold text-[#8A6D2B] shrink-0">🌐 Site público:</span>
+              <code className="truncate text-[#56657A]">/imob/{slug}</code>
+              <a href={`/imob/${slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Abrir</a>
+              <button onClick={copiarSite} className="text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
+            </div>
+            <div className="flex items-center gap-2 text-[12.5px] border-t border-[#C9A24B]/20 pt-1.5">
               <span className="font-semibold text-[#8A6D2B] shrink-0">📤 Feed de imóveis (portais):</span>
               <code className="truncate text-[#56657A]">/api/portais/{slug}</code>
               <button onClick={copiarFeed} className="ml-auto text-[12px] font-semibold text-[#8A6D2B] hover:underline shrink-0">Copiar</button>
