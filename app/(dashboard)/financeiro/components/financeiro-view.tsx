@@ -4,6 +4,7 @@ import { Plus, X, Save, Trash2, Copy, Check, ExternalLink } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/types/database'
+import { Topbar } from '@/components/layout/topbar'
 
 interface Lancamento {
   id: number
@@ -219,11 +220,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Financeiro</h1>
-        </div>
-      </div>
+      <Topbar title="Financeiro" />
 
       {/* Tabs */}
       <div className="px-6 pt-4 pb-0 shrink-0">

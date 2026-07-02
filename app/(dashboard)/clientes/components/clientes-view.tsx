@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Search, UserPlus } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import ClienteModal from './cliente-modal'
+import { Topbar } from '@/components/layout/topbar'
 
 interface Cliente {
   id: number
@@ -117,12 +118,7 @@ export default function ClientesView({ clientes }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      {/* Topbar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Clientes</h1>
-        </div>
-      </div>
+      <Topbar title="Clientes" />
 
       {/* Search + Button */}
       <div className="flex items-center gap-3 px-6 py-4 shrink-0">

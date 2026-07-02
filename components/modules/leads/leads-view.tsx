@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
+import { Topbar } from '@/components/layout/topbar'
 
 interface LeadsViewProps {
   initialLeads: Lead[]
@@ -114,6 +115,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
 
   return (
     <div className="flex flex-col h-full min-h-0">
+
+      <Topbar title="Leads" />
 
       {/* Header */}
       <div className="px-[30px] pt-[22px] pb-5">

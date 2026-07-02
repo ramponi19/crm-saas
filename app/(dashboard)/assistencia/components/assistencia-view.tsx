@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import OSModal from './os-modal'
+import { Topbar } from '@/components/layout/topbar'
 
 interface OS {
   id: number
@@ -80,12 +81,8 @@ export default function AssistenciaView({ ordens }: Props) {
   ]
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Assistência Técnica</h1>
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+      <Topbar title="Assistência Técnica" />
 
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
         {STATS.map(s => (

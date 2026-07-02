@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
+import { Topbar } from '@/components/layout/topbar'
 
 interface Pedido {
   id: number
@@ -146,11 +147,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
 
   return (
     <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <div className="flex items-center px-6 py-4 border-b border-[#16212E]/[0.08] shrink-0">
-        <div>
-          <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E]">Compras</h1>
-        </div>
-      </div>
+      <Topbar title="Compras" />
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
