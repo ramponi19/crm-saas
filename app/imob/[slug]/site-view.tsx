@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { BedDouble, Car, Ruler, MapPin, MessageCircle, Search, SlidersHorizontal } from 'lucide-react'
+import { EmptyState } from '@/components/ui'
 
 type Imovel = {
   id: number; codigo: string | null; titulo: string | null; tipo: string; finalidade: string
@@ -20,7 +21,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const foto0 = (f: unknown) => (Array.isArray(f) && f[0] ? (f[0] as string) : null)
 
 export default function SiteView({ empresa, imoveis }: { empresa: Empresa; imoveis: Imovel[] }) {
-  const cor = empresa.wl_cor || '#C9A24B'
+  const cor = empresa.wl_cor || '#2E5CE6'
   const zap = (empresa.wl_whatsapp || empresa.telefone || '').replace(/\D/g, '')
 
   const [busca, setBusca] = useState('')
@@ -54,40 +55,40 @@ export default function SiteView({ empresa, imoveis }: { empresa: Empresa; imove
     })
   }, [imoveis, busca, tipo, finalidade, cidade, precoMax, quartosMin])
 
-  const sel = 'bg-white border border-[#141E2C]/[0.12] rounded-[10px] px-3 py-2.5 text-[13.5px] text-[#141E2C] outline-none focus:border-[#141E2C]/35'
+  const sel = 'rounded-control border border-line bg-card px-3 py-2.5 text-[13.5px] text-ink outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30'
 
   return (
-    <main style={{ background: '#F7F4EC', minHeight: '100vh' }} className="text-[#141E2C]">
+    <main className="min-h-screen bg-bg font-sans text-ink antialiased">
       {/* Header */}
-      <header className="border-b border-[#141E2C]/[0.08] bg-white/70 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-[1180px] mx-auto px-5 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+      <header className="sticky top-0 z-20 border-b border-line bg-bg">
+        <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
             {empresa.wl_logo_url
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={empresa.wl_logo_url} alt={empresa.nome} className="h-9 w-auto object-contain" />
-              : <span className="font-extrabold text-[19px]" style={{ color: cor }}>{empresa.nome}</span>}
-            {empresa.wl_slogan && <span className="hidden md:block text-[13px] text-[#788698] border-l border-[#141E2C]/10 pl-3 truncate">{empresa.wl_slogan}</span>}
+              : <span className="text-[19px] font-bold tracking-[-0.02em]" style={{ color: cor }}>{empresa.nome}</span>}
+            {empresa.wl_slogan && <span className="hidden truncate border-l border-line pl-3 text-[13px] text-ink-2 md:block">{empresa.wl_slogan}</span>}
           </div>
           {zap && (
             <a href={`https://wa.me/55${zap}`} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-[13.5px] font-semibold text-white shrink-0" style={{ background: '#25D366' }}>
-              <MessageCircle size={16} /> WhatsApp
+              className="inline-flex shrink-0 items-center gap-2 rounded-control bg-ink px-4 py-2.5 text-[13.5px] font-semibold text-white transition-colors hover:bg-ink/90">
+              <MessageCircle size={16} strokeWidth={1.7} /> WhatsApp
             </a>
           )}
         </div>
       </header>
 
       {/* Hero + busca */}
-      <section className="max-w-[1180px] mx-auto px-5 pt-10 pb-6">
-        <h1 className="text-[30px] md:text-[38px] font-extrabold leading-tight">Encontre seu próximo imóvel</h1>
-        <p className="text-[15px] text-[#566072] mt-1 mb-6">{imoveis.length} imóve{imoveis.length === 1 ? 'l' : 'is'} disponíve{imoveis.length === 1 ? 'l' : 'is'} na {empresa.nome}.</p>
+      <section className="mx-auto max-w-[1180px] px-5 pb-6 pt-10">
+        <h1 className="text-[30px] font-bold leading-tight tracking-[-0.03em] md:text-[38px]">Encontre seu próximo imóvel</h1>
+        <p className="mb-6 mt-1.5 text-[15px] text-ink-2">{imoveis.length} imóve{imoveis.length === 1 ? 'l' : 'is'} disponíve{imoveis.length === 1 ? 'l' : 'is'} na {empresa.nome}.</p>
 
         {/* Filtros */}
-        <div className="bg-white rounded-[16px] border border-[#141E2C]/[0.08] p-3 shadow-[0_10px_30px_rgba(22,35,50,.06)]">
-          <div className="flex items-center gap-2 mb-2 text-[12px] font-semibold text-[#788698]"><SlidersHorizontal size={14} /> Filtrar</div>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-            <div className="col-span-2 md:col-span-2 relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9AA7B6]" />
+        <div className="rounded-card border border-line bg-card p-3">
+          <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-ink-3"><SlidersHorizontal size={14} strokeWidth={1.7} /> Filtrar</div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+            <div className="relative col-span-2 md:col-span-2">
+              <Search size={15} strokeWidth={1.7} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar bairro, código…" className={`${sel} w-full pl-9`} />
             </div>
             <select value={tipo} onChange={e => setTipo(e.target.value)} className={sel}>
@@ -113,36 +114,40 @@ export default function SiteView({ empresa, imoveis }: { empresa: Empresa; imove
       </section>
 
       {/* Grid */}
-      <section className="max-w-[1180px] mx-auto px-5 pb-16">
+      <section className="mx-auto max-w-[1180px] px-5 pb-16">
         {filtrados.length === 0 ? (
-          <div className="text-center py-20 text-[#788698]">Nenhum imóvel encontrado com esses filtros.</div>
+          <EmptyState
+            icon={<Search size={22} strokeWidth={1.7} />}
+            title="Nenhum imóvel encontrado"
+            description="Ajuste os filtros para ver mais opções."
+          />
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {filtrados.map(im => {
               const capa = foto0(im.fotos)
               return (
-                <a key={im.id} href={`/imovel/${im.id}`} className="group bg-white rounded-[16px] border border-[#141E2C]/[0.08] overflow-hidden hover:shadow-[0_16px_40px_rgba(22,35,50,.12)] transition-shadow">
-                  <div className="h-[190px] bg-[#141E2C]/[0.05] relative">
+                <a key={im.id} href={`/imovel/${im.id}`} className="group overflow-hidden rounded-card border border-line bg-card transition-colors hover:border-ink/20">
+                  <div className="relative h-[190px] bg-line-soft">
                     {capa
                       // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={capa} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
-                      : <div className="w-full h-full flex items-center justify-center text-[#B0BCC9] text-[13px]">Sem foto</div>}
-                    <span className="absolute top-3 left-3 text-[10.5px] font-semibold px-2 py-1 rounded-full text-white" style={{ background: cor }}>
+                      ? <img src={capa} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                      : <div className="flex h-full w-full items-center justify-center text-[13px] text-ink-3">Sem foto</div>}
+                    <span className="absolute left-3 top-3 rounded-[6px] px-2 py-1 text-[10.5px] font-semibold text-white" style={{ background: cor }}>
                       {im.finalidade === 'locacao' ? 'Locação' : im.finalidade === 'ambos' ? 'Venda/Locação' : 'Venda'}
                     </span>
                   </div>
                   <div className="p-4">
-                    <div className="text-[10px] font-mono text-[#9AA7B6]">{im.codigo || cap(im.tipo)}</div>
-                    <div className="text-[15.5px] font-bold truncate">{im.titulo || cap(im.tipo)}</div>
-                    <div className="flex items-center gap-1 text-[12.5px] text-[#788698] mt-0.5 mb-3">
-                      <MapPin size={13} style={{ color: cor }} /> {[im.bairro, im.cidade].filter(Boolean).join(', ') || 'Endereço sob consulta'}
+                    <div className="font-mono text-[10px] text-ink-3">{im.codigo || cap(im.tipo)}</div>
+                    <div className="truncate text-[15.5px] font-semibold tracking-[-0.01em]">{im.titulo || cap(im.tipo)}</div>
+                    <div className="mb-3 mt-0.5 flex items-center gap-1 text-[12.5px] text-ink-2">
+                      <MapPin size={13} strokeWidth={1.7} style={{ color: cor }} /> {[im.bairro, im.cidade].filter(Boolean).join(', ') || 'Endereço sob consulta'}
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#56607A] mb-3">
-                      {im.quartos ? <span className="inline-flex items-center gap-1"><BedDouble size={14} /> {im.quartos}</span> : null}
-                      {im.vagas ? <span className="inline-flex items-center gap-1"><Car size={14} /> {im.vagas}</span> : null}
-                      {im.area_util ? <span className="inline-flex items-center gap-1"><Ruler size={14} /> {im.area_util}m²</span> : null}
+                    <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
+                      {im.quartos ? <span className="inline-flex items-center gap-1"><BedDouble size={14} strokeWidth={1.7} /> {im.quartos}</span> : null}
+                      {im.vagas ? <span className="inline-flex items-center gap-1"><Car size={14} strokeWidth={1.7} /> {im.vagas}</span> : null}
+                      {im.area_util ? <span className="inline-flex items-center gap-1"><Ruler size={14} strokeWidth={1.7} /> {im.area_util}m²</span> : null}
                     </div>
-                    <div className="text-[18px] font-extrabold">{brl(im.valor_venda ?? im.valor_locacao) ?? 'Sob consulta'}{im.valor_venda == null && im.valor_locacao != null ? <span className="text-[12px] font-medium text-[#788698]">/mês</span> : null}</div>
+                    <div className="text-[18px] font-bold tracking-[-0.02em] tabular-nums">{brl(im.valor_venda ?? im.valor_locacao) ?? 'Sob consulta'}{im.valor_venda == null && im.valor_locacao != null ? <span className="text-[12px] font-medium text-ink-2">/mês</span> : null}</div>
                   </div>
                 </a>
               )
@@ -151,7 +156,7 @@ export default function SiteView({ empresa, imoveis }: { empresa: Empresa; imove
         )}
       </section>
 
-      <footer className="text-center text-[12px] text-[#788698] pb-8">
+      <footer className="pb-8 text-center text-[12px] text-ink-3">
         {empresa.nome} · powered by Nexus
       </footer>
     </main>
