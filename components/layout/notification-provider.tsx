@@ -31,14 +31,19 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
   useEffect(() => {
     const supabase = createClient()
 
-    // Atualiza título da aba com contagem de não lidas
+    // Atualiza título da aba: (nº de LEADS distintos aguardando resposta) empresa — CRM.
     async function updateTitle() {
       const { data } = await supabase
         .from('lead_mensagens')
         .select('lead_id')
         .eq('lida', false)
         .eq('direcao', 'recebida')
-      const count = data?.length ?? 0
+      // Conta leads distintos, não mensagens (um lead com 3 msgs = 1).
+      const leads = new Set<number>()
+      for (const m of (data ?? []) as Array<{ lead_id: number | null }>) {
+        if (m.lead_id != null) leads.add(m.lead_id)
+      }
+      const count = leads.size
       document.title = count > 0 ? `(${count}) ${nomeAba}` : nomeAba
     }
     updateTitle()
