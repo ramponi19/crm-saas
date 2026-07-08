@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban } from 'lucide-react'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
@@ -10,6 +10,7 @@ import { HorarioCard } from './horario-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
 import { MotivosPerdaCard } from './motivos-perda-card'
+import { AutomacoesCard } from './automacoes-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'taxas',       label: 'Taxas',            Icon: Percent },
   { id: 'sla',         label: 'SLA atendimento',  Icon: Timer   },
   { id: 'motivos',     label: 'Motivos de perda', Icon: Ban     },
+  { id: 'automacoes',  label: 'Automações',       Icon: Zap     },
   { id: 'horario',     label: 'Horário',          Icon: Clock   },
   { id: 'modelos',     label: 'Modelos WhatsApp', Icon: MessageSquareText },
   { id: 'notificacoes', label: 'Notificações',    Icon: Bell    },
@@ -386,6 +388,9 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── MOTIVOS DE PERDA ── */}
         {aba === 'motivos' && <MotivosPerdaCard />}
+
+        {/* ── AUTOMAÇÕES ── */}
+        {aba === 'automacoes' && <AutomacoesCard />}
 
         {/* ── HORÁRIO DE FUNCIONAMENTO ── */}
         {aba === 'horario' && <HorarioCard />}

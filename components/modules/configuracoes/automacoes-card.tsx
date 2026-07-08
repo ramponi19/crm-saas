@@ -1,0 +1,184 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Trash2, Zap } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
+import type { Json } from '@/types/database'
+
+interface Automacao {
+  id: number
+  etapa_slug: string | null
+  gatilho: string
+  horas: number | null
+  acao: string
+  config: Record<string, unknown> | null
+  ativo: boolean
+}
+interface Etapa { slug: string; label: string }
+
+const TEMPLATES = [
+  { chave: 'boas_vindas', label: 'Boas-vindas' },
+  { chave: 'confirmacao_visita', label: 'Confirmação de visita' },
+  { chave: 'cobranca', label: 'Cobrança' },
+  { chave: 'followup', label: 'Follow-up' },
+  { chave: 'agradecimento', label: 'Pós-venda' },
+]
+
+const ACAO_LABEL: Record<string, string> = {
+  criar_tarefa: 'criar tarefa',
+  enviar_whatsapp_template: 'preparar WhatsApp',
+  notificar_gestor: 'notificar gestor',
+}
+
+export function AutomacoesCard() {
+  const supabase = createClient()
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+  const [etapas, setEtapas] = useState<Etapa[]>([])
+  const [lista, setLista] = useState<Automacao[]>([])
+  const [salvando, setSalvando] = useState(false)
+
+  // form
+  const [gatilho, setGatilho] = useState('entrou_na_etapa')
+  const [etapaSlug, setEtapaSlug] = useState('')
+  const [horas, setHoras] = useState('48')
+  const [acao, setAcao] = useState('criar_tarefa')
+  const [titulo, setTitulo] = useState('')
+  const [templateChave, setTemplateChave] = useState('boas_vindas')
+
+  const carregar = useCallback(async (empId: number) => {
+    const { data } = await supabase
+      .from('automacoes').select('id, etapa_slug, gatilho, horas, acao, config, ativo')
+      .eq('empresa_id', empId).order('created_at', { ascending: false })
+    setLista(((data ?? []) as unknown as Automacao[]))
+  }, [supabase])
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: vinculo } = await supabase
+        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
+      if (!vinculo) return
+      setEmpresaId(vinculo.empresa_id)
+      const { data: et } = await supabase
+        .from('funil_etapas').select('slug, label').eq('empresa_id', vinculo.empresa_id).eq('ativo', true).order('ordem')
+      setEtapas(((et ?? []) as Etapa[]))
+      await carregar(vinculo.empresa_id)
+    })()
+  }, [supabase, carregar])
+
+  function etapaLabel(slug: string | null) {
+    if (!slug) return 'qualquer etapa'
+    return etapas.find(e => e.slug === slug)?.label ?? slug
+  }
+
+  function frase(a: Automacao) {
+    const quando = a.gatilho === 'parado_x_horas'
+      ? `Quando o lead fica ${a.horas ?? 48}h parado em ${etapaLabel(a.etapa_slug)}`
+      : `Quando o lead entra em ${etapaLabel(a.etapa_slug)}`
+    let oQue = ACAO_LABEL[a.acao] ?? a.acao
+    const cfg = a.config ?? {}
+    if (a.acao === 'enviar_whatsapp_template' && cfg.template_chave) {
+      oQue += ` (${TEMPLATES.find(t => t.chave === cfg.template_chave)?.label ?? cfg.template_chave})`
+    } else if (cfg.titulo) {
+      oQue += ` "${cfg.titulo as string}"`
+    }
+    return `${quando} → ${oQue}`
+  }
+
+  async function adicionar() {
+    if (!empresaId) { notify.bad('Empresa não identificada'); return }
+    setSalvando(true)
+    try {
+      const config: Record<string, unknown> = {}
+      if (acao === 'enviar_whatsapp_template') config.template_chave = templateChave
+      else if (titulo.trim()) config.titulo = titulo.trim()
+      const { error } = await supabase.from('automacoes').insert({
+        empresa_id: empresaId,
+        gatilho,
+        etapa_slug: etapaSlug || null,
+        horas: gatilho === 'parado_x_horas' ? Math.max(1, Number(horas) || 48) : null,
+        acao,
+        config: config as Json,
+        ativo: true,
+      })
+      if (error) throw new Error(error.message)
+      notify.ok('Automação criada')
+      setTitulo('')
+      await carregar(empresaId)
+    } catch (e) {
+      notify.bad('Erro ao criar', e instanceof Error ? e.message : undefined)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function toggle(a: Automacao) {
+    await supabase.from('automacoes').update({ ativo: !a.ativo }).eq('id', a.id)
+    if (empresaId) await carregar(empresaId)
+  }
+  async function remover(a: Automacao) {
+    await supabase.from('automacoes').delete().eq('id', a.id)
+    if (empresaId) await carregar(empresaId)
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card title="Nova automação">
+        <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
+          Regras que disparam sozinhas. As ações criam <strong className="text-ink">tarefas internas</strong> —
+          o WhatsApp vira uma tarefa com a mensagem pronta (não envia sozinho).
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Select label="Gatilho" value={gatilho} onChange={e => setGatilho(e.target.value)}>
+            <option value="entrou_na_etapa">Quando o lead entra na etapa</option>
+            <option value="parado_x_horas">Quando o lead fica parado</option>
+          </Select>
+          <Select label="Etapa" value={etapaSlug} onChange={e => setEtapaSlug(e.target.value)}>
+            <option value="">Qualquer etapa</option>
+            {etapas.map(e => <option key={e.slug} value={e.slug}>{e.label}</option>)}
+          </Select>
+          {gatilho === 'parado_x_horas' && (
+            <Input label="Horas parado" type="number" min={1} value={horas} onChange={e => setHoras(e.target.value)} />
+          )}
+          <Select label="Ação" value={acao} onChange={e => setAcao(e.target.value)}>
+            <option value="criar_tarefa">Criar tarefa</option>
+            <option value="enviar_whatsapp_template">Preparar WhatsApp (tarefa)</option>
+            <option value="notificar_gestor">Notificar gestor</option>
+          </Select>
+          {acao === 'enviar_whatsapp_template' ? (
+            <Select label="Modelo de mensagem" value={templateChave} onChange={e => setTemplateChave(e.target.value)}>
+              {TEMPLATES.map(t => <option key={t.chave} value={t.chave}>{t.label}</option>)}
+            </Select>
+          ) : (
+            <Input label="Título da tarefa (opcional)" value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ex.: Responder o lead" />
+          )}
+        </div>
+        <div className="mt-4">
+          <Button onClick={adicionar} loading={salvando} icon={<Plus size={15} strokeWidth={1.7} />}>Adicionar automação</Button>
+        </div>
+      </Card>
+
+      <Card title={`Automações ativas (${lista.filter(a => a.ativo).length})`} flush>
+        {lista.length === 0 ? (
+          <p className="p-6 text-[13px] text-ink-3">Nenhuma automação. Crie a primeira acima.</p>
+        ) : (
+          <div className="divide-y divide-line-soft">
+            {lista.map(a => (
+              <div key={a.id} className={`flex items-center gap-3 px-4 py-3 ${!a.ativo ? 'opacity-55' : ''}`}>
+                <Zap size={15} strokeWidth={1.7} className="flex-none text-accent" />
+                <span className="min-w-0 flex-1 text-[13px] text-ink">{frase(a)}</span>
+                {!a.ativo && <Badge tone="neutro">inativa</Badge>}
+                <Button variant="ghost" size="sm" onClick={() => toggle(a)}>{a.ativo ? 'Desativar' : 'Ativar'}</Button>
+                <Button variant="ghost" size="sm" icon={<Trash2 size={14} strokeWidth={1.7} />} className="text-bad hover:bg-bad/10" onClick={() => remover(a)}>
+                  <span className="sr-only">Remover</span>
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
