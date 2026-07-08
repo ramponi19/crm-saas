@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      automacoes: {
+        Row: {
+          id: number
+          empresa_id: number
+          etapa_slug: string | null
+          gatilho: string
+          horas: number | null
+          acao: string
+          config: Json
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          etapa_slug?: string | null
+          gatilho: string
+          horas?: number | null
+          acao: string
+          config?: Json
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          etapa_slug?: string | null
+          gatilho?: string
+          horas?: number | null
+          acao?: string
+          config?: Json
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       motivos_perda: {
         Row: {
           id: number

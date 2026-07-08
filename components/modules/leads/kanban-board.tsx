@@ -5,7 +5,6 @@ import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
   PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
 } from '@dnd-kit/core'
-import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, type KanbanColumn as KanbanColumnDef, type Motivo } from './types'
 import { KanbanColumn } from './kanban-column'
 import { LeadCard } from './lead-card'
@@ -54,14 +53,15 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
     setLocalLeads(prev => prev.map(l => l.id === activeLeadId ? { ...l, kanban_status: targetStatus } : l))
   }
 
-  // Grava a mudança de etapa (+ extras, ex.: motivo de perda). Reverte no erro.
+  // Grava a mudança de etapa (+ extras, ex.: motivo de perda) via route server,
+  // que também dispara as automações de "entrou_na_etapa". Reverte no erro.
   async function persistirMove(lead: Lead, extra?: { motivo_perda_id?: number; perdido_em?: string; observacoes?: string }) {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('leads')
-      .update({ kanban_status: lead.kanban_status, data_transferencia_funil: new Date().toISOString(), ...(extra ?? {}) })
-      .eq('id', lead.id)
-    if (error) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return false }
+    const res = await fetch('/api/leads/mover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: lead.id, kanban_status: lead.kanban_status, ...(extra ?? {}) }),
+    })
+    if (!res.ok) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return false }
     onLeadUpdate({ ...lead, ...(extra ?? {}) })
     const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
     notify.ok('Lead movido', destino)

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
+import { executarAcao } from '@/lib/automacoes'
 import { timingSafeEqual } from 'crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -167,7 +169,41 @@ export async function GET(
           })
         }
 
-        return NextResponse.json({ ok: true, job, criadas })
+        // Automações "parado_x_horas" (Fase 4.3) — acopladas à régua (sem cron novo).
+        // Idempotente por (automação, lead, instante de entrada na etapa).
+        let disparosAuto = 0
+        const { data: autos } = await supabase
+          .from('automacoes')
+          .select('id, empresa_id, etapa_slug, horas, acao, config')
+          .eq('gatilho', 'parado_x_horas').eq('ativo', true)
+        for (const a of (autos ?? []) as Array<{ id: number; empresa_id: number; etapa_slug: string | null; horas: number | null; acao: string; config: Record<string, unknown> | null }>) {
+          if (desativadas.has(a.empresa_id)) continue
+          const horas = a.horas ?? 48
+          const corte = new Date(now.getTime() - horas * 3600 * 1000).toISOString()
+          let q = supabase.from('leads')
+            .select('id, nome, responsavel_id, data_transferencia_funil')
+            .eq('empresa_id', a.empresa_id).eq('ativo', true)
+            .lt('data_transferencia_funil', corte)
+          if (a.etapa_slug) q = q.eq('kanban_status', a.etapa_slug)
+          const { data: parados } = await q.limit(500)
+          for (const l of (parados ?? []) as Array<{ id: number; nome: string | null; responsavel_id: string | null; data_transferencia_funil: string | null }>) {
+            const chave = `auto:${a.id}:lead:${l.id}:${l.data_transferencia_funil ?? 'x'}`
+            const { data: marca } = await supabase
+              .from('followups_gerados')
+              .upsert({ empresa_id: a.empresa_id, lead_id: l.id, regra: `automacao:${a.id}`, chave }, { onConflict: 'chave', ignoreDuplicates: true })
+              .select('id').maybeSingle()
+            if (!marca) continue // já disparou para este instante de entrada
+            try {
+              await executarAcao(supabase as unknown as SupabaseClient, a.empresa_id, { id: l.id, nome: l.nome, responsavel_id: l.responsavel_id }, a.acao, a.config ?? {})
+              disparosAuto++
+            } catch (e) {
+              await supabase.from('followups_gerados').delete().eq('id', marca.id)
+              console.error('[cron/automacoes] falha', a.id, e)
+            }
+          }
+        }
+
+        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto })
       }
 
       default:
