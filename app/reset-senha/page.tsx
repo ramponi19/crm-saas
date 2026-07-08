@@ -40,7 +40,7 @@ export default function ResetSenhaPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-6 py-12">
       <div className="w-full max-w-[400px]">
         <div className="flex justify-center">
-          <Image src="/nexus-logo.png" alt="Nexus" width={503} height={431} priority className="h-16 w-auto" />
+          <Image src="/nexus-logo.png" alt="Nexus" width={503} height={431} priority className="h-24 w-auto" />
         </div>
 
         <div className="mt-8 rounded-card border border-line bg-card p-7">
