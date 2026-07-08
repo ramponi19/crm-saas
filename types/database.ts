@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      notificacao_prefs: {
+        Row: {
+          usuario_id: string
+          prefs: Json
+          updated_at: string
+        }
+        Insert: {
+          usuario_id: string
+          prefs?: Json
+          updated_at?: string
+        }
+        Update: {
+          usuario_id?: string
+          prefs?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       avisos_plataforma: {
         Row: {
           id: number
