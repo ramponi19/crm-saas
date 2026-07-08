@@ -191,6 +191,8 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           menuOverrideInit={(empresa.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null}
           items={resolverMenu({ segmento: normalizarSegmento(empresa.segmento), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
             .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
+          limiteUsuariosInit={empresa.limite_usuarios ?? 0}
+          limiteLeadsInit={empresa.limite_leads ?? 0}
         />
       </div>
 

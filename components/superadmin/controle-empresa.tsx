@@ -22,11 +22,13 @@ const ESTADOS: { v: Estado; label: string }[] = [
   { v: 'off', label: 'Bloquear' },
 ]
 
-export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, items }: {
+export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, items, limiteUsuariosInit, limiteLeadsInit }: {
   empresaId: number
   modulosInit: Record<string, boolean> | null
   menuOverrideInit: { hidden?: string[]; labels?: Record<string, string> } | null
   items: { href: string; label: string }[]
+  limiteUsuariosInit: number
+  limiteLeadsInit: number
 }) {
   const router = useRouter()
   const [modulos, setModulos] = useState<Record<string, Estado>>(() => {
@@ -39,6 +41,8 @@ export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, item
   })
   const [hidden, setHidden] = useState<Set<string>>(new Set(menuOverrideInit?.hidden ?? []))
   const [labels, setLabels] = useState<Record<string, string>>(menuOverrideInit?.labels ?? {})
+  const [limUsuarios, setLimUsuarios] = useState(String(limiteUsuariosInit))
+  const [limLeads, setLimLeads] = useState(String(limiteLeadsInit))
   const [saving, setSaving] = useState(false)
 
   const toggle = (href: string) => setHidden((s) => { const n = new Set(s); n.has(href) ? n.delete(href) : n.add(href); return n })
@@ -55,6 +59,8 @@ export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, item
         body: JSON.stringify({
           modulos_override: Object.keys(mo).length ? mo : null,
           menu_override: { hidden: [...hidden], labels: cleanLabels },
+          limite_usuarios: Number(limUsuarios) || 0,
+          limite_leads: Number(limLeads) || 0,
         }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
@@ -69,6 +75,20 @@ export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, item
 
   return (
     <div className="space-y-5">
+      <Card title="Limites da empresa">
+        <div className="grid grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-medium text-ink-2">Limite de usuários</span>
+            <input value={limUsuarios} onChange={(e) => setLimUsuarios(e.target.value.replace(/[^0-9]/g, ''))} className="num rounded-control border border-line bg-card px-3 py-2 text-[13px] text-ink outline-none focus:border-[#6D28D9] focus:ring-2 focus:ring-[#6D28D9]/30" />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-medium text-ink-2">Limite de leads</span>
+            <input value={limLeads} onChange={(e) => setLimLeads(e.target.value.replace(/[^0-9]/g, ''))} className="num rounded-control border border-line bg-card px-3 py-2 text-[13px] text-ink outline-none focus:border-[#6D28D9] focus:ring-2 focus:ring-[#6D28D9]/30" />
+          </label>
+        </div>
+        <p className="mt-2 text-[11.5px] text-ink-3">0 = ilimitado. Vale para a criação de usuários e leads da empresa.</p>
+      </Card>
+
       <Card title="Módulos do plano (override por empresa)">
         <div className="space-y-2.5">
           {MODULOS.map((m) => (
