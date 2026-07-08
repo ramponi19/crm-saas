@@ -68,10 +68,14 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
         method: 'POST',
       })
       if (res.ok) {
-        router.push('/dashboard')
-        router.refresh()
+        // Navegação hard (não router.push): força um render fresco do servidor
+        // já com a empresa impersonada. Um push para /dashboard serviria o
+        // payload em cache da impersonação anterior ("retorna para a JM").
+        window.location.href = '/dashboard'
+        return
       }
-    } finally {
+      setLoading(false)
+    } catch {
       setLoading(false)
     }
   }

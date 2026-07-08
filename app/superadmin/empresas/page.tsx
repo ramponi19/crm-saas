@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { Search, ChevronRight, Building2 } from 'lucide-react'
 import { Card, Badge, Table, EmptyState, type Column } from '@/components/ui'
@@ -58,7 +58,9 @@ type Empresa = {
 
 export default async function EmpresasPage({ searchParams }: PageProps) {
   const { q, status, plano } = await searchParams
-  const supabase = await createClient()
+  // Service client: o superadmin vê TODAS as empresas (a RLS de empresas escopa
+  // por empresa do usuário logado). A rota já é trancada por superadmin/layout.
+  const supabase = createServiceClient()
 
   let query = supabase
     .from('empresas')

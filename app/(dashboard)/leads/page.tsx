@@ -68,10 +68,12 @@ export default async function LeadsPage() {
     return { id: eu.usuario_id, nome: u?.nome ?? '', role: eu.role ?? '' }
   })
 
-  // Visibilidade de leads por permissão: vendedor/técnico sem "ver leads de outros" vê só os seus.
+  // Visibilidade de leads por permissão: só restringe quando o papel é CONHECIDO
+  // e explicitamente sem "ver leads de outros". Papel desconhecido (ex.: superadmin
+  // impersonando, que não está em empresa_usuarios) ou owner/admin → vê tudo.
   const meuRole = usuariosMapped.find((u) => u.id === user?.id)?.role ?? ''
-  const perms = permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null)
-  const leadsVisiveis = perms.verLeadsOutros ? leadsComContagem : leadsComContagem.filter((l) => l.responsavel_id === user?.id)
+  const restringe = !!meuRole && !permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
+  const leadsVisiveis = restringe ? leadsComContagem.filter((l) => l.responsavel_id === user?.id) : leadsComContagem
 
   return (
     <LeadsView

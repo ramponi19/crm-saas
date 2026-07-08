@@ -1,21 +1,20 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Eye, X } from 'lucide-react'
 
 // Roxo = modo plataforma (superadmin). Barra chapada e discreta (sem gradiente).
 export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
-  const router = useRouter()
   const [saindo, setSaindo] = useState(false)
 
   async function sair() {
     setSaindo(true)
     try {
       await fetch('/api/superadmin/empresas/0/impersonar', { method: 'DELETE' })
-      router.push('/superadmin/empresas')
-      router.refresh()
-    } finally {
+      // Navegação hard: garante que o servidor re-renderize sem a impersonação,
+      // sem risco de servir o /dashboard em cache da empresa anterior.
+      window.location.href = '/superadmin/empresas'
+    } catch {
       setSaindo(false)
     }
   }
