@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui'
 import { Lead, Usuario, getKanbanColumns, ganhoColId } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -118,37 +119,19 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: Leads
 
       <Topbar title="Leads" />
 
-      {/* Header */}
-      <div className="px-[30px] pt-[22px] pb-5">
-        <div className="flex items-center gap-7 flex-wrap">
-          {/* Stats */}
-          <div>
-            <div className="font-serif text-[25px] text-[#16212E]">{stats.ativos}</div>
-            <div className="text-[11.5px] text-[#6B7C92]">leads ativos</div>
-          </div>
-          <div>
-            <div className="font-serif text-[25px]" style={{ color: stats.precisam > 0 ? '#A8884A' : '#16212E' }}>{stats.precisam}</div>
-            <div className="text-[11.5px] text-[#6B7C92]">precisam de resposta</div>
-          </div>
-          <div>
-            <div className="font-serif text-[25px] text-[#34D399]">{stats.taxa}%</div>
-            <div className="text-[11.5px] text-[#6B7C92]">taxa de conversão</div>
-          </div>
-          <div>
-            <div className="font-serif text-[25px] text-[#16212E]">{fmtK(stats.negoc)}</div>
-            <div className="text-[11.5px] text-[#6B7C92]">em negociação</div>
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Novo lead */}
-          <button
-            onClick={() => setShowNewLead(true)}
-            className="flex items-center gap-2 px-[18px] py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] shadow-[0_6px_18px_rgba(22,33,46,0.32)] hover:-translate-y-[2px] transition-all"
-          >
-            <Plus size={17} /> Novo lead
-          </button>
+      {/* Header — subtítulo de stats + ação (o título "Leads" vem do Topbar) */}
+      <div className="flex flex-wrap items-end justify-between gap-3 px-6 pt-5 pb-4">
+        <div className="num text-[13px] text-ink-2">
+          {stats.ativos} em aberto
+          {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação
+          {' · '}conversão {stats.taxa}%
+          {stats.precisam > 0 && (
+            <span className="font-semibold text-bad"> · {stats.precisam} aguardando resposta</span>
+          )}
         </div>
+        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setShowNewLead(true)}>
+          Novo lead
+        </Button>
       </div>
 
       {/* Kanban */}

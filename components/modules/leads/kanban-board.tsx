@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, type KanbanColumn as KanbanColumnDef } from './types'
 import { KanbanColumn } from './kanban-column'
 import { LeadCard } from './lead-card'
-import { toast } from 'sonner'
+import { notify } from '@/components/ui'
 
 interface KanbanBoardProps {
   leads: Lead[]
@@ -64,15 +64,16 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
       .from('leads')
       .update({ kanban_status: lead.kanban_status, data_transferencia_funil: new Date().toISOString() })
       .eq('id', leadId)
-    if (error) { toast.error('Erro ao mover lead'); setLocalLeads(leads); return }
+    if (error) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return }
     onLeadUpdate(lead)
-    toast.success(`Lead movido para ${lead.kanban_status}`)
+    const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
+    notify.ok('Lead movido', destino)
   }
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners}
       onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 h-full overflow-x-auto px-[30px] py-4 pb-6">
+      <div className="flex h-full gap-3 overflow-x-auto px-6 py-4 pb-6">
         {columns.map(col => (
           <KanbanColumn
             key={col.id} column={col}
@@ -86,7 +87,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
       </div>
       <DragOverlay>
         {activeLead && activeCol && (
-          <div className="rotate-1 opacity-90 scale-105">
+          <div className="w-[228px] rotate-1 opacity-95">
             <LeadCard lead={activeLead} usuarios={usuarios} onClick={() => {}} isDragging barColor={activeCol.color} sla={sla} />
           </div>
         )}

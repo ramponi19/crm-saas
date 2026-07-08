@@ -14,58 +14,47 @@ interface KanbanColumnProps {
   sla?: { verde: number; amarelo: number; vermelho: number }
 }
 
+const fmtK = (v: number) =>
+  v >= 1000 ? `R$ ${(v / 1000).toFixed(1).replace('.', ',')} mil` : `R$ ${v}`
+
 export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `col-${column.id}`,
-    data: { status: column.id },
-  })
+  const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}`, data: { status: column.id } })
+
+  const soma = column.tipo === 'negociacao'
+    ? leads.reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
+    : 0
 
   const emptyMsg =
-    column.tipo === 'ganho'   ? 'Suas vendas fechadas aparecem aqui. 🎯' :
+    column.tipo === 'ganho' ? 'Vendas fechadas aparecem aqui.' :
     column.tipo === 'perdido' ? 'Nada perdido — bom sinal.' :
     'Arraste um lead aqui.'
 
   return (
-    <div className="flex flex-col flex-none w-[296px] h-full bg-[rgba(22,33,46,0.025)] border border-[#16212E]/[0.05] rounded-[16px] p-3">
-      {/* Header da coluna */}
-      <div className="flex items-center gap-[9px] px-1 pb-3 shrink-0">
-        <span
-          className="w-[9px] h-[9px] rounded-full flex-none"
-          style={{ background: column.color }}
-        />
-        <span className="text-[13px] font-bold text-[#1F2A39] flex-1 truncate">{column.label}</span>
-        <span className="font-mono text-[11px] text-[#6B7C92] bg-white border border-[#16212E]/[0.08] px-[8px] py-[2px] rounded-full">
-          {leads.length}
-        </span>
+    <div className="flex h-full w-[228px] flex-none flex-col">
+      {/* Header da coluna: dot quadrado 6px · label · soma · contagem */}
+      <div className="flex items-center gap-2 px-1 pb-2.5">
+        <span className="h-1.5 w-1.5 flex-none rounded-[2px]" style={{ background: column.color }} />
+        <span className="truncate text-[12px] font-semibold text-ink-2">{column.label}</span>
+        {soma > 0 && <span className="num ml-1 flex-none text-[10.5px] font-medium text-ink-3">{fmtK(soma)}</span>}
+        <span className="num ml-auto flex-none text-[11px] font-semibold text-ink-3">{leads.length}</span>
       </div>
 
-      {/* Drop zone — rola por coluna */}
+      {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className="flex flex-col gap-[9px] flex-1 min-h-[90px] overflow-y-auto scrollbar-thin rounded-[12px] transition-colors duration-150 p-0.5"
-        style={{
-          background: isOver ? `${column.color}0F` : 'transparent',
-          outline: isOver ? `1px dashed ${column.color}55` : 'none',
-        }}
+        className={`flex min-h-[90px] flex-1 flex-col gap-2 overflow-y-auto rounded-card p-0.5 transition-colors scrollbar-thin ${
+          isOver ? 'bg-accent-soft outline outline-1 outline-dashed outline-accent/40' : ''
+        }`}
       >
-        <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
-          {leads.map(lead => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              usuarios={usuarios}
-              onClick={() => onLeadClick(lead)}
-              barColor={column.color}
-              sla={sla}
-            />
+        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+          {leads.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} usuarios={usuarios} onClick={() => onLeadClick(lead)} barColor={column.color} sla={sla} />
           ))}
         </SortableContext>
 
         {leads.length === 0 && (
-          <div className="flex-1 min-h-[80px] flex items-center justify-center rounded-[12px] border border-dashed border-[#16212E]/[0.10] px-3 text-center">
-            <p className="text-[12px] text-[#9AA7B6] leading-relaxed">
-              {isDragging ? 'Soltar aqui' : emptyMsg}
-            </p>
+          <div className="flex min-h-[80px] flex-1 items-center justify-center rounded-card border border-dashed border-line px-3 text-center">
+            <p className="text-[11.5px] leading-relaxed text-ink-3">{isDragging ? 'Soltar aqui' : emptyMsg}</p>
           </div>
         )}
       </div>
