@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <EmpresaProvider>
-      <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
+      <div className="flex h-screen bg-bg overflow-hidden">
         <AdminSidebar
           userName={usuario?.nome ?? usuario?.email ?? 'Administrador'}
           empresaNome={empresa?.nome ?? 'Minha empresa'}

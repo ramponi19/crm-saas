@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { TrendingUp, AlertTriangle } from 'lucide-react'
+import { Card, StatCard, Badge } from '@/components/ui'
 
-const ADMIN_COR = '#7C3AED'
+const ROXO = '#6D28D9'
 
 const PRECO_PLANO: Record<string, number> = { free: 0, starter: 97, pro: 197 }
 
@@ -83,104 +84,114 @@ export default async function MetricasPage() {
     .sort((a, b) => b.pctMax - a.pctMax)
 
   return (
-    <div className="px-8 py-7 max-w-[1400px]">
-      <div className="mb-6">
-        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">Métricas</h1>
-        <p className="text-[14px] text-[#788698] mt-1">Crescimento, receita e capacidade dos tenants</p>
-      </div>
+    <div className="min-h-full bg-bg px-8 py-7">
+      <div className="mx-auto max-w-[1400px] space-y-5">
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        {/* Novos tenants por mês */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6">
-          <h3 className="font-sans font-bold text-[15px] text-[#16212E] mb-5">Novos tenants por mês</h3>
-          <div className="flex items-end justify-between gap-3 h-[160px]">
-            {meses.map(m => (
-              <div key={m.chave} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex items-end justify-center" style={{ height: '130px' }}>
-                  <div
-                    className="w-full max-w-[44px] rounded-t-[6px] transition-all relative group"
-                    style={{
-                      height: `${(m.total / maxMes) * 100}%`,
-                      minHeight: m.total > 0 ? '6px' : '2px',
-                      background: m.total > 0 ? `linear-gradient(to top, ${ADMIN_COR}, #9F67F0)` : '#16212E10',
-                    }}
-                  >
-                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[12px] font-bold text-[#16212E]">
-                      {m.total > 0 ? m.total : ''}
-                    </span>
+        <div>
+          <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Métricas</h1>
+          <p className="mt-0.5 text-[13px] text-ink-2">Crescimento, receita e capacidade dos tenants</p>
+        </div>
+
+        {/* Resumo */}
+        <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          <StatCard bare label="MRR estimado" value={fmtBRL(mrrTotal)} />
+          <StatCard bare label="Total de tenants" value={lista.length} />
+          <StatCard bare label="Ativos" value={ativas.length} delta="em operação" deltaTone="ok" />
+          <StatCard bare label="Inativos" value={lista.length - ativas.length} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Novos tenants por mês */}
+          <Card title="Novos tenants por mês">
+            <div className="flex h-[160px] items-end justify-between gap-3">
+              {meses.map(m => (
+                <div key={m.chave} className="flex flex-1 flex-col items-center gap-2">
+                  <div className="flex w-full items-end justify-center" style={{ height: '130px' }}>
+                    <div
+                      className="relative w-full max-w-[44px] rounded-t-[6px] transition-all"
+                      style={{
+                        height: `${(m.total / maxMes) * 100}%`,
+                        minHeight: m.total > 0 ? '6px' : '2px',
+                        background: m.total > 0 ? ROXO : 'rgba(21,24,28,0.06)',
+                      }}
+                    >
+                      <span className="num absolute -top-5 left-1/2 -translate-x-1/2 text-[12px] font-bold text-ink">
+                        {m.total > 0 ? m.total : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-ink-3">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* MRR por plano */}
+          <Card
+            title={
+              <span className="flex items-center gap-2">
+                <TrendingUp size={17} strokeWidth={1.7} style={{ color: ROXO }} />
+                MRR por plano
+              </span>
+            }
+          >
+            <div className="num mb-5 text-[30px] font-bold tracking-[-0.035em] text-ink">{fmtBRL(mrrTotal)}</div>
+            <div className="space-y-4">
+              {mrrPorPlano.map(p => (
+                <div key={p.plano}>
+                  <div className="mb-1.5 flex justify-between text-[13px]">
+                    <span className="font-semibold capitalize text-ink-2">{p.plano} ({p.qtd})</span>
+                    <span className="num font-bold text-ink">{fmtBRL(p.mrr)}</span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-ink/[0.06]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${mrrTotal > 0 ? (p.mrr / mrrTotal) * 100 : 0}%`,
+                        background: p.plano === 'pro' ? ROXO : 'rgba(21,24,28,0.30)',
+                      }}
+                    />
                   </div>
                 </div>
-                <span className="text-[11px] text-[#9AA7B6] font-mono">{m.label}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Card>
         </div>
 
-        {/* MRR por plano */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp size={18} style={{ color: ADMIN_COR }} />
-            <h3 className="font-sans font-bold text-[15px] text-[#16212E]">MRR por plano</h3>
-          </div>
-          <div className="font-sans font-extrabold text-[30px] text-[#16212E] mb-5">{fmtBRL(mrrTotal)}</div>
-          <div className="space-y-4">
-            {mrrPorPlano.map(p => (
-              <div key={p.plano}>
-                <div className="flex justify-between text-[13px] mb-1.5">
-                  <span className="text-[#56657A] font-semibold capitalize">{p.plano} ({p.qtd})</span>
-                  <span className="text-[#16212E] font-bold">{fmtBRL(p.mrr)}</span>
-                </div>
-                <div className="h-2.5 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${mrrTotal > 0 ? (p.mrr / mrrTotal) * 100 : 0}%`,
-                      background: p.plano === 'pro' ? ADMIN_COR : '#2563EB',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Empresas próximas do limite */}
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <AlertTriangle size={18} style={{ color: '#D97706' }} />
-          <h3 className="font-sans font-bold text-[15px] text-[#16212E]">Empresas próximas do limite</h3>
-          <span className="text-[12px] text-[#9AA7B6]">(uso ≥ 70%)</span>
-        </div>
-        {proximasLimite.length === 0 ? (
-          <p className="text-[13px] text-[#9AA7B6] py-4">Nenhuma empresa próxima do limite no momento.</p>
-        ) : (
-          <div className="space-y-3">
-            {proximasLimite.map(u => (
-              <Link
-                key={u.id}
-                href={`/superadmin/empresas/${u.id}`}
-                className="flex items-center gap-4 p-3 rounded-[12px] border border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.015] transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-semibold text-[#16212E] truncate">{u.nome}</div>
-                  <div className="text-[12px] text-[#9AA7B6]">
-                    {u.leads}/{u.limLeads} leads · {u.usuarios}/{u.limUsuarios} usuários
-                  </div>
-                </div>
-                <span
-                  className="text-[13px] font-bold px-3 py-1 rounded-full shrink-0"
-                  style={{
-                    background: u.pctMax >= 90 ? '#DC262615' : '#D9770615',
-                    color: u.pctMax >= 90 ? '#B91C1C' : '#B45309',
-                  }}
+        {/* Empresas próximas do limite */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <AlertTriangle size={17} strokeWidth={1.7} className="text-warn" />
+              Empresas próximas do limite
+            </span>
+          }
+          actions={<span className="text-[12px] text-ink-3">uso ≥ 70%</span>}
+        >
+          {proximasLimite.length === 0 ? (
+            <p className="py-4 text-[13px] text-ink-3">Nenhuma empresa próxima do limite no momento.</p>
+          ) : (
+            <div className="space-y-2">
+              {proximasLimite.map(u => (
+                <Link
+                  key={u.id}
+                  href={`/superadmin/empresas/${u.id}`}
+                  className="flex items-center gap-4 rounded-card border border-line-soft p-3 transition-colors hover:bg-raised"
                 >
-                  {Math.round(u.pctMax)}%
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[14px] font-semibold text-ink">{u.nome}</div>
+                    <div className="num text-[12px] text-ink-3">
+                      {u.leads}/{u.limLeads} leads · {u.usuarios}/{u.limUsuarios} usuários
+                    </div>
+                  </div>
+                  <Badge tone={u.pctMax >= 90 ? 'bad' : 'warn'} className="num">
+                    {Math.round(u.pctMax)}%
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   )

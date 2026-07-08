@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { ScrollText } from 'lucide-react'
+import { Card, Table, EmptyState, type Column } from '@/components/ui'
 
 
 function fmtDataHora(d: string) {
@@ -34,49 +36,30 @@ export default async function LogsPage() {
     admin: { nome: string } | null
   }>
 
-  return (
-    <div className="px-8 py-7 max-w-[1400px]">
-      <div className="mb-6">
-        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
-          Logs de atividade
-        </h1>
-        <p className="text-[14px] text-[#788698] mt-1">
-          Registro de ações administrativas sobre os tenants
-        </p>
-      </div>
+  type Log = (typeof lista)[number]
+  const cols: Column<Log>[] = [
+    { key: 'data', header: 'Data', className: 'num whitespace-nowrap', render: (log) => <span className="text-ink-2">{fmtDataHora(log.created_at)}</span> },
+    { key: 'admin', header: 'Admin', render: (log) => <span className="text-ink">{log.admin?.nome ?? '—'}</span> },
+    { key: 'acao', header: 'Ação', render: (log) => <span className="font-semibold text-ink">{ACAO_LABEL[log.acao] ?? log.acao}</span> },
+    { key: 'empresa', header: 'Empresa', render: (log) => <span className="text-ink-2">{log.empresa?.nome ?? '—'}</span> },
+  ]
 
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#16212E]/[0.07]">
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3.5">Data</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Admin</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Ação</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Empresa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-5 py-12 text-center text-[14px] text-[#9AA7B6]">
-                  Nenhuma ação registrada ainda.
-                </td>
-              </tr>
-            )}
-            {lista.map(log => (
-              <tr key={log.id} className="border-b border-[#16212E]/[0.05] last:border-0">
-                <td className="px-5 py-3.5 text-[13px] text-[#56657A] font-mono whitespace-nowrap">
-                  {fmtDataHora(log.created_at)}
-                </td>
-                <td className="px-3 py-3.5 text-[13px] text-[#16212E]">{log.admin?.nome ?? '—'}</td>
-                <td className="px-3 py-3.5 text-[13px] font-semibold text-[#16212E]">
-                  {ACAO_LABEL[log.acao] ?? log.acao}
-                </td>
-                <td className="px-3 py-3.5 text-[13px] text-[#56657A]">{log.empresa?.nome ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  return (
+    <div className="min-h-full bg-bg px-8 py-7">
+      <div className="mx-auto max-w-[1400px] space-y-5">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Logs de atividade</h1>
+          <p className="mt-0.5 text-[13px] text-ink-2">Registro de ações administrativas sobre os tenants</p>
+        </div>
+
+        <Card flush>
+          <Table
+            columns={cols}
+            rows={lista}
+            rowKey={(log) => log.id}
+            empty={<EmptyState icon={<ScrollText size={22} strokeWidth={1.7} />} title="Nenhuma ação registrada ainda" description="As ações administrativas sobre os tenants aparecerão aqui." />}
+          />
+        </Card>
       </div>
     </div>
   )

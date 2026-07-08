@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { Zap } from 'lucide-react'
-import { toast } from 'sonner'
-
-const GOLD = '#C9A24B'
+import { Card, Badge, notify } from '@/components/ui'
+import { cn } from '@/lib/utils'
 
 export function ReguaFollowupCard({ inicialAtivo, isImob }: { inicialAtivo: boolean; isImob: boolean }) {
   const [ativo, setAtivo] = useState(inicialAtivo)
@@ -21,49 +20,54 @@ export function ReguaFollowupCard({ inicialAtivo, isImob }: { inicialAtivo: bool
         body: JSON.stringify({ ativo: novo }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? 'Falha ao salvar')
-      toast.success(novo ? 'Régua de follow-up ativada' : 'Régua de follow-up desativada')
+      notify.ok(novo ? 'Régua de follow-up ativada' : 'Régua de follow-up desativada')
     } catch (e) {
       setAtivo(!novo) // desfaz
-      toast.error(e instanceof Error ? e.message : 'Erro ao salvar')
+      notify.bad(e instanceof Error ? e.message : 'Erro ao salvar')
     } finally {
       setSalvando(false)
     }
   }
 
   return (
-    <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6">
+    <Card>
       <div className="flex items-start gap-4">
-        <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center shrink-0" style={{ background: `${GOLD}18`, color: GOLD }}>
-          <Zap size={21} />
+        <div className="grid h-11 w-11 flex-none place-items-center rounded-control bg-accent-soft text-accent">
+          <Zap size={21} strokeWidth={1.7} />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-[15px] font-bold text-[#16212E]">Régua de follow-up automática</div>
+            <div className="text-[15px] font-semibold text-ink">Régua de follow-up automática</div>
             {/* switch */}
             <button
               role="switch"
               aria-checked={ativo}
               disabled={salvando}
               onClick={alternar}
-              className="relative w-[46px] h-[26px] rounded-full transition-colors shrink-0 disabled:opacity-60"
-              style={{ background: ativo ? GOLD : 'rgba(22,33,46,0.18)' }}
+              className={cn(
+                'relative h-[26px] w-[46px] shrink-0 rounded-full transition-colors disabled:opacity-60',
+                ativo ? 'bg-accent' : 'bg-ink/20',
+              )}
             >
               <span
-                className="absolute top-[3px] left-[3px] w-[20px] h-[20px] rounded-full bg-white shadow transition-transform"
+                className="absolute left-[3px] top-[3px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform"
                 style={{ transform: ativo ? 'translateX(20px)' : 'translateX(0)' }}
               />
             </button>
           </div>
-          <p className="text-[12.5px] text-[#788698] mt-1.5 leading-relaxed">
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-2">
             Cria tarefas de cobrança sozinha: lead novo sem primeiro contato em 24h
             {isImob ? ' e visita realizada sem proposta em 3 dias' : ''}. São tarefas
             internas na equipe — não envia nada para o cliente.
           </p>
-          <p className="text-[11.5px] mt-2" style={{ color: ativo ? '#15803D' : '#9AA7B6' }}>
-            {ativo ? '● Ativa — roda todo dia de manhã.' : '○ Desativada — nenhuma tarefa automática é criada.'}
-          </p>
+          <div className="mt-2.5 flex items-center gap-2">
+            <Badge tone={ativo ? 'ok' : 'neutro'} dot>{ativo ? 'Ativa' : 'Pausada'}</Badge>
+            <span className="text-[11.5px] text-ink-3">
+              {ativo ? 'Roda todo dia de manhã.' : 'Nenhuma tarefa automática é criada.'}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

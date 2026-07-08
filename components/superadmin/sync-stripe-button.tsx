@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui'
 
 export function SyncStripeButton() {
   const [estado, setEstado] = useState<'idle' | 'carregando' | 'ok' | 'erro'>('idle')
@@ -29,16 +30,17 @@ export function SyncStripeButton() {
 
   return (
     <div className="flex items-center gap-3">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={handleSync}
-        disabled={estado === 'carregando'}
-        className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#7C3AED]/40 text-[#7C3AED] hover:bg-[#7C3AED]/10 disabled:opacity-50 transition-colors"
+        loading={estado === 'carregando'}
+        icon={<RefreshCw size={14} strokeWidth={1.7} />}
       >
-        <RefreshCw size={13} className={estado === 'carregando' ? 'animate-spin' : ''} />
         Sincronizar Stripe
-      </button>
+      </Button>
       {resultado && (
-        <span className={`text-xs ${estado === 'erro' ? 'text-red-400' : 'text-green-400'}`}>
+        <span className={`text-[12px] font-medium ${estado === 'erro' ? 'text-bad' : 'text-ok'}`}>
           {resultado}
         </span>
       )}

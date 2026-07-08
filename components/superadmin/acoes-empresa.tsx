@@ -2,10 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { CreditCard, Power, CalendarClock, Eye, X, Check, Shapes } from 'lucide-react'
+import { CreditCard, Power, CalendarClock, Eye, Shapes } from 'lucide-react'
 import { SEGMENTOS_LISTA } from '@/lib/segmentos'
+import { Card, Button, Modal, Select, Input } from '@/components/ui'
 
-const ADMIN_COR = '#7C3AED'
+// Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
+const PLATFORM = '#6D28D9'
 
 interface Props {
   empresaId: number
@@ -16,6 +18,13 @@ interface Props {
 }
 
 type ModalTipo = 'plano' | 'status' | 'trial' | 'segmento' | null
+
+const MODAL_TITULO: Record<Exclude<ModalTipo, null>, string> = {
+  plano: 'Trocar plano',
+  segmento: 'Trocar segmento',
+  status: 'Alterar status',
+  trial: 'Estender trial',
+}
 
 export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, segmentoAtual }: Props) {
   const router = useRouter()
@@ -68,173 +77,112 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
   }
 
   const botoes = [
-    { tipo: 'plano' as const, label: 'Trocar plano', icon: CreditCard, cor: '#7C3AED' },
-    { tipo: 'segmento' as const, label: 'Trocar segmento', icon: Shapes, cor: '#0D9488' },
-    { tipo: 'status' as const, label: 'Alterar status', icon: Power, cor: '#DC2626' },
-    { tipo: 'trial' as const, label: 'Estender trial', icon: CalendarClock, cor: '#D97706' },
+    { tipo: 'plano' as const, label: 'Trocar plano', icon: CreditCard },
+    { tipo: 'segmento' as const, label: 'Trocar segmento', icon: Shapes },
+    { tipo: 'status' as const, label: 'Alterar status', icon: Power },
+    { tipo: 'trial' as const, label: 'Estender trial', icon: CalendarClock },
   ]
+
+  function confirmar() {
+    if (modal === 'plano') executar({ tipo: 'trocar_plano', plano: novoPlano })
+    if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoSegmento })
+    if (modal === 'status') executar({ tipo: 'alterar_status', status: novoStatus })
+    if (modal === 'trial') executar({ tipo: 'estender_trial', dias: diasTrial })
+  }
 
   return (
     <>
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
-        <h3 className="font-sans font-bold text-[15px] text-[#16212E] mb-4">Ações administrativas</h3>
+      <Card title="Ações administrativas">
         <div className="flex flex-wrap gap-2.5">
           {botoes.map(b => {
             const Icon = b.icon
             return (
-              <button
+              <Button
                 key={b.tipo}
+                variant="outline"
+                icon={<Icon size={16} strokeWidth={1.7} />}
                 onClick={() => { setErro(null); setModal(b.tipo) }}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13px] font-semibold border transition-all hover:bg-[#16212E]/[0.02]"
-                style={{ borderColor: `${b.cor}30`, color: b.cor }}
               >
-                <Icon size={16} />
                 {b.label}
-              </button>
+              </Button>
             )
           })}
-          <button
+          <Button
             onClick={impersonar}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
-            style={{ background: `linear-gradient(135deg, ${ADMIN_COR}, #6D28D9)` }}
+            loading={loading}
+            icon={<Eye size={16} strokeWidth={1.7} />}
+            style={{ background: PLATFORM }}
+            className="text-white hover:opacity-90"
           >
-            <Eye size={16} />
             Entrar como esta empresa
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !loading && setModal(null)}>
-          <div className="bg-white rounded-[18px] w-full max-w-[420px] p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-sans font-bold text-[17px] text-[#16212E]">
-                {modal === 'plano' && 'Trocar plano'}
-                {modal === 'segmento' && 'Trocar segmento'}
-                {modal === 'status' && 'Alterar status'}
-                {modal === 'trial' && 'Estender trial'}
-              </h3>
-              <button onClick={() => !loading && setModal(null)} className="text-[#9AA7B6] hover:text-[#16212E]" aria-label="Fechar">
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-[13px] text-[#788698] mb-5">{empresaNome}</p>
+      <Modal
+        open={modal !== null}
+        onClose={() => setModal(null)}
+        size="sm"
+        disableOverlayClose={loading}
+        title={modal ? MODAL_TITULO[modal] : ''}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModal(null)} disabled={loading}>Cancelar</Button>
+            <Button onClick={confirmar} loading={loading} style={{ background: PLATFORM }} className="text-white hover:opacity-90">
+              {loading ? 'Aplicando…' : 'Confirmar'}
+            </Button>
+          </>
+        }
+      >
+        <p className="mb-4 text-[13px] text-ink-2">{empresaNome}</p>
 
-            {modal === 'plano' && (
-              <div className="space-y-2 mb-5">
-                {['free', 'starter', 'pro'].map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setNovoPlano(p)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-[11px] border text-[14px] font-semibold capitalize transition-all"
-                    style={novoPlano === p
-                      ? { borderColor: ADMIN_COR, background: `${ADMIN_COR}0A`, color: ADMIN_COR }
-                      : { borderColor: '#16212E14', color: '#56657A' }}
-                  >
-                    {p}
-                    {novoPlano === p && <Check size={17} />}
-                  </button>
-                ))}
-              </div>
-            )}
+        {modal === 'plano' && (
+          <Select label="Plano" value={novoPlano} onChange={e => setNovoPlano(e.target.value)}>
+            {['free', 'starter', 'pro'].map(p => (
+              <option key={p} value={p} className="capitalize">{p}</option>
+            ))}
+          </Select>
+        )}
 
-            {modal === 'segmento' && (
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                {SEGMENTOS_LISTA.map(({ id, config }) => (
-                  <button
-                    key={id}
-                    onClick={() => setNovoSegmento(id)}
-                    className="flex items-center gap-2 px-3 py-3 rounded-[11px] border text-[13px] font-semibold text-left transition-all"
-                    style={novoSegmento === id
-                      ? { borderColor: ADMIN_COR, background: `${ADMIN_COR}0A`, color: ADMIN_COR }
-                      : { borderColor: '#16212E14', color: '#56657A' }}
-                  >
-                    <span className="text-[16px]">{config.emoji}</span>
-                    <span className="flex-1">{config.label}</span>
-                    {novoSegmento === id && <Check size={16} />}
-                  </button>
-                ))}
-              </div>
-            )}
+        {modal === 'segmento' && (
+          <Select label="Segmento" value={novoSegmento} onChange={e => setNovoSegmento(e.target.value)}>
+            {SEGMENTOS_LISTA.map(({ id, config }) => (
+              <option key={id} value={id}>{config.label}</option>
+            ))}
+          </Select>
+        )}
 
-            {modal === 'status' && (
-              <div className="space-y-2 mb-5">
-                {[
-                  { v: 'ativo', cor: '#16A34A' },
-                  { v: 'suspenso', cor: '#DC2626' },
-                  { v: 'cancelado', cor: '#6B7280' },
-                ].map(s => (
-                  <button
-                    key={s.v}
-                    onClick={() => setNovoStatus(s.v)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-[11px] border text-[14px] font-semibold capitalize transition-all"
-                    style={novoStatus === s.v
-                      ? { borderColor: s.cor, background: `${s.cor}0A`, color: s.cor }
-                      : { borderColor: '#16212E14', color: '#56657A' }}
-                  >
-                    {s.v}
-                    {novoStatus === s.v && <Check size={17} />}
-                  </button>
-                ))}
-              </div>
-            )}
+        {modal === 'status' && (
+          <Select label="Status" value={novoStatus} onChange={e => setNovoStatus(e.target.value)}>
+            {['ativo', 'suspenso', 'cancelado'].map(s => (
+              <option key={s} value={s} className="capitalize">{s}</option>
+            ))}
+          </Select>
+        )}
 
-            {modal === 'trial' && (
-              <div className="mb-5">
-                <label className="block text-[13px] font-semibold text-[#56657A] mb-2">
-                  Dias a adicionar (a partir de hoje)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={diasTrial}
-                  onChange={e => setDiasTrial(Number(e.target.value))}
-                  className="w-full px-4 py-3 text-[14px] border border-[#16212E]/[0.12] rounded-[11px] outline-none focus:border-[#7C3AED]/40"
-                />
-                <div className="flex gap-2 mt-2">
-                  {[7, 14, 30, 60].map(d => (
-                    <button
-                      key={d}
-                      onClick={() => setDiasTrial(d)}
-                      className="px-3 py-1.5 rounded-[9px] text-[12px] font-semibold border border-[#16212E]/[0.1] text-[#788698] hover:bg-[#16212E]/[0.03]"
-                    >
-                      {d}d
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {erro && <p className="text-[13px] text-[#DC2626] mb-3">{erro}</p>}
-
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => setModal(null)}
-                disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#788698] border border-[#16212E]/[0.1] hover:bg-[#16212E]/[0.03] disabled:opacity-60"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  if (modal === 'plano') executar({ tipo: 'trocar_plano', plano: novoPlano })
-                  if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoSegmento })
-                  if (modal === 'status') executar({ tipo: 'alterar_status', status: novoStatus })
-                  if (modal === 'trial') executar({ tipo: 'estender_trial', dias: diasTrial })
-                }}
-                disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white disabled:opacity-60"
-                style={{ background: `linear-gradient(135deg, ${ADMIN_COR}, #6D28D9)` }}
-              >
-                {loading ? 'Aplicando...' : 'Confirmar'}
-              </button>
+        {modal === 'trial' && (
+          <div>
+            <Input
+              label="Dias a adicionar (a partir de hoje)"
+              type="number"
+              min={1}
+              max={365}
+              value={diasTrial}
+              onChange={e => setDiasTrial(Number(e.target.value))}
+            />
+            <div className="mt-2 flex gap-2">
+              {[7, 14, 30, 60].map(d => (
+                <Button key={d} variant="outline" size="sm" onClick={() => setDiasTrial(d)}>
+                  {d}d
+                </Button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {erro && <p className="mt-3 text-[13px] text-bad">{erro}</p>}
+      </Modal>
     </>
   )
 }

@@ -14,17 +14,15 @@ export default async function AdminsPage() {
     .order('nome')
 
   return (
-    <div className="px-8 py-7 max-w-[800px]">
-      <div className="mb-6">
-        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
-          Administradores
-        </h1>
-        <p className="text-[14px] text-[#788698] mt-1">
-          Gerencie quem tem acesso de super admin ao CRM
-        </p>
-      </div>
+    <div className="min-h-full bg-bg px-8 py-7">
+      <div className="mx-auto max-w-[800px] space-y-5">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Administradores</h1>
+          <p className="mt-0.5 text-[13px] text-ink-2">Gerencie quem tem acesso de super admin ao CRM</p>
+        </div>
 
-      <GestaoSuperAdmins admins={admins ?? []} currentUserId={userId} />
+        <GestaoSuperAdmins admins={admins ?? []} currentUserId={userId} />
+      </div>
     </div>
   )
 }

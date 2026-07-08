@@ -3,20 +3,38 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Users, Target, ShoppingBag, Building2 } from 'lucide-react'
+import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
+import { Card, Badge } from '@/components/ui'
 
-const ADMIN_COR = '#7C3AED'
+// Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
+const PLATFORM = '#6D28D9'
 
-const STATUS_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  ativo:     { label: 'Ativo',     bg: '#16A34A15', text: '#15803D' },
-  suspenso:  { label: 'Suspenso',  bg: '#DC262615', text: '#B91C1C' },
-  cancelado: { label: 'Cancelado', bg: '#6B728015', text: '#4B5563' },
+const STATUS_TONE: Record<string, 'ok' | 'bad' | 'neutro'> = {
+  ativo: 'ok', suspenso: 'bad', cancelado: 'neutro',
+}
+const STATUS_LABEL: Record<string, string> = {
+  ativo: 'Ativo', suspenso: 'Suspenso', cancelado: 'Cancelado',
+}
+const PLANO_LABEL: Record<string, string> = {
+  free: 'Free', starter: 'Starter', pro: 'Pro',
 }
 
-const PLANO_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  free:    { label: 'Free',    bg: '#6B728015', text: '#4B5563' },
-  starter: { label: 'Starter', bg: '#2563EB15', text: '#1D4ED8' },
-  pro:     { label: 'Pro',     bg: '#7C3AED15', text: '#6D28D9' },
+function planoBadge(plano: string) {
+  const label = PLANO_LABEL[plano] ?? 'Free'
+  if (plano === 'pro') return <Badge className="bg-[#6D28D9]/10 text-[#6D28D9]">{label}</Badge>
+  return <Badge tone="neutro">{label}</Badge>
+}
+
+function statusBadge(status: string) {
+  const tone = STATUS_TONE[status] ?? 'neutro'
+  const label = STATUS_LABEL[status] ?? 'Cancelado'
+  return tone === 'ok' ? <Badge tone="ok" dot>{label}</Badge> : <Badge tone={tone}>{label}</Badge>
+}
+
+function getInitials(nome: string) {
+  const parts = nome.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return nome.slice(0, 2).toUpperCase()
 }
 
 function fmtData(d: string | null) {
@@ -68,8 +86,6 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   ])
 
   const usuariosAtivos = membros.filter(m => m.ativo).length
-  const sb = STATUS_BADGE[empresa.status] ?? STATUS_BADGE.cancelado
-  const pb = PLANO_BADGE[empresa.plano] ?? PLANO_BADGE.free
 
   const limiteUsuarios = empresa.limite_usuarios ?? 0
   const limiteLeads = empresa.limite_leads ?? 0
@@ -78,82 +94,80 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const usoLeads = limiteLeads > 0 ? Math.min(100, ((leadsCount ?? 0) / limiteLeads) * 100) : 0
 
   const contadores = [
-    { label: 'Leads', valor: leadsCount ?? 0, icon: Target, cor: '#2563EB' },
-    { label: 'Vendas', valor: vendasCount ?? 0, icon: ShoppingBag, cor: '#16A34A' },
-    { label: 'Clientes', valor: clientesCount ?? 0, icon: Users, cor: '#D97706' },
+    { label: 'Leads', valor: leadsCount ?? 0, icon: Target },
+    { label: 'Vendas', valor: vendasCount ?? 0, icon: ShoppingBag },
+    { label: 'Clientes', valor: clientesCount ?? 0, icon: Users },
   ]
 
   return (
-    <div className="px-8 py-7 max-w-[1100px]">
+    <div className="max-w-[1100px] px-8 py-7">
       {/* Voltar */}
       <Link
         href="/superadmin/empresas"
-        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#788698] hover:text-[#16212E] transition-colors mb-5"
+        className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink"
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={16} strokeWidth={1.7} />
         Voltar para empresas
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div
-            className="w-[56px] h-[56px] rounded-[15px] flex items-center justify-center shrink-0"
-            style={{ background: `${(empresa.wl_cor ?? ADMIN_COR)}18` }}
-          >
-            <Building2 size={26} style={{ color: empresa.wl_cor ?? ADMIN_COR }} />
-          </div>
-          <div>
-            <h1 className="font-serif font-medium text-[24px] text-[#16212E] tracking-[-0.02em]">{empresa.nome}</h1>
-            <p className="text-[13px] text-[#9AA7B6] font-mono">{empresa.slug}</p>
+          <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-ink text-[15px] font-bold text-white">
+            {getInitials(empresa.nome)}
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-[24px] font-bold tracking-[-0.03em] text-ink">{empresa.nome}</h1>
+            <p className="num text-[13px] text-ink-3">{empresa.slug}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex px-3 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: pb.bg, color: pb.text }}>{pb.label}</span>
-          <span className="inline-flex px-3 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: sb.bg, color: sb.text }}>{sb.label}</span>
+          {planoBadge(empresa.plano)}
+          {statusBadge(empresa.status)}
         </div>
       </div>
 
       {/* Contadores de uso */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="mb-5 grid grid-cols-3 gap-4">
         {contadores.map(c => {
           const Icon = c.icon
           return (
-            <div key={c.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Icon size={17} style={{ color: c.cor }} />
-                <span className="text-[13px] font-semibold text-[#788698]">{c.label}</span>
+            <div key={c.label} className="flex items-center gap-3 rounded-card border border-line bg-card p-5">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-control bg-ink/[0.04] text-ink-3">
+                <Icon size={17} strokeWidth={1.7} />
+              </span>
+              <div>
+                <div className="num text-[24px] font-bold leading-none text-ink">{c.valor}</div>
+                <div className="mt-1 text-[12px] text-ink-3">{c.label}</div>
               </div>
-              <div className="font-sans font-extrabold text-[26px] text-[#16212E]">{c.valor}</div>
             </div>
           )
         })}
       </div>
 
       {/* Limites de uso */}
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 mb-5">
-        <h3 className="font-sans font-bold text-[15px] text-[#16212E] mb-4">Uso vs. limites do plano</h3>
+      <Card title="Uso vs. limites do plano" className="mb-5">
         <div className="space-y-4">
           <div>
-            <div className="flex justify-between text-[13px] mb-1.5">
-              <span className="text-[#56657A] font-semibold">Usuários</span>
-              <span className="text-[#788698]">{usuariosAtivos} / {limiteUsuarios}</span>
+            <div className="mb-1.5 flex justify-between text-[13px]">
+              <span className="font-semibold text-ink-2">Usuários</span>
+              <span className="num text-ink-3">{usuariosAtivos} / {limiteUsuarios}</span>
             </div>
-            <div className="h-2 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${usoUsuarios}%`, background: usoUsuarios > 90 ? '#DC2626' : ADMIN_COR }} />
+            <div className="h-2 overflow-hidden rounded-full bg-ink/[0.06]">
+              <div className={`h-full rounded-full ${usoUsuarios > 90 ? 'bg-bad' : ''}`} style={{ width: `${usoUsuarios}%`, background: usoUsuarios > 90 ? undefined : PLATFORM }} />
             </div>
           </div>
           <div>
-            <div className="flex justify-between text-[13px] mb-1.5">
-              <span className="text-[#56657A] font-semibold">Leads</span>
-              <span className="text-[#788698]">{leadsCount ?? 0} / {limiteLeads}</span>
+            <div className="mb-1.5 flex justify-between text-[13px]">
+              <span className="font-semibold text-ink-2">Leads</span>
+              <span className="num text-ink-3">{leadsCount ?? 0} / {limiteLeads}</span>
             </div>
-            <div className="h-2 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${usoLeads}%`, background: usoLeads > 90 ? '#DC2626' : ADMIN_COR }} />
+            <div className="h-2 overflow-hidden rounded-full bg-ink/[0.06]">
+              <div className={`h-full rounded-full ${usoLeads > 90 ? 'bg-bad' : ''}`} style={{ width: `${usoLeads}%`, background: usoLeads > 90 ? undefined : PLATFORM }} />
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Ações administrativas (client) */}
       <div className="mb-5">
@@ -167,56 +181,50 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
       </div>
 
       {/* Grid: dados + membros */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Dados da assinatura */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
-          <h3 className="font-sans font-bold text-[15px] text-[#16212E] mb-4">Assinatura & Stripe</h3>
+        <Card title="Assinatura & Stripe">
           <dl className="space-y-3 text-[13.5px]">
             <div className="flex justify-between">
-              <dt className="text-[#9AA7B6]">Criada em</dt>
-              <dd className="text-[#16212E] font-semibold">{fmtData(empresa.created_at)}</dd>
+              <dt className="text-ink-3">Criada em</dt>
+              <dd className="font-semibold text-ink">{fmtData(empresa.created_at)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-[#9AA7B6]">Trial termina</dt>
-              <dd className="text-[#16212E] font-semibold">{fmtData(empresa.trial_ends_at)}</dd>
+              <dt className="text-ink-3">Trial termina</dt>
+              <dd className="font-semibold text-ink">{fmtData(empresa.trial_ends_at)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-[#9AA7B6]">Stripe status</dt>
-              <dd className="text-[#16212E] font-semibold">{empresa.stripe_status ?? '—'}</dd>
+              <dt className="text-ink-3">Stripe status</dt>
+              <dd className="font-semibold text-ink">{empresa.stripe_status ?? '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-[#9AA7B6]">Customer ID</dt>
-              <dd className="text-[#16212E] font-mono text-[12px] truncate max-w-[180px]">{empresa.stripe_customer_id ?? '—'}</dd>
+              <dt className="text-ink-3">Customer ID</dt>
+              <dd className="num max-w-[180px] truncate text-[12px] text-ink">{empresa.stripe_customer_id ?? '—'}</dd>
             </div>
           </dl>
-        </div>
+        </Card>
 
         {/* Membros */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
-          <h3 className="font-sans font-bold text-[15px] text-[#16212E] mb-4">
-            Usuários ({membros.length})
-          </h3>
+        <Card title={`Usuários (${membros.length})`}>
           <div className="space-y-2.5">
             {membros.length === 0 && (
-              <p className="text-[13px] text-[#9AA7B6]">Nenhum usuário vinculado.</p>
+              <p className="text-[13px] text-ink-3">Nenhum usuário vinculado.</p>
             )}
             {membros.map((m, i) => (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-[34px] h-[34px] rounded-[10px] bg-[#16212E]/[0.05] flex items-center justify-center text-[12px] font-bold text-[#56657A] shrink-0">
+                <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
                   {(m.usuario?.nome ?? '?').slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-semibold text-[#16212E] truncate">{m.usuario?.nome ?? '—'}</div>
-                  <div className="text-[12px] text-[#9AA7B6] truncate">{m.usuario?.email ?? '—'}</div>
-                </div>
-                <span className="text-[11.5px] font-semibold capitalize px-2 py-0.5 rounded-full bg-[#16212E]/[0.05] text-[#56657A]">
-                  {m.role}
                 </span>
-                {!m.ativo && <span className="text-[11px] text-[#DC2626]">inativo</span>}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-semibold text-ink">{m.usuario?.nome ?? '—'}</div>
+                  <div className="truncate text-[12px] text-ink-3">{m.usuario?.email ?? '—'}</div>
+                </div>
+                <Badge tone="neutro" className="capitalize">{m.role}</Badge>
+                {!m.ativo && <Badge tone="bad">inativo</Badge>}
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   )

@@ -1,19 +1,37 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Search, ChevronRight } from 'lucide-react'
+import { Search, ChevronRight, Building2 } from 'lucide-react'
+import { Card, Badge, Table, EmptyState, type Column } from '@/components/ui'
 
-const ADMIN_COR = '#7C3AED'
+// Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
+const PLATFORM = '#6D28D9'
 
-const STATUS_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  ativo:     { label: 'Ativo',     bg: '#16A34A15', text: '#15803D' },
-  suspenso:  { label: 'Suspenso',  bg: '#DC262615', text: '#B91C1C' },
-  cancelado: { label: 'Cancelado', bg: '#6B728015', text: '#4B5563' },
+const STATUS_TONE: Record<string, 'ok' | 'bad' | 'neutro'> = {
+  ativo: 'ok', suspenso: 'bad', cancelado: 'neutro',
+}
+const STATUS_LABEL: Record<string, string> = {
+  ativo: 'Ativo', suspenso: 'Suspenso', cancelado: 'Cancelado',
+}
+const PLANO_LABEL: Record<string, string> = {
+  free: 'Free', starter: 'Starter', pro: 'Pro',
 }
 
-const PLANO_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  free:    { label: 'Free',    bg: '#6B728015', text: '#4B5563' },
-  starter: { label: 'Starter', bg: '#2563EB15', text: '#1D4ED8' },
-  pro:     { label: 'Pro',     bg: '#7C3AED15', text: '#6D28D9' },
+function planoBadge(plano: string) {
+  const label = PLANO_LABEL[plano] ?? 'Free'
+  if (plano === 'pro') return <Badge className="bg-[#6D28D9]/10 text-[#6D28D9]">{label}</Badge>
+  return <Badge tone="neutro">{label}</Badge>
+}
+
+function statusBadge(status: string) {
+  const tone = STATUS_TONE[status] ?? 'neutro'
+  const label = STATUS_LABEL[status] ?? 'Cancelado'
+  return tone === 'ok' ? <Badge tone="ok" dot>{label}</Badge> : <Badge tone={tone}>{label}</Badge>
+}
+
+function getInitials(nome: string) {
+  const parts = nome.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return nome.slice(0, 2).toUpperCase()
 }
 
 function fmtData(d: string | null) {
@@ -23,6 +41,19 @@ function fmtData(d: string | null) {
 
 interface PageProps {
   searchParams: Promise<{ q?: string; status?: string; plano?: string }>
+}
+
+type Empresa = {
+  id: number
+  nome: string
+  slug: string
+  plano: string
+  status: string
+  stripe_status: string | null
+  trial_ends_at: string | null
+  created_at: string | null
+  limite_usuarios: number | null
+  limite_leads: number | null
 }
 
 export default async function EmpresasPage({ searchParams }: PageProps) {
@@ -39,7 +70,7 @@ export default async function EmpresasPage({ searchParams }: PageProps) {
   if (q) query = query.ilike('nome', `%${q}%`)
 
   const { data: empresas } = await query
-  const lista = empresas ?? []
+  const lista = (empresas ?? []) as Empresa[]
 
   function filtroLink(params: Record<string, string | undefined>) {
     const sp = new URLSearchParams()
@@ -56,44 +87,71 @@ export default async function EmpresasPage({ searchParams }: PageProps) {
     { value: 'cancelado', label: 'Cancelados' },
   ]
 
+  const cols: Column<Empresa>[] = [
+    {
+      key: 'empresa', header: 'Empresa',
+      render: (emp) => (
+        <Link href={`/superadmin/empresas/${emp.id}`} className="flex items-center gap-3">
+          <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+            {getInitials(emp.nome)}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{emp.nome}</div>
+            <div className="num truncate text-[11px] text-ink-3">{emp.slug}</div>
+          </div>
+        </Link>
+      ),
+    },
+    { key: 'plano', header: 'Plano', render: (emp) => planoBadge(emp.plano) },
+    { key: 'status', header: 'Status', render: (emp) => statusBadge(emp.status) },
+    { key: 'stripe', header: 'Stripe', hideOnMobile: true, render: (emp) => <span className="text-ink-2">{emp.stripe_status ?? '—'}</span> },
+    { key: 'criada', header: 'Criada em', hideOnMobile: true, render: (emp) => <span className="num text-ink-2">{fmtData(emp.created_at)}</span> },
+    {
+      key: 'acao', header: '', align: 'right',
+      render: (emp) => (
+        <Link href={`/superadmin/empresas/${emp.id}`} className="inline-flex text-ink-3 transition-colors hover:text-[#6D28D9]">
+          <ChevronRight size={18} strokeWidth={1.7} />
+        </Link>
+      ),
+    },
+  ]
+
   return (
-    <div className="px-8 py-7 max-w-[1400px]">
+    <div className="max-w-[1400px] px-8 py-7">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-serif font-medium text-[26px] text-[#16212E] tracking-[-0.02em]">
-          Empresas
-        </h1>
-        <p className="text-[14px] text-[#788698] mt-1">
+        <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink">Empresas</h1>
+        <p className="mt-1 text-[14px] text-ink-2">
           {lista.length} {lista.length === 1 ? 'empresa encontrada' : 'empresas encontradas'}
         </p>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <form className="relative flex-1 min-w-[240px] max-w-[360px]">
-          <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9AA7B6]" />
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <form className="relative min-w-[240px] max-w-[360px] flex-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3">
+            <Search size={15} strokeWidth={1.7} />
+          </span>
           <input
             type="text"
             name="q"
             defaultValue={q ?? ''}
-            placeholder="Buscar por nome..."
-            className="w-full pl-10 pr-4 py-[10px] text-[13.5px] bg-white border border-[#16212E]/[0.08] rounded-[11px] outline-none focus:border-[#7C3AED]/40 transition-colors text-[#16212E] placeholder:text-[#9AA7B6]"
+            placeholder="Buscar por nome…"
+            className="h-9 w-full rounded-control border border-line bg-card pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-3 transition-colors focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/30"
           />
           {status && <input type="hidden" name="status" value={status} />}
           {plano && <input type="hidden" name="plano" value={plano} />}
         </form>
 
-        <div className="flex items-center gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
+        <div className="flex w-max items-center gap-1 rounded-control border border-line bg-card p-1">
           {statusFiltros.map(f => {
             const ativo = status === f.value || (!status && !f.value)
             return (
               <Link
                 key={f.label}
                 href={filtroLink({ status: f.value })}
-                className="flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13px] font-semibold transition-all whitespace-nowrap"
-                style={ativo
-                  ? { background: `linear-gradient(to bottom, ${ADMIN_COR}, #6D28D9)`, color: '#fff', boxShadow: '0 4px 14px rgba(124,58,237,0.35)' }
-                  : { color: '#788698' }}
+                className={`whitespace-nowrap rounded-[6px] px-4 py-1.5 text-[13px] font-semibold transition-colors ${ativo ? 'text-white' : 'text-ink-2 hover:bg-ink/[0.04]'}`}
+                style={ativo ? { background: PLATFORM } : undefined}
               >
                 {f.label}
               </Link>
@@ -103,67 +161,14 @@ export default async function EmpresasPage({ searchParams }: PageProps) {
       </div>
 
       {/* Tabela */}
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#16212E]/[0.07]">
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3.5">Empresa</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Plano</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Status</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Stripe</th>
-              <th className="text-left font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-3 py-3.5">Criada em</th>
-              <th className="w-[40px]"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-[14px] text-[#9AA7B6]">
-                  Nenhuma empresa encontrada com os filtros atuais.
-                </td>
-              </tr>
-            )}
-            {lista.map(emp => {
-              const sb = STATUS_BADGE[emp.status] ?? STATUS_BADGE.cancelado
-              const pb = PLANO_BADGE[emp.plano] ?? PLANO_BADGE.free
-              return (
-                <tr
-                  key={emp.id}
-                  className="border-b border-[#16212E]/[0.05] last:border-0 hover:bg-[#16212E]/[0.015] transition-colors"
-                >
-                  <td className="px-5 py-4">
-                    <Link href={`/superadmin/empresas/${emp.id}`} className="block">
-                      <div className="font-semibold text-[14px] text-[#16212E]">{emp.nome}</div>
-                      <div className="text-[12px] text-[#9AA7B6] font-mono">{emp.slug}</div>
-                    </Link>
-                  </td>
-                  <td className="px-3 py-4">
-                    <span className="inline-flex px-2.5 py-1 rounded-full text-[11.5px] font-semibold" style={{ background: pb.bg, color: pb.text }}>
-                      {pb.label}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4">
-                    <span className="inline-flex px-2.5 py-1 rounded-full text-[11.5px] font-semibold" style={{ background: sb.bg, color: sb.text }}>
-                      {sb.label}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 text-[13px] text-[#56657A]">
-                    {emp.stripe_status ?? '—'}
-                  </td>
-                  <td className="px-3 py-4 text-[13px] text-[#56657A]">
-                    {fmtData(emp.created_at)}
-                  </td>
-                  <td className="px-3 py-4">
-                    <Link href={`/superadmin/empresas/${emp.id}`} className="text-[#9AA7B6] hover:text-[#7C3AED] transition-colors">
-                      <ChevronRight size={18} />
-                    </Link>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <Card flush>
+        <Table
+          columns={cols}
+          rows={lista}
+          rowKey={(emp) => emp.id}
+          empty={<EmptyState icon={<Building2 size={22} strokeWidth={1.7} />} title="Nenhuma empresa encontrada" description="Nenhuma empresa corresponde aos filtros atuais." />}
+        />
+      </Card>
     </div>
   )
 }

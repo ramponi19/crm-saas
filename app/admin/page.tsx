@@ -3,6 +3,8 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, StatCard } from '@/components/ui'
+import { cn } from '@/lib/utils'
 import {
   Users, Target, Package, Wallet, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp,
@@ -10,7 +12,6 @@ import {
 
 export const metadata = { title: 'Administração' }
 
-const GOLD = '#C9A24B'
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export default async function AdminOverviewPage() {
@@ -78,93 +79,90 @@ export default async function AdminOverviewPage() {
   ]
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <Topbar title="Visão geral" />
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
-      <div className="px-8 py-8 max-w-[1100px]">
-      <p className="text-[14px] text-[#788698] mb-6">A saúde da sua operação num só lugar.</p>
+      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+        <div className="mx-auto max-w-[1100px] space-y-6">
+          <p className="text-[14px] text-ink-2">A saúde da sua operação num só lugar.</p>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map((s) => {
-          const Icon = s.icon
-          return (
-            <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5">
-              <div className="w-[40px] h-[40px] rounded-[11px] flex items-center justify-center mb-4" style={{ background: `${GOLD}18`, color: GOLD }}>
-                <Icon size={20} />
-              </div>
-              <div className="text-[26px] font-extrabold text-[#16212E] leading-none">{s.value}</div>
-              <div className="text-[12.5px] text-[#788698] mt-2">{s.label}</div>
-              <div className="text-[11px] text-[#9AA7B6] mt-0.5">{s.sub}</div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Plano + uso */}
-      <div className="grid lg:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-[12.5px] text-[#788698]">Plano atual</div>
-              <div className="text-[20px] font-extrabold text-[#16212E] capitalize">{planoCfg?.nome ?? empresa?.plano ?? '—'}</div>
-            </div>
-            <Link href="/admin/planos" className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${GOLD}, #A8884A)` }}>
-              Fazer upgrade <ArrowUpRight size={15} />
-            </Link>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card lg:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+            {stats.map((s) => (
+              <StatCard bare key={s.label} label={s.label} value={s.value} delta={s.sub} deltaTone="neutral" />
+            ))}
           </div>
-          {trialDias !== null && trialDias > 0 && (
-            <div className="text-[12.5px] rounded-[10px] px-3 py-2" style={{ background: `${GOLD}12`, color: '#8A6D2B' }}>
-              Período de teste: <b>{trialDias} dia{trialDias === 1 ? '' : 's'}</b> restante{trialDias === 1 ? '' : 's'}.
-            </div>
-          )}
+
+          {/* Plano + uso */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card
+              title="Plano atual"
+              actions={
+                <Link
+                  href="/admin/planos"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-control bg-ink px-4 text-[13px] font-medium text-white transition-colors hover:bg-ink/90"
+                >
+                  Fazer upgrade <ArrowUpRight size={15} strokeWidth={1.7} />
+                </Link>
+              }
+            >
+              <div className="text-[22px] font-bold capitalize tracking-[-0.03em] text-ink">{planoCfg?.nome ?? empresa?.plano ?? '—'}</div>
+              {trialDias !== null && trialDias > 0 && (
+                <div className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-[12.5px] text-accent">
+                  Período de teste: <b className="num">{trialDias} dia{trialDias === 1 ? '' : 's'}</b> restante{trialDias === 1 ? '' : 's'}.
+                </div>
+              )}
+            </Card>
+
+            <Card title="Uso do plano">
+              <div className="space-y-4">
+                {[
+                  { label: 'Leads ativos', used: leadsAtivos, limit: limiteLeads, pct: pctLeads },
+                  { label: 'Usuários', used: usuarios, limit: limiteUsuarios, pct: pctUsuarios },
+                ].map((u) => (
+                  <div key={u.label}>
+                    <div className="mb-1.5 flex justify-between text-[12.5px]">
+                      <span className="text-ink-2">{u.label}</span>
+                      <span className="num font-semibold text-ink">{u.used}{u.limit ? ` / ${u.limit}` : ''}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-ink/[0.06]">
+                      <div className={cn('h-full rounded-full', u.pct > 90 ? 'bg-bad' : 'bg-accent')} style={{ width: `${u.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Automação */}
+          <div>
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">Automação</div>
+            <ReguaFollowupCard inicialAtivo={reguaAtiva} isImob={isImob} />
+          </div>
+
+          {/* Atalhos de administração */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {atalhos.map((a) => {
+              const Icon = a.icon
+              return (
+                <Link
+                  key={a.href}
+                  href={a.href}
+                  className="group flex items-center gap-4 rounded-card border border-line bg-card p-5 transition-colors hover:border-ink/20"
+                >
+                  <div className="grid h-11 w-11 flex-none place-items-center rounded-control bg-accent-soft text-accent">
+                    <Icon size={21} strokeWidth={1.7} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold text-ink">{a.label}</div>
+                    <div className="text-[12.5px] text-ink-2">{a.desc}</div>
+                  </div>
+                  <ArrowUpRight size={18} strokeWidth={1.7} className="text-ink-3 transition-colors group-hover:text-accent" />
+                </Link>
+              )
+            })}
+          </div>
         </div>
-
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6 space-y-4">
-          <div className="text-[12.5px] text-[#788698] font-semibold">Uso do plano</div>
-          {[
-            { label: 'Leads ativos', used: leadsAtivos, limit: limiteLeads, pct: pctLeads },
-            { label: 'Usuários', used: usuarios, limit: limiteUsuarios, pct: pctUsuarios },
-          ].map((u) => (
-            <div key={u.label}>
-              <div className="flex justify-between text-[12.5px] mb-1.5">
-                <span className="text-[#56657A]">{u.label}</span>
-                <span className="font-semibold text-[#16212E]">{u.used}{u.limit ? ` / ${u.limit}` : ''}</span>
-              </div>
-              <div className="h-2 bg-[#16212E]/[0.06] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${u.pct}%`, background: u.pct > 90 ? '#DC2626' : GOLD }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Automação */}
-      <div className="mb-6">
-        <div className="font-mono text-[10px] tracking-[0.2em] text-[#9AA7B6] uppercase mb-2">Automação</div>
-        <ReguaFollowupCard inicialAtivo={reguaAtiva} isImob={isImob} />
-      </div>
-
-      {/* Atalhos de administração */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        {atalhos.map((a) => {
-          const Icon = a.icon
-          return (
-            <Link key={a.href} href={a.href} className="group bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4 hover:border-[rgba(201,162,75,.55)] hover:shadow-[0_10px_30px_rgba(22,35,50,.08)] transition-all">
-              <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center shrink-0" style={{ background: `${GOLD}18`, color: GOLD }}>
-                <Icon size={21} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[15px] font-bold text-[#16212E]">{a.label}</div>
-                <div className="text-[12.5px] text-[#788698]">{a.desc}</div>
-              </div>
-              <ArrowUpRight size={18} className="text-[#B0BCC9] group-hover:text-[#C9A24B] transition-colors" />
-            </Link>
-          )
-        })}
-      </div>
-      </div>
-      </div>
+      </main>
     </div>
   )
 }
