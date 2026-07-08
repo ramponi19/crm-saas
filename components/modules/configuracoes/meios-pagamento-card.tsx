@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Check, CreditCard } from 'lucide-react'
+import { Card, Input, Button } from '@/components/ui'
 
 type ProviderId = 'manual' | 'mercadopago' | 'asaas' | 'efibank' | 'pagseguro'
 
@@ -89,69 +90,65 @@ export function MeiosPagamentoCard() {
   }
 
   return (
-    <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-      <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">PAGAMENTOS</div>
-      <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-1">Meios de pagamento</h3>
-      <p className="text-[12.5px] text-[#788698] mb-[18px]">
+    <Card title="Meios de pagamento">
+      <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
         Escolha o provedor que sua loja usará para gerar cobranças (Pix, boleto, link).
         As credenciais ficam criptografadas e nunca são exibidas após salvas.
       </p>
 
       {/* Seletor de provedor */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5">
+      <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         {PROVIDERS.map(p => (
           <button
             key={p.id}
             onClick={() => { setProvider(p.id); setCredenciais({}); setFeedback(null) }}
             className={cn(
-              'text-left p-[12px_14px] rounded-[13px] border transition-all',
+              'rounded-card border p-[12px_14px] text-left transition-colors',
               provider === p.id
-                ? 'border-[#16212E] bg-[#16212E]/[0.04]'
-                : 'border-[#16212E]/[0.08] hover:bg-[#16212E]/[0.02]'
+                ? 'border-accent bg-accent-soft'
+                : 'border-line hover:bg-bg',
             )}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[13.5px] font-semibold text-[#1F2A39]">{p.nome}</span>
-              {provider === p.id && <Check size={15} className="text-[#16212E]" />}
+              <span className="text-[13.5px] font-semibold text-ink">{p.nome}</span>
+              {provider === p.id && <Check size={15} strokeWidth={1.7} className="text-accent" />}
             </div>
-            <p className="text-[11px] text-[#788698] mt-1 leading-snug">{p.desc}</p>
+            <p className="mt-1 text-[11px] leading-snug text-ink-2">{p.desc}</p>
           </button>
         ))}
       </div>
 
       {/* Campos de credenciais */}
       {def.campos.length > 0 && (
-        <div className="space-y-3 mb-4">
+        <div className="mb-4 space-y-3">
           {configurado && (
-            <p className="text-[12px] text-[#788698] bg-[#16212E]/[0.03] rounded-[10px] px-3 py-2">
-              <CreditCard size={13} className="inline mr-1.5 -mt-0.5" />
+            <p className="rounded-control bg-ink/[0.03] px-3 py-2 text-[12px] text-ink-2">
+              <CreditCard size={13} strokeWidth={1.7} className="-mt-0.5 mr-1.5 inline" />
               Já existe uma configuração salva. Preencha novamente para substituir.
             </p>
           )}
           {def.campos.map(c => (
-            <div key={c.key}>
-              <label className="block text-[12.5px] font-semibold text-[#56657A] mb-1.5">{c.label}</label>
-              <input
-                type="password"
-                autoComplete="off"
-                placeholder={c.placeholder}
-                value={credenciais[c.key] ?? ''}
-                onChange={e => setCredenciais(v => ({ ...v, [c.key]: e.target.value }))}
-                className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3.5 py-[10px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]"
-              />
-            </div>
+            <Input
+              key={c.key}
+              label={c.label}
+              type="password"
+              autoComplete="off"
+              placeholder={c.placeholder}
+              value={credenciais[c.key] ?? ''}
+              onChange={e => setCredenciais(v => ({ ...v, [c.key]: e.target.value }))}
+            />
           ))}
 
           {/* Modo */}
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[12.5px] font-semibold text-[#56657A]">Ambiente:</span>
+            <span className="text-[12.5px] font-semibold text-ink-2">Ambiente:</span>
             {(['producao', 'sandbox'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => setModo(m)}
                 className={cn(
-                  'px-3 py-1.5 rounded-[9px] text-[12px] font-semibold capitalize transition-all',
-                  modo === m ? 'bg-[#16212E] text-white' : 'bg-[#16212E]/[0.05] text-[#788698]'
+                  'rounded-control px-3 py-1.5 text-[12px] font-semibold capitalize transition-colors',
+                  modo === m ? 'bg-ink text-white' : 'bg-ink/[0.05] text-ink-2',
                 )}
               >
                 {m === 'producao' ? 'Produção' : 'Sandbox'}
@@ -162,18 +159,14 @@ export function MeiosPagamentoCard() {
       )}
 
       {feedback && (
-        <p className={cn('text-[12.5px] mb-3', feedback.tipo === 'ok' ? 'text-[#16A34A]' : 'text-[#DC2626]')}>
+        <p className={cn('mb-3 text-[12.5px]', feedback.tipo === 'ok' ? 'text-ok' : 'text-bad')}>
           {feedback.msg}
         </p>
       )}
 
-      <button
-        onClick={salvar}
-        disabled={loading}
-        className="px-[18px] py-[10px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white text-[13.5px] font-semibold shadow-[0_4px_14px_rgba(22,33,46,0.35)] hover:opacity-95 disabled:opacity-60 transition-all"
-      >
+      <Button onClick={salvar} loading={loading}>
         {loading ? 'Salvando...' : 'Salvar configuração'}
-      </button>
-    </div>
+      </Button>
+    </Card>
   )
 }

@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plug, Percent, Timer, Save, X, Link as LinkIcon, Copy, Wallet } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
@@ -113,7 +112,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   }, [empresaId])
 
   async function salvarTaxas() {
-    if (!empresaId) { toast.error('Empresa não carregada'); return }
+    if (!empresaId) { notify.bad('Empresa não carregada'); return }
     const empresa_id = empresaId
     setSavingTaxas(true)
     try {
@@ -131,21 +130,21 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
       }
       if (rows.length > 0) {
         const { error } = await supabase.from('taxas_pagamento').insert(rows)
-        if (error) { toast.error('Erro ao salvar taxas: ' + error.message); return }
+        if (error) { notify.bad('Erro ao salvar taxas: ' + error.message); return }
       }
-      toast.success('Taxas salvas com sucesso!')
+      notify.ok('Taxas salvas com sucesso!')
     } finally { setSavingTaxas(false) }
   }
 
   async function salvarSLA() {
-    if (!empresaId) { toast.error('Empresa não carregada'); return }
+    if (!empresaId) { notify.bad('Empresa não carregada'); return }
     setSavingSLA(true)
     try {
       const [verde, amarelo, vermelho] = slaValues
       const { error } = await supabase.from('configuracoes_sistema')
         .upsert({ empresa_id: empresaId, chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'empresa_id,chave' })
-      if (error) { toast.error('Erro ao salvar SLA'); return }
-      toast.success('Regras de SLA salvas!')
+      if (error) { notify.bad('Erro ao salvar SLA'); return }
+      notify.ok('Regras de SLA salvas!')
     } finally { setSavingSLA(false) }
   }
 
@@ -202,12 +201,12 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
   function copyWebhook() {
     navigator.clipboard?.writeText(WEBHOOK_URL)
-    toast.success('URL do webhook copiada!')
+    notify.ok('URL do webhook copiada!')
   }
 
   async function saveModal() {
     if (!modalCanal) return
-    if (!empresaId) { toast.error('Empresa não carregada'); return }
+    if (!empresaId) { notify.bad('Empresa não carregada'); return }
     setSaving(true)
     const upsert = (chave: string, valor: unknown) =>
       supabase.from('configuracoes_sistema')
@@ -242,11 +241,11 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
           ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
         })
       }
-      toast.success(`${modalCanal.nome} configurado!`)
+      notify.ok(`${modalCanal.nome} configurado!`)
       setModalCanal(null)
       setTimeout(() => location.reload(), 600)
     } catch {
-      toast.error('Erro ao salvar')
+      notify.bad('Erro ao salvar')
     } finally {
       setSaving(false)
     }
@@ -262,53 +261,45 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     { label: 'Atraso crítico',   desc: 'Bolinha vermelha: SLA estourado',                color: '#DC2626', min: 60 },
   ]
 
-  const inputCls = "w-full text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]"
-
   return (
-    <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
-      <div className="max-w-[980px] mx-auto animate-fade-up space-y-4">
+    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+      <div className="mx-auto max-w-[980px] space-y-4">
 
         {/* Tabs */}
-        <div className="flex gap-[5px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max overflow-x-auto">
-          {TABS.map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => setAba(id)}
-              className={cn('flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                aba === id ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
-                           : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]')}>
-              <Icon size={16} /> {label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          items={TABS.map(({ id, label, Icon }) => ({
+            value: id,
+            label: (
+              <span className="flex items-center gap-2">
+                <Icon size={15} strokeWidth={1.7} /> {label}
+              </span>
+            ),
+          }))}
+          value={aba}
+          onValueChange={setAba}
+        />
 
         {/* ── INTEGRAÇÕES ── */}
         {aba === 'integracoes' && (
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">CANAIS DE ATENDIMENTO</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-1">Integrações</h3>
-              <p className="text-[12.5px] text-[#788698] mb-[18px]">
-                WhatsApp, Instagram e Messenger via <strong className="text-[#16212E]">Meta Cloud API</strong>.
-                Conecte cada canal para a caixa de entrada unificada dos leads.
-              </p>
-              <div className="flex flex-col gap-3">
-                {integracoes.map(i => (
-                  <div key={i.id} className="flex items-center gap-[14px] p-[14px_16px] rounded-[14px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08]">
-                    <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[14px] font-semibold text-[#1F2A39]">{i.nome}</div>
-                      <div className="text-[11.5px] text-[#788698]">{i.desc}</div>
-                    </div>
-                    <span className="px-[11px] py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
-                      style={{ background: i.ativo ? 'rgba(52,211,153,0.13)' : 'rgba(107,124,146,0.18)', color: i.ativo ? '#34D399' : '#8A9BB0' }}>
-                      {i.ativo ? 'Conectado' : 'Inativo'}
-                    </span>
-                    <button onClick={() => openModal(i)}
-                      className="px-[14px] py-2 rounded-[10px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.04] transition-colors whitespace-nowrap">
-                      Configurar
-                    </button>
+          <Card title="Integrações">
+            <p className="-mt-0.5 mb-[18px] text-[12.5px] text-ink-2">
+              WhatsApp, Instagram e Messenger via <strong className="text-ink">Meta Cloud API</strong>.
+              Conecte cada canal para a caixa de entrada unificada dos leads.
+            </p>
+            <div className="flex flex-col gap-3">
+              {integracoes.map(i => (
+                <div key={i.id} className="flex items-center gap-3.5 rounded-card border border-line bg-raised px-4 py-3.5">
+                  <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold text-ink">{i.nome}</div>
+                    <div className="text-[11.5px] text-ink-2">{i.desc}</div>
                   </div>
-                ))}
-              </div>
+                  <Badge tone={i.ativo ? 'ok' : 'neutro'} dot>{i.ativo ? 'Conectado' : 'Inativo'}</Badge>
+                  <Button variant="outline" size="sm" onClick={() => openModal(i)}>Configurar</Button>
+                </div>
+              ))}
             </div>
+          </Card>
         )}
 
         {/* ── MEIOS DE PAGAMENTO ── */}
@@ -316,163 +307,135 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── TAXAS ── */}
         {aba === 'taxas' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-            <div className="flex items-start justify-between gap-3 flex-wrap mb-[6px]">
-              <div>
-                <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">MAQUININHA · % POR PARCELA</div>
-                <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Taxas de crédito e link</h3>
-              </div>
-              <button onClick={salvarTaxas} disabled={savingTaxas}
-                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(22,33,46,0.32)] disabled:opacity-50">
-                <Save size={17} /> {savingTaxas ? 'Salvando...' : 'Salvar taxas'}
-              </button>
-            </div>
-            <p className="text-[12.5px] text-[#788698] mb-4">
-              Estes valores alimentam o <strong className="text-[#16212E]">PDV</strong> e o{' '}
-              <strong className="text-[#16212E]">Simulador de Parcelas</strong> em tempo real.
+          <Card
+            title="Taxas de crédito e link"
+            actions={
+              <Button onClick={salvarTaxas} loading={savingTaxas} icon={<Save size={15} strokeWidth={1.7} />}>
+                {savingTaxas ? 'Salvando...' : 'Salvar taxas'}
+              </Button>
+            }
+          >
+            <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
+              Estes valores alimentam o <strong className="text-ink">PDV</strong> e o{' '}
+              <strong className="text-ink">Simulador de Parcelas</strong> em tempo real.
             </p>
             <div className="overflow-x-auto">
               <div className="min-w-[520px]">
-                <div className="grid gap-3 px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
+                <div className="grid gap-3 border-b border-line-soft px-1 pb-[10px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-ink-3"
                   style={{ gridTemplateColumns: '.6fr 1fr 1fr 1fr' }}>
-                  <div>PARCELAS</div>
-                  <div className="text-center">VISA / MASTER (%)</div>
-                  <div className="text-center">ELO / AMEX / OUTROS (%)</div>
-                  <div className="text-center">LINK (%)</div>
+                  <div>Parcelas</div>
+                  <div className="text-center">Visa / Master (%)</div>
+                  <div className="text-center">Elo / Amex / Outros (%)</div>
+                  <div className="text-center">Link (%)</div>
                 </div>
                 {taxaRows.map(n => (
-                  <div key={n} className="grid gap-3 items-center px-1 py-2 border-b border-[#16212E]/[0.08]"
+                  <div key={n} className="grid items-center gap-3 border-b border-line-soft px-1 py-2"
                     style={{ gridTemplateColumns: '.6fr 1fr 1fr 1fr' }}>
-                    <div className="text-[14px] font-bold text-[#16212E]">{n}x</div>
-                    <input value={taxasVisa[n] ?? ''}   onChange={e => setTaxasVisa(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
-                    <input value={taxasOutros[n] ?? ''} onChange={e => setTaxasOutros(v => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
-                    <input value={taxasLink[n] ?? ''}   onChange={e => setTaxasLink(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className={inputCls} />
+                    <div className="text-[14px] font-bold text-ink">{n}x</div>
+                    <Input value={taxasVisa[n] ?? ''}   onChange={e => setTaxasVisa(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className="text-center" />
+                    <Input value={taxasOutros[n] ?? ''} onChange={e => setTaxasOutros(v => ({ ...v, [n]: e.target.value }))} placeholder="—" className="text-center" />
+                    <Input value={taxasLink[n] ?? ''}   onChange={e => setTaxasLink(v   => ({ ...v, [n]: e.target.value }))} placeholder="—" className="text-center" />
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* ── SLA ── */}
         {aba === 'sla' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-            <div className="flex items-start justify-between gap-3 flex-wrap mb-[6px]">
-              <div>
-                <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">TEMPO DE RESPOSTA · LEADS</div>
-                <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">SLA de atendimento</h3>
-              </div>
-              <button onClick={salvarSLA} disabled={savingSLA}
-                className="flex items-center gap-2 px-5 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[2px] transition-all shadow-[0_6px_18px_rgba(22,33,46,0.32)] disabled:opacity-50">
-                <Save size={17} /> {savingSLA ? 'Salvando...' : 'Salvar regras'}
-              </button>
-            </div>
-            <p className="text-[12.5px] text-[#788698] mb-[18px] leading-[1.5]">
-              Define a cor da <strong className="text-[#16212E]">bolinha de status</strong> em cada card de lead no Kanban,
+          <Card
+            title="SLA de atendimento"
+            actions={
+              <Button onClick={salvarSLA} loading={savingSLA} icon={<Save size={15} strokeWidth={1.7} />}>
+                {savingSLA ? 'Salvando...' : 'Salvar regras'}
+              </Button>
+            }
+          >
+            <p className="-mt-0.5 mb-[18px] text-[12.5px] leading-[1.5] text-ink-2">
+              Define a cor da <strong className="text-ink">bolinha de status</strong> em cada card de lead no Kanban,
               conforme o tempo de espera sem resposta.
             </p>
             <div className="flex flex-col gap-3">
               {slaRows.map((s, i) => (
-                <div key={i} className="flex items-center gap-4 p-[16px_18px] rounded-[14px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08]">
-                  <span className="w-[16px] h-[16px] rounded-full flex-none" style={{ background: s.color, boxShadow: `0 0 12px ${s.color}` }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-[#1F2A39]">{s.label}</div>
-                    <div className="text-[11.5px] text-[#788698]">{s.desc}</div>
+                <div key={i} className="flex items-center gap-4 rounded-card border border-line bg-raised px-[18px] py-4">
+                  <span className="h-3.5 w-3.5 flex-none rounded-full" style={{ background: s.color }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold text-ink">{s.label}</div>
+                    <div className="text-[11.5px] text-ink-2">{s.desc}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input value={slaValues[i]} onChange={e => setSlaValues(v => v.map((x, j) => j === i ? Number(e.target.value) : x))} className="w-[64px] text-center bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[9px] py-[9px] text-[13px] text-[#1F2A39] font-mono outline-none focus:border-[rgba(201,162,75,0.6)]" />
-                    <span className="text-[12px] text-[#788698]">min</span>
+                    <Input value={slaValues[i]} onChange={e => setSlaValues(v => v.map((x, j) => j === i ? Number(e.target.value) : x))} className="w-[64px] text-center" />
+                    <span className="text-[12px] text-ink-2">min</span>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
       </div>
 
       {/* ── MODAL CONFIGURAR ── */}
       {modalCanal && (
-        <div onClick={() => setModalCanal(null)}
-          className="fixed inset-0 z-[80] flex items-center justify-center p-6" style={{ background: 'rgba(5,9,16,0.62)' }}>
-          <div onClick={e => e.stopPropagation()}
-            className="w-[480px] max-w-[94vw] max-h-[90vh] overflow-y-auto scrollbar-thin p-6 rounded-[18px]"
-            style={{ background: '#FFFFFF', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'popIn 0.3s ease' }}>
-            <div className="flex items-start justify-between gap-3 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center flex-none" style={{ background: modalCanal.color + '22' }}>
-                  <svg width={26} height={26} viewBox="0 0 24 24" style={{ color: modalCanal.color }}>{modalCanal.svg}</svg>
-                </div>
-                <div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#16212E]">Configurar {modalCanal.nome}</h3>
-                  <div className="text-[12px] text-[#7E8EA2] mt-[2px]">
-                    Meta Cloud API
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setModalCanal(null)}
-                className="w-[34px] h-[34px] rounded-[9px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] text-[#9FB0C2] flex items-center justify-center flex-none hover:bg-[#16212E]/[0.04] transition-colors">
-                <X size={18} />
-              </button>
-            </div>
+        <Modal
+          open
+          onClose={() => setModalCanal(null)}
+          size="sm"
+          title={
+            <span className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 flex-none place-items-center rounded-control" style={{ background: modalCanal.color + '22', color: modalCanal.color }}>
+                <svg width={20} height={20} viewBox="0 0 24 24">{modalCanal.svg}</svg>
+              </span>
+              Configurar {modalCanal.nome}
+            </span>
+          }
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setModalCanal(null)} disabled={saving}>Cancelar</Button>
+              <Button onClick={saveModal} loading={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button>
+            </>
+          }
+        >
+          <div className="mb-3 text-[12px] text-ink-3">Meta Cloud API</div>
 
-            {/* Seletor de provider — só WhatsApp */}
-            {modalCanal.id === 'whatsapp' && (
-              <div className="flex gap-2 mb-4 p-1 bg-[#16212E]/[0.04] rounded-[11px] border border-[#16212E]/[0.08]">
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 py-[9px] rounded-[8px] text-[12.5px] font-semibold bg-[#16212E]/[0.04] text-[#16212E]">
-                  API Oficial
-                  <span className="text-[9px] font-mono px-[6px] py-[2px] rounded-full"
-                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>
-                    Recomendado
-                  </span>
-                </button>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-4">
-              {(PROVIDER_FIELDS[modalCanal.id === 'whatsapp' ? waProvider : modalCanal.provider]).map(f => (
-                <div key={f.key}>
-                  <label className="font-mono text-[10px] tracking-[0.12em] text-[#788698] uppercase mb-[6px] block">{f.label}</label>
-                  <input value={modalValues[f.key] ?? ''} placeholder={f.placeholder}
-                    onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
-                    className="w-full bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[10px] text-[13px] text-[#1F2A39] placeholder:text-[#9AA7B6] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors" />
-                </div>
-              ))}
+          {/* Seletor de provider — só WhatsApp */}
+          {modalCanal.id === 'whatsapp' && (
+            <div className="mb-4 flex items-center gap-2 rounded-control border border-line bg-raised px-3 py-2.5">
+              <span className="text-[12.5px] font-semibold text-ink">API Oficial</span>
+              <Badge tone="ok">Recomendado</Badge>
             </div>
+          )}
 
-            {/* Webhook URL */}
-            <div className="mt-[18px] p-[14px_16px] rounded-[13px]" style={{ background: 'rgba(127,176,232,0.06)', border: '1px solid rgba(127,176,232,0.18)' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <LinkIcon size={16} className="text-[#9CC2EE]" />
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[#9CC2EE]">URL DO WEBHOOK</span>
-              </div>
-              <div className="flex items-center gap-[10px]">
-                <code className="flex-1 min-w-0 font-mono text-[12px] text-[#1F2A39] bg-[#16212E]/[0.06] border border-[#16212E]/[0.08] rounded-[8px] px-3 py-[9px] overflow-x-auto whitespace-nowrap">
-                  {WEBHOOK_URL}
-                </code>
-                <button onClick={copyWebhook}
-                  className="flex items-center gap-[6px] px-[13px] py-[9px] rounded-[9px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] text-[12px] font-semibold hover:bg-[#16212E]/[0.04] transition-colors flex-none">
-                  <Copy size={14} /> Copiar
-                </button>
-              </div>
-              <p className="text-[11px] text-[#7E8EA2] mt-2">
-                Configure esta URL no painel da Meta para receber as mensagens.
-              </p>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setModalCanal(null)}
-                className="flex-1 py-[11px] rounded-[11px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] font-semibold text-[13.5px] hover:bg-[#16212E]/[0.04] transition-colors">
-                Cancelar
-              </button>
-              <button onClick={saveModal} disabled={saving}
-                className="flex-1 py-[11px] rounded-[11px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13.5px] hover:-translate-y-[1px] transition-all disabled:opacity-40 shadow-[0_6px_18px_rgba(22,33,46,0.32)]">
-                {saving ? 'Salvando…' : 'Salvar'}
-              </button>
-            </div>
+          <div className="flex flex-col gap-4">
+            {(PROVIDER_FIELDS[modalCanal.id === 'whatsapp' ? waProvider : modalCanal.provider]).map(f => (
+              <Input
+                key={f.key}
+                label={f.label}
+                placeholder={f.placeholder}
+                value={modalValues[f.key] ?? ''}
+                onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
+              />
+            ))}
           </div>
-        </div>
+
+          {/* Webhook URL */}
+          <div className="mt-[18px] rounded-card border border-accent/20 bg-accent-soft px-4 py-3.5">
+            <div className="mb-2 flex items-center gap-2">
+              <LinkIcon size={16} strokeWidth={1.7} className="text-accent" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">URL do webhook</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-line bg-bg px-3 py-2 text-[12px] text-ink-2">
+                {WEBHOOK_URL}
+              </code>
+              <Button variant="outline" size="sm" icon={<Copy size={14} strokeWidth={1.7} />} onClick={copyWebhook}>Copiar</Button>
+            </div>
+            <p className="mt-2 text-[11px] text-ink-3">
+              Configure esta URL no painel da Meta para receber as mensagens.
+            </p>
+          </div>
+        </Modal>
       )}
     </main>
   )

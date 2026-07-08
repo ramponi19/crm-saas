@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui'
 
 type Estado = 'verificando' | 'confirmado' | 'erro'
 
@@ -41,50 +42,47 @@ export default function CheckoutSucessoPage() {
 
   if (estado === 'verificando') {
     return (
-      <div className="flex flex-col h-full bg-[#0A111E] items-center justify-center">
-        <div className="text-sm text-[#5C6E84]">Verificando pagamento…</div>
+      <div className="flex h-full items-center justify-center bg-bg px-6">
+        <div className="flex items-center gap-2 text-[13px] text-ink-3">
+          <Loader2 size={16} strokeWidth={1.7} className="animate-spin" />
+          Verificando pagamento…
+        </div>
       </div>
     )
   }
 
   if (estado === 'erro') {
     return (
-      <div className="flex flex-col h-full bg-[#0A111E] items-center justify-center">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-[rgba(22,33,46,0.1)] flex items-center justify-center mx-auto mb-6">
-            <XCircle size={36} className="text-[#16212E]" />
+      <div className="flex h-full items-center justify-center bg-bg px-6">
+        <div className="w-full max-w-sm rounded-card border border-line bg-card p-8 text-center">
+          <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-bad-soft">
+            <XCircle size={32} strokeWidth={1.7} className="text-bad" />
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">Não foi possível confirmar</h1>
-          <p className="text-sm text-[#5C6E84] mb-6">
+          <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-ink">Não foi possível confirmar</h1>
+          <p className="mt-2 text-[13px] text-ink-2">
             Não conseguimos verificar o pagamento. Se você foi cobrado, entre em contato com o suporte.
           </p>
-          <button
-            onClick={() => router.push('/planos')}
-            className="flex items-center gap-2 mx-auto bg-[#16212E] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
-          >
-            Voltar aos planos
-          </button>
+          <div className="mt-6 flex justify-center">
+            <Button onClick={() => router.push('/planos')}>Voltar aos planos</Button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0A111E] items-center justify-center">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-full bg-[rgba(34,197,94,0.1)] flex items-center justify-center mx-auto mb-6">
-          <CheckCircle size={36} className="text-[#22C55E]" />
+    <div className="flex h-full items-center justify-center bg-bg px-6">
+      <div className="w-full max-w-sm rounded-card border border-line bg-card p-8 text-center">
+        <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-ok-soft">
+          <CheckCircle size={32} strokeWidth={1.7} className="text-ok" />
         </div>
-        <h1 className="text-xl font-bold text-white mb-2">Assinatura confirmada!</h1>
-        <p className="text-sm text-[#5C6E84] mb-6">
+        <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-ink">Assinatura confirmada!</h1>
+        <p className="mt-2 text-[13px] text-ink-2">
           Seu plano foi ativado. Você será redirecionado ao dashboard em {contador} segundo{contador !== 1 ? 's' : ''}.
         </p>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="flex items-center gap-2 mx-auto bg-[#16212E] text-white text-sm font-semibold px-6 py-2.5 rounded-[10px] hover:bg-[#B91C1C] transition-colors"
-        >
-          Ir para o dashboard
-        </button>
+        <div className="mt-6 flex justify-center">
+          <Button onClick={() => router.push('/dashboard')}>Ir para o dashboard</Button>
+        </div>
       </div>
     </div>
   )

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Loader2, ExternalLink } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, Button, Badge } from '@/components/ui'
 
 interface PlanoConfig {
   id: string
@@ -84,32 +86,29 @@ export default function PlanosView({ empresa, planos }: Props) {
   const gridCols = planos.length === 2 ? 'grid-cols-2' : planos.length >= 3 ? 'grid-cols-3' : 'grid-cols-1'
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9]">
+    <div className="flex h-full flex-col bg-bg">
       <Topbar title="Planos" />
-      <div className="flex-1 overflow-y-auto">
-      <div className="px-8 pt-8 pb-12">
+      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
 
-        <div className="text-center mb-10">
-          <h1 className="font-serif font-medium text-[28px] text-[#1F2A39]">Planos e preços</h1>
-          <p className="text-[#788698] text-sm mt-2">
+        <div className="mb-8 text-center">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Planos e preços</h1>
+          <p className="mt-2 text-[13px] text-ink-2">
             14 dias grátis em qualquer plano pago. Cancele quando quiser.
           </p>
 
-          {emTrial && (
-            <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.2)] rounded-full">
-              <span className="text-xs text-[#FBBF24] font-medium">
-                ✨ Você tem {diasTrial} dia{diasTrial !== 1 ? 's' : ''} de trial restante{diasTrial !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
-
-          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-full ml-2">
-            <span className="text-xs text-[#788698]">Plano atual:</span>
-            <span className="text-xs font-semibold text-[#1F2A39] capitalize">{planoAtual}</span>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {emTrial && (
+              <Badge tone="warn">
+                Você tem {diasTrial} dia{diasTrial !== 1 ? 's' : ''} de trial restante{diasTrial !== 1 ? 's' : ''}
+              </Badge>
+            )}
+            <Badge tone="neutro">
+              Plano atual: <span className="capitalize">{planoAtual}</span>
+            </Badge>
           </div>
         </div>
 
-        <div className={`grid ${gridCols} gap-6 max-w-4xl mx-auto`}>
+        <div className={`grid ${gridCols} mx-auto max-w-4xl gap-6`}>
           {planos.map(p => {
             const ativo = planoAtual === p.id
             const loading = loadingPlano === p.id
@@ -118,73 +117,69 @@ export default function PlanosView({ empresa, planos }: Props) {
             return (
               <div
                 key={p.id}
-                className="relative flex flex-col rounded-[20px] border p-6 transition-all"
-                style={p.destaque
-                  ? { borderColor: `${p.cor}66`, background: `${p.cor}08`, boxShadow: `0 8px 32px ${p.cor}15` }
-                  : { borderColor: 'rgba(22,33,46,0.08)', background: '#F0F2F5' }}
+                className={cn(
+                  'relative flex flex-col rounded-card border bg-card p-6',
+                  p.destaque ? 'border-accent ring-2 ring-accent/30' : 'border-line',
+                )}
               >
                 {p.destaque && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-wide"
-                      style={{ background: p.cor }}>
-                      POPULAR
-                    </span>
+                    <Badge tone="acc">POPULAR</Badge>
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-[10px] flex items-center justify-center"
-                    style={{ background: `${p.cor}18` }}>
-                    <div className="w-4 h-4 rounded-full" style={{ background: p.cor }} />
+                <div className="mb-4 flex items-center gap-3">
+                  <div className={cn('grid h-10 w-10 place-items-center rounded-control', p.destaque ? 'bg-accent-soft' : 'bg-ink/[0.05]')}>
+                    <div className={cn('h-4 w-4 rounded-full', p.destaque ? 'bg-accent' : 'bg-ink-3')} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-[#1F2A39]">{p.nome}</p>
-                    <p className="text-xs text-[#788698]">{p.descricao}</p>
+                    <p className="text-[13px] font-semibold text-ink">{p.nome}</p>
+                    <p className="text-[12px] text-ink-3">{p.descricao}</p>
                   </div>
                 </div>
 
                 <div className="mb-6">
-                  <span className="text-3xl font-extrabold text-[#1F2A39]">{fmtPreco(p.preco_centavos)}</span>
-                  {isPago && <span className="text-sm text-[#788698]">/mês</span>}
+                  <span className="num text-3xl font-bold text-ink">{fmtPreco(p.preco_centavos)}</span>
+                  {isPago && <span className="text-[13px] text-ink-3">/mês</span>}
                   {isPago && (
-                    <p className="text-[10px] text-[#9AA7B6] mt-1">14 dias grátis, depois cobra</p>
+                    <p className="mt-1 text-[11px] text-ink-3">14 dias grátis, depois cobra</p>
                   )}
                 </div>
 
-                <div className="flex-1 space-y-2 mb-6">
+                <div className="mb-6 flex-1 space-y-2">
                   {(Array.isArray(p.features) ? p.features : []).map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-[#56657A]">
-                      <Check size={12} className="text-[#15986A] shrink-0" />
+                    <div key={i} className="flex items-center gap-2 text-[12px] text-ink-2">
+                      <Check size={13} strokeWidth={1.7} className="shrink-0 text-ok" />
                       {f}
                     </div>
                   ))}
                 </div>
 
                 {ativo ? (
-                  <div className="w-full py-2.5 text-center text-sm font-semibold rounded-[10px] bg-white/[0.06] text-[#788698]">
+                  <div className="w-full rounded-control border border-line bg-bg py-2.5 text-center text-[13px] font-semibold text-ink-3">
                     Plano atual
                   </div>
                 ) : !isPago ? (
-                  <div className="w-full py-2.5 text-center text-sm text-[#9AA7B6] rounded-[10px] border border-[#16212E]/[0.06]">
+                  <div className="w-full rounded-control border border-line py-2.5 text-center text-[13px] text-ink-3">
                     Disponível no downgrade
                   </div>
                 ) : !PAGAMENTOS_ATIVO ? (
-                  <div className="w-full py-2.5 text-center text-sm text-[#9AA7B6] rounded-[10px] border border-[#16212E]/[0.06]">
+                  <div className="w-full rounded-control border border-line py-2.5 text-center text-[13px] text-ink-3">
                     Em breve
                   </div>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => assinar(p.id)}
                     disabled={!!loadingPlano}
-                    className="w-full py-2.5 text-sm font-semibold rounded-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-white"
-                    style={{ background: p.cor }}
+                    loading={loading}
+                    className="w-full"
                   >
                     {loading
-                      ? <><Loader2 size={14} className="animate-spin" /> Abrindo...</>
+                      ? 'Abrindo...'
                       : planoAtual === 'free'
                       ? 'Começar trial grátis'
                       : 'Fazer upgrade'}
-                  </button>
+                  </Button>
                 )}
               </div>
             )
@@ -192,51 +187,50 @@ export default function PlanosView({ empresa, planos }: Props) {
         </div>
 
         {!PAGAMENTOS_ATIVO && (
-          <div className="max-w-4xl mx-auto mt-8 p-5 bg-[#FEF9EC] border border-[#FBBF24]/30 rounded-[16px] flex items-start gap-3">
-            <span className="text-xl">⚙️</span>
-            <div>
-              <p className="text-sm font-semibold text-[#78350F]">Pagamentos em configuração</p>
-              <p className="text-xs text-[#92400E] mt-0.5">
-                A cobrança automática será ativada em breve. Para assinar um plano, entre em contato com o suporte.
-              </p>
-            </div>
+          <div className="mx-auto mt-8 max-w-4xl rounded-card border border-warn/20 bg-warn-soft p-5">
+            <p className="text-[13px] font-semibold text-warn">Pagamentos em configuração</p>
+            <p className="mt-0.5 text-[12px] text-ink-2">
+              A cobrança automática será ativada em breve. Para assinar um plano, entre em contato com o suporte.
+            </p>
           </div>
         )}
 
         {temAssinatura && PAGAMENTOS_ATIVO && (
-          <div className="max-w-4xl mx-auto mt-8 p-5 bg-[#F0F2F5] border border-[#16212E]/[0.08] rounded-[16px] flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-[#1F2A39]">Gerenciar assinatura</p>
-              <p className="text-xs text-[#788698] mt-0.5">
-                Altere o método de pagamento, veja faturas ou cancele.
-              </p>
+          <Card className="mx-auto mt-8 max-w-4xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[13px] font-semibold text-ink">Gerenciar assinatura</p>
+                <p className="mt-0.5 text-[12px] text-ink-2">
+                  Altere o método de pagamento, veja faturas ou cancele.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={abrirPortal}
+                disabled={loadingPortal}
+                loading={loadingPortal}
+                icon={<ExternalLink size={14} strokeWidth={1.7} />}
+              >
+                Portal do cliente
+              </Button>
             </div>
-            <button
-              onClick={abrirPortal}
-              disabled={loadingPortal}
-              className="flex items-center gap-2 bg-white border border-[#16212E]/[0.08] text-sm text-[#56657A] font-medium px-4 py-2 rounded-[10px] transition-colors disabled:opacity-50 hover:bg-[#F4F6F9]"
-            >
-              {loadingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-              Portal do cliente
-            </button>
-          </div>
+          </Card>
         )}
 
-        <div className="max-w-4xl mx-auto mt-10 grid grid-cols-2 gap-4">
+        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-4">
           {[
             { q: 'Preciso de cartão para o trial?', r: 'Sim, mas o cartão só é cobrado após os 14 dias.' },
             { q: 'Posso cancelar a qualquer momento?', r: 'Sim. Pelo portal do cliente você cancela em segundos.' },
             { q: 'Meus dados ficam salvos se cancelar?', r: 'Sim, você tem 30 dias para reativar antes de qualquer exclusão.' },
             { q: 'Aceita boleto ou PIX?', r: 'Por enquanto apenas cartão. Boleto/PIX em breve.' },
           ].map(item => (
-            <div key={item.q} className="p-4 bg-[#F0F2F5] border border-[#16212E]/[0.08] rounded-[12px]">
-              <p className="text-xs font-semibold text-[#56657A] mb-1">{item.q}</p>
-              <p className="text-xs text-[#788698]">{item.r}</p>
+            <div key={item.q} className="rounded-card border border-line bg-card p-4">
+              <p className="mb-1 text-[12px] font-semibold text-ink">{item.q}</p>
+              <p className="text-[12px] text-ink-2">{item.r}</p>
             </div>
           ))}
         </div>
-      </div>
-      </div>
+      </main>
     </div>
   )
 }

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { TrendingUp, Boxes, Users, Download, Search } from 'lucide-react'
+import { TrendingUp, Boxes, Users, Download, Search, Receipt, Wallet } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { Card, StatCard, Table, Badge, Tabs, Button, Input, Select, EmptyState, type Column } from '@/components/ui'
 
 interface Venda {
   id: number
@@ -143,38 +144,20 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
     return { label, total }
   })
   const maxVal = Math.max(...days.map(d => d.total), 1)
-  const W = 700, H = 160, pb = 28, pt = 10
-  const barW = 48, gap = (W - days.length * barW) / (days.length + 1)
   return (
-    <svg viewBox={`0 0 ${W} ${H + pb}`} width="100%" style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#C9A24B" stopOpacity={0.9} />
-          <stop offset="100%" stopColor="#16212E" stopOpacity={0.7} />
-        </linearGradient>
-      </defs>
-      {days.map((d, i) => {
-        const x = gap + i * (barW + gap)
-        const barH = Math.max(((d.total / maxVal) * H) - pt, d.total > 0 ? 4 : 0)
-        const y = pt + (H - barH)
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH} rx={6}
-              fill={d.total > 0 ? 'url(#bg)' : 'rgba(255,255,255,0.04)'} />
-            {d.total > 0 && (
-              <text x={x + barW / 2} y={y - 6} textAnchor="middle"
-                fill="#9FB0C2" fontSize={9} fontFamily="JetBrains Mono, monospace">
-                {formatCurrency(d.total).replace('R$\u00a0', '')}
-              </text>
-            )}
-            <text x={x + barW / 2} y={H + pb - 4} textAnchor="middle"
-              fill="#4F6178" fontSize={10} fontFamily="JetBrains Mono, monospace">
-              {d.label}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+    <div className="flex flex-col gap-3">
+      {days.map((d, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <span className="num w-[52px] shrink-0 text-[11.5px] text-ink-2">{d.label}</span>
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-ink/[0.06]">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${d.total > 0 ? Math.max((d.total / maxVal) * 100, 4) : 0}%` }} />
+          </div>
+          <span className={cn('num w-[96px] shrink-0 text-right text-[11.5px]', d.total > 0 ? 'font-semibold text-ink' : 'text-ink-3')}>
+            {d.total > 0 ? formatCurrency(d.total) : '—'}
+          </span>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -202,11 +185,11 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     const ticket   = qtd > 0 ? receita / qtd : 0
     const descontos = conc.reduce((s, v) => s + (v.desconto_valor ?? 0), 0)
     return [
-      { l: 'TOTAL VENDAS',  v: formatCurrency(receita),  c: '#DC2626' },
-      { l: 'LUCRO TOTAL',   v: formatCurrency(lucro),    c: '#34D399' },
-      { l: 'TICKET MÉDIO',  v: formatCurrency(ticket),   c: '#7FB0E8' },
-      { l: 'DESCONTOS',     v: formatCurrency(descontos),c: '#F4B740' },
-      { l: 'QTD. VENDAS',   v: String(qtd),              c: '#C6A86A' },
+      { label: 'Total vendas', value: formatCurrency(receita) },
+      { label: 'Lucro total',  value: formatCurrency(lucro) },
+      { label: 'Ticket médio', value: formatCurrency(ticket) },
+      { label: 'Descontos',    value: formatCurrency(descontos) },
+      { label: 'Qtd. vendas',  value: String(qtd) },
     ]
   }, [vendasFiltradas])
 
@@ -216,190 +199,120 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
   const saldo     = entradas - saidas
 
-  const inputCls = "bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[10px] px-3 py-[9px] text-[#1F2A39] text-[13px] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors [color-scheme:dark]"
+  const vendaCols: Column<Venda>[] = [
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
+    { key: 'cliente', header: 'Cliente', render: v => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
+    { key: 'produto', header: 'Produto', hideOnMobile: true, render: v => <span className="text-ink-2">{v.produto_nome ?? v.forma_pagamento ?? '—'}</span> },
+    { key: 'vendedor', header: 'Vendedor', hideOnMobile: true, render: v => <span className="text-ink-2">{v.vendedor_nome ?? '—'}</span> },
+    { key: 'canal', header: 'Canal', hideOnMobile: true, render: v => <Badge tone="neutro">{CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}</Badge> },
+    { key: 'valor', header: 'Valor', align: 'right', className: 'num', render: v => <span className="font-semibold text-ink">{formatCurrency(v.valor_venda)}</span> },
+    { key: 'desc', header: 'Desc.', align: 'right', className: 'num', hideOnMobile: true, render: v => <span className="text-bad">{v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}</span> },
+    { key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: v => <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> },
+  ]
+
+  const lancCols: Column<Lancamento>[] = [
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: l => <span className="text-ink-2">{new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}</span> },
+    { key: 'desc', header: 'Descrição', render: l => <span className="font-medium text-ink">{l.descricao ?? '—'}</span> },
+    { key: 'cat', header: 'Categoria', hideOnMobile: true, render: l => <span className="text-ink-2">{l.categoria ?? '—'}</span> },
+    { key: 'tipo', header: 'Tipo', render: l => { const r = l.tipo === 'receita'; return <Badge tone={r ? 'ok' : 'bad'}>{r ? 'Entrada' : 'Saída'}</Badge> } },
+    { key: 'valor', header: 'Valor', align: 'right', className: 'num', render: l => { const r = l.tipo === 'receita'; return <span className={cn('font-semibold', r ? 'text-ok' : 'text-bad')}>{r ? '+' : '−'} {formatCurrency(l.valor)}</span> } },
+    { key: 'status', header: 'Status', align: 'right', render: l => { const p = l.status === 'pago'; return <Badge tone={p ? 'ok' : 'warn'}>{p ? 'Pago' : 'Pendente'}</Badge> } },
+  ]
+
+  const tabItems = TABS.map(({ id, label, Icon }) => ({
+    value: id,
+    label: <span className="flex items-center gap-1.5"><Icon size={15} strokeWidth={1.7} /> {label}</span>,
+  }))
 
   return (
-    <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
-      <div className="max-w-[1320px] mx-auto animate-fade-up space-y-4">
+    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+      <div className="mx-auto max-w-[1240px] space-y-4">
 
         {/* Tabs */}
-        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max overflow-x-auto">
-          {TABS.map(({ id, label, Icon }) => (
-            <button key={id} onClick={() => setAba(id)}
-              className={cn(
-                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                aba === id
-                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
-                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
-              )}>
-              <Icon size={16} /> {label}
-            </button>
-          ))}
-        </div>
+        <Tabs items={tabItems} value={aba} onValueChange={setAba} />
 
         {/* ── ABA VENDAS ── */}
         {aba === 'vendas' && (<>
           {/* Filtros */}
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-[16px_18px] flex items-end gap-4 flex-wrap">
-            <div>
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">INÍCIO</div>
-              <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">FIM</div>
-              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputCls} />
-            </div>
-            <div className="flex-1 min-w-[180px]">
-              <div className="font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-[6px]">VENDEDOR</div>
-              <select value={vendedor} onChange={e => setVendedor(e.target.value)}
-                className={cn(inputCls, 'w-full cursor-pointer')}>
-                <option style={{ background: '#FFFFFF' }}>Todos</option>
+          <Card>
+            <div className="flex flex-wrap items-end gap-3">
+              <Input label="Início" type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} wrapperClassName="w-[160px]" />
+              <Input label="Fim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} wrapperClassName="w-[160px]" />
+              <Select label="Vendedor" value={vendedor} onChange={e => setVendedor(e.target.value)} wrapperClassName="min-w-[180px] flex-1">
+                <option>Todos</option>
                 {vendedores.map(v => (
-                  <option key={v} style={{ background: '#FFFFFF' }}>{v}</option>
+                  <option key={v}>{v}</option>
                 ))}
-              </select>
+              </Select>
+              <Button
+                icon={<Search size={15} strokeWidth={1.7} />}
+                onClick={() => toast.success(`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? 'venda' : 'vendas'} no período selecionado`)}
+              >
+                Gerar
+              </Button>
+              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => exportCSV(vendasFiltradas)}>CSV</Button>
             </div>
-            <button
-              onClick={() => toast.success(`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? 'venda' : 'vendas'} no período selecionado`)}
-              className="flex items-center gap-2 px-[18px] py-[11px] rounded-[10px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[13px] hover:-translate-y-[1px] transition-all shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
-              <Search size={15} /> Gerar
-            </button>
-            <button onClick={() => exportCSV(vendasFiltradas)}
-              className="flex items-center gap-2 px-[16px] py-[11px] rounded-[10px] border border-[#16212E]/[0.08] bg-[#16212E]/[0.04] text-[#16212E] font-semibold text-[13px] hover:bg-[#16212E]/[0.04] transition-colors">
-              <Download size={15} /> CSV
-            </button>
-          </div>
+          </Card>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-5 gap-[14px]">
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-5 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
             {kpis.map(k => (
-              <div key={k.l} className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-[16px_18px]"
-                style={{ borderTop: `3px solid ${k.c}` }}>
-                <div className="font-mono text-[9.5px] tracking-[0.1em] text-[#788698]">{k.l}</div>
-                <div className="font-serif text-[23px] mt-1" style={{ color: k.c }}>{k.v}</div>
-              </div>
+              <StatCard key={k.label} bare label={k.label} value={k.value} />
             ))}
           </div>
 
           {/* Gráfico */}
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[22px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">ÚLTIMOS 7 DIAS</div>
-            <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-[18px]">Vendas por dia</h3>
+          <Card title="Vendas por dia" actions={<span className="num text-[11px] text-ink-3">Últimos 7 dias</span>}>
             <BarChart vendas={vendas} />
-          </div>
+          </Card>
 
           {/* Tabela */}
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] overflow-x-auto">
-            <div style={{ minWidth: 920 }}>
-              <div className="grid gap-3 px-6 py-4 font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
-                style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
-                <div>DATA</div><div>CLIENTE</div><div>PRODUTO</div><div>VENDEDOR</div>
-                <div>CANAL</div><div className="text-right">VALOR</div>
-                <div className="text-right">DESC.</div><div className="text-right">LUCRO</div>
-              </div>
-              {vendasFiltradas.length === 0 ? (
-                <div className="text-center py-10 text-[#788698] text-[13px]">Nenhuma venda no período.</div>
-              ) : vendasFiltradas.map(v => (
-                <div key={v.id} className="grid gap-3 px-6 py-[13px] border-b border-[#16212E]/[0.08] last:border-0 hover:bg-[#16212E]/[0.04] items-center"
-                  style={{ gridTemplateColumns: '1.2fr 1.4fr 2fr 1.3fr .9fr 1fr .8fr 1fr' }}>
-                  <div className="font-mono text-[11px] text-[#788698]">
-                    {v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}
-                  </div>
-                  <div className="text-[12.5px] font-semibold text-[#1F2A39] truncate">{v.cliente_nome ?? '—'}</div>
-                  <div className="text-[12.5px] text-[#B7C2D0] truncate">{v.produto_nome ?? v.forma_pagamento ?? '—'}</div>
-                  <div className="text-[12px] text-[#788698]">{v.vendedor_nome ?? '—'}</div>
-                  <div>
-                    <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold bg-[#16212E]/[0.04] text-[#9FB0C2]">
-                      {CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}
-                    </span>
-                  </div>
-                  <div className="text-right font-mono text-[12.5px] font-semibold text-[#16212E]">{formatCurrency(v.valor_venda)}</div>
-                  <div className="text-right font-mono text-[12px] text-[#DC2626]">
-                    {v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}
-                  </div>
-                  <div className={cn('text-right font-mono text-[12.5px] font-bold',
-                    (v.lucro ?? 0) > 0 ? 'text-[#34D399]' : 'text-[#DC2626]')}>
-                    {v.lucro != null ? formatCurrency(v.lucro) : '—'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Card flush>
+            <Table
+              columns={vendaCols}
+              rows={vendasFiltradas}
+              rowKey={v => v.id}
+              empty={<EmptyState icon={<Receipt size={22} strokeWidth={1.7} />} title="Nenhuma venda no período" description="Ajuste o período ou o vendedor no filtro acima." />}
+            />
+          </Card>
         </>)}
 
         {/* ── ABA ESTOQUE ── */}
         {aba === 'estoque' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">FLUXO FINANCEIRO</div>
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-[14px] mt-[5px]">
-              <h3 className="font-serif font-medium text-[19px] text-[#16212E]">
-                Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-              </h3>
-              <div className="text-[12px] text-[#788698]">
-                Entradas <span className="text-[#34D399] font-bold">{formatCurrency(entradas)}</span>
-                {' · '}Saídas <span className="text-[#DC2626] font-bold">{formatCurrency(saidas)}</span>
+          <Card
+            flush
+            title={<>Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</>}
+            actions={
+              <span className="text-[12px] text-ink-2">
+                Entradas <span className="num font-semibold text-ok">{formatCurrency(entradas)}</span>
+                {' · '}Saídas <span className="num font-semibold text-bad">{formatCurrency(saidas)}</span>
                 {' · '}Saldo{' '}
-                <span className={cn('font-bold', saldo >= 0 ? 'text-[#34D399]' : 'text-[#DC2626]')}>
+                <span className={cn('num font-semibold', saldo >= 0 ? 'text-ok' : 'text-bad')}>
                   {formatCurrency(saldo)}
                 </span>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <div style={{ minWidth: 720 }}>
-                <div className="grid gap-3 py-[14px] px-[6px] font-mono text-[9.5px] tracking-[0.12em] text-[#788698] border-b border-[#16212E]/[0.08]"
-                  style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
-                  <div>DATA</div><div>DESCRIÇÃO</div><div>CATEGORIA</div>
-                  <div>TIPO</div><div className="text-right">VALOR</div><div className="text-right">STATUS</div>
-                </div>
-                {lancMes.length === 0
-                  ? <div className="text-center py-8 text-[#788698] text-[13px]">Sem lançamentos este mês.</div>
-                  : lancMes.map(l => {
-                    const isReceit = l.tipo === 'receita'
-                    const isPago   = l.status === 'pago'
-                    return (
-                      <div key={l.id} className="grid gap-3 py-[13px] px-[6px] items-center border-b border-[#16212E]/[0.08] last:border-0 hover:bg-[#16212E]/[0.04]"
-                        style={{ gridTemplateColumns: '.7fr 2.4fr 1.1fr .9fr 1.1fr 1fr' }}>
-                        <div className="font-mono text-[11px] text-[#788698]">
-                          {new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </div>
-                        <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{l.descricao ?? '—'}</div>
-                        <div className="text-[12px] text-[#788698]">{l.categoria ?? '—'}</div>
-                        <div>
-                          <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-bold"
-                            style={{ background: isReceit ? 'rgba(52,211,153,0.12)' : 'rgba(220,38,38,0.12)', color: isReceit ? '#34D399' : '#DC2626' }}>
-                            {isReceit ? 'Entrada' : 'Saída'}
-                          </span>
-                        </div>
-                        <div className={cn('text-right font-mono text-[13px] font-semibold', isReceit ? 'text-[#34D399]' : 'text-[#DC2626]')}>
-                          {isReceit ? '+' : '−'} {formatCurrency(l.valor)}
-                        </div>
-                        <div className="text-right">
-                          <span className="px-[9px] py-[3px] rounded-[7px] text-[10.5px] font-semibold"
-                            style={{ background: isPago ? 'rgba(52,211,153,0.1)' : 'rgba(244,183,64,0.1)', color: isPago ? '#34D399' : '#F4B740' }}>
-                            {isPago ? 'Pago' : 'Pendente'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-              </div>
-            </div>
-          </div>
+              </span>
+            }
+          >
+            <Table
+              columns={lancCols}
+              rows={lancMes}
+              rowKey={l => l.id}
+              empty={<EmptyState icon={<Wallet size={22} strokeWidth={1.7} />} title="Sem lançamentos este mês" description="Os lançamentos financeiros do mês aparecerão aqui." />}
+            />
+          </Card>
         )}
 
         {/* ── ABA CLIENTES ── */}
         {aba === 'clientes' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] flex items-center justify-center h-[200px]">
-            <div className="text-center text-[#9AA7B6] font-mono text-[13px]">Relatório de clientes em construção</div>
-          </div>
+          <Card>
+            <EmptyState icon={<Users size={22} strokeWidth={1.7} />} title="Relatório de clientes em construção" description="Em breve você verá métricas detalhadas de clientes aqui." />
+          </Card>
         )}
 
         {/* ── ABA EXPORTAR ── */}
         {aba === 'exportar' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px]">
-            <div className="font-mono text-[10px] tracking-[0.16em] text-[#788698]">EXPORTAÇÕES</div>
-            <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-6">Exportar dados</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <Card title="Exportar dados">
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
                 { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas) },
                 { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: exportClientes },
@@ -407,16 +320,18 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                 { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos) },
               ].map(e => (
                 <button key={e.label} onClick={e.action}
-                  className="flex items-start gap-4 p-[18px_20px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.08] rounded-[16px] hover:bg-[#16212E]/[0.04] hover:border-[rgba(22,33,46,0.3)] transition-all text-left">
-                  <Download size={22} className="text-[#DC2626] mt-[2px] flex-none" />
+                  className="flex items-start gap-3 rounded-card border border-line bg-card p-4 text-left transition-colors hover:bg-raised">
+                  <span className="grid h-9 w-9 flex-none place-items-center rounded-control bg-accent-soft text-accent">
+                    <Download size={17} strokeWidth={1.7} />
+                  </span>
                   <div>
-                    <div className="text-[13.5px] font-semibold text-[#1F2A39]">{e.label}</div>
-                    <div className="text-[12px] text-[#788698] mt-[3px]">{e.sub}</div>
+                    <div className="text-[13.5px] font-semibold text-ink">{e.label}</div>
+                    <div className="mt-0.5 text-[12px] text-ink-2">{e.sub}</div>
                   </div>
                 </button>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
       </div>
