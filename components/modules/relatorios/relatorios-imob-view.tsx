@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getKanbanColumns, ganhoColId } from '@/components/modules/leads/types'
 import { Home, Target, TrendingUp, Wallet } from 'lucide-react'
 import { Card, StatCard } from '@/components/ui'
+import { RelatorioPerdas } from './relatorio-perdas'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -133,6 +134,7 @@ export async function RelatoriosImobView() {
             </div>
           </Card>
         </div>
+        <div className="mt-4"><RelatorioPerdas /></div>
       </div>
     </main>
   )

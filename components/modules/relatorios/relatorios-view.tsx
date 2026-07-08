@@ -6,6 +6,7 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Card, StatCard, Table, Badge, Tabs, Button, Input, Select, EmptyState, type Column } from '@/components/ui'
+import { RelatorioPerdas } from './relatorio-perdas'
 
 interface Venda {
   id: number
@@ -334,6 +335,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           </Card>
         )}
 
+        <div className="mt-4"><RelatorioPerdas /></div>
       </div>
     </main>
   )
