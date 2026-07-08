@@ -68,10 +68,10 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras', '/relatorios'],
     labelOverrides: {},
     funil: ['Lead novo', 'Contato feito', 'Visita agendada', 'Visita realizada', 'Proposta', 'Análise de crédito', 'Fechamento'],
+    // Agenda e Tarefas passaram ao núcleo (grupo "Hoje", todos os segmentos) — ver lib/menu.
     modulosExtra: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home' },
       { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound' },
-      { href: '/agenda', label: 'Agenda', icon: 'Calendar' },
     ],
   },
   saude: {

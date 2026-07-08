@@ -74,7 +74,7 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
-      <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-bg">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
           userRole={
@@ -85,10 +85,9 @@ export default async function DashboardLayout({
           }
           userEmpresa={empresa?.nome}
           leadsCount={leadsCount ?? 0}
-          empresaCor={empresa?.wl_cor ?? '#16212E'}
           empresaLogo={empresa?.wl_logo_url ?? null}
           isSuperAdmin={usuario?.is_super_admin ?? false}
-          isEmpresaAdmin={role === 'owner' || role === 'admin' || (usuario?.is_super_admin ?? false)}
+          role={role}
           plano={plano}
           segmento={normalizarSegmento(empresa?.segmento)}
         />
