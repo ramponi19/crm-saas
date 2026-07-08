@@ -13,8 +13,9 @@ interface ToastNotif {
   leadId?: number
 }
 
-export function NotificationProvider() {
+export function NotificationProvider({ empresaNome }: { empresaNome?: string }) {
   const router = useRouter()
+  const nomeAba = empresaNome?.trim() || 'Nexus CRM'
   const [toasts, setToasts] = useState<ToastNotif[]>([])
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
@@ -38,7 +39,7 @@ export function NotificationProvider() {
         .eq('lida', false)
         .eq('direcao', 'recebida')
       const count = data?.length ?? 0
-      document.title = count > 0 ? `(${count}) 🔔 JM Store — CRM` : 'JM Store — CRM'
+      document.title = count > 0 ? `(${count}) ${nomeAba}` : nomeAba
     }
     updateTitle()
 
@@ -82,7 +83,7 @@ export function NotificationProvider() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [addToast])
+  }, [addToast, nomeAba])
 
   if (toasts.length === 0) return null
 

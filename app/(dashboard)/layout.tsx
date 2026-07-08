@@ -141,7 +141,7 @@ export default async function DashboardLayout({
           />
         </div>
       </div>
-      <NotificationProvider />
+      <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
       <SessionGuard />
     </EmpresaProvider>
   )
