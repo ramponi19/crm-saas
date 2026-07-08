@@ -23,7 +23,9 @@ const TIPOS = [
   { v: 'perdido', label: 'Perdido' },
 ]
 
-export function FunilView({ initial }: { initial: EtapaEdit[] }) {
+interface Funil { id: number; nome: string; padrao: boolean }
+
+export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit[]; funilId?: number; funis?: Funil[] }) {
   const router = useRouter()
   const [etapas, setEtapas] = useState<EtapaEdit[]>(initial.length ? initial : [])
   const [saving, setSaving] = useState(false)
@@ -42,7 +44,7 @@ export function FunilView({ initial }: { initial: EtapaEdit[] }) {
     try {
       const res = await fetch('/api/funil', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo })) }),
+        body: JSON.stringify({ funilId, etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo })) }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
       notify.ok('Funil salvo', 'O kanban de Leads já reflete as etapas.')
@@ -57,6 +59,22 @@ export function FunilView({ initial }: { initial: EtapaEdit[] }) {
   return (
     <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[760px] space-y-4">
+        {funis.length > 1 && (
+          <div className="flex w-max items-center gap-0.5 rounded-control border border-line bg-card p-0.5">
+            {funis.map(f => {
+              const ativo = f.id === funilId
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => router.push(`/funil?funil=${f.id}`)}
+                  className={cn('whitespace-nowrap rounded-[6px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors', ativo ? 'bg-ink text-white' : 'text-ink-2 hover:bg-ink/[0.04]')}
+                >
+                  {f.nome}
+                </button>
+              )
+            })}
+          </div>
+        )}
         <p className="text-[13px] text-ink-2">
           As etapas do <b className="text-ink">kanban de Leads</b>. Reordene, renomeie, recolora ou arquive.
           Etapas <b className="text-ink">Ganho</b> e <b className="text-ink">Perdido</b> definem conversão e perda.

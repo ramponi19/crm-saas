@@ -30,14 +30,23 @@ export async function POST(req: Request) {
   const isAdmin = usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin'
   if (!isAdmin) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
-  const body = await req.json().catch(() => ({})) as { etapas?: EtapaIn[] }
+  const body = await req.json().catch(() => ({})) as { etapas?: EtapaIn[]; funilId?: number }
   const etapas = body.etapas ?? []
   if (!Array.isArray(etapas) || etapas.length === 0) return NextResponse.json({ error: 'Nenhuma etapa' }, { status: 400 })
   const TIPOS = ['normal', 'negociacao', 'ganho', 'perdido']
 
   const service = createServiceClient()
-  // slugs existentes (para gerar únicos nas etapas novas)
-  const { data: exist } = await service.from('funil_etapas').select('slug').eq('empresa_id', empresaId)
+
+  // Funil alvo: informado ou o padrão da empresa (Fase 4.1). Etapas pertencem a um funil.
+  let funilId = body.funilId
+  if (!funilId) {
+    const { data: padrao } = await service.from('funis').select('id').eq('empresa_id', empresaId).eq('padrao', true).maybeSingle()
+    funilId = padrao?.id
+  }
+  if (!funilId) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 400 })
+
+  // slugs existentes NESTE funil (unique é por funil_id, slug)
+  const { data: exist } = await service.from('funil_etapas').select('slug').eq('funil_id', funilId)
   const slugs = new Set((exist ?? []).map((r) => r.slug))
 
   for (let i = 0; i < etapas.length; i++) {
@@ -55,7 +64,7 @@ export async function POST(req: Request) {
       while (slugs.has(slug)) slug = `${slugify(e.label)}_${n++}`
       slugs.add(slug)
       const { error } = await service.from('funil_etapas')
-        .insert({ empresa_id: empresaId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo })
+        .insert({ empresa_id: empresaId, funil_id: funilId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
