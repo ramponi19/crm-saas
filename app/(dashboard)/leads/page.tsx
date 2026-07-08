@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
-import type { Lead, KanbanColumn, Motivo } from '@/components/modules/leads/types'
+import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/leads/types'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 
@@ -11,14 +11,14 @@ export const metadata = {
 export default async function LeadsPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }] = await Promise.all([
+  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }, { data: funisRaw }] = await Promise.all([
     supabase
       .from('leads')
       .select(`
         id, nome, telefone, instagram, origem, kanban_status,
         responsavel_id, observacoes, created_at, ativo,
         primeira_msg, msgs_nao_lidas, ultima_tratativa,
-        ultima_mensagem_at, produto_interessado, convertido_em
+        ultima_mensagem_at, produto_interessado, convertido_em, funil_id
       `)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
@@ -36,18 +36,20 @@ export default async function LeadsPage() {
       .eq('lida', false)
       .eq('direcao', 'recebida'),
     supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
-    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
+    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
+    supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
   // Etapas do funil vindas do banco (fallback = constante do segmento, na view).
-  type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number }
+  type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number; funil_id: number | null }
   const funilEtapas: KanbanColumn[] = ((etapasRaw ?? []) as EtapaRow[]).map((e) => ({
     id: e.slug,
     label: e.label,
     color: e.cor,
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
+    funilId: e.funil_id ?? undefined,
   }))
 
   // Agrupa não-lidas por lead_id
@@ -84,6 +86,7 @@ export default async function LeadsPage() {
       segmento={normalizarSegmento(empresa?.segmento)}
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
+      funis={(funisRaw ?? []) as Funil[]}
     />
   )
 }

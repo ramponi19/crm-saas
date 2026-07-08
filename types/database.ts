@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      funis: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          padrao: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          nome: string
+          padrao?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          nome?: string
+          padrao?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       automacoes: {
         Row: {
           id: number
@@ -181,6 +205,7 @@ export type Database = {
           ordem: number
           slug: string
           tipo: string
+          funil_id: number | null
         }
         Insert: {
           ativo?: boolean
@@ -192,6 +217,7 @@ export type Database = {
           ordem?: number
           slug: string
           tipo?: string
+          funil_id?: number | null
         }
         Update: {
           ativo?: boolean
@@ -203,6 +229,7 @@ export type Database = {
           ordem?: number
           slug?: string
           tipo?: string
+          funil_id?: number | null
         }
         Relationships: [
           {
@@ -1495,6 +1522,7 @@ export type Database = {
           valor_estimado: number | null
           motivo_perda_id: number | null
           perdido_em: string | null
+          funil_id: number | null
         }
         Insert: {
           ativo?: boolean | null
@@ -1520,6 +1548,7 @@ export type Database = {
           valor_estimado?: number | null
           motivo_perda_id?: number | null
           perdido_em?: string | null
+          funil_id?: number | null
         }
         Update: {
           ativo?: boolean | null
@@ -1545,6 +1574,7 @@ export type Database = {
           valor_estimado?: number | null
           motivo_perda_id?: number | null
           perdido_em?: string | null
+          funil_id?: number | null
         }
         Relationships: [
           {

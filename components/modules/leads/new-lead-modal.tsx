@@ -11,6 +11,8 @@ interface NewLeadModalProps {
   columns: KanbanColumn[]
   onClose: () => void
   onCreate: (lead: Lead) => void
+  /** Funil ao qual o novo lead pertence (Fase 4.1). */
+  funilId?: number
 }
 
 const ORIGENS = [
@@ -22,12 +24,12 @@ const ORIGENS = [
   { value: 'manual', label: 'Loja física' },
 ]
 
-export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadModalProps) {
+export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: NewLeadModalProps) {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     nome: '', telefone: '', instagram: '', origem: '',
     produto_interessado: '', valor_estimado: '',
-    kanban_status: 'novo', responsavel_id: '', observacoes: '',
+    kanban_status: columns[0]?.id ?? 'novo', responsavel_id: '', observacoes: '',
   })
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
@@ -68,6 +70,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate }: NewLeadMo
       kanban_status: form.kanban_status,
       responsavel_id: form.responsavel_id || null,
       observacoes: form.observacoes.trim() || null,
+      funil_id: funilId ?? null,
       ativo: true, msgs_nao_lidas: 0,
     } as TablesInsert<'leads'>).select().single()
 

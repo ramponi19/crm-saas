@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo } from './types'
+import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo, type Funil } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
@@ -21,17 +21,27 @@ interface LeadsViewProps {
   funilEtapas?: KanbanColumn[]
   /** Motivos de perda configurados da empresa (Fase 4.2). */
   motivos?: Motivo[]
+  /** Funis da empresa (Fase 4.1). */
+  funis?: Funil[]
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
   const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
 
-  const columns = useMemo(
-    () => (funilEtapas && funilEtapas.length > 0 ? funilEtapas : getKanbanColumns(segmento)),
-    [funilEtapas, segmento],
+  const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
+  const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
+
+  const columns = useMemo(() => {
+    const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
+    return doFunil.length > 0 ? doFunil : getKanbanColumns(segmento)
+  }, [funilEtapas, segmento, funilId])
+
+  const leadsDoFunil = useMemo(
+    () => (funilId == null ? leads : leads.filter(l => (l.funil_id ?? funilPadrao) === funilId)),
+    [leads, funilId, funilPadrao],
   )
 
   useEffect(() => {
@@ -48,7 +58,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   const stats = useMemo(() => {
     const ganhoId   = ganhoColId(columns)
     const negocIds  = columns.filter(c => c.tipo === 'negociacao').map(c => c.id)
-    const ativos    = leads.filter(l => l.ativo !== false)
+    const ativos    = leadsDoFunil.filter(l => l.ativo !== false)
     const conv      = ativos.filter(l => l.kanban_status === ganhoId).length
     const taxa      = ativos.length > 0 ? Math.round((conv / ativos.length) * 100) : 0
     const negoc     = ativos
@@ -56,7 +66,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
       .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
     const precisam  = ativos.filter(l => (l.msgs_nao_lidas ?? 0) > 0).length
     return { ativos: ativos.length, taxa, negoc, precisam }
-  }, [leads, columns])
+  }, [leadsDoFunil, columns])
 
   // Realtime: novas mensagens recebidas incrementam o badge do card,
   // e leads novos (conversas que ainda não estão na tela) entram sozinhos.
@@ -128,13 +138,31 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
 
       {/* Header — subtítulo de stats + ação (o título "Leads" vem do Topbar) */}
       <div className="flex flex-wrap items-end justify-between gap-3 px-6 pt-5 pb-4">
-        <div className="num text-[13px] text-ink-2">
-          {stats.ativos} em aberto
-          {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação
-          {' · '}conversão {stats.taxa}%
-          {stats.precisam > 0 && (
-            <span className="font-semibold text-bad"> · {stats.precisam} aguardando resposta</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {funis && funis.length > 1 && (
+            <div className="flex w-max items-center gap-0.5 rounded-control border border-line bg-card p-0.5">
+              {funis.map(f => {
+                const ativo = f.id === funilId
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setFunilId(f.id)}
+                    className={`whitespace-nowrap rounded-[6px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${ativo ? 'bg-ink text-white' : 'text-ink-2 hover:bg-ink/[0.04]'}`}
+                  >
+                    {f.nome}
+                  </button>
+                )
+              })}
+            </div>
           )}
+          <div className="num text-[13px] text-ink-2">
+            {stats.ativos} em aberto
+            {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação
+            {' · '}conversão {stats.taxa}%
+            {stats.precisam > 0 && (
+              <span className="font-semibold text-bad"> · {stats.precisam} aguardando resposta</span>
+            )}
+          </div>
         </div>
         <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setShowNewLead(true)}>
           Novo lead
@@ -144,7 +172,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
       {/* Kanban */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <KanbanBoard
-          leads={leads}
+          leads={leadsDoFunil}
           usuarios={usuarios}
           columns={columns}
           onLeadClick={setSelectedLead}
@@ -169,6 +197,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
         <NewLeadModal
           usuarios={usuarios}
           columns={columns}
+          funilId={funilId}
           onClose={() => setShowNewLead(false)}
           onCreate={handleLeadCreate}
         />

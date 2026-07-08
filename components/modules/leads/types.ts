@@ -21,6 +21,14 @@ export interface Lead {
   convertido_em: number | null
   motivo_perda_id?: number | null
   perdido_em?: string | null
+  funil_id?: number | null
+}
+
+/** Funil (Fase 4.1) — uma empresa pode ter vários. */
+export interface Funil {
+  id: number
+  nome: string
+  padrao: boolean
 }
 
 export interface Usuario {
@@ -40,6 +48,7 @@ export interface KanbanColumn {
   label: string
   color: string                                  // dot + accent color hex
   tipo?: 'ganho' | 'negociacao' | 'perdido'      // papel da etapa (p/ métricas)
+  funilId?: number                               // funil a que a etapa pertence (Fase 4.1)
 }
 
 // Funil padrão (varejo / genérico) — não muda o comportamento atual.
