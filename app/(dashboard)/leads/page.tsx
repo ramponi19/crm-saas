@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
-import type { Lead } from '@/components/modules/leads/types'
+import type { Lead, KanbanColumn } from '@/components/modules/leads/types'
 import { normalizarSegmento } from '@/lib/segmentos'
 
 export const metadata = {
@@ -10,7 +10,7 @@ export const metadata = {
 export default async function LeadsPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }] = await Promise.all([
+  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }] = await Promise.all([
     supabase
       .from('leads')
       .select(`
@@ -35,7 +35,17 @@ export default async function LeadsPage() {
       .eq('lida', false)
       .eq('direcao', 'recebida'),
     supabase.from('empresas').select('segmento').eq('id', empresaId).single(),
+    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
   ])
+
+  // Etapas do funil vindas do banco (fallback = constante do segmento, na view).
+  type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number }
+  const funilEtapas: KanbanColumn[] = ((etapasRaw ?? []) as EtapaRow[]).map((e) => ({
+    id: e.slug,
+    label: e.label,
+    color: e.cor,
+    tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
+  }))
 
   // Agrupa não-lidas por lead_id
   const contagem: Record<number, number> = {}
@@ -62,6 +72,7 @@ export default async function LeadsPage() {
       usuarios={usuariosMapped}
       empresaId={empresaId}
       segmento={normalizarSegmento(empresa?.segmento)}
+      funilEtapas={funilEtapas}
     />
   )
 }

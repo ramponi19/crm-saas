@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      funil_etapas: {
+        Row: {
+          ativo: boolean
+          cor: string
+          created_at: string
+          empresa_id: number
+          id: number
+          label: string
+          ordem: number
+          slug: string
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          empresa_id: number
+          id?: never
+          label: string
+          ordem?: number
+          slug: string
+          tipo?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          empresa_id?: number
+          id?: never
+          label?: string
+          ordem?: number
+          slug?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funil_etapas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_produtos: {
         Row: {
           ativo: boolean | null

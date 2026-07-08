@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { Lead, Usuario, getKanbanColumns, ganhoColId } from './types'
+import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
@@ -17,15 +17,20 @@ interface LeadsViewProps {
   usuarios: Usuario[]
   empresaId: number
   segmento?: string | null
+  /** Etapas vindas de funil_etapas (banco). Fallback = constante do segmento. */
+  funilEtapas?: KanbanColumn[]
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
   const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
 
-  const columns = useMemo(() => getKanbanColumns(segmento), [segmento])
+  const columns = useMemo(
+    () => (funilEtapas && funilEtapas.length > 0 ? funilEtapas : getKanbanColumns(segmento)),
+    [funilEtapas, segmento],
+  )
 
   useEffect(() => {
     const supabase = createClient()
