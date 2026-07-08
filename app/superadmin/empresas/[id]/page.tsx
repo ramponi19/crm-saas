@@ -81,12 +81,25 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
     usuario: { nome: string; email: string | null } | null
   }>
 
-  // Contadores de uso
-  const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }] = await Promise.all([
+  // Contadores de uso + última atividade (último lead recebido)
+  const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }, { data: ultimoLead }] = await Promise.all([
     svc.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('leads').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
+
+  // Saúde da assinatura (derivada do stripe_status) e atividade.
+  const ss = (empresa.stripe_status ?? '').toLowerCase()
+  const saudeAssinatura: { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' } =
+    ss === 'active' || ss === 'ativo' ? { label: 'Em dia', tone: 'ok' }
+    : ss === 'trialing' || ss === 'trial' ? { label: 'Em trial', tone: 'neutro' }
+    : ss === 'past_due' || ss === 'unpaid' || ss === 'incomplete' ? { label: 'Inadimplente', tone: 'bad' }
+    : ss === 'canceled' || ss === 'cancelado' ? { label: 'Cancelada', tone: 'bad' }
+    : { label: empresa.stripe_status ?? 'Sem assinatura', tone: 'neutro' }
+
+  const ultAtividade = ultimoLead?.created_at ? new Date(ultimoLead.created_at) : null
+  const diasInativo = ultAtividade ? Math.floor((Date.now() - ultAtividade.getTime()) / 86_400_000) : null
 
   const usuariosAtivos = membros.filter(m => m.ativo).length
 
@@ -147,6 +160,31 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           )
         })}
       </div>
+
+      {/* Saúde da conta */}
+      <Card title="Cobrança & atividade" className="mb-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <div className="mb-1 text-[12px] text-ink-3">Assinatura</div>
+            {saudeAssinatura.tone === 'ok'
+              ? <Badge tone="ok" dot>{saudeAssinatura.label}</Badge>
+              : <Badge tone={saudeAssinatura.tone}>{saudeAssinatura.label}</Badge>}
+          </div>
+          <div>
+            <div className="mb-1 text-[12px] text-ink-3">Última atividade</div>
+            <div className="text-[14px] font-semibold text-ink">
+              {ultAtividade
+                ? (diasInativo === 0 ? 'Hoje' : `há ${diasInativo} dia${diasInativo === 1 ? '' : 's'}`)
+                : 'Sem leads ainda'}
+            </div>
+            {ultAtividade && <div className="text-[11.5px] text-ink-3">{fmtData(ultimoLead!.created_at)}</div>}
+          </div>
+          <div>
+            <div className="mb-1 text-[12px] text-ink-3">Trial termina</div>
+            <div className="text-[14px] font-semibold text-ink">{fmtData(empresa.trial_ends_at)}</div>
+          </div>
+        </div>
+      </Card>
 
       {/* Limites de uso */}
       <Card title="Uso vs. limites do plano" className="mb-5">
