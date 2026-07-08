@@ -321,32 +321,6 @@ export function Topbar({
               className="w-full py-[13px] bg-[rgba(201,162,75,0.12)] text-[#A8884A] text-[13px] font-semibold hover:bg-[rgba(201,162,75,0.20)] transition-colors">
               Ver todos os leads
             </button>
-            <button
-              onClick={async () => {
-                if (typeof window === 'undefined' || !('Notification' in window)) {
-                  alert('Este navegador não suporta notificações.')
-                  return
-                }
-                let perm = Notification.permission
-                if (perm === 'default') perm = await Notification.requestPermission()
-                if (perm !== 'granted') {
-                  alert('Permissão de notificação: ' + perm + '. Ative nas configurações do site (cadeado na barra de endereço).')
-                  return
-                }
-                try {
-                  const n = new Notification('🔔 Teste — JM Store CRM', {
-                    body: 'Se você está vendo isto, as notificações estão funcionando!',
-                    tag: 'jmstore-teste',
-                    renotify: true,
-                  } as NotificationOptions)
-                  setTimeout(() => { try { n.close() } catch {} }, 6000)
-                } catch (e) {
-                  alert('Falha ao disparar: ' + (e as Error).message)
-                }
-              }}
-              className="w-full py-[10px] text-[#6B7C92] text-[11.5px] font-medium hover:text-[#9FB0C2] hover:bg-[#16212E]/[0.03] transition-colors border-t border-[#16212E]/[0.07]">
-              Testar notificação do navegador
-            </button>
           </div>
         )}
       </div>
