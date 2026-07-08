@@ -73,7 +73,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners}
       onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="flex h-full gap-3 overflow-x-auto px-6 py-4 pb-6">
+      <div className="flex h-full snap-x snap-mandatory gap-3 overflow-x-auto px-6 py-4 pb-6 sm:snap-none">
         {columns.map(col => (
           <KanbanColumn
             key={col.id} column={col}

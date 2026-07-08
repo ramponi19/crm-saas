@@ -30,7 +30,7 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
     'Arraste um lead aqui.'
 
   return (
-    <div className="flex h-full w-[228px] flex-none flex-col">
+    <div className="flex h-full w-[84vw] max-w-[300px] flex-none snap-start flex-col sm:w-[228px]">
       {/* Header da coluna: dot quadrado 6px · label · soma · contagem */}
       <div className="flex items-center gap-2 px-1 pb-2.5">
         <span className="h-1.5 w-1.5 flex-none rounded-[2px]" style={{ background: column.color }} />

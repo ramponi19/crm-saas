@@ -5,21 +5,10 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import {
-  LayoutDashboard, BarChart3, ScanBarcode, Calculator, ReceiptText, Target,
-  Smartphone, Boxes, BookOpen, Users, ShieldCheck, Wrench, ShoppingCart,
-  Wallet, UserCog, Settings, Building2, CreditCard, LogOut, ShieldAlert,
-  Lock, Home, KeyRound, Calendar, CheckSquare,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock } from 'lucide-react'
 import { resolverMenu } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
-
-const ICONS: Record<string, LucideIcon> = {
-  LayoutDashboard, BarChart3, ScanBarcode, Calculator, ReceiptText, Target,
-  Smartphone, Boxes, BookOpen, Users, ShieldCheck, Wrench, ShoppingCart,
-  Wallet, UserCog, Settings, Building2, CreditCard, Home, KeyRound, Calendar, CheckSquare,
-}
+import { MENU_ICONS } from './menu-icons'
 
 const PLANO_LABEL: Record<string, string> = { free: 'Plano Free', starter: 'Plano Starter', pro: 'Plano Pro' }
 
@@ -66,7 +55,7 @@ export function Sidebar({
     key === 'leads' ? leadsCount : key === 'garantia' ? garantiasCount : 0
 
   return (
-    <aside className="flex h-screen w-[216px] shrink-0 flex-col border-r border-line-soft bg-raised">
+    <aside className="hidden h-screen w-[216px] shrink-0 flex-col border-r border-line-soft bg-raised md:flex">
 
       {/* Brand — logo do tenant ou quadrado da marca */}
       <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3.5">
@@ -94,7 +83,7 @@ export function Sidebar({
             </p>
             <div className="space-y-px">
               {group.items.map((item) => {
-                const Icon = ICONS[item.icon] ?? LayoutDashboard
+                const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
                 const isActive = !item.locked && (pathname === item.href || pathname.startsWith(item.href + '/'))
                 const href = item.locked ? `/planos?upgrade=${item.modulo}` : item.href
                 const badge = item.locked ? 0 : badgeCount(item.badge)

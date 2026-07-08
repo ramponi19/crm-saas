@@ -43,7 +43,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-ink/30 px-4 py-[8vh]"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/30 sm:items-start sm:px-4 sm:py-[8vh]"
       onMouseDown={(e) => {
         if (!disableOverlayClose && e.target === e.currentTarget) onClose()
       }}
@@ -53,13 +53,13 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'w-full rounded-modal border border-line bg-card shadow-[0_30px_70px_-20px_rgba(21,24,28,0.4)]',
-          'animate-[uiPop_0.16s_cubic-bezier(0.16,1,0.3,1)]',
+          'flex max-h-[92vh] w-full flex-col rounded-t-modal border border-line bg-card shadow-[0_30px_70px_-20px_rgba(21,24,28,0.4)]',
+          'animate-[uiSheetUp_0.22s_cubic-bezier(0.16,1,0.3,1)] sm:max-h-[86vh] sm:rounded-modal sm:animate-[uiPop_0.16s_cubic-bezier(0.16,1,0.3,1)]',
           SIZES[size],
         )}
       >
         {title != null && (
-          <div className="flex items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
             <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{title}</h2>
             <button
               aria-label="Fechar"
@@ -70,9 +70,9 @@ export function Modal({
             </button>
           </div>
         )}
-        <div className="px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-line-soft px-5 py-3.5">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line-soft px-5 py-3.5">
             {footer}
           </div>
         )}

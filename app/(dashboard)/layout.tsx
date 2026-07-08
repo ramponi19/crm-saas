@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar'
+import { BottomNav } from '@/components/layout/bottom-nav'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
@@ -95,6 +96,13 @@ export default async function DashboardLayout({
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           <LimiteBanner />
           {children}
+          <BottomNav
+            segmento={normalizarSegmento(empresa?.segmento)}
+            plano={plano}
+            role={role}
+            isSuperAdmin={usuario?.is_super_admin ?? false}
+            leadsCount={leadsCount ?? 0}
+          />
         </div>
       </div>
       <NotificationProvider />
