@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn } from './types'
+import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
@@ -19,9 +19,11 @@ interface LeadsViewProps {
   segmento?: string | null
   /** Etapas vindas de funil_etapas (banco). Fallback = constante do segmento. */
   funilEtapas?: KanbanColumn[]
+  /** Motivos de perda configurados da empresa (Fase 4.2). */
+  motivos?: Motivo[]
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -148,6 +150,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           onLeadClick={setSelectedLead}
           onLeadUpdate={handleLeadUpdate}
           sla={sla}
+          motivos={motivos}
         />
       </div>
 

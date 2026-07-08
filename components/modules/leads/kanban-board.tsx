@@ -6,9 +6,10 @@ import {
   PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
 } from '@dnd-kit/core'
 import { createClient } from '@/lib/supabase/client'
-import { Lead, Usuario, type KanbanColumn as KanbanColumnDef } from './types'
+import { Lead, Usuario, type KanbanColumn as KanbanColumnDef, type Motivo } from './types'
 import { KanbanColumn } from './kanban-column'
 import { LeadCard } from './lead-card'
+import { MotivoPerdaModal } from './motivo-perda-modal'
 import { notify } from '@/components/ui'
 
 interface KanbanBoardProps {
@@ -18,11 +19,14 @@ interface KanbanBoardProps {
   onLeadClick: (lead: Lead) => void
   onLeadUpdate: (lead: Lead) => void
   sla?: { verde: number; amarelo: number; vermelho: number }
+  motivos?: Motivo[]
 }
 
-export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla }: KanbanBoardProps) {
+export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [] }: KanbanBoardProps) {
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
+  const [pendingPerda, setPendingPerda] = useState<Lead | null>(null)
+  const [salvandoPerda, setSalvandoPerda] = useState(false)
 
   useEffect(() => { if (!activeId) setLocalLeads(leads) }, [leads, activeId])
 
@@ -50,6 +54,20 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
     setLocalLeads(prev => prev.map(l => l.id === activeLeadId ? { ...l, kanban_status: targetStatus } : l))
   }
 
+  // Grava a mudança de etapa (+ extras, ex.: motivo de perda). Reverte no erro.
+  async function persistirMove(lead: Lead, extra?: { motivo_perda_id?: number; perdido_em?: string; observacoes?: string }) {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('leads')
+      .update({ kanban_status: lead.kanban_status, data_transferencia_funil: new Date().toISOString(), ...(extra ?? {}) })
+      .eq('id', lead.id)
+    if (error) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return false }
+    onLeadUpdate({ ...lead, ...(extra ?? {}) })
+    const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
+    notify.ok('Lead movido', destino)
+    return true
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveId(null)
@@ -59,15 +77,33 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
     if (!lead) return
     const originalStatus = leads.find(l => l.id === leadId)?.kanban_status
     if (lead.kanban_status === originalStatus) return
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('leads')
-      .update({ kanban_status: lead.kanban_status, data_transferencia_funil: new Date().toISOString() })
-      .eq('id', leadId)
-    if (error) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return }
-    onLeadUpdate(lead)
-    const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
-    notify.ok('Lead movido', destino)
+
+    // Etapa de perda: exige motivo antes de gravar (mantém o card no lugar
+    // visualmente até confirmar; cancelar reverte).
+    const destCol = columns.find(c => c.id === lead.kanban_status)
+    if (destCol?.tipo === 'perdido') { setPendingPerda(lead); return }
+
+    await persistirMove(lead)
+  }
+
+  async function confirmarPerda(motivoId: number, observacao: string) {
+    if (!pendingPerda) return
+    setSalvandoPerda(true)
+    const extra: { motivo_perda_id: number; perdido_em: string; observacoes?: string } = {
+      motivo_perda_id: motivoId,
+      perdido_em: new Date().toISOString(),
+    }
+    if (observacao) {
+      extra.observacoes = (pendingPerda.observacoes ? pendingPerda.observacoes + '\n' : '') + `Motivo da perda: ${observacao}`
+    }
+    await persistirMove(pendingPerda, extra)
+    setSalvandoPerda(false)
+    setPendingPerda(null)
+  }
+
+  function cancelarPerda() {
+    setPendingPerda(null)
+    setLocalLeads(leads) // desfaz o movimento visual
   }
 
   return (
@@ -92,6 +128,16 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
           </div>
         )}
       </DragOverlay>
+
+      {pendingPerda && (
+        <MotivoPerdaModal
+          leadNome={pendingPerda.nome ?? ''}
+          motivos={motivos}
+          loading={salvandoPerda}
+          onConfirm={confirmarPerda}
+          onCancel={cancelarPerda}
+        />
+      )}
     </DndContext>
   )
 }

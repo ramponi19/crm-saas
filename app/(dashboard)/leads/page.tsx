@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
-import type { Lead, KanbanColumn } from '@/components/modules/leads/types'
+import type { Lead, KanbanColumn, Motivo } from '@/components/modules/leads/types'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 
@@ -11,7 +11,7 @@ export const metadata = {
 export default async function LeadsPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }] = await Promise.all([
+  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }] = await Promise.all([
     supabase
       .from('leads')
       .select(`
@@ -37,6 +37,7 @@ export default async function LeadsPage() {
       .eq('direcao', 'recebida'),
     supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
+    supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -82,6 +83,7 @@ export default async function LeadsPage() {
       empresaId={empresaId}
       segmento={normalizarSegmento(empresa?.segmento)}
       funilEtapas={funilEtapas}
+      motivos={(motivosRaw ?? []) as Motivo[]}
     />
   )
 }

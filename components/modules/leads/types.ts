@@ -19,12 +19,20 @@ export interface Lead {
   produto_interessado: string | null
   valor_estimado?: number | null
   convertido_em: number | null
+  motivo_perda_id?: number | null
+  perdido_em?: string | null
 }
 
 export interface Usuario {
   id: string
   nome: string
   role: string
+}
+
+/** Motivo de perda configurável por empresa (Fase 4.2). */
+export interface Motivo {
+  id: number
+  label: string
 }
 
 export interface KanbanColumn {

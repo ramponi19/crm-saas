@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      motivos_perda: {
+        Row: {
+          id: number
+          empresa_id: number
+          label: string
+          ordem: number
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          label: string
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          label?: string
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       notificacao_prefs: {
         Row: {
           usuario_id: string
@@ -1430,6 +1457,8 @@ export type Database = {
           ultima_mensagem_at: string | null
           ultima_tratativa: string | null
           valor_estimado: number | null
+          motivo_perda_id: number | null
+          perdido_em: string | null
         }
         Insert: {
           ativo?: boolean | null
@@ -1453,6 +1482,8 @@ export type Database = {
           ultima_mensagem_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null
+          motivo_perda_id?: number | null
+          perdido_em?: string | null
         }
         Update: {
           ativo?: boolean | null
@@ -1476,6 +1507,8 @@ export type Database = {
           ultima_mensagem_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null
+          motivo_perda_id?: number | null
+          perdido_em?: string | null
         }
         Relationships: [
           {
