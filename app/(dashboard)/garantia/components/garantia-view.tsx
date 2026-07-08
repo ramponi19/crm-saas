@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import GarantiaModal from './garantia-modal'
+import { Plus, ShieldCheck } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, Table, Button, Badge, StatCard, Tabs, EmptyState, type Column } from '@/components/ui'
+import GarantiaModal from './garantia-modal'
 
 interface Garantia {
   id: number
@@ -31,23 +31,20 @@ interface Garantia {
 
 interface Props { garantias: Garantia[] }
 
-// Status badge — cores do modelo
-const STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  em_analise: { label: 'Em análise', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  aprovado:   { label: 'Aprovado',   color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)' },
-  em_reparo:  { label: 'Em reparo',  color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)' },
-  concluido:  { label: 'Concluído',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
-  entregue:   { label: 'Entregue',   color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' },
-  recusado:   { label: 'Reprovado',  color: '#16212E', bg: 'rgba(22,33,46,0.12)'  },
+type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
+
+const STATUS: Record<string, { label: string; tone: Tone }> = {
+  em_analise: { label: 'Em análise', tone: 'warn' },
+  aprovado:   { label: 'Aprovado',   tone: 'acc' },
+  em_reparo:  { label: 'Em reparo',  tone: 'acc' },
+  concluido:  { label: 'Concluído',  tone: 'ok' },
+  entregue:   { label: 'Entregue',   tone: 'neutro' },
+  recusado:   { label: 'Reprovado',  tone: 'bad' },
 }
 
 function StatusBadge({ status }: { status: string | null }) {
-  const s = STATUS[status ?? ''] ?? { label: status ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
-  return (
-    <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold">
-      {s.label}
-    </span>
-  )
+  const s = STATUS[status ?? ''] ?? { label: status ?? '—', tone: 'neutro' as Tone }
+  return <Badge tone={s.tone}>{s.label}</Badge>
 }
 
 function fmtPrazo(dias: number | null) {
@@ -79,113 +76,72 @@ export default function GarantiaView({ garantias }: Props) {
   }, [garantias, filtro])
 
   const FILTROS = [
-    { key: 'todas',     label: 'Todas'      },
-    { key: 'em_analise',label: 'Em análise' },
-    { key: 'em_reparo', label: 'Em reparo'  },
-    { key: 'concluidas',label: 'Concluídas' },
+    { value: 'todas',      label: 'Todas'      },
+    { value: 'em_analise', label: 'Em análise' },
+    { value: 'em_reparo',  label: 'Em reparo'  },
+    { value: 'concluidas', label: 'Concluídas' },
   ]
 
-  // Stat cards — ícones emoji simples com cor de fundo circular
-  const STATS = [
-    { label: 'Em análise',       value: stats.emAnalise,      iconBg: 'rgba(245,158,11,0.15)',  iconColor: '#F59E0B', icon: '⏱' },
-    { label: 'Em reparo',        value: stats.emReparo,       iconBg: 'rgba(139,92,246,0.15)',  iconColor: '#8B5CF6', icon: '🔧' },
-    { label: 'Dentro da garantia',value: stats.dentroGarantia,iconBg: 'rgba(34,197,94,0.15)',   iconColor: '#22C55E', icon: '✓'  },
-    { label: 'Concluídas no mês', value: stats.concluidasMes, iconBg: 'rgba(92,110,132,0.15)', iconColor: '#5C6E84', icon: '✓'  },
+  function openGarantia(g: Garantia) { setSelecionada(g); setIsNew(false); setModalOpen(true) }
+  function openNovo() { setSelecionada(null); setIsNew(true); setModalOpen(true) }
+
+  const cols: Column<Garantia>[] = [
+    {
+      key: 'protocolo', header: 'Protocolo',
+      render: (g) => <span className="num font-semibold text-ink">{g.protocolo ?? `#GA-${g.id}`}</span>,
+    },
+    {
+      key: 'cliente', header: 'Cliente / Produto',
+      render: (g) => (
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-ink">{g.clientes?.nome ?? '—'}</div>
+          <div className="truncate text-[11px] text-ink-3">
+            {g.produtos?.nome ?? '—'}{g.imei_serial ? ` · IMEI ··${g.imei_serial.slice(-4)}` : ''}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'tipo', header: 'Tipo', hideOnMobile: true,
+      render: (g) => <span className="text-ink-2">{g.tipo ? g.tipo.charAt(0).toUpperCase() + g.tipo.slice(1) : '—'}</span>,
+    },
+    {
+      key: 'prazo', header: 'Prazo', hideOnMobile: true,
+      render: (g) => (
+        <span className={g.dias_garantia_restantes != null && g.dias_garantia_restantes < 0 ? 'text-ink' : 'text-ink-2'}>
+          {fmtPrazo(g.dias_garantia_restantes)}
+        </span>
+      ),
+    },
+    { key: 'status', header: 'Status', align: 'right', render: (g) => <StatusBadge status={g.status} /> },
   ]
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Garantia" />
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
-        {STATS.map(s => (
-          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0">
-              {s.icon}
-            </div>
-            <div>
-              <div className="text-2xl font-normal text-[#16212E] leading-none">{s.value}</div>
-              <div className="text-[11px] text-[#788698] mt-1">{s.label}</div>
-            </div>
-          </div>
-        ))}
+      <div className="grid shrink-0 grid-cols-2 gap-3 px-6 py-4 md:grid-cols-4">
+        <StatCard label="Em análise" value={stats.emAnalise} />
+        <StatCard label="Em reparo" value={stats.emReparo} />
+        <StatCard label="Dentro da garantia" value={stats.dentroGarantia} />
+        <StatCard label="Concluídas no mês" value={stats.concluidasMes} />
       </div>
 
-      {/* Filtros + botão */}
-      <div className="flex items-center justify-between px-6 pb-4 shrink-0">
-        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
-          {FILTROS.map(f => (
-            <button key={f.key} onClick={() => setFiltro(f.key)}
-              className={cn(
-                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                filtro === f.key
-                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
-                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
-              )}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => { setSelecionada(null); setIsNew(true); setModalOpen(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors">
-          <Plus size={15} />
-          Novo protocolo
-        </button>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-6 pb-4">
+        <Tabs items={FILTROS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
+        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo protocolo</Button>
       </div>
 
-      {/* Tabela */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#16212E]/[0.08]">
-                {['Protocolo', 'Cliente / Produto', 'Tipo', 'Prazo', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-16 text-[#9AA7B6] text-sm">Nenhuma garantia encontrada</td></tr>
-              ) : filtrados.map(g => (
-                <tr key={g.id}
-                  onClick={() => { setSelecionada(g); setIsNew(false); setModalOpen(true) }}
-                  className="border-b border-[#16212E]/[0.08] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
-                  {/* Protocolo */}
-                  <td className="px-5 py-4">
-                    <div className="text-sm font-mono font-semibold text-[#16212E]">{g.protocolo ?? `#GA-${g.id}`}</div>
-                  </td>
-                  {/* Cliente / Produto */}
-                  <td className="px-5 py-4">
-                    <div className="text-sm font-semibold text-[#16212E]">{g.clientes?.nome ?? '—'}</div>
-                    <div className="text-[11px] text-[#788698]">
-                      {g.produtos?.nome ?? '—'}{g.imei_serial ? ` · IMEI ··${g.imei_serial.slice(-4)}` : ''}
-                    </div>
-                  </td>
-                  {/* Tipo */}
-                  <td className="px-5 py-4">
-                    <span className="text-sm text-[#16212E]">
-                      {g.tipo ? g.tipo.charAt(0).toUpperCase() + g.tipo.slice(1) : '—'}
-                    </span>
-                  </td>
-                  {/* Prazo */}
-                  <td className="px-5 py-4">
-                    <span className={cn('text-sm', g.dias_garantia_restantes != null && g.dias_garantia_restantes < 0 ? 'text-[#16212E]' : 'text-[#788698]')}>
-                      {fmtPrazo(g.dias_garantia_restantes)}
-                    </span>
-                  </td>
-                  {/* Status */}
-                  <td className="px-5 py-4">
-                    <StatusBadge status={g.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card flush>
+          <Table
+            columns={cols}
+            rows={filtrados}
+            rowKey={(g) => g.id}
+            onRowClick={openGarantia}
+            empty={<EmptyState icon={<ShieldCheck size={22} strokeWidth={1.7} />} title="Nenhuma garantia encontrada" description="Registre um novo protocolo de garantia." action={<Button size="sm" onClick={openNovo}>Novo protocolo</Button>} />}
+          />
+        </Card>
       </div>
 
       {modalOpen && (

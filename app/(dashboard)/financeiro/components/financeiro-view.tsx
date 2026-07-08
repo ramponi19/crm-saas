@@ -1,10 +1,11 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { Plus, X, Save, Trash2, Copy, Check, ExternalLink } from 'lucide-react'
+import { Plus, Copy, Check, ExternalLink, Trash2, Receipt } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/types/database'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, StatCard, Table, Tabs, Badge, Button, IconButton, Input, Select, Textarea, Modal, EmptyState, type Column } from '@/components/ui'
 
 interface Lancamento {
   id: number
@@ -218,391 +219,275 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
     return { pendentes: pendentes.length, pagas: pagas.length, totalPendente, totalPago }
   }, [cobrancas])
 
+  const cobCols: Column<Cobranca>[] = [
+    {
+      key: 'data', header: 'Data', className: 'num w-[96px]',
+      render: (c) => <span className="text-ink-2">{new Date(c.created_at ?? '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>,
+    },
+    {
+      key: 'descricao', header: 'Descrição',
+      render: (c) => (
+        <div>
+          <div className="font-medium text-ink">{c.descricao ?? '—'}</div>
+          <div className="text-[11px] text-ink-3">{c.os_id ? `OS #${c.os_id}` : c.venda_id ? `Venda #${c.venda_id}` : '—'}</div>
+        </div>
+      ),
+    },
+    { key: 'cliente', header: 'Cliente', hideOnMobile: true, render: (c) => <span className="text-ink-2">{getNomeCliente(c)}</span> },
+    { key: 'tipo', header: 'Tipo', hideOnMobile: true, render: (c) => <Badge tone="neutro">{c.tipo ?? 'pix'}</Badge> },
+    { key: 'valor', header: 'Valor', align: 'right', className: 'num', render: (c) => <span className="font-semibold text-ink">{c.valor != null ? formatCurrency(c.valor) : '—'}</span> },
+    {
+      key: 'status', header: 'Status', align: 'right',
+      render: (c) => {
+        const tone = c.status === 'pago' ? 'ok' : c.status === 'expirado' ? 'neutro' : 'warn'
+        const label = c.status === 'pago' ? 'Pago' : c.status === 'expirado' ? 'Expirado' : 'Pendente'
+        return <Badge tone={tone}>{label}</Badge>
+      },
+    },
+    {
+      key: 'acoes', header: 'Ações', align: 'right',
+      render: (c) => (
+        <div className="flex items-center justify-end gap-1">
+          {(c.linha_digitavel ?? c.qr_code ?? c.link_pagamento) && (
+            <IconButton aria-label="Copiar chave Pix" size="sm" onClick={() => copiarChave(c)}>
+              {copiado === c.id ? <Check size={15} strokeWidth={1.7} className="text-ok" /> : <Copy size={15} strokeWidth={1.7} />}
+            </IconButton>
+          )}
+          {c.link_pagamento && (
+            <a href={c.link_pagamento} target="_blank" rel="noopener noreferrer" title="Abrir link"
+              className="grid h-8 w-8 place-items-center rounded-control text-ink-2 transition-colors hover:bg-ink/[0.05] hover:text-ink">
+              <ExternalLink size={15} strokeWidth={1.7} />
+            </a>
+          )}
+          {c.status !== 'pago' && (
+            <button onClick={() => marcarPago(c.id)}
+              className="whitespace-nowrap px-2 text-[12px] font-semibold text-ok hover:underline">
+              Marcar pago
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Financeiro" />
 
-      {/* Tabs */}
-      <div className="px-6 pt-4 pb-0 shrink-0">
-        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn(
-                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                tab === t.key
-                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
-                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
-              )}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
+        <div className="mx-auto max-w-[1240px] space-y-4">
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
-        {[
-          { label: 'À receber',        value: fmtBRL(stats.aReceber),  sub: `${listaReceber.length} lançamentos`,    iconBg: 'rgba(34,197,94,0.15)',   iconColor: '#22C55E', icon: '↓' },
-          { label: 'À pagar',          value: fmtBRL(stats.aPagar),    sub: `${listaPagar.length} contas em aberto`, iconBg: 'rgba(245,158,11,0.15)',  iconColor: '#F59E0B', icon: '↑' },
-          { label: 'Despesas do mês',  value: fmtBRL(stats.despesas),  sub: 'custo operacional',                     iconBg: 'rgba(59,125,232,0.15)',  iconColor: '#3B7DE8', icon: '≡' },
-          { label: 'Resultado líquido',value: fmtBRL(stats.resultado), sub: 'receitas − despesas',                   iconBg: 'rgba(139,92,246,0.15)',  iconColor: '#8B5CF6', icon: '~' },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: s.iconBg, color: s.iconColor }}>{s.icon}</div>
-              <span className="text-[10px] font-mono tracking-widest text-[#788698] uppercase">{s.label}</span>
-            </div>
-            <div className="text-xl font-bold text-[#1F2A39]">{s.value}</div>
-            <div className="text-[11px] text-[#788698] mt-0.5">{s.sub}</div>
+          {/* Stats */}
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+            <StatCard bare label="À receber" value={fmtBRL(stats.aReceber)} delta={`${listaReceber.length} lançamentos`} deltaTone="ok" />
+            <StatCard bare label="À pagar" value={fmtBRL(stats.aPagar)} delta={`${listaPagar.length} contas em aberto`} deltaTone="warn" />
+            <StatCard bare label="Despesas do mês" value={fmtBRL(stats.despesas)} delta="custo operacional" deltaTone="neutral" />
+            <StatCard bare label="Resultado líquido" value={fmtBRL(stats.resultado)} delta="receitas − despesas" deltaTone={stats.resultado >= 0 ? 'ok' : 'bad'} />
           </div>
-        ))}
-      </div>
 
-      {/* Conteúdo da tab */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
-        {tab === 'fluxo' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
-              <div>
-                <h2 className="text-base font-semibold text-[#1F2A39]">Livro-caixa</h2>
-                <p className="text-[11px] text-[#788698] mt-0.5">
-                  Entradas <span className="text-[#15986A]">+{fmtBRL(listaReceber.reduce((s,l)=>s+(l.valor??0),0))}</span>
-                  {' · '}Saídas <span className="text-[#16212E]">−{fmtBRL(listaPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
-                </p>
-              </div>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
-                <Plus size={13} /> Novo lançamento
-              </button>
-            </div>
-            <LancamentosTable lancamentos={todos} onEditar={abrirEditar} />
-          </div>
-        )}
-        {tab === 'pagar' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
-              <h2 className="text-base font-semibold text-[#1F2A39]">Contas a pagar</h2>
-              <button onClick={() => abrirNovo('despesa')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
-                <Plus size={13} /> Nova conta
-              </button>
-            </div>
-            <LancamentosTable lancamentos={listaPagar} onEditar={abrirEditar} />
-          </div>
-        )}
-        {tab === 'receber' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
-              <h2 className="text-base font-semibold text-[#1F2A39]">Contas a receber</h2>
-              <button onClick={() => abrirNovo('receita')} className="flex items-center gap-1.5 px-4 py-2 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
-                <Plus size={13} /> Novo título
-              </button>
-            </div>
-            <LancamentosTable lancamentos={listaReceber} onEditar={abrirEditar} />
-          </div>
-        )}
-        {tab === 'cobrancas' && (
-          <div className="space-y-4">
-            {/* Stats das cobranças */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Aguardando pagamento', value: fmtBRL(cobrancasStats.totalPendente), sub: `${cobrancasStats.pendentes} cobranças`, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-                { label: 'Recebido via cobrança', value: fmtBRL(cobrancasStats.totalPago),    sub: `${cobrancasStats.pagas} confirmadas`,  color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
-              ].map(s => (
-                <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4">
-                  <div className="text-[10px] font-mono tracking-widest text-[#788698] uppercase mb-1.5">{s.label}</div>
-                  <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[11px] text-[#788698] mt-0.5">{s.sub}</div>
+          {/* Tabs */}
+          <Tabs items={TABS.map(t => ({ value: t.key, label: t.label }))} value={tab} onValueChange={setTab} />
+
+          {/* Conteúdo da tab */}
+          {tab === 'fluxo' && (
+            <Card flush>
+              <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3">
+                <div>
+                  <h3 className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Livro-caixa</h3>
+                  <p className="mt-0.5 text-[12px] text-ink-3">
+                    Entradas <span className="num font-semibold text-ok">+{fmtBRL(listaReceber.reduce((s,l)=>s+(l.valor??0),0))}</span>
+                    {' · '}Saídas <span className="num font-semibold text-bad">−{fmtBRL(listaPagar.reduce((s,l)=>s+(l.valor??0),0))}</span>
+                  </p>
                 </div>
-              ))}
-            </div>
-
-            {/* Tabela de cobranças */}
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#16212E]/[0.08]">
-                <h2 className="text-base font-semibold text-[#1F2A39]">Conciliação de Cobranças</h2>
-                <p className="text-[11px] text-[#788698] mt-0.5">Cobranças Pix geradas via OS e PDV</p>
+                <Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => abrirNovo('receita')}>Novo lançamento</Button>
               </div>
-              {cobrancas.length === 0 ? (
-                <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhuma cobrança gerada ainda.</p>
+              <LancamentosTable lancamentos={todos} onEditar={abrirEditar} />
+            </Card>
+          )}
+          {tab === 'pagar' && (
+            <Card flush title="Contas a pagar" actions={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => abrirNovo('despesa')}>Nova conta</Button>}>
+              <LancamentosTable lancamentos={listaPagar} onEditar={abrirEditar} />
+            </Card>
+          )}
+          {tab === 'receber' && (
+            <Card flush title="Contas a receber" actions={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => abrirNovo('receita')}>Novo título</Button>}>
+              <LancamentosTable lancamentos={listaReceber} onEditar={abrirEditar} />
+            </Card>
+          )}
+          {tab === 'cobrancas' && (
+            <div className="space-y-4">
+              {/* Stats das cobranças */}
+              <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+                <StatCard bare label="Aguardando pagamento" value={fmtBRL(cobrancasStats.totalPendente)} delta={`${cobrancasStats.pendentes} cobranças`} deltaTone="warn" />
+                <StatCard bare label="Recebido via cobrança" value={fmtBRL(cobrancasStats.totalPago)} delta={`${cobrancasStats.pagas} confirmadas`} deltaTone="ok" />
+              </div>
+
+              {/* Tabela de cobranças */}
+              <Card flush>
+                <div className="border-b border-line-soft px-4 py-3">
+                  <h3 className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Conciliação de Cobranças</h3>
+                  <p className="mt-0.5 text-[12px] text-ink-3">Cobranças Pix geradas via OS e PDV</p>
+                </div>
+                <Table
+                  columns={cobCols}
+                  rows={cobrancas}
+                  rowKey={(c) => c.id}
+                  empty={<EmptyState icon={<Receipt size={22} strokeWidth={1.7} />} title="Nenhuma cobrança gerada ainda" description="As cobranças Pix criadas na OS e no PDV aparecerão aqui." />}
+                />
+              </Card>
+            </div>
+          )}
+
+          {tab === 'dre' && (
+            <Card flush>
+              <div className="border-b border-line-soft px-4 py-3">
+                <h3 className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Demonstração do Resultado</h3>
+                <p className="mt-0.5 text-[12px] text-ink-3">Receitas, despesas por categoria e resultado líquido</p>
+              </div>
+              {lancamentos.length === 0 ? (
+                <EmptyState icon={<Receipt size={22} strokeWidth={1.7} />} title="Nenhum lançamento registrado" description="Registre entradas e saídas para gerar o DRE." />
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-[#16212E]/[0.08]">
-                      {['Data','Descrição','Cliente','Tipo','Valor','Status','Ações'].map(h => (
-                        <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cobrancas.map(c => {
-                      const statusColor = c.status === 'pago' ? '#22C55E' : c.status === 'expirado' ? '#16212E' : '#F59E0B'
-                      const statusBg    = c.status === 'pago' ? 'rgba(34,197,94,0.1)' : c.status === 'expirado' ? 'rgba(22,33,46,0.1)' : 'rgba(245,158,11,0.1)'
-                      const statusLabel = c.status === 'pago' ? 'Pago' : c.status === 'expirado' ? 'Expirado' : 'Pendente'
-                      const origem = c.os_id ? `OS #${c.os_id}` : c.venda_id ? `Venda #${c.venda_id}` : '—'
-                      return (
-                        <tr key={c.id} className="border-b border-[#16212E]/[0.06] last:border-0 hover:bg-[#16212E]/[0.02] transition-colors">
-                          <td className="px-5 py-3.5 text-sm text-[#788698] whitespace-nowrap">
-                            {new Date(c.created_at ?? '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                          </td>
-                          <td className="px-5 py-3.5 text-sm text-[#1F2A39]">
-                            <div>{c.descricao ?? '—'}</div>
-                            <div className="text-[10px] text-[#9AA7B6]">{origem}</div>
-                          </td>
-                          <td className="px-5 py-3.5 text-sm text-[#788698]">{getNomeCliente(c)}</td>
-                          <td className="px-5 py-3.5">
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[rgba(22,33,46,0.06)] text-[#56657A] uppercase">{c.tipo ?? 'pix'}</span>
-                          </td>
-                          <td className="px-5 py-3.5 text-sm font-bold text-[#1F2A39] tabular-nums">
-                            {c.valor != null ? formatCurrency(c.valor) : '—'}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ color: statusColor, backgroundColor: statusBg }}>
-                              {statusLabel}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-2">
-                              {(c.linha_digitavel ?? c.qr_code ?? c.link_pagamento) && (
-                                <button onClick={() => copiarChave(c)}
-                                  className="flex items-center gap-1 text-[11px] text-[#788698] hover:text-[#1F2A39] transition-colors"
-                                  title="Copiar chave Pix">
-                                  {copiado === c.id ? <Check size={13} className="text-[#22C55E]" /> : <Copy size={13} />}
-                                </button>
-                              )}
-                              {c.link_pagamento && (
-                                <a href={c.link_pagamento} target="_blank" rel="noopener noreferrer"
-                                  className="text-[#788698] hover:text-[#1F2A39] transition-colors" title="Abrir link">
-                                  <ExternalLink size={13} />
-                                </a>
-                              )}
-                              {c.status !== 'pago' && (
-                                <button onClick={() => marcarPago(c.id)}
-                                  className="text-[11px] font-semibold text-[#22C55E] hover:underline whitespace-nowrap">
-                                  Marcar pago
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === 'dre' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#16212E]/[0.08]">
-              <h2 className="text-base font-semibold text-[#1F2A39]">Demonstração do Resultado</h2>
-              <p className="text-[11px] text-[#788698] mt-0.5">Receitas, despesas por categoria e resultado líquido</p>
-            </div>
-            {lancamentos.length === 0 ? (
-              <div className="p-8 text-center text-[#788698] text-sm">Nenhum lançamento registrado.</div>
-            ) : (
-              <div className="px-5 py-4">
-                <div className="flex items-center justify-between py-2.5 border-b border-[#16212E]/[0.06]">
-                  <span className="text-[13.5px] font-semibold text-[#1F2A39]">Receita bruta</span>
-                  <span className="text-[13.5px] font-semibold text-[#15986A] tabular-nums">+{fmtBRL(dre.receitaBruta)}</span>
-                </div>
-
-                <div className="pt-3 pb-1">
-                  <span className="text-[10px] font-mono tracking-widest text-[#788698] uppercase">(−) Despesas por categoria</span>
-                </div>
-                {dre.despesas.length === 0 ? (
-                  <div className="py-2 text-[13px] text-[#788698]">Nenhuma despesa registrada.</div>
-                ) : (
-                  dre.despesas.map(d => (
-                    <div key={d.categoria} className="flex items-center justify-between py-2 border-b border-[#16212E]/[0.04]">
-                      <span className="text-[13px] text-[#56657A]">{d.categoria}</span>
-                      <span className="text-[13px] text-[#16212E] tabular-nums">−{fmtBRL(d.valor)}</span>
-                    </div>
-                  ))
-                )}
-                <div className="flex items-center justify-between py-2.5 border-b border-[#16212E]/[0.06]">
-                  <span className="text-[13.5px] font-semibold text-[#1F2A39]">Total de despesas</span>
-                  <span className="text-[13.5px] font-semibold text-[#16212E] tabular-nums">−{fmtBRL(dre.totalDespesas)}</span>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 mt-1">
-                  <div>
-                    <span className="text-[15px] font-bold text-[#1F2A39]">Resultado líquido</span>
-                    <span className="block text-[11px] text-[#788698]">margem {dre.margem.toFixed(1)}%</span>
+                <div className="px-4 py-4">
+                  <div className="flex items-center justify-between border-b border-line-soft py-2.5">
+                    <span className="text-[13.5px] font-semibold text-ink">Receita bruta</span>
+                    <span className="num text-[13.5px] font-semibold text-ok">+{fmtBRL(dre.receitaBruta)}</span>
                   </div>
-                  <span className={cn('text-[18px] font-bold tabular-nums', dre.resultado >= 0 ? 'text-[#15986A]' : 'text-[#16212E]')}>
-                    {dre.resultado >= 0 ? '+' : '−'}{fmtBRL(Math.abs(dre.resultado))}
-                  </span>
+
+                  <div className="pb-1 pt-3">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">(−) Despesas por categoria</span>
+                  </div>
+                  {dre.despesas.length === 0 ? (
+                    <div className="py-2 text-[13px] text-ink-2">Nenhuma despesa registrada.</div>
+                  ) : (
+                    dre.despesas.map(d => (
+                      <div key={d.categoria} className="flex items-center justify-between border-b border-line-soft py-2">
+                        <span className="text-[13px] text-ink-2">{d.categoria}</span>
+                        <span className="num text-[13px] text-bad">−{fmtBRL(d.valor)}</span>
+                      </div>
+                    ))
+                  )}
+                  <div className="flex items-center justify-between border-b border-line-soft py-2.5">
+                    <span className="text-[13.5px] font-semibold text-ink">Total de despesas</span>
+                    <span className="num text-[13.5px] font-semibold text-bad">−{fmtBRL(dre.totalDespesas)}</span>
+                  </div>
+
+                  <div className="mt-1 flex items-center justify-between pt-4">
+                    <div>
+                      <span className="text-[15px] font-bold text-ink">Resultado líquido</span>
+                      <span className="block text-[11px] text-ink-3">margem {dre.margem.toFixed(1)}%</span>
+                    </div>
+                    <span className={cn('num text-[18px] font-bold', dre.resultado >= 0 ? 'text-ok' : 'text-bad')}>
+                      {dre.resultado >= 0 ? '+' : '−'}{fmtBRL(Math.abs(dre.resultado))}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </Card>
+          )}
+
+        </div>
       </div>
 
       {/* Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08] shrink-0">
-              <h2 className="text-base font-bold text-[#1F2A39]">{editId ? 'Editar lançamento' : 'Novo lançamento'}</h2>
-              <button onClick={() => setModal(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors"><X size={20} /></button>
-            </div>
-
-            <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
-            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-              {/* Tipo */}
-              <div className="grid grid-cols-2 gap-2">
-                {(['receita','despesa'] as const).map(t => (
-                  <button type="button" key={t} onClick={() => set('tipo', t)}
-                    className={cn(
-                      'py-2.5 rounded-[10px] text-sm font-semibold transition-all border',
-                      form.tipo === t
-                        ? t === 'receita'
-                          ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.3)] text-[#15986A]'
-                          : 'bg-[rgba(22,33,46,0.1)] border-[rgba(22,33,46,0.3)] text-[#16212E]'
-                        : 'bg-transparent border-[#16212E]/[0.1] text-[#788698] hover:border-[#16212E]/20'
-                    )}>
-                    {t === 'receita' ? '↑ Receita' : '↓ Despesa'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
-                <input value={form.descricao} onChange={e => set('descricao', e.target.value)}
-                  placeholder="Ex: Pagamento fornecedor, Venda à vista..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-              </div>
-
-              {/* Valor + Vencimento */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Valor (R$) *</label>
-                  <input type="number" step="0.01" min="0" value={form.valor} onChange={e => set('valor', e.target.value)}
-                    placeholder="0,00"
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Vencimento *</label>
-                  <input type="date" value={form.data_venc} onChange={e => set('data_venc', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-                </div>
-              </div>
-
-              {/* Categoria + Forma */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Categoria</label>
-                  <select value={form.categoria} onChange={e => set('categoria', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
-                    <option value="">— Selecionar —</option>
-                    {catsFiltradas.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Forma de pagamento</label>
-                  <select value={form.forma_pgto} onChange={e => set('forma_pgto', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
-                    <option value="">— Selecionar —</option>
-                    {FORMAS.map(f => <option key={f} value={f}>{FORMAS_LABEL[f]}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Status + Data pgto */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Status</label>
-                  <select value={form.status} onChange={e => set('status', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
-                    <option value="pendente">Pendente</option>
-                    <option value="pago">Pago</option>
-                    <option value="atrasado">Atrasado</option>
-                    <option value="cancelado">Cancelado</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Data de pagamento</label>
-                  <input type="date" value={form.data_pgto} onChange={e => set('data_pgto', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-                </div>
-              </div>
-
-              {/* Observações */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Observações</label>
-                <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)}
-                  rows={2} placeholder="Notas adicionais..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors resize-none" />
-              </div>
-
-              {erro && <p className="text-xs text-[#16212E]">{erro}</p>}
-            </div>
-
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
-              {editId ? (
-                <button type="button" onClick={excluir} className="flex items-center gap-1.5 text-xs text-[#788698] hover:text-[#16212E] transition-colors">
-                  <Trash2 size={13} /> Remover
-                </button>
-              ) : <div />}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setModal(false)}
-                  className="px-4 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60">
-                  <Save size={13} />
-                  {saving ? 'Salvando...' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-            </form>
+      <Modal
+        open={modal}
+        onClose={() => setModal(false)}
+        size="lg"
+        disableOverlayClose={saving}
+        title={editId ? 'Editar lançamento' : 'Novo lançamento'}
+        footer={
+          <>
+            {editId && (
+              <Button variant="ghost" className="mr-auto text-bad hover:bg-bad-soft" icon={<Trash2 size={15} strokeWidth={1.7} />} onClick={excluir} disabled={saving}>
+                Remover
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setModal(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={salvar} loading={saving}>Salvar</Button>
+          </>
+        }
+      >
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+          {/* Tipo */}
+          <div className="col-span-2 grid grid-cols-2 gap-2">
+            {(['receita','despesa'] as const).map(t => (
+              <button type="button" key={t} onClick={() => set('tipo', t)}
+                className={cn(
+                  'h-9 rounded-control border text-[13px] font-semibold transition-colors',
+                  form.tipo === t
+                    ? t === 'receita'
+                      ? 'border-ok/30 bg-ok-soft text-ok'
+                      : 'border-bad/30 bg-bad-soft text-bad'
+                    : 'border-line bg-card text-ink-2 hover:bg-bg'
+                )}>
+                {t === 'receita' ? 'Receita' : 'Despesa'}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
+
+          <Input wrapperClassName="col-span-2" label="Descrição" required value={form.descricao} onChange={e => set('descricao', e.target.value)} placeholder="Ex: Pagamento fornecedor, Venda à vista..." />
+
+          <Input label="Valor (R$)" required type="number" step="0.01" min="0" value={form.valor} onChange={e => set('valor', e.target.value)} placeholder="0,00" />
+          <Input label="Vencimento" required type="date" value={form.data_venc} onChange={e => set('data_venc', e.target.value)} />
+
+          <Select label="Categoria" value={form.categoria} onChange={e => set('categoria', e.target.value)}>
+            <option value="">— Selecionar —</option>
+            {catsFiltradas.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+          </Select>
+          <Select label="Forma de pagamento" value={form.forma_pgto} onChange={e => set('forma_pgto', e.target.value)}>
+            <option value="">— Selecionar —</option>
+            {FORMAS.map(f => <option key={f} value={f}>{FORMAS_LABEL[f]}</option>)}
+          </Select>
+
+          <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="atrasado">Atrasado</option>
+            <option value="cancelado">Cancelado</option>
+          </Select>
+          <Input label="Data de pagamento" type="date" value={form.data_pgto} onChange={e => set('data_pgto', e.target.value)} />
+
+          <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes} onChange={e => set('observacoes', e.target.value)} placeholder="Notas adicionais..." />
+
+          {erro && <p className="col-span-2 text-[12px] font-medium text-bad">{erro}</p>}
+        </form>
+      </Modal>
     </div>
   )
 }
 
 function LancamentosTable({ lancamentos, onEditar }: { lancamentos: Lancamento[]; onEditar: (l: Lancamento) => void }) {
-  if (lancamentos.length === 0) return <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum lançamento</p>
+  const cols: Column<Lancamento>[] = [
+    {
+      key: 'data', header: 'Data', className: 'num w-[88px]',
+      render: (l) => <span className="text-ink-2">{new Date(l.data_venc ? l.data_venc + 'T00:00:00' : l.created_at ?? '').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>,
+    },
+    { key: 'descricao', header: 'Descrição', render: (l) => <span className="font-medium text-ink">{l.descricao ?? '—'}</span> },
+    { key: 'categoria', header: 'Categoria', hideOnMobile: true, render: (l) => <span className="text-ink-2">{l.categoria ?? '—'}</span> },
+    { key: 'tipo', header: 'Tipo', render: (l) => <Badge tone={l.tipo === 'receita' ? 'ok' : 'bad'}>{l.tipo === 'receita' ? 'Receita' : 'Despesa'}</Badge> },
+    {
+      key: 'valor', header: 'Valor', align: 'right', className: 'num',
+      render: (l) => {
+        const isReceita = l.tipo === 'receita'
+        return <span className={cn('font-semibold', isReceita ? 'text-ok' : 'text-bad')}>{isReceita ? '+' : '−'} {l.valor != null ? formatCurrency(l.valor) : '—'}</span>
+      },
+    },
+    {
+      key: 'status', header: 'Status', align: 'right',
+      render: (l) => {
+        const tone = l.status === 'pago' ? 'ok' : l.status === 'atrasado' ? 'bad' : 'warn'
+        const label = l.status === 'pago' ? 'Pago' : l.status === 'atrasado' ? 'Atrasado' : 'Pendente'
+        return <Badge tone={tone}>{label}</Badge>
+      },
+    },
+  ]
   return (
-    <table className="w-full">
-      <thead>
-        <tr className="border-b border-[#16212E]/[0.08]">
-          {['Data','Descrição','Categoria','Tipo','Valor','Status'].map(h => (
-            <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {lancamentos.map(l => {
-          const isReceita = l.tipo === 'receita'
-          return (
-            <tr key={l.id} onClick={() => onEditar(l)} className="border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0">
-              <td className="px-5 py-3.5 text-sm text-[#788698]">{new Date(l.data_venc ? l.data_venc + 'T00:00:00' : l.created_at ?? '').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
-              <td className="px-5 py-3.5 text-sm font-medium text-[#1F2A39]">{l.descricao ?? '—'}</td>
-              <td className="px-5 py-3.5 text-sm text-[#788698]">{l.categoria ?? '—'}</td>
-              <td className="px-5 py-3.5">
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: isReceita ? '#22C55E' : '#16212E', backgroundColor: isReceita ? 'rgba(34,197,94,0.12)' : 'rgba(22,33,46,0.12)' }}>
-                  {isReceita ? 'Receita' : 'Despesa'}
-                </span>
-              </td>
-              <td className="px-5 py-3.5 text-sm font-bold" style={{ color: isReceita ? '#22C55E' : '#16212E' }}>
-                {isReceita ? '+' : '−'} {l.valor != null ? formatCurrency(l.valor) : '—'}
-              </td>
-              <td className="px-5 py-3.5">
-                <span className={cn('text-sm font-medium', l.status === 'pago' ? 'text-[#15986A]' : l.status === 'atrasado' ? 'text-[#16212E]' : 'text-[#B47B12]')}>
-                  {l.status === 'pago' ? 'Pago' : l.status === 'atrasado' ? 'Atrasado' : 'Pendente'}
-                </span>
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+    <Table
+      columns={cols}
+      rows={lancamentos}
+      rowKey={(l) => l.id}
+      onRowClick={onEditar}
+      empty={<EmptyState icon={<Receipt size={22} strokeWidth={1.7} />} title="Nenhum lançamento" description="Registre uma entrada ou saída para começar." />}
+    />
   )
 }

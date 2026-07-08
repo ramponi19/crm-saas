@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
 
 interface Garantia {
@@ -55,13 +54,20 @@ const STATUS_OPTIONS = [
   { value: 'recusado',   label: 'Recusado' },
 ]
 
-// Design tokens do modelo
-const inputCls = [
-  'w-full rounded-[10px] px-3 py-2.5 text-sm outline-none transition-colors',
-  'text-[#1F2A39] placeholder:text-[#9AA7B6]',
-  'bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20',
-].join(' ')
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
+type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
+const STATUS_TONE: Record<string, Tone> = {
+  em_analise: 'warn', aprovado: 'acc', em_reparo: 'acc',
+  concluido: 'ok', entregue: 'neutro', recusado: 'bad',
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-card border border-line bg-raised p-3 text-center">
+      <div className="num text-[15px] font-bold leading-tight text-ink">{value}</div>
+      <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">{label}</div>
+    </div>
+  )
+}
 
 const supabase = createClient()
 
@@ -96,182 +102,86 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
     if (isNew) {
       const { error } = await supabase.from('garantias_assistencias').insert(data)
-      if (error) { toast.error('Erro ao criar protocolo'); setSaving(false); return }
-      toast.success('Protocolo criado!')
+      if (error) { notify.bad('Erro ao criar protocolo'); setSaving(false); return }
+      notify.ok('Protocolo criado!')
     } else {
       const { error } = await supabase.from('garantias_assistencias').update(data).eq('id', garantia!.id!)
-      if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
-      toast.success('Salvo!')
+      if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      notify.ok('Salvo!')
     }
     router.refresh()
     onClose()
   }
 
   const statusLabel = STATUS_OPTIONS.find(s => s.value === form.status)?.label ?? form.status ?? '—'
-  const statusColors: Record<string, string> = {
-    em_analise: '#F59E0B', aprovado: '#3B7DE8', em_reparo: '#8B5CF6',
-    concluido: '#22C55E', entregue: '#5C6E84', recusado: '#16212E'
-  }
-  const statusColor = statusColors[form.status ?? ''] ?? '#5C6E84'
+  const statusTone = STATUS_TONE[form.status ?? ''] ?? 'neutro'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
-      <div
-        className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-[#16212E]/[0.10]"
-        style={{ backgroundColor: '#FFFFFF' }}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-[#1F2A39]">
-                {isNew ? 'Novo Protocolo' : (form.protocolo ?? `Protocolo #${garantia?.id}`)}
-              </h2>
-              {!isNew && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
-                  style={{ color: statusColor, backgroundColor: `${statusColor}18`, border: `1px solid ${statusColor}40` }}>
-                  {statusLabel}
-                </span>
-              )}
-            </div>
-            {!isNew && garantia?.clientes?.nome && (
-              <p className="text-[11px] text-[#9AA7B6] mt-0.5">{garantia.clientes.nome}</p>
-            )}
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors shrink-0">
-            <X size={16} />
-          </button>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      disableOverlayClose={saving}
+      title={
+        <span className="flex items-center gap-2.5">
+          <span className="truncate">{isNew ? 'Novo protocolo' : (form.protocolo ?? `Protocolo #${garantia?.id}`)}</span>
+          {!isNew && <Badge tone={statusTone}>{statusLabel}</Badge>}
+        </span>
+      }
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Fechar</Button>
+          <Button onClick={salvar} loading={saving}>Salvar</Button>
+        </>
+      }
+    >
+      {!isNew && garantia?.clientes?.nome && (
+        <p className="mb-4 text-[12px] text-ink-3">{garantia.clientes.nome}</p>
+      )}
+
+      {!isNew && (
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <Stat label="Entrada" value={new Date(garantia?.data_entrada ?? garantia?.created_at ?? '').toLocaleDateString('pt-BR')} />
+          <Stat label="Prazo" value={garantia?.dias_garantia_restantes != null ? `${garantia.dias_garantia_restantes}d` : '—'} />
+          <Stat label="Orçamento" value={garantia?.orcamento_valor ? `R$ ${Number(garantia.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
         </div>
+      )}
 
-        {/* Stats (só existente) */}
-        {!isNew && (
-          <div className="grid grid-cols-3 gap-2 px-6 pb-4 shrink-0">
-            {[
-              { label: 'Entrada',  value: new Date(garantia?.data_entrada ?? garantia?.created_at ?? '').toLocaleDateString('pt-BR') },
-              { label: 'Prazo',    value: garantia?.dias_garantia_restantes != null ? `${garantia.dias_garantia_restantes}d` : '—' },
-              { label: 'Orçamento',value: garantia?.orcamento_valor ? `R$ ${Number(garantia.orcamento_valor).toLocaleString('pt-BR')}` : '—' },
-            ].map(s => (
-              <div key={s.label} className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center"
-                style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
-                <div className="text-sm font-bold text-[#1F2A39] leading-tight">{s.value}</div>
-                <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
+      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <Input label="Protocolo" value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} placeholder="GAR-000001" />
+        <Select label="Status" value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)}>
+          {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
 
-        {/* Form */}
-        <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Protocolo</label>
-              <input value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)}
-                className={inputCls} placeholder="GAR-000001" />
-            </div>
-            <div>
-              <label className={labelCls}>Status</label>
-              <select value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)} className={inputCls}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#FFFFFF' }}>{o.label}</option>)}
-              </select>
-            </div>
-          </div>
+        <Select label="Cliente" value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Selecionar...</option>
+          {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </Select>
+        <Select label="Produto" value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Selecionar...</option>
+          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        </Select>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Cliente</label>
-              <select value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
-                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#FFFFFF' }}>{c.nome}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Produto</label>
-              <select value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
-                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#FFFFFF' }}>{p.nome}</option>)}
-              </select>
-            </div>
-          </div>
+        <Input label="IMEI / Nº de série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+        <Input label="Data de entrada" type="date" value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>IMEI / Nº de série</label>
-              <input value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)}
-                className={inputCls} placeholder="358000000000000" />
-            </div>
-            <div>
-              <label className={labelCls}>Data de entrada</label>
-              <input value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)}
-                type="date" className={inputCls} />
-            </div>
-          </div>
+        <Input label="Dias de garantia restantes" type="number" value={form.dias_garantia_restantes ?? ''} onChange={e => set('dias_garantia_restantes', e.target.value ? Number(e.target.value) : null)} placeholder="365" />
+        <Input label="Orçamento (R$)" type="number" value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} placeholder="0,00" />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Dias de garantia restantes</label>
-              <input value={form.dias_garantia_restantes ?? ''} onChange={e => set('dias_garantia_restantes', e.target.value ? Number(e.target.value) : null)}
-                type="number" className={inputCls} placeholder="365" />
-            </div>
-            <div>
-              <label className={labelCls}>Orçamento (R$)</label>
-              <input value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)}
-                type="number" className={inputCls} placeholder="0,00" />
-            </div>
-          </div>
+        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder="Ex: Tela trincada, sem carregador..." />
 
-          <div>
-            <label className={labelCls}>Estado de entrada</label>
-            <input value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)}
-              className={inputCls} placeholder="Ex: Tela trincada, sem carregador..." />
-          </div>
+        <Textarea wrapperClassName="col-span-2" label="Defeito relatado pelo cliente" rows={2} value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} placeholder="Descreva o problema..." />
 
-          <div>
-            <label className={labelCls}>Defeito relatado pelo cliente</label>
-            <textarea value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)}
-              rows={2} className={inputCls + ' resize-none'} placeholder="Descreva o problema..." />
-          </div>
+        <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico técnico..." />
 
-          <div>
-            <label className={labelCls}>Parecer técnico</label>
-            <textarea value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)}
-              rows={2} className={inputCls + ' resize-none'} placeholder="Diagnóstico técnico..." />
-          </div>
+        <Select label="Celular reserva" value={form.celular_reserva_fornecido ? 'sim' : 'nao'} onChange={e => set('celular_reserva_fornecido', e.target.value === 'sim')}>
+          <option value="nao">Não fornecido</option>
+          <option value="sim">Fornecido</option>
+        </Select>
+        <Input label="Modelo reserva" value={form.modelo_reserva ?? ''} onChange={e => set('modelo_reserva', e.target.value)} placeholder="Ex: iPhone 11" />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Celular reserva</label>
-              <select value={form.celular_reserva_fornecido ? 'sim' : 'nao'} onChange={e => set('celular_reserva_fornecido', e.target.value === 'sim')} className={inputCls}>
-                <option value="nao" style={{ backgroundColor: '#FFFFFF' }}>Não fornecido</option>
-                <option value="sim" style={{ backgroundColor: '#FFFFFF' }}>Fornecido</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Modelo reserva</label>
-              <input value={form.modelo_reserva ?? ''} onChange={e => set('modelo_reserva', e.target.value)}
-                className={inputCls} placeholder="Ex: iPhone 11" />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>Observações</label>
-            <textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)}
-              rows={2} className={inputCls + ' resize-none'} placeholder="Observações adicionais..." />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">
-            Fechar
-          </button>
-          <button type="submit" disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
-        </div>
-        </form>
-      </div>
-    </div>
+        <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} placeholder="Observações adicionais..." />
+      </form>
+    </Modal>
   )
 }

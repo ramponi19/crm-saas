@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus, ShoppingCart, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, StatCard, Modal, Input, Select, Textarea, Button, Badge, EmptyState } from '@/components/ui'
 
 interface Pedido {
   id: number
@@ -29,17 +30,11 @@ interface Fornecedor {
 }
 interface Props { pedidos: Pedido[]; fornecedores: Fornecedor[] }
 
-const STATUS_PEDIDO: Record<string, { label: string; color: string; bg: string }> = {
-  aberto:      { label: 'Aberto',       color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)'  },
-  em_transito: { label: 'Em trânsito',  color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
-  recebido:    { label: 'Recebido',     color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
-  cancelado:   { label: 'Cancelado',    color: '#16212E', bg: 'rgba(22,33,46,0.12)'   },
-}
-
-function avatarColor(name: string) {
-  const colors = ['#16212E','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#10B981']
-  let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
+const STATUS_PEDIDO: Record<string, { label: string; tone: 'acc' | 'ok' | 'warn' | 'neutro' }> = {
+  aberto:      { label: 'Aberto',      tone: 'acc'    },
+  em_transito: { label: 'Em trânsito', tone: 'warn'   },
+  recebido:    { label: 'Recebido',    tone: 'ok'     },
+  cancelado:   { label: 'Cancelado',   tone: 'neutro' },
 }
 
 const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
@@ -47,6 +42,10 @@ const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 function fmtData(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
+function getInitials(name: string) {
+  return name.trim().split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
 const FORM_VAZIO = { nome_fantasia: '', razao_social: '', cnpj: '', contato: '', telefone: '', email: '' }
@@ -146,216 +145,201 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Compras" />
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 px-6 py-4 shrink-0">
-        {[
-          { label: 'Pedidos abertos', value: stats.abertos,  iconBg: 'rgba(59,125,232,0.15)',  icon: '🛒' },
-          { label: 'Em trânsito',     value: stats.transito,  iconBg: 'rgba(245,158,11,0.15)',  icon: '🚚' },
-          { label: 'Recebidos no mês',value: stats.recebidos, iconBg: 'rgba(34,197,94,0.15)',   icon: '📦' },
-          { label: 'Investido no mês',value: fmtBRL(stats.investido), iconBg: 'rgba(139,92,246,0.15)', icon: '💰' },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0" style={{ backgroundColor: s.iconBg }}>{s.icon}</div>
-            <div>
-              <div className="text-xl font-normal text-[#16212E] leading-none">{s.value}</div>
-              <div className="text-[11px] text-[#788698] mt-1">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
+        <div className="mx-auto max-w-[1240px] space-y-4">
 
-      {/* Dois painéis */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 grid grid-cols-[1fr_360px] gap-4">
-        {/* Pedidos */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
-            <h2 className="text-base font-semibold text-[#1F2A39]">Pedidos de compra</h2>
-            <button
-              onClick={() => { setFormPedido(PEDIDO_VAZIO); setErroPedido(null); setModalPedido(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors">
-              <Plus size={13} /> Novo pedido
-            </button>
+          {/* Stats */}
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+            <StatCard bare label="Pedidos abertos" value={stats.abertos} />
+            <StatCard bare label="Em trânsito" value={stats.transito} />
+            <StatCard bare label="Recebidos no mês" value={stats.recebidos} />
+            <StatCard bare label="Investido no mês" value={fmtBRL(stats.investido)} />
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {pedidos.length === 0 ? (
-              <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum pedido</p>
-            ) : pedidos.map(p => {
-              const s = STATUS_PEDIDO[p.status ?? ''] ?? { label: p.status ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
-              return (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer last:border-0">
-                  <div>
-                    <div className="text-sm font-medium text-[#1F2A39]">{p.descricao ?? `Pedido #${p.id}`}</div>
-                    <div className="text-[11px] text-[#788698] mt-0.5">{p.fornecedores?.nome_fantasia ?? '—'} · {fmtData(p.data_pedido ?? p.created_at)}</div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-semibold text-[#1F2A39]">{fmtBRL(p.valor_total)}</span>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: s.color, backgroundColor: s.bg }}>{s.label}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
 
-        {/* Fornecedores */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#16212E]/[0.08]">
-            <h2 className="text-base font-semibold text-[#1F2A39]">Fornecedores</h2>
-            <button
-              onClick={() => { setForm(FORM_VAZIO); setErro(null); setModalFornecedor(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] text-white text-xs font-semibold rounded-[8px] transition-colors"
+          {/* Dois painéis */}
+          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+
+            {/* Pedidos */}
+            <Card
+              flush
+              title="Pedidos de compra"
+              actions={
+                <Button
+                  size="sm"
+                  icon={<Plus size={14} strokeWidth={1.7} />}
+                  onClick={() => { setFormPedido(PEDIDO_VAZIO); setErroPedido(null); setModalPedido(true) }}
+                >
+                  Novo pedido
+                </Button>
+              }
             >
-              <Plus size={13} /> Novo
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {fornecedores.length === 0 ? (
-              <p className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum fornecedor</p>
-            ) : fornecedores.map(f => {
-              const color = avatarColor(f.nome_fantasia)
-              const initials = f.nome_fantasia.trim().split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-              const qtd = pedidos.filter(p => p.fornecedor_id === f.id).length
-              return (
-                <div key={f.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer last:border-0">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: color }}>{initials}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-[#1F2A39] truncate">{f.nome_fantasia}</div>
-                    <div className="text-[11px] text-[#788698] truncate">{f.contato ?? '—'}{f.telefone ? ` · ${f.telefone}` : ''}</div>
-                  </div>
-                  <span className="text-[11px] text-[#788698] shrink-0">{qtd} pedidos</span>
+              {pedidos.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState icon={<ShoppingCart size={22} strokeWidth={1.7} />} title="Nenhum pedido" description="Registre seu primeiro pedido de compra." />
                 </div>
-              )
-            })}
+              ) : (
+                <div className="divide-y divide-line-soft">
+                  {pedidos.map(p => {
+                    const s = STATUS_PEDIDO[p.status ?? ''] ?? { label: p.status ?? '—', tone: 'neutro' as const }
+                    return (
+                      <div key={p.id} className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-ink/[0.03]">
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-medium text-ink">{p.descricao ?? `Pedido #${p.id}`}</div>
+                          <div className="mt-0.5 truncate text-[11px] text-ink-3">{p.fornecedores?.nome_fantasia ?? '—'} · <span className="num">{fmtData(p.data_pedido ?? p.created_at)}</span></div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <span className="num text-[13px] font-semibold text-ink">{fmtBRL(p.valor_total)}</span>
+                          <Badge tone={s.tone}>{s.label}</Badge>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Fornecedores */}
+            <Card
+              flush
+              title="Fornecedores"
+              actions={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<Plus size={14} strokeWidth={1.7} />}
+                  onClick={() => { setForm(FORM_VAZIO); setErro(null); setModalFornecedor(true) }}
+                >
+                  Novo
+                </Button>
+              }
+            >
+              {fornecedores.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState icon={<Building2 size={22} strokeWidth={1.7} />} title="Nenhum fornecedor" description="Cadastre seu primeiro fornecedor." />
+                </div>
+              ) : (
+                <div className="divide-y divide-line-soft">
+                  {fornecedores.map(f => {
+                    const qtd = pedidos.filter(p => p.fornecedor_id === f.id).length
+                    return (
+                      <div key={f.id} className="flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink/[0.03]">
+                        <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+                          {getInitials(f.nome_fantasia)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-semibold text-ink">{f.nome_fantasia}</div>
+                          <div className="truncate text-[11px] text-ink-3">{f.contato ?? '—'}{f.telefone ? ` · ${f.telefone}` : ''}</div>
+                        </div>
+                        <span className="num shrink-0 text-[11px] text-ink-3">{qtd} pedidos</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+
           </div>
         </div>
       </div>
 
       {/* Modal novo fornecedor */}
-      {modalFornecedor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08]">
-              <h2 className="text-base font-bold text-[#1F2A39]">Novo fornecedor</h2>
-              <button onClick={() => setModalFornecedor(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={e => { e.preventDefault(); salvarFornecedor() }}>
-            <div className="px-6 py-5 space-y-4">
-              {[
-                { label: 'Nome fantasia *', key: 'nome_fantasia', placeholder: 'Ex: Distribuidora ABC' },
-                { label: 'Razão social',    key: 'razao_social',  placeholder: 'Ex: ABC Comércio Ltda' },
-                { label: 'CNPJ',            key: 'cnpj',          placeholder: '00.000.000/0000-00' },
-                { label: 'Contato (pessoa)',key: 'contato',       placeholder: 'Nome do responsável' },
-                { label: 'Telefone',        key: 'telefone',      placeholder: '(11) 99999-9999' },
-                { label: 'E-mail',          key: 'email',         placeholder: 'contato@fornecedor.com' },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">{label}</label>
-                  <input
-                    type="text"
-                    value={form[key as keyof typeof FORM_VAZIO]}
-                    onChange={e => set(key as keyof typeof FORM_VAZIO, e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors"
-                  />
-                </div>
-              ))}
-
-              {erro && <p className="text-xs text-[#16212E]">{erro}</p>}
-            </div>
-
-            <div className="flex gap-3 px-6 pb-6">
-              <button
-                type="button"
-                onClick={() => setModalFornecedor(false)}
-                className="flex-1 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={salvando}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60"
-              >
-                {salvando ? 'Salvando...' : 'Salvar fornecedor'}
-              </button>
-            </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={modalFornecedor}
+        onClose={() => setModalFornecedor(false)}
+        title="Novo fornecedor"
+        disableOverlayClose={salvando}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModalFornecedor(false)} disabled={salvando}>Cancelar</Button>
+            <Button onClick={salvarFornecedor} loading={salvando}>Salvar fornecedor</Button>
+          </>
+        }
+      >
+        <form onSubmit={e => { e.preventDefault(); salvarFornecedor() }} className="space-y-3.5">
+          {[
+            { label: 'Nome fantasia', key: 'nome_fantasia', placeholder: 'Ex: Distribuidora ABC', required: true },
+            { label: 'Razão social',    key: 'razao_social',  placeholder: 'Ex: ABC Comércio Ltda' },
+            { label: 'CNPJ',            key: 'cnpj',          placeholder: '00.000.000/0000-00' },
+            { label: 'Contato (pessoa)',key: 'contato',       placeholder: 'Nome do responsável' },
+            { label: 'Telefone',        key: 'telefone',      placeholder: '(11) 99999-9999' },
+            { label: 'E-mail',          key: 'email',         placeholder: 'contato@fornecedor.com' },
+          ].map(({ label, key, placeholder, required }) => (
+            <Input
+              key={key}
+              label={label}
+              required={required}
+              value={form[key as keyof typeof FORM_VAZIO]}
+              onChange={e => set(key as keyof typeof FORM_VAZIO, e.target.value)}
+              placeholder={placeholder}
+            />
+          ))}
+          {erro && <p className="text-[12px] font-medium text-bad">{erro}</p>}
+        </form>
+      </Modal>
 
       {/* Modal novo pedido */}
-      {modalPedido && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08]">
-              <h2 className="text-base font-bold text-[#1F2A39]">Novo pedido de compra</h2>
-              <button onClick={() => setModalPedido(false)} className="text-[#788698] hover:text-[#1F2A39] transition-colors"><X size={20} /></button>
-            </div>
-            <form onSubmit={e => { e.preventDefault(); salvarPedido() }}>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Descrição *</label>
-                <input value={formPedido.descricao} onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
-                  placeholder="Ex: Reposição de estoque smartphones"
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Fornecedor</label>
-                <select value={formPedido.fornecedor_id} onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
-                  <option value="">— Selecionar —</option>
-                  {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Valor total (R$)</label>
-                  <input value={formPedido.valor_total} onChange={e => setFormPedido(f => ({ ...f, valor_total: e.target.value }))}
-                    placeholder="0,00"
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Data do pedido</label>
-                  <input type="date" value={formPedido.data_pedido} onChange={e => setFormPedido(f => ({ ...f, data_pedido: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Status</label>
-                <select value={formPedido.status} onChange={e => setFormPedido(f => ({ ...f, status: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors">
-                  {Object.entries(STATUS_PEDIDO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-[#788698] uppercase tracking-wide mb-1.5">Observações</label>
-                <textarea value={formPedido.observacoes} onChange={e => setFormPedido(f => ({ ...f, observacoes: e.target.value }))}
-                  rows={2} placeholder="Informações adicionais..."
-                  className="w-full px-3 py-2.5 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] rounded-[10px] outline-none focus:border-[#16212E]/50 transition-colors resize-none" />
-              </div>
-              {erroPedido && <p className="text-xs text-[#16212E]">{erroPedido}</p>}
-            </div>
-            <div className="flex gap-3 px-6 pb-6">
-              <button type="button" onClick={() => setModalPedido(false)}
-                className="flex-1 py-2.5 text-sm font-semibold text-[#788698] bg-[#F4F6F9] rounded-[10px] hover:bg-[#E8EAED] transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" disabled={salvandoPedido}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#16212E] hover:bg-[#16212E] rounded-[10px] transition-colors disabled:opacity-60">
-                {salvandoPedido ? 'Salvando...' : 'Criar pedido'}
-              </button>
-            </div>
-            </form>
+      <Modal
+        open={modalPedido}
+        onClose={() => setModalPedido(false)}
+        title="Novo pedido de compra"
+        disableOverlayClose={salvandoPedido}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModalPedido(false)} disabled={salvandoPedido}>Cancelar</Button>
+            <Button onClick={salvarPedido} loading={salvandoPedido}>Criar pedido</Button>
+          </>
+        }
+      >
+        <form onSubmit={e => { e.preventDefault(); salvarPedido() }} className="space-y-3.5">
+          <Input
+            label="Descrição"
+            required
+            value={formPedido.descricao}
+            onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
+            placeholder="Ex: Reposição de estoque smartphones"
+          />
+          <Select
+            label="Fornecedor"
+            value={formPedido.fornecedor_id}
+            onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
+          >
+            <option value="">— Selecionar —</option>
+            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Valor total (R$)"
+              value={formPedido.valor_total}
+              onChange={e => setFormPedido(f => ({ ...f, valor_total: e.target.value }))}
+              placeholder="0,00"
+            />
+            <Input
+              label="Data do pedido"
+              type="date"
+              value={formPedido.data_pedido}
+              onChange={e => setFormPedido(f => ({ ...f, data_pedido: e.target.value }))}
+            />
           </div>
-        </div>
-      )}
+          <Select
+            label="Status"
+            value={formPedido.status}
+            onChange={e => setFormPedido(f => ({ ...f, status: e.target.value }))}
+          >
+            {Object.entries(STATUS_PEDIDO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </Select>
+          <Textarea
+            label="Observações"
+            rows={2}
+            value={formPedido.observacoes}
+            onChange={e => setFormPedido(f => ({ ...f, observacoes: e.target.value }))}
+            placeholder="Informações adicionais..."
+          />
+          {erroPedido && <p className="text-[12px] font-medium text-bad">{erroPedido}</p>}
+        </form>
+      </Modal>
     </div>
   )
 }

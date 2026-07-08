@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { X, QrCode, Send, Copy, Check } from 'lucide-react'
+import { QrCode, Send, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
-import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
 
 interface Cobranca {
   id: number
@@ -49,17 +49,25 @@ const EMPTY: OS = {
   cliente_id: null, produto_id: null,
 }
 
-const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#1F2A39] placeholder:text-[#9AA7B6] bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20 outline-none transition-colors'
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
+type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
-const STATUS_OPTIONS = [
-  { value: 'em_analise', label: 'Em análise' },
-  { value: 'em_reparo', label: 'Em reparo' },
-  { value: 'aguardando_peca', label: 'Aguardando peça' },
-  { value: 'concluido', label: 'Concluído' },
-  { value: 'entregue', label: 'Entregue' },
-  { value: 'reprovado', label: 'Reprovado' },
+const STATUS_OPTIONS: { value: string; label: string; tone: Tone }[] = [
+  { value: 'em_analise', label: 'Em análise', tone: 'acc' },
+  { value: 'em_reparo', label: 'Em reparo', tone: 'warn' },
+  { value: 'aguardando_peca', label: 'Aguardando peça', tone: 'warn' },
+  { value: 'concluido', label: 'Concluído', tone: 'ok' },
+  { value: 'entregue', label: 'Entregue', tone: 'neutro' },
+  { value: 'reprovado', label: 'Reprovado', tone: 'bad' },
 ]
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-card border border-line bg-raised p-3 text-center">
+      <div className="num truncate text-[15px] font-bold leading-tight text-ink">{value}</div>
+      <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">{label}</div>
+    </div>
+  )
+}
 
 const supabase = createClient()
 
@@ -104,9 +112,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Erro ao gerar cobrança')
       setCobranca(json.cobranca)
-      toast.success('Cobrança gerada!')
+      notify.ok('Cobrança gerada!')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+      notify.bad(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
     } finally {
       setCobrando(false)
     }
@@ -132,9 +140,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
         body: JSON.stringify({ to: os.clientes.telefone, message: msg }),
       })
       if (!res.ok) throw new Error('Falha ao enviar')
-      toast.success('WhatsApp enviado!')
+      notify.ok('WhatsApp enviado!')
     } catch {
-      toast.error('Erro ao enviar WhatsApp')
+      notify.bad('Erro ao enviar WhatsApp')
     } finally {
       setEnviandoWpp(false)
     }
@@ -146,147 +154,111 @@ export default function OSModal({ os, isNew, onClose }: Props) {
     const base = { ...payload, tipo: 'assistencia' as const, empresa_id: empresaId, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
     if (isNew) {
       const { error } = await supabase.from('garantias_assistencias').insert(base as TablesInsert<'garantias_assistencias'>)
-      if (error) { toast.error('Erro ao criar OS'); setSaving(false); return }
-      toast.success('OS criada!')
+      if (error) { notify.bad('Erro ao criar OS'); setSaving(false); return }
+      notify.ok('OS criada!')
     } else {
       const { error } = await supabase.from('garantias_assistencias').update(base as TablesUpdate<'garantias_assistencias'>).eq('id', os!.id!)
-      if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
-      toast.success('Salvo!')
+      if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      notify.ok('Salvo!')
     }
     router.refresh(); onClose()
   }
 
-  const statusColors: Record<string, string> = {
-    em_analise: '#F59E0B', em_reparo: '#8B5CF6', aguardando_peca: '#3B7DE8',
-    concluido: '#22C55E', entregue: '#5C6E84', reprovado: '#16212E'
-  }
-  const sc = statusColors[form.status ?? ''] ?? '#5C6E84'
+  const statusOpt = STATUS_OPTIONS.find(s => s.value === form.status)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
-      <div className="w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-[18px] border border-[#16212E]/[0.10]" style={{ backgroundColor: '#FFFFFF' }}>
-        <div className="flex items-center gap-3 px-6 pt-5 pb-4 shrink-0">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-[#1F2A39]">{isNew ? 'Nova OS' : (form.protocolo ?? `OS #${os?.id}`)}</h2>
-              {!isNew && <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold" style={{ color: sc, backgroundColor: `${sc}18`, border: `1px solid ${sc}40` }}>{STATUS_OPTIONS.find(s => s.value === form.status)?.label}</span>}
-            </div>
-            {!isNew && os?.clientes?.nome && <p className="text-[11px] text-[#9AA7B6] mt-0.5">{os.clientes.nome}</p>}
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] hover:text-[#56657A] transition-colors"><X size={16} /></button>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      disableOverlayClose={saving}
+      title={
+        <span className="flex items-center gap-2.5">
+          <span className="truncate">{isNew ? 'Nova OS' : (form.protocolo ?? `OS #${os?.id}`)}</span>
+          {!isNew && statusOpt && <Badge tone={statusOpt.tone}>{statusOpt.label}</Badge>}
+        </span>
+      }
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Fechar</Button>
+          <Button onClick={salvar} loading={saving}>Salvar</Button>
+        </>
+      }
+    >
+      {!isNew && os?.clientes?.nome && (
+        <p className="-mt-1 mb-3 text-[12px] text-ink-2">{os.clientes.nome}</p>
+      )}
 
-        {!isNew && (
-          <div className="grid grid-cols-3 gap-2 px-6 pb-4 shrink-0">
-            {[
-              { label: 'Entrada', value: new Date(os?.data_entrada ?? os?.created_at ?? '').toLocaleDateString('pt-BR') },
-              { label: 'Orçamento', value: os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—' },
-              { label: 'Aparelho', value: os?.produtos?.nome ?? '—' },
-            ].map(s => (
-              <div key={s.label} className="rounded-[13px] border border-[#16212E]/[0.08] p-3 text-center" style={{ backgroundColor: 'rgba(22,32,46,0.04)' }}>
-                <div className="text-sm font-bold text-[#1F2A39] leading-tight truncate">{s.value}</div>
-                <div className="text-[9px] text-[#9AA7B6] tracking-widest uppercase font-mono mt-0.5">{s.label}</div>
+      {!isNew && (
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <Stat label="Entrada" value={new Date(os?.data_entrada ?? os?.created_at ?? '').toLocaleDateString('pt-BR')} />
+          <Stat label="Orçamento" value={os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
+          <Stat label="Aparelho" value={os?.produtos?.nome ?? '—'} />
+        </div>
+      )}
+
+      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <Input label="Nº OS" value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} placeholder="OS-000001" />
+        <Select label="Status" value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)}>
+          {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+        <Select label="Cliente" value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Selecionar...</option>
+          {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </Select>
+        <Select label="Produto" value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Selecionar...</option>
+          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        </Select>
+        <Input label="IMEI / Nº série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+        <Input label="Data de entrada" type="date" value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} />
+        <Select label="Origem" value={form.dentro_garantia ? 'garantia' : 'externo'} onChange={e => set('dentro_garantia', e.target.value === 'garantia')}>
+          <option value="externo">Reparo externo</option>
+          <option value="garantia">Garantia</option>
+        </Select>
+        <Input label="Orçamento (R$)" type="number" value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} placeholder="0,00" />
+        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder="Ex: Tela trincada..." />
+        <Textarea wrapperClassName="col-span-2" label="Defeito relatado" rows={2} value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} placeholder="Descreva o problema..." />
+        <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico..." />
+        <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} placeholder="..." />
+      </form>
+
+      {/* Cobrança Pix */}
+      {!isNew && !!form.orcamento_valor && form.status !== 'reprovado' && (
+        <div className="mt-4 space-y-3 border-t border-line-soft pt-4">
+          {!cobranca ? (
+            <Button type="button" variant="outline" className="w-full text-ok" icon={<QrCode size={15} strokeWidth={1.7} />} onClick={cobrar} loading={cobrando}>
+              {cobrando ? 'Gerando cobrança...' : `Cobrar R$ ${Number(form.orcamento_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            </Button>
+          ) : (
+            <div className="rounded-card border border-ok/20 bg-ok-soft p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-ok">Pix gerado</p>
+                <Badge tone="ok">{cobranca.status}</Badge>
               </div>
-            ))}
-          </div>
-        )}
-
-        <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>Nº OS</label><input value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} className={inputCls} placeholder="OS-000001" /></div>
-            <div><label className={labelCls}>Status</label>
-              <select value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)} className={inputCls}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ backgroundColor: '#FFFFFF' }}>{o.label}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>Cliente</label>
-              <select value={form.cliente_id ?? ''} onChange={e => set('cliente_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
-                {clientes.map(c => <option key={c.id} value={c.id} style={{ backgroundColor: '#FFFFFF' }}>{c.nome}</option>)}
-              </select>
-            </div>
-            <div><label className={labelCls}>Produto</label>
-              <select value={form.produto_id ?? ''} onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)} className={inputCls}>
-                <option value="" style={{ backgroundColor: '#FFFFFF' }}>Selecionar...</option>
-                {produtos.map(p => <option key={p.id} value={p.id} style={{ backgroundColor: '#FFFFFF' }}>{p.nome}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>IMEI / Nº série</label><input value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} className={inputCls} placeholder="358000000000000" /></div>
-            <div><label className={labelCls}>Data de entrada</label><input value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} type="date" className={inputCls} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelCls}>Origem</label>
-              <select value={form.dentro_garantia ? 'garantia' : 'externo'} onChange={e => set('dentro_garantia', e.target.value === 'garantia')} className={inputCls}>
-                <option value="externo" style={{ backgroundColor: '#FFFFFF' }}>Reparo externo</option>
-                <option value="garantia" style={{ backgroundColor: '#FFFFFF' }}>Garantia</option>
-              </select>
-            </div>
-            <div><label className={labelCls}>Orçamento (R$)</label><input value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} type="number" className={inputCls} placeholder="0,00" /></div>
-          </div>
-          <div><label className={labelCls}>Estado de entrada</label><input value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} className={inputCls} placeholder="Ex: Tela trincada..." /></div>
-          <div><label className={labelCls}>Defeito relatado</label><textarea value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Descreva o problema..." /></div>
-          <div><label className={labelCls}>Parecer técnico</label><textarea value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Diagnóstico..." /></div>
-          <div><label className={labelCls}>Observações</label><textarea value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="..." /></div>
-        </div>
-
-        {/* Cobrança Pix */}
-        {!isNew && !!form.orcamento_valor && form.status !== 'reprovado' && (
-          <div className="px-6 pb-4 shrink-0 space-y-3">
-            <div className="h-px bg-[#16212E]/[0.08]" />
-            {!cobranca ? (
-              <button type="button" onClick={cobrar} disabled={cobrando}
-                className="flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-[10px] text-sm font-semibold bg-[#0e9f6e]/10 text-[#0e9f6e] border border-[#0e9f6e]/20 hover:bg-[#0e9f6e]/20 disabled:opacity-50 transition-colors">
-                <QrCode size={15} />
-                {cobrando ? 'Gerando cobrança...' : `Cobrar R$ ${Number(form.orcamento_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              </button>
-            ) : (
-              <div className="rounded-[13px] border border-[#0e9f6e]/20 bg-[#0e9f6e]/[0.04] p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-[#0e9f6e]">Pix gerado</p>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0e9f6e]/10 text-[#0e9f6e] font-mono">{cobranca.status}</span>
+              {cobranca.qr_code_base64 && (
+                <div className="flex justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`data:image/png;base64,${cobranca.qr_code_base64}`} alt="QR Code Pix" className="h-36 w-36 rounded-control" />
                 </div>
-                {cobranca.qr_code_base64 && (
-                  <div className="flex justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`data:image/png;base64,${cobranca.qr_code_base64}`} alt="QR Code Pix" className="w-36 h-36 rounded-[8px]" />
-                  </div>
-                )}
-                {(cobranca.linha_digitavel ?? cobranca.qr_code) && (
-                  <div className="flex gap-2">
-                    <input readOnly value={cobranca.linha_digitavel ?? cobranca.qr_code ?? ''}
-                      className="flex-1 rounded-[8px] px-3 py-2 text-[11px] font-mono text-[#56657A] bg-white border border-[#16212E]/[0.08] outline-none truncate" />
-                    <button type="button" onClick={copiarPix}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] bg-white border border-[#16212E]/[0.08] text-[11px] font-semibold text-[#56657A] hover:bg-[#16212E]/[0.04] transition-colors shrink-0">
-                      {copiado ? <Check size={13} className="text-[#0e9f6e]" /> : <Copy size={13} />}
-                      {copiado ? 'Copiado' : 'Copiar'}
-                    </button>
-                  </div>
-                )}
-                {os?.clientes?.telefone && (
-                  <button type="button" onClick={enviarWhatsApp} disabled={enviandoWpp}
-                    className="flex items-center gap-2 w-full justify-center px-4 py-2 rounded-[10px] text-sm font-semibold bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 hover:bg-[#25D366]/20 disabled:opacity-50 transition-colors">
-                    <Send size={13} />
-                    {enviandoWpp ? 'Enviando...' : 'Enviar via WhatsApp'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Fechar</button>
-          <button type="submit" disabled={saving} className="px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
+              )}
+              {(cobranca.linha_digitavel ?? cobranca.qr_code) && (
+                <div className="flex items-center gap-2">
+                  <Input wrapperClassName="flex-1" readOnly value={cobranca.linha_digitavel ?? cobranca.qr_code ?? ''} className="num truncate text-ink-2" />
+                  <Button type="button" variant="outline" onClick={copiarPix} icon={copiado ? <Check size={13} strokeWidth={1.7} className="text-ok" /> : <Copy size={13} strokeWidth={1.7} />}>
+                    {copiado ? 'Copiado' : 'Copiar'}
+                  </Button>
+                </div>
+              )}
+              {os?.clientes?.telefone && (
+                <Button type="button" variant="outline" className="w-full text-ok" icon={<Send size={13} strokeWidth={1.7} />} onClick={enviarWhatsApp} loading={enviandoWpp}>
+                  {enviandoWpp ? 'Enviando...' : 'Enviar via WhatsApp'}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-        </form>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
