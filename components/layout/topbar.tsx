@@ -1,11 +1,12 @@
 'use client'
 
-import { Bell, Search, X } from 'lucide-react'
+import { Bell, MessageSquare, Search } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
+import { CommandPalette } from './command-palette'
 
 interface TopbarProps {
   eyebrow?: string
@@ -23,61 +24,32 @@ interface NotifLead {
   nao_lidas: number
 }
 
-interface SearchResult {
-  tipo: 'cliente' | 'lead' | 'estoque'
-  id: number | string
-  titulo: string
-  sub: string
-  href: string
-}
-
 const periods = [
-  { value: 'hoje', label: 'Hoje'   },
-  { value: '7d',   label: '7 dias' },
-  { value: '30d',  label: '30 dias'},
-  { value: 'mes',  label: 'Mês'    },
-  { value: 'ano',  label: 'Ano'    },
+  { value: 'hoje', label: 'Hoje' },
+  { value: '7d', label: '7 dias' },
+  { value: '30d', label: '30 dias' },
+  { value: 'mes', label: 'Mês' },
+  { value: 'ano', label: 'Ano' },
 ]
 
-const ORIGEM_EMOJI: Record<string, string> = {
-  whatsapp: '💬', instagram: '📸', messenger: '💙', manual: '👤',
-}
-
-export function Topbar({
-  title = '',
-  showPeriods = false,
-  activePeriod = 'mes',
-  onPeriodChange,
-}: TopbarProps) {
+export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', onPeriodChange }: TopbarProps) {
   const router = useRouter()
-
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotifLead[]>([])
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searching, setSearching] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Pede permissão para notificações do navegador
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {})
     }
   }, [])
 
-  // Busca leads com mensagens não lidas (+ atualização em tempo real)
   useEffect(() => {
     const supabase = createClient()
     async function load() {
       const { data: msgs } = await supabase
-        .from('lead_mensagens')
-        .select('lead_id')
-        .eq('lida', false)
-        .eq('direcao', 'recebida')
+        .from('lead_mensagens').select('lead_id').eq('lida', false).eq('direcao', 'recebida')
       if (!msgs) return
       const contagem: Record<number, number> = {}
       for (const m of msgs as Array<{ lead_id: number | null }>) {
@@ -87,42 +59,27 @@ export function Topbar({
       const ids = Object.keys(contagem).map(Number)
       if (ids.length === 0) { setNotifs([]); return }
       const { data: leads } = await supabase
-        .from('leads')
-        .select('id, nome, produto_interessado, origem')
-        .in('id', ids)
-        .eq('ativo', true)
+        .from('leads').select('id, nome, produto_interessado, origem').in('id', ids).eq('ativo', true)
       type LeadNotifRow = { id: number; nome: string | null; produto_interessado: string | null; origem: string | null }
-      const list: NotifLead[] = ((leads ?? []) as LeadNotifRow[]).map(l => ({
-        id: l.id, nome: l.nome, produto_interessado: l.produto_interessado,
-        origem: l.origem, nao_lidas: contagem[l.id] ?? 0,
-      })).sort((a, b) => b.nao_lidas - a.nao_lidas)
-      setNotifs(list)
+      setNotifs(((leads ?? []) as LeadNotifRow[]).map((l) => ({
+        id: l.id, nome: l.nome, produto_interessado: l.produto_interessado, origem: l.origem, nao_lidas: contagem[l.id] ?? 0,
+      })).sort((a, b) => b.nao_lidas - a.nao_lidas))
     }
     load()
 
-    // Realtime: recarrega notificações + dispara notificação do navegador
     const channel = supabase
       .channel(`topbar_notifs_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; conteudo: string | null }>) => {
         load()
-        // Notificação do navegador apenas para mensagens NOVAS recebidas
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            // Busca o nome do lead para a notificação
             let titulo = 'Nova mensagem'
             try {
-              const { data } = await supabase
-                .from('leads')
-                .select('nome, origem')
-                .eq('id', payload.new.lead_id)
-                .maybeSingle()
+              const { data } = await supabase.from('leads').select('nome, origem').eq('id', payload.new.lead_id).maybeSingle()
               if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
               else if (data?.origem) titulo = `Nova mensagem · ${data.origem}`
             } catch {}
             try {
-              // Sem `icon` propositalmente: um ícone que retorna 404 faz o Chrome
-              // engolir a notificação inteira sem mostrar nada. Sem icon, ele usa
-              // o ícone padrão da aba e a notificação sempre aparece.
               const notif = new Notification(titulo, {
                 body: payload.new.conteudo?.slice(0, 120) ?? '',
                 tag: `lead-${payload.new.lead_id}`,
@@ -140,7 +97,6 @@ export function Topbar({
     return () => { supabase.removeChannel(channel) }
   }, [router])
 
-  // Fecha painel ao clicar fora
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
@@ -151,179 +107,85 @@ export function Topbar({
 
   const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
 
-  // Busca global com debounce
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    if (!query.trim() || query.length < 2) { setSearchResults([]); setSearchOpen(false); return }
-    setSearchOpen(true)
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true)
-      const supabase = createClient()
-      const q = query.trim()
-      // Busca produtos pelo nome para depois filtrar inventario_unidades
-      const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }] = await Promise.all([
-        supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('leads').select('id, nome, produto_interessado').ilike('nome', `%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(3),
-        supabase.from('produtos').select('id').ilike('nome', `%${q}%`).limit(10),
-      ])
-
-      // Busca unidades pelo produto_id encontrado
-      type EstoqueRow = { id: number; imei: string | null; numero_serie: string | null; produtos: { nome: string | null } | { nome: string | null }[] | null }
-      const produtoIds = ((produtosMatch ?? []) as Array<{ id: number }>).map(p => p.id)
-      let estoqueNome: EstoqueRow[] = []
-      if (produtoIds.length > 0) {
-        const { data } = await supabase
-          .from('inventario_unidades')
-          .select('id, imei, numero_serie, produtos!produto_id(nome)')
-          .in('produto_id', produtoIds)
-          .eq('ativo', true)
-          .limit(4)
-        estoqueNome = (data ?? []) as unknown as EstoqueRow[]
-      }
-
-      // Merge e deduplica por id
-      const allEstoque = [...((estoque ?? []) as unknown as EstoqueRow[]), ...estoqueNome]
-      const seenIds = new Set<number>()
-      const estoqueDedup = allEstoque.filter(u => { if (seenIds.has(u.id)) return false; seenIds.add(u.id); return true }).slice(0, 4)
-      const estNome = (r: EstoqueRow['produtos']): string | null => (Array.isArray(r) ? r[0]?.nome : r?.nome) ?? null
-
-      const results: SearchResult[] = [
-        ...((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>).map(c => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
-        ...((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null }>).map(l => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
-        ...estoqueDedup.map(u => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
-      ]
-      setSearchResults(results)
-      setSearching(false)
-    }, 300)
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
-  }, [query])
-
-  // Fecha busca ao clicar fora
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }
-  const TIPO_COLOR: Record<string, string> = { cliente: '#3B7DE8', lead: '#F59E0B', estoque: '#22C55E' }
-
   return (
-    <header suppressHydrationWarning className="flex items-center gap-5 px-[30px] py-4 border-b border-[#16212E]/[0.08] bg-[rgba(255,255,255,0.82)] backdrop-blur-md shrink-0 z-10">
-
-      <div className="min-w-0">
-        <h1 className="font-serif font-medium text-[24px] tracking-[-0.02em] text-[#16212E] whitespace-nowrap leading-tight">{title}</h1>
-      </div>
+    <header suppressHydrationWarning className="z-10 flex h-[52px] shrink-0 items-center gap-3 border-b border-line-soft bg-card/90 px-5 backdrop-blur-md">
+      <span className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-ink">{title}</span>
 
       <div className="flex-1" />
 
       {showPeriods && (
-        <div className="flex gap-[3px] p-[3px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10]">
+        <div className="hidden gap-0.5 rounded-control border border-line bg-raised p-0.5 sm:flex">
           {periods.map((p) => (
-            <button key={p.value} onClick={() => onPeriodChange?.(p.value)}
-              className={cn('px-[13px] py-[7px] rounded-[8px] text-[12.5px] font-medium transition-all duration-150',
-                activePeriod === p.value
-                  ? 'bg-[#16212E] text-white font-bold shadow-[0_4px_12px_rgba(22,33,46,0.28)]'
-                  : 'text-[#788698] hover:text-[#56657A] hover:bg-[#16212E]/[0.06]')}>
+            <button
+              key={p.value}
+              onClick={() => onPeriodChange?.(p.value)}
+              className={cn('rounded-[6px] px-3 py-1 text-[12px] font-medium transition-colors',
+                activePeriod === p.value ? 'bg-card text-ink shadow-[0_1px_2px_rgba(21,24,28,0.08)]' : 'text-ink-2 hover:text-ink')}
+            >
               {p.label}
             </button>
           ))}
         </div>
       )}
 
-      <div className="relative flex items-center" ref={searchRef}>
-        <Search size={17} className="absolute left-3 text-[#46586E] pointer-events-none z-10" />
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onFocus={() => { if (searchResults.length > 0) setSearchOpen(true) }}
-          placeholder="Buscar produto, cliente, IMEI…"
-          className="bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] rounded-[11px] py-[10px] pl-[38px] pr-[14px] w-[280px] text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-[rgba(201,162,75,0.6)] focus:bg-[#16212E]/[0.05] transition-all"
-        />
-        {query && (
-          <button onClick={() => { setQuery(''); setSearchResults([]); setSearchOpen(false) }}
-            className="absolute right-3 text-[#788698] hover:text-[#1F2A39]">
-            <X size={14} />
-          </button>
-        )}
-        {searchOpen && (
-          <div className="absolute top-[48px] left-0 w-[380px] bg-white border border-[#16212E]/[0.10] rounded-[14px] shadow-[0_16px_48px_rgba(22,32,46,0.16)] z-50 overflow-hidden">
-            {searching ? (
-              <div className="px-4 py-3 text-[12px] text-[#788698]">Buscando…</div>
-            ) : searchResults.map((r, i) => (
-              <button key={i} onClick={() => { router.push(r.href); setSearchOpen(false); setQuery('') }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#16212E]/[0.03] transition-colors border-b border-[#16212E]/[0.05] last:border-0 text-left">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                  style={{ color: TIPO_COLOR[r.tipo], backgroundColor: `${TIPO_COLOR[r.tipo]}18` }}>
-                  {TIPO_LABEL[r.tipo]}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{r.titulo}</div>
-                  <div className="text-[11px] text-[#788698] truncate">{r.sub}</div>
-                </div>
-              </button>
-            ))}
-            {!searching && searchResults.length === 0 && (
-              <div className="px-4 py-3 text-[12px] text-[#788698]">Nenhum resultado para &quot;{query}&quot;</div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Gatilho do Command Palette (⌘K) */}
+      <button
+        onClick={() => setPaletteOpen(true)}
+        className="hidden w-[270px] items-center gap-2.5 rounded-control border border-line bg-card px-3 py-1.5 text-[12.5px] text-ink-3 transition-colors hover:border-ink/20 md:flex"
+      >
+        <Search size={15} strokeWidth={1.7} />
+        <span className="flex-1 text-left">Buscar ou executar ação…</span>
+        <kbd className="rounded-[4px] border border-line bg-raised px-1.5 text-[10.5px] font-semibold text-ink-2">⌘K</kbd>
+      </button>
 
-      {/* Notifications */}
+      {/* Notificações */}
       <div className="relative" ref={notifRef}>
-        <button onClick={() => setNotifOpen(o => !o)}
-          className="relative w-[42px] h-[42px] rounded-[11px] bg-[#16212E]/[0.04] border border-[#16212E]/[0.10] flex items-center justify-center text-[#9FB0C2] hover:bg-[#16212E]/[0.06] transition-colors">
-          <Bell size={19} />
-          {totalNaoLidas > 0 && (
-            <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#C9A24B] border-2 border-white animate-pulse" />
-          )}
+        <button
+          onClick={() => setNotifOpen((o) => !o)}
+          aria-label="Notificações"
+          className="relative grid h-8 w-8 place-items-center rounded-control border border-line bg-card text-ink-2 transition-colors hover:bg-bg"
+        >
+          <Bell size={16} strokeWidth={1.7} />
+          {totalNaoLidas > 0 && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border-2 border-card bg-accent" />}
         </button>
 
         {notifOpen && (
-          <div className="absolute right-0 top-[50px] w-[330px] bg-white border border-[#16212E]/[0.10] rounded-[16px] shadow-[0_24px_60px_rgba(0,0,0,0.6)] z-30 overflow-hidden"
-            style={{ animation: 'popIn 0.18s ease' }}>
-            <div className="flex items-center justify-between px-[17px] py-[15px] border-b border-[#16212E]/[0.08]">
-              <span className="font-serif text-[16px] text-[#16212E]">Notificações</span>
+          <div className="absolute right-0 top-[42px] z-30 w-[330px] overflow-hidden rounded-card border border-line bg-card shadow-[0_24px_60px_-24px_rgba(21,24,28,0.35)] animate-[uiPop_0.16s_cubic-bezier(0.16,1,0.3,1)]">
+            <div className="flex items-center justify-between border-b border-line-soft px-4 py-3">
+              <span className="text-[14px] font-semibold text-ink">Notificações</span>
               {totalNaoLidas > 0 && (
-                <span className="font-mono text-[10px] text-[#A8884A] bg-[rgba(201,162,75,0.14)] px-[8px] py-[2px] rounded-full">
-                  {totalNaoLidas} não lidas
-                </span>
+                <span className="num rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">{totalNaoLidas} não lidas</span>
               )}
             </div>
             <div className="max-h-[320px] overflow-y-auto scrollbar-thin">
               {notifs.length === 0 ? (
-                <div className="px-6 py-8 text-center text-[#788698] text-[13px]">Tudo em dia ✓</div>
-              ) : notifs.map(n => (
-                <button key={n.id}
+                <div className="px-6 py-8 text-center text-[13px] text-ink-3">Tudo em dia.</div>
+              ) : notifs.map((n) => (
+                <button
+                  key={n.id}
                   onClick={() => { setNotifOpen(false); router.push('/leads') }}
-                  className="w-full flex items-center gap-[11px] px-[17px] py-[13px] border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] transition-colors text-left">
-                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[rgba(201,162,75,0.14)] flex items-center justify-center flex-none text-[16px]">
-                    {ORIGEM_EMOJI[n.origem ?? 'manual'] ?? '👤'}
-                  </div>
+                  className="flex w-full items-center gap-3 border-b border-line-soft px-4 py-3 text-left transition-colors last:border-0 hover:bg-raised"
+                >
+                  <span className="grid h-8 w-8 flex-none place-items-center rounded-control bg-accent-soft text-accent"><MessageSquare size={15} strokeWidth={1.7} /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{n.nome ?? `Lead #${n.id}`}</div>
-                    <div className="text-[11.5px] text-[#788698] truncate">
+                    <div className="truncate text-[13px] font-semibold text-ink">{n.nome ?? `Lead #${n.id}`}</div>
+                    <div className="truncate text-[11.5px] text-ink-3">
                       {n.nao_lidas} nova{n.nao_lidas > 1 ? 's' : ''} mensagem{n.nao_lidas > 1 ? 's' : ''}
                       {n.produto_interessado ? ` · ${n.produto_interessado}` : ''}
                     </div>
                   </div>
-                  <span className="min-w-[20px] h-[20px] px-[5px] rounded-full bg-[#C9A24B] text-[#16212E] font-mono text-[10px] font-bold flex items-center justify-center flex-none">
-                    {n.nao_lidas > 99 ? '99+' : n.nao_lidas}
-                  </span>
+                  <span className="num flex-none rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">{n.nao_lidas > 99 ? '99+' : n.nao_lidas}</span>
                 </button>
               ))}
             </div>
-            <button onClick={() => { setNotifOpen(false); router.push('/leads') }}
-              className="w-full py-[13px] bg-[rgba(201,162,75,0.12)] text-[#A8884A] text-[13px] font-semibold hover:bg-[rgba(201,162,75,0.20)] transition-colors">
+            <button onClick={() => { setNotifOpen(false); router.push('/leads') }} className="w-full bg-accent-soft py-3 text-[13px] font-semibold text-accent transition-colors hover:bg-accent/[0.14]">
               Ver todos os leads
             </button>
           </div>
         )}
       </div>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </header>
   )
 }

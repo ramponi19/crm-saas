@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Eye, X } from 'lucide-react'
 
+// Roxo = modo plataforma (superadmin). Barra chapada e discreta (sem gradiente).
 export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
   const router = useRouter()
   const [saindo, setSaindo] = useState(false)
@@ -11,7 +12,6 @@ export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
   async function sair() {
     setSaindo(true)
     try {
-      // O id no path é ignorado pelo handler DELETE; usamos 0 como placeholder.
       await fetch('/api/superadmin/empresas/0/impersonar', { method: 'DELETE' })
       router.push('/superadmin/empresas')
       router.refresh()
@@ -21,21 +21,16 @@ export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
   }
 
   return (
-    <div
-      className="flex items-center justify-center gap-3 px-4 py-2.5 text-white text-[13px] font-semibold"
-      style={{ background: 'linear-gradient(90deg, #7C3AED, #6D28D9)' }}
-    >
-      <Eye size={16} className="shrink-0" />
-      <span>
-        Você está visualizando como <strong>{empresaNome}</strong> — modo impersonação ativo
-      </span>
+    <div className="flex items-center justify-center gap-2.5 border-b border-[#6D28D9]/20 bg-[#6D28D9]/[0.08] px-4 py-2 text-[12.5px] font-medium text-[#6D28D9]">
+      <Eye size={14} strokeWidth={1.7} className="shrink-0" />
+      <span>Visualizando como <strong className="font-semibold">{empresaNome}</strong> — modo plataforma</span>
       <button
         onClick={sair}
         disabled={saindo}
-        className="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-[12px] disabled:opacity-60"
+        className="ml-1 inline-flex items-center gap-1 rounded-control bg-[#6D28D9]/10 px-2.5 py-1 text-[11.5px] font-semibold transition-colors hover:bg-[#6D28D9]/20 disabled:opacity-60"
       >
-        <X size={13} />
-        {saindo ? 'Saindo...' : 'Sair'}
+        <X size={12} strokeWidth={2} />
+        {saindo ? 'Saindo…' : 'Sair'}
       </button>
     </div>
   )
