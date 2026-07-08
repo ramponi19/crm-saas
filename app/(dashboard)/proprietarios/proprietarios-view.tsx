@@ -3,13 +3,22 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
-import { Plus, Pencil, Trash2, X, Loader2, KeyRound, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import { Plus, Pencil, Trash2, KeyRound, Search } from 'lucide-react'
+import {
+  Card, Table, Input, Textarea, Button, IconButton, Modal, ConfirmDialog, EmptyState, notify,
+  type Column,
+} from '@/components/ui'
 import type { Tables } from '@/types/database'
 
 type Proprietario = Tables<'proprietarios'>
 
 const vazio = { nome: '', cpf_cnpj: '', telefone: '', email: '', observacoes: '' }
+
+function getInitials(name: string) {
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase() || 'PR'
+}
 
 export default function ProprietariosView({ inicial, empresaId }: { inicial: Proprietario[]; empresaId: number }) {
   const supabase = createClient()
@@ -19,6 +28,7 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
   const [editando, setEditando] = useState<Proprietario | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState(vazio)
+  const [confirmDel, setConfirmDel] = useState<Proprietario | null>(null)
 
   const set = (k: keyof typeof vazio, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -30,7 +40,7 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { toast.error('Informe o nome'); return }
+    if (!form.nome.trim()) { notify.warn('Informe o nome'); return }
     setLoading(true)
     const payload = {
       nome: form.nome.trim(),
@@ -41,24 +51,23 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
     }
     if (editando) {
       const { data, error } = await supabase.from('proprietarios').update(payload).eq('id', editando.id).select('*').single()
-      if (error) { toast.error(error.message); setLoading(false); return }
+      if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => l.map(x => (x.id === editando.id ? data : x)))
-      toast.success('Proprietário atualizado')
+      notify.ok('Proprietário atualizado')
     } else {
       const { data, error } = await supabase.from('proprietarios').insert({ ...payload, empresa_id: empresaId }).select('*').single()
-      if (error) { toast.error(error.message); setLoading(false); return }
+      if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => [...l, data].sort((a, b) => a.nome.localeCompare(b.nome)))
-      toast.success('Proprietário cadastrado')
+      notify.ok('Proprietário cadastrado')
     }
     setLoading(false); setModal(false)
   }
 
   async function excluir(p: Proprietario) {
-    if (!confirm(`Excluir o proprietário "${p.nome}"?`)) return
     const { error } = await supabase.from('proprietarios').delete().eq('id', p.id)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setLista(l => l.filter(x => x.id !== p.id))
-    toast.success('Proprietário excluído')
+    notify.ok('Proprietário excluído')
   }
 
   const filtrada = lista.filter(p =>
@@ -67,101 +76,90 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
     (p.telefone ?? '').includes(busca)
   )
 
-  const inputCls = 'w-full bg-[rgba(22,32,46,.04)] border border-[rgba(22,32,46,.12)] rounded-[10px] px-3 py-2.5 text-[14px] text-[#16212E] outline-none focus:border-[rgba(22,32,46,.35)] transition-colors'
+  const cols: Column<Proprietario>[] = [
+    {
+      key: 'nome', header: 'Nome',
+      render: (p) => (
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+            {getInitials(p.nome)}
+          </span>
+          <span className="truncate text-[13px] font-semibold text-ink">{p.nome}</span>
+        </div>
+      ),
+    },
+    { key: 'cpf_cnpj', header: 'CPF/CNPJ', hideOnMobile: true, className: 'num', render: (p) => <span className="text-ink-2">{p.cpf_cnpj || '—'}</span> },
+    { key: 'telefone', header: 'Telefone', hideOnMobile: true, className: 'num', render: (p) => <span className="text-ink-2">{p.telefone || '—'}</span> },
+    { key: 'email', header: 'E-mail', hideOnMobile: true, render: (p) => <span className="text-ink-2">{p.email || '—'}</span> },
+    {
+      key: 'acoes', header: '', align: 'right',
+      render: (p) => (
+        <div className="flex items-center justify-end gap-1">
+          <IconButton size="sm" aria-label="Editar" onClick={() => abrirEdit(p)}><Pencil size={15} strokeWidth={1.7} /></IconButton>
+          <IconButton size="sm" variant="danger" aria-label="Excluir" onClick={() => setConfirmDel(p)}><Trash2 size={15} strokeWidth={1.7} /></IconButton>
+        </div>
+      ),
+    },
+  ]
 
   return (
-    <>
-      <Topbar eyebrow="IMOBILIÁRIA" title="Proprietários" />
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      <Topbar title="Proprietários" />
 
-      <div className="p-6 max-w-[1100px]">
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <div className="relative flex-1 max-w-[360px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9AA7B6]" />
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, CPF/CNPJ, telefone..." className={`${inputCls} pl-9`} />
-          </div>
-          <button onClick={abrirNovo} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] transition-colors shrink-0">
-            <Plus size={17} /> Novo proprietário
-          </button>
-        </div>
-
-        {filtrada.length === 0 ? (
-          <div className="text-center py-20 text-[#788698]">
-            <KeyRound size={36} className="mx-auto mb-3 opacity-40" />
-            <p className="text-[14px]">Nenhum proprietário {busca ? 'encontrado' : 'cadastrado ainda'}.</p>
-          </div>
-        ) : (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <table className="w-full text-[14px]">
-              <thead>
-                <tr className="border-b border-[#16212E]/[0.07] text-left">
-                  <th className="font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3">Nome</th>
-                  <th className="font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3">CPF/CNPJ</th>
-                  <th className="font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3">Telefone</th>
-                  <th className="font-mono text-[10px] tracking-[0.12em] uppercase text-[#9AA7B6] px-5 py-3">E-mail</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrada.map(p => (
-                  <tr key={p.id} className="border-b border-[#16212E]/[0.05] last:border-0 hover:bg-[#16212E]/[0.015]">
-                    <td className="px-5 py-3 font-semibold text-[#16212E]">{p.nome}</td>
-                    <td className="px-5 py-3 text-[#56657A]">{p.cpf_cnpj || '—'}</td>
-                    <td className="px-5 py-3 text-[#56657A]">{p.telefone || '—'}</td>
-                    <td className="px-5 py-3 text-[#56657A]">{p.email || '—'}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => abrirEdit(p)} className="p-2 rounded-[8px] text-[#788698] hover:bg-[#16212E]/[0.06] hover:text-[#16212E]" aria-label="Editar"><Pencil size={15} /></button>
-                        <button onClick={() => excluir(p)} className="p-2 rounded-[8px] text-[#788698] hover:bg-[#DC2626]/[0.08] hover:text-[#DC2626]" aria-label="Excluir"><Trash2 size={15} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="flex shrink-0 items-center gap-3 px-6 py-4">
+        <Input
+          wrapperClassName="flex-1 max-w-[360px]"
+          icon={<Search size={15} strokeWidth={1.7} />}
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar por nome, CPF/CNPJ, telefone…"
+        />
+        <div className="flex-1" />
+        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovo}>Novo proprietário</Button>
       </div>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !loading && setModal(false)}>
-          <div className="bg-white rounded-[18px] w-full max-w-[460px] p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-sans font-bold text-[17px] text-[#16212E]">{editando ? 'Editar proprietário' : 'Novo proprietário'}</h3>
-              <button onClick={() => !loading && setModal(false)} className="text-[#9AA7B6] hover:text-[#16212E]" aria-label="Fechar"><X size={20} /></button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">NOME *</label>
-                <input value={form.nome} onChange={e => set('nome', e.target.value)} className={inputCls} placeholder="Nome do proprietário" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">CPF/CNPJ</label>
-                  <input value={form.cpf_cnpj} onChange={e => set('cpf_cnpj', e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">TELEFONE</label>
-                  <input value={form.telefone} onChange={e => set('telefone', e.target.value)} className={inputCls} placeholder="(00) 00000-0000" />
-                </div>
-              </div>
-              <div>
-                <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">E-MAIL</label>
-                <input value={form.email} onChange={e => set('email', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5">OBSERVAÇÕES</label>
-                <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)} rows={3} className={inputCls} />
-              </div>
-            </div>
-            <div className="flex gap-2.5 mt-6">
-              <button onClick={() => setModal(false)} disabled={loading} className="flex-1 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#788698] border border-[#16212E]/[0.1] hover:bg-[#16212E]/[0.03] disabled:opacity-60">Cancelar</button>
-              <button onClick={salvar} disabled={loading} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] disabled:opacity-60">
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Salvando...</> : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <Card flush>
+          <Table
+            columns={cols}
+            rows={filtrada}
+            rowKey={(p) => p.id}
+            empty={<EmptyState icon={<KeyRound size={22} strokeWidth={1.7} />} title={`Nenhum proprietário ${busca ? 'encontrado' : 'cadastrado ainda'}`} description={busca ? 'Tente outro termo de busca.' : 'Cadastre seu primeiro proprietário.'} action={!busca ? <Button size="sm" onClick={abrirNovo}>Novo proprietário</Button> : undefined} />}
+          />
+        </Card>
+      </div>
+
+      <Modal
+        open={modal}
+        onClose={() => setModal(false)}
+        size="md"
+        disableOverlayClose={loading}
+        title={editando ? 'Editar proprietário' : 'Novo proprietário'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModal(false)} disabled={loading}>Cancelar</Button>
+            <Button onClick={salvar} loading={loading}>Salvar</Button>
+          </>
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+          <Input wrapperClassName="col-span-2" label="Nome" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome do proprietário" />
+          <Input label="CPF/CNPJ" value={form.cpf_cnpj} onChange={(e) => set('cpf_cnpj', e.target.value)} />
+          <Input label="Telefone" value={form.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="(00) 00000-0000" />
+          <Input wrapperClassName="col-span-2" label="E-mail" value={form.email} onChange={(e) => set('email', e.target.value)} />
+          <Textarea wrapperClassName="col-span-2" label="Observações" rows={3} value={form.observacoes} onChange={(e) => set('observacoes', e.target.value)} />
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmDel !== null}
+        onClose={() => setConfirmDel(null)}
+        onConfirm={() => { if (confirmDel) excluir(confirmDel) }}
+        title="Excluir proprietário?"
+        description={`Excluir o proprietário "${confirmDel?.nome ?? ''}"? Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        tone="danger"
+      />
+    </div>
   )
 }

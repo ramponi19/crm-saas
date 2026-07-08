@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
 import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Globe } from 'lucide-react'
-import { toast } from 'sonner'
+import { Button, IconButton, Input, Select, Textarea, Modal, ConfirmDialog, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables, TablesInsert } from '@/types/database'
 
 type Imovel = Tables<'imoveis'>
@@ -13,27 +13,28 @@ type ProprietarioMin = { id: number; nome: string }
 const TIPOS = ['apartamento', 'casa', 'terreno', 'comercial', 'sala', 'galpao', 'cobertura', 'sitio']
 const FINALIDADES = [{ v: 'venda', l: 'Venda' }, { v: 'locacao', l: 'Locação' }, { v: 'ambos', l: 'Venda e Locação' }]
 const STATUS = [
-  { v: 'disponivel', l: 'Disponível', c: '#16A34A' },
-  { v: 'reservado', l: 'Reservado', c: '#D97706' },
-  { v: 'vendido', l: 'Vendido', c: '#2563EB' },
-  { v: 'alugado', l: 'Alugado', c: '#7C3AED' },
-  { v: 'inativo', l: 'Inativo', c: '#6B7280' },
+  { v: 'disponivel', l: 'Disponível' },
+  { v: 'reservado', l: 'Reservado' },
+  { v: 'vendido', l: 'Vendido' },
+  { v: 'alugado', l: 'Alugado' },
+  { v: 'inativo', l: 'Inativo' },
 ]
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'acc' | 'neutro'> = {
+  disponivel: 'ok', reservado: 'warn', vendido: 'acc', alugado: 'acc', inativo: 'neutro',
+}
 
 const brl = (v: number | null) => (v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }))
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-const INPUT = 'w-full bg-[rgba(22,32,46,.04)] border border-[rgba(22,32,46,.12)] rounded-[10px] px-3 py-2.5 text-[14px] text-[#16212E] outline-none focus:border-[rgba(22,32,46,.35)] transition-colors'
-const LBL = 'block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5'
-
 // Campo no escopo do módulo (identidade estável — não perde foco ao digitar)
 function Campo({ label, value, onChange, ph, tipo = 'text' }: { label: string; value: string; onChange: (v: string) => void; ph?: string; tipo?: string }) {
   return (
-    <div>
-      <label className={LBL}>{label}</label>
-      <input type={tipo} value={value} onChange={e => onChange(e.target.value)} placeholder={ph} className={INPUT} />
-    </div>
+    <Input label={label} type={tipo} value={value} onChange={e => onChange(e.target.value)} placeholder={ph} />
   )
+}
+
+function Secao({ children }: { children: React.ReactNode }) {
+  return <p className="mb-2 mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{children}</p>
 }
 
 const vazio = {
@@ -57,6 +58,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
   const [form, setForm] = useState<FormT>(vazio)
   const [fotos, setFotos] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+  const [confirmDel, setConfirmDel] = useState<Imovel | null>(null)
 
   const set = (k: keyof FormT, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
 
@@ -67,7 +69,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
       const path = `${empresaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       const { error } = await supabase.storage.from('imoveis').upload(path, file, { cacheControl: '3600', upsert: false })
-      if (error) { toast.error('Falha ao enviar foto: ' + error.message); continue }
+      if (error) { notify.bad('Falha ao enviar foto: ' + error.message); continue }
       const { data } = supabase.storage.from('imoveis').getPublicUrl(path)
       setFotos(f => [...f, data.publicUrl])
     }
@@ -79,7 +81,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
     const url = `${window.location.origin}/imovel/${im.id}`
     try {
       await navigator.clipboard.writeText(url)
-      toast.success('Link público copiado!')
+      notify.ok('Link público copiado!')
     } catch {
       window.open(url, '_blank')
     }
@@ -110,7 +112,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
   }
 
   async function salvar() {
-    if (!form.titulo.trim() && !form.codigo.trim()) { toast.error('Informe ao menos o título ou o código'); return }
+    if (!form.titulo.trim() && !form.codigo.trim()) { notify.bad('Informe ao menos o título ou o código'); return }
     setLoading(true)
     const payload: TablesInsert<'imoveis'> = {
       empresa_id: empresaId,
@@ -131,24 +133,23 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
     }
     if (editando) {
       const { data, error } = await supabase.from('imoveis').update(payload).eq('id', editando.id).select('*').single()
-      if (error) { toast.error(error.message); setLoading(false); return }
+      if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => l.map(x => (x.id === editando.id ? data : x)))
-      toast.success('Imóvel atualizado')
+      notify.ok('Imóvel atualizado')
     } else {
       const { data, error } = await supabase.from('imoveis').insert(payload).select('*').single()
-      if (error) { toast.error(error.message); setLoading(false); return }
+      if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => [data, ...l])
-      toast.success('Imóvel cadastrado')
+      notify.ok('Imóvel cadastrado')
     }
     setLoading(false); setModal(false)
   }
 
   async function excluir(im: Imovel) {
-    if (!confirm(`Excluir o imóvel "${im.titulo || im.codigo || im.id}"?`)) return
     const { error } = await supabase.from('imoveis').delete().eq('id', im.id)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setLista(l => l.filter(x => x.id !== im.id))
-    toast.success('Imóvel excluído')
+    notify.ok('Imóvel excluído')
   }
 
   const filtrada = lista.filter(im =>
@@ -159,197 +160,199 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
   )
 
   return (
-    <>
-      <Topbar eyebrow="IMOBILIÁRIA" title="Imóveis" />
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      <Topbar title="Imóveis" />
 
-      <div className="p-6 max-w-[1200px]">
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <div className="relative flex-1 max-w-[380px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9AA7B6]" />
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por título, código, bairro, cidade..." className={`${INPUT} pl-9`} />
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {slug && (
-              <a href={`/imob/${slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#16212E] border border-[#16212E]/[0.15] hover:bg-[#16212E]/[0.03] transition-colors">
-                <Globe size={16} /> Site
-              </a>
-            )}
-            <button onClick={abrirNovo} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] transition-colors">
-              <Plus size={17} /> Novo imóvel
-            </button>
-          </div>
+      <div className="flex shrink-0 items-center gap-3 px-6 py-4">
+        <Input
+          wrapperClassName="w-full max-w-[380px]"
+          icon={<Search size={15} strokeWidth={1.7} />}
+          value={busca}
+          onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar por título, código, bairro, cidade…"
+        />
+        <div className="ml-auto flex items-center gap-2">
+          {slug && (
+            <a
+              href={`/imob/${slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center gap-2 rounded-control border border-line bg-card px-4 text-[13px] font-medium tracking-[-0.01em] text-ink transition-colors hover:bg-bg"
+            >
+              <Globe size={15} strokeWidth={1.7} /> Site
+            </a>
+          )}
+          <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovo}>Novo imóvel</Button>
         </div>
-
-        {filtrada.length === 0 ? (
-          <div className="text-center py-20 text-[#788698]">
-            <Home size={36} className="mx-auto mb-3 opacity-40" />
-            <p className="text-[14px]">Nenhum imóvel {busca ? 'encontrado' : 'cadastrado ainda'}.</p>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtrada.map(im => {
-              const st = STATUS.find(s => s.v === im.status)
-              return (
-                <div key={im.id} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-4 overflow-hidden hover:shadow-[0_10px_30px_rgba(22,35,50,.08)] transition-shadow">
-                  {Array.isArray(im.fotos) && (im.fotos as string[])[0] && (
-                    <div className="-mx-4 -mt-4 mb-3 h-[150px] bg-[#16212E]/[0.04]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={(im.fotos as string[])[0]} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-mono text-[#9AA7B6]">{im.codigo || `#${im.id}`}</div>
-                      <div className="text-[15px] font-bold text-[#16212E] truncate">{im.titulo || cap(im.tipo)}</div>
-                    </div>
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full shrink-0" style={{ background: `${st?.c ?? '#6B7280'}18`, color: st?.c ?? '#6B7280' }}>{st?.l ?? im.status}</span>
-                  </div>
-                  <div className="text-[12.5px] text-[#788698] mb-3">
-                    {cap(im.tipo)} · {(im.bairro || im.cidade) ? [im.bairro, im.cidade].filter(Boolean).join(', ') : 'sem endereço'}
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#56657A] mb-3">
-                    {im.quartos ? <span>{im.quartos} qto</span> : null}
-                    {im.vagas ? <span>{im.vagas} vaga</span> : null}
-                    {im.area_util ? <span>{im.area_util} m²</span> : null}
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <div>
-                      {im.valor_venda ? <div className="text-[15px] font-extrabold text-[#16212E]">{brl(im.valor_venda)}</div> : null}
-                      {im.valor_locacao ? <div className="text-[12.5px] text-[#56657A]">{brl(im.valor_locacao)}/mês</div> : null}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => compartilhar(im)} className="p-2 rounded-[8px] text-[#788698] hover:bg-[#16212E]/[0.06] hover:text-[#16212E]" aria-label="Compartilhar"><Share2 size={15} /></button>
-                      <button onClick={() => abrirEdit(im)} className="p-2 rounded-[8px] text-[#788698] hover:bg-[#16212E]/[0.06] hover:text-[#16212E]" aria-label="Editar"><Pencil size={15} /></button>
-                      <button onClick={() => excluir(im)} className="p-2 rounded-[8px] text-[#788698] hover:bg-[#DC2626]/[0.08] hover:text-[#DC2626]" aria-label="Excluir"><Trash2 size={15} /></button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !loading && setModal(false)}>
-          <div className="bg-white rounded-[18px] w-full max-w-[720px] max-h-[90vh] overflow-y-auto scrollbar-thin p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-sans font-bold text-[17px] text-[#16212E]">{editando ? 'Editar imóvel' : 'Novo imóvel'}</h3>
-              <button onClick={() => !loading && setModal(false)} className="text-[#9AA7B6] hover:text-[#16212E]" aria-label="Fechar"><X size={20} /></button>
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="mx-auto max-w-[1200px]">
+          {filtrada.length === 0 ? (
+            <Card flush>
+              <EmptyState
+                icon={<Home size={22} strokeWidth={1.7} />}
+                title={`Nenhum imóvel ${busca ? 'encontrado' : 'cadastrado ainda'}`}
+                description={busca ? 'Tente outro termo de busca.' : 'Cadastre seu primeiro imóvel.'}
+                action={!busca ? <Button size="sm" onClick={abrirNovo}>Novo imóvel</Button> : undefined}
+              />
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtrada.map(im => {
+                const st = STATUS.find(s => s.v === im.status)
+                return (
+                  <div key={im.id} className="overflow-hidden rounded-card border border-line bg-card transition-colors hover:border-ink/20">
+                    {Array.isArray(im.fotos) && (im.fotos as string[])[0] && (
+                      <div className="h-[150px] bg-raised">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={(im.fotos as string[])[0]} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="num text-[11px] text-ink-3">{im.codigo || `#${im.id}`}</div>
+                          <div className="truncate text-[14px] font-semibold text-ink">{im.titulo || cap(im.tipo)}</div>
+                        </div>
+                        <Badge tone={STATUS_TONE[im.status] ?? 'neutro'} dot={im.status === 'disponivel'}>{st?.l ?? im.status}</Badge>
+                      </div>
+                      <div className="mb-3 text-[12.5px] text-ink-2">
+                        {cap(im.tipo)} · {(im.bairro || im.cidade) ? [im.bairro, im.cidade].filter(Boolean).join(', ') : 'sem endereço'}
+                      </div>
+                      <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
+                        {im.quartos ? <span>{im.quartos} qto</span> : null}
+                        {im.vagas ? <span>{im.vagas} vaga</span> : null}
+                        {im.area_util ? <span>{im.area_util} m²</span> : null}
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          {im.valor_venda ? <div className="num text-[15px] font-bold text-ink">{brl(im.valor_venda)}</div> : null}
+                          {im.valor_locacao ? <div className="num text-[12.5px] text-ink-2">{brl(im.valor_locacao)}/mês</div> : null}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <IconButton size="sm" aria-label="Compartilhar" onClick={() => compartilhar(im)}><Share2 size={15} strokeWidth={1.7} /></IconButton>
+                          <IconButton size="sm" aria-label="Editar" onClick={() => abrirEdit(im)}><Pencil size={15} strokeWidth={1.7} /></IconButton>
+                          <IconButton size="sm" variant="danger" aria-label="Excluir" onClick={() => setConfirmDel(im)}><Trash2 size={15} strokeWidth={1.7} /></IconButton>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+          )}
+        </div>
+      </div>
 
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">IDENTIFICAÇÃO</p>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <Campo label="CÓDIGO" value={form.codigo} onChange={str('codigo')} ph="Ex: AP-102" />
-              <Campo label="TÍTULO" value={form.titulo} onChange={str('titulo')} ph="Ex: Apto 2 quartos no Centro" />
-              <div>
-                <label className={LBL}>TIPO</label>
-                <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={INPUT}>
-                  {TIPOS.map(t => <option key={t} value={t}>{cap(t)}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={LBL}>FINALIDADE</label>
-                <select value={form.finalidade} onChange={e => set('finalidade', e.target.value)} className={INPUT}>
-                  {FINALIDADES.map(f => <option key={f.v} value={f.v}>{f.l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={LBL}>STATUS</label>
-                <select value={form.status} onChange={e => set('status', e.target.value)} className={INPUT}>
-                  {STATUS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={LBL}>PROPRIETÁRIO</label>
-                <select value={form.proprietario_id} onChange={e => set('proprietario_id', e.target.value)} className={INPUT}>
-                  <option value="">— nenhum —</option>
-                  {proprietarios.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                </select>
-              </div>
-            </div>
+      <Modal
+        open={modal}
+        onClose={() => { if (!loading) setModal(false) }}
+        size="lg"
+        disableOverlayClose={loading}
+        title={editando ? 'Editar imóvel' : 'Novo imóvel'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModal(false)} disabled={loading}>Cancelar</Button>
+            <Button onClick={salvar} loading={loading}>Salvar imóvel</Button>
+          </>
+        }
+      >
+        <Secao>Identificação</Secao>
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          <Campo label="Código" value={form.codigo} onChange={str('codigo')} ph="Ex: AP-102" />
+          <Campo label="Título" value={form.titulo} onChange={str('titulo')} ph="Ex: Apto 2 quartos no Centro" />
+          <Select label="Tipo" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
+            {TIPOS.map(t => <option key={t} value={t}>{cap(t)}</option>)}
+          </Select>
+          <Select label="Finalidade" value={form.finalidade} onChange={e => set('finalidade', e.target.value)}>
+            {FINALIDADES.map(f => <option key={f.v} value={f.v}>{f.l}</option>)}
+          </Select>
+          <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
+            {STATUS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
+          </Select>
+          <Select label="Proprietário" value={form.proprietario_id} onChange={e => set('proprietario_id', e.target.value)}>
+            <option value="">— nenhum —</option>
+            {proprietarios.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </Select>
+        </div>
 
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">FOTOS</p>
-            <div className="flex flex-wrap gap-2 mb-5">
-              {fotos.map(url => (
-                <div key={url} className="relative w-[84px] h-[84px] rounded-[10px] overflow-hidden border border-[#16212E]/[0.1]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="Foto do imóvel" className="w-full h-full object-cover" />
-                  <button type="button" onClick={() => removerFoto(url)} className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-0.5" aria-label="Remover foto">
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              <label className="w-[84px] h-[84px] rounded-[10px] border-2 border-dashed border-[#16212E]/[0.15] flex flex-col items-center justify-center gap-1 text-[#9AA7B6] cursor-pointer hover:border-[#C9A24B]/60 hover:text-[#C9A24B] transition-colors">
-                {uploading
-                  ? <Loader2 size={18} className="animate-spin" />
-                  : <><ImagePlus size={18} /><span className="text-[9px]">Adicionar</span></>}
-                <input type="file" accept="image/*" multiple className="hidden" onChange={e => enviarFotos(e.target.files)} disabled={uploading} />
-              </label>
-            </div>
-
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">VALORES</p>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <Campo label="VALOR DE VENDA (R$)" value={form.valor_venda} onChange={str('valor_venda')} tipo="number" />
-              <Campo label="VALOR DE LOCAÇÃO (R$)" value={form.valor_locacao} onChange={str('valor_locacao')} tipo="number" />
-              <Campo label="CONDOMÍNIO (R$)" value={form.valor_condominio} onChange={str('valor_condominio')} tipo="number" />
-              <Campo label="IPTU (R$)" value={form.valor_iptu} onChange={str('valor_iptu')} tipo="number" />
-              <div>
-                <label className={LBL}>PERIODICIDADE DO IPTU</label>
-                <select value={form.iptu_periodicidade} onChange={e => set('iptu_periodicidade', e.target.value)} className={INPUT}>
-                  <option value="anual">Anual</option>
-                  <option value="mensal">Mensal</option>
-                </select>
-              </div>
-            </div>
-
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">CARACTERÍSTICAS</p>
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <Campo label="ÁREA ÚTIL (m²)" value={form.area_util} onChange={str('area_util')} tipo="number" />
-              <Campo label="ÁREA TOTAL (m²)" value={form.area_total} onChange={str('area_total')} tipo="number" />
-              <Campo label="QUARTOS" value={form.quartos} onChange={str('quartos')} tipo="number" />
-              <Campo label="SUÍTES" value={form.suites} onChange={str('suites')} tipo="number" />
-              <Campo label="BANHEIROS" value={form.banheiros} onChange={str('banheiros')} tipo="number" />
-              <Campo label="VAGAS" value={form.vagas} onChange={str('vagas')} tipo="number" />
-              <Campo label="MATRÍCULA" value={form.matricula} onChange={str('matricula')} />
-              <Campo label="CHAVES" value={form.status_chaves} onChange={str('status_chaves')} ph="Ex: na imobiliária" />
-            </div>
-
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">ENDEREÇO</p>
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <Campo label="CEP" value={form.cep} onChange={str('cep')} />
-              <div className="col-span-2"><Campo label="LOGRADOURO" value={form.logradouro} onChange={str('logradouro')} /></div>
-              <Campo label="NÚMERO" value={form.numero} onChange={str('numero')} />
-              <Campo label="COMPLEMENTO" value={form.complemento} onChange={str('complemento')} />
-              <Campo label="BAIRRO" value={form.bairro} onChange={str('bairro')} />
-              <Campo label="CIDADE" value={form.cidade} onChange={str('cidade')} />
-              <Campo label="UF" value={form.uf} onChange={str('uf')} />
-            </div>
-            <label className="flex items-center gap-2 text-[13px] text-[#56657A] mb-5">
-              <input type="checkbox" checked={form.ocultar_numero_publico} onChange={e => set('ocultar_numero_publico', e.target.checked)} />
-              Ocultar número no anúncio público
-            </label>
-
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#C9A24B] mb-2">OPÇÕES</p>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-[13px] text-[#56657A]">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.aceita_permuta} onChange={e => set('aceita_permuta', e.target.checked)} /> Aceita permuta</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.aceita_financiamento} onChange={e => set('aceita_financiamento', e.target.checked)} /> Aceita financiamento</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.publicar_portais} onChange={e => set('publicar_portais', e.target.checked)} /> Publicar nos portais</label>
-            </div>
-            <div className="mb-6">
-              <label className={LBL}>DESCRIÇÃO</label>
-              <textarea value={form.descricao} onChange={e => set('descricao', e.target.value)} rows={3} className={INPUT} />
-            </div>
-
-            <div className="flex gap-2.5">
-              <button onClick={() => setModal(false)} disabled={loading} className="flex-1 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#788698] border border-[#16212E]/[0.1] hover:bg-[#16212E]/[0.03] disabled:opacity-60">Cancelar</button>
-              <button onClick={salvar} disabled={loading} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f] disabled:opacity-60">
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Salvando...</> : 'Salvar imóvel'}
+        <Secao>Fotos</Secao>
+        <div className="mb-5 flex flex-wrap gap-2">
+          {fotos.map(url => (
+            <div key={url} className="relative h-[84px] w-[84px] overflow-hidden rounded-control border border-line">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="Foto do imóvel" className="h-full w-full object-cover" />
+              <button type="button" onClick={() => removerFoto(url)} className="absolute right-1 top-1 rounded-full bg-ink/70 p-0.5 text-white transition-colors hover:bg-ink" aria-label="Remover foto">
+                <X size={12} strokeWidth={1.7} />
               </button>
             </div>
-          </div>
+          ))}
+          <label className="flex h-[84px] w-[84px] cursor-pointer flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed border-line text-ink-3 transition-colors hover:border-accent hover:text-accent">
+            {uploading
+              ? <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+              : <><ImagePlus size={18} strokeWidth={1.7} /><span className="text-[9px]">Adicionar</span></>}
+            <input type="file" accept="image/*" multiple className="hidden" onChange={e => enviarFotos(e.target.files)} disabled={uploading} />
+          </label>
         </div>
-      )}
-    </>
+
+        <Secao>Valores</Secao>
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          <Campo label="Valor de venda (R$)" value={form.valor_venda} onChange={str('valor_venda')} tipo="number" />
+          <Campo label="Valor de locação (R$)" value={form.valor_locacao} onChange={str('valor_locacao')} tipo="number" />
+          <Campo label="Condomínio (R$)" value={form.valor_condominio} onChange={str('valor_condominio')} tipo="number" />
+          <Campo label="IPTU (R$)" value={form.valor_iptu} onChange={str('valor_iptu')} tipo="number" />
+          <Select label="Periodicidade do IPTU" value={form.iptu_periodicidade} onChange={e => set('iptu_periodicidade', e.target.value)}>
+            <option value="anual">Anual</option>
+            <option value="mensal">Mensal</option>
+          </Select>
+        </div>
+
+        <Secao>Características</Secao>
+        <div className="mb-5 grid grid-cols-3 gap-3">
+          <Campo label="Área útil (m²)" value={form.area_util} onChange={str('area_util')} tipo="number" />
+          <Campo label="Área total (m²)" value={form.area_total} onChange={str('area_total')} tipo="number" />
+          <Campo label="Quartos" value={form.quartos} onChange={str('quartos')} tipo="number" />
+          <Campo label="Suítes" value={form.suites} onChange={str('suites')} tipo="number" />
+          <Campo label="Banheiros" value={form.banheiros} onChange={str('banheiros')} tipo="number" />
+          <Campo label="Vagas" value={form.vagas} onChange={str('vagas')} tipo="number" />
+          <Campo label="Matrícula" value={form.matricula} onChange={str('matricula')} />
+          <Campo label="Chaves" value={form.status_chaves} onChange={str('status_chaves')} ph="Ex: na imobiliária" />
+        </div>
+
+        <Secao>Endereço</Secao>
+        <div className="mb-2 grid grid-cols-3 gap-3">
+          <Campo label="CEP" value={form.cep} onChange={str('cep')} />
+          <div className="col-span-2"><Campo label="Logradouro" value={form.logradouro} onChange={str('logradouro')} /></div>
+          <Campo label="Número" value={form.numero} onChange={str('numero')} />
+          <Campo label="Complemento" value={form.complemento} onChange={str('complemento')} />
+          <Campo label="Bairro" value={form.bairro} onChange={str('bairro')} />
+          <Campo label="Cidade" value={form.cidade} onChange={str('cidade')} />
+          <Campo label="UF" value={form.uf} onChange={str('uf')} />
+        </div>
+        <label className="mb-5 flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" className="h-4 w-4 accent-accent" checked={form.ocultar_numero_publico} onChange={e => set('ocultar_numero_publico', e.target.checked)} />
+          Ocultar número no anúncio público
+        </label>
+
+        <Secao>Opções</Secao>
+        <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-ink-2">
+          <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-accent" checked={form.aceita_permuta} onChange={e => set('aceita_permuta', e.target.checked)} /> Aceita permuta</label>
+          <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-accent" checked={form.aceita_financiamento} onChange={e => set('aceita_financiamento', e.target.checked)} /> Aceita financiamento</label>
+          <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-accent" checked={form.publicar_portais} onChange={e => set('publicar_portais', e.target.checked)} /> Publicar nos portais</label>
+        </div>
+        <Textarea label="Descrição" rows={3} value={form.descricao} onChange={e => set('descricao', e.target.value)} />
+      </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDel}
+        onClose={() => setConfirmDel(null)}
+        onConfirm={async () => { const im = confirmDel; setConfirmDel(null); if (im) await excluir(im) }}
+        title="Excluir imóvel?"
+        description={`"${confirmDel?.titulo || confirmDel?.codigo || confirmDel?.id}" será removido permanentemente.`}
+        confirmLabel="Excluir"
+        tone="danger"
+      />
+    </div>
   )
 }

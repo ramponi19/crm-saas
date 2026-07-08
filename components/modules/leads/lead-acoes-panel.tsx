@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CheckSquare, Square, Plus, CalendarPlus, Loader2, Clock } from 'lucide-react'
-import { toast } from 'sonner'
+import { Input, Button, IconButton, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
 
 type Tarefa = Tables<'tarefas'>
@@ -67,21 +67,21 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
     }
     const { data, error } = await supabase.from('tarefas').insert(payload).select('*').single()
     setSalvando(false)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setTarefas(t => [data as unknown as Tarefa, ...t])
     setNova(''); setPrazo('')
-    toast.success('Tarefa criada')
+    notify.ok('Tarefa criada')
   }
 
   async function toggle(t: Tarefa) {
     const nv = !t.concluida
     const { error } = await supabase.from('tarefas').update({ concluida: nv, concluida_em: nv ? new Date().toISOString() : null }).eq('id', t.id)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setTarefas(list => list.map(x => x.id === t.id ? { ...x, concluida: nv } : x))
   }
 
   async function addVisita() {
-    if (!visData) { toast.error('Informe data e hora'); return }
+    if (!visData) { notify.bad('Informe data e hora'); return }
     setVisSalvando(true)
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
@@ -91,27 +91,25 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
     }
     const { data, error } = await supabase.from('visitas').insert(payload).select('*').single()
     setVisSalvando(false)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setVisitas(v => [...v, data as unknown as Visita].sort((a, b) => a.data_hora.localeCompare(b.data_hora)))
     setVisData(''); setVisObs(''); setVisForm(false)
-    toast.success('Visita agendada')
+    notify.ok('Visita agendada')
   }
 
   const agora = Date.now()
-  const labelCls = 'font-mono text-[10px] tracking-[0.12em] text-[#6B7C92] uppercase mb-[6px] block'
-  const inputCls = 'w-full bg-white/[0.04] border border-[#16212E]/[0.10] rounded-[9px] px-[11px] py-[8px] text-[13px] text-[#1F2A39] outline-none focus:border-[rgba(201,162,75,0.6)] transition-colors box-border'
 
   return (
-    <div className="border-t border-[#16212E]/[0.08] pt-[13px]">
-      <label className={labelCls}>Próximas ações</label>
+    <div className="border-t border-line-soft pt-[13px]">
+      <span className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Próximas ações</span>
 
       {/* lista de tarefas */}
       {loading ? (
-        <div className="text-[12px] text-[#788698] py-2">Carregando…</div>
+        <div className="text-[12px] text-ink-3 py-2">Carregando…</div>
       ) : (
         <div className="flex flex-col gap-1 mb-2">
           {tarefas.length === 0 && visitas.length === 0 && (
-            <div className="text-[12px] text-[#9AA7B6] py-1">Nenhuma ação pendente.</div>
+            <div className="text-[12px] text-ink-3 py-1">Nenhuma ação pendente.</div>
           )}
           {tarefas.map(t => {
             const atrasada = !t.concluida && t.vencimento && new Date(t.vencimento).getTime() < agora
@@ -119,12 +117,12 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
               <button key={t.id} onClick={() => toggle(t)}
                 className="flex items-start gap-2 text-left py-[5px] group">
                 {t.concluida
-                  ? <CheckSquare size={16} className="text-[#16A34A] shrink-0 mt-[1px]" />
-                  : <Square size={16} className="text-[#9AA7B6] group-hover:text-[#16A34A] shrink-0 mt-[1px]" />}
+                  ? <CheckSquare size={16} strokeWidth={1.7} className="text-ok shrink-0 mt-[1px]" />
+                  : <Square size={16} strokeWidth={1.7} className="text-ink-3 group-hover:text-ok shrink-0 mt-[1px]" />}
                 <span className="flex-1 min-w-0">
-                  <span className={`text-[12.5px] ${t.concluida ? 'text-[#9AA7B6] line-through' : 'text-[#1F2A39]'}`}>{t.titulo}</span>
+                  <span className={`text-[12.5px] ${t.concluida ? 'text-ink-3 line-through' : 'text-ink'}`}>{t.titulo}</span>
                   {t.vencimento && (
-                    <span className={`block text-[10.5px] ${atrasada ? 'text-[#DC2626] font-semibold' : 'text-[#788698]'}`}>{fmt(t.vencimento)}</span>
+                    <span className={`block num text-[10.5px] ${atrasada ? 'text-bad font-semibold' : 'text-ink-3'}`}>{fmt(t.vencimento)}</span>
                   )}
                 </span>
               </button>
@@ -132,10 +130,10 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
           })}
           {visitas.map(v => (
             <div key={`v${v.id}`} className="flex items-start gap-2 py-[5px]">
-              <Clock size={16} className="text-[#8A6D2B] shrink-0 mt-[1px]" />
+              <Clock size={16} strokeWidth={1.7} className="text-accent shrink-0 mt-[1px]" />
               <span className="flex-1 min-w-0">
-                <span className="text-[12.5px] text-[#1F2A39]">Visita {v.status !== 'agendada' ? `· ${v.status}` : ''}</span>
-                <span className="block text-[10.5px] text-[#788698]">{fmt(v.data_hora)}</span>
+                <span className="text-[12.5px] text-ink">Visita {v.status !== 'agendada' ? `· ${v.status}` : ''}</span>
+                <span className="block num text-[10.5px] text-ink-3">{fmt(v.data_hora)}</span>
               </span>
             </div>
           ))}
@@ -144,35 +142,31 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
 
       {/* nova tarefa */}
       <div className="flex gap-1.5 mb-1.5">
-        <input value={nova} onChange={e => setNova(e.target.value)}
+        <Input wrapperClassName="flex-1" value={nova} onChange={e => setNova(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addTarefa()}
-          placeholder="Nova tarefa de follow-up…" className={inputCls} />
-        <button onClick={addTarefa} disabled={salvando || !nova.trim()}
-          className="w-[38px] shrink-0 rounded-[9px] bg-[#16212E] text-white flex items-center justify-center disabled:opacity-40">
-          {salvando ? <Loader2 size={15} className="animate-spin" /> : <Plus size={16} />}
-        </button>
+          placeholder="Nova tarefa de follow-up…" />
+        <IconButton aria-label="Adicionar tarefa" variant="primary" onClick={addTarefa} disabled={salvando || !nova.trim()}>
+          {salvando ? <Loader2 size={15} strokeWidth={1.7} className="animate-spin" /> : <Plus size={16} strokeWidth={1.7} />}
+        </IconButton>
       </div>
-      <input type="datetime-local" value={prazo} onChange={e => setPrazo(e.target.value)}
-        className={`${inputCls} text-[#788698]`} title="Prazo (opcional)" />
+      <Input type="datetime-local" value={prazo} onChange={e => setPrazo(e.target.value)}
+        className="num text-ink-3" title="Prazo (opcional)" />
 
       {/* agendar visita (imob) */}
       {isImob && (
         <div className="mt-2">
           {!visForm ? (
             <button onClick={() => setVisForm(true)}
-              className="flex items-center gap-1.5 text-[12px] font-semibold text-[#8A6D2B] hover:text-[#6b5420]">
-              <CalendarPlus size={15} /> Agendar visita
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:text-accent/80">
+              <CalendarPlus size={15} strokeWidth={1.7} /> Agendar visita
             </button>
           ) : (
-            <div className="flex flex-col gap-1.5 rounded-[10px] border border-[#C9A24B]/40 bg-[#C9A24B]/[0.06] p-2.5">
-              <input type="datetime-local" value={visData} onChange={e => setVisData(e.target.value)} className={inputCls} />
-              <input value={visObs} onChange={e => setVisObs(e.target.value)} placeholder="Observações (opcional)" className={inputCls} />
+            <div className="flex flex-col gap-1.5 rounded-card border border-accent/30 bg-accent-soft p-2.5">
+              <Input type="datetime-local" className="num" value={visData} onChange={e => setVisData(e.target.value)} />
+              <Input value={visObs} onChange={e => setVisObs(e.target.value)} placeholder="Observações (opcional)" />
               <div className="flex gap-1.5">
-                <button onClick={() => setVisForm(false)} className="flex-1 py-[7px] rounded-[9px] text-[12px] font-semibold text-[#788698] border border-[#16212E]/10">Cancelar</button>
-                <button onClick={addVisita} disabled={visSalvando}
-                  className="flex-1 py-[7px] rounded-[9px] text-[12px] font-semibold text-white bg-[#16212E] disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
-                  {visSalvando ? <Loader2 size={14} className="animate-spin" /> : 'Agendar'}
-                </button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setVisForm(false)}>Cancelar</Button>
+                <Button size="sm" className="flex-1" onClick={addVisita} loading={visSalvando}>Agendar</Button>
               </div>
             </div>
           )}
