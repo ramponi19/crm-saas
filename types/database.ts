@@ -2442,6 +2442,10 @@ export type Database = {
       }
       is_super_admin: { Args: never; Returns: boolean }
       refresh_status_atrasados: { Args: never; Returns: undefined }
+      set_impersonation: {
+        Args: { p_empresa_id: number | null; p_ttl_seconds?: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

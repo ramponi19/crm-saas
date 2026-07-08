@@ -37,20 +37,19 @@ export async function POST(
     detalhes: { empresa_nome: empresa.nome },
   })
 
-  // Persistir a empresa impersonada na coluna do usuário — é a fonte de verdade
-  // para o RLS (get_empresa_id considera isto quando o usuário é super admin).
-  // IMPORTANTE: usar o client AUTENTICADO do super admin (não o service role).
-  // O trigger `prevent_privilege_escalation` bloqueia mudanças em
-  // impersonando_empresa_id quando auth.uid() não é super admin — e o service
-  // role não tem sessão (auth.uid() = NULL), então a escrita era barrada e
-  // silenciosamente engolida, prendendo a impersonação na empresa anterior.
+  // Persistir a empresa impersonada — fonte de verdade para o RLS (get_empresa_id
+  // considera isto quando o usuário é super admin). Via RPC SECURITY DEFINER
+  // `set_impersonation`, chamada com o client AUTENTICADO do super admin.
+  // Por quê a RPC: só o service_role tem GRANT de UPDATE em `usuarios`, mas o
+  // trigger prevent_privilege_escalation exige auth.uid() = super admin (o
+  // service role não tem sessão). A RPC roda como owner (passa o grant),
+  // preserva auth.uid() do chamador (passa o trigger) e exige super admin.
   const TTL_SECONDS = 60 * 60 * 4 // 4 horas — deve coincidir com maxAge do cookie
-  const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString()
 
-  const { error: updErr } = await supabase
-    .from('usuarios')
-    .update({ impersonando_empresa_id: empresaId, impersonando_expires_at: expiresAt })
-    .eq('id', userId)
+  const { error: updErr } = await supabase.rpc('set_impersonation', {
+    p_empresa_id: empresaId,
+    p_ttl_seconds: TTL_SECONDS,
+  })
 
   if (updErr) {
     return NextResponse.json({ error: `Falha ao iniciar impersonação: ${updErr.message}` }, { status: 500 })
@@ -78,12 +77,8 @@ export async function DELETE() {
       .eq('id', user.id)
       .single()
 
-    // Client autenticado (não service role): o trigger prevent_privilege_escalation
-    // exige que auth.uid() seja super admin para mexer em impersonando_empresa_id.
-    await supabase
-      .from('usuarios')
-      .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
-      .eq('id', user.id)
+    // Encerra via a mesma RPC (p_empresa_id = null), com o client autenticado.
+    await supabase.rpc('set_impersonation', { p_empresa_id: null })
 
     await logSuperAdminAction({
       adminUserId: user.id,

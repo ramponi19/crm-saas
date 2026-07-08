@@ -2,7 +2,6 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { Database } from '@/types/database'
-import { createServiceClient } from '@/lib/supabase/service'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -50,11 +49,10 @@ export async function getEmpresaId(): Promise<number> {
     if (usuario.impersonando_expires_at && new Date(usuario.impersonando_expires_at) > new Date()) {
       return usuario.impersonando_empresa_id
     }
-    // TTL expirado: zera a impersonação no DB
-    createServiceClient()
-      .from('usuarios')
-      .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
-      .eq('id', user.id)
+    // TTL expirado: zera a impersonação no DB (RPC SECURITY DEFINER — o UPDATE
+    // direto em usuarios é barrado pelo trigger/grant; ver rota impersonar).
+    supabase
+      .rpc('set_impersonation', { p_empresa_id: null })
       .then(() => {/* fire-and-forget */})
   }
 
