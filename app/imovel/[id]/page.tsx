@@ -152,7 +152,7 @@ export default async function ImovelPublicoPage({ params }: { params: Promise<{ 
       </div>
 
       <footer className="text-center text-[12px] text-[#788698] pb-8">
-        {empresa?.nome} · powered by ÁPICE
+        {empresa?.nome} · powered by Nexus
       </footer>
     </main>
   )

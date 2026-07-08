@@ -146,7 +146,7 @@ export default function Landing({ plans }: { plans?: PlanData[] }) {
       <nav className={styles.nav}>
         <Link href="/" className={styles.brand}>
           <Image src={logoSrc} alt="" width={68} height={49} className={styles.brandMark} priority />
-          <span className={styles.brandName}>ÁPICE</span>
+          <span className={styles.brandName}>Nexus</span>
           <span className={styles.brandReg}>®</span>
         </Link>
         <div className={styles.navRight}>

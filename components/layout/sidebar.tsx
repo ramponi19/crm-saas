@@ -162,7 +162,7 @@ export function Sidebar({
             {userEmpresa ?? 'CRM Store'}
           </div>
           <div className="font-mono text-[9px] tracking-[0.3em] mt-[3px]" style={{ color: GOLD }}>
-            ÁPICE CRM
+            NEXUS CRM
           </div>
         </div>
       </div>

@@ -230,7 +230,7 @@ export default function Sections({ plans }: { plans?: PlanData[] }) {
         <footer className={styles.footer}>
           <div className={styles.footerInner}>
             <div className={styles.footerBrand}>
-              <span className={styles.footerLogo}>ÁPICE<i>®</i></span>
+              <span className={styles.footerLogo}>Nexus<i>®</i></span>
               <p>O CRM do empreendedor brasileiro.<br />Menos improviso, mais decisão.</p>
             </div>
             <div className={styles.footerCols}>
@@ -253,7 +253,7 @@ export default function Sections({ plans }: { plans?: PlanData[] }) {
             </div>
           </div>
           <div className={styles.footerBottom}>
-            <span>© 2026 ÁPICE · Feito no Brasil 🇧🇷</span>
+            <span>© 2026 Nexus · Feito no Brasil 🇧🇷</span>
           </div>
         </footer>
       </section>

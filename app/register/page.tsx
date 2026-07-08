@@ -180,9 +180,9 @@ export default function RegisterPage() {
           <div className="relative w-[80px] h-[80px] flex items-center justify-center mb-4">
             <div className="absolute rounded-full border border-dashed border-[rgba(201,162,75,.35)] animate-spin"
               style={{ inset: '-10px', animationDuration: '26s' }} />
-            <img src="/eagle-navy.png" alt="ÁPICE" className="w-[72px] h-[72px] object-contain drop-shadow-lg" />
+            <img src="/eagle-navy.png" alt="Nexus" className="w-[72px] h-[72px] object-contain drop-shadow-lg" />
           </div>
-          <div className="font-serif font-medium text-[28px] tracking-[-0.01em] text-[#141E2C] leading-none">ÁPICE</div>
+          <div className="font-serif font-medium text-[28px] tracking-[-0.01em] text-[#141E2C] leading-none">Nexus</div>
           <div className="font-mono text-[9px] tracking-[0.36em] text-[#7A6A45] mt-2 pl-[0.36em]">O CRM DO EMPREENDEDOR</div>
         </div>
 

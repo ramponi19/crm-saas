@@ -69,7 +69,7 @@ export default function IntegracoesView({ slug, segmento, token, feedUrlInicial,
     setImportando(false)
   }
 
-  const snippet = `<!-- Formulário de contato — envia leads pro CRM ÁPICE -->
+  const snippet = `<!-- Formulário de contato — envia leads pro CRM Nexus -->
 <form id="apice-lead">
   <input name="nome" placeholder="Seu nome" required />
   <input name="telefone" placeholder="WhatsApp" required />
@@ -146,7 +146,7 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
         </Card>
 
         {/* Site ÁPICE */}
-        <Card icon={Globe} titulo="Site público ÁPICE" desc="Não tem site? Use o nosso — vitrine pronta com seus imóveis, busca e WhatsApp.">
+        <Card icon={Globe} titulo="Site público Nexus" desc="Não tem site? Use o nosso — vitrine pronta com seus imóveis, busca e WhatsApp.">
           <div className="flex items-center gap-2">
             <code className="text-[12px] text-[#56657A] truncate flex-1 bg-[#16212E]/[0.03] rounded-[10px] px-3 py-2">{siteUrl || `/imob/${slug}`}</code>
             <a href={`/imob/${slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-semibold text-[#16212E] border border-[#16212E]/[0.15] hover:bg-[#16212E]/[0.03] shrink-0"><ExternalLink size={13} /> Abrir</a>

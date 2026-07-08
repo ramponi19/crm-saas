@@ -36,14 +36,14 @@ export default function LoginPage() {
           <div className="absolute rounded-full border border-dashed border-[rgba(20,30,44,.14)] animate-spin"
             style={{ inset: '-26px', animationDuration: '38s', animationDirection: 'reverse' }} />
           <div className="w-[100px] h-[100px] animate-[jmBob_6s_ease-in-out_infinite]">
-            <img src="/eagle-navy.png" alt="ÁPICE" className="w-full h-full object-contain drop-shadow-xl" />
+            <img src="/eagle-navy.png" alt="Nexus" className="w-full h-full object-contain drop-shadow-xl" />
           </div>
         </div>
 
         {/* Wordmark ÁPICE */}
         <div className="text-center mb-6">
           <div className="font-serif font-medium text-[36px] tracking-[-0.01em] text-[#141E2C] leading-none">
-            ÁPICE
+            Nexus
           </div>
           <div className="font-mono text-[10.5px] tracking-[0.36em] text-[#7A6A45] mt-3 pl-[0.36em]">O CRM DO EMPREENDEDOR</div>
         </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
 
         <div className="flex items-center gap-2 mt-6 text-[11.5px] text-[#8A96A6]">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Acesso seguro · ÁPICE © {new Date().getFullYear()}
+          Acesso seguro · Nexus © {new Date().getFullYear()}
         </div>
       </div>
 
