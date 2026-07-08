@@ -131,6 +131,7 @@ export const CATALOGO: MenuGroupBase[] = [
     items: [
       { href: '/funil', label: 'Funil', icon: 'GitBranch', adminOnly: true },
       { href: '/meu-menu', label: 'Meu menu', icon: 'SlidersHorizontal', adminOnly: true },
+      { href: '/permissoes', label: 'Permissões', icon: 'Shield', adminOnly: true },
       { href: '/aparencia', label: 'Aparência', icon: 'Palette', adminOnly: true },
       { href: '/configuracoes', label: 'Configurações', icon: 'Settings', adminOnly: true },
       { href: '/empresa', label: 'Minha empresa', icon: 'Building2', adminOnly: true },

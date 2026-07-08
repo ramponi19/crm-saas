@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead, KanbanColumn } from '@/components/modules/leads/types'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 
 export const metadata = {
   title: 'Leads — CRM SaaS',
@@ -34,9 +35,10 @@ export default async function LeadsPage() {
       .eq('leads.empresa_id', empresaId)
       .eq('lida', false)
       .eq('direcao', 'recebida'),
-    supabase.from('empresas').select('segmento').eq('id', empresaId).single(),
+    supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
   ])
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Etapas do funil vindas do banco (fallback = constante do segmento, na view).
   type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number }
@@ -66,9 +68,14 @@ export default async function LeadsPage() {
     return { id: eu.usuario_id, nome: u?.nome ?? '', role: eu.role ?? '' }
   })
 
+  // Visibilidade de leads por permissão: vendedor/técnico sem "ver leads de outros" vê só os seus.
+  const meuRole = usuariosMapped.find((u) => u.id === user?.id)?.role ?? ''
+  const perms = permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  const leadsVisiveis = perms.verLeadsOutros ? leadsComContagem : leadsComContagem.filter((l) => l.responsavel_id === user?.id)
+
   return (
     <LeadsView
-      initialLeads={leadsComContagem}
+      initialLeads={leadsVisiveis}
       usuarios={usuariosMapped}
       empresaId={empresaId}
       segmento={normalizarSegmento(empresa?.segmento)}

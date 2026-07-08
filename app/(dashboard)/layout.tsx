@@ -11,6 +11,7 @@ import { normalizarSegmento } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
 import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
+import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -33,7 +34,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; modulos_override?: unknown; menu_override?: unknown; menu_config?: unknown } | null = null
+  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; modulos_override?: unknown; menu_override?: unknown; menu_config?: unknown; permissoes?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
 
@@ -41,7 +42,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config')
+      .select('nome, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -50,7 +51,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config)')
+      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -63,7 +64,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; modulos_override: unknown; menu_override: unknown; menu_config: unknown } | null
+      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; modulos_override: unknown; menu_override: unknown; menu_config: unknown; permissoes: unknown } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -78,9 +79,14 @@ export default async function DashboardLayout({
 
   // Camadas 3 (override do superadmin) e 4 (config do dono) do resolverMenu.
   const mo = (empresa?.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
+  // Enforcement de permissão do papel: esconde itens que o papel não pode ver.
+  const perms = permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  const permHidden: string[] = []
+  if (!perms.verFinanceiro) permHidden.push('/financeiro')
+  if (!perms.verRelatorios) permHidden.push('/relatorios')
   const menuOverrides: MenuOverridesSuperadmin = {
     modulos: (empresa?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
-    hidden: mo?.hidden,
+    hidden: [...(mo?.hidden ?? []), ...permHidden],
     labels: mo?.labels,
   }
   const menuConfig = (empresa?.menu_config ?? undefined) as MenuConfigDono | undefined

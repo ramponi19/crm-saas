@@ -556,6 +556,7 @@ export type Database = {
           modulos_override: Json | null
           menu_override: Json | null
           menu_config: Json | null
+          permissoes: Json | null
         }
         Insert: {
           cnpj?: string | null
@@ -583,6 +584,7 @@ export type Database = {
           modulos_override?: Json | null
           menu_override?: Json | null
           menu_config?: Json | null
+          permissoes?: Json | null
         }
         Update: {
           cnpj?: string | null
@@ -610,6 +612,7 @@ export type Database = {
           modulos_override?: Json | null
           menu_override?: Json | null
           menu_config?: Json | null
+          permissoes?: Json | null
         }
         Relationships: []
       }
