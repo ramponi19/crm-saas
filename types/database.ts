@@ -514,6 +514,9 @@ export type Database = {
           wl_slogan: string | null
           wl_whatsapp: string | null
           wl_menu: Json | null
+          modulos_override: Json | null
+          menu_override: Json | null
+          menu_config: Json | null
         }
         Insert: {
           cnpj?: string | null
@@ -538,6 +541,9 @@ export type Database = {
           wl_slogan?: string | null
           wl_whatsapp?: string | null
           wl_menu?: Json | null
+          modulos_override?: Json | null
+          menu_override?: Json | null
+          menu_config?: Json | null
         }
         Update: {
           cnpj?: string | null
@@ -562,6 +568,9 @@ export type Database = {
           wl_slogan?: string | null
           wl_whatsapp?: string | null
           wl_menu?: Json | null
+          modulos_override?: Json | null
+          menu_override?: Json | null
+          menu_config?: Json | null
         }
         Relationships: []
       }

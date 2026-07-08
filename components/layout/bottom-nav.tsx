@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Target, Users, Menu, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { resolverMenu } from '@/lib/menu'
+import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
 import { Drawer } from '@/components/ui'
@@ -16,6 +16,8 @@ interface BottomNavProps {
   role?: string
   isSuperAdmin?: boolean
   leadsCount?: number
+  overrides?: MenuOverridesSuperadmin
+  configDono?: MenuConfigDono
 }
 
 // Ação central (FAB) por segmento.
@@ -28,11 +30,11 @@ const FAB: Record<string, { label: string; href: string }> = {
   saude: { label: 'Agenda', href: '/agenda' },
 }
 
-export function BottomNav({ segmento = 'varejo', plano, role = 'owner', isSuperAdmin = false, leadsCount = 0 }: BottomNavProps) {
+export function BottomNav({ segmento = 'varejo', plano, role = 'owner', isSuperAdmin = false, leadsCount = 0, overrides, configDono }: BottomNavProps) {
   const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
   const [maisOpen, setMaisOpen] = useState(false)
-  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin })
+  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono })
   const fab = FAB[seg] ?? { label: 'Novo lead', href: '/leads' }
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')

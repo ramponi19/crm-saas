@@ -9,6 +9,8 @@ import { EmpresaProvider } from '@/lib/empresa-context'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
+import type { MenuOverridesSuperadmin, MenuConfigDono } from '@/lib/menu'
+import type { ModuloPlano } from '@/lib/plano'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -31,7 +33,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown } | null = null
+  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; modulos_override?: unknown; menu_override?: unknown; menu_config?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
 
@@ -39,7 +41,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, segmento, wl_cor, wl_logo_url, wl_menu')
+      .select('nome, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -48,7 +50,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url, wl_menu)')
+      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -61,7 +63,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null } | null
+      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; modulos_override: unknown; menu_override: unknown; menu_config: unknown } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -73,6 +75,15 @@ export default async function DashboardLayout({
     .select('*', { count: 'exact', head: true })
     .eq('ativo', true)
     .eq('kanban_status', 'novo')
+
+  // Camadas 3 (override do superadmin) e 4 (config do dono) do resolverMenu.
+  const mo = (empresa?.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
+  const menuOverrides: MenuOverridesSuperadmin = {
+    modulos: (empresa?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
+    hidden: mo?.hidden,
+    labels: mo?.labels,
+  }
+  const menuConfig = (empresa?.menu_config ?? undefined) as MenuConfigDono | undefined
 
   return (
     <EmpresaProvider>
@@ -93,6 +104,8 @@ export default async function DashboardLayout({
           plano={plano}
           segmento={normalizarSegmento(empresa?.segmento)}
           theme={resolveTheme(empresa?.wl_menu as WlMenu | null, empresa?.wl_cor)}
+          overrides={menuOverrides}
+          configDono={menuConfig}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
@@ -104,6 +117,8 @@ export default async function DashboardLayout({
             role={role}
             isSuperAdmin={usuario?.is_super_admin ?? false}
             leadsCount={leadsCount ?? 0}
+            overrides={menuOverrides}
+            configDono={menuConfig}
           />
         </div>
       </div>

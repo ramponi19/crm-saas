@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
+import { ControleEmpresa } from '@/components/superadmin/controle-empresa'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
+import { resolverMenu } from '@/lib/menu'
+import { normalizarSegmento } from '@/lib/segmentos'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -177,6 +180,17 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           planoAtual={empresa.plano}
           statusAtual={empresa.status}
           segmentoAtual={empresa.segmento}
+        />
+      </div>
+
+      {/* Controle de módulos e menu por empresa (camada 3 do resolverMenu) */}
+      <div className="mb-5">
+        <ControleEmpresa
+          empresaId={empresaId}
+          modulosInit={(empresa.modulos_override ?? null) as Record<string, boolean> | null}
+          menuOverrideInit={(empresa.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null}
+          items={resolverMenu({ segmento: normalizarSegmento(empresa.segmento), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
+            .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
         />
       </div>
 
