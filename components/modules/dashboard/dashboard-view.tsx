@@ -3,18 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { TrendingUp, Package, Users, AlertTriangle, Zap, ArrowUpRight, CheckSquare, CircleAlert } from 'lucide-react'
+import { Package, Users, AlertTriangle, CheckSquare, CircleAlert, Download, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency, CANAIS_VENDA } from '@/lib/utils'
 import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { AreaChart } from '@/components/ui/area-chart'
+import { Card, StatCard, Badge, Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
 import { createClient } from '@/lib/supabase/client'
 
-// ─────────────────────────────────────────
-// Tipos
-// ─────────────────────────────────────────
 interface Kpis {
   receitaMes: number; lucroMes: number; qtdVendasMes: number; ticketMedio: number
   totalClientes: number; leadsAtivos: number; leadsNovos: number
@@ -38,73 +36,52 @@ const PERIOD_LABELS: Record<string, string> = {
   hoje: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', mes: 'este mês', ano: 'este ano',
 }
 
-// ─────────────────────────────────────────
-// KPI Card
-// ─────────────────────────────────────────
-function KpiCard({ label, children, sub, delta, deltaUp, delay = 0 }: {
-  label: string; children: React.ReactNode; sub?: string
-  delta?: string; deltaUp?: boolean; delay?: number
-}) {
-  return (
-    <div className="bg-white border border-[#16212E]/[0.08] rounded-[18px] p-[22px] transition-all duration-300 hover:-translate-y-[3px] hover:border-white/[0.18] animate-fade-up"
-      style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex justify-between items-start">
-        <div />
-        {delta && (
-          <span className={cn('flex items-center gap-1 text-[12px] font-bold', deltaUp ? 'text-[#34D399]' : 'text-[#DC2626]')}>
-            <TrendingUp size={14} />{delta}
-          </span>
-        )}
-      </div>
-      <div className="font-mono text-[10.5px] tracking-[0.12em] text-[#6B7C92] mt-[18px]">{label}</div>
-      <div className="font-serif font-medium text-[30px] tracking-[-0.02em] text-[#16212E] mt-1">{children}</div>
-      {sub && <div className="text-[12px] text-[#788698] mt-1">{sub}</div>}
-    </div>
-  )
+function saudacao() {
+  const h = new Date().getHours()
+  return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
 }
 
-// ─────────────────────────────────────────
-// Donut — Vendas por canal
-// ─────────────────────────────────────────
+const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
+
+// Cores (token hex) para SVG/gráficos — this file não é components/ui.
+const OK = '#188A54', ACC = '#2E5CE6', INK2 = '#5C6470', INK3 = '#9199A3', WARN = '#B45309'
+
+// ── Donut — vendas por canal ──
 const CANAL_META: Record<string, { color: string; label: string }> = {
-  whatsapp:    { color: '#34D399', label: 'WhatsApp' },
-  instagram:   { color: '#DD2A7B', label: 'Instagram' },
-  loja_fisica: { color: '#AEB8C6', label: 'Loja física' },
-  site:        { color: '#7FB0E8', label: 'Site' },
+  whatsapp: { color: OK, label: 'WhatsApp' },
+  instagram: { color: ACC, label: 'Instagram' },
+  loja_fisica: { color: INK3, label: 'Loja física' },
+  site: { color: INK2, label: 'Site' },
 }
 function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
   const counts: Record<string, number> = {}
-  vendas.forEach(v => { const c = v.canal_venda ?? 'loja_fisica'; counts[c] = (counts[c] ?? 0) + 1 })
+  vendas.forEach((v) => { const c = v.canal_venda ?? 'loja_fisica'; counts[c] = (counts[c] ?? 0) + 1 })
   const total = Object.values(counts).reduce((s, v) => s + v, 0)
-  if (!total) return <div className="text-center py-8 text-[#788698] text-[13px]">Sem dados ainda.</div>
+  if (!total) return <div className="py-8 text-center text-[13px] text-ink-3">Sem dados ainda.</div>
   const segs = Object.entries(counts).map(([c, n]) => ({
-    label: CANAL_META[c]?.label ?? c, color: CANAL_META[c]?.color ?? '#6B7C92',
-    pct: Math.round((n / total) * 100),
+    label: CANAL_META[c]?.label ?? c, color: CANAL_META[c]?.color ?? INK3, pct: Math.round((n / total) * 100),
   }))
   const R = 52, cx = 70, cy = 70, C = 2 * Math.PI * R
   let off = 0
   const rings = segs.map((s, i) => {
-    const len = C * s.pct / 100
-    const el = <circle key={i} cx={cx} cy={cy} r={R} fill="none" stroke={s.color} strokeWidth={15}
-      strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-off} transform={`rotate(-90 ${cx} ${cy})`} />
+    const len = (C * s.pct) / 100
+    const el = <circle key={i} cx={cx} cy={cy} r={R} fill="none" stroke={s.color} strokeWidth={14} strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-off} transform={`rotate(-90 ${cx} ${cy})`} />
     off += len; return el
   })
   return (
     <div className="flex items-center gap-[18px]">
       <svg width={140} height={140} viewBox="0 0 140 140" style={{ flex: 'none' }}>
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(22,32,46,0.08)" strokeWidth={15} />
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(21,24,28,0.07)" strokeWidth={14} />
         {rings}
-        <text x={cx} y={cy - 3} textAnchor="middle" fill="#16212E" fontSize={23}
-          fontFamily="Fraunces, serif" fontWeight={600}>{total}</text>
-        <text x={cx} y={cy + 15} textAnchor="middle" fill="#5C6E84" fontSize={9}
-          fontFamily="JetBrains Mono, monospace" letterSpacing="1.5">VENDAS</text>
+        <text x={cx} y={cy - 2} textAnchor="middle" fill="#15181C" fontSize={22} fontWeight={700} style={{ fontVariantNumeric: 'tabular-nums' }}>{total}</text>
+        <text x={cx} y={cy + 15} textAnchor="middle" fill={INK3} fontSize={9} letterSpacing="1">VENDAS</text>
       </svg>
-      <div className="flex flex-col gap-[13px] flex-1">
+      <div className="flex flex-1 flex-col gap-3">
         {segs.map((s, i) => (
-          <div key={i} className="flex items-center gap-[10px]">
-            <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s.color }} />
-            <span className="text-[13px] text-[#9FB0C2] flex-1">{s.label}</span>
-            <span className="font-mono text-[13px] font-bold text-[#56657A]">{s.pct}%</span>
+          <div key={i} className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: s.color }} />
+            <span className="flex-1 text-[13px] text-ink-2">{s.label}</span>
+            <span className="num text-[13px] font-semibold text-ink">{s.pct}%</span>
           </div>
         ))}
       </div>
@@ -112,25 +89,20 @@ function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
   )
 }
 
-// ─────────────────────────────────────────
-// Top Produtos (barra horizontal)
-// ─────────────────────────────────────────
+// ── Top produtos ──
 function TopProdutos({ produtos }: { produtos: Array<{ nome: string; qtd: number }> }) {
-  if (!produtos.length) {
-    return <div className="text-center py-8 text-[#788698] text-[13px]">Sem vendas no período.</div>
-  }
-  const maxQtd = Math.max(...produtos.map(p => p.qtd), 1)
+  if (!produtos.length) return <div className="py-8 text-center text-[13px] text-ink-3">Sem vendas no período.</div>
+  const maxQtd = Math.max(...produtos.map((p) => p.qtd), 1)
   return (
-    <div className="flex flex-col gap-[15px]">
+    <div className="flex flex-col gap-3.5">
       {produtos.map((p, i) => (
         <div key={i}>
-          <div className="flex justify-between mb-[6px]">
-            <span className="text-[12.5px] text-[#16212E] font-medium">{p.nome}</span>
-            <span className="font-mono text-[12px] text-[#6B7C92]">{p.qtd} {p.qtd === 1 ? 'venda' : 'vendas'}</span>
+          <div className="mb-1.5 flex justify-between">
+            <span className="text-[12.5px] font-medium text-ink">{p.nome}</span>
+            <span className="num text-[12px] text-ink-3">{p.qtd} {p.qtd === 1 ? 'venda' : 'vendas'}</span>
           </div>
-          <div className="h-[8px] rounded-[8px] bg-[#16212E]/[0.06] overflow-hidden">
-            <div className="h-full rounded-[8px]"
-              style={{ width: `${(p.qtd / maxQtd) * 100}%`, background: i === 0 ? 'linear-gradient(90deg,#A8884A,#C9A24B)' : 'linear-gradient(90deg,#3A4A63,#6E8099)' }} />
+          <div className="h-2 overflow-hidden rounded-full bg-ink/[0.06]">
+            <div className={cn('h-full rounded-full', i === 0 ? 'bg-accent' : 'bg-ink/25')} style={{ width: `${(p.qtd / maxQtd) * 100}%` }} />
           </div>
         </div>
       ))}
@@ -138,154 +110,60 @@ function TopProdutos({ produtos }: { produtos: Array<{ nome: string; qtd: number
   )
 }
 
-// ─────────────────────────────────────────
-// Funil de leads
-// ─────────────────────────────────────────
-function FunilLeads({ funil }: { funil: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number } }) {
+// ── Funil de leads ──
+function FunilLeads({ funil }: { funil: DashboardData['funilLeads'] }) {
   const rows = [
-    { label: 'Novos leads', val: funil.novo,        color: '#7FB0E8' },
-    { label: 'Em contato',  val: funil.em_contato,  color: '#F4B740' },
-    { label: 'Negociando',  val: funil.negociando,  color: '#C9A24B' },
-    { label: 'Convertido',  val: funil.convertido,  color: '#34D399' },
+    { label: 'Novos leads', val: funil.novo, cls: 'bg-ink-3' },
+    { label: 'Em contato', val: funil.em_contato, cls: 'bg-ink-2' },
+    { label: 'Negociando', val: funil.negociando, cls: 'bg-accent' },
+    { label: 'Convertido', val: funil.convertido, cls: 'bg-ok' },
   ]
-  const maxVal = Math.max(...rows.map(r => r.val), 1)
+  const maxVal = Math.max(...rows.map((r) => r.val), 1)
   return (
-    <div className="flex flex-col gap-[12px]">
+    <div className="flex flex-col gap-3">
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-[12px]">
-          <div className="flex-1 h-[38px] rounded-[10px] bg-[#16212E]/[0.06] overflow-hidden relative">
-            <div className="h-full rounded-[10px] flex items-center px-3"
-              style={{ width: `${Math.max((r.val / maxVal) * 100, 8)}%`, background: r.color }}>
-              <span className={cn('text-[12.5px] font-semibold whitespace-nowrap', i === 3 ? 'text-[#06281C]' : 'text-white')}>
-                {r.label}
-              </span>
+        <div key={i} className="flex items-center gap-3">
+          <div className="relative h-9 flex-1 overflow-hidden rounded-control bg-ink/[0.05]">
+            <div className={cn('flex h-full items-center rounded-control px-3', r.cls)} style={{ width: `${Math.max((r.val / maxVal) * 100, 12)}%` }}>
+              <span className="whitespace-nowrap text-[12px] font-semibold text-white">{r.label}</span>
             </div>
           </div>
-          <span className="font-mono text-[14px] font-bold text-[#16212E] w-8 text-right">{r.val}</span>
+          <span className="num w-8 text-right text-[14px] font-bold text-ink">{r.val}</span>
         </div>
       ))}
     </div>
   )
 }
 
-// ─────────────────────────────────────────
-// Alertas
-// ─────────────────────────────────────────
-function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: {
-  estoqueDisponivel: number; leadsNovos: number; assistenciasAbertas: number
-}) {
+// ── Alertas ──
+function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: { estoqueDisponivel: number; leadsNovos: number; assistenciasAbertas: number }) {
   const items = [
-    estoqueDisponivel < 5 && {
-      icon: <Package size={24} className="text-[#F4B740] flex-none" />,
-      bg: 'rgba(244,183,64,.1)', title: 'Estoque baixo',
-      desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária`,
-    },
-    assistenciasAbertas > 0 && {
-      icon: <AlertTriangle size={24} className="text-[#DC2626] flex-none" />,
-      bg: 'rgba(220,38,38,.1)', title: 'Assistências abertas',
-      desc: `${assistenciasAbertas} ordem(s) em andamento`,
-    },
-    leadsNovos > 20 && {
-      icon: <Users size={24} className="text-[#7FB0E8] flex-none" />,
-      bg: 'rgba(127,176,232,.1)', title: `${leadsNovos} leads sem tratativa`,
-      desc: 'Leads acumulados aguardando primeiro contato',
-    },
-  ].filter(Boolean) as Array<{ icon: React.ReactNode; bg: string; title: string; desc: string }>
+    estoqueDisponivel < 5 && { tone: 'warn' as const, icon: Package, title: 'Estoque baixo', desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária.` },
+    assistenciasAbertas > 0 && { tone: 'bad' as const, icon: AlertTriangle, title: 'Assistências abertas', desc: `${assistenciasAbertas} ordem(s) em andamento.` },
+    leadsNovos > 20 && { tone: 'acc' as const, icon: Users, title: `${leadsNovos} leads sem tratativa`, desc: 'Leads acumulados aguardando primeiro contato.' },
+  ].filter(Boolean) as Array<{ tone: 'warn' | 'bad' | 'acc'; icon: typeof Package; title: string; desc: string }>
 
   if (!items.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 gap-3 text-[#34D399]">
-        <div className="w-10 h-10 rounded-full bg-[rgba(52,211,153,0.1)] flex items-center justify-center">
-          <TrendingUp size={20} />
-        </div>
-        <span className="text-[13px] font-semibold">Tudo em ordem!</span>
-        <span className="text-[11px] text-[#788698] text-center">Sem alertas críticos no momento.</span>
+      <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+        <div className="grid h-10 w-10 place-items-center rounded-full bg-ok-soft text-ok"><CheckSquare size={18} strokeWidth={1.7} /></div>
+        <span className="text-[13px] font-semibold text-ink">Tudo em ordem</span>
+        <span className="text-[11px] text-ink-3">Sem alertas críticos no momento.</span>
       </div>
     )
   }
+  const TONE: Record<string, string> = { warn: 'bg-warn-soft text-warn', bad: 'bg-bad-soft text-bad', acc: 'bg-accent-soft text-accent' }
   return (
-    <div className="flex flex-col gap-[12px]">
-      {items.map((a, i) => (
-        <div key={i} className="flex gap-3 items-start p-3 rounded-[13px] cursor-pointer hover:translate-x-[3px] transition-transform"
-          style={{ background: a.bg }}>
-          {a.icon}
-          <div>
-            <div className="text-[13.5px] font-semibold text-[#EAEFF5]">{a.title}</div>
-            <div className="text-[11.5px] text-[#788698] mt-[2px] leading-[1.4]">{a.desc}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────
-// Top Vendedores — dados reais com meta
-// ─────────────────────────────────────────
-const AVATAR_COLORS = ['#16212E', '#7FB0E8', '#34D399', '#F4B740', '#C6A86A']
-
-function getInitials(nome: string) {
-  return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-}
-
-function TopVendedores({ vendedores }: {
-  vendedores: Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>
-}) {
-  if (!vendedores.length) return <div className="text-center py-6 text-[#788698] text-[13px]">Sem dados.</div>
-  const maxTotal = Math.max(...vendedores.map(v => v.total), 1)
-
-  return (
-    <div className="flex flex-col gap-[18px]">
-      {vendedores.map((v, i) => {
-        const color = AVATAR_COLORS[i % AVATAR_COLORS.length]
-        const pctMeta = v.meta && v.meta > 0 ? Math.min(Math.round((v.total / v.meta) * 100), 100) : null
-        const pctBar  = Math.max(Math.round((v.total / maxTotal) * 100), 4)
+    <div className="flex flex-col gap-2.5">
+      {items.map((a, i) => {
+        const Icon = a.icon
         return (
-          <div key={v.id}>
-            <div className="flex items-center gap-[12px] mb-[9px]">
-              {/* Avatar com iniciais e cor única por posição */}
-              <div
-                className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center font-bold text-[13px] flex-none"
-                style={{
-                  background: `linear-gradient(135deg, ${color}55, ${color}22)`,
-                  border: `1px solid ${color}44`,
-                  color: color,
-                }}
-              >
-                {getInitials(v.nome)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{v.nome}</div>
-                <div className="text-[11.5px] text-[#6B7C92]">
-                  {v.qtd} {v.qtd === 1 ? 'venda' : 'vendas'}
-                  {pctMeta !== null && (
-                    <span className={pctMeta >= 100 ? 'text-[#34D399] ml-1 font-semibold' : 'text-[#F4B740] ml-1'}>
-                      · meta {pctMeta}%
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-[13.5px] font-bold text-[#16212E]">{formatCurrency(v.total)}</div>
+          <div key={i} className="flex items-start gap-3 rounded-card border border-line-soft p-3">
+            <span className={cn('grid h-8 w-8 flex-none place-items-center rounded-control', TONE[a.tone])}><Icon size={16} strokeWidth={1.7} /></span>
+            <div>
+              <div className="text-[13px] font-semibold text-ink">{a.title}</div>
+              <div className="mt-0.5 text-[11.5px] leading-snug text-ink-2">{a.desc}</div>
             </div>
-            {/* Barra de progresso — meta se tiver, senão relativa ao maior */}
-            <div className="h-[6px] rounded-[6px] bg-[#16212E]/[0.06] overflow-hidden">
-              <div
-                className="h-full rounded-[6px] transition-all duration-700"
-                style={{
-                  width: `${pctMeta ?? pctBar}%`,
-                  background: pctMeta !== null && pctMeta >= 100
-                    ? 'linear-gradient(90deg, #16a34a, #34D399)'
-                    : 'linear-gradient(90deg, #A8884A, #C9A24B)',
-                }}
-              />
-            </div>
-            {/* Label da meta se configurada */}
-            {v.meta !== null && (
-              <div className="flex justify-between mt-[4px]">
-                <span className="font-mono text-[9px] text-[#9AA7B6]">R$ 0</span>
-                <span className="font-mono text-[9px] text-[#9AA7B6]">{formatCurrency(v.meta)}</span>
-              </div>
-            )}
           </div>
         )
       })}
@@ -293,9 +171,40 @@ function TopVendedores({ vendedores }: {
   )
 }
 
-// ─────────────────────────────────────────
-// Follow-ups pendentes (tarefas do usuário) — auto-contido; some quando vazio
-// ─────────────────────────────────────────
+// ── Top vendedores ──
+function TopVendedores({ vendedores }: { vendedores: Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }> }) {
+  if (!vendedores.length) return <div className="py-6 text-center text-[13px] text-ink-3">Sem dados.</div>
+  const maxTotal = Math.max(...vendedores.map((v) => v.total), 1)
+  return (
+    <div className="flex flex-col gap-4">
+      {vendedores.map((v) => {
+        const pctMeta = v.meta && v.meta > 0 ? Math.min(Math.round((v.total / v.meta) * 100), 100) : null
+        const pctBar = Math.max(Math.round((v.total / maxTotal) * 100), 4)
+        const bateuMeta = pctMeta !== null && pctMeta >= 100
+        return (
+          <div key={v.id}>
+            <div className="mb-2 flex items-center gap-3">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[12px] font-bold text-white">{getInitials(v.nome)}</span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-ink">{v.nome}</div>
+                <div className="text-[11.5px] text-ink-3">
+                  {v.qtd} {v.qtd === 1 ? 'venda' : 'vendas'}
+                  {pctMeta !== null && <span className={cn('ml-1 font-semibold', bateuMeta ? 'text-ok' : 'text-warn')}>· meta {pctMeta}%</span>}
+                </div>
+              </div>
+              <div className="num text-[13px] font-bold text-ink">{formatCurrency(v.total)}</div>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
+              <div className={cn('h-full rounded-full transition-all', bateuMeta ? 'bg-ok' : 'bg-accent')} style={{ width: `${pctMeta ?? pctBar}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Follow-ups ──
 function FollowupsCard() {
   type Task = { id: number; titulo: string; vencimento: string | null; lead_nome: string | null }
   const [tarefas, setTarefas] = useState<Task[]>([])
@@ -307,13 +216,12 @@ function FollowupsCard() {
       const user = data.user
       if (!user) { setLoaded(true); return }
       const { data: rows } = await supabase
-        .from('tarefas')
-        .select('id, titulo, vencimento, leads(nome)')
+        .from('tarefas').select('id, titulo, vencimento, leads(nome)')
         .eq('concluida', false).eq('responsavel_id', user.id)
         .order('vencimento', { nullsFirst: false }).limit(6)
       type Row = { id: number; titulo: string; vencimento: string | null; leads: { nome: string | null } | { nome: string | null }[] | null }
       const one = (r: Row['leads']) => (Array.isArray(r) ? r[0] ?? null : r)
-      setTarefas(((rows ?? []) as unknown as Row[]).map(t => ({ id: t.id, titulo: t.titulo, vencimento: t.vencimento, lead_nome: one(t.leads)?.nome ?? null })))
+      setTarefas(((rows ?? []) as unknown as Row[]).map((t) => ({ id: t.id, titulo: t.titulo, vencimento: t.vencimento, lead_nome: one(t.leads)?.nome ?? null })))
       setLoaded(true)
     })
   }, [])
@@ -323,35 +231,27 @@ function FollowupsCard() {
   const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
   return (
-    <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">A FAZER</div>
-          <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] inline-flex items-center gap-2"><CheckSquare size={17} className="text-[#A8884A]" /> Meus follow-ups</h3>
-        </div>
-        <Link href="/tarefas" className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.06] transition-colors">
-          Ver tarefas <ArrowUpRight size={15} />
-        </Link>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-x-6">
-        {tarefas.map(t => {
+    <Card title="Meus follow-ups" actions={<Link href="/tarefas" className="text-[12px] font-semibold text-accent hover:underline">Ver tarefas →</Link>}>
+      <div className="grid gap-x-8 sm:grid-cols-2">
+        {tarefas.map((t) => {
           const atrasada = t.vencimento && new Date(t.vencimento).getTime() < nowMs
           return (
-            <div key={t.id} className="flex items-center gap-2 py-[9px] border-b border-[#16212E]/[0.06]">
-              {atrasada ? <CircleAlert size={15} className="text-[#DC2626] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#7FB0E8]" />}
-              <span className="text-[13px] text-[#16212E] truncate flex-1">{t.titulo}{t.lead_nome ? <span className="text-[#9AA7B6]"> · {t.lead_nome}</span> : ''}</span>
-              {t.vencimento && <span className={`text-[11px] shrink-0 ${atrasada ? 'text-[#DC2626] font-semibold' : 'text-[#9AA7B6]'}`}>{diaMes(t.vencimento)}</span>}
+            <div key={t.id} className="flex items-center gap-2 border-b border-line-soft py-2.5 last:border-0">
+              {atrasada ? <CircleAlert size={15} strokeWidth={1.7} className="shrink-0 text-bad" /> : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
+              <span className="flex-1 truncate text-[13px] text-ink">{t.titulo}{t.lead_nome ? <span className="text-ink-3"> · {t.lead_nome}</span> : ''}</span>
+              {t.vencimento && <span className={cn('num text-[11px] shrink-0', atrasada ? 'font-semibold text-bad' : 'text-ink-3')}>{diaMes(t.vencimento)}</span>}
             </div>
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }
 
-// ─────────────────────────────────────────
-// Dashboard principal
-// ─────────────────────────────────────────
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
+  concluida: 'ok', pendente: 'warn', cancelada: 'bad', devolvida: 'neutro',
+}
+
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const { empresa } = useEmpresa()
   const router = useRouter()
@@ -374,14 +274,9 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user
       if (!user) return
-      const { data: perfil } = await supabase
-        .from('usuarios')
-        .select('nome')
-        .eq('id', user.id)
-        .single()
-      if (perfil?.nome) {
-        setUserName(perfil.nome.trim().split(' ')[0])
-      } else {
+      const { data: perfil } = await supabase.from('usuarios').select('nome').eq('id', user.id).single()
+      if (perfil?.nome) setUserName(perfil.nome.trim().split(' ')[0])
+      else {
         const meta = user.user_metadata
         const name: string | undefined = meta?.nome ?? meta?.full_name ?? meta?.name
         setUserName(name ? name.split(' ')[0] : (user.email?.split('@')[0] ?? null))
@@ -392,8 +287,8 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   useEffect(() => {
     let cancelled = false
     fetch('/api/dashboard')
-      .then(r => r.ok ? r.json() : null)
-      .then(json => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
         if (cancelled || !json) return
         setPeriodsData(json.periods)
         setGlobais(json.globais)
@@ -413,190 +308,102 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const margem = receita > 0 ? Math.round((lucro / receita) * 100) : 0
   const periodLabel = PERIOD_LABELS[activePeriod] ?? 'este mês'
 
+  const spark = faturamentoMensal.slice(-7).map((m) => m.total)
+  const sparkNorm = spark.length > 1 ? (() => { const mx = Math.max(...spark, 1); return spark.map((v) => v / mx) })() : undefined
+
   return (
     <>
-      <Topbar eyebrow={`PAINEL · ${empresa?.nome?.toUpperCase() ?? 'CRM'}`} title="Visão geral"
-        showPeriods activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
+      <Topbar title="Visão geral" showPeriods activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
 
-      <main className="flex-1 overflow-y-auto scrollbar-thin px-[30px] py-7">
-        <div className="max-w-[1320px] mx-auto space-y-5">
+      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+        <div className="mx-auto max-w-[1240px] space-y-4">
 
-          {/* ── HERO ── */}
-          <section className="relative overflow-hidden rounded-[24px] p-[36px_40px] animate-fade-up"
-            style={{ background: 'radial-gradient(130% 150% at 88% 0%, rgba(201,162,75,0.20), transparent 52%), linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 55%, #EDF0F5 100%)', border: '1px solid rgba(22,32,46,0.10)', boxShadow: '0 28px 70px rgba(22,32,46,0.12)' }}>
-            <div className="absolute right-[42px] top-[36px] flex items-center gap-2 px-[13px] py-[7px] rounded-full bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)]">
-              <span className="w-[7px] h-[7px] rounded-full bg-[#34D399] animate-[pulseDot_2.2s_ease-in-out_infinite]" />
-              <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#15986A]">SISTEMA ONLINE</span>
+          {/* Header */}
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">{saudacao()}{userName ? `, ${userName}` : ''}.</h1>
+              <p className="mt-0.5 text-[13px] text-ink-2">
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {globais.leadsNovos > 0 && <> — <span className="font-medium text-ink">{globais.leadsNovos}</span> leads aguardam primeira resposta.</>}
+              </p>
             </div>
-            <div className="relative z-10 max-w-[620px]">
-              <div className="font-mono text-[11px] tracking-[0.16em] text-[#56657A] uppercase opacity-70">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
-              </div>
-              <h2 className="mt-2 font-serif font-normal text-[34px] leading-[1.12] tracking-[-0.025em] text-[#16212E]">
-                Bom te ver{userName ? `, ${userName}` : ''}.
-                <br />
-                Boa gestão gera bons resultados.
-              </h2>
-              <div className="flex items-end gap-[18px] mt-[26px]">
-                <div>
-                  <div className="font-mono text-[10px] tracking-[0.18em] text-[#788698]">
-                    FATURAMENTO · {periodLabel.toUpperCase()}
-                  </div>
-                  <AnimatedCurrency value={receita}
-                    className="block font-serif font-medium text-[52px] leading-none tracking-[-0.03em] text-[#16212E] mt-1.5" />
-                </div>
-                <div className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full bg-[rgba(52,211,153,0.14)] mb-2">
-                  <TrendingUp size={15} className="text-[#34D399]" />
-                  <span className="text-[13px] font-bold text-[#34D399]">
-                    <AnimatedInt value={qtdVendas} /> vendas
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-7">
-                <button onClick={() => router.push('/pdv')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] bg-gradient-to-b from-[#22303F] to-[#16212E] text-white font-semibold text-[14px] shadow-[0_8px_24px_rgba(22,33,46,0.32)] hover:-translate-y-[2px] transition-all">
-                  <Zap size={18} /> Nova venda
-                </button>
-                <button onClick={() => router.push('/estoque')} className="flex items-center gap-2 px-5 py-3 rounded-[12px] font-semibold text-[14px] transition-colors" style={{ background: 'rgba(22,32,46,0.08)', border: '1px solid rgba(22,32,46,0.14)', color: '#1F2A39' }}>
-                  <Package size={18} /> Ver estoque
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />}>Exportar</Button>
+              <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>
             </div>
-          </section>
-
-          {/* ── KPI GRID — 4 cols ── */}
-          <div className="grid grid-cols-4 gap-[18px]">
-            <KpiCard label="VENDAS TOTAIS" sub={periodLabel} delay={50}>
-              <AnimatedCurrency value={receita} />
-            </KpiCard>
-            <KpiCard label="LUCRO BRUTO" sub={`margem de ${margem}%`} delay={120}>
-              <AnimatedCurrency value={lucro} />
-            </KpiCard>
-            <KpiCard label="TICKET MÉDIO" sub="por venda fechada" delay={190}>
-              <AnimatedCurrency value={ticketMedio} />
-            </KpiCard>
-            <KpiCard label="VENDAS FECHADAS" sub="no período" delay={260}>
-              <AnimatedInt value={qtdVendas} />
-            </KpiCard>
           </div>
 
-          {/* ── STRIP — 4 cols ── */}
-          <div className="grid grid-cols-4 gap-[18px]">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+            <StatCard bare label={`Vendas · ${periodLabel}`} value={<AnimatedCurrency value={receita} />} spark={sparkNorm} />
+            <StatCard bare label="Lucro bruto" value={<AnimatedCurrency value={lucro} />} delta={`margem de ${margem}%`} deltaTone={margem >= 0 ? 'ok' : 'bad'} />
+            <StatCard bare label="Ticket médio" value={<AnimatedCurrency value={ticketMedio} />} delta="por venda fechada" deltaTone="neutral" />
+            <StatCard bare label="Vendas fechadas" value={<AnimatedInt value={qtdVendas} />} delta="no período" deltaTone="neutral" />
+          </div>
+
+          {/* Strip secundário */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              { icon: Package,       color: '#F4B740', val: `${globais.estoqueDisponivel} un`, sub: 'disponíveis em estoque',   alert: globais.estoqueDisponivel < 5 },
-              { icon: Users,         color: '#7FB0E8', val: String(globais.totalClientes),       sub: 'clientes cadastrados',      alert: false },
-              { icon: AlertTriangle, color: '#788698', val: String(globais.assistenciasAbertas), sub: 'assistências abertas',      alert: globais.assistenciasAbertas > 0 },
-              { icon: TrendingUp,    color: '#C9A24B', val: String(globais.leadsAtivos),          sub: 'leads ativos no funil',     alert: globais.leadsNovos > 20 },
-            ].map(({ icon: Icon, color, val, sub, alert }, i) => (
-              <div key={i} className={cn('bg-white border rounded-[16px] p-[16px_18px] flex items-center gap-[14px]',
-                alert ? 'border-[rgba(240,100,107,0.25)]' : 'border-[#16212E]/[0.07]')}>
-                <Icon size={30} style={{ color }} />
+              { icon: Package, val: `${globais.estoqueDisponivel} un`, sub: 'em estoque', alerta: globais.estoqueDisponivel < 5 },
+              { icon: Users, val: String(globais.totalClientes), sub: 'clientes', alerta: false },
+              { icon: AlertTriangle, val: String(globais.assistenciasAbertas), sub: 'assistências abertas', alerta: globais.assistenciasAbertas > 0 },
+              { icon: Users, val: String(globais.leadsAtivos), sub: 'leads ativos', alerta: globais.leadsNovos > 20 },
+            ].map(({ icon: Icon, val, sub, alerta }, i) => (
+              <div key={i} className={cn('flex items-center gap-3 rounded-card border bg-card p-4', alerta ? 'border-warn/30' : 'border-line')}>
+                <span className={cn('grid h-9 w-9 flex-none place-items-center rounded-control', alerta ? 'bg-warn-soft text-warn' : 'bg-ink/[0.04] text-ink-3')}><Icon size={17} strokeWidth={1.7} /></span>
                 <div>
-                  <div className="font-serif text-[20px] text-[#16212E]">{val}</div>
-                  <div className="text-[11.5px] text-[#788698] mt-[1px]">{sub}</div>
+                  <div className="num text-[18px] font-bold text-ink">{val}</div>
+                  <div className="text-[11px] text-ink-3">{sub}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* ── Meus follow-ups (some quando não há tarefas) ── */}
           <FollowupsCard />
 
-          {/* ── ROW A: Gráfico área (1.85fr) + Donut canais (1fr) ── */}
-          <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.85fr 1fr' }}>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '350ms' }}>
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESEMPENHO</div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Tendência de faturamento</h3>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#16212E]/[0.05] font-mono text-[10.5px] text-[#9FB0C2]">
-                  12 MESES
-                </div>
-              </div>
+          {/* Gráfico + Donut */}
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.85fr) minmax(0,1fr)' }}>
+            <Card title="Tendência de faturamento" actions={<span className="num text-[11px] text-ink-3">12 meses</span>}>
               <AreaChart data={faturamentoMensal} />
-            </div>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '420ms' }}>
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ORIGEM</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-[22px]">Vendas por canal</h3>
+            </Card>
+            <Card title="Vendas por canal">
               <DonutCanais vendas={vendasRecentes} />
-            </div>
+            </Card>
           </div>
 
-          {/* ── ROW B: Produtos (1fr) + Funil (1fr) + Alertas (1fr) ── */}
-          <div className="grid grid-cols-3 gap-[18px]">
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '460ms' }}>
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">RANKING</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Produtos mais vendidos</h3>
-              <TopProdutos produtos={initialData.topProdutos} />
-            </div>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '500ms' }}>
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">CONVERSÃO</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-5">Funil de leads</h3>
-              <FunilLeads funil={initialData.funilLeads} />
-            </div>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '540ms' }}>
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">ATENÇÃO</div>
-              <h3 className="font-serif font-medium text-[19px] text-[#16212E] mt-[5px] mb-[18px]">Alertas</h3>
-              <Alertas estoqueDisponivel={globais.estoqueDisponivel}
-                leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} />
-            </div>
+          {/* Produtos + Funil + Alertas */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card title="Produtos mais vendidos"><TopProdutos produtos={initialData.topProdutos} /></Card>
+            <Card title="Funil de leads"><FunilLeads funil={initialData.funilLeads} /></Card>
+            <Card title="Alertas"><Alertas estoqueDisponivel={globais.estoqueDisponivel} leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} /></Card>
           </div>
 
-          {/* ── ROW C: Vendas recentes (1.7fr) + Top vendedores (1fr) ── */}
-          <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.7fr 1fr' }}>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '580ms' }}>
-              <div className="flex justify-between items-center mb-[18px]">
-                <div>
-                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">TEMPO REAL</div>
-                  <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px]">Vendas recentes</h3>
-                </div>
-                <button className="flex items-center gap-1.5 px-[14px] py-2 rounded-[10px] bg-white/[0.04] border border-[#16212E]/[0.10] text-[#16212E] text-[12.5px] font-semibold hover:bg-[#16212E]/[0.06] transition-colors">
-                  Ver todas <ArrowUpRight size={15} />
-                </button>
-              </div>
-              {/* Cabeçalho da tabela */}
-              <div className="grid gap-[10px] px-1 pb-[10px] font-mono text-[9.5px] tracking-[0.1em] text-[#9AA7B6] border-b border-[#16212E]/[0.08]"
-                style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
-                <div>DATA</div><div>CLIENTE / PRODUTO</div>
-                <div className="text-right">VALOR</div><div className="text-right w-[96px]">STATUS</div>
-              </div>
+          {/* Vendas recentes + Top vendedores */}
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)' }}>
+            <Card title="Vendas recentes" flush>
               {vendasRecentes.length === 0 ? (
-                <div className="text-center py-8 text-[#788698] text-[13px]">Nenhuma venda ainda.</div>
-              ) : vendasRecentes.map((v, i) => {
-                const canal = CANAIS_VENDA.find(c => c.value === v.canal_venda)
-                const avatarColors = ['#34D399', '#7FB0E8', '#16212E', '#F4B740', '#C6A86A']
-                const color = avatarColors[i % avatarColors.length]
-                const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--/--'
-                return (
-                  <div key={v.id} className="grid gap-[10px] items-center px-1 py-[13px] border-b border-[#16212E]/[0.06] last:border-0 hover:bg-[#16212E]/[0.04] transition-colors"
-                    style={{ gridTemplateColumns: '60px 1fr auto auto' }}>
-                    <div className="font-mono text-[12px] text-[#6B7C92]">{data}</div>
-                    <div>
-                      <div className="text-[13px] font-semibold text-[#1F2A39]">{v.cliente_nome ?? '—'}</div>
-                      <div className="text-[11px] text-[#6B7C92]">
-                        {v.produto_nome
-                          ? <>{v.produto_nome} · {canal?.label ?? 'Loja física'}</>
-                          : <>{canal?.label ?? 'Loja física'} · {v.forma_pagamento ?? 'Pix'}</>
-                        }
+                <div className="px-4 py-8 text-center text-[13px] text-ink-3">Nenhuma venda ainda.</div>
+              ) : (
+                <div>
+                  {vendasRecentes.map((v) => {
+                    const canal = CANAIS_VENDA.find((c) => c.value === v.canal_venda)
+                    const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
+                    return (
+                      <div key={v.id} className="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0 hover:bg-raised">
+                        <span className="num w-[46px] flex-none text-[12px] text-ink-3">{data}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-semibold text-ink">{v.cliente_nome ?? '—'}</div>
+                          <div className="truncate text-[11px] text-ink-3">{v.produto_nome ? `${v.produto_nome} · ${canal?.label ?? 'Loja física'}` : `${canal?.label ?? 'Loja física'} · ${v.forma_pagamento ?? 'Pix'}`}</div>
+                        </div>
+                        <span className="num flex-none text-[13px] font-semibold text-ink">{formatCurrency(v.valor_venda)}</span>
+                        <Badge tone={STATUS_TONE[v.status ?? 'concluida'] ?? 'neutro'}>{v.status ?? 'concluída'}</Badge>
                       </div>
-                    </div>
-                    <div className="font-serif text-[15px] text-[#16212E] text-right">{formatCurrency(v.valor_venda)}</div>
-                    <div className="text-right w-[96px]">
-                      <span className="font-mono text-[10px] font-semibold px-[8px] py-[3px] rounded-full"
-                        style={{ color, background: `${color}22` }}>
-                        {v.status ?? 'concluida'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] p-[24px_26px] animate-fade-up" style={{ animationDelay: '620ms' }}>
-              <div className="font-mono text-[10px] tracking-[0.16em] text-[#6B7C92]">DESTAQUE</div>
-              <h3 className="font-serif font-medium text-[20px] text-[#16212E] mt-[5px] mb-[20px]">Top vendedores</h3>
-              <TopVendedores vendedores={topVendedores} />
-            </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+            <Card title="Top vendedores"><TopVendedores vendedores={topVendedores} /></Card>
           </div>
 
         </div>

@@ -57,7 +57,7 @@ export function AreaChart({ data }: AreaChartProps) {
   // Linhas de grade horizontais
   const gridLines = [0, 1, 2, 3, 4].map(g => {
     const yy = pt + (g / 4) * ih
-    return <line key={g} x1={pl} x2={W - pr} y1={yy} y2={yy} stroke="rgba(22,33,46,0.06)" />
+    return <line key={g} x1={pl} x2={W - pr} y1={yy} y2={yy} stroke="rgba(21,24,28,0.06)" />
   })
 
   // Labels dos meses
@@ -66,10 +66,9 @@ export function AreaChart({ data }: AreaChartProps) {
       key={i}
       x={X(i)}
       y={H - 9}
-      fill="#4F6178"
+      fill="#9199A3"
       fontSize={9.5}
       textAnchor="middle"
-      fontFamily="JetBrains Mono, monospace"
       letterSpacing=".5"
     >
       {m.label}
@@ -92,8 +91,8 @@ export function AreaChart({ data }: AreaChartProps) {
       >
         <defs>
           <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#C9A24B" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="#C9A24B" stopOpacity={0} />
+            <stop offset="0%" stopColor="#2E5CE6" stopOpacity={0.16} />
+            <stop offset="100%" stopColor="#2E5CE6" stopOpacity={0} />
           </linearGradient>
         </defs>
         {gridLines}
@@ -101,8 +100,8 @@ export function AreaChart({ data }: AreaChartProps) {
         <path
           d={linePath}
           fill="none"
-          stroke="#16212E"
-          strokeWidth={2.6}
+          stroke="#2E5CE6"
+          strokeWidth={2.4}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -110,8 +109,8 @@ export function AreaChart({ data }: AreaChartProps) {
         <circle
           cx={X(lastIdx)}
           cy={Y(lastVal)}
-          r={5}
-          fill="#C9A24B"
+          r={4.5}
+          fill="#2E5CE6"
           stroke="#FFFFFF"
           strokeWidth={2.5}
         />
@@ -119,11 +118,11 @@ export function AreaChart({ data }: AreaChartProps) {
         <text
           x={X(lastIdx)}
           y={Y(lastVal) - 12}
-          fill="#16212E"
-          fontSize={10}
+          fill="#15181C"
+          fontSize={10.5}
           textAnchor="middle"
-          fontFamily="JetBrains Mono, monospace"
           fontWeight="600"
+          style={{ fontVariantNumeric: 'tabular-nums' }}
         >
           {tooltipLabel}
         </text>
