@@ -19,7 +19,7 @@ function MiniSidebar({ wl }: { wl: WlMenu }) {
   return (
     <div className="w-full overflow-hidden rounded-card border border-line" style={{ background: t.bg }}>
       <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid color-mix(in srgb, var(--x-text) 12%, transparent)', ['--x-text' as string]: t.text }}>
-        <span className="grid h-5 w-5 place-items-center rounded-[5px] bg-jm text-[9px] font-bold text-white">J</span>
+        <span className="grid h-5 w-5 place-items-center rounded-[5px] bg-ink text-[9px] font-bold text-white">J</span>
         <span className="text-[12px] font-bold" style={{ color: t.dark ? '#fff' : '#15181C' }}>JM Store</span>
       </div>
       <div className="space-y-0.5 p-2">

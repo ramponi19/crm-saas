@@ -73,7 +73,7 @@ export function Sidebar({
             <Image src={empresaLogo} alt="Logo" width={26} height={26} className="object-contain" />
           </div>
         ) : (
-          <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-jm text-[12px] font-bold text-white">
+          <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-ink text-[12px] font-bold text-white">
             {iniciais.slice(0, 1)}
           </div>
         )}
@@ -132,7 +132,7 @@ export function Sidebar({
       {/* User */}
       <div className="px-3 py-2.5" style={{ borderTop: '1px solid color-mix(in srgb, var(--sb-text) 12%, transparent)' }}>
         <div className="flex items-center gap-2.5" style={{ color: 'var(--sb-text)' }}>
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-jm text-[10px] font-bold text-white">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-white">
             {userName.slice(0, 2).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
