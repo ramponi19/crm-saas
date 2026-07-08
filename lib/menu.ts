@@ -61,6 +61,13 @@ export interface MenuConfigDono {
   labels?: Record<string, string>
 }
 
+/** Config do segmento vinda do banco (segmentos_config) — sobrepõe o SEGMENTOS estático. */
+export interface SegOverride {
+  hiddenHrefs?: string[]
+  labelOverrides?: Record<string, string>
+  modulosExtra?: { href: string; label: string; icon: string }[]
+}
+
 export interface ResolverMenuInput {
   segmento: Segmento
   plano?: string
@@ -68,6 +75,8 @@ export interface ResolverMenuInput {
   isSuperAdmin: boolean
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
+  /** Camada 1 dinâmica: config do segmento do banco (fallback = SEGMENTOS estático). */
+  segOverride?: SegOverride
 }
 
 // Nunca podem ser ocultados pela config do dono (camada 4).
@@ -131,21 +140,26 @@ export const CATALOGO: MenuGroupBase[] = [
 ]
 
 export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
-  const { segmento, plano, role, isSuperAdmin, overrides, configDono } = input
+  const { segmento, plano, role, isSuperAdmin, overrides, configDono, segOverride } = input
   const seg = SEGMENTOS[segmento]
   const isAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
 
+  // Camada 1: config do segmento — do banco (segOverride) com fallback ao estático.
+  const segHidden = segOverride?.hiddenHrefs ?? seg.hiddenHrefs
+  const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
+  const segExtras = segOverride?.modulosExtra ?? seg.modulosExtra
+
   // Camadas 1 (segmento) + 3 (superadmin) + 4 (dono) de hidden/labels.
   const donoHidden = (configDono?.hidden ?? []).filter((h) => !PROTEGIDOS.has(h))
-  const hidden = new Set<string>([...seg.hiddenHrefs, ...(overrides?.hidden ?? []), ...donoHidden])
+  const hidden = new Set<string>([...segHidden, ...(overrides?.hidden ?? []), ...donoHidden])
   const labels: Record<string, string> = {
-    ...seg.labelOverrides,
+    ...segLabels,
     ...(overrides?.labels ?? {}),
     ...(configDono?.labels ?? {}),
   }
 
   // Injeta os módulos exclusivos do segmento em "Operação".
-  const extras: MenuItemBase[] = (seg.modulosExtra ?? []).map((m) => ({ href: m.href, label: m.label, icon: m.icon }))
+  const extras: MenuItemBase[] = (segExtras ?? []).map((m) => ({ href: m.href, label: m.label, icon: m.icon }))
 
   const grupos = CATALOGO.map((g) => ({
     label: g.label,

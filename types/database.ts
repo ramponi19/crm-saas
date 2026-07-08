@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      segmentos_config: {
+        Row: {
+          chave: string
+          label: string
+          descricao: string | null
+          hidden_hrefs: Json
+          label_overrides: Json
+          funil_seed: Json
+          modulos_extra: Json
+          ordem: number
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          chave: string
+          label: string
+          descricao?: string | null
+          hidden_hrefs?: Json
+          label_overrides?: Json
+          funil_seed?: Json
+          modulos_extra?: Json
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          chave?: string
+          label?: string
+          descricao?: string | null
+          hidden_hrefs?: Json
+          label_overrides?: Json
+          funil_seed?: Json
+          modulos_extra?: Json
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       funil_etapas: {
         Row: {
           ativo: boolean

@@ -13,6 +13,7 @@ import {
   LogOut,
   ShieldAlert,
   CreditCard,
+  Layers,
 } from 'lucide-react'
 
 const ADMIN_COR = '#6D28D9'
@@ -20,6 +21,7 @@ const ADMIN_COR = '#6D28D9'
 const navItems = [
   { href: '/superadmin',          label: 'Visão geral',     icon: LayoutDashboard, exact: true },
   { href: '/superadmin/empresas', label: 'Empresas',        icon: Building2 },
+  { href: '/superadmin/segmentos', label: 'Segmentos',      icon: Layers },
   { href: '/superadmin/metricas', label: 'Métricas',        icon: LineChart },
   { href: '/superadmin/planos',   label: 'Planos',          icon: CreditCard },
   { href: '/superadmin/admins',   label: 'Administradores', icon: ShieldCheck },

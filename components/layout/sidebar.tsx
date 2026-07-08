@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock } from 'lucide-react'
-import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono } from '@/lib/menu'
+import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
 import { resolveTheme, themeVars, type SidebarTheme } from '@/lib/wl-menu'
@@ -29,6 +29,7 @@ interface SidebarProps {
   theme?: SidebarTheme
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
+  segOverride?: SegOverride
 }
 
 export function Sidebar({
@@ -45,6 +46,7 @@ export function Sidebar({
   theme,
   overrides,
   configDono,
+  segOverride,
 }: SidebarProps) {
   const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
@@ -53,7 +55,7 @@ export function Sidebar({
 
   const t = theme ?? resolveTheme(null)
   const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
-  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono })
+  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
 
   async function handleLogout() {
     await supabase.auth.signOut()

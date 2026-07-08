@@ -9,7 +9,7 @@ import { EmpresaProvider } from '@/lib/empresa-context'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import type { MenuOverridesSuperadmin, MenuConfigDono } from '@/lib/menu'
+import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
 import { redirect } from 'next/navigation'
 
@@ -85,6 +85,17 @@ export default async function DashboardLayout({
   }
   const menuConfig = (empresa?.menu_config ?? undefined) as MenuConfigDono | undefined
 
+  // Camada 1 dinâmica: config do segmento vinda de segmentos_config (fallback = estático).
+  const { data: segCfg } = await supabase
+    .from('segmentos_config')
+    .select('hidden_hrefs, label_overrides, modulos_extra')
+    .eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
+  const segOverride: SegOverride | undefined = segCfg ? {
+    hiddenHrefs: (segCfg.hidden_hrefs ?? []) as string[],
+    labelOverrides: (segCfg.label_overrides ?? {}) as Record<string, string>,
+    modulosExtra: (segCfg.modulos_extra ?? []) as { href: string; label: string; icon: string }[],
+  } : undefined
+
   return (
     <EmpresaProvider>
       <div className="flex h-screen overflow-hidden bg-bg">
@@ -106,6 +117,7 @@ export default async function DashboardLayout({
           theme={resolveTheme(empresa?.wl_menu as WlMenu | null, empresa?.wl_cor)}
           overrides={menuOverrides}
           configDono={menuConfig}
+          segOverride={segOverride}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
@@ -119,6 +131,7 @@ export default async function DashboardLayout({
             leadsCount={leadsCount ?? 0}
             overrides={menuOverrides}
             configDono={menuConfig}
+            segOverride={segOverride}
           />
         </div>
       </div>
