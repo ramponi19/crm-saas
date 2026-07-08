@@ -91,21 +91,21 @@ export function NotificationProvider() {
       {toasts.map(t => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-start gap-3 w-[320px] bg-[#0E1A2C] border border-white/[0.12] rounded-[14px] p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+          className="pointer-events-auto flex w-[320px] items-start gap-3 rounded-card border border-line bg-card p-4 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]"
           style={{ animation: 'slideInRight 0.22s ease' }}
         >
-          <div className="w-8 h-8 rounded-[9px] bg-[rgba(22,33,46,0.18)] flex items-center justify-center flex-none mt-0.5">
-            <Bell size={15} className="text-[#C9A24B]" />
+          <div className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-control bg-accent-soft">
+            <Bell size={15} strokeWidth={1.7} className="text-accent" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-[#F4F6F9] truncate">{t.titulo}</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-ink">{t.titulo}</div>
             {t.corpo && (
-              <div className="text-[12px] text-[#8A9BB0] mt-0.5 line-clamp-2">{t.corpo}</div>
+              <div className="mt-0.5 line-clamp-2 text-[12px] text-ink-2">{t.corpo}</div>
             )}
             {t.leadId && (
               <button
                 onClick={() => { router.push('/leads'); removeToast(t.id) }}
-                className="text-[11.5px] text-[#C9A24B] font-semibold mt-1.5 hover:text-[#D9B871] transition-colors"
+                className="mt-1.5 text-[11.5px] font-semibold text-accent transition-colors hover:text-accent/80"
               >
                 Abrir lead →
               </button>
@@ -113,7 +113,7 @@ export function NotificationProvider() {
           </div>
           <button
             onClick={() => removeToast(t.id)}
-            className="text-[#46586E] hover:text-[#9FB0C2] transition-colors flex-none mt-0.5"
+            className="mt-0.5 flex-none text-ink-3 transition-colors hover:text-ink"
           >
             <X size={14} />
           </button>
