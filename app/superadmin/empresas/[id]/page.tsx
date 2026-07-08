@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import { ControleEmpresa } from '@/components/superadmin/controle-empresa'
+import { ZonaPerigo } from '@/components/superadmin/zona-perigo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
@@ -279,6 +280,11 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
             ))}
           </div>
         </Card>
+      </div>
+
+      {/* LGPD & zona de perigo */}
+      <div className="mt-5">
+        <ZonaPerigo empresaId={empresaId} empresaNome={empresa.nome} />
       </div>
     </div>
   )

@@ -2495,6 +2495,7 @@ export type Database = {
         Returns: undefined
       }
       is_super_admin: { Args: never; Returns: boolean }
+      hard_delete_empresa: { Args: { p_empresa_id: number }; Returns: undefined }
       refresh_status_atrasados: { Args: never; Returns: undefined }
       set_impersonation: {
         Args: { p_empresa_id: number | null; p_ttl_seconds?: number }
