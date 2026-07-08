@@ -93,7 +93,7 @@ export default async function ParaSegmentoPage({ params }: { params: Promise<{ s
       <nav className="sticky top-0 z-50 border-b border-line-soft bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-[60px] max-w-[1080px] items-center gap-4 px-6">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/nexus-logo.png" alt="Nexus" width={503} height={431} className="h-8 w-auto" priority />
+            <Image src="/nexus-logo.png" alt="Nexus" width={426} height={285} className="h-10 w-auto" priority />
           </Link>
           <div className="ml-auto flex items-center gap-3">
             <Link href="/login" className="text-[13.5px] font-medium text-ink-2 hover:text-ink">Entrar</Link>

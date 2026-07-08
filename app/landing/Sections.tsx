@@ -349,7 +349,7 @@ export default function Sections({ plans }: { plans?: PlanData[] }) {
       <footer className="border-t border-line-soft">
         <div className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-between gap-4 px-6 py-9 text-[12.5px] text-ink-3">
           <Link href="/" className="flex items-center" aria-label="Nexus">
-            <Image src="/nexus-logo.png" alt="Nexus" width={34} height={29} className="h-[28px] w-auto" />
+            <Image src="/nexus-logo.png" alt="Nexus" width={42} height={28} className="h-[28px] w-auto" />
           </Link>
           <div className="flex items-center gap-5">
             <a href="#produto" className="transition-colors hover:text-ink">Produto</a>

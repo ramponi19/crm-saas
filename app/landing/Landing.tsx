@@ -167,7 +167,7 @@ export default function Landing({ plans }: { plans?: PlanData[] }) {
       <nav className="sticky top-0 z-50 border-b border-line-soft bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-[60px] max-w-[1080px] items-center gap-8 px-6">
           <Link href="/" className="flex items-center" aria-label="Nexus">
-            <Image src="/nexus-logo.png" alt="Nexus" width={60} height={51} priority className="h-[44px] w-auto" />
+            <Image src="/nexus-logo.png" alt="Nexus" width={66} height={44} priority className="h-[44px] w-auto" />
           </Link>
           <div className="ml-2 hidden items-center gap-7 text-[13.5px] font-medium text-ink-2 md:flex">
             <a href="#produto" className="transition-colors hover:text-ink">Produto</a>

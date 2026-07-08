@@ -159,7 +159,7 @@ export default function RegisterPage() {
       <div className="flex w-full max-w-[480px] flex-col items-center">
 
         {/* Logo */}
-        <Image src="/nexus-logo.png" alt="Nexus" width={503} height={431} priority className="h-24 w-auto" />
+        <Image src="/nexus-logo.png" alt="Nexus" width={426} height={285} priority className="h-24 w-auto" />
 
         {/* Stepper */}
         <div className="mt-7 flex items-center gap-1.5">
