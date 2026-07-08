@@ -3,14 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Loader2, Mail, Lock, Package, ShoppingCart, Users, BarChart2 } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
-import { toast } from 'sonner'
-
-const FIELD_BASE = 'flex items-center gap-2.5 px-[14px] py-3 rounded-[12px] transition-all border'
-const FIELD_IDLE = 'bg-[rgba(22,32,46,.05)] border-[rgba(22,32,46,.12)]'
-const FIELD_FOCUS = 'focus-within:border-[rgba(201,162,75,.55)] focus-within:bg-[rgba(22,32,46,.035)]'
+import { Input, Button, notify } from '@/components/ui'
 
 export function LoginForm() {
   const router = useRouter()
@@ -28,15 +24,15 @@ export function LoginForm() {
   }, [])
 
   async function handleReset() {
-    if (!email) { toast.error('Digite seu e-mail primeiro.'); return }
+    if (!email) { notify.bad('Digite seu e-mail primeiro.'); return }
     setResetLoading(true)
     const supabase = createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-senha`,
     })
     setResetLoading(false)
-    if (error) toast.error('Erro ao enviar e-mail: ' + error.message)
-    else toast.success('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
+    if (error) notify.bad('Erro ao enviar e-mail: ' + error.message)
+    else notify.ok('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -47,101 +43,74 @@ export function LoginForm() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setLoading(false)
-      if (error.message.includes('Invalid login credentials')) toast.error('E-mail ou senha incorretos.')
-      else if (error.message.includes('Too many requests')) toast.error('Muitas tentativas. Aguarde alguns minutos.')
-      else toast.error(error.message)
+      if (error.message.includes('Invalid login credentials')) notify.bad('E-mail ou senha incorretos.')
+      else if (error.message.includes('Too many requests')) notify.bad('Muitas tentativas. Aguarde alguns minutos.')
+      else notify.bad(error.message)
       return
     }
     markSessionActive()
-    toast.success('Acesso autorizado!')
+    notify.ok('Acesso autorizado!')
     router.push('/entrar')
     router.refresh()
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Email */}
-      <div>
-        <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">E-MAIL</label>
-        <div className={`jm-field ${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
-          <Mail size={19} className="text-[#5A6A7E] shrink-0" />
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="voce@suaempresa.com.br"
-            autoComplete="username"
-            required
-            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"
-          />
-        </div>
-      </div>
+      <Input
+        label="E-mail"
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="voce@suaempresa.com.br"
+        autoComplete="username"
+        required
+      />
 
-      {/* Senha */}
       <div>
-        <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SENHA</label>
-        <div className={`jm-field ${FIELD_BASE} ${FIELD_IDLE} ${FIELD_FOCUS}`}>
-          <Lock size={19} className="text-[#5A6A7E] shrink-0" />
-          <input
+        <label htmlFor="login-senha" className="mb-1.5 block text-[12px] font-medium text-ink-2">Senha</label>
+        <div className="relative">
+          <Input
+            id="login-senha"
             type={showPw ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete="current-password"
             required
-            className="bg-transparent flex-1 text-[14px] text-[#16212E] placeholder:text-[#8A96A6] outline-none"
+            className="pr-10"
           />
-          <button type="button" onClick={() => setShowPw(s => !s)} className="text-[#5A6A7E] hover:text-[#C9A24B] transition-colors shrink-0">
-            {showPw ? <EyeOff size={19} /> : <Eye size={19} />}
+          <button
+            type="button"
+            onClick={() => setShowPw(s => !s)}
+            aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+            className="absolute inset-y-0 right-3 flex items-center text-ink-3 transition-colors hover:text-ink"
+          >
+            {showPw ? <EyeOff size={17} strokeWidth={1.7} /> : <Eye size={17} strokeWidth={1.7} />}
           </button>
         </div>
       </div>
 
-      {/* Esqueci */}
       <div className="flex justify-end">
-        <button type="button" onClick={handleReset} disabled={resetLoading} className="text-[12.5px] font-semibold text-[#5A6A7E] hover:text-[#C9A24B] transition-colors disabled:opacity-50">
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={resetLoading}
+          className="text-[12px] font-medium text-accent transition-colors hover:text-ink disabled:opacity-50"
+        >
           {resetLoading ? 'Enviando…' : 'Esqueci a senha'}
         </button>
       </div>
 
-      {/* Entrar */}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full flex items-center justify-center gap-2.5 py-[14px] rounded-[13px] bg-gradient-to-b from-[#D9BC7A] to-[#C9A24B] text-[#0B1119] text-[14.5px] font-bold shadow-[0_6px_16px_rgba(201,162,75,.32)] hover:-translate-y-[2px] hover:shadow-[0_10px_22px_rgba(201,162,75,.45)] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
-      >
-        {loading ? <><Loader2 size={19} className="animate-spin" /> Entrando…</> : 'Entrar'}
-      </button>
+      <Button type="submit" size="lg" loading={loading} className="w-full">
+        {loading ? 'Entrando…' : 'Entrar'}
+      </Button>
 
-      {/* Cadastro */}
-      <p className="text-center text-[13px] text-[#5A6A7E]">
+      <p className="text-center text-[13px] text-ink-2">
         Sua primeira vez aqui?{' '}
-        <Link href="/register" className="font-semibold text-[#C9A24B] hover:text-[#A8884A] transition-colors">
+        <Link href="/register" className="font-medium text-accent transition-colors hover:text-ink">
           Criar uma conta
         </Link>
       </p>
-
-      {/* Recursos */}
-      <div className="pt-1">
-        <div className="flex items-center gap-3 my-[18px]">
-          <span className="flex-1 h-px bg-[rgba(22,32,46,.10)]" />
-          <span className="font-mono text-[9px] tracking-[0.16em] text-[#8A96A6]">TUDO NUM SÓ LUGAR</span>
-          <span className="flex-1 h-px bg-[rgba(22,32,46,.10)]" />
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: 'ESTOQUE',    icon: Package,      color: '#C9A24B' },
-            { label: 'VENDAS',     icon: ShoppingCart, color: '#22D3B0' },
-            { label: 'CLIENTES',   icon: Users,        color: '#A8884A' },
-            { label: 'RELATÓRIOS', icon: BarChart2,    color: '#141E2C' },
-          ].map(({ label, icon: Icon, color }) => (
-            <div key={label} className="flex flex-col items-center gap-[7px] py-[10px] px-1 rounded-[12px] bg-[rgba(22,32,46,.04)] border border-[rgba(22,32,46,.06)]">
-              <Icon size={20} style={{ color }} strokeWidth={1.6} />
-              <span className="font-mono text-[8.5px] tracking-[0.1em] text-[#5A6A7E]">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </form>
   )
 }

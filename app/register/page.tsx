@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
-import { Check, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Check, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { SEGMENTOS_LISTA } from '@/lib/segmentos'
+import { Input, Button } from '@/components/ui'
 
 type Step = 'plano' | 'loja' | 'conta'
 
@@ -34,8 +36,6 @@ const STEPS: { id: Step; label: string }[] = [
   { id: 'loja',  label: 'Sua loja' },
   { id: 'conta', label: 'Sua conta' },
 ]
-
-const FIELD = 'w-full bg-[rgba(22,32,46,.05)] border border-[rgba(22,32,46,.12)] rounded-[12px] px-[14px] py-3 text-[14px] text-[#141E2C] placeholder:text-[#8A96A6] outline-none focus:border-[rgba(201,162,75,.5)] transition-colors'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -155,71 +155,42 @@ export default function RegisterPage() {
   }
 
   return (
-    <div
-      className="fixed inset-0 overflow-auto flex items-center justify-center p-6"
-      style={{ background: 'radial-gradient(130% 120% at 50% -10%, #FFFFFF 0%, #F7F4EC 45%, #EFE9DC 100%)' }}
-    >
-      {/* Aurora blobs — gold / navy (identidade ÁPICE) */}
-      <div className="fixed top-[-12%] left-[8%] w-[520px] h-[520px] rounded-full pointer-events-none blur-[36px] animate-[jmDrift1_16s_ease-in-out_infinite]"
-        style={{ background: 'radial-gradient(circle, rgba(201,162,75,.28), transparent 68%)' }} />
-      <div className="fixed bottom-[-18%] right-[6%] w-[600px] h-[600px] rounded-full pointer-events-none blur-[44px] animate-[jmDrift2_21s_ease-in-out_infinite]"
-        style={{ background: 'radial-gradient(circle, rgba(20,30,44,.10), transparent 66%)' }} />
-
-      {/* Grid overlay */}
-      <div className="fixed inset-0 pointer-events-none" style={{
-        backgroundImage: 'linear-gradient(rgba(22,32,46,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(22,32,46,.04) 1px, transparent 1px)',
-        backgroundSize: '64px 64px',
-        maskImage: 'radial-gradient(120% 90% at 50% 30%, #000 30%, transparent 75%)',
-        WebkitMaskImage: 'radial-gradient(120% 90% at 50% 30%, #000 30%, transparent 75%)',
-      }} />
-
-      <div className="relative z-10 w-full max-w-[480px] flex flex-col items-center py-8">
+    <div className="flex min-h-screen items-center justify-center overflow-auto bg-bg px-6 py-12">
+      <div className="flex w-full max-w-[480px] flex-col items-center">
 
         {/* Logo */}
-        <div className="flex flex-col items-center mb-7">
-          <div className="relative w-[80px] h-[80px] flex items-center justify-center mb-4">
-            <div className="absolute rounded-full border border-dashed border-[rgba(201,162,75,.35)] animate-spin"
-              style={{ inset: '-10px', animationDuration: '26s' }} />
-            <img src="/eagle-navy.png" alt="Nexus" className="w-[72px] h-[72px] object-contain drop-shadow-lg" />
-          </div>
-          <div className="font-serif font-medium text-[28px] tracking-[-0.01em] text-[#141E2C] leading-none">Nexus</div>
-          <div className="font-mono text-[9px] tracking-[0.36em] text-[#7A6A45] mt-2 pl-[0.36em]">O CRM DO EMPREENDEDOR</div>
-        </div>
+        <Image src="/nexus-logo.png" alt="Nexus" width={503} height={431} priority className="h-16 w-auto" />
 
-        {/* Steps */}
-        <div className="flex items-center gap-1.5 mb-6">
+        {/* Stepper */}
+        <div className="mt-7 flex items-center gap-1.5">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center gap-1.5">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+              <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
                 i < stepIdx
-                  ? 'bg-[rgba(34,197,94,.12)] text-[#16A34A]'
+                  ? 'bg-ok-soft text-ok'
                   : i === stepIdx
-                  ? 'bg-[rgba(201,162,75,.14)] text-[#A8884A]'
-                  : 'bg-[rgba(22,32,46,.06)] text-[#788698]'
+                  ? 'bg-accent-soft text-accent'
+                  : 'bg-raised text-ink-3'
               }`}>
-                {i < stepIdx ? <Check size={11} strokeWidth={2.5} /> : <span className="w-[14px] text-center">{i + 1}</span>}
+                {i < stepIdx
+                  ? <Check size={12} strokeWidth={1.7} />
+                  : <span className="num w-[14px] text-center">{i + 1}</span>}
                 {s.label}
               </div>
-              {i < STEPS.length - 1 && <ChevronRight size={13} className="text-[#B0BCC9]" />}
+              {i < STEPS.length - 1 && <ChevronRight size={13} strokeWidth={1.7} className="text-ink-3" />}
             </div>
           ))}
         </div>
 
         {/* Card */}
-        <div className="w-full rounded-[22px] p-[30px_28px]" style={{
-          background: 'rgba(255,255,255,.82)',
-          backdropFilter: 'blur(18px) saturate(1.2)',
-          WebkitBackdropFilter: 'blur(18px) saturate(1.2)',
-          border: '1px solid rgba(22,32,46,.11)',
-          boxShadow: '0 24px 60px rgba(22,32,46,.12)',
-        }}>
+        <div className="mt-6 w-full rounded-card border border-line bg-card p-7">
 
           {/* Step 1 — Plano */}
           {step === 'plano' && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-[18px] font-bold text-[#16212E]">Escolha seu plano</h2>
-                <p className="text-[13px] text-[#5A6A7E] mt-1">14 dias grátis em qualquer plano. Sem cartão agora.</p>
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Escolha seu plano</h2>
+                <p className="mt-1 text-[13px] text-ink-2">14 dias grátis em qualquer plano. Sem cartão agora.</p>
               </div>
               <div className="space-y-2.5">
                 {planos.map(p => (
@@ -227,32 +198,32 @@ export default function RegisterPage() {
                     key={p.id}
                     type="button"
                     onClick={() => set('plano', p.id)}
-                    className={`w-full text-left p-4 rounded-[14px] border transition-all ${
+                    className={`w-full rounded-card border p-4 text-left transition-colors ${
                       form.plano === p.id
-                        ? 'border-[rgba(201,162,75,.5)] bg-[rgba(201,162,75,.06)]'
-                        : 'border-[rgba(22,32,46,.10)] hover:border-[rgba(22,32,46,.20)] bg-transparent'
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-line bg-card hover:border-line-soft hover:bg-bg'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all ${
-                          form.plano === p.id ? 'border-[#C9A24B]' : 'border-[rgba(22,32,46,.25)]'
+                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 transition-colors ${
+                          form.plano === p.id ? 'border-accent' : 'border-line'
                         }`}>
-                          {form.plano === p.id && <div className="w-1.5 h-1.5 rounded-full bg-[#C9A24B]" />}
-                        </div>
-                        <span className="text-[14px] font-semibold text-[#16212E]">{p.nome}</span>
+                          {form.plano === p.id && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                        </span>
+                        <span className="text-[14px] font-semibold text-ink">{p.nome}</span>
                         {p.destaque && (
-                          <span className="text-[10px] bg-[rgba(201,162,75,.16)] text-[#A8884A] px-2 py-0.5 rounded-full font-medium">
+                          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent">
                             Popular
                           </span>
                         )}
                       </div>
-                      <span className="text-[13px] font-bold text-[#141E2C]">{fmtPreco(p.preco_centavos)}</span>
+                      <span className="num text-[13px] font-semibold text-ink">{fmtPreco(p.preco_centavos)}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 pl-[22px]">
                       {p.features.map(f => (
-                        <span key={f} className="text-[11px] text-[#5A6A7E] flex items-center gap-1">
-                          <Check size={9} className="text-[#16A34A]" strokeWidth={2.5} /> {f}
+                        <span key={f} className="flex items-center gap-1 text-[11px] text-ink-2">
+                          <Check size={11} strokeWidth={1.7} className="text-ok" /> {f}
                         </span>
                       ))}
                     </div>
@@ -266,61 +237,50 @@ export default function RegisterPage() {
           {step === 'loja' && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-[18px] font-bold text-[#16212E]">Sobre sua loja</h2>
-                <p className="text-[13px] text-[#5A6A7E] mt-1">Configure seu sistema em menos de 2 minutos.</p>
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Sobre sua loja</h2>
+                <p className="mt-1 text-[13px] text-ink-2">Configure seu sistema em menos de 2 minutos.</p>
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SEGMENTO DO NEGÓCIO *</label>
+                <label className="mb-2 block text-[12px] font-medium text-ink-2">Segmento do negócio <span className="text-bad">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {SEGMENTOS_LISTA.map(({ id, config }) => (
                     <button
                       key={id}
                       type="button"
                       onClick={() => set('segmento', id)}
-                      className={`text-left p-3 rounded-[12px] border transition-all ${
+                      className={`rounded-control border p-3 text-left transition-colors ${
                         form.segmento === id
-                          ? 'border-[rgba(201,162,75,.5)] bg-[rgba(201,162,75,.06)]'
-                          : 'border-[rgba(22,32,46,.10)] hover:border-[rgba(22,32,46,.20)]'
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-line hover:border-line-soft hover:bg-bg'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[16px]">{config.emoji}</span>
-                        <span className="text-[13px] font-semibold text-[#141E2C]">{config.label}</span>
-                      </div>
+                      <span className="text-[13px] font-semibold text-ink">{config.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-3.5">
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">NOME DA LOJA *</label>
-                  <input
-                    value={form.nomeEmpresa}
-                    onChange={e => set('nomeEmpresa', e.target.value)}
-                    placeholder="Ex: Tech Mobile, iPhone Store..."
-                    className={FIELD}
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">CNPJ</label>
-                  <input
-                    value={form.cnpj}
-                    onChange={e => set('cnpj', e.target.value)}
-                    placeholder="00.000.000/0000-00"
-                    className={FIELD}
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">TELEFONE / WHATSAPP</label>
-                  <input
-                    value={form.telefone}
-                    onChange={e => set('telefone', e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    className={FIELD}
-                  />
-                </div>
+                <Input
+                  label="Nome da loja"
+                  required
+                  value={form.nomeEmpresa}
+                  onChange={e => set('nomeEmpresa', e.target.value)}
+                  placeholder="Ex: Tech Mobile, iPhone Store..."
+                />
+                <Input
+                  label="CNPJ"
+                  value={form.cnpj}
+                  onChange={e => set('cnpj', e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                />
+                <Input
+                  label="Telefone / WhatsApp"
+                  value={form.telefone}
+                  onChange={e => set('telefone', e.target.value)}
+                  placeholder="(11) 99999-9999"
+                />
               </div>
             </div>
           )}
@@ -329,110 +289,100 @@ export default function RegisterPage() {
           {step === 'conta' && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-[18px] font-bold text-[#16212E]">Sua conta de acesso</h2>
-                <p className="text-[13px] text-[#5A6A7E] mt-1">Você será o administrador do sistema.</p>
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Sua conta de acesso</h2>
+                <p className="mt-1 text-[13px] text-ink-2">Você será o administrador do sistema.</p>
               </div>
               <div className="space-y-3.5">
+                <Input
+                  label="Seu nome"
+                  required
+                  value={form.nomeUsuario}
+                  onChange={e => set('nomeUsuario', e.target.value)}
+                  placeholder="Nome completo"
+                />
+                <Input
+                  label="E-mail"
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  placeholder="voce@suaempresa.com.br"
+                  autoComplete="username"
+                />
                 <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SEU NOME *</label>
-                  <input
-                    value={form.nomeUsuario}
-                    onChange={e => set('nomeUsuario', e.target.value)}
-                    placeholder="Nome completo"
-                    className={FIELD}
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">E-MAIL *</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={e => set('email', e.target.value)}
-                    placeholder="voce@suaempresa.com.br"
-                    autoComplete="username"
-                    className={FIELD}
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">SENHA *</label>
+                  <label htmlFor="reg-senha" className="mb-1.5 block text-[12px] font-medium text-ink-2">Senha <span className="text-bad">*</span></label>
                   <div className="relative">
-                    <input
+                    <Input
+                      id="reg-senha"
                       type={showPw ? 'text' : 'password'}
                       value={form.senha}
                       onChange={e => set('senha', e.target.value)}
                       placeholder="Mínimo 8 caracteres"
                       autoComplete="new-password"
-                      className={FIELD + ' pr-11'}
+                      className="pr-10"
                     />
-                    <button type="button" onClick={() => setShowPw(s => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#788698] hover:text-[#C9A24B] transition-colors">
-                      {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                    <button
+                      type="button"
+                      onClick={() => setShowPw(s => !s)}
+                      aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+                      className="absolute inset-y-0 right-3 flex items-center text-ink-3 transition-colors hover:text-ink"
+                    >
+                      {showPw ? <EyeOff size={17} strokeWidth={1.7} /> : <Eye size={17} strokeWidth={1.7} />}
                     </button>
                   </div>
                 </div>
-                <div>
-                  <label className="block font-mono text-[10px] tracking-[0.14em] text-[#788698] mb-2">CONFIRMAR SENHA *</label>
-                  <input
-                    type={showPw ? 'text' : 'password'}
-                    value={form.confirmaSenha}
-                    onChange={e => set('confirmaSenha', e.target.value)}
-                    placeholder="Repita a senha"
-                    autoComplete="new-password"
-                    className={FIELD}
-                  />
-                </div>
+                <Input
+                  label="Confirmar senha"
+                  required
+                  type={showPw ? 'text' : 'password'}
+                  value={form.confirmaSenha}
+                  onChange={e => set('confirmaSenha', e.target.value)}
+                  placeholder="Repita a senha"
+                  autoComplete="new-password"
+                />
               </div>
             </div>
           )}
 
           {/* Erro */}
           {erro && (
-            <div className="mt-4 p-3 bg-[rgba(22,33,46,.08)] border border-[rgba(22,33,46,.20)] rounded-[10px]">
-              <p className="text-[12px] text-[#16212E]">{erro}</p>
+            <div className="mt-4 rounded-control border border-bad/20 bg-bad-soft p-3">
+              <p className="text-[12px] text-bad">{erro}</p>
             </div>
           )}
 
           {/* Botões */}
-          <div className={`flex gap-2 mt-6 ${stepIdx > 0 ? 'flex-row' : ''}`}>
+          <div className="mt-6 flex gap-2">
             {stepIdx > 0 && (
-              <button
-                type="button"
-                onClick={voltar}
-                className="px-4 py-[13px] rounded-[13px] text-[14px] text-[#788698] hover:text-[#16212E] border border-[rgba(22,32,46,.12)] hover:border-[rgba(22,32,46,.25)] transition-all"
-              >
+              <Button type="button" variant="outline" size="lg" onClick={voltar} disabled={loading}>
                 Voltar
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
+              size="lg"
               onClick={avancar}
-              disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 py-[14px] rounded-[13px] bg-gradient-to-b from-[#D9BC7A] to-[#C9A24B] text-[#0B1119] text-[14.5px] font-bold shadow-[0_6px_16px_rgba(201,162,75,.32)] hover:-translate-y-[1px] hover:shadow-[0_10px_22px_rgba(201,162,75,.45)] transition-all disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
+              loading={loading}
+              className="flex-1"
             >
               {loading
-                ? <><Loader2 size={18} className="animate-spin" /> Criando conta…</>
+                ? 'Criando conta…'
                 : step === 'conta'
-                ? <><Check size={17} /> Criar conta grátis</>
-                : <>Continuar <ChevronRight size={17} /></>
-              }
-            </button>
+                ? <><Check size={16} strokeWidth={1.7} /> Criar conta grátis</>
+                : <>Continuar <ChevronRight size={16} strokeWidth={1.7} /></>}
+            </Button>
           </div>
 
           {step === 'plano' && (
-            <p className="text-center text-[13px] text-[#788698] mt-4">
+            <p className="mt-4 text-center text-[13px] text-ink-2">
               Já tem conta?{' '}
-              <Link href="/login" className="font-semibold text-[#C9A24B] hover:text-[#A8884A] transition-colors">
+              <Link href="/login" className="font-medium text-accent transition-colors hover:text-ink">
                 Entrar
               </Link>
             </p>
           )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes jmDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-30px) scale(1.12); } }
-        @keyframes jmDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,30px) scale(1.18); } }
-      `}</style>
     </div>
   )
 }
