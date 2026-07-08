@@ -3,19 +3,20 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
-import { Plus, X, Loader2, Clock, MapPin, Phone, CalendarDays } from 'lucide-react'
-import { toast } from 'sonner'
+import { Plus, Clock, MapPin, Phone, CalendarDays } from 'lucide-react'
+import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
 
 type Visita = Tables<'visitas'> & { lead_nome: string | null; lead_tel: string | null; imovel_nome: string | null; imovel_bairro: string | null }
 type Opt = { id: number; nome: string | null }
 type UsuarioMin = { id: string; nome: string }
+type Tone = 'acc' | 'ok' | 'bad' | 'warn'
 
-const STATUS = [
-  { v: 'agendada', l: 'Agendada', c: '#7FB0E8' },
-  { v: 'realizada', l: 'Realizada', c: '#16A34A' },
-  { v: 'cancelada', l: 'Cancelada', c: '#DC2626' },
-  { v: 'no_show', l: 'Não compareceu', c: '#D97706' },
+const STATUS: { v: string; l: string; tone: Tone }[] = [
+  { v: 'agendada', l: 'Agendada', tone: 'acc' },
+  { v: 'realizada', l: 'Realizada', tone: 'ok' },
+  { v: 'cancelada', l: 'Cancelada', tone: 'bad' },
+  { v: 'no_show', l: 'Não compareceu', tone: 'warn' },
 ]
 const stInfo = (s: string) => STATUS.find(x => x.v === s) ?? STATUS[0]
 const diaLabel = (iso: string) => {
@@ -40,7 +41,7 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
   const set = (k: keyof typeof vazio, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function salvar() {
-    if (!form.data_hora) { toast.error('Informe data e hora'); return }
+    if (!form.data_hora) { notify.warn('Informe data e hora'); return }
     setLoading(true)
     const payload = {
       empresa_id: empresaId,
@@ -53,17 +54,17 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
     }
     const { data, error } = await supabase.from('visitas').insert(payload).select('*, leads(nome, telefone), imoveis(titulo, codigo, bairro)').single()
     setLoading(false)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     const d = data as unknown as { leads?: { nome: string | null; telefone: string | null }; imoveis?: { titulo: string | null; codigo: string | null; bairro: string | null } } & Tables<'visitas'>
     const nova: Visita = { ...d, lead_nome: d.leads?.nome ?? null, lead_tel: d.leads?.telefone ?? null, imovel_nome: d.imoveis ? (d.imoveis.titulo || d.imoveis.codigo) : null, imovel_bairro: d.imoveis?.bairro ?? null }
     setLista(l => [...l, nova].sort((a, b) => a.data_hora.localeCompare(b.data_hora)))
     setForm(vazio); setModal(false)
-    toast.success('Visita agendada')
+    notify.ok('Visita agendada')
   }
 
   async function mudarStatus(v: Visita, status: string) {
     const { error } = await supabase.from('visitas').update({ status }).eq('id', v.id)
-    if (error) { toast.error(error.message); return }
+    if (error) { notify.bad(error.message); return }
     setLista(l => l.map(x => x.id === v.id ? { ...x, status } : x))
   }
 
@@ -75,88 +76,96 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
     if (g) g.itens.push(v); else grupos.push({ label: lbl, itens: [v] })
   }
 
-  const inp = 'w-full bg-[rgba(22,32,46,.04)] border border-[rgba(22,32,46,.12)] rounded-[10px] px-3 py-2.5 text-[14px] text-[#16212E] outline-none focus:border-[rgba(22,32,46,.35)]'
-  const lbl = 'block font-mono text-[10px] tracking-[0.12em] text-[#788698] mb-1.5'
-
   return (
-    <>
-      <Topbar eyebrow="IMOBILIÁRIA" title="Agenda" />
-      <div className="p-6 max-w-[820px]">
-        <div className="flex justify-end mb-4">
-          <button onClick={() => setModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] hover:bg-[#22303f]">
-            <Plus size={17} /> Agendar visita
-          </button>
-        </div>
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      <Topbar title="Agenda" />
 
-        {lista.length === 0 ? (
-          <div className="text-center py-16 text-[#788698]"><CalendarDays size={34} className="mx-auto mb-3 opacity-40" /><p className="text-[14px]">Nenhuma visita agendada.</p></div>
-        ) : grupos.map(g => (
-          <div key={g.label} className="mb-5">
-            <div className="text-[12px] font-bold text-[#8A6D2B] uppercase tracking-wide mb-2 capitalize">{g.label}</div>
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] divide-y divide-[#16212E]/[0.05]">
-              {g.itens.map(v => {
-                const st = stInfo(v.status)
-                return (
-                  <div key={v.id} className="flex items-center gap-3 p-4">
-                    <div className="text-center shrink-0 w-[52px]">
-                      <div className="text-[16px] font-extrabold text-[#16212E] leading-none flex items-center justify-center gap-1"><Clock size={13} className="text-[#9AA7B6]" />{hora(v.data_hora)}</div>
-                    </div>
-                    <div className="flex-1 min-w-0 border-l border-[#16212E]/[0.08] pl-3">
-                      <div className="text-[14px] font-semibold text-[#16212E] truncate">{v.lead_nome || 'Visita'}</div>
-                      <div className="flex items-center gap-3 text-[12px] text-[#788698] mt-0.5">
-                        {v.imovel_nome && <span className="inline-flex items-center gap-1 truncate"><MapPin size={12} />{v.imovel_nome}{v.imovel_bairro ? ` · ${v.imovel_bairro}` : ''}</span>}
-                        {v.lead_tel && <span className="inline-flex items-center gap-1"><Phone size={12} />{v.lead_tel}</span>}
-                      </div>
-                    </div>
-                    <select value={v.status} onChange={e => mudarStatus(v, e.target.value)}
-                      className="text-[11.5px] font-semibold rounded-full px-2.5 py-1 border-0 cursor-pointer shrink-0 outline-none"
-                      style={{ background: `${st.c}18`, color: st.c }}>
-                      {STATUS.map(s => <option key={s.v} value={s.v} style={{ background: '#fff', color: '#16212E' }}>{s.l}</option>)}
-                    </select>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+      <div className="flex shrink-0 items-center justify-end px-6 py-4">
+        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setModal(true)}>Agendar visita</Button>
       </div>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !loading && setModal(false)}>
-          <div className="bg-white rounded-[18px] w-full max-w-[460px] p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-[17px] text-[#16212E]">Agendar visita</h3>
-              <button onClick={() => setModal(false)} className="text-[#9AA7B6] hover:text-[#16212E]"><X size={20} /></button>
+      <main className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
+        <div className="mx-auto w-full max-w-[820px]">
+          {lista.length === 0 ? (
+            <Card flush>
+              <EmptyState
+                icon={<CalendarDays size={22} strokeWidth={1.7} />}
+                title="Nenhuma visita agendada"
+                description="Agende a primeira visita para começar."
+                action={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => setModal(true)}>Agendar visita</Button>}
+              />
+            </Card>
+          ) : grupos.map(g => (
+            <div key={g.label} className="mb-5">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3 capitalize">{g.label}</div>
+              <Card flush>
+                <div className="divide-y divide-line-soft">
+                  {g.itens.map(v => {
+                    const st = stInfo(v.status)
+                    return (
+                      <div key={v.id} className="flex items-center gap-3 p-4">
+                        <div className="flex w-[56px] shrink-0 items-center justify-center gap-1 text-ink">
+                          <Clock size={13} strokeWidth={1.7} className="text-ink-3" />
+                          <span className="num text-[15px] font-semibold leading-none">{hora(v.data_hora)}</span>
+                        </div>
+                        <div className="min-w-0 flex-1 border-l border-line pl-3">
+                          <div className="truncate text-[13px] font-semibold text-ink">{v.lead_nome || 'Visita'}</div>
+                          <div className="mt-0.5 flex items-center gap-3 text-[12px] text-ink-2">
+                            {v.imovel_nome && <span className="inline-flex items-center gap-1 truncate"><MapPin size={12} strokeWidth={1.7} />{v.imovel_nome}{v.imovel_bairro ? ` · ${v.imovel_bairro}` : ''}</span>}
+                            {v.lead_tel && <span className="num inline-flex items-center gap-1"><Phone size={12} strokeWidth={1.7} />{v.lead_tel}</span>}
+                          </div>
+                        </div>
+                        <div className="relative shrink-0">
+                          <Badge tone={st.tone} dot>{st.l}</Badge>
+                          <select
+                            value={v.status}
+                            onChange={e => mudarStatus(v, e.target.value)}
+                            aria-label="Alterar status"
+                            className="absolute inset-0 w-full cursor-pointer opacity-0"
+                          >
+                            {STATUS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
             </div>
-            <div className="space-y-3">
-              <div><label className={lbl}>DATA E HORA *</label><input type="datetime-local" value={form.data_hora} onChange={e => set('data_hora', e.target.value)} className={inp} /></div>
-              <div><label className={lbl}>LEAD / CLIENTE</label>
-                <select value={form.lead_id} onChange={e => set('lead_id', e.target.value)} className={inp}>
-                  <option value="">— selecionar —</option>
-                  {leads.map(l => <option key={l.id} value={l.id}>{l.nome || `Lead #${l.id}`}</option>)}
-                </select></div>
-              <div><label className={lbl}>IMÓVEL</label>
-                <select value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)} className={inp}>
-                  <option value="">— selecionar —</option>
-                  {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
-                </select></div>
-              {isGestor && (
-                <div><label className={lbl}>CORRETOR</label>
-                  <select value={form.corretor_id} onChange={e => set('corretor_id', e.target.value)} className={inp}>
-                    {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                  </select></div>
-              )}
-              <div><label className={lbl}>OBSERVAÇÕES</label><textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)} rows={2} className={inp} /></div>
-            </div>
-            <div className="flex gap-2.5 mt-6">
-              <button onClick={() => setModal(false)} className="flex-1 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-[#788698] border border-[#16212E]/[0.1]">Cancelar</button>
-              <button onClick={salvar} disabled={loading} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[11px] text-[13.5px] font-semibold text-white bg-[#16212E] disabled:opacity-60">
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Salvando…</> : 'Agendar'}
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
-    </>
+      </main>
+
+      <Modal
+        open={modal}
+        onClose={() => { if (!loading) setModal(false) }}
+        title="Agendar visita"
+        disableOverlayClose={loading}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModal(false)} disabled={loading}>Cancelar</Button>
+            <Button onClick={salvar} loading={loading}>Agendar</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Input label="Data e hora" required type="datetime-local" value={form.data_hora} onChange={e => set('data_hora', e.target.value)} />
+          <Select label="Lead / cliente" value={form.lead_id} onChange={e => set('lead_id', e.target.value)}>
+            <option value="">— selecionar —</option>
+            {leads.map(l => <option key={l.id} value={l.id}>{l.nome || `Lead #${l.id}`}</option>)}
+          </Select>
+          <Select label="Imóvel" value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
+            <option value="">— selecionar —</option>
+            {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
+          </Select>
+          {isGestor && (
+            <Select label="Corretor" value={form.corretor_id} onChange={e => set('corretor_id', e.target.value)}>
+              {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+            </Select>
+          )}
+          <Textarea label="Observações" rows={2} value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
+        </div>
+      </Modal>
+    </div>
   )
 }

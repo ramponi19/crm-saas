@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, X, Save, ChevronLeft, ChevronRight, Check, TrendingUp } from 'lucide-react'
+import { UserPlus, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatCurrency } from '@/lib/utils'
-import { toast } from 'sonner'
+import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
+import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, notify, type Column } from '@/components/ui'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,26 +35,19 @@ interface Props {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'usuarios',  label: 'Usuários'  },
-  { key: 'metas',     label: 'Metas'     },
-  { key: 'comissoes', label: 'Comissões' },
+  { value: 'usuarios',  label: 'Usuários'  },
+  { value: 'metas',     label: 'Metas'     },
+  { value: 'comissoes', label: 'Comissões' },
 ]
 
-const ROLES = [
-  { value: 'admin',    label: 'Administrador', color: '#16212E', bg: 'rgba(22,33,46,0.12)'  },
-  { value: 'vendedor', label: 'Vendedor',       color: '#22C55E', bg: 'rgba(34,197,94,0.12)'  },
-  { value: 'tecnico',  label: 'Técnico',         color: '#3B7DE8', bg: 'rgba(59,125,232,0.12)' },
-  { value: 'owner',    label: 'Proprietário',    color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
+const ROLES: { value: string; label: string; tone: Tone }[] = [
+  { value: 'admin',    label: 'Administrador', tone: 'neutro' },
+  { value: 'vendedor', label: 'Vendedor',      tone: 'ok'     },
+  { value: 'tecnico',  label: 'Técnico',       tone: 'acc'    },
+  { value: 'owner',    label: 'Proprietário',  tone: 'warn'   },
 ]
 
-const inputCls = 'w-full rounded-[10px] px-3 py-2.5 text-sm text-[#1F2A39] placeholder:text-[#9AA7B6] bg-white border border-[#16212E]/[0.10] focus:border-[#16212E]/20 outline-none transition-colors'
-const labelCls = 'block text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase mb-1.5'
-
-function avatarColor(name: string) {
-  const colors = ['#16212E','#3B7DE8','#22C55E','#F59E0B','#8B5CF6','#EC4899','#06B6D4']
-  let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
-  return colors[Math.abs(h) % colors.length]
-}
 function initials(nome: string) {
   return nome.trim().split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
@@ -79,6 +72,28 @@ function fmtMes(m: string) {
   return `${meses[Number(mo)-1]} ${y}`
 }
 
+function Avatar({ nome }: { nome: string }) {
+  return (
+    <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+      {initials(nome)}
+    </span>
+  )
+}
+
+function MonthPicker({ mes, setMes }: { mes: string; setMes: (m: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <IconButton aria-label="Mês anterior" variant="outline" size="sm" onClick={() => setMes(prevMonth(mes))}>
+        <ChevronLeft size={16} strokeWidth={1.7} />
+      </IconButton>
+      <span className="w-24 text-center text-[13px] font-semibold text-ink">{fmtMes(mes)}</span>
+      <IconButton aria-label="Próximo mês" variant="outline" size="sm" onClick={() => setMes(nextMonth(mes))}>
+        <ChevronRight size={16} strokeWidth={1.7} />
+      </IconButton>
+    </div>
+  )
+}
+
 // ─── Modal de Usuário ─────────────────────────────────────────────────────────
 
 function UsuarioModal({ usuario, onClose, onSaved }: {
@@ -91,9 +106,9 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
   async function salvar() {
-    if (!form.nome.trim() || !form.role) { toast.error('Preencha nome e perfil'); return }
+    if (!form.nome.trim() || !form.role) { notify.warn('Preencha nome e perfil'); return }
     if (isNew && (!form.email.includes('@') || form.senha.length < 8)) {
-      toast.error('E-mail inválido ou senha curta (mín. 8 chars)'); return
+      notify.warn('E-mail inválido ou senha curta (mín. 8 chars)'); return
     }
     setSaving(true)
     try {
@@ -103,76 +118,62 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
           body: JSON.stringify({ nome: form.nome, email: form.email, senha: form.senha, role: form.role }),
         })
         const j = await r.json()
-        if (!r.ok) { toast.error(j.error ?? 'Erro ao criar'); return }
-        toast.success('Usuário criado!')
+        if (!r.ok) { notify.bad(j.error ?? 'Erro ao criar'); return }
+        notify.ok('Usuário criado!')
       } else {
         const r = await fetch('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: usuario!.id, nome: form.nome, role: form.role }),
         })
         const j = await r.json()
-        if (!r.ok) { toast.error(j.error ?? 'Erro ao salvar'); return }
-        toast.success('Salvo!')
+        if (!r.ok) { notify.bad(j.error ?? 'Erro ao salvar'); return }
+        notify.ok('Salvo!')
       }
       onSaved()
     } finally { setSaving(false) }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-[18px] border border-[#16212E]/[0.10] shadow-2xl">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#16212E]/[0.07]">
-          <h2 className="text-base font-semibold text-[#1F2A39]">{isNew ? 'Novo usuário' : 'Editar usuário'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#9AA7B6] transition-colors"><X size={16} /></button>
-        </div>
-
-        <form onSubmit={e => { e.preventDefault(); salvar() }}>
-        <div className="px-6 py-4 space-y-3">
-          <div>
-            <label className={labelCls}>Nome completo</label>
-            <input value={form.nome} onChange={e => set('nome', e.target.value)} className={inputCls} placeholder="Ex: João Silva" />
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      disableOverlayClose={saving}
+      title={
+        <span className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+            {initials(form.nome || 'US')}
+          </span>
+          <span className="truncate">{isNew ? 'Novo usuário' : form.nome || 'Editar usuário'}</span>
+        </span>
+      }
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={salvar} loading={saving}>{isNew ? 'Criar usuário' : 'Salvar'}</Button>
+        </>
+      }
+    >
+      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid gap-3">
+        <Input label="Nome completo" value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex: João Silva" />
+        {isNew && (
+          <>
+            <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="joao@loja.com" />
+            <Input label="Senha provisória" type="password" value={form.senha} onChange={e => set('senha', e.target.value)} placeholder="Mín. 8 caracteres" />
+          </>
+        )}
+        <Select label="Perfil de acesso" value={form.role} onChange={e => set('role', e.target.value)}>
+          {ROLES.filter(r => r.value !== 'owner').map(r => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </Select>
+        {!isNew && (
+          <div className="rounded-control border border-line bg-raised px-3 py-2 text-[12px] text-ink-3">
+            E-mail: <strong className="text-ink-2">{usuario?.email ?? '—'}</strong> · não pode ser alterado aqui
           </div>
-          {isNew && (
-            <>
-              <div>
-                <label className={labelCls}>E-mail</label>
-                <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className={inputCls} placeholder="joao@loja.com" />
-              </div>
-              <div>
-                <label className={labelCls}>Senha provisória</label>
-                <input type="password" value={form.senha} onChange={e => set('senha', e.target.value)} className={inputCls} placeholder="Mín. 8 caracteres" />
-              </div>
-            </>
-          )}
-          <div>
-            <label className={labelCls}>Perfil de acesso</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              {ROLES.filter(r => r.value !== 'owner').map(r => (
-                <button type="button" key={r.value} onClick={() => set('role', r.value)}
-                  className={cn('px-3 py-2 rounded-[10px] text-[13px] font-semibold border transition-all text-left', form.role === r.value ? 'border-transparent' : 'border-[#16212E]/[0.09] text-[#788698] bg-transparent')}
-                  style={form.role === r.value ? { background: r.bg, color: r.color, border: `1px solid ${r.color}33` } : {}}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {!isNew && (
-            <div className="text-[11.5px] text-[#9AA7B6] bg-[#F4F6F9] rounded-[8px] px-3 py-2">
-              E-mail: <strong className="text-[#56657A]">{usuario?.email ?? '—'}</strong> · não pode ser alterado aqui
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#16212E]/[0.07]">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#9AA7B6] hover:text-[#56657A] font-medium transition-colors">Cancelar</button>
-          <button type="submit" disabled={saving}
-            className="px-5 py-2 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-sm font-semibold rounded-[10px] transition-colors">
-            {saving ? 'Salvando...' : isNew ? 'Criar usuário' : 'Salvar'}
-          </button>
-        </div>
-        </form>
-      </div>
-    </div>
+        )}
+      </form>
+    </Modal>
   )
 }
 
@@ -206,7 +207,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
     // fallback: get empresa_id from any empresa_usuario of current session
     const { data: euMe } = await supabase.from('empresa_usuarios').select('empresa_id').single()
     const empresa_id = euMe?.empresa_id
-    if (!empresa_id) { toast.error('Empresa não encontrada'); setSaving(null); return }
+    if (!empresa_id) { notify.bad('Empresa não encontrada'); setSaving(null); return }
 
     const meta = metas[uid] ?? {}
     const existing = metas[uid] as Meta | undefined
@@ -217,7 +218,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
         meta_vendas_qtd: meta.meta_vendas_qtd ?? null,
         percentual_comissao_padrao: meta.percentual_comissao_padrao ?? null,
       }).eq('id', existing.id)
-      if (error) { toast.error('Erro ao salvar'); setSaving(null); return }
+      if (error) { notify.bad('Erro ao salvar'); setSaving(null); return }
     } else {
       const { error } = await supabase.from('metas_comissoes').insert({
         usuario_id: uid, mes_ano: mes,
@@ -226,80 +227,72 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
         percentual_comissao_padrao: meta.percentual_comissao_padrao ?? null,
         empresa_id,
       })
-      if (error) { toast.error('Erro ao salvar'); setSaving(null); return }
+      if (error) { notify.bad('Erro ao salvar'); setSaving(null); return }
     }
-    toast.success('Meta salva!'); await load(); setSaving(null)
+    notify.ok('Meta salva!'); await load(); setSaving(null)
   }
+
+  const cols: Column<Usuario>[] = [
+    {
+      key: 'vendedor', header: 'Vendedor',
+      render: (u) => (
+        <div className="flex items-center gap-3">
+          <Avatar nome={u.nome} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
+            <div className="text-[11px] text-ink-3">{ROLES.find(r => r.value === u.role)?.label ?? u.role}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'meta_valor', header: 'Meta de faturamento (R$)',
+      render: (u) => (
+        <Input type="number" min="0" step="100" wrapperClassName="w-40"
+          value={(metas[u.id] ?? {}).meta_vendas_valor ?? ''}
+          onChange={e => setField(u.id, 'meta_vendas_valor', e.target.value)} placeholder="Ex: 30000" />
+      ),
+    },
+    {
+      key: 'meta_qtd', header: 'Meta de vendas (qtd)',
+      render: (u) => (
+        <Input type="number" min="0" step="1" wrapperClassName="w-28"
+          value={(metas[u.id] ?? {}).meta_vendas_qtd ?? ''}
+          onChange={e => setField(u.id, 'meta_vendas_qtd', e.target.value)} placeholder="Ex: 20" />
+      ),
+    },
+    {
+      key: 'comissao', header: 'Comissão (%)',
+      render: (u) => (
+        <div className="flex items-center gap-1.5">
+          <Input type="number" min="0" max="100" step="0.5" wrapperClassName="w-24"
+            value={(metas[u.id] ?? {}).percentual_comissao_padrao ?? ''}
+            onChange={e => setField(u.id, 'percentual_comissao_padrao', e.target.value)} placeholder="Ex: 5" />
+          <span className="text-[13px] text-ink-3">%</span>
+        </div>
+      ),
+    },
+    {
+      key: 'acao', header: '', align: 'right',
+      render: (u) => (
+        <Button size="sm" icon={<Save size={12} strokeWidth={1.7} />} loading={saving === u.id} onClick={() => salvarMeta(u.id)}>
+          Salvar
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-4">
-      {/* Seletor de mês */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => setMes(prevMonth(mes))} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#788698] transition-colors"><ChevronLeft size={16} /></button>
-        <span className="text-sm font-semibold text-[#1F2A39] w-24 text-center">{fmtMes(mes)}</span>
-        <button onClick={() => setMes(nextMonth(mes))} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#788698] transition-colors"><ChevronRight size={16} /></button>
-      </div>
-
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#16212E]/[0.08]">
-              {['Vendedor', 'Meta de faturamento (R$)', 'Meta de vendas (qtd)', 'Comissão (%)', ''].map(h => (
-                <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {vendedores.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum vendedor cadastrado</td></tr>
-            ) : vendedores.map(u => {
-              const color = avatarColor(u.nome)
-              const m = metas[u.id] ?? {}
-              return (
-                <tr key={u.id} className="border-b border-[#16212E]/[0.06] last:border-0">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: `linear-gradient(135deg,${color}cc,${color}88)` }}>{initials(u.nome)}</div>
-                      <div>
-                        <div className="text-sm font-semibold text-[#16212E]">{u.nome}</div>
-                        <div className="text-[11px] text-[#788698]">{ROLES.find(r => r.value === u.role)?.label ?? u.role}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <input type="number" min="0" step="100"
-                      value={m.meta_vendas_valor ?? ''} onChange={e => setField(u.id, 'meta_vendas_valor', e.target.value)}
-                      className="w-36 rounded-[8px] px-3 py-2 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] outline-none focus:border-[#16212E]/20 transition-colors"
-                      placeholder="Ex: 30000" />
-                  </td>
-                  <td className="px-5 py-4">
-                    <input type="number" min="0" step="1"
-                      value={m.meta_vendas_qtd ?? ''} onChange={e => setField(u.id, 'meta_vendas_qtd', e.target.value)}
-                      className="w-24 rounded-[8px] px-3 py-2 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] outline-none focus:border-[#16212E]/20 transition-colors"
-                      placeholder="Ex: 20" />
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <input type="number" min="0" max="100" step="0.5"
-                        value={m.percentual_comissao_padrao ?? ''} onChange={e => setField(u.id, 'percentual_comissao_padrao', e.target.value)}
-                        className="w-20 rounded-[8px] px-3 py-2 text-sm text-[#1F2A39] bg-[#F4F6F9] border border-[#16212E]/[0.08] outline-none focus:border-[#16212E]/20 transition-colors"
-                        placeholder="Ex: 5" />
-                      <span className="text-sm text-[#9AA7B6]">%</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <button onClick={() => salvarMeta(u.id)} disabled={saving === u.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#16212E] disabled:opacity-50 text-white text-xs font-semibold rounded-[8px] transition-colors">
-                      {saving === u.id ? '...' : <><Save size={12} /> Salvar</>}
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <MonthPicker mes={mes} setMes={setMes} />
+      <Card flush>
+        <Table
+          columns={cols}
+          rows={vendedores}
+          rowKey={(u) => u.id}
+          empty={<EmptyState icon={<Users size={22} strokeWidth={1.7} />} title="Nenhum vendedor cadastrado" />}
+        />
+      </Card>
     </div>
   )
 }
@@ -332,13 +325,13 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     setQuitando(uid)
     const { data: euMe } = await supabase.from('empresa_usuarios').select('empresa_id').single()
     const empresa_id = euMe?.empresa_id
-    if (!empresa_id) { toast.error('Empresa não encontrada'); setQuitando(null); return }
+    if (!empresa_id) { notify.bad('Empresa não encontrada'); setQuitando(null); return }
     const { error } = await supabase.from('comissoes').insert({
       usuario_id: uid, valor_comissao: valorComissao, percentual,
       status: 'pago', data_pagamento: new Date().toISOString().split('T')[0], empresa_id,
     })
-    if (error) { toast.error('Erro ao quitar'); setQuitando(null); return }
-    toast.success('Comissão quitada!'); await load(); setQuitando(null)
+    if (error) { notify.bad('Erro ao quitar'); setQuitando(null); return }
+    notify.ok('Comissão quitada!'); await load(); setQuitando(null)
   }
 
   // Aggregations
@@ -365,94 +358,86 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     totalPago += pago; totalAPagar += Math.max(0, calculado - pago)
   })
 
+  const cols: Column<Usuario>[] = [
+    {
+      key: 'vendedor', header: 'Vendedor',
+      render: (u) => {
+        const pctMeta = metaMap[u.id]?.meta_vendas_valor ? Math.min(Math.round(((vendasPorUser[u.id]?.total ?? 0) / Number(metaMap[u.id].meta_vendas_valor)) * 100), 100) : null
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar nome={u.nome} />
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
+              {pctMeta !== null && <div className="text-[11px] text-ink-3">meta {pctMeta}%</div>}
+            </div>
+          </div>
+        )
+      },
+    },
+    { key: 'vendas', header: 'Vendas', align: 'right', className: 'num', render: (u) => <span className="text-ink-2">{vendasPorUser[u.id]?.qtd ?? 0}</span> },
+    { key: 'faturado', header: 'Faturado', align: 'right', className: 'num', render: (u) => <span className="font-semibold text-ink">{formatCurrency(vendasPorUser[u.id]?.total ?? 0)}</span> },
+    {
+      key: 'pct', header: '% Comissão', align: 'right', className: 'num',
+      render: (u) => { const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0); return pct > 0 ? <span className="text-ink-2">{pct}%</span> : <span className="text-ink-3">—</span> },
+    },
+    {
+      key: 'comissao', header: 'Comissão', align: 'right', className: 'num',
+      render: (u) => {
+        const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0)
+        const calculado = ((vendasPorUser[u.id]?.total ?? 0) * pct) / 100
+        return pct > 0 ? <span className="font-bold text-ink">{formatCurrency(calculado)}</span> : <span className="text-ink-3">—</span>
+      },
+    },
+    {
+      key: 'pago', header: 'Já pago', align: 'right', className: 'num',
+      render: (u) => { const pago = pagaMap[u.id] ?? 0; return pago > 0 ? <span className="font-semibold text-ok">{formatCurrency(pago)}</span> : <span className="text-ink-3">—</span> },
+    },
+    {
+      key: 'situacao', header: 'Situação', align: 'right',
+      render: (u) => {
+        const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0)
+        const calculado = ((vendasPorUser[u.id]?.total ?? 0) * pct) / 100
+        const pago = pagaMap[u.id] ?? 0
+        const pendente = Math.max(0, calculado - pago)
+        if (calculado <= 0) return <span className="text-[11px] text-ink-3">Sem comissão</span>
+        if (pendente <= 0) return <Badge tone="ok"><Check size={11} strokeWidth={1.7} /> Quitado</Badge>
+        return <Badge tone="warn">{formatCurrency(pendente)} pendente</Badge>
+      },
+    },
+    {
+      key: 'acao', header: '', align: 'right',
+      render: (u) => {
+        const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0)
+        const calculado = ((vendasPorUser[u.id]?.total ?? 0) * pct) / 100
+        const pago = pagaMap[u.id] ?? 0
+        const pendente = Math.max(0, calculado - pago)
+        if (!(pendente > 0 && pct > 0)) return null
+        return (
+          <Button size="sm" icon={<TrendingUp size={11} strokeWidth={1.7} />} loading={quitando === u.id} onClick={() => quitar(u.id, pendente, pct)}>
+            Quitar
+          </Button>
+        )
+      },
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      {/* Seletor de mês */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => setMes(prevMonth(mes))} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#788698] transition-colors"><ChevronLeft size={16} /></button>
-        <span className="text-sm font-semibold text-[#1F2A39] w-24 text-center">{fmtMes(mes)}</span>
-        <button onClick={() => setMes(nextMonth(mes))} className="p-1.5 rounded-lg hover:bg-[#16212E]/[0.06] text-[#788698] transition-colors"><ChevronRight size={16} /></button>
-      </div>
+      <MonthPicker mes={mes} setMes={setMes} />
 
-      {/* Cards de resumo */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-4">
-          <div className="text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase">A pagar</div>
-          <div className="text-2xl font-bold text-[#16212E] mt-1">{formatCurrency(totalAPagar)}</div>
-        </div>
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[14px] p-4">
-          <div className="text-[9.5px] font-mono tracking-[0.15em] text-[#9AA7B6] uppercase">Já pago</div>
-          <div className="text-2xl font-bold text-[#22C55E] mt-1">{formatCurrency(totalPago)}</div>
-        </div>
+        <StatCard label="A pagar" value={formatCurrency(totalAPagar)} />
+        <StatCard label="Já pago" value={<span className="text-ok">{formatCurrency(totalPago)}</span>} />
       </div>
 
-      <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#16212E]/[0.08]">
-              {['Vendedor','Vendas','Faturado','% Comissão','Comissão','Já pago','Situação',''].map(h => (
-                <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-4 py-3.5 whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {vendedores.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-[#9AA7B6] text-sm">Nenhum vendedor cadastrado</td></tr>
-            ) : vendedores.map(u => {
-              const color = avatarColor(u.nome)
-              const { qtd = 0, total = 0 } = vendasPorUser[u.id] ?? {}
-              const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0)
-              const calculado = (total * pct) / 100
-              const pago = pagaMap[u.id] ?? 0
-              const pendente = Math.max(0, calculado - pago)
-              const pctMeta = metaMap[u.id]?.meta_vendas_valor ? Math.min(Math.round((total / Number(metaMap[u.id].meta_vendas_valor)) * 100), 100) : null
-
-              return (
-                <tr key={u.id} className="border-b border-[#16212E]/[0.06] last:border-0 hover:bg-[#16212E]/[0.02] transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: `linear-gradient(135deg,${color}cc,${color}88)` }}>{initials(u.nome)}</div>
-                      <div>
-                        <div className="text-sm font-semibold text-[#16212E]">{u.nome}</div>
-                        {pctMeta !== null && (
-                          <div className="text-[10px] text-[#788698]">meta {pctMeta}%</div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 font-mono text-sm text-[#56657A] font-variant-numeric tabular-nums">{qtd}</td>
-                  <td className="px-4 py-4 text-sm font-semibold text-[#16212E]">{formatCurrency(total)}</td>
-                  <td className="px-4 py-4 font-mono text-sm text-[#56657A]">{pct > 0 ? `${pct}%` : <span className="text-[#C8D0DA]">—</span>}</td>
-                  <td className="px-4 py-4 text-sm font-bold text-[#16212E]">{pct > 0 ? formatCurrency(calculado) : <span className="text-[#C8D0DA]">—</span>}</td>
-                  <td className="px-4 py-4 text-sm text-[#22C55E] font-semibold">{pago > 0 ? formatCurrency(pago) : '—'}</td>
-                  <td className="px-4 py-4">
-                    {calculado <= 0 ? (
-                      <span className="text-[11px] text-[#C8D0DA]">Sem comissão</span>
-                    ) : pendente <= 0 ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[rgba(34,197,94,0.12)] text-[#18825A] text-[11px] font-semibold">
-                        <Check size={11} /> Quitado
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[rgba(244,183,64,0.14)] text-[#A07000] text-[11px] font-semibold">
-                        {formatCurrency(pendente)} pendente
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {pendente > 0 && pct > 0 && (
-                      <button onClick={() => quitar(u.id, pendente, pct)} disabled={quitando === u.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16212E] hover:bg-[#1F2A39] disabled:opacity-50 text-white text-xs font-semibold rounded-[8px] transition-colors">
-                        {quitando === u.id ? '...' : <><TrendingUp size={11} /> Quitar</>}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <Card flush>
+        <Table
+          columns={cols}
+          rows={vendedores}
+          rowKey={(u) => u.id}
+          empty={<EmptyState icon={<Users size={22} strokeWidth={1.7} />} title="Nenhum vendedor cadastrado" />}
+        />
+      </Card>
     </div>
   )
 }
@@ -466,82 +451,51 @@ export default function EquipeView({ usuarios }: Props) {
 
   function onSaved() { setModal({ open: false, usuario: null }); router.refresh() }
 
+  const cols: Column<Usuario>[] = [
+    {
+      key: 'usuario', header: 'Usuário',
+      render: (u) => (
+        <div className="flex items-center gap-3">
+          <Avatar nome={u.nome} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
+            <div className="truncate text-[11px] text-ink-3">{u.email ?? '—'}</div>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'modulos', header: 'Módulos de acesso', hideOnMobile: true, render: (u) => <span className="text-ink-2">{(u.modulos_acesso ?? []).join(' · ') || 'Acesso total'}</span> },
+    {
+      key: 'perfil', header: 'Perfil',
+      render: (u) => { const rb = ROLES.find(r => r.value === u.role); return <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge> },
+    },
+    { key: 'acesso', header: 'Último acesso', align: 'right', hideOnMobile: true, render: (u) => <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span> },
+  ]
+
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Equipe" />
 
-      <div className="flex items-center justify-between px-6 py-4 shrink-0">
-        <div className="flex gap-[4px] bg-white border border-[#16212E]/[0.08] rounded-[13px] p-[5px] w-max">
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn(
-                'flex items-center gap-2 px-[16px] py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-all whitespace-nowrap',
-                tab === t.key
-                  ? 'bg-gradient-to-b from-[#22303F] to-[#16212E] text-white shadow-[0_4px_14px_rgba(22,33,46,0.35)]'
-                  : 'text-[#788698] hover:text-[#16212E] hover:bg-[#16212E]/[0.04]'
-              )}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex shrink-0 items-center justify-between gap-3 px-6 py-4">
+        <Tabs items={TABS} value={tab} onValueChange={setTab} className="border-b-0" />
         {tab === 'usuarios' && (
-          <button onClick={() => setModal({ open: true, usuario: null })}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors">
-            <UserPlus size={15} /> Novo usuário
-          </button>
+          <Button icon={<UserPlus size={15} strokeWidth={1.7} />} onClick={() => setModal({ open: true, usuario: null })}>
+            Novo usuário
+          </Button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
         {tab === 'usuarios' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#16212E]/[0.08]">
-                  {['Usuário','Módulos de acesso','Perfil','Último acesso','Ação'].map(h => (
-                    <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {usuarios.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-16 text-[#9AA7B6] text-sm">Nenhum usuário</td></tr>
-                ) : usuarios.map(u => {
-                  const color = avatarColor(u.nome)
-                  const rb = ROLES.find(r => r.value === u.role) ?? { label: u.role ?? '—', color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' }
-                  return (
-                    <tr key={u.id} className="border-b border-[#16212E]/[0.08] hover:bg-[#16212E]/[0.03] transition-colors last:border-0">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                            style={{ background: `linear-gradient(135deg,${color}cc,${color}88)` }}>
-                            {initials(u.nome)}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-[#16212E]">{u.nome}</div>
-                            <div className="text-[11px] text-[#788698]">{u.email ?? '—'}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4"><span className="text-sm text-[#788698]">{(u.modulos_acesso ?? []).join(' · ') || 'Acesso total'}</span></td>
-                      <td className="px-5 py-4">
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold" style={{ color: rb.color, background: rb.bg }}>
-                          {rb.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4"><span className="text-sm text-[#788698]">{fmtAcesso(u.ultimo_acesso)}</span></td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => setModal({ open: true, usuario: u })}
-                          className="px-3 py-1.5 text-xs font-semibold text-[#788698] hover:text-[#16212E] bg-[#16212E]/[0.04] hover:bg-[#16212E]/[0.08] rounded-[8px] transition-colors">
-                          ✎ Editar
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Card flush>
+            <Table
+              columns={cols}
+              rows={usuarios}
+              rowKey={(u) => u.id}
+              onRowClick={(u) => setModal({ open: true, usuario: u })}
+              empty={<EmptyState icon={<Users size={22} strokeWidth={1.7} />} title="Nenhum usuário" description="Adicione o primeiro membro da equipe." />}
+            />
+          </Card>
         )}
         {tab === 'metas' && <MetasTab usuarios={usuarios} />}
         {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} />}
