@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet } from 'lucide-react'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
+import { TemplatesCard } from './templates-card'
+import { HorarioCard } from './horario-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -27,6 +29,8 @@ const TABS = [
   { id: 'pagamentos',  label: 'Meios de pagamento', Icon: Wallet },
   { id: 'taxas',       label: 'Taxas',            Icon: Percent },
   { id: 'sla',         label: 'SLA atendimento',  Icon: Timer   },
+  { id: 'horario',     label: 'Horário',          Icon: Clock   },
+  { id: 'modelos',     label: 'Modelos WhatsApp', Icon: MessageSquareText },
 ]
 
 type Provider = 'evolution' | 'meta'
@@ -373,6 +377,12 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             </div>
           </Card>
         )}
+
+        {/* ── HORÁRIO DE FUNCIONAMENTO ── */}
+        {aba === 'horario' && <HorarioCard />}
+
+        {/* ── MODELOS DE MENSAGEM ── */}
+        {aba === 'modelos' && <TemplatesCard />}
 
       </div>
 
