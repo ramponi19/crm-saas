@@ -81,6 +81,15 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
           leadId: novo.lead_id,
         })
       })
+      // Mensagens marcadas como lidas (UPDATE em `lida`) fazem o contador da aba
+      // DESCER em tempo real — sem toast, só recalcula.
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'lead_mensagens',
+      }, () => {
+        updateTitle()
+      })
       .subscribe()
 
     channelRef.current = channel
