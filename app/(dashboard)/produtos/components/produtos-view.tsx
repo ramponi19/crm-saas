@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Package, TrendingUp, AlertTriangle, XCircle } from 'lucide-react'
-import { cn, formatCurrency } from '@/lib/utils'
+import { Search, Plus, Package } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, Table, StatCard, Tabs, Input, Button, Badge, EmptyState, type Column, type TabItem } from '@/components/ui'
 
 interface Produto {
   id: number
@@ -25,22 +26,16 @@ interface Props {
   categorias: { id: number; nome: string }[]
 }
 
-const ICON_MAP: Record<string, string> = {
-  apple: '🍎',
-  samsung: '📱',
-  xiaomi: '📱',
-  motorola: '📱',
-  sony: '🎧',
+function getInitials(name: string) {
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase() || 'PR'
 }
 
-function getIcon(marca: string) {
-  return ICON_MAP[marca.toLowerCase()] ?? '📦'
-}
-
-function getStatusLabel(estoque: number): { label: string; color: string; bg: string } {
-  if (estoque === 0) return { label: 'Esgotado', color: '#DC2626', bg: 'rgba(220,38,38,0.12)' }
-  if (estoque <= 2) return { label: 'Estoque baixo', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' }
-  return { label: 'Em estoque', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' }
+function statusBadge(estoque: number) {
+  if (estoque === 0) return <Badge tone="bad">Esgotado</Badge>
+  if (estoque <= 2) return <Badge tone="warn">Estoque baixo</Badge>
+  return <Badge tone="ok" dot>Em estoque</Badge>
 }
 
 export default function ProdutosView({ produtos: produtosInit, marcas, categorias }: Props) {
@@ -73,6 +68,11 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
     return Array.from(set.entries()).map(([key, val]) => ({ key, label: val }))
   }, [produtos])
 
+  const catTabs: TabItem[] = useMemo(() => [
+    { value: 'todas', label: 'Todos' },
+    ...categoriasUnicas.map(({ key, label }) => ({ value: label, label: key })),
+  ], [categoriasUnicas])
+
   const filtrados = useMemo(() => {
     return produtos.filter(p => {
       const matchSearch = !search ||
@@ -86,148 +86,81 @@ export default function ProdutosView({ produtos: produtosInit, marcas, categoria
   function abrirNovo() { setProdutoSel(null); setModalOpen(true) }
   function abrirEditar(p: Produto) { setProdutoSel(p); setModalOpen(true) }
 
-  return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <Topbar eyebrow="Catálogo" title="Produtos" />
-
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-
-        {/* Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          {[
-            { icon: <Package size={20} />, label: 'Produtos ativos', value: stats.total.toString(), color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
-            { icon: <TrendingUp size={20} />, label: 'Valor em estoque', value: fmt(stats.valorEstoque), color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
-            { icon: <AlertTriangle size={20} />, label: 'Estoque baixo', value: stats.baixo.toString(), color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-            { icon: <XCircle size={20} />, label: 'Esgotados', value: stats.esgotado.toString(), color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
-          ].map((c, i) => (
-            <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
-              <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>
-                {c.icon}
-              </div>
-              <div>
-                <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em]">{c.label}</div>
-                <div className="text-[22px] font-serif text-[#16212E] mt-0.5 leading-none">{c.value}</div>
-              </div>
-            </div>
-          ))}
+  const cols: Column<Produto>[] = [
+    {
+      key: 'produto', header: 'Produto',
+      render: (p) => (
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="grid h-9 w-9 flex-none place-items-center rounded-control bg-ink text-[11px] font-bold text-white">
+            {getInitials(p.nome)}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{p.nome}</div>
+            <div className="truncate text-[11px] text-ink-3">{p.marca_nome}</div>
+          </div>
         </div>
+      ),
+    },
+    { key: 'condicao', header: 'Condição', hideOnMobile: true, render: () => <Badge tone="acc">Novo</Badge> },
+    { key: 'estoque', header: 'Estoque', className: 'num', render: (p) => <span className="font-semibold text-ink">{p.estoque} un</span> },
+    { key: 'custo', header: 'Custo', align: 'right', hideOnMobile: true, className: 'num', render: (p) => p.custo_min ? <span className="text-ink-2">{fmt(p.custo_min)}</span> : <span className="text-ink-3">—</span> },
+    { key: 'preco', header: 'Preço', align: 'right', className: 'num', render: (p) => p.preco_max ? <span className="font-semibold text-ink">{fmt(p.preco_max)}</span> : <span className="text-ink-3">—</span> },
+    {
+      key: 'margem', header: 'Margem', align: 'right', hideOnMobile: true, className: 'num',
+      render: (p) => {
+        const margem = p.custo_min && p.preco_max && p.custo_min > 0
+          ? Math.round(((p.preco_max - p.custo_min) / p.preco_max) * 100)
+          : null
+        return margem != null ? <span className="font-semibold text-ok">{margem}%</span> : <span className="text-ink-3">—</span>
+      },
+    },
+    { key: 'status', header: 'Status', align: 'right', render: (p) => statusBadge(p.estoque) },
+  ]
 
-        {/* Barra de busca + filtros + botão */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-[360px]">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#46586E]" />
-            <input
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      <Topbar title="Produtos" />
+
+      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+        <div className="space-y-5">
+
+          {/* Cards de summary */}
+          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+            <StatCard bare label="Produtos ativos" value={stats.total} />
+            <StatCard bare label="Valor em estoque" value={fmt(stats.valorEstoque)} />
+            <StatCard bare label="Estoque baixo" value={stats.baixo} />
+            <StatCard bare label="Esgotados" value={stats.esgotado} />
+          </div>
+
+          {/* Busca + botão */}
+          <div className="flex items-center gap-3">
+            <Input
+              wrapperClassName="flex-1 max-w-[360px]"
+              icon={<Search size={15} strokeWidth={1.7} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nome, modelo ou marca..."
-              className="w-full bg-white border border-[#16212E]/[0.10] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-white/[0.2] transition-all"
+              placeholder="Buscar por nome, modelo ou marca…"
             />
+            <div className="flex-1" />
+            <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovo}>Novo produto</Button>
           </div>
 
-          <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
-            <button
-              onClick={() => setFiltroCategoria('todas')}
-              className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all',
-                filtroCategoria === 'todas' ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
-            >
-              Todos
-            </button>
-            {categoriasUnicas.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFiltroCategoria(label)}
-                className={cn('px-3.5 py-1.5 rounded-[8px] text-[12.5px] font-medium transition-all whitespace-nowrap',
-                  filtroCategoria === label ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}
-              >
-                {key}
-              </button>
-            ))}
-          </div>
+          {/* Filtro por categoria */}
+          <Tabs items={catTabs} value={filtroCategoria} onValueChange={setFiltroCategoria} />
 
-          <div className="flex-1" />
-          <button
-            onClick={abrirNovo}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]"
-          >
-            <Plus size={16} />
-            Novo produto
-          </button>
+          {/* Tabela */}
+          <Card flush>
+            <Table
+              columns={cols}
+              rows={filtrados}
+              rowKey={(p) => p.id}
+              onRowClick={abrirEditar}
+              empty={<EmptyState icon={<Package size={22} strokeWidth={1.7} />} title="Nenhum produto encontrado" description={search ? 'Tente outro termo de busca.' : 'Cadastre seu primeiro produto.'} action={!search ? <Button size="sm" onClick={abrirNovo}>Novo produto</Button> : undefined} />}
+            />
+          </Card>
+
         </div>
-
-        {/* Tabela */}
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-          {/* Header */}
-          <div className="grid gap-3 px-5 py-3 border-b border-[#16212E]/[0.08]" style={{ gridTemplateColumns: '2.4fr 1fr 0.9fr 1fr 1fr 0.8fr 1.1fr' }}>
-            {['Produto', 'Condição', 'Estoque', 'Custo', 'Preço', 'Margem', 'Status'].map(h => (
-              <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
-            ))}
-          </div>
-
-          {/* Linhas */}
-          {filtrados.length === 0 ? (
-            <div className="py-16 text-center text-[#788698] text-[13px]">Nenhum produto encontrado</div>
-          ) : filtrados.map(p => {
-            const margem = p.custo_min && p.preco_max && p.custo_min > 0
-              ? Math.round(((p.preco_max - p.custo_min) / p.preco_max) * 100)
-              : null
-            const st = getStatusLabel(p.estoque)
-            return (
-              <div
-                key={p.id}
-                onClick={() => abrirEditar(p)}
-                className="grid gap-3 px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors items-center"
-                style={{ gridTemplateColumns: '2.4fr 1fr 0.9fr 1fr 1fr 0.8fr 1.1fr' }}
-              >
-                {/* Produto */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-[42px] h-[42px] rounded-[11px] bg-white/[0.05] flex items-center justify-center flex-none text-[22px]">
-                    {getIcon(p.marca_nome)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{p.nome}</div>
-                    <div className="text-[11.5px] text-[#6B7C92]">{p.marca_nome}</div>
-                  </div>
-                </div>
-
-                {/* Condição — produtos são novos por padrão */}
-                <div>
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[rgba(107,140,255,0.12)] text-[#6B8CFF]">Novo</span>
-                </div>
-
-                {/* Estoque */}
-                <div className="text-[13px] text-[#16212E] font-semibold">{p.estoque} un</div>
-
-                {/* Custo */}
-                <div className="text-[13px] text-[#788698] text-right">
-                  {p.custo_min ? fmt(p.custo_min) : '—'}
-                </div>
-
-                {/* Preço */}
-                <div className="text-[13.5px] text-[#16212E] font-bold text-right">
-                  {p.preco_max ? fmt(p.preco_max) : '—'}
-                </div>
-
-                {/* Margem */}
-                <div className="text-[13px] font-semibold text-right" style={{ color: margem ? '#34D399' : '#5C6E84' }}>
-                  {margem != null ? `${margem}%` : '—'}
-                </div>
-
-                {/* Status */}
-                <div className="flex items-center justify-end">
-                  <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                    style={{ background: st.bg, color: st.color }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />
-                    {st.label}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-      </div>
+      </main>
 
       {modalOpen && (
         <ProdutoModal

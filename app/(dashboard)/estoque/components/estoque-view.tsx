@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Package, CheckCircle, Clock, Wrench, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import {
+  Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify,
+  type Column,
+} from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
 
 export interface Unidade {
@@ -52,27 +55,37 @@ interface Props {
   empresaId: number
 }
 
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  disponivel:  { label: 'Disponível',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  reservado:   { label: 'Reservado',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  vendido:     { label: 'Vendido',     color: '#5C6E84', bg: 'rgba(92,110,132,0.12)' },
-  assistencia: { label: 'Em reparo',   color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
+type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
+
+const STATUS_BADGE: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
+  disponivel:  { label: 'Disponível', tone: 'ok', dot: true },
+  reservado:   { label: 'Reservado',  tone: 'warn' },
+  vendido:     { label: 'Vendido',    tone: 'neutro' },
+  assistencia: { label: 'Em reparo',  tone: 'acc' },
 }
 
-const CONDICAO_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  novo:      { label: 'Novo',       color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
-  seminovo:  { label: 'Seminovo',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  usado:     { label: 'Usado',      color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' },
-  defeito:   { label: 'Com defeito',color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
+const CONDICAO_BADGE: Record<string, { label: string; tone: Tone }> = {
+  novo:     { label: 'Novo',        tone: 'acc' },
+  seminovo: { label: 'Seminovo',    tone: 'warn' },
+  usado:    { label: 'Usado',       tone: 'neutro' },
+  defeito:  { label: 'Com defeito', tone: 'bad' },
 }
 
-const TIPO_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  entrada:  { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  saida:    { label: 'Saída',    color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
-  ajuste:   { label: 'Ajuste',   color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  compra:   { label: 'Entrada',  color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  venda:    { label: 'Saída',    color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
+const TIPO_BADGE: Record<string, { label: string; tone: Tone }> = {
+  entrada: { label: 'Entrada', tone: 'ok' },
+  saida:   { label: 'Saída',   tone: 'bad' },
+  ajuste:  { label: 'Ajuste',  tone: 'warn' },
+  compra:  { label: 'Entrada', tone: 'ok' },
+  venda:   { label: 'Saída',   tone: 'bad' },
 }
+
+const STATUS_FILTER = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'disponivel', label: 'Disponível' },
+  { value: 'reservado', label: 'Reservado' },
+  { value: 'assistencia', label: 'Em reparo' },
+  { value: 'vendido', label: 'Vendido' },
+]
 
 const fmt = (v: number) => formatCurrency(v)
 const fmtDate = (s: string) => {
@@ -81,6 +94,13 @@ const fmtDate = (s: string) => {
 }
 
 type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
+
+const TABS: { value: Tab; label: React.ReactNode }[] = [
+  { value: 'dashboard', label: <span className="flex items-center gap-2"><LayoutDashboard size={14} strokeWidth={1.7} />Dashboard</span> },
+  { value: 'lista',     label: <span className="flex items-center gap-2"><List size={14} strokeWidth={1.7} />Lista</span> },
+  { value: 'entrada',   label: <span className="flex items-center gap-2"><ArrowDownLeft size={14} strokeWidth={1.7} />Entrada</span> },
+  { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
+]
 
 export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, empresaId }: Props) {
   const [tab, setTab] = useState<Tab>('lista')
@@ -115,213 +135,182 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     return matchSearch && matchStatus && matchMarca
   }), [itens, search, filtroStatus, filtroMarca])
 
-  const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={14} /> },
-    { key: 'lista',     label: 'Lista',     icon: <List size={14} /> },
-    { key: 'entrada',   label: 'Entrada',   icon: <ArrowDownLeft size={14} /> },
-    { key: 'historico', label: 'Histórico', icon: <History size={14} /> },
+  const listaCols: Column<Unidade>[] = [
+    {
+      key: 'produto', header: 'Produto',
+      render: (u) => (
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-ink">{u.produto_nome}</div>
+          <div className="text-[11.5px] text-ink-3">{u.marca_nome}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'imei', header: 'IMEI', hideOnMobile: true, className: 'num',
+      render: (u) => {
+        const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
+        return <span className="text-ink-2">{imeiMask}</span>
+      },
+    },
+    {
+      key: 'condicao', header: 'Condição', hideOnMobile: true,
+      render: (u) => { const c = CONDICAO_BADGE[u.condicao ?? 'novo'] ?? CONDICAO_BADGE.novo; return <Badge tone={c.tone}>{c.label}</Badge> },
+    },
+    {
+      key: 'bateria', header: 'Bateria', align: 'right', hideOnMobile: true, className: 'num',
+      render: (u) => u.bateria
+        ? <span className={cn('font-semibold', Number(u.bateria) >= 90 ? 'text-ok' : Number(u.bateria) >= 80 ? 'text-warn' : 'text-bad')}>{u.bateria}%</span>
+        : <span className="text-ink-3">—</span>,
+    },
+    {
+      key: 'variante', header: 'Variante', hideOnMobile: true,
+      render: (u) => <span className="text-ink-2">{[u.cor, u.armazenamento].filter(Boolean).join(' · ') || '—'}</span>,
+    },
+    {
+      key: 'custo', header: 'Custo', align: 'right', hideOnMobile: true, className: 'num',
+      render: (u) => <span className="text-ink-2">{u.preco_custo ? fmt(u.preco_custo) : '—'}</span>,
+    },
+    {
+      key: 'venda', header: 'Venda', align: 'right', className: 'num',
+      render: (u) => u.preco_venda ? <span className="font-semibold text-ink">{fmt(u.preco_venda)}</span> : <span className="text-ink-3">—</span>,
+    },
+    {
+      key: 'status', header: 'Status', align: 'right',
+      render: (u) => { const s = STATUS_BADGE[u.status ?? 'disponivel'] ?? STATUS_BADGE.disponivel; return <Badge tone={s.tone} dot={s.dot}>{s.label}</Badge> },
+    },
+  ]
+
+  const histCols: Column<Movimentacao>[] = [
+    { key: 'data', header: 'Data', className: 'num w-[130px]', render: (m) => <span className="text-ink-2">{fmtDate(m.created_at)}</span> },
+    {
+      key: 'movimento', header: 'Movimento',
+      render: (m) => { const t = TIPO_BADGE[m.tipo_movimento] ?? { label: m.tipo_movimento, tone: 'neutro' as Tone }; return <Badge tone={t.tone}>{t.label}</Badge> },
+    },
+    { key: 'produto', header: 'Produto', render: (m) => <span className="font-semibold text-ink">{m.produto_nome}</span> },
+    {
+      key: 'qtd', header: 'Qtd', align: 'right', className: 'num',
+      render: (m) => <span className={cn('font-semibold', m.quantidade > 0 ? 'text-ok' : 'text-bad')}>{m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}</span>,
+    },
+    { key: 'responsavel', header: 'Responsável', hideOnMobile: true, render: (m) => <span className="text-ink-2">{m.usuario_nome ?? '—'}</span> },
+    { key: 'obs', header: 'Observação', hideOnMobile: true, render: (m) => <span className="block max-w-[220px] truncate text-ink-3">{m.observacoes ?? '—'}</span> },
   ]
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
-      <Topbar eyebrow="Catálogo · Controle de Unidades" title="Estoque" />
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      <Topbar title="Estoque" />
 
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+        <div className="mx-auto max-w-[1240px] space-y-4">
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[12px] w-fit">
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn('flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all',
-                tab === t.key ? 'bg-[#22303F] text-white font-bold shadow-[0_4px_12px_rgba(22,33,46,0.3)]' : 'text-[#788698] hover:text-[#56657A]')}>
-              {t.icon}{t.label}
-            </button>
-          ))}
-        </div>
+          <Tabs items={TABS} value={tab} onValueChange={(v) => setTab(v as Tab)} />
 
-        {/* ── DASHBOARD ── */}
-        {tab === 'dashboard' && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { icon: <Package size={20}/>, label: 'Unidades ativas', value: stats.total, color: '#6B8CFF', bg: 'rgba(107,140,255,0.12)' },
-                { icon: <CheckCircle size={20}/>, label: 'Disponíveis', value: stats.disponiveis, color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-                { icon: <Clock size={20}/>, label: 'Reservadas', value: stats.reservados, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-                { icon: <Wrench size={20}/>, label: 'Em reparo', value: stats.reparo, color: '#DC2626', bg: 'rgba(220,38,38,0.12)' },
-              ].map((c, i) => (
-                <div key={i} className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-5 flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-none" style={{ background: c.bg, color: c.color }}>{c.icon}</div>
+          {/* ── DASHBOARD ── */}
+          {tab === 'dashboard' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+                <StatCard bare label="Unidades ativas" value={stats.total} />
+                <StatCard bare label="Disponíveis" value={stats.disponiveis} deltaTone="ok" />
+                <StatCard bare label="Reservadas" value={stats.reservados} />
+                <StatCard bare label="Em reparo" value={stats.reparo} />
+              </div>
+
+              <Card title="Distribuição por status">
+                <div className="space-y-4">
+                  {[
+                    { label: 'Disponíveis', count: stats.disponiveis, bar: 'bg-ok' },
+                    { label: 'Reservadas', count: stats.reservados, bar: 'bg-warn' },
+                    { label: 'Em reparo', count: stats.reparo, bar: 'bg-accent' },
+                    { label: 'Vendidas (total)', count: stats.vendidos, bar: 'bg-ink-3' },
+                  ].map(r => (
+                    <div key={r.label} className="flex items-center gap-4">
+                      <div className="w-32 text-[13px] text-ink-2">{r.label}</div>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.06]">
+                        <div className={cn('h-full rounded-full transition-all duration-700', r.bar)}
+                          style={{ width: stats.total ? `${(r.count / stats.total) * 100}%` : '0%' }} />
+                      </div>
+                      <div className="num w-8 text-right text-[13px] font-semibold text-ink">{r.count}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* ── LISTA ── */}
+          {tab === 'lista' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  wrapperClassName="min-w-[240px] flex-1"
+                  icon={<Search size={15} strokeWidth={1.7} />}
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar por produto, marca, IMEI ou número de série…"
+                />
+                {marcasUnicas.length > 0 && (
+                  <Select wrapperClassName="w-[190px]" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
+                    <option value="todas">Todas as marcas</option>
+                    {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
+                  </Select>
+                )}
+                <Button icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
+                  Entrada de estoque
+                </Button>
+              </div>
+
+              <Tabs items={STATUS_FILTER} value={filtroStatus} onValueChange={setFiltroStatus} className="border-b-0" />
+
+              <Card flush>
+                <Table
+                  columns={listaCols}
+                  rows={filtrados}
+                  rowKey={(u) => u.id}
+                  onRowClick={(u) => { setUnidadeSel(u); setModalOpen(true) }}
+                  empty={<EmptyState icon={<Package size={22} strokeWidth={1.7} />} title="Nenhuma unidade encontrada" description={search ? 'Tente outro termo de busca.' : 'Registre a primeira entrada de estoque.'} />}
+                />
+              </Card>
+            </div>
+          )}
+
+          {/* ── ENTRADA ── */}
+          {tab === 'entrada' && (
+            <div className="mx-auto max-w-[720px]">
+              <Card>
+                <div className="mb-5 flex items-center gap-3">
+                  <span className="grid h-10 w-10 flex-none place-items-center rounded-control bg-ink text-white">
+                    <ArrowDownLeft size={18} strokeWidth={1.7} />
+                  </span>
                   <div>
-                    <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em]">{c.label}</div>
-                    <div className="text-[26px] font-serif text-[#16212E] leading-none mt-1">{c.value}</div>
+                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Nova entrada de unidade</div>
+                    <div className="text-[12px] text-ink-2">Cadastre uma unidade física no estoque por IMEI / número de série</div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] p-6 space-y-4">
-              <div className="text-[11px] font-mono text-[#788698] uppercase tracking-[0.12em]">Distribuição por Status</div>
-              {[
-                { label: 'Disponíveis', count: stats.disponiveis, color: '#22C55E' },
-                { label: 'Reservadas',  count: stats.reservados,  color: '#F59E0B' },
-                { label: 'Em reparo',   count: stats.reparo,       color: '#6B8CFF' },
-                { label: 'Vendidas (total)', count: stats.vendidos, color: '#5C6E84' },
-              ].map(r => (
-                <div key={r.label} className="flex items-center gap-4">
-                  <div className="w-32 text-[13px] text-[#788698]">{r.label}</div>
-                  <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: stats.total ? `${(r.count / stats.total) * 100}%` : '0%', background: r.color }} />
-                  </div>
-                  <div className="w-8 text-[13px] text-[#16212E] font-semibold text-right">{r.count}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── LISTA ── */}
-        {tab === 'lista' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-[360px]">
-                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#46586E]" />
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Buscar por IMEI, número de série..."
-                  className="w-full bg-white border border-[#16212E]/[0.10] rounded-[11px] py-2.5 pl-10 pr-4 text-[13px] text-[#1F2A39] placeholder:text-[#46586E] outline-none focus:border-white/[0.2]" />
-              </div>
-
-              <div className="flex gap-1 p-1 bg-white border border-[#16212E]/[0.08] rounded-[11px]">
-                {['todos','disponivel','reservado','assistencia','vendido'].map(s => (
-                  <button key={s} onClick={() => setFiltroStatus(s)}
-                    className={cn('px-3 py-1.5 rounded-[8px] text-[12px] font-medium capitalize transition-all',
-                      filtroStatus === s ? 'bg-[#22303F] text-white font-bold' : 'text-[#788698] hover:text-[#56657A]')}>
-                    {s === 'todos' ? 'Todos' : STATUS_STYLE[s]?.label ?? s}
-                  </button>
-                ))}
-              </div>
-
-              {marcasUnicas.length > 0 && (
-                <select value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}
-                  className="bg-white border border-[#16212E]/[0.10] rounded-[11px] px-3 py-2.5 text-[13px] text-[#788698] outline-none">
-                  <option value="todas">Todas as marcas</option>
-                  {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              )}
-
-              <div className="flex-1" />
-              <button onClick={() => { setUnidadeSel(null); setModalOpen(true) }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
-                <ArrowDownLeft size={15} /> Entrada de estoque
-              </button>
-            </div>
-
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-              <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
-                style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
-                {['Produto','IMEI','Condição','Bateria','Variante','Custo','Venda','Status'].map(h => (
-                  <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
-                ))}
-              </div>
-
-              {filtrados.length === 0 ? (
-                <div className="py-14 text-center text-[#788698] text-[13px]">Nenhuma unidade encontrada</div>
-              ) : filtrados.map(u => {
-                const cond = CONDICAO_STYLE[u.condicao ?? 'novo'] ?? CONDICAO_STYLE.novo
-                const st = STATUS_STYLE[u.status ?? 'disponivel'] ?? STATUS_STYLE.disponivel
-                const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
-                const variante = [u.cor, u.armazenamento].filter(Boolean).join(' · ') || '—'
-                return (
-                  <div key={u.id} onClick={() => { setUnidadeSel(u); setModalOpen(true) }}
-                    className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] hover:bg-[#16212E]/[0.03] cursor-pointer transition-colors items-center"
-                    style={{ gridTemplateColumns: '2fr 1.2fr 0.9fr 0.7fr 1.2fr 1fr 1fr 1.1fr' }}>
-                    <div className="min-w-0">
-                      <div className="text-[13.5px] font-semibold text-[#1F2A39] truncate">{u.produto_nome}</div>
-                      <div className="text-[11.5px] text-[#6B7C92]">{u.marca_nome}</div>
-                    </div>
-                    <div className="text-[12.5px] text-[#788698] font-mono">{imeiMask}</div>
-                    <div>
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: cond.bg, color: cond.color }}>{cond.label}</span>
-                    </div>
-                    <div className="text-[13px] font-semibold" style={{ color: Number(u.bateria) >= 90 ? '#22C55E' : Number(u.bateria) >= 80 ? '#F59E0B' : '#DC2626' }}>
-                      {u.bateria ? `${u.bateria}%` : '—'}
-                    </div>
-                    <div className="text-[12.5px] text-[#788698] truncate">{variante}</div>
-                    <div className="text-[13px] text-[#788698]">{u.preco_custo ? fmt(u.preco_custo) : '—'}</div>
-                    <div className="text-[13.5px] font-bold text-[#16212E]">{u.preco_venda ? fmt(u.preco_venda) : '—'}</div>
-                    <div>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: st.bg, color: st.color }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />
-                        {st.label}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── ENTRADA ── */}
-        {tab === 'entrada' && (
-          <div className="max-w-[700px]">
-            <div className="bg-white border border-[#16212E]/[0.08] rounded-[20px] overflow-hidden">
-              <div className="flex items-center gap-4 px-6 py-5 border-b border-[#16212E]/[0.08]">
-                <div className="w-10 h-10 rounded-[12px] bg-[rgba(22,33,46,0.15)] flex items-center justify-center">
-                  <ArrowDownLeft size={18} className="text-[#DC2626]" />
-                </div>
-                <div>
-                  <div className="text-[16px] font-serif text-[#16212E]">Nova entrada de unidade</div>
-                  <div className="text-[12px] text-[#788698]">Cadastre uma unidade física no estoque por IMEI / número de série</div>
-                </div>
-              </div>
-              <div className="px-6 py-5">
                 <UnidadeInlineForm
                   produtos={produtos}
                   empresaId={empresaId}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
                     setTab('lista')
-                    toast.success('Unidade adicionada ao estoque!')
+                    notify.ok('Unidade adicionada ao estoque')
                   }}
                 />
-              </div>
+              </Card>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── HISTÓRICO ── */}
-        {tab === 'historico' && (
-          <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-            <div className="grid px-5 py-3 border-b border-[#16212E]/[0.08]"
-              style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
-              {['Data','Movimento','Produto','Qtd','Responsável','Reservação'].map(h => (
-                <div key={h} className="text-[10.5px] font-mono text-[#46586E] uppercase tracking-[0.12em]">{h}</div>
-              ))}
-            </div>
-            {movimentacoes.length === 0 ? (
-              <div className="py-14 text-center text-[#788698] text-[13px]">Nenhuma movimentação registrada</div>
-            ) : movimentacoes.map(m => {
-              const tipo = TIPO_STYLE[m.tipo_movimento] ?? { label: m.tipo_movimento, color: '#8A9BB0', bg: 'rgba(138,155,176,0.12)' }
-              return (
-                <div key={m.id} className="grid px-5 py-3.5 border-b border-[#16212E]/[0.06] items-center"
-                  style={{ gridTemplateColumns: '1.2fr 1fr 2fr 0.5fr 1.5fr 1.5fr' }}>
-                  <div className="text-[12.5px] text-[#788698] font-mono">{fmtDate(m.created_at)}</div>
-                  <div>
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: tipo.bg, color: tipo.color }}>{tipo.label}</span>
-                  </div>
-                  <div className="text-[13px] font-semibold text-[#1F2A39] truncate">{m.produto_nome}</div>
-                  <div className="text-[13px] font-semibold" style={{ color: m.quantidade > 0 ? '#22C55E' : '#DC2626' }}>
-                    {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
-                  </div>
-                  <div className="text-[13px] text-[#788698]">{m.usuario_nome ?? '—'}</div>
-                  <div className="text-[12.5px] text-[#6B7C92] truncate">{m.observacoes ?? '—'}</div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+          {/* ── HISTÓRICO ── */}
+          {tab === 'historico' && (
+            <Card flush>
+              <Table
+                columns={histCols}
+                rows={movimentacoes}
+                rowKey={(m) => m.id}
+                empty={<EmptyState icon={<History size={22} strokeWidth={1.7} />} title="Nenhuma movimentação registrada" description="As entradas e saídas de estoque aparecerão aqui." />}
+              />
+            </Card>
+          )}
+        </div>
+      </main>
 
       {modalOpen && (
         <UnidadeModal
@@ -354,9 +343,9 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
     ? (((Number(form.preco_venda) - custoTotal) / Number(form.preco_venda)) * 100).toFixed(1) : null
 
   async function salvar() {
-    if (!form.produto_id) { toast.error('Selecione um produto'); return }
-    if (!form.preco_custo) { toast.error('Informe o preço de custo'); return }
-    if (!form.preco_venda) { toast.error('Informe o preço de venda'); return }
+    if (!form.produto_id) { notify.warn('Selecione um produto'); return }
+    if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
+    if (!form.preco_venda) { notify.warn('Informe o preço de venda'); return }
     setSaving(true)
     const payload = {
       empresa_id: empresaId,
@@ -371,27 +360,23 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
     }
     const { data, error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>).select().single()
     setSaving(false)
-    if (error) { toast.error('Erro: ' + error.message); return }
+    if (error) { notify.bad('Erro ao cadastrar', error.message); return }
     const prod = produtos.find(p => p.id === Number(form.produto_id))
     onSaved({ ...data, produto_id: data.produto_id!, produto_nome: prod?.nome ?? '', marca_nome: prod?.marca_nome ?? '', fornecedor_nome: null })
   }
 
   const field = (label: string, node: React.ReactNode) => (
-    <div>
-      <label className="block text-[10.5px] font-mono text-[#788698] uppercase tracking-[0.12em] mb-1.5">{label}</label>
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[12px] font-medium text-ink-2">{label}</label>
       {node}
     </div>
   )
-  const inp = (k: keyof typeof form, placeholder?: string, type = 'text') => (
-    <input type={type} value={form[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder}
-      className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]" />
-  )
   const btnGroup = (k: keyof typeof form, opts: { v: string; label: string }[]) => (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex flex-wrap gap-1.5">
       {opts.map(o => (
         <button key={o.v} type="button" onClick={() => set(k, o.v)}
-          className={cn('px-4 py-2 rounded-[9px] text-[12.5px] font-medium transition-all border',
-            form[k] === o.v ? 'bg-[#16212E] text-white border-[#16212E]' : 'text-[#788698] border-[#16212E]/[0.10] hover:border-white/[0.2]')}>
+          className={cn('rounded-control border px-3.5 py-2 text-[12.5px] font-medium transition-colors',
+            form[k] === o.v ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink-2 hover:border-ink/20')}>
           {o.label}
         </button>
       ))}
@@ -400,67 +385,65 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
 
   return (
     <div className="space-y-5">
-      {field('Produto (Catálogo) *',
-        <select value={form.produto_id} onChange={e => set('produto_id', e.target.value)}
-          className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] outline-none">
-          <option value="">Buscar modelo no catálogo...</option>
-          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
-        </select>
-      )}
+      <Select
+        label="Produto (catálogo)"
+        required
+        value={form.produto_id}
+        onChange={e => set('produto_id', e.target.value)}
+      >
+        <option value="">Buscar modelo no catálogo…</option>
+        {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
+      </Select>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('Tipo de Entrada *', btnGroup('tipo', [{ v:'compra', label:'Compra' }, { v:'consignado', label:'Consignado' }, { v:'troca', label:'Troca' }]))}
-        {field('Condição *', btnGroup('condicao', [{ v:'novo', label:'Novo' }, { v:'usado', label:'Usado' }]))}
+        {field('Tipo de entrada *', btnGroup('tipo', [{ v: 'compra', label: 'Compra' }, { v: 'consignado', label: 'Consignado' }, { v: 'troca', label: 'Troca' }]))}
+        {field('Condição *', btnGroup('condicao', [{ v: 'novo', label: 'Novo' }, { v: 'usado', label: 'Usado' }]))}
       </div>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('Estado *',
-          <select value={form.estado} onChange={e => set('estado', e.target.value)}
-            className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] outline-none">
-            {['lacrado','excelente','bom','regular'].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase()+v.slice(1)}</option>)}
-          </select>
-        )}
-        {field('Status Inicial *', btnGroup('status', [{ v:'disponivel', label:'Disponível' }, { v:'pendente', label:'Pendente' }, { v:'assistencia', label:'Em reparo' }]))}
+        <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}>
+          {['lacrado', 'excelente', 'bom', 'regular'].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>)}
+        </Select>
+        {field('Status inicial *', btnGroup('status', [{ v: 'disponivel', label: 'Disponível' }, { v: 'pendente', label: 'Pendente' }, { v: 'assistencia', label: 'Em reparo' }]))}
       </div>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('Cor', inp('cor', 'Titânio Natural'))}
-        {field('Armazenamento', inp('armazenamento', '256GB'))}
+        <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
+        <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
       </div>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('IMEI / Número de Série', inp('imei', '354 88•••• ••••'))}
-        {field('Saúde da Bateria', inp('bateria', '100'))}
+        <Input label="IMEI / Número de série" value={form.imei} onChange={e => set('imei', e.target.value)} placeholder="354 88•••• ••••" className="num" />
+        <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
       </div>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('Preço de Custo *', inp('preco_custo', 'R$ 0,00', 'number'))}
-        {field('Custo de Reparo', inp('custo_reparo', 'R$ 0,00', 'number'))}
+        <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />
+        <Input label="Custo de reparo" type="number" value={form.custo_reparo} onChange={e => set('custo_reparo', e.target.value)} placeholder="R$ 0,00" className="num" />
       </div>
 
       <div className="grid grid-cols-2 gap-5">
-        {field('Custo Total (Auto)',
-          <div className="w-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[#15986A]">
+        {field('Custo total (auto)',
+          <div className="num rounded-control border border-ok/20 bg-ok-soft px-3 py-2 text-[13px] font-semibold text-ok">
             {formatCurrency(custoTotal)}
-            {margem && <span className="ml-2 text-[11px] text-[#15986A]/70">· margem {margem}%</span>}
+            {margem && <span className="ml-2 text-[11px] font-normal text-ok/70">· margem {margem}%</span>}
           </div>
         )}
-        {field('Preço de Venda *', inp('preco_venda', 'R$ 0,00', 'number'))}
+        <Input label="Preço de venda *" type="number" value={form.preco_venda} onChange={e => set('preco_venda', e.target.value)} placeholder="R$ 0,00" className="num" />
       </div>
 
-      {field('Observações', 
-        <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)}
-          placeholder="Detalhes da unidade, acessórios inclusos, avarias..."
-          rows={3}
-          className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-[13px] text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] resize-none" />
-      )}
+      <Textarea
+        label="Observações"
+        rows={3}
+        value={form.observacoes}
+        onChange={e => set('observacoes', e.target.value)}
+        placeholder="Detalhes da unidade, acessórios inclusos, avarias…"
+      />
 
       <div className="flex justify-end pt-2">
-        <button onClick={salvar} disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-[#16212E] hover:bg-[#16212E] text-white text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-[0_4px_14px_rgba(22,33,46,0.3)]">
-          <ArrowDownLeft size={15} />
-          {saving ? 'Salvando...' : 'Registrar entrada'}
-        </button>
+        <Button icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={salvar} loading={saving}>
+          {saving ? 'Salvando…' : 'Registrar entrada'}
+        </Button>
       </div>
     </div>
   )

@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { Modal, Input, Select, Textarea, Button, ConfirmDialog, notify } from '@/components/ui'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 interface Unidade {
@@ -47,6 +46,7 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
   const [saving, setSaving] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const [produtos, setProdutos] = useState<{ id: number; nome: string; marca_nome: string }[]>([])
   const [fornecedores, setFornecedores] = useState<{ id: number; nome_fantasia: string }[]>([])
 
@@ -72,196 +72,153 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
     : null
 
   async function salvar() {
-    if (!form.produto_id) { toast.error('Selecione um produto'); return }
+    if (!form.produto_id) { notify.warn('Selecione um produto'); return }
     setSaving(true)
     const payload = { ...form, ativo: true, empresa_id: empresaId }
 
     if (isNew) {
       const { error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>)
-      if (error) { toast.error('Erro ao cadastrar: ' + error.message); setSaving(false); return }
-      toast.success('Unidade adicionada ao estoque!')
+      if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
+      notify.ok('Unidade adicionada ao estoque')
     } else {
       const { error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!)
-      if (error) { toast.error('Erro ao salvar'); setSaving(false); return }
-      toast.success('Unidade atualizada!')
+      if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      notify.ok('Unidade atualizada')
     }
     router.refresh()
     onClose()
   }
 
   async function excluir() {
-    if (!confirm('Remover esta unidade do estoque?')) return
     await supabase.from('inventario_unidades').update({ ativo: false }).eq('id', unidade!.id!)
-    toast.success('Removido do estoque')
+    notify.ok('Removido do estoque')
     router.refresh()
     onClose()
   }
 
-  const Input = ({ label, field, placeholder, type = 'text' }: { label: string; field: keyof Unidade; placeholder?: string; type?: string }) => (
-    <div>
-      <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">{label}</label>
-      <input
-        type={type}
-        value={(form[field] as string) ?? ''}
-        onChange={e => set(field, e.target.value || null)}
-        placeholder={placeholder}
-        className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] transition-colors"
-      />
-    </div>
-  )
-
-  const Sel = ({ label, field, options }: { label: string; field: keyof Unidade; options: { value: string; label: string }[] }) => (
-    <div>
-      <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">{label}</label>
-      <select
-        value={(form[field] as string) ?? ''}
-        onChange={e => set(field, e.target.value || null)}
-        className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2] transition-colors"
-      >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  )
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-      <div className="w-[600px] max-h-[88vh] bg-[#F0F2F5] border border-[#16212E]/[0.10] rounded-[20px] flex flex-col overflow-hidden shadow-2xl">
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        size="lg"
+        disableOverlayClose={saving}
+        title={
+          <span className="flex items-center gap-2.5">
+            <span className="truncate">{isNew ? 'Adicionar unidade' : 'Editar unidade'}</span>
+            {!isNew && <span className="num text-[12px] font-normal text-ink-3">#{unidade?.id}</span>}
+          </span>
+        }
+        footer={
+          <>
+            {!isNew && (
+              <Button variant="ghost" className="mr-auto text-bad hover:bg-bad-soft" onClick={() => setConfirmDel(true)} disabled={saving}>
+                Remover
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button onClick={salvar} loading={saving}>Salvar</Button>
+          </>
+        }
+      >
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+          <Select
+            wrapperClassName="col-span-2"
+            label="Produto"
+            required
+            value={form.produto_id ?? ''}
+            onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Selecionar produto…</option>
+            {produtos.map(p => (
+              <option key={p.id} value={p.id}>{p.marca_nome} {p.nome}</option>
+            ))}
+          </Select>
 
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[#16212E]/[0.08] shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-[#16212E]">{isNew ? 'Adicionar Unidade' : 'Editar Unidade'}</h2>
-            {!isNew && <p className="text-xs text-[#788698] mt-0.5">ID #{unidade?.id}</p>}
-          </div>
-          <button onClick={onClose} className="text-[#788698] hover:text-[#9FB0C2] transition-colors"><X size={20} /></button>
-        </div>
+          <Select label="Status" value={form.status ?? ''} onChange={e => set('status', e.target.value || null)}>
+            <option value="disponivel">Disponível</option>
+            <option value="reservado">Reservado</option>
+            <option value="vendido">Vendido</option>
+            <option value="assistencia">Assistência</option>
+          </Select>
+          <Select label="Tipo" value={form.tipo ?? ''} onChange={e => set('tipo', e.target.value || null)}>
+            <option value="compra">Compra</option>
+            <option value="seminovo">Seminovo</option>
+            <option value="troca">Troca</option>
+            <option value="consignado">Consignado</option>
+          </Select>
 
-        <form onSubmit={e => { e.preventDefault(); salvar() }} className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Produto */}
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Produto *</label>
-              <select
-                value={form.produto_id ?? ''}
-                onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2]"
-              >
-                <option value="">Selecionar produto...</option>
-                {produtos.map(p => (
-                  <option key={p.id} value={p.id}>{p.marca_nome} {p.nome}</option>
-                ))}
-              </select>
-            </div>
+          <Input label="IMEI 1" value={form.imei ?? ''} onChange={e => set('imei', e.target.value || null)} placeholder="000000000000000" className="num" />
+          <Input label="IMEI 2 / Série" value={form.imei2 ?? ''} onChange={e => set('imei2', e.target.value || null)} placeholder="000000000000000" className="num" />
+          <Input label="Número de série" value={form.numero_serie ?? ''} onChange={e => set('numero_serie', e.target.value || null)} placeholder="XXXXX" className="num" />
+          <Input label="Bateria %" value={form.bateria ?? ''} onChange={e => set('bateria', e.target.value || null)} placeholder="95" className="num" />
+          <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
+          <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
 
-            <Sel label="Status" field="status" options={[
-              { value: 'disponivel', label: 'Disponível' },
-              { value: 'reservado', label: 'Reservado' },
-              { value: 'vendido', label: 'Vendido' },
-              { value: 'assistencia', label: 'Assistência' },
-            ]} />
-            <Sel label="Tipo" field="tipo" options={[
-              { value: 'compra', label: 'Compra' },
-              { value: 'seminovo', label: 'Seminovo' },
-              { value: 'troca', label: 'Troca' },
-              { value: 'consignado', label: 'Consignado' },
-            ]} />
+          <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
+            <option value="novo">Novo</option>
+            <option value="seminovo">Seminovo</option>
+            <option value="usado">Usado</option>
+          </Select>
+          <Select label="Estado físico" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
+            <option value="lacrado">Lacrado</option>
+            <option value="excelente">Excelente</option>
+            <option value="otimo">Ótimo</option>
+            <option value="bom">Bom</option>
+            <option value="regular">Regular</option>
+          </Select>
 
-            <Input label="IMEI 1" field="imei" placeholder="000000000000000" />
-            <Input label="IMEI 2 / Série" field="imei2" placeholder="000000000000000" />
-            <Input label="Número de Série" field="numero_serie" placeholder="XXXXX" />
-            <Input label="Bateria %" field="bateria" placeholder="95" />
-            <Input label="Cor" field="cor" placeholder="Preto, Branco..." />
-            <Input label="Armazenamento" field="armazenamento" placeholder="256GB" />
+          <Input
+            label="Preço de custo"
+            type="number"
+            value={form.preco_custo ?? ''}
+            onChange={e => set('preco_custo', e.target.value ? Number(e.target.value) : null)}
+            placeholder="0,00"
+            className="num"
+          />
+          <Input
+            label="Preço de venda"
+            hint={margem ? `${margem}% margem` : undefined}
+            type="number"
+            value={form.preco_venda ?? ''}
+            onChange={e => set('preco_venda', e.target.value ? Number(e.target.value) : null)}
+            placeholder="0,00"
+            className="num"
+          />
 
-            <Sel label="Condição" field="condicao" options={[
-              { value: 'novo', label: 'Novo' },
-              { value: 'seminovo', label: 'Seminovo' },
-              { value: 'usado', label: 'Usado' },
-            ]} />
-            <Sel label="Estado Físico" field="estado" options={[
-              { value: 'lacrado', label: 'Lacrado' },
-              { value: 'excelente', label: 'Excelente' },
-              { value: 'otimo', label: 'Ótimo' },
-              { value: 'bom', label: 'Bom' },
-              { value: 'regular', label: 'Regular' },
-            ]} />
+          <Select label="Fornecedor" value={form.fornecedor_id ?? ''} onChange={e => set('fornecedor_id', e.target.value ? Number(e.target.value) : null)}>
+            <option value="">Nenhum</option>
+            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
+          </Select>
+          <Input
+            label="Custo de reparo"
+            type="number"
+            value={form.custo_reparo ?? ''}
+            onChange={e => set('custo_reparo', e.target.value || null)}
+            placeholder="0,00"
+            className="num"
+          />
 
-            {/* Preços */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Preço de Custo</label>
-              <input
-                type="number"
-                value={form.preco_custo ?? ''}
-                onChange={e => set('preco_custo', e.target.value ? Number(e.target.value) : null)}
-                placeholder="0,00"
-                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">
-                Preço de Venda
-                {margem && <span className="ml-2 text-[#15986A] normal-case font-sans">{margem}% margem</span>}
-              </label>
-              <input
-                type="number"
-                value={form.preco_venda ?? ''}
-                onChange={e => set('preco_venda', e.target.value ? Number(e.target.value) : null)}
-                placeholder="0,00"
-                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2]"
-              />
-            </div>
-
-            {/* Fornecedor */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Fornecedor</label>
-              <select
-                value={form.fornecedor_id ?? ''}
-                onChange={e => set('fornecedor_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] outline-none focus:border-white/[0.2]"
-              >
-                <option value="">Nenhum</option>
-                {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
-              </select>
-            </div>
-
-            <Input label="Custo de Reparo" field="custo_reparo" type="number" placeholder="0,00" />
-
-            <div className="col-span-2">
-              <label className="block text-[11px] font-mono text-[#788698] uppercase tracking-[0.1em] mb-1.5">Observações</label>
-              <textarea
-                value={form.observacoes ?? ''}
-                onChange={e => set('observacoes', e.target.value || null)}
-                rows={3}
-                placeholder="Defeitos, histórico, detalhes..."
-                className="w-full bg-[#F4F6F9] border border-[#16212E]/[0.10] rounded-[9px] px-3 py-2.5 text-sm text-[#56657A] placeholder:text-[#9AA7B6] outline-none focus:border-white/[0.2] resize-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#16212E]/[0.08] shrink-0">
-          {!isNew ? (
-            <button type="button" onClick={excluir} className="flex items-center gap-2 text-xs text-[#788698] hover:text-[#DC2626] transition-colors">
-              <Trash2 size={14} />
-              Remover
-            </button>
-          ) : <div />}
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[9px] text-sm text-[#788698] hover:text-[#56657A] transition-colors">
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-[9px] bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              <Save size={14} />
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
-          </div>
-        </div>
+          <Textarea
+            wrapperClassName="col-span-2"
+            label="Observações"
+            rows={3}
+            value={form.observacoes ?? ''}
+            onChange={e => set('observacoes', e.target.value || null)}
+            placeholder="Defeitos, histórico, detalhes…"
+          />
         </form>
-      </div>
-    </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmDel}
+        onClose={() => setConfirmDel(false)}
+        onConfirm={excluir}
+        title="Remover unidade?"
+        description="Esta unidade deixará de aparecer no estoque."
+        confirmLabel="Remover"
+        tone="danger"
+      />
+    </>
   )
 }
