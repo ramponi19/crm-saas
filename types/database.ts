@@ -469,6 +469,7 @@ export type Database = {
           wl_logo_url: string | null
           wl_slogan: string | null
           wl_whatsapp: string | null
+          wl_menu: Json | null
         }
         Insert: {
           cnpj?: string | null
@@ -492,6 +493,7 @@ export type Database = {
           wl_logo_url?: string | null
           wl_slogan?: string | null
           wl_whatsapp?: string | null
+          wl_menu?: Json | null
         }
         Update: {
           cnpj?: string | null
@@ -515,6 +517,7 @@ export type Database = {
           wl_logo_url?: string | null
           wl_slogan?: string | null
           wl_whatsapp?: string | null
+          wl_menu?: Json | null
         }
         Relationships: []
       }

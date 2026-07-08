@@ -120,6 +120,7 @@ export const CATALOGO: MenuGroupBase[] = [
   {
     label: 'Sistema',
     items: [
+      { href: '/aparencia', label: 'Aparência', icon: 'Palette', adminOnly: true },
       { href: '/configuracoes', label: 'Configurações', icon: 'Settings', adminOnly: true },
       { href: '/empresa', label: 'Minha empresa', icon: 'Building2', adminOnly: true },
       { href: '/planos', label: 'Planos', icon: 'CreditCard', adminOnly: true },
