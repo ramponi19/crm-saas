@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
+import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
@@ -37,16 +38,19 @@ export default async function DashboardLayout({
   let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; modulos_override?: unknown; menu_override?: unknown; menu_config?: unknown; permissoes?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
+  let empresaId: number | undefined
 
   if (impersonation) {
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes')
+      .select('nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
     role = 'owner' // super admin tem controle total na empresa impersonada
+    plano = empImp?.plano ?? undefined
+    empresaId = impersonation.empresaId
   } else {
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
@@ -69,7 +73,25 @@ export default async function DashboardLayout({
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
     plano = vinculoTyped.empresa?.plano ?? undefined
+    empresaId = (vinculoTyped.empresa as { id?: number } | null)?.id
   }
+
+  // Avisos da plataforma (banner) — filtra por alvo: todos | plano | empresa.
+  const { data: avisosRaw } = await supabase
+    .from('avisos_plataforma')
+    .select('id, titulo, corpo, tom, alvo, alvo_valor, ativo, expira_em')
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
+  const avisos: AvisoBanner[] = ((avisosRaw ?? []) as Array<{
+    id: number; titulo: string; corpo: string; tom: string; alvo: string; alvo_valor: string | null; expira_em: string | null
+  }>)
+    .filter(a => !a.expira_em || new Date(a.expira_em) > new Date())
+    .filter(a =>
+      a.alvo === 'todos' ||
+      (a.alvo === 'plano' && a.alvo_valor === plano) ||
+      (a.alvo === 'empresa' && a.alvo_valor === String(empresaId ?? ''))
+    )
+    .map(a => ({ id: a.id, titulo: a.titulo, corpo: a.corpo, tom: a.tom }))
 
   const { count: leadsCount } = await supabase
     .from('leads')
@@ -127,6 +149,7 @@ export default async function DashboardLayout({
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
+          {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <LimiteBanner />
           {children}
           <BottomNav

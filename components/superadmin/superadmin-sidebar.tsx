@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   CreditCard,
   Layers,
+  Megaphone,
 } from 'lucide-react'
 
 const ADMIN_COR = '#6D28D9'
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/superadmin/segmentos', label: 'Segmentos',      icon: Layers },
   { href: '/superadmin/metricas', label: 'Métricas',        icon: LineChart },
   { href: '/superadmin/planos',   label: 'Planos',          icon: CreditCard },
+  { href: '/superadmin/avisos',   label: 'Avisos',          icon: Megaphone },
   { href: '/superadmin/admins',   label: 'Administradores', icon: ShieldCheck },
   { href: '/superadmin/logs',     label: 'Logs',            icon: ScrollText },
 ]

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      avisos_plataforma: {
+        Row: {
+          id: number
+          titulo: string
+          corpo: string
+          tom: string
+          alvo: string
+          alvo_valor: string | null
+          ativo: boolean
+          expira_em: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          titulo: string
+          corpo?: string
+          tom?: string
+          alvo?: string
+          alvo_valor?: string | null
+          ativo?: boolean
+          expira_em?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          titulo?: string
+          corpo?: string
+          tom?: string
+          alvo?: string
+          alvo_valor?: string | null
+          ativo?: boolean
+          expira_em?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       segmentos_config: {
         Row: {
           chave: string
