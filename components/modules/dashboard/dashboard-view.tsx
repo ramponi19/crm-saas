@@ -9,6 +9,7 @@ import { formatCurrency, CANAIS_VENDA } from '@/lib/utils'
 import { AnimatedCurrency, AnimatedInt } from '@/components/ui/animated-value'
 import { AreaChart } from '@/components/ui/area-chart'
 import { Card, StatCard, Badge, Button } from '@/components/ui'
+import { OnboardingCard } from './onboarding-card'
 import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
 import { createClient } from '@/lib/supabase/client'
@@ -332,6 +333,8 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>
             </div>
           </div>
+
+          <OnboardingCard />
 
           {/* KPIs */}
           <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
