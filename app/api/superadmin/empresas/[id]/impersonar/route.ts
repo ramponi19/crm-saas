@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/service'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 
 const IMPERSONATE_COOKIE = 'impersonating_empresa_id'
@@ -40,14 +39,22 @@ export async function POST(
 
   // Persistir a empresa impersonada na coluna do usuário — é a fonte de verdade
   // para o RLS (get_empresa_id considera isto quando o usuário é super admin).
+  // IMPORTANTE: usar o client AUTENTICADO do super admin (não o service role).
+  // O trigger `prevent_privilege_escalation` bloqueia mudanças em
+  // impersonando_empresa_id quando auth.uid() não é super admin — e o service
+  // role não tem sessão (auth.uid() = NULL), então a escrita era barrada e
+  // silenciosamente engolida, prendendo a impersonação na empresa anterior.
   const TTL_SECONDS = 60 * 60 * 4 // 4 horas — deve coincidir com maxAge do cookie
   const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString()
 
-  const serviceClient = createServiceClient()
-  await serviceClient
+  const { error: updErr } = await supabase
     .from('usuarios')
     .update({ impersonando_empresa_id: empresaId, impersonando_expires_at: expiresAt })
     .eq('id', userId)
+
+  if (updErr) {
+    return NextResponse.json({ error: `Falha ao iniciar impersonação: ${updErr.message}` }, { status: 500 })
+  }
 
   const res = NextResponse.json({ ok: true, empresa: empresa.nome })
   res.cookies.set(IMPERSONATE_COOKIE, String(empresaId), {
@@ -65,14 +72,15 @@ export async function DELETE() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    const serviceClient = createServiceClient()
-    const { data: usuario } = await serviceClient
+    const { data: usuario } = await supabase
       .from('usuarios')
       .select('impersonando_empresa_id')
       .eq('id', user.id)
       .single()
 
-    await serviceClient
+    // Client autenticado (não service role): o trigger prevent_privilege_escalation
+    // exige que auth.uid() seja super admin para mexer em impersonando_empresa_id.
+    await supabase
       .from('usuarios')
       .update({ impersonando_empresa_id: null, impersonando_expires_at: null })
       .eq('id', user.id)
