@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { enviarEmail, emailBoasVindas } from '@/lib/email'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -121,6 +122,10 @@ export async function POST(req: Request) {
     await rollback()
     return NextResponse.json({ error: 'Erro ao vincular usuário: ' + vinErr.message }, { status: 500 })
   }
+
+  // 5) e-mail de boas-vindas (não-bloqueante: nunca falha o cadastro).
+  const { subject, html } = emailBoasVindas(nomeUsuario, nomeEmpresa)
+  enviarEmail({ to: email, subject, html }).catch(() => {/* stub/no-op sem provider */})
 
   return NextResponse.json({ ok: true, empresaId: empresa.id })
 }
