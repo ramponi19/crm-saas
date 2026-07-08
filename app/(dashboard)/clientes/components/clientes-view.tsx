@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, UserPlus } from 'lucide-react'
-import { cn, formatCurrency } from '@/lib/utils'
-import ClienteModal from './cliente-modal'
+import { Search, UserPlus, Users } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
+import { Card, Table, Input, Button, Badge, EmptyState, type Column } from '@/components/ui'
+import ClienteModal from './cliente-modal'
 
 interface Cliente {
   id: number
@@ -44,17 +45,6 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-function avatarColor(name: string): string {
-  const colors = [
-    '#16212E', '#3B7DE8', '#22C55E', '#F59E0B',
-    '#8B5CF6', '#EC4899', '#06B6D4', '#10B981',
-    '#F97316', '#6366F1',
-  ]
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
 function fmtUltimaCompra(d: string | null | undefined) {
   if (!d) return '—'
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
@@ -66,26 +56,10 @@ function fmtUltimaCompra(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('pt-BR')
 }
 
-function StatusBadge({ tipo, ativo }: { tipo: string | null; ativo: boolean | null }) {
-  if (tipo === 'VIP') {
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border border-[#F59E0B]/40 text-[#B47B12] bg-[#F59E0B]/10">
-        VIP
-      </span>
-    )
-  }
-  if (ativo === false) {
-    return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#788698] bg-white/[0.05]">
-        Inativo
-      </span>
-    )
-  }
-  return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#15986A] bg-[#22C55E]/10">
-      Ativo
-    </span>
-  )
+function statusBadge(c: Cliente) {
+  if (c.tipo_cliente === 'VIP') return <Badge tone="warn">VIP</Badge>
+  if (c.ativo === false) return <Badge tone="neutro">Inativo</Badge>
+  return <Badge tone="ok" dot>Ativo</Badge>
 }
 
 export default function ClientesView({ clientes }: Props) {
@@ -97,140 +71,74 @@ export default function ClientesView({ clientes }: Props) {
   const filtrados = useMemo(() => {
     if (!search) return clientes
     const q = search.toLowerCase()
-    return clientes.filter(c =>
+    return clientes.filter((c) =>
       c.nome.toLowerCase().includes(q) ||
       (c.email ?? '').toLowerCase().includes(q) ||
-      (c.telefone ?? '').includes(q)
+      (c.telefone ?? '').includes(q),
     )
   }, [clientes, search])
 
-  function openCliente(c: Cliente) {
-    setClienteSelecionado(c)
-    setIsNew(false)
-    setModalOpen(true)
-  }
+  function openCliente(c: Cliente) { setClienteSelecionado(c); setIsNew(false); setModalOpen(true) }
+  function openNovo() { setClienteSelecionado(null); setIsNew(true); setModalOpen(true) }
 
-  function openNovo() {
-    setClienteSelecionado(null)
-    setIsNew(true)
-    setModalOpen(true)
-  }
+  const cols: Column<Cliente>[] = [
+    {
+      key: 'cliente', header: 'Cliente',
+      render: (c) => (
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
+            {getInitials(c.nome)}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{c.nome}</div>
+            {c.email && <div className="truncate text-[11px] text-ink-3">{c.email}</div>}
+          </div>
+        </div>
+      ),
+    },
+    { key: 'telefone', header: 'Telefone', hideOnMobile: true, render: (c) => <span className="num text-ink-2">{c.telefone ?? '—'}</span> },
+    {
+      key: 'cidade', header: 'Cidade', hideOnMobile: true,
+      render: (c) => <span className="text-ink-2">{c.cidade && c.estado ? `${c.cidade} · ${c.estado}` : c.cidade ?? c.estado ?? '—'}</span>,
+    },
+    { key: 'compras', header: 'Compras', align: 'right', className: 'num', render: (c) => <span className={(c.total_vendas ?? 0) > 0 ? 'text-ink' : 'text-ink-3'}>{c.total_vendas ?? 0}</span> },
+    {
+      key: 'total', header: 'Total gasto', align: 'right', hideOnMobile: true, className: 'num',
+      render: (c) => (c.valor_total ?? 0) > 0 ? <span className="font-semibold text-ink">{formatCurrency(c.valor_total!)}</span> : <span className="text-ink-3">—</span>,
+    },
+    { key: 'ultima', header: 'Última', align: 'right', hideOnMobile: true, render: (c) => <span className="text-ink-2">{fmtUltimaCompra(c.ultima_compra)}</span> },
+    { key: 'status', header: 'Status', align: 'right', render: (c) => statusBadge(c) },
+  ]
 
   return (
-    <div className="flex flex-col h-full bg-[#F4F6F9] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Clientes" />
 
-      {/* Search + Button */}
-      <div className="flex items-center gap-3 px-6 py-4 shrink-0">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#788698]" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar cliente por nome, e-mail ou telefone..."
-            className="w-full bg-white border border-[#16212E]/[0.08] rounded-[10px] pl-9 pr-4 py-2.5 text-sm text-[#56657A] placeholder:text-[#788698] outline-none focus:border-[#16212E]/[0.15] transition-colors"
-          />
-        </div>
-        <button
-          onClick={openNovo}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#16212E] hover:bg-[#16212E] text-white text-sm font-semibold rounded-[10px] transition-colors shrink-0"
-        >
-          <UserPlus size={15} />
-          Novo cliente
-        </button>
+      <div className="flex shrink-0 items-center gap-3 px-6 py-4">
+        <Input
+          wrapperClassName="flex-1"
+          icon={<Search size={15} strokeWidth={1.7} />}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar cliente por nome, e-mail ou telefone…"
+        />
+        <Button icon={<UserPlus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo cliente</Button>
       </div>
 
-      {/* Table — card azul-médio como no modelo */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="bg-white border border-[#16212E]/[0.08] rounded-[16px] overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#16212E]/[0.10]">
-                {['Cliente', 'Telefone', 'Cidade', 'Compras', 'Total Gasto', 'Última', 'Status'].map(h => (
-                  <th key={h} className="text-left text-[10px] font-mono tracking-[0.15em] text-[#788698] uppercase px-5 py-3.5 whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-16 text-[#788698] text-sm">
-                    Nenhum cliente encontrado
-                  </td>
-                </tr>
-              ) : filtrados.map(c => {
-                const color = avatarColor(c.nome)
-                const tv = c.total_vendas ?? 0
-                const vt = c.valor_total ?? 0
-                return (
-                  <tr
-                    key={c.id}
-                    onClick={() => openCliente(c)}
-                    className="border-b border-[#16212E]/[0.07] hover:bg-[#16212E]/[0.04] cursor-pointer transition-colors last:border-0"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                          style={{ backgroundColor: color }}
-                        >
-                          {getInitials(c.nome)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#1F2A39] leading-tight">{c.nome}</div>
-                          {c.email && (
-                            <div className="text-[11px] text-[#788698] truncate max-w-[200px]">{c.email}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-[#788698]">{c.telefone ?? '—'}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-[#788698]">
-                        {c.cidade && c.estado ? `${c.cidade} · ${c.estado}` : c.cidade ?? c.estado ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={cn(
-                        'text-sm font-semibold font-mono',
-                        tv > 0 ? 'text-[#16212E]' : 'text-[#788698]'
-                      )}>
-                        {tv}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      {vt > 0 ? (
-                        <span className="text-sm font-bold text-[#16212E]">
-                          {formatCurrency(vt)}
-                        </span>
-                      ) : (
-                        <span className="text-[#788698]">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-[#788698]">{fmtUltimaCompra(c.ultima_compra)}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <StatusBadge tipo={c.tipo_cliente} ativo={c.ativo} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Card flush>
+          <Table
+            columns={cols}
+            rows={filtrados}
+            rowKey={(c) => c.id}
+            onRowClick={openCliente}
+            empty={<EmptyState icon={<Users size={22} strokeWidth={1.7} />} title="Nenhum cliente encontrado" description={search ? 'Tente outro termo de busca.' : 'Cadastre seu primeiro cliente.'} action={!search ? <Button size="sm" onClick={openNovo}>Novo cliente</Button> : undefined} />}
+          />
+        </Card>
       </div>
 
       {modalOpen && (
-        <ClienteModal
-          cliente={isNew ? null : clienteSelecionado}
-          isNew={isNew}
-          onClose={() => setModalOpen(false)}
-        />
+        <ClienteModal cliente={isNew ? null : clienteSelecionado} isNew={isNew} onClose={() => setModalOpen(false)} />
       )}
     </div>
   )
