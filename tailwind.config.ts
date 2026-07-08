@@ -11,12 +11,37 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        serif: ['Fraunces', 'Georgia', 'serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        // ── Precisão: fonte única ──
+        sans: ['var(--font-geist)', 'system-ui', 'sans-serif'],
+        // TEMP ÁPICE — remover ao fim da Fase 2 (ainda usado por views não migradas)
+        serif: ['var(--font-fraunces)', 'Georgia', 'serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },
       colors: {
-        // ── Sistema ÁPICE: navy = primária, dourado = accent, vermelho = só perigo ──
+        // ══ Sistema PRECISÃO (oficial) ══
+        bg: '#FAFAF9',            // fundo da página
+        card: '#FFFFFF',
+        raised: '#FCFCFB',        // sidebar, barras
+        ink: {
+          DEFAULT: '#15181C',     // texto principal
+          2: '#5C6470',           // texto secundário
+          3: '#9199A3',           // metadados, placeholders
+        },
+        line: {
+          DEFAULT: 'rgba(21,24,28,.09)',   // bordas padrão
+          soft: 'rgba(21,24,28,.06)',      // divisores internos
+        },
+        accent: {
+          DEFAULT: '#2E5CE6',              // cobalto: links, ativo, foco, CTA secundário
+          soft: 'rgba(46,92,230,.08)',
+        },
+        ok: { DEFAULT: '#188A54', soft: 'rgba(24,138,84,.09)' },
+        warn: { DEFAULT: '#B45309', soft: 'rgba(180,83,9,.08)' },
+        bad: { DEFAULT: '#D92D20', soft: 'rgba(217,45,32,.07)' },
+        // Vermelho JM — SOMENTE o quadrado do logo Nexus. Nunca em botões/estados/textos.
+        jm: '#D7282F',
+
+        // ── TEMP ÁPICE — remover ao fim da Fase 2 (24+ views ainda referenciam) ──
         navy: {
           DEFAULT: '#16212E',
           soft: '#22303F',
@@ -32,12 +57,6 @@ const config: Config = {
           soft: '#F0656B',
           dark: '#B91C1C',
         },
-        ink: {
-          DEFAULT: '#16212E',
-          2: '#55647A',
-          3: '#8A97A8',
-        },
-        // `brand` mantido como apelido → agora aponta pra navy (compat durante a migração)
         brand: {
           DEFAULT: '#16212E',
           light: '#22303F',
@@ -50,7 +69,18 @@ const config: Config = {
           border: 'rgba(22,32,46,0.08)',
         },
       },
+      borderRadius: {
+        // Precisão: 8 (controles) · 10-12 (cards) · 12 (modais)
+        control: '8px',
+        card: '12px',
+        modal: '12px',
+        // TEMP ÁPICE
+        xl: '1rem',
+        '2xl': '1.25rem',
+        '3xl': '1.5rem',
+      },
       backgroundImage: {
+        // TEMP ÁPICE — remover ao fim da Fase 2
         'hero-gradient':
           'radial-gradient(130% 150% at 88% 0%, rgba(201,162,75,0.20), transparent 52%), linear-gradient(135deg, #17263F 0%, #101D32 55%, #0B1422 100%)',
         'sidebar-gradient':
@@ -77,11 +107,6 @@ const config: Config = {
           from: { transform: 'scaleX(0)' },
           to: { transform: 'scaleX(1)' },
         },
-      },
-      borderRadius: {
-        xl: '1rem',
-        '2xl': '1.25rem',
-        '3xl': '1.5rem',
       },
     },
   },
