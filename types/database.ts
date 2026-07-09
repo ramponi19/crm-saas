@@ -83,6 +83,63 @@ export type Database = {
         }
         Relationships: []
       }
+      chaves_imoveis: {
+        Row: {
+          id: number
+          empresa_id: number
+          imovel_id: number | null
+          codigo: string | null
+          status: string
+          com_quem: string | null
+          retirada_em: string | null
+          devolucao_prevista: string | null
+          observacoes: string | null
+          usuario_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          imovel_id?: number | null
+          codigo?: string | null
+          status?: string
+          com_quem?: string | null
+          retirada_em?: string | null
+          devolucao_prevista?: string | null
+          observacoes?: string | null
+          usuario_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          imovel_id?: number | null
+          codigo?: string | null
+          status?: string
+          com_quem?: string | null
+          retirada_em?: string | null
+          devolucao_prevista?: string | null
+          observacoes?: string | null
+          usuario_id?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chaves_imoveis_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chaves_imoveis_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       avaliacoes_usados: {
         Row: {
           id: number
