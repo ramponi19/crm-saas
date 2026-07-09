@@ -14,6 +14,7 @@ export interface EtapaEdit {
   tipo: string
   ativo: boolean
   ordem?: number
+  probabilidade?: number
 }
 
 const TIPOS = [
@@ -36,7 +37,7 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
     if (j < 0 || j >= e.length) return e
     const copy = [...e];[copy[i], copy[j]] = [copy[j], copy[i]]; return copy
   })
-  const add = () => setEtapas((e) => [...e, { label: 'Nova etapa', cor: '#9199A3', tipo: 'normal', ativo: true }])
+  const add = () => setEtapas((e) => [...e, { label: 'Nova etapa', cor: '#9199A3', tipo: 'normal', ativo: true, probabilidade: 25 }])
 
   async function salvar() {
     if (etapas.some((e) => !e.label.trim())) { notify.warn('Toda etapa precisa de um nome'); return }
@@ -44,7 +45,7 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
     try {
       const res = await fetch('/api/funil', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ funilId, etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo })) }),
+        body: JSON.stringify({ funilId, etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo, probabilidade: e.probabilidade ?? 0 })) }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
       notify.ok('Funil salvo', 'O kanban de Leads já reflete as etapas.')
@@ -89,9 +90,19 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
               </div>
               <input type="color" value={e.cor} onChange={(ev) => set(i, { cor: ev.target.value })} className="h-8 w-8 flex-none cursor-pointer rounded-control border border-line bg-transparent p-0.5" aria-label="Cor" />
               <Input wrapperClassName="flex-1" value={e.label} onChange={(ev) => set(i, { label: ev.target.value })} />
-              <Select wrapperClassName="w-[150px]" value={e.tipo} onChange={(ev) => set(i, { tipo: ev.target.value })}>
+              <Select wrapperClassName="w-[140px]" value={e.tipo} onChange={(ev) => set(i, { tipo: ev.target.value })}>
                 {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
               </Select>
+              <div className="flex w-[92px] flex-none items-center gap-1">
+                <Input
+                  type="number" min={0} max={100}
+                  value={e.probabilidade ?? 0}
+                  onChange={(ev) => set(i, { probabilidade: Math.max(0, Math.min(100, Number(ev.target.value))) })}
+                  className="num text-center"
+                  aria-label="Probabilidade"
+                />
+                <span className="text-[12px] text-ink-3">%</span>
+              </div>
               {!e.ativo && <Badge tone="neutro">Arquivada</Badge>}
               <IconButton aria-label={e.ativo ? 'Arquivar' : 'Reativar'} variant={e.ativo ? 'ghost' : 'outline'} onClick={() => set(i, { ativo: !e.ativo })}>
                 {e.ativo ? <Archive size={15} strokeWidth={1.7} /> : <RotateCcw size={15} strokeWidth={1.7} />}

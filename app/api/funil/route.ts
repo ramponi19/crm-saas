@@ -8,6 +8,7 @@ interface EtapaIn {
   cor: string
   tipo: string
   ativo: boolean
+  probabilidade?: number
 }
 
 function slugify(s: string): string {
@@ -52,10 +53,11 @@ export async function POST(req: Request) {
   for (let i = 0; i < etapas.length; i++) {
     const e = etapas[i]
     const tipo = TIPOS.includes(e.tipo) ? e.tipo : 'normal'
+    const prob = Math.max(0, Math.min(100, Math.round(Number(e.probabilidade) || 0)))
     if (e.id) {
       // slug NÃO muda (leads.kanban_status depende dele)
       const { error } = await service.from('funil_etapas')
-        .update({ label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo })
+        .update({ label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, probabilidade: prob })
         .eq('id', e.id).eq('empresa_id', empresaId)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     } else {
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
       while (slugs.has(slug)) slug = `${slugify(e.label)}_${n++}`
       slugs.add(slug)
       const { error } = await service.from('funil_etapas')
-        .insert({ empresa_id: empresaId, funil_id: funilId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo })
+        .insert({ empresa_id: empresaId, funil_id: funilId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, probabilidade: prob })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   }

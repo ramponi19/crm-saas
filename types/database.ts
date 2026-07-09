@@ -206,6 +206,7 @@ export type Database = {
           slug: string
           tipo: string
           funil_id: number | null
+          probabilidade: number
         }
         Insert: {
           ativo?: boolean
@@ -218,6 +219,7 @@ export type Database = {
           slug: string
           tipo?: string
           funil_id?: number | null
+          probabilidade?: number
         }
         Update: {
           ativo?: boolean
@@ -230,6 +232,7 @@ export type Database = {
           slug?: string
           tipo?: string
           funil_id?: number | null
+          probabilidade?: number
         }
         Relationships: [
           {

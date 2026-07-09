@@ -30,7 +30,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
     : (funis.find(f => f.padrao)?.id ?? funis[0]?.id)
 
   const { data: etapas } = await supabase
-    .from('funil_etapas').select('id, slug, label, cor, tipo, ativo, ordem')
+    .from('funil_etapas').select('id, slug, label, cor, tipo, ativo, ordem, probabilidade')
     .eq('empresa_id', empresaId).eq('funil_id', funilId ?? -1).order('ordem')
 
   return (
