@@ -33,5 +33,10 @@ export default async function EntrarPage() {
   if (vinculo.role === 'owner' || vinculo.role === 'admin') {
     redirect('/admin')
   }
+
+  // Saúde: a Agenda é a tela inicial do segmento (consultas do dia).
+  const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', vinculo.empresa_id).maybeSingle()
+  if (emp?.segmento === 'saude') redirect('/agenda')
+
   redirect('/dashboard')
 }

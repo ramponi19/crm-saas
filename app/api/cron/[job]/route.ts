@@ -170,6 +170,28 @@ export async function GET(
           })
         }
 
+        // Regra 3 — confirmação D-1: consultas/visitas de AMANHÃ → tarefa de confirmar
+        // (útil p/ saúde e imob; varejo não tem visitas, então não gera ruído).
+        const amanhaIni = new Date(now); amanhaIni.setDate(now.getDate() + 1); amanhaIni.setHours(0, 0, 0, 0)
+        const amanhaFim = new Date(amanhaIni); amanhaFim.setHours(23, 59, 59, 999)
+        const { data: consultasAmanha } = await supabase
+          .from('visitas')
+          .select('id, empresa_id, lead_id, corretor_id, data_hora, status, leads(nome, responsavel_id)')
+          .gte('data_hora', amanhaIni.toISOString()).lte('data_hora', amanhaFim.toISOString())
+          .limit(500)
+        type ConsRow = { id: number; empresa_id: number; lead_id: number | null; corretor_id: string | null; data_hora: string; status: string | null; leads: Embed<{ nome: string | null; responsavel_id: string | null }> }
+        for (const v of (consultasAmanha ?? []) as unknown as ConsRow[]) {
+          if (!v.lead_id || desativadas.has(v.empresa_id)) continue
+          if (['realizada', 'cancelada'].includes(v.status ?? '')) continue
+          const lead = one(v.leads)
+          const quando = new Date(v.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+          criadas += await gerar({
+            empresaId: v.empresa_id, leadId: v.lead_id, responsavelId: lead?.responsavel_id ?? v.corretor_id,
+            regra: 'confirmacao_d1', chave: `confirmacao_d1:visita:${v.id}`,
+            titulo: `Confirmar com ${lead?.nome ?? 'o cliente'}: agendamento amanhã (${quando})`,
+          })
+        }
+
         // Automações "parado_x_horas" (Fase 4.3) — acopladas à régua (sem cron novo).
         // Idempotente por (automação, lead, instante de entrada na etapa).
         let disparosAuto = 0
