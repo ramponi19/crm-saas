@@ -18,7 +18,7 @@ export default async function LeadsPage() {
         id, nome, telefone, instagram, origem, kanban_status,
         responsavel_id, observacoes, created_at, ativo,
         primeira_msg, msgs_nao_lidas, ultima_tratativa,
-        ultima_mensagem_at, produto_interessado, convertido_em, funil_id
+        ultima_mensagem_at, produto_interessado, convertido_em, funil_id, valor_estimado
       `)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)

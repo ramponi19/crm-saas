@@ -5,6 +5,13 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Lead, Usuario } from './types'
 import { formatCurrency } from '@/lib/utils'
+import { calcularScore } from '@/lib/lead-score'
+
+const TIER_CHIP: Record<string, { label: string; cls: string }> = {
+  quente: { label: 'Quente', cls: 'bg-accent-soft text-accent' },
+  morno: { label: 'Morno', cls: 'bg-warn-soft text-warn' },
+  frio: { label: 'Frio', cls: 'bg-ink/[0.06] text-ink-3' },
+}
 
 interface LeadCardProps {
   lead: Lead
@@ -75,6 +82,8 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
   const lastAt = lead.ultima_mensagem_at ?? lead.ultima_tratativa
   const slaTone = getSlaTone(lastAt, sla)
+  const { score, tier } = calcularScore(lead)
+  const chip = TIER_CHIP[tier]
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick} className="cursor-grab select-none active:cursor-grabbing">
@@ -109,6 +118,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
           ) : (
             <span title="Na esteira — sem dono" className="grid h-[19px] w-[19px] flex-none place-items-center rounded-full border border-dashed border-warn/60 text-[8px] font-bold text-warn">?</span>
           )}
+          <span title={`Score ${score}/100`} className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${chip.cls}`}>{chip.label}</span>
           <span className="flex-1" />
           {temMsgs && (
             <span className="num rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
