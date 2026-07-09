@@ -10,7 +10,7 @@ export const metadata = { title: 'Configurações' }
 async function getConfigs() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: configs }, { data: taxas }] = await Promise.all([
+  const [{ data: configs }, { data: taxas }, { data: empresa }] = await Promise.all([
     supabase
       .from('configuracoes_sistema')
       .select('chave, valor')
@@ -21,6 +21,7 @@ async function getConfigs() {
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
+    supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
   ])
 
   const evolution    = configs?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
@@ -34,6 +35,8 @@ async function getConfigs() {
     evolution: evolution ?? null,
     official: official ?? null,
     instagram, messenger, dadosLoja, preferencias,
+    segmento: empresa?.segmento ?? null,
+    slug: empresa?.slug ?? null,
     taxas: ((taxas ?? []) as Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>).map(t => ({
       forma_pagamento: t.forma_pagamento,
       bandeira: t.bandeira,
@@ -44,7 +47,7 @@ async function getConfigs() {
 }
 
 export default async function ConfiguracoesPage() {
-  const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas } = await getConfigs()
+  const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
 
   return (
     <>
@@ -57,6 +60,8 @@ export default async function ConfiguracoesPage() {
         dadosLoja={dadosLoja}
         preferencias={preferencias}
         taxas={taxas}
+        segmento={segmento}
+        slug={slug}
       />
     </>
   )

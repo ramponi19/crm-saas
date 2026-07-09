@@ -12,6 +12,7 @@ import { NotificacoesCard } from './notificacoes-card'
 import { MotivosPerdaCard } from './motivos-perda-card'
 import { AutomacoesCard } from './automacoes-card'
 import { FunisCard } from './funis-card'
+import { PortaisCard } from './portais-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -25,6 +26,8 @@ interface Props {
   dadosLoja: unknown
   preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
+  segmento?: string | null
+  slug?: string | null
 }
 
 const WEBHOOK_URL = 'https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads'
@@ -76,8 +79,11 @@ const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeh
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ evolution, official, instagram, messenger, taxas }: Props) {
+export function ConfiguracoesView({ evolution, official, instagram, messenger, taxas, segmento, slug }: Props) {
   const [aba, setAba]       = useState('integracoes')
+  const tabs = segmento === 'imobiliaria'
+    ? [...TABS, { id: 'portais', label: 'Portais', Icon: LinkIcon }]
+    : TABS
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -281,7 +287,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* Tabs */}
         <Tabs
-          items={TABS.map(({ id, label, Icon }) => ({
+          items={tabs.map(({ id, label, Icon }) => ({
             value: id,
             label: (
               <span className="flex items-center gap-2">
@@ -408,6 +414,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
         {/* ── EXPORTAR DADOS ── */}
         {aba === 'dados' && <ExportarDadosCard />}
+        {aba === 'portais' && <PortaisCard slug={slug ?? null} />}
 
       </div>
 
