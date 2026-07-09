@@ -192,6 +192,53 @@ export async function GET(
           })
         }
 
+        // Campanhas de fidelidade/recompra (Fase 6) — geram tarefas em datas-alvo (Meta-safe).
+        const renderTit = (t: string | null, nome: string | null, fallback: string) =>
+          ((t && t.trim()) ? t : fallback).replace(/\{\{nome\}\}/g, nome ?? '')
+        async function gerarCampanha(empId: number, chave: string, regra: string, titulo: string, respId: string | null, leadId: number | null): Promise<number> {
+          const { data: marca } = await supabase.from('followups_gerados')
+            .upsert({ empresa_id: empId, lead_id: leadId, regra, chave }, { onConflict: 'chave', ignoreDuplicates: true }).select('id').maybeSingle()
+          if (!marca) return 0
+          const { data: tarefa, error } = await supabase.from('tarefas')
+            .insert({ empresa_id: empId, lead_id: leadId, responsavel_id: respId, titulo, tipo: 'ligacao', vencimento: nowIso }).select('id').single()
+          if (error || !tarefa) { await supabase.from('followups_gerados').delete().eq('id', marca.id); return 0 }
+          await supabase.from('followups_gerados').update({ tarefa_id: tarefa.id }).eq('id', marca.id)
+          return 1
+        }
+        let campanhasGeradas = 0
+        const anoAtual = now.getFullYear()
+        const { data: campanhas } = await supabase.from('campanhas_fidelidade').select('id, empresa_id, gatilho, dias, titulo').eq('ativo', true)
+        for (const c of (campanhas ?? []) as Array<{ id: number; empresa_id: number; gatilho: string; dias: number | null; titulo: string | null }>) {
+          if (desativadas.has(c.empresa_id)) continue
+          if (c.gatilho === 'aniversario_cliente') {
+            const mm = String(now.getUTCMonth() + 1).padStart(2, '0'); const dd = String(now.getUTCDate()).padStart(2, '0')
+            const { data: nivers } = await supabase.from('clientes').select('id, nome, data_nascimento').eq('empresa_id', c.empresa_id).eq('ativo', true).not('data_nascimento', 'is', null).limit(1000)
+            for (const cl of (nivers ?? []) as Array<{ id: number; nome: string | null; data_nascimento: string | null }>) {
+              if (!cl.data_nascimento) continue
+              const dn = new Date(cl.data_nascimento)
+              if (String(dn.getUTCMonth() + 1).padStart(2, '0') !== mm || String(dn.getUTCDate()).padStart(2, '0') !== dd) continue
+              campanhasGeradas += await gerarCampanha(c.empresa_id, `camp:${c.id}:cliente:${cl.id}:${anoAtual}`, `campanha:${c.id}`, renderTit(c.titulo, cl.nome, `Parabenizar ${cl.nome ?? 'o cliente'} (aniversário)`), null, null)
+            }
+          } else {
+            const dias = Math.max(0, c.dias ?? 0)
+            const ini = new Date(now); ini.setDate(now.getDate() - dias); ini.setHours(0, 0, 0, 0)
+            const fim = new Date(ini); fim.setHours(23, 59, 59, 999)
+            if (c.gatilho === 'aniversario_compra') {
+              const { data: vendas } = await supabase.from('vendas').select('id, vendedor_id, clientes(nome)').eq('empresa_id', c.empresa_id).gte('data_venda', ini.toISOString()).lte('data_venda', fim.toISOString()).limit(500)
+              for (const v of (vendas ?? []) as unknown as Array<{ id: number; vendedor_id: string | null; clientes: Embed<{ nome: string | null }> }>) {
+                const nome = one(v.clientes)?.nome ?? null
+                campanhasGeradas += await gerarCampanha(c.empresa_id, `camp:${c.id}:venda:${v.id}`, `campanha:${c.id}`, renderTit(c.titulo, nome, `Recompra: contatar ${nome ?? 'cliente'}`), v.vendedor_id, null)
+              }
+            } else if (c.gatilho === 'retorno_consulta') {
+              const { data: vs } = await supabase.from('visitas').select('id, lead_id, corretor_id, leads(nome, responsavel_id)').eq('empresa_id', c.empresa_id).eq('status', 'realizada').gte('data_hora', ini.toISOString()).lte('data_hora', fim.toISOString()).limit(500)
+              for (const vv of (vs ?? []) as unknown as Array<{ id: number; lead_id: number | null; corretor_id: string | null; leads: Embed<{ nome: string | null; responsavel_id: string | null }> }>) {
+                const lead = one(vv.leads)
+                campanhasGeradas += await gerarCampanha(c.empresa_id, `camp:${c.id}:visita:${vv.id}`, `campanha:${c.id}`, renderTit(c.titulo, lead?.nome ?? null, `Retorno: contatar ${lead?.nome ?? 'paciente'}`), lead?.responsavel_id ?? vv.corretor_id, vv.lead_id)
+              }
+            }
+          }
+        }
+
         // Automações "parado_x_horas" (Fase 4.3) — acopladas à régua (sem cron novo).
         // Idempotente por (automação, lead, instante de entrada na etapa).
         let disparosAuto = 0
@@ -226,7 +273,7 @@ export async function GET(
           }
         }
 
-        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto })
+        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto, campanhas: campanhasGeradas })
       }
 
       case 'sync-fipe': {

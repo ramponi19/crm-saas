@@ -83,6 +83,47 @@ export type Database = {
         }
         Relationships: []
       }
+      campanhas_fidelidade: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          gatilho: string
+          dias: number | null
+          titulo: string | null
+          ativo: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          nome: string
+          gatilho: string
+          dias?: number | null
+          titulo?: string | null
+          ativo?: boolean
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          nome?: string
+          gatilho?: string
+          dias?: number | null
+          titulo?: string | null
+          ativo?: boolean
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanhas_fidelidade_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lista_espera: {
         Row: {
           id: number

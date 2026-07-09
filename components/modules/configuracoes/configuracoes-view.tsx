@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch } from 'lucide-react'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
@@ -14,6 +14,7 @@ import { AutomacoesCard } from './automacoes-card'
 import { FunisCard } from './funis-card'
 import { PortaisCard } from './portais-card'
 import { CardapioCard } from './cardapio-card'
+import { FidelidadeCard } from './fidelidade-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -41,6 +42,7 @@ const TABS = [
   { id: 'funis',       label: 'Funis',            Icon: GitBranch },
   { id: 'motivos',     label: 'Motivos de perda', Icon: Ban     },
   { id: 'automacoes',  label: 'Automações',       Icon: Zap     },
+  { id: 'fidelidade',  label: 'Fidelidade',       Icon: Gift    },
   { id: 'horario',     label: 'Horário',          Icon: Clock   },
   { id: 'modelos',     label: 'Modelos WhatsApp', Icon: MessageSquareText },
   { id: 'notificacoes', label: 'Notificações',    Icon: Bell    },
@@ -419,6 +421,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
         {aba === 'dados' && <ExportarDadosCard />}
         {aba === 'portais' && <PortaisCard slug={slug ?? null} />}
         {aba === 'cardapio' && <CardapioCard slug={slug ?? null} />}
+        {aba === 'fidelidade' && <FidelidadeCard />}
 
       </div>
 
