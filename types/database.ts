@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      avaliacoes_usados: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          veiculo: Json | null
+          km: number | null
+          fotos_urls: string | null
+          valor_mercado: number | null
+          valor_ofertado: number | null
+          status: string
+          observacoes: string | null
+          usuario_id: string | null
+          unidade_id: number | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          lead_id?: number | null
+          veiculo?: Json | null
+          km?: number | null
+          fotos_urls?: string | null
+          valor_mercado?: number | null
+          valor_ofertado?: number | null
+          status?: string
+          observacoes?: string | null
+          usuario_id?: string | null
+          unidade_id?: number | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          lead_id?: number | null
+          veiculo?: Json | null
+          km?: number | null
+          fotos_urls?: string | null
+          valor_mercado?: number | null
+          valor_ofertado?: number | null
+          status?: string
+          observacoes?: string | null
+          usuario_id?: string | null
+          unidade_id?: number | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_usados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_usados_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_usados_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_atribuicoes: {
         Row: {
           id: number

@@ -100,8 +100,8 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: ['/pdv', '/compras', '/simular-parcela'],
     labelOverrides: { '/produtos': 'Veículos', '/assistencia': 'Oficina' },
     funil: ['Novo', 'Contato', 'Test-drive agendado', 'Test-drive feito', 'Avaliação do usado', 'Proposta + F&I', 'Fechamento'],
-    // /avaliacoes chega no bloco 5.1.d (módulo próprio); por ora só o simulador de financiamento.
     modulosExtra: [
+      { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
     ],
   },
