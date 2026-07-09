@@ -15,7 +15,7 @@ interface Automacao {
   config: Record<string, unknown> | null
   ativo: boolean
 }
-interface Etapa { slug: string; label: string }
+interface Etapa { slug: string; label: string; tipo: string | null }
 
 const TEMPLATES = [
   { chave: 'boas_vindas', label: 'Boas-vindas' },
@@ -34,6 +34,7 @@ const ACAO_LABEL: Record<string, string> = {
 export function AutomacoesCard() {
   const supabase = createClient()
   const [empresaId, setEmpresaId] = useState<number | null>(null)
+  const [segmento, setSegmento] = useState<string | null>(null)
   const [etapas, setEtapas] = useState<Etapa[]>([])
   const [lista, setLista] = useState<Automacao[]>([])
   const [salvando, setSalvando] = useState(false)
@@ -62,8 +63,10 @@ export function AutomacoesCard() {
         .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
       if (!vinculo) return
       setEmpresaId(vinculo.empresa_id)
+      const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', vinculo.empresa_id).maybeSingle()
+      setSegmento(emp?.segmento ?? null)
       const { data: et } = await supabase
-        .from('funil_etapas').select('slug, label').eq('empresa_id', vinculo.empresa_id).eq('ativo', true).order('ordem')
+        .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', vinculo.empresa_id).eq('ativo', true).order('ordem')
       setEtapas(((et ?? []) as Etapa[]))
       await carregar(vinculo.empresa_id)
     })()
@@ -128,8 +131,50 @@ export function AutomacoesCard() {
     if (empresaId) await carregar(empresaId)
   }
 
+  const ganhoSlug = etapas.find(e => e.tipo === 'ganho')?.slug ?? null
+
+  async function ativarPosVenda() {
+    if (!empresaId) { notify.bad('Empresa não identificada'); return }
+    if (!ganhoSlug) { notify.warn('Sem etapa de fechamento', 'Marque uma etapa do funil como "ganho" primeiro.'); return }
+    setSalvando(true)
+    try {
+      const regras = [
+        { titulo: 'Revisão pós-venda (6 meses)', prazo_dias: 180 },
+        { titulo: 'Revisão pós-venda (1 ano)', prazo_dias: 365 },
+      ]
+      const jaTem = (dias: number) => lista.some(a =>
+        a.gatilho === 'entrou_na_etapa' && a.etapa_slug === ganhoSlug && a.acao === 'criar_tarefa' && Number(a.config?.prazo_dias) === dias)
+      const novas = regras.filter(r => !jaTem(r.prazo_dias)).map(r => ({
+        empresa_id: empresaId, gatilho: 'entrou_na_etapa', etapa_slug: ganhoSlug,
+        horas: null, acao: 'criar_tarefa', config: { titulo: r.titulo, prazo_dias: r.prazo_dias } as Json, ativo: true,
+      }))
+      if (novas.length === 0) { notify.warn('Pós-venda já ativado'); setSalvando(false); return }
+      const { error } = await supabase.from('automacoes').insert(novas as never)
+      if (error) throw new Error(error.message)
+      notify.ok('Pós-venda ativado', 'Tarefas de revisão em 180 e 365 dias após o fechamento.')
+      await carregar(empresaId)
+    } catch (e) {
+      notify.bad('Erro ao ativar', e instanceof Error ? e.message : undefined)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
+      {segmento === 'concessionaria' && (
+        <Card>
+          <div className="flex flex-wrap items-center gap-3">
+            <Zap size={18} strokeWidth={1.7} className="flex-none text-accent" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] font-semibold text-ink">Pós-venda automático</div>
+              <div className="text-[12.5px] text-ink-2">Ao fechar a venda, cria tarefas de revisão em 180 e 365 dias.</div>
+            </div>
+            <Button variant="outline" onClick={ativarPosVenda} loading={salvando}>Ativar pós-venda</Button>
+          </div>
+        </Card>
+      )}
+
       <Card title="Nova automação">
         <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
           Regras que disparam sozinhas. As ações criam <strong className="text-ink">tarefas internas</strong> —
