@@ -32,12 +32,15 @@ interface Props { ordens: OS[] }
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
-  em_analise:      { label: 'Em análise',      tone: 'acc'    },
-  em_reparo:       { label: 'Em reparo',        tone: 'warn'   },
-  aguardando_peca: { label: 'Aguardando peça',  tone: 'warn'   },
-  concluido:       { label: 'Concluído',        tone: 'ok'     },
-  entregue:        { label: 'Entregue',         tone: 'neutro' },
-  reprovado:       { label: 'Reprovado',        tone: 'bad'    },
+  em_analise:           { label: 'Em análise',          tone: 'acc'    },
+  aguardando_aprovacao: { label: 'Aguardando aprovação', tone: 'warn'  },
+  aprovado:             { label: 'Aprovado',            tone: 'ok'     },
+  em_reparo:            { label: 'Em reparo',           tone: 'warn'   },
+  aguardando_peca:      { label: 'Aguardando peça',     tone: 'warn'   },
+  pronto:               { label: 'Pronto p/ retirada',  tone: 'ok'     },
+  concluido:            { label: 'Concluído',           tone: 'ok'     },
+  entregue:             { label: 'Entregue',            tone: 'neutro' },
+  reprovado:            { label: 'Reprovado',           tone: 'bad'    },
 }
 
 const ORIGEM: Record<string, { label: string; tone: Tone }> = {

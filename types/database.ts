@@ -1504,6 +1504,9 @@ export type Database = {
           status: string | null
           tipo: string | null
           usuario_id: string | null
+          token: string | null
+          aprovado_em: string | null
+          recusado_em: string | null
         }
         Insert: {
           celular_reserva_fornecido?: boolean | null
@@ -1527,6 +1530,9 @@ export type Database = {
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
+          token?: string | null
+          aprovado_em?: string | null
+          recusado_em?: string | null
         }
         Update: {
           celular_reserva_fornecido?: boolean | null
@@ -1550,6 +1556,9 @@ export type Database = {
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
+          token?: string | null
+          aprovado_em?: string | null
+          recusado_em?: string | null
         }
         Relationships: [
           {

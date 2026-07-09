@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { QrCode, Send, Copy, Check } from 'lucide-react'
+import { QrCode, Send, Copy, Check, Link as LinkIcon, PackageCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
@@ -35,6 +35,9 @@ interface OS {
   modelo_reserva: string | null
   cliente_id: number | null
   produto_id: number | null
+  token?: string | null
+  aprovado_em?: string | null
+  recusado_em?: string | null
   clientes?: { nome: string; telefone: string | null } | null
   produtos?: { nome: string } | null
 }
@@ -53,8 +56,11 @@ type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
 const STATUS_OPTIONS: { value: string; label: string; tone: Tone }[] = [
   { value: 'em_analise', label: 'Em análise', tone: 'acc' },
+  { value: 'aguardando_aprovacao', label: 'Aguardando aprovação', tone: 'warn' },
+  { value: 'aprovado', label: 'Aprovado', tone: 'ok' },
   { value: 'em_reparo', label: 'Em reparo', tone: 'warn' },
   { value: 'aguardando_peca', label: 'Aguardando peça', tone: 'warn' },
+  { value: 'pronto', label: 'Pronto p/ retirada', tone: 'ok' },
   { value: 'concluido', label: 'Concluído', tone: 'ok' },
   { value: 'entregue', label: 'Entregue', tone: 'neutro' },
   { value: 'reprovado', label: 'Reprovado', tone: 'bad' },
@@ -83,6 +89,39 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const [cobranca, setCobranca] = useState<Cobranca | null>(null)
   const [copiado, setCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
+  const [origin, setOrigin] = useState('')
+  const [linkCopiado, setLinkCopiado] = useState(false)
+  const [marcandoPronto, setMarcandoPronto] = useState(false)
+  useEffect(() => { if (typeof window !== 'undefined') setOrigin(window.location.origin) }, [])
+  const aprovacaoUrl = form.token && origin ? `${origin}/os/${form.token}` : ''
+
+  async function copiarLink() {
+    if (!aprovacaoUrl) return
+    await navigator.clipboard.writeText(aprovacaoUrl)
+    setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 2000)
+  }
+  function compartilharLink() {
+    if (!aprovacaoUrl) return
+    const msg = encodeURIComponent(`Olá${os?.clientes?.nome ? ' ' + os.clientes.nome : ''}! Segue o orçamento da OS ${form.protocolo ?? `#${os?.id}`} para sua aprovação: ${aprovacaoUrl}`)
+    const digits = (os?.clientes?.telefone ?? '').replace(/\D/g, '')
+    const alvo = digits ? (digits.length <= 11 ? '55' + digits : digits) : ''
+    window.open(alvo ? `https://wa.me/${alvo}?text=${msg}` : `https://wa.me/?text=${msg}`, '_blank')
+  }
+  async function marcarPronto() {
+    if (!os?.id) return
+    setMarcandoPronto(true)
+    const { error } = await supabase.from('garantias_assistencias').update({ status: 'pronto' }).eq('id', os.id)
+    if (!error && empresaId) {
+      // Aviso "pronto para retirada" = TAREFA interna (Meta-safe: não envia mensagem).
+      await supabase.from('tarefas').insert({
+        empresa_id: empresaId, tipo: 'ligacao', vencimento: new Date().toISOString(),
+        titulo: `Avisar cliente: OS ${form.protocolo ?? `#${os.id}`} pronta para retirada${os.clientes?.nome ? ` (${os.clientes.nome})` : ''}`,
+      } as TablesInsert<'tarefas'>)
+    }
+    setMarcandoPronto(false)
+    if (error) { notify.bad('Erro ao marcar'); return }
+    notify.ok('OS pronta — tarefa de aviso criada'); setForm(f => ({ ...f, status: 'pronto' })); router.refresh()
+  }
 
   useEffect(() => {
     if (!empresaId) return
@@ -222,6 +261,38 @@ export default function OSModal({ os, isNew, onClose }: Props) {
         <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico..." />
         <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} placeholder="..." />
       </form>
+
+      {/* Aprovação do orçamento por link público (Meta-safe: link, não envio automático) */}
+      {!isNew && !!form.orcamento_valor && (
+        <div className="mt-4 space-y-2.5 border-t border-line-soft pt-4">
+          <div className="flex items-center gap-2 text-[12.5px] font-semibold text-ink">
+            <LinkIcon size={14} strokeWidth={1.7} /> Aprovação do orçamento
+            {form.aprovado_em && <Badge tone="ok">Aprovado pelo cliente</Badge>}
+            {form.recusado_em && <Badge tone="bad">Recusado pelo cliente</Badge>}
+          </div>
+          {!form.aprovado_em && !form.recusado_em && (
+            <p className="text-[11.5px] text-ink-3">Envie o link pro cliente aprovar. A resposta atualiza o status da OS aqui automaticamente.</p>
+          )}
+          {aprovacaoUrl && (
+            <>
+              <div className="flex items-center gap-2">
+                <Input wrapperClassName="flex-1" readOnly value={aprovacaoUrl} className="num truncate text-ink-2" />
+                <Button type="button" variant="outline" onClick={copiarLink} icon={linkCopiado ? <Check size={13} strokeWidth={1.7} className="text-ok" /> : <Copy size={13} strokeWidth={1.7} />}>
+                  {linkCopiado ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+              <Button type="button" variant="outline" className="w-full" icon={<Send size={13} strokeWidth={1.7} />} onClick={compartilharLink}>
+                Enviar link no WhatsApp
+              </Button>
+            </>
+          )}
+          {form.status !== 'pronto' && form.status !== 'entregue' && (
+            <Button type="button" variant="outline" className="w-full text-ok" icon={<PackageCheck size={14} strokeWidth={1.7} />} onClick={marcarPronto} loading={marcandoPronto}>
+              Marcar pronto para retirada
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Cobrança Pix */}
       {!isNew && !!form.orcamento_valor && form.status !== 'reprovado' && (
