@@ -122,6 +122,7 @@ export const CATALOGO: MenuGroupBase[] = [
     label: 'Gestão',
     items: [
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true },
+      { href: '/metas', label: 'Metas', icon: 'Gauge', adminOnly: true },
       { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true },
       { href: '/equipe', label: 'Equipe', icon: 'UserCog', modulo: 'multi_usuario', adminOnly: true },
     ],
