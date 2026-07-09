@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, Eye } from 'lucide-react'
-import { Card, Button, IconButton, Input, Textarea, Modal, Badge, notify } from '@/components/ui'
+import { Plus, Pencil, Eye, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/components/ui'
 import { CATALOGO } from '@/lib/menu'
 
 export interface SegmentoRow {
@@ -22,15 +22,12 @@ export interface SegmentoRow {
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : [])
 const obj = (v: unknown): Record<string, string> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : {})
 
-const linhasToArr = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean)
-const arrToLinhas = (a: string[]) => a.join('\n')
-
 // Núcleo: sempre ligado (não dá pra desmarcar). Espelha o NUCLEO de lib/menu.
 const TRAVADOS = new Set(['/dashboard', '/leads', '/clientes'])
 
 interface FormState {
   novo: boolean; chave: string; label: string; descricao: string; ordem: string; ativo: boolean
-  funil: string
+  funil: string[]                       // etapas do funil (em ordem)
   habilitados: string[]                 // hrefs ligados (opt-in)
   labels: Record<string, string>        // href -> novo nome
 }
@@ -38,11 +35,11 @@ interface FormState {
 function fromRow(s: SegmentoRow): FormState {
   return {
     novo: false, chave: s.chave, label: s.label, descricao: s.descricao ?? '', ordem: String(s.ordem), ativo: s.ativo,
-    funil: arrToLinhas(arr(s.funil_seed)),
+    funil: arr(s.funil_seed),
     habilitados: arr(s.modulos_habilitados), labels: obj(s.label_overrides),
   }
 }
-const EMPTY: FormState = { novo: true, chave: '', label: '', descricao: '', ordem: '99', ativo: true, funil: '', habilitados: [], labels: {} }
+const EMPTY: FormState = { novo: true, chave: '', label: '', descricao: '', ordem: '99', ativo: true, funil: [], habilitados: [], labels: {} }
 
 export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   const router = useRouter()
@@ -82,6 +79,18 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
     })
   }
 
+  // Funil (etapas em linhas)
+  const setEtapa = (i: number, v: string) => setForm((f) => (f ? { ...f, funil: f.funil.map((e, j) => (j === i ? v : e)) } : f))
+  const addEtapa = () => setForm((f) => (f ? { ...f, funil: [...f.funil, ''] } : f))
+  const rmEtapa = (i: number) => setForm((f) => (f ? { ...f, funil: f.funil.filter((_, j) => j !== i) } : f))
+  const moveEtapa = (i: number, dir: -1 | 1) => setForm((f) => {
+    if (!f) return f
+    const j = i + dir
+    if (j < 0 || j >= f.funil.length) return f
+    const funil = [...f.funil];[funil[i], funil[j]] = [funil[j], funil[i]]
+    return { ...f, funil }
+  })
+
   async function salvar() {
     if (!form) return
     if (!form.label.trim()) { notify.warn('Informe o label'); return }
@@ -94,7 +103,7 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
         body: JSON.stringify({
           novo: form.novo, chave: form.chave, label: form.label, descricao: form.descricao,
           ordem: Number(form.ordem) || 0, ativo: form.ativo,
-          funil_seed: linhasToArr(form.funil), label_overrides: form.labels,
+          funil_seed: form.funil.map((e) => e.trim()).filter(Boolean), label_overrides: form.labels,
           modulos_habilitados: habilitados,
         }),
       })
@@ -191,9 +200,27 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
               </div>
             </div>
 
+            {/* Funil em linhas */}
+            <div>
+              <div className="mb-1 text-[12.5px] font-semibold text-ink">Funil (etapas do kanban)</div>
+              <p className="mb-2.5 text-[11.5px] text-ink-3">A ordem aqui é a ordem das colunas no funil de leads.</p>
+              <div className="space-y-1.5">
+                {form.funil.length === 0 && <p className="text-[12px] text-ink-3">Nenhuma etapa. Adicione a primeira abaixo.</p>}
+                {form.funil.map((etapa, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <span className="num w-5 text-right text-[11px] text-ink-3">{i + 1}</span>
+                    <Input wrapperClassName="flex-1" value={etapa} onChange={(e) => setEtapa(i, e.target.value)} placeholder="Nome da etapa" />
+                    <IconButton aria-label="Subir" onClick={() => moveEtapa(i, -1)} disabled={i === 0}><ArrowUp size={14} strokeWidth={1.7} /></IconButton>
+                    <IconButton aria-label="Descer" onClick={() => moveEtapa(i, 1)} disabled={i === form.funil.length - 1}><ArrowDown size={14} strokeWidth={1.7} /></IconButton>
+                    <IconButton aria-label="Remover etapa" onClick={() => rmEtapa(i)}><Trash2 size={14} strokeWidth={1.7} className="text-bad" /></IconButton>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" size="sm" className="mt-2" icon={<Plus size={14} strokeWidth={1.7} />} onClick={addEtapa}>Adicionar etapa</Button>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <Textarea wrapperClassName="col-span-2" label="Funil (uma etapa por linha)" rows={4} value={form.funil} onChange={(e) => set('funil', e.target.value)} placeholder={'Novo\nContato\nFechamento'} />
-              <Input label="Ordem" className="num" value={form.ordem} onChange={(e) => set('ordem', e.target.value.replace(/[^0-9]/g, ''))} />
+              <Input label="Ordem do segmento" className="num" value={form.ordem} onChange={(e) => set('ordem', e.target.value.replace(/[^0-9]/g, ''))} />
               <label className="flex items-center gap-2 pt-6 text-[13px] text-ink">
                 <input type="checkbox" checked={form.ativo} onChange={(e) => set('ativo', e.target.checked)} className="h-4 w-4 accent-[#6D28D9]" /> Ativo
               </label>
