@@ -23,6 +23,37 @@ function limparVeiculo(raw: unknown): Veiculo {
 
 const numOrNull = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && v !== '' && v !== null ? n : null }
 
+type Sb = Awaited<ReturnType<typeof createClient>>
+
+/** Acha (case-insensitive) ou cria uma linha "nome + empresa_id" e devolve o id. */
+async function acharOuCriar(sb: Sb, tabela: 'marcas_produtos' | 'categorias_produtos', empresaId: number, nome: string): Promise<number | null> {
+  const n = nome.trim()
+  if (!n) return null
+  const { data: existe } = await sb.from(tabela).select('id').eq('empresa_id', empresaId).ilike('nome', n).limit(1).maybeSingle()
+  if (existe?.id) return existe.id
+  const { data: novo } = await sb.from(tabela).insert({ empresa_id: empresaId, nome: n } as never).select('id').single()
+  return novo?.id ?? null
+}
+
+/** Resolve (ou cria) o "modelo" no catálogo a partir do veículo avaliado. Devolve produto_id ou null. */
+async function resolverProduto(sb: Sb, empresaId: number, v: Veiculo): Promise<number | null> {
+  const nomeModelo = [v.modelo, v.versao].filter(Boolean).join(' ').trim() || (v.marca ?? '').trim()
+  if (!nomeModelo) return null
+  const marcaId = v.marca ? await acharOuCriar(sb, 'marcas_produtos', empresaId, v.marca) : null
+  const categoriaId = v.categoria ? await acharOuCriar(sb, 'categorias_produtos', empresaId, v.categoria) : null
+
+  // modelo já existe? (mesmo nome + mesma marca)
+  let q = sb.from('produtos').select('id').eq('empresa_id', empresaId).ilike('nome', nomeModelo).limit(1)
+  if (marcaId != null) q = q.eq('marca_id', marcaId)
+  const { data: existe } = await q.maybeSingle()
+  if (existe?.id) return existe.id
+
+  const { data: novo } = await sb.from('produtos')
+    .insert({ empresa_id: empresaId, nome: nomeModelo, marca_id: marcaId, categoria_id: categoriaId } as never)
+    .select('id').single()
+  return novo?.id ?? null
+}
+
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
@@ -71,9 +102,10 @@ export async function PATCH(req: Request) {
     if (av && !av.unidade_id) {
       const v = (av.veiculo ?? {}) as Veiculo
       const desc = [v.marca, v.modelo, v.versao].filter(Boolean).join(' ')
+      const produtoId = await resolverProduto(supabase, empresaId!, v)
       const { data: unidade } = await supabase.from('inventario_unidades').insert({
         empresa_id: empresaId,
-        produto_id: null,
+        produto_id: produtoId,
         placa: v.placa ?? null,
         chassi: v.chassi ?? null,
         ano: v.ano ?? null,
@@ -84,7 +116,7 @@ export async function PATCH(req: Request) {
         estado: 'bom',
         tipo: 'troca',
         status: 'disponivel',
-        observacoes: `Entrada por avaliação #${av.id}${desc ? ` — ${desc}` : ''}. Completar o modelo no catálogo.`,
+        observacoes: `Entrada por avaliação #${av.id}${desc ? ` — ${desc}` : ''}.`,
         ativo: true,
       } as never).select('id').single()
       if (unidade?.id) {
