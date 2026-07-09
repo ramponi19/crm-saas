@@ -26,6 +26,8 @@ export interface MenuItemBase {
   modulo?: ModuloPlano
   adminOnly?: boolean
   badge?: BadgeKey
+  /** Módulo OPCIONAL (nasce desligado; habilitado por segmento via opt-in). */
+  opcional?: boolean
 }
 
 export interface MenuGroupBase {
@@ -66,6 +68,8 @@ export interface SegOverride {
   hiddenHrefs?: string[]
   labelOverrides?: Record<string, string>
   modulosExtra?: { href: string; label: string; icon: string }[]
+  /** Opt-in: hrefs habilitados neste segmento (novo modelo). Se presente, tem precedência. */
+  habilitados?: string[]
 }
 
 export interface ResolverMenuInput {
@@ -81,6 +85,24 @@ export interface ResolverMenuInput {
 
 // Nunca podem ser ocultados pela config do dono (camada 4).
 const PROTEGIDOS = new Set(['/dashboard', '/configuracoes'])
+
+// Núcleo: sempre habilitado, independente do opt-in do segmento.
+const NUCLEO = new Set(['/dashboard', '/leads', '/clientes'])
+
+/** Hrefs do catálogo que NÃO são opcionais (base comum a todo segmento). */
+export function hrefsBase(): string[] {
+  return CATALOGO.flatMap((g) => g.items).filter((i) => !i.opcional).map((i) => i.href)
+}
+
+/**
+ * Deriva os módulos habilitados a partir da config ESTÁTICA (fallback quando o
+ * banco ainda não tem `modulos_habilitados`): base menos ocultos + extras.
+ */
+function habilitadosDerivados(seg: { hiddenHrefs: string[]; modulosExtra?: { href: string }[] }): string[] {
+  const base = hrefsBase().filter((h) => !seg.hiddenHrefs.includes(h))
+  const extras = (seg.modulosExtra ?? []).map((m) => m.href)
+  return [...base, ...extras]
+}
 
 /**
  * Catálogo base do menu (camada 1, parte comum). Os módulos EXCLUSIVOS de cada
@@ -117,6 +139,22 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
       { href: '/assistencia', label: 'Assistência', icon: 'Wrench' },
+      // Ferramenta compartilhada (imob + veículos) — opcional, junto do simulador.
+      { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator', opcional: true },
+    ],
+  },
+  {
+    label: 'Imóveis',
+    items: [
+      { href: '/imoveis', label: 'Imóveis', icon: 'Home', opcional: true },
+      { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound', opcional: true },
+    ],
+  },
+  {
+    label: 'Veículos',
+    items: [
+      { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck', opcional: true },
+      { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car', opcional: true },
     ],
   },
   {
@@ -147,36 +185,29 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   const seg = SEGMENTOS[segmento]
   const isAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
 
-  // Camada 1: config do segmento — do banco (segOverride) com fallback ao estático.
-  const segHidden = segOverride?.hiddenHrefs ?? seg.hiddenHrefs
-  const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
-  const segExtras = segOverride?.modulosExtra ?? seg.modulosExtra
+  // Camada 1 (opt-in): módulos habilitados do segmento — do banco (segOverride)
+  // com fallback derivado da config estática. O núcleo sempre entra.
+  const habilitados = new Set<string>(segOverride?.habilitados ?? habilitadosDerivados(seg))
+  NUCLEO.forEach((h) => habilitados.add(h))
 
-  // Camadas 1 (segmento) + 3 (superadmin) + 4 (dono) de hidden/labels.
+  const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
+
+  // Camadas 3 (superadmin) + 4 (dono): ocultar dentro do habilitado + renomear.
   const donoHidden = (configDono?.hidden ?? []).filter((h) => !PROTEGIDOS.has(h))
-  const hidden = new Set<string>([...segHidden, ...(overrides?.hidden ?? []), ...donoHidden])
+  const hidden = new Set<string>([...(overrides?.hidden ?? []), ...donoHidden])
   const labels: Record<string, string> = {
     ...segLabels,
     ...(overrides?.labels ?? {}),
     ...(configDono?.labels ?? {}),
   }
 
-  // Injeta os módulos exclusivos do segmento em "Operação".
-  const extras: MenuItemBase[] = (segExtras ?? []).map((m) => ({ href: m.href, label: m.label, icon: m.icon }))
-
-  const grupos = CATALOGO.map((g) => ({
-    label: g.label,
-    items: g.label === 'Operação' ? [...g.items, ...extras] : g.items,
-  }))
-
   const out: MenuGroup[] = []
-  for (const g of grupos) {
+  for (const g of CATALOGO) {
     const items: MenuItem[] = []
     for (const item of g.items) {
-      // Camada 1/3/4: visibilidade
-      if (hidden.has(item.href)) continue
-      // Camada 5: papel
-      if (item.adminOnly && !isAdmin) continue
+      if (!habilitados.has(item.href)) continue        // Camada 1: opt-in do segmento
+      if (hidden.has(item.href)) continue              // Camada 3/4: dono/superadmin ocultou
+      if (item.adminOnly && !isAdmin) continue         // Camada 5: papel
       // Camada 2/3: plano + override de módulo
       const forcado = item.modulo ? overrides?.modulos?.[item.modulo] : undefined
       if (forcado === false) continue // superadmin bloqueou explicitamente

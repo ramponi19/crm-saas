@@ -116,12 +116,13 @@ export default async function DashboardLayout({
   // Camada 1 dinâmica: config do segmento vinda de segmentos_config (fallback = estático).
   const { data: segCfg } = await supabase
     .from('segmentos_config')
-    .select('hidden_hrefs, label_overrides, modulos_extra')
+    .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados')
     .eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
   const segOverride: SegOverride | undefined = segCfg ? {
     hiddenHrefs: (segCfg.hidden_hrefs ?? []) as string[],
     labelOverrides: (segCfg.label_overrides ?? {}) as Record<string, string>,
     modulosExtra: (segCfg.modulos_extra ?? []) as { href: string; label: string; icon: string }[],
+    habilitados: (segCfg.modulos_habilitados ?? undefined) as string[] | undefined,
   } : undefined
 
   return (

@@ -435,6 +435,7 @@ export type Database = {
           label_overrides: Json
           funil_seed: Json
           modulos_extra: Json
+          modulos_habilitados: Json | null
           ordem: number
           ativo: boolean
           created_at: string
@@ -447,6 +448,7 @@ export type Database = {
           label_overrides?: Json
           funil_seed?: Json
           modulos_extra?: Json
+          modulos_habilitados?: Json | null
           ordem?: number
           ativo?: boolean
           created_at?: string
@@ -459,6 +461,7 @@ export type Database = {
           label_overrides?: Json
           funil_seed?: Json
           modulos_extra?: Json
+          modulos_habilitados?: Json | null
           ordem?: number
           ativo?: boolean
           created_at?: string

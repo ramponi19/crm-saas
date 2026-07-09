@@ -14,6 +14,7 @@ export async function POST(req: Request) {
     chave?: string; novo?: boolean; label?: string; descricao?: string | null
     hidden_hrefs?: string[]; label_overrides?: Record<string, string>
     funil_seed?: string[]; modulos_extra?: { href: string; label: string; icon: string }[]
+    modulos_habilitados?: string[]
     ordem?: number; ativo?: boolean
   }
   if (!b.label?.trim()) return NextResponse.json({ error: 'Label obrigatório' }, { status: 400 })
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
     label_overrides: (b.label_overrides ?? {}) as never,
     funil_seed: (b.funil_seed ?? []) as never,
     modulos_extra: (b.modulos_extra ?? []) as never,
+    modulos_habilitados: (b.modulos_habilitados ?? []) as never,
     ordem: Number.isFinite(b.ordem) ? b.ordem! : 0,
     ativo: b.ativo ?? true,
   }
