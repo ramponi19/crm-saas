@@ -18,6 +18,7 @@ export type Segmento =
   | 'imobiliaria'
   | 'saude'
   | 'food'
+  | 'concessionaria'
 
 export interface SegmentoConfig {
   label: string
@@ -90,6 +91,19 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: ['/garantia', '/assistencia', '/simular-parcela'],
     labelOverrides: { '/produtos': 'Cardápio', '/catalogo': 'Cardápio' },
     funil: ['Novo', 'Contato', 'Pedido', 'Entregue'],
+  },
+  concessionaria: {
+    label: 'Loja de veículos',
+    descricao: 'Compra e venda de carros e motos (seminovos e 0km): estoque, avaliação de usados, test-drive e F&I.',
+    emoji: '🚗',
+    // Venda vai por proposta + F&I (não PDV); a "compra" é a avaliação de usados (não o módulo de fornecedores).
+    hiddenHrefs: ['/pdv', '/compras', '/simular-parcela'],
+    labelOverrides: { '/produtos': 'Veículos', '/assistencia': 'Oficina' },
+    funil: ['Novo', 'Contato', 'Test-drive agendado', 'Test-drive feito', 'Avaliação do usado', 'Proposta + F&I', 'Fechamento'],
+    // /avaliacoes chega no bloco 5.1.d (módulo próprio); por ora só o simulador de financiamento.
+    modulosExtra: [
+      { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
+    ],
   },
 }
 
