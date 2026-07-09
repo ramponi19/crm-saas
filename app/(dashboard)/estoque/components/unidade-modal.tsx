@@ -24,11 +24,17 @@ interface Unidade {
   tipo: string | null
   estado: string | null
   custo_reparo: number | null
+  placa: string | null
+  chassi: string | null
+  renavam: string | null
+  km: number | null
+  ano: number | null
 }
 
 interface Props {
   unidade: Unidade | null
   empresaId: number
+  isVeiculo?: boolean
   onClose: () => void
 }
 
@@ -37,11 +43,12 @@ const EMPTY: Unidade = {
   condicao: 'novo', cor: null, armazenamento: null, preco_custo: null, preco_venda: null,
   fornecedor_id: null, observacoes: null, status: 'disponivel', tipo: 'compra',
   estado: 'lacrado', custo_reparo: null,
+  placa: null, chassi: null, renavam: null, km: null, ano: null,
 }
 
 const supabase = createClient()
 
-export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
+export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, onClose }: Props) {
   const router = useRouter()
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
@@ -105,7 +112,7 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
         disableOverlayClose={saving}
         title={
           <span className="flex items-center gap-2.5">
-            <span className="truncate">{isNew ? 'Adicionar unidade' : 'Editar unidade'}</span>
+            <span className="truncate">{isNew ? (isVeiculo ? 'Adicionar veículo' : 'Adicionar unidade') : (isVeiculo ? 'Editar veículo' : 'Editar unidade')}</span>
             {!isNew && <span className="num text-[12px] font-normal text-ink-3">#{unidade?.id}</span>}
           </span>
         }
@@ -124,12 +131,12 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
         <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
           <Select
             wrapperClassName="col-span-2"
-            label="Produto"
+            label={isVeiculo ? 'Modelo' : 'Produto'}
             required
             value={form.produto_id ?? ''}
             onChange={e => set('produto_id', e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Selecionar produto…</option>
+            <option value="">{isVeiculo ? 'Selecionar modelo…' : 'Selecionar produto…'}</option>
             {produtos.map(p => (
               <option key={p.id} value={p.id}>{p.marca_nome} {p.nome}</option>
             ))}
@@ -148,25 +155,50 @@ export default function UnidadeModal({ unidade, empresaId, onClose }: Props) {
             <option value="consignado">Consignado</option>
           </Select>
 
-          <Input label="IMEI 1" value={form.imei ?? ''} onChange={e => set('imei', e.target.value || null)} placeholder="000000000000000" className="num" />
-          <Input label="IMEI 2 / Série" value={form.imei2 ?? ''} onChange={e => set('imei2', e.target.value || null)} placeholder="000000000000000" className="num" />
-          <Input label="Número de série" value={form.numero_serie ?? ''} onChange={e => set('numero_serie', e.target.value || null)} placeholder="XXXXX" className="num" />
-          <Input label="Bateria %" value={form.bateria ?? ''} onChange={e => set('bateria', e.target.value || null)} placeholder="95" className="num" />
-          <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
-          <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
+          {isVeiculo ? (
+            <>
+              <Input label="Placa" value={form.placa ?? ''} onChange={e => set('placa', e.target.value.toUpperCase() || null)} placeholder="ABC1D23" className="num" />
+              <Input label="Ano/modelo" type="number" value={form.ano ?? ''} onChange={e => set('ano', e.target.value ? Number(e.target.value) : null)} placeholder="2022" className="num" />
+              <Input label="Chassi" value={form.chassi ?? ''} onChange={e => set('chassi', e.target.value.toUpperCase() || null)} placeholder="9BW…" className="num" />
+              <Input label="Renavam" value={form.renavam ?? ''} onChange={e => set('renavam', e.target.value || null)} placeholder="00000000000" className="num" />
+              <Input label="Km" type="number" value={form.km ?? ''} onChange={e => set('km', e.target.value ? Number(e.target.value) : null)} placeholder="45000" className="num" />
+              <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Prata, Preto…" />
 
-          <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
-            <option value="novo">Novo</option>
-            <option value="seminovo">Seminovo</option>
-            <option value="usado">Usado</option>
-          </Select>
-          <Select label="Estado físico" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
-            <option value="lacrado">Lacrado</option>
-            <option value="excelente">Excelente</option>
-            <option value="otimo">Ótimo</option>
-            <option value="bom">Bom</option>
-            <option value="regular">Regular</option>
-          </Select>
+              <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
+                <option value="novo">0km</option>
+                <option value="seminovo">Seminovo</option>
+                <option value="usado">Usado</option>
+              </Select>
+              <Select label="Estado" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
+                <option value="excelente">Excelente</option>
+                <option value="otimo">Ótimo</option>
+                <option value="bom">Bom</option>
+                <option value="regular">Regular</option>
+              </Select>
+            </>
+          ) : (
+            <>
+              <Input label="IMEI 1" value={form.imei ?? ''} onChange={e => set('imei', e.target.value || null)} placeholder="000000000000000" className="num" />
+              <Input label="IMEI 2 / Série" value={form.imei2 ?? ''} onChange={e => set('imei2', e.target.value || null)} placeholder="000000000000000" className="num" />
+              <Input label="Número de série" value={form.numero_serie ?? ''} onChange={e => set('numero_serie', e.target.value || null)} placeholder="XXXXX" className="num" />
+              <Input label="Bateria %" value={form.bateria ?? ''} onChange={e => set('bateria', e.target.value || null)} placeholder="95" className="num" />
+              <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
+              <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
+
+              <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
+                <option value="novo">Novo</option>
+                <option value="seminovo">Seminovo</option>
+                <option value="usado">Usado</option>
+              </Select>
+              <Select label="Estado físico" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
+                <option value="lacrado">Lacrado</option>
+                <option value="excelente">Excelente</option>
+                <option value="otimo">Ótimo</option>
+                <option value="bom">Bom</option>
+                <option value="regular">Regular</option>
+              </Select>
+            </>
+          )}
 
           <Input
             label="Preço de custo"

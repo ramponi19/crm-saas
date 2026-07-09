@@ -11,6 +11,7 @@ import {
   type Column,
 } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
+import type { Segmento } from '@/lib/segmentos'
 
 export interface Unidade {
   id: number
@@ -34,6 +35,12 @@ export interface Unidade {
   custo_reparo: number | null
   observacoes: string | null
   created_at: string | null
+  // Veículos (segmento concessionaria)
+  placa: string | null
+  chassi: string | null
+  renavam: string | null
+  km: number | null
+  ano: number | null
 }
 
 export interface Movimentacao {
@@ -53,6 +60,7 @@ interface Props {
   categorias: { id: number; nome: string }[]
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
   empresaId: number
+  segmento: Segmento
 }
 
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
@@ -102,7 +110,8 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, empresaId }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, empresaId, segmento }: Props) {
+  const isVeiculo = segmento === 'concessionaria'
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')
@@ -125,19 +134,52 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   const marcasUnicas = useMemo(() => [...new Set(itens.map(i => i.marca_nome))].filter(Boolean), [itens])
 
   const filtrados = useMemo(() => itens.filter(i => {
+    const s = search.toLowerCase()
     const matchSearch = !search ||
-      i.produto_nome.toLowerCase().includes(search.toLowerCase()) ||
-      i.marca_nome.toLowerCase().includes(search.toLowerCase()) ||
+      i.produto_nome.toLowerCase().includes(s) ||
+      i.marca_nome.toLowerCase().includes(s) ||
       (i.imei ?? '').includes(search) ||
-      (i.numero_serie ?? '').includes(search)
+      (i.numero_serie ?? '').includes(search) ||
+      (i.placa ?? '').toLowerCase().includes(s) ||
+      (i.chassi ?? '').toLowerCase().includes(s)
     const matchStatus = filtroStatus === 'todos' || i.status === filtroStatus
     const matchMarca = filtroMarca === 'todas' || i.marca_nome === filtroMarca
     return matchSearch && matchStatus && matchMarca
   }), [itens, search, filtroStatus, filtroMarca])
 
+  const idCol: Column<Unidade> = isVeiculo
+    ? {
+        key: 'placa', header: 'Placa', hideOnMobile: true, className: 'num',
+        render: (u) => <span className="text-ink-2">{u.placa ? u.placa.toUpperCase() : (u.chassi ? `chassi ${u.chassi.slice(-6)}` : '—')}</span>,
+      }
+    : {
+        key: 'imei', header: 'IMEI', hideOnMobile: true, className: 'num',
+        render: (u) => {
+          const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
+          return <span className="text-ink-2">{imeiMask}</span>
+        },
+      }
+
+  const detalheCol: Column<Unidade> = isVeiculo
+    ? {
+        key: 'anokm', header: 'Ano · Km', align: 'right', hideOnMobile: true, className: 'num',
+        render: (u) => <span className="text-ink-2">{[u.ano ? String(u.ano) : null, u.km != null ? `${u.km.toLocaleString('pt-BR')} km` : null].filter(Boolean).join(' · ') || '—'}</span>,
+      }
+    : {
+        key: 'bateria', header: 'Bateria', align: 'right', hideOnMobile: true, className: 'num',
+        render: (u) => u.bateria
+          ? <span className={cn('font-semibold', Number(u.bateria) >= 90 ? 'text-ok' : Number(u.bateria) >= 80 ? 'text-warn' : 'text-bad')}>{u.bateria}%</span>
+          : <span className="text-ink-3">—</span>,
+      }
+
+  const varianteCol: Column<Unidade> = {
+    key: 'variante', header: isVeiculo ? 'Cor' : 'Variante', hideOnMobile: true,
+    render: (u) => <span className="text-ink-2">{(isVeiculo ? [u.cor] : [u.cor, u.armazenamento]).filter(Boolean).join(' · ') || '—'}</span>,
+  }
+
   const listaCols: Column<Unidade>[] = [
     {
-      key: 'produto', header: 'Produto',
+      key: 'produto', header: isVeiculo ? 'Veículo' : 'Produto',
       render: (u) => (
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{u.produto_nome}</div>
@@ -145,27 +187,13 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         </div>
       ),
     },
-    {
-      key: 'imei', header: 'IMEI', hideOnMobile: true, className: 'num',
-      render: (u) => {
-        const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
-        return <span className="text-ink-2">{imeiMask}</span>
-      },
-    },
+    idCol,
     {
       key: 'condicao', header: 'Condição', hideOnMobile: true,
       render: (u) => { const c = CONDICAO_BADGE[u.condicao ?? 'novo'] ?? CONDICAO_BADGE.novo; return <Badge tone={c.tone}>{c.label}</Badge> },
     },
-    {
-      key: 'bateria', header: 'Bateria', align: 'right', hideOnMobile: true, className: 'num',
-      render: (u) => u.bateria
-        ? <span className={cn('font-semibold', Number(u.bateria) >= 90 ? 'text-ok' : Number(u.bateria) >= 80 ? 'text-warn' : 'text-bad')}>{u.bateria}%</span>
-        : <span className="text-ink-3">—</span>,
-    },
-    {
-      key: 'variante', header: 'Variante', hideOnMobile: true,
-      render: (u) => <span className="text-ink-2">{[u.cor, u.armazenamento].filter(Boolean).join(' · ') || '—'}</span>,
-    },
+    detalheCol,
+    varianteCol,
     {
       key: 'custo', header: 'Custo', align: 'right', hideOnMobile: true, className: 'num',
       render: (u) => <span className="text-ink-2">{u.preco_custo ? fmt(u.preco_custo) : '—'}</span>,
@@ -245,7 +273,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   icon={<Search size={15} strokeWidth={1.7} />}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Buscar por produto, marca, IMEI ou número de série…"
+                  placeholder={isVeiculo ? 'Buscar por modelo, marca, placa ou chassi…' : 'Buscar por produto, marca, IMEI ou número de série…'}
                 />
                 {marcasUnicas.length > 0 && (
                   <Select wrapperClassName="w-[190px]" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
@@ -254,7 +282,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   </Select>
                 )}
                 <Button icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
-                  Entrada de estoque
+                  {isVeiculo ? 'Adicionar veículo' : 'Entrada de estoque'}
                 </Button>
               </div>
 
@@ -281,13 +309,14 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     <ArrowDownLeft size={18} strokeWidth={1.7} />
                   </span>
                   <div>
-                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Nova entrada de unidade</div>
-                    <div className="text-[12px] text-ink-2">Cadastre uma unidade física no estoque por IMEI / número de série</div>
+                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{isVeiculo ? 'Novo veículo no estoque' : 'Nova entrada de unidade'}</div>
+                    <div className="text-[12px] text-ink-2">{isVeiculo ? 'Cadastre um veículo no estoque por placa / chassi' : 'Cadastre uma unidade física no estoque por IMEI / número de série'}</div>
                   </div>
                 </div>
                 <UnidadeInlineForm
                   produtos={produtos}
                   empresaId={empresaId}
+                  isVeiculo={isVeiculo}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
                     setTab('lista')
@@ -316,6 +345,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         <UnidadeModal
           unidade={unidadeSel}
           empresaId={empresaId}
+          isVeiculo={isVeiculo}
           onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
@@ -324,15 +354,17 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
+function UnidadeInlineForm({ produtos, empresaId, isVeiculo, onSaved }: {
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
   empresaId: number
+  isVeiculo: boolean
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
   const [form, setForm] = useState({
-    produto_id: '', tipo: 'compra', condicao: 'novo', estado: 'lacrado',
+    produto_id: '', tipo: 'compra', condicao: isVeiculo ? 'usado' : 'novo', estado: isVeiculo ? 'bom' : 'lacrado',
     status: 'disponivel', cor: '', armazenamento: '', imei: '', bateria: '',
+    placa: '', chassi: '', renavam: '', km: '', ano: '',
     preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor',
   })
   const [saving, setSaving] = useState(false)
@@ -352,8 +384,15 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
       produto_id: Number(form.produto_id),
       tipo: form.tipo, condicao: form.condicao, estado: form.estado,
       status: form.status,
-      cor: form.cor || null, armazenamento: form.armazenamento || null,
-      imei: form.imei || null, bateria: form.bateria || null,
+      cor: form.cor || null,
+      armazenamento: isVeiculo ? null : (form.armazenamento || null),
+      imei: isVeiculo ? null : (form.imei || null),
+      bateria: isVeiculo ? null : (form.bateria || null),
+      placa: isVeiculo ? (form.placa || null) : null,
+      chassi: isVeiculo ? (form.chassi || null) : null,
+      renavam: isVeiculo ? (form.renavam || null) : null,
+      km: isVeiculo && form.km ? Number(form.km) : null,
+      ano: isVeiculo && form.ano ? Number(form.ano) : null,
       preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
       custo_reparo: Number(form.custo_reparo) || null,
       observacoes: form.observacoes || null, ativo: true,
@@ -386,36 +425,54 @@ function UnidadeInlineForm({ produtos, empresaId, onSaved }: {
   return (
     <div className="space-y-5">
       <Select
-        label="Produto (catálogo)"
+        label={isVeiculo ? 'Modelo (catálogo)' : 'Produto (catálogo)'}
         required
         value={form.produto_id}
         onChange={e => set('produto_id', e.target.value)}
       >
-        <option value="">Buscar modelo no catálogo…</option>
+        <option value="">{isVeiculo ? 'Buscar modelo no catálogo…' : 'Buscar modelo no catálogo…'}</option>
         {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
       </Select>
 
       <div className="grid grid-cols-2 gap-5">
         {field('Tipo de entrada *', btnGroup('tipo', [{ v: 'compra', label: 'Compra' }, { v: 'consignado', label: 'Consignado' }, { v: 'troca', label: 'Troca' }]))}
-        {field('Condição *', btnGroup('condicao', [{ v: 'novo', label: 'Novo' }, { v: 'usado', label: 'Usado' }]))}
+        {field('Condição *', btnGroup('condicao', isVeiculo ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }] : [{ v: 'novo', label: 'Novo' }, { v: 'usado', label: 'Usado' }]))}
       </div>
 
       <div className="grid grid-cols-2 gap-5">
         <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}>
-          {['lacrado', 'excelente', 'bom', 'regular'].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>)}
+          {(isVeiculo ? ['excelente', 'otimo', 'bom', 'regular'] : ['lacrado', 'excelente', 'bom', 'regular']).map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>)}
         </Select>
         {field('Status inicial *', btnGroup('status', [{ v: 'disponivel', label: 'Disponível' }, { v: 'pendente', label: 'Pendente' }, { v: 'assistencia', label: 'Em reparo' }]))}
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
-        <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
-        <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-5">
-        <Input label="IMEI / Número de série" value={form.imei} onChange={e => set('imei', e.target.value)} placeholder="354 88•••• ••••" className="num" />
-        <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
-      </div>
+      {isVeiculo ? (
+        <>
+          <div className="grid grid-cols-2 gap-5">
+            <Input label="Placa" value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC1D23" className="num" />
+            <Input label="Ano/modelo" type="number" value={form.ano} onChange={e => set('ano', e.target.value)} placeholder="2022" className="num" />
+          </div>
+          <div className="grid grid-cols-2 gap-5">
+            <Input label="Chassi" value={form.chassi} onChange={e => set('chassi', e.target.value.toUpperCase())} placeholder="9BW…" className="num" />
+            <Input label="Km" type="number" value={form.km} onChange={e => set('km', e.target.value)} placeholder="45000" className="num" />
+          </div>
+          <div className="grid grid-cols-2 gap-5">
+            <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Prata" />
+            <Input label="Renavam" value={form.renavam} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" className="num" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-5">
+            <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
+            <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
+          </div>
+          <div className="grid grid-cols-2 gap-5">
+            <Input label="IMEI / Número de série" value={form.imei} onChange={e => set('imei', e.target.value)} placeholder="354 88•••• ••••" className="num" />
+            <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
+          </div>
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-5">
         <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />

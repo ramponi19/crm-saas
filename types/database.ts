@@ -1337,9 +1337,11 @@ export type Database = {
       inventario_unidades: {
         Row: {
           anatel_resultado: string | null
+          ano: number | null
           armazenamento: string | null
           ativo: boolean | null
           bateria: string | null
+          chassi: string | null
           cliente_id: number | null
           condicao: string | null
           cor: string | null
@@ -1352,20 +1354,25 @@ export type Database = {
           id: number
           imei: string | null
           imei2: string | null
+          km: number | null
           numero_serie: string | null
           observacoes: string | null
+          placa: string | null
           preco_custo: number | null
           preco_venda: number | null
           produto_id: number | null
+          renavam: string | null
           status: string | null
           tipo: string | null
           usuario_id: string | null
         }
         Insert: {
           anatel_resultado?: string | null
+          ano?: number | null
           armazenamento?: string | null
           ativo?: boolean | null
           bateria?: string | null
+          chassi?: string | null
           cliente_id?: number | null
           condicao?: string | null
           cor?: string | null
@@ -1378,20 +1385,25 @@ export type Database = {
           id?: number
           imei?: string | null
           imei2?: string | null
+          km?: number | null
           numero_serie?: string | null
           observacoes?: string | null
+          placa?: string | null
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          renavam?: string | null
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
         }
         Update: {
           anatel_resultado?: string | null
+          ano?: number | null
           armazenamento?: string | null
           ativo?: boolean | null
           bateria?: string | null
+          chassi?: string | null
           cliente_id?: number | null
           condicao?: string | null
           cor?: string | null
@@ -1404,11 +1416,14 @@ export type Database = {
           id?: number
           imei?: string | null
           imei2?: string | null
+          km?: number | null
           numero_serie?: string | null
           observacoes?: string | null
+          placa?: string | null
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          renavam?: string | null
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
