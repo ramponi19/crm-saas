@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      lead_atribuicoes: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number
+          de_responsavel: string | null
+          para_responsavel: string | null
+          por_usuario: string | null
+          acao: string
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          lead_id: number
+          de_responsavel?: string | null
+          para_responsavel?: string | null
+          por_usuario?: string | null
+          acao: string
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          lead_id?: number
+          de_responsavel?: string | null
+          para_responsavel?: string | null
+          por_usuario?: string | null
+          acao?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       propostas: {
         Row: {
           id: number

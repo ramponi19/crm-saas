@@ -33,15 +33,21 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
 
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
+  const [soEsteira, setSoEsteira] = useState(false)
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
     return doFunil.length > 0 ? doFunil : getKanbanColumns(segmento)
   }, [funilEtapas, segmento, funilId])
 
-  const leadsDoFunil = useMemo(
+  const leadsDoFunilBase = useMemo(
     () => (funilId == null ? leads : leads.filter(l => (l.funil_id ?? funilPadrao) === funilId)),
     [leads, funilId, funilPadrao],
+  )
+  const esteiraCount = useMemo(() => leadsDoFunilBase.filter(l => !l.responsavel_id && l.ativo !== false).length, [leadsDoFunilBase])
+  const leadsDoFunil = useMemo(
+    () => (soEsteira ? leadsDoFunilBase.filter(l => !l.responsavel_id) : leadsDoFunilBase),
+    [leadsDoFunilBase, soEsteira],
   )
 
   useEffect(() => {
@@ -155,6 +161,12 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
               })}
             </div>
           )}
+          <button
+            onClick={() => setSoEsteira(v => !v)}
+            className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${soEsteira ? 'border-warn bg-warn-soft text-warn' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
+          >
+            Esteira{esteiraCount > 0 ? ` (${esteiraCount})` : ''}
+          </button>
           <div className="num text-[13px] text-ink-2">
             {stats.ativos} em aberto
             {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação

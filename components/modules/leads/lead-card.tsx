@@ -107,7 +107,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
               {getInitials(responsavel.nome)}
             </span>
           ) : (
-            <span className="h-[19px] w-[19px] flex-none rounded-full border border-line" />
+            <span title="Na esteira — sem dono" className="grid h-[19px] w-[19px] flex-none place-items-center rounded-full border border-dashed border-warn/60 text-[8px] font-bold text-warn">?</span>
           )}
           <span className="flex-1" />
           {temMsgs && (

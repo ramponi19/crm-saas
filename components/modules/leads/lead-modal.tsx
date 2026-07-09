@@ -9,6 +9,7 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
 import { LeadMatchPanel } from './lead-match-panel'
 import { LeadAcoesPanel } from './lead-acoes-panel'
+import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
 import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, notify } from '@/components/ui'
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
@@ -285,6 +286,12 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <Textarea label="Observações" rows={3} value={form.obs} onChange={(e) => set('obs', e.target.value)} placeholder="Contexto, anotações…" />
 
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} segmento={segmento} />}
+            <ResponsavelPanel
+              leadId={lead.id}
+              usuarios={usuarios}
+              responsavelInicial={lead.responsavel_id}
+              onChange={(id) => { setForm((f) => ({ ...f, responsavel: usuarios.find((u) => u.id === id)?.nome ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
+            />
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             <Button className="mt-1 w-full" onClick={handleSave} loading={saving}>Salvar</Button>
           </div>
