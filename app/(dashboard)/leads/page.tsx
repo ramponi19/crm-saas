@@ -36,20 +36,21 @@ export default async function LeadsPage() {
       .eq('lida', false)
       .eq('direcao', 'recebida'),
     supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
-    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
+    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
   // Etapas do funil vindas do banco (fallback = constante do segmento, na view).
-  type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number; funil_id: number | null }
+  type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number; funil_id: number | null; campos_obrigatorios: unknown }
   const funilEtapas: KanbanColumn[] = ((etapasRaw ?? []) as EtapaRow[]).map((e) => ({
     id: e.slug,
     label: e.label,
     color: e.cor,
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
     funilId: e.funil_id ?? undefined,
+    camposObrigatorios: Array.isArray(e.campos_obrigatorios) ? (e.campos_obrigatorios as string[]) : [],
   }))
 
   // Agrupa não-lidas por lead_id

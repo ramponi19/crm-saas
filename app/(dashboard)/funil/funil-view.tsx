@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown, Plus, Archive, RotateCcw } from 'lucide-react'
 import { Card, Button, IconButton, Input, Select, Badge, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { CAMPOS_QUALIFICACAO } from '@/components/modules/leads/types'
 
 export interface EtapaEdit {
   id?: number
@@ -15,6 +16,7 @@ export interface EtapaEdit {
   ativo: boolean
   ordem?: number
   probabilidade?: number
+  camposObrigatorios?: string[]
 }
 
 const TIPOS = [
@@ -45,7 +47,7 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
     try {
       const res = await fetch('/api/funil', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ funilId, etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo, probabilidade: e.probabilidade ?? 0 })) }),
+        body: JSON.stringify({ funilId, etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo, probabilidade: e.probabilidade ?? 0, camposObrigatorios: e.camposObrigatorios ?? [] })) }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
       notify.ok('Funil salvo', 'O kanban de Leads já reflete as etapas.')
@@ -83,7 +85,8 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
 
         <Card flush>
           {etapas.map((e, i) => (
-            <div key={e.id ?? `novo-${i}`} className={cn('flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0', !e.ativo && 'opacity-55')}>
+            <div key={e.id ?? `novo-${i}`} className={cn('border-b border-line-soft px-4 py-3 last:border-0', !e.ativo && 'opacity-55')}>
+             <div className="flex items-center gap-3">
               <div className="flex flex-col">
                 <button onClick={() => move(i, -1)} disabled={i === 0} className="text-ink-3 hover:text-ink disabled:opacity-30"><ChevronUp size={15} strokeWidth={1.7} /></button>
                 <button onClick={() => move(i, 1)} disabled={i === etapas.length - 1} className="text-ink-3 hover:text-ink disabled:opacity-30"><ChevronDown size={15} strokeWidth={1.7} /></button>
@@ -107,6 +110,24 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
               <IconButton aria-label={e.ativo ? 'Arquivar' : 'Reativar'} variant={e.ativo ? 'ghost' : 'outline'} onClick={() => set(i, { ativo: !e.ativo })}>
                 {e.ativo ? <Archive size={15} strokeWidth={1.7} /> : <RotateCcw size={15} strokeWidth={1.7} />}
               </IconButton>
+             </div>
+             {/* Qualificação: campos obrigatórios p/ entrar nesta etapa (Fase 4.6) */}
+             <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-[52px]">
+               <span className="text-[11px] text-ink-3">Exigir p/ entrar:</span>
+               {CAMPOS_QUALIFICACAO.map(c => {
+                 const on = (e.camposObrigatorios ?? []).includes(c.key)
+                 return (
+                   <button
+                     key={c.key}
+                     type="button"
+                     onClick={() => set(i, { camposObrigatorios: on ? (e.camposObrigatorios ?? []).filter(x => x !== c.key) : [...(e.camposObrigatorios ?? []), c.key] })}
+                     className={cn('rounded-[6px] border px-2 py-0.5 text-[11.5px] font-medium transition-colors', on ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-card text-ink-3 hover:text-ink')}
+                   >
+                     {c.label}
+                   </button>
+                 )
+               })}
+             </div>
             </div>
           ))}
           <div className="px-4 py-3">

@@ -49,7 +49,16 @@ export interface KanbanColumn {
   color: string                                  // dot + accent color hex
   tipo?: 'ganho' | 'negociacao' | 'perdido'      // papel da etapa (p/ métricas)
   funilId?: number                               // funil a que a etapa pertence (Fase 4.1)
+  camposObrigatorios?: string[]                  // campos do lead exigidos p/ entrar (Fase 4.6)
 }
+
+/** Campos qualificáveis por etapa (Fase 4.6). */
+export const CAMPOS_QUALIFICACAO: { key: string; label: string }[] = [
+  { key: 'telefone', label: 'Telefone' },
+  { key: 'valor_estimado', label: 'Valor estimado' },
+  { key: 'responsavel_id', label: 'Responsável' },
+  { key: 'produto_interessado', label: 'Produto' },
+]
 
 // Funil padrão (varejo / genérico) — não muda o comportamento atual.
 export const KANBAN_COLUMNS: KanbanColumn[] = [

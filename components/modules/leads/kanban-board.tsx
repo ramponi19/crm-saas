@@ -5,7 +5,7 @@ import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
   PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
 } from '@dnd-kit/core'
-import { Lead, Usuario, type KanbanColumn as KanbanColumnDef, type Motivo } from './types'
+import { Lead, Usuario, type KanbanColumn as KanbanColumnDef, type Motivo, CAMPOS_QUALIFICACAO } from './types'
 import { KanbanColumn } from './kanban-column'
 import { LeadCard } from './lead-card'
 import { MotivoPerdaModal } from './motivo-perda-modal'
@@ -78,9 +78,22 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
     const originalStatus = leads.find(l => l.id === leadId)?.kanban_status
     if (lead.kanban_status === originalStatus) return
 
+    const destCol = columns.find(c => c.id === lead.kanban_status)
+
+    // Qualificação (Fase 4.6): bloqueia se faltar campo obrigatório da etapa.
+    const faltando = (destCol?.camposObrigatorios ?? []).filter(campo => {
+      const v = (lead as unknown as Record<string, unknown>)[campo]
+      return v == null || v === '' || (campo === 'valor_estimado' && !Number(v))
+    })
+    if (faltando.length > 0) {
+      const nomes = faltando.map(c => CAMPOS_QUALIFICACAO.find(x => x.key === c)?.label ?? c)
+      notify.warn(`Para mover para "${destCol?.label}"`, `Preencha: ${nomes.join(', ')}.`)
+      setLocalLeads(leads)
+      return
+    }
+
     // Etapa de perda: exige motivo antes de gravar (mantém o card no lugar
     // visualmente até confirmar; cancelar reverte).
-    const destCol = columns.find(c => c.id === lead.kanban_status)
     if (destCol?.tipo === 'perdido') { setPendingPerda(lead); return }
 
     await persistirMove(lead)

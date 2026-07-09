@@ -30,13 +30,25 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
     : (funis.find(f => f.padrao)?.id ?? funis[0]?.id)
 
   const { data: etapas } = await supabase
-    .from('funil_etapas').select('id, slug, label, cor, tipo, ativo, ordem, probabilidade')
+    .from('funil_etapas').select('id, slug, label, cor, tipo, ativo, ordem, probabilidade, campos_obrigatorios')
     .eq('empresa_id', empresaId).eq('funil_id', funilId ?? -1).order('ordem')
+
+  const etapasEdit: EtapaEdit[] = ((etapas ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    id: e.id as number,
+    slug: e.slug as string,
+    label: e.label as string,
+    cor: e.cor as string,
+    tipo: e.tipo as string,
+    ativo: e.ativo as boolean,
+    ordem: e.ordem as number,
+    probabilidade: (e.probabilidade as number) ?? 0,
+    camposObrigatorios: Array.isArray(e.campos_obrigatorios) ? (e.campos_obrigatorios as string[]) : [],
+  }))
 
   return (
     <>
       <Topbar title="Funil de vendas" />
-      <FunilView initial={(etapas ?? []) as EtapaEdit[]} funilId={funilId} funis={funis} />
+      <FunilView initial={etapasEdit} funilId={funilId} funis={funis} />
     </>
   )
 }

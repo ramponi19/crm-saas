@@ -207,6 +207,7 @@ export type Database = {
           tipo: string
           funil_id: number | null
           probabilidade: number
+          campos_obrigatorios: Json
         }
         Insert: {
           ativo?: boolean
@@ -220,6 +221,7 @@ export type Database = {
           tipo?: string
           funil_id?: number | null
           probabilidade?: number
+          campos_obrigatorios?: Json
         }
         Update: {
           ativo?: boolean
@@ -233,6 +235,7 @@ export type Database = {
           tipo?: string
           funil_id?: number | null
           probabilidade?: number
+          campos_obrigatorios?: Json
         }
         Relationships: [
           {
