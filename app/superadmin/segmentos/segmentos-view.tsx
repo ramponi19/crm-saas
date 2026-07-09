@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, Eye } from 'lucide-react'
 import { Card, Button, IconButton, Input, Textarea, Modal, Badge, notify } from '@/components/ui'
 import { CATALOGO } from '@/lib/menu'
 
@@ -53,6 +53,20 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   const router = useRouter()
   const [form, setForm] = useState<FormState | null>(null)
   const [saving, setSaving] = useState(false)
+  const [previewing, setPreviewing] = useState<string | null>(null)
+
+  async function preview(chave: string) {
+    setPreviewing(chave)
+    try {
+      const res = await fetch(`/api/superadmin/segmentos/${chave}/preview`, { method: 'POST' })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Falha ao abrir o preview')
+      window.location.href = '/dashboard' // navega inteiro p/ o layout pegar a impersonação
+    } catch (e) {
+      notify.bad('Não foi possível abrir o preview', e instanceof Error ? e.message : undefined)
+      setPreviewing(null)
+    }
+  }
   const set = (k: keyof FormState, v: string | boolean) => setForm((f) => (f ? { ...f, [k]: v } : f))
 
   const visivel = (href: string) => !form?.hidden.includes(href)
@@ -120,6 +134,9 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
                 </div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">{arr(s.funil_seed).length} etapas · {arr(s.hidden_hrefs).length} ocultos · {extras(s.modulos_extra).length} módulos extras</div>
               </div>
+              <IconButton aria-label="Prever CRM deste segmento" onClick={() => preview(s.chave)} disabled={previewing !== null}>
+                <Eye size={15} strokeWidth={1.7} className={previewing === s.chave ? 'animate-pulse' : ''} />
+              </IconButton>
               <IconButton aria-label="Editar" onClick={() => setForm(fromRow(s))}><Pencil size={15} strokeWidth={1.7} /></IconButton>
             </div>
           ))}

@@ -12,7 +12,7 @@ export default async function AvisosPage() {
     svc.from('avisos_plataforma')
       .select('id, titulo, corpo, tom, alvo, alvo_valor, ativo, expira_em, created_at')
       .order('created_at', { ascending: false }),
-    svc.from('empresas').select('id, nome').order('nome'),
+    svc.from('empresas').select('id, nome').neq('demo', true).order('nome'),
     svc.from('planos_config').select('id, nome').order('ordem'),
   ])
 

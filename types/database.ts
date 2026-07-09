@@ -978,6 +978,7 @@ export type Database = {
           menu_override: Json | null
           menu_config: Json | null
           permissoes: Json | null
+          demo: boolean | null
         }
         Insert: {
           cnpj?: string | null
@@ -1006,6 +1007,7 @@ export type Database = {
           menu_override?: Json | null
           menu_config?: Json | null
           permissoes?: Json | null
+          demo?: boolean | null
         }
         Update: {
           cnpj?: string | null
@@ -1034,6 +1036,7 @@ export type Database = {
           menu_override?: Json | null
           menu_config?: Json | null
           permissoes?: Json | null
+          demo?: boolean | null
         }
         Relationships: []
       }

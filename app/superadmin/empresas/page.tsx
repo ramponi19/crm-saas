@@ -65,6 +65,7 @@ export default async function EmpresasPage({ searchParams }: PageProps) {
   let query = supabase
     .from('empresas')
     .select('id, nome, slug, plano, status, stripe_status, trial_ends_at, created_at, limite_usuarios, limite_leads')
+    .neq('demo', true)
     .order('created_at', { ascending: false })
 
   if (status) query = query.eq('status', status)
