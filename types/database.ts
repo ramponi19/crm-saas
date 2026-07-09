@@ -1616,6 +1616,7 @@ export type Database = {
           motivo_perda_id: number | null
           perdido_em: string | null
           funil_id: number | null
+          interesse: Json | null
         }
         Insert: {
           ativo?: boolean | null
@@ -1642,6 +1643,7 @@ export type Database = {
           motivo_perda_id?: number | null
           perdido_em?: string | null
           funil_id?: number | null
+          interesse?: Json | null
         }
         Update: {
           ativo?: boolean | null
@@ -1668,6 +1670,7 @@ export type Database = {
           motivo_perda_id?: number | null
           perdido_em?: string | null
           funil_id?: number | null
+          interesse?: Json | null
         }
         Relationships: [
           {

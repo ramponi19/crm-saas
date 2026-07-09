@@ -8,6 +8,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
 import { LeadMatchPanel } from './lead-match-panel'
+import { LeadInteressePanel } from './lead-interesse-panel'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
@@ -275,7 +276,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <Input label="Nome" value={form.nome} onChange={(e) => set('nome', e.target.value)} />
             <Input label="Telefone / WhatsApp" value={form.tel} onChange={(e) => set('tel', e.target.value)} className="num" />
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
-            <Input label="Produto interessado" value={form.produto} onChange={(e) => set('produto', e.target.value)} />
+            <Input label={segmento === 'concessionaria' ? 'Veículo interessado' : segmento === 'imobiliaria' ? 'Imóvel interessado' : 'Produto interessado'} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
             <Select label="Status no funil" value={form.status} onChange={(e) => set('status', e.target.value)}>
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
@@ -293,6 +294,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               onChange={(id) => { setForm((f) => ({ ...f, responsavel: usuarios.find((u) => u.id === id)?.nome ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
             />
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
+            {segmento === 'concessionaria' && <LeadInteressePanel leadId={lead.id} />}
             <Button className="mt-1 w-full" onClick={handleSave} loading={saving}>Salvar</Button>
           </div>
 
