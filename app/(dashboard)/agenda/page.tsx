@@ -46,6 +46,7 @@ export default async function AgendaPage() {
       empresaId={empresaId}
       meuId={user!.id}
       isGestor={isGestor}
+      segmento={empresa?.segmento ?? null}
     />
   )
 }

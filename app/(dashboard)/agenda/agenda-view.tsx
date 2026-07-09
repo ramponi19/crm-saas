@@ -29,16 +29,31 @@ const diaLabel = (iso: string) => {
 }
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
-export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaId, meuId, isGestor }: {
-  inicial: Visita[]; leads: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]; empresaId: number; meuId: string; isGestor: boolean
+export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaId, meuId, isGestor, segmento }: {
+  inicial: Visita[]; leads: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]; empresaId: number; meuId: string; isGestor: boolean; segmento?: string | null
 }) {
   const supabase = createClient()
+  const isSaude = segmento === 'saude'
+  const L = {
+    agendar: isSaude ? 'Agendar consulta' : 'Agendar visita',
+    item: isSaude ? 'Consulta' : 'Visita',
+    pessoa: isSaude ? 'Paciente' : 'Lead / cliente',
+    prof: isSaude ? 'Profissional' : 'Corretor',
+  }
   const [lista, setLista] = useState<Visita[]>(inicial)
   const [modal, setModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const vazio = { lead_id: '', imovel_id: '', corretor_id: meuId, data_hora: '', observacoes: '' }
   const [form, setForm] = useState(vazio)
   const set = (k: keyof typeof vazio, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  // Agendar retorno: reabre o modal com o paciente e uma data sugerida (+30 dias).
+  function agendarRetorno(v: Visita) {
+    const dt = new Date(Date.now() + 30 * 864e5)
+    const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    setForm({ ...vazio, lead_id: v.lead_id ? String(v.lead_id) : '', data_hora: local })
+    setModal(true)
+  }
 
   async function salvar() {
     if (!form.data_hora) { notify.warn('Informe data e hora'); return }
@@ -59,7 +74,7 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
     const nova: Visita = { ...d, lead_nome: d.leads?.nome ?? null, lead_tel: d.leads?.telefone ?? null, imovel_nome: d.imoveis ? (d.imoveis.titulo || d.imoveis.codigo) : null, imovel_bairro: d.imoveis?.bairro ?? null }
     setLista(l => [...l, nova].sort((a, b) => a.data_hora.localeCompare(b.data_hora)))
     setForm(vazio); setModal(false)
-    notify.ok('Visita agendada')
+    notify.ok(isSaude ? 'Consulta agendada' : 'Visita agendada')
   }
 
   async function mudarStatus(v: Visita, status: string) {
@@ -81,7 +96,7 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
       <Topbar title="Agenda" />
 
       <div className="flex shrink-0 items-center justify-end px-6 py-4">
-        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setModal(true)}>Agendar visita</Button>
+        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => { setForm(vazio); setModal(true) }}>{L.agendar}</Button>
       </div>
 
       <main className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
@@ -90,9 +105,9 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
             <Card flush>
               <EmptyState
                 icon={<CalendarDays size={22} strokeWidth={1.7} />}
-                title="Nenhuma visita agendada"
-                description="Agende a primeira visita para começar."
-                action={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => setModal(true)}>Agendar visita</Button>}
+                title={isSaude ? 'Nenhuma consulta agendada' : 'Nenhuma visita agendada'}
+                description={isSaude ? 'Agende a primeira consulta para começar.' : 'Agende a primeira visita para começar.'}
+                action={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => { setForm(vazio); setModal(true) }}>{L.agendar}</Button>}
               />
             </Card>
           ) : grupos.map(g => (
@@ -109,12 +124,15 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
                           <span className="num text-[15px] font-semibold leading-none">{hora(v.data_hora)}</span>
                         </div>
                         <div className="min-w-0 flex-1 border-l border-line pl-3">
-                          <div className="truncate text-[13px] font-semibold text-ink">{v.lead_nome || 'Visita'}</div>
+                          <div className="truncate text-[13px] font-semibold text-ink">{v.lead_nome || L.item}</div>
                           <div className="mt-0.5 flex items-center gap-3 text-[12px] text-ink-2">
                             {v.imovel_nome && <span className="inline-flex items-center gap-1 truncate"><MapPin size={12} strokeWidth={1.7} />{v.imovel_nome}{v.imovel_bairro ? ` · ${v.imovel_bairro}` : ''}</span>}
                             {v.lead_tel && <span className="num inline-flex items-center gap-1"><Phone size={12} strokeWidth={1.7} />{v.lead_tel}</span>}
                           </div>
                         </div>
+                        {isSaude && v.lead_id && (
+                          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => agendarRetorno(v)}>Retorno</Button>
+                        )}
                         <div className="relative shrink-0">
                           <Badge tone={st.tone} dot>{st.l}</Badge>
                           <select
@@ -139,7 +157,7 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
       <Modal
         open={modal}
         onClose={() => { if (!loading) setModal(false) }}
-        title="Agendar visita"
+        title={L.agendar}
         disableOverlayClose={loading}
         footer={
           <>
@@ -150,16 +168,18 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
       >
         <div className="space-y-3">
           <Input label="Data e hora" required type="datetime-local" value={form.data_hora} onChange={e => set('data_hora', e.target.value)} />
-          <Select label="Lead / cliente" value={form.lead_id} onChange={e => set('lead_id', e.target.value)}>
+          <Select label={L.pessoa} value={form.lead_id} onChange={e => set('lead_id', e.target.value)}>
             <option value="">— selecionar —</option>
-            {leads.map(l => <option key={l.id} value={l.id}>{l.nome || `Lead #${l.id}`}</option>)}
+            {leads.map(l => <option key={l.id} value={l.id}>{l.nome || `#${l.id}`}</option>)}
           </Select>
-          <Select label="Imóvel" value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
-            <option value="">— selecionar —</option>
-            {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
-          </Select>
+          {!isSaude && (
+            <Select label="Imóvel" value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
+              <option value="">— selecionar —</option>
+              {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
+            </Select>
+          )}
           {isGestor && (
-            <Select label="Corretor" value={form.corretor_id} onChange={e => set('corretor_id', e.target.value)}>
+            <Select label={L.prof} value={form.corretor_id} onChange={e => set('corretor_id', e.target.value)}>
               {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </Select>
           )}
