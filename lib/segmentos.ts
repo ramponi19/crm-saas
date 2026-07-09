@@ -90,8 +90,11 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     descricao: 'Restaurantes e delivery: cardápio e comandas.',
     emoji: '🍽️',
     hiddenHrefs: ['/garantia', '/assistencia', '/simular-parcela'],
-    labelOverrides: { '/produtos': 'Cardápio', '/catalogo': 'Cardápio' },
+    labelOverrides: {},
     funil: ['Novo', 'Contato', 'Pedido', 'Entregue'],
+    modulosExtra: [
+      { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed' },
+    ],
   },
   concessionaria: {
     label: 'Loja de veículos',

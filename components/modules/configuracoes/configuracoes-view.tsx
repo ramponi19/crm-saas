@@ -13,6 +13,7 @@ import { MotivosPerdaCard } from './motivos-perda-card'
 import { AutomacoesCard } from './automacoes-card'
 import { FunisCard } from './funis-card'
 import { PortaisCard } from './portais-card'
+import { CardapioCard } from './cardapio-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -83,6 +84,8 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [aba, setAba]       = useState('integracoes')
   const tabs = segmento === 'imobiliaria'
     ? [...TABS, { id: 'portais', label: 'Portais', Icon: LinkIcon }]
+    : segmento === 'food'
+    ? [...TABS, { id: 'cardapio', label: 'Cardápio', Icon: LinkIcon }]
     : TABS
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
@@ -415,6 +418,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
         {/* ── EXPORTAR DADOS ── */}
         {aba === 'dados' && <ExportarDadosCard />}
         {aba === 'portais' && <PortaisCard slug={slug ?? null} />}
+        {aba === 'cardapio' && <CardapioCard slug={slug ?? null} />}
 
       </div>
 

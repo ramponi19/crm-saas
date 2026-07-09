@@ -159,6 +159,12 @@ export const CATALOGO: MenuGroupBase[] = [
     ],
   },
   {
+    label: 'Food',
+    items: [
+      { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed', opcional: true },
+    ],
+  },
+  {
     label: 'Gestão',
     items: [
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true },

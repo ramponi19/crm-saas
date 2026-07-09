@@ -2416,6 +2416,10 @@ export type Database = {
           marca_id: number | null
           nome: string
           subcategoria_id: number | null
+          preco: number | null
+          descricao: string | null
+          foto_url: string | null
+          disponivel: boolean | null
         }
         Insert: {
           armazenamentos?: string[] | null
@@ -2430,6 +2434,10 @@ export type Database = {
           marca_id?: number | null
           nome: string
           subcategoria_id?: number | null
+          preco?: number | null
+          descricao?: string | null
+          foto_url?: string | null
+          disponivel?: boolean | null
         }
         Update: {
           armazenamentos?: string[] | null
@@ -2444,6 +2452,10 @@ export type Database = {
           marca_id?: number | null
           nome?: string
           subcategoria_id?: number | null
+          preco?: number | null
+          descricao?: string | null
+          foto_url?: string | null
+          disponivel?: boolean | null
         }
         Relationships: [
           {
