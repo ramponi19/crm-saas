@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, ClipboardCheck } from 'lucide-react'
+import { Plus, Trash2, ClipboardCheck, Car } from 'lucide-react'
 import { Card, Button, Input, Textarea, Select, Badge, Modal, EmptyState, notify } from '@/components/ui'
+import { FipePicker } from '@/components/modules/veiculos/fipe-picker'
 
 export interface Veiculo {
   categoria?: string; marca?: string; modelo?: string; versao?: string
@@ -44,11 +45,13 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
   const [fotos, setFotos] = useState('')
   const [obs, setObs] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [mostrarFipe, setMostrarFipe] = useState(false)
 
   const setV = (patch: Partial<Veiculo>) => setVeiculo((v) => ({ ...v, ...patch }))
 
   function abrir(a: Avaliacao | 'nova') {
     setEditando(a)
+    setMostrarFipe(false)
     if (a === 'nova') {
       setVeiculo(vazioVeiculo); setLeadId(''); setKm(''); setValorMercado(''); setValorOfertado(''); setFotos(''); setObs('')
     } else {
@@ -169,6 +172,29 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
           <Input label="Chassi" className="num" value={veiculo.chassi ?? ''} onChange={(e) => setV({ chassi: e.target.value.toUpperCase() })} placeholder="9BW…" />
           <Input label="Valor de mercado" type="number" className="num" value={valorMercado} onChange={(e) => setValorMercado(e.target.value)} hint="FIPE/referência" placeholder="0,00" />
           <Input label="Valor ofertado" type="number" className="num" value={valorOfertado} onChange={(e) => setValorOfertado(e.target.value)} placeholder="0,00" />
+
+          <div className="col-span-2">
+            {!mostrarFipe ? (
+              <Button variant="ghost" size="sm" icon={<Car size={15} strokeWidth={1.7} />} onClick={() => setMostrarFipe(true)}>
+                Consultar valor na FIPE
+              </Button>
+            ) : (
+              <div className="rounded-control border border-line-soft bg-bg p-3">
+                <div className="mb-2 text-[12px] font-semibold text-ink-2">Tabela FIPE</div>
+                <FipePicker onUsar={(r) => {
+                  if (r.valor != null) setValorMercado(String(r.valor))
+                  const anoNum = r.anoLabel ? parseInt(r.anoLabel, 10) : null
+                  setVeiculo((v) => ({
+                    ...v,
+                    marca: v.marca?.trim() ? v.marca : (r.marca ?? ''),
+                    modelo: v.modelo?.trim() ? v.modelo : (r.modelo ?? ''),
+                    ano: v.ano ?? (Number.isFinite(anoNum) ? anoNum : null),
+                  }))
+                  notify.ok('Valor FIPE aplicado ao "valor de mercado"')
+                }} />
+              </div>
+            )}
+          </div>
           <Input wrapperClassName="col-span-2" label="Fotos (URLs, separadas por vírgula)" value={fotos} onChange={(e) => setFotos(e.target.value)} placeholder="https://…" />
           <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Estado, avarias, laudo…" />
         </div>

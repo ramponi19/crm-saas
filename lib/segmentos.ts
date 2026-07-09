@@ -102,6 +102,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     funil: ['Novo', 'Contato', 'Test-drive agendado', 'Test-drive feito', 'Avaliação do usado', 'Proposta + F&I', 'Fechamento'],
     modulosExtra: [
       { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck' },
+      { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
     ],
   },
