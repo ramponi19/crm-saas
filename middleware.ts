@@ -40,7 +40,8 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/api/portais/') ||
                         request.nextUrl.pathname.startsWith('/api/imob/') ||
                         request.nextUrl.pathname.startsWith('/imovel/') ||
-                        request.nextUrl.pathname.startsWith('/imob/')
+                        request.nextUrl.pathname.startsWith('/imob/') ||
+                        request.nextUrl.pathname.startsWith('/proposta/')
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {

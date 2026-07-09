@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      propostas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          cliente_nome: string
+          itens: Json
+          observacoes: string | null
+          total: number
+          status: string
+          token: string
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          lead_id?: number | null
+          cliente_nome?: string
+          itens?: Json
+          observacoes?: string | null
+          total?: number
+          status?: string
+          token?: string
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          lead_id?: number | null
+          cliente_nome?: string
+          itens?: Json
+          observacoes?: string | null
+          total?: number
+          status?: string
+          token?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       funis: {
         Row: {
           id: number
