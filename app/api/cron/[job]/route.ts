@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 import { executarAcao } from '@/lib/automacoes'
+import { atualizarReferencia } from '@/lib/fipe'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -204,6 +205,13 @@ export async function GET(
         }
 
         return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto })
+      }
+
+      case 'sync-fipe': {
+        // Revalida o mês de referência da FIPE (barato: 1 request). Os valores em si
+        // são cacheados sob demanda em fipe_consultas ao serem consultados.
+        const { codigo, mes } = await atualizarReferencia(supabase)
+        return NextResponse.json({ ok: true, job, codigo, mes })
       }
 
       default:

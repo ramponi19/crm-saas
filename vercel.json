@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/gerar-followups",
       "schedule": "5 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-fipe",
+      "schedule": "0 5 * * *"
     }
   ]
 }

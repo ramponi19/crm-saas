@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      fipe_referencia: {
+        Row: {
+          id: number
+          codigo: number | null
+          mes: string | null
+          atualizado_em: string | null
+        }
+        Insert: {
+          id?: number
+          codigo?: number | null
+          mes?: string | null
+          atualizado_em?: string | null
+        }
+        Update: {
+          id?: number
+          codigo?: number | null
+          mes?: string | null
+          atualizado_em?: string | null
+        }
+        Relationships: []
+      }
+      fipe_consultas: {
+        Row: {
+          id: number
+          tipo: number
+          codigo_marca: number
+          codigo_modelo: number
+          ano: string
+          referencia_codigo: number
+          marca_nome: string | null
+          modelo_nome: string | null
+          ano_label: string | null
+          valor: number | null
+          codigo_fipe: string | null
+          mes_referencia: string | null
+          criado_em: string | null
+        }
+        Insert: {
+          id?: never
+          tipo: number
+          codigo_marca: number
+          codigo_modelo: number
+          ano: string
+          referencia_codigo: number
+          marca_nome?: string | null
+          modelo_nome?: string | null
+          ano_label?: string | null
+          valor?: number | null
+          codigo_fipe?: string | null
+          mes_referencia?: string | null
+          criado_em?: string | null
+        }
+        Update: {
+          id?: never
+          tipo?: number
+          codigo_marca?: number
+          codigo_modelo?: number
+          ano?: string
+          referencia_codigo?: number
+          marca_nome?: string | null
+          modelo_nome?: string | null
+          ano_label?: string | null
+          valor?: number | null
+          codigo_fipe?: string | null
+          mes_referencia?: string | null
+          criado_em?: string | null
+        }
+        Relationships: []
+      }
       avaliacoes_usados: {
         Row: {
           id: number
