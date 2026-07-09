@@ -16,6 +16,7 @@ export default async function PDVPage() {
     { data: clientes },
     { data: taxas },
     { data: vendasRecentes },
+    { data: empresa },
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
@@ -29,6 +30,7 @@ export default async function PDVPage() {
       .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
+    supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
   ])
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
@@ -65,6 +67,7 @@ export default async function PDVPage() {
           clientes={clientes ?? []}
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
+          segmento={empresa?.segmento ?? null}
         />
       </div>
     </>

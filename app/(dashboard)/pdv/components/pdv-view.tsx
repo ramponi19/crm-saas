@@ -20,7 +20,7 @@ interface ClienteSimples { id: number; nome: string; telefone: string | null; cp
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
 interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[] }
+interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null }
 interface ItemCarrinho { item: ItemEstoque; desconto: number }
 
 const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
@@ -34,7 +34,9 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
+export default function PDVView({ itensDisponiveis, clientes, taxas, segmento }: Props) {
+  const isFood = segmento === 'food'
+  const [comanda, setComanda] = useState('')
   const supabase = createClient()
   const router = useRouter()
 
@@ -167,6 +169,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
             forma_pagamento: formaPagamento,
             parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
             canal_venda: 'loja_fisica',
+            comanda: isFood ? (comanda.trim() || null) : null,
             desconto_valor: descontoItem,
             produto_id: c.item.produto_id,
             numero_serie: c.item.imei ?? c.item.numero_serie,
@@ -206,6 +209,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
       notify.ok('Venda finalizada')
       setCarrinho([]); setDesconto(''); setParcelas(1)
       if (formaPagamento !== 'pix') setClienteSelecionado(null)
+      setComanda('')
       router.refresh()
     } catch (e) {
       notify.bad('Erro ao finalizar', e instanceof Error ? e.message : String(e))
@@ -339,6 +343,13 @@ export default function PDVView({ itensDisponiveis, clientes, taxas }: Props) {
               <h3 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Carrinho</h3>
               <span className="num text-[11px] text-ink-3">{carrinho.length} {carrinho.length === 1 ? 'item' : 'itens'}</span>
             </div>
+
+            {/* Mesa / comanda (Food) */}
+            {isFood && (
+              <div className="mb-4">
+                <Input label="Mesa / Comanda" value={comanda} onChange={(e) => setComanda(e.target.value)} placeholder="Ex: Mesa 5" />
+              </div>
+            )}
 
             {/* Seletor de cliente */}
             <div className="relative mb-4" ref={dropRef}>

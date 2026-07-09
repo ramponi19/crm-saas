@@ -2786,6 +2786,7 @@ export type Database = {
         Row: {
           canal_venda: string | null
           cliente_id: number | null
+          comanda: string | null
           comissao: number | null
           created_at: string | null
           data_venda: string | null
@@ -2809,6 +2810,7 @@ export type Database = {
         Insert: {
           canal_venda?: string | null
           cliente_id?: number | null
+          comanda?: string | null
           comissao?: number | null
           created_at?: string | null
           data_venda?: string | null
@@ -2832,6 +2834,7 @@ export type Database = {
         Update: {
           canal_venda?: string | null
           cliente_id?: number | null
+          comanda?: string | null
           comissao?: number | null
           created_at?: string | null
           data_venda?: string | null
