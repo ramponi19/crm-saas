@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
 import { Plus, Clock, MapPin, Phone, CalendarDays } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
+import { ListaEspera, type Espera } from '@/components/modules/saude/lista-espera'
 import type { Tables } from '@/types/database'
 
 type Visita = Tables<'visitas'> & { lead_nome: string | null; lead_tel: string | null; imovel_nome: string | null; imovel_bairro: string | null }
@@ -55,6 +56,12 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
     setModal(true)
   }
 
+  // Encaixar alguém da lista de espera: abre o modal com os dados na observação.
+  function agendarDaEspera(e: Espera) {
+    setForm({ ...vazio, observacoes: `${e.nome}${e.telefone ? ` · ${e.telefone}` : ''}${e.observacao ? ` — ${e.observacao}` : ''} (lista de espera)` })
+    setModal(true)
+  }
+
   async function salvar() {
     if (!form.data_hora) { notify.warn('Informe data e hora'); return }
     setLoading(true)
@@ -101,6 +108,11 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
 
       <main className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
         <div className="mx-auto w-full max-w-[820px]">
+          {isSaude && (
+            <div className="mb-5">
+              <ListaEspera empresaId={empresaId} onAgendar={agendarDaEspera} />
+            </div>
+          )}
           {lista.length === 0 ? (
             <Card flush>
               <EmptyState

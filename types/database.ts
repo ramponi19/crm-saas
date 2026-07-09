@@ -83,6 +83,41 @@ export type Database = {
         }
         Relationships: []
       }
+      lista_espera: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          telefone: string | null
+          observacao: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          nome: string
+          telefone?: string | null
+          observacao?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          nome?: string
+          telefone?: string | null
+          observacao?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lista_espera_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chaves_imoveis: {
         Row: {
           id: number
