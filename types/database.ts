@@ -84,6 +84,66 @@ export type Database = {
           },
         ]
       }
+      fichas_financiamento: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          banco: string | null
+          valor: number | null
+          entrada: number | null
+          parcelas: number | null
+          taxa: number | null
+          status: string
+          observacoes: string | null
+          usuario_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          lead_id?: number | null
+          banco?: string | null
+          valor?: number | null
+          entrada?: number | null
+          parcelas?: number | null
+          taxa?: number | null
+          status?: string
+          observacoes?: string | null
+          usuario_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          lead_id?: number | null
+          banco?: string | null
+          valor?: number | null
+          entrada?: number | null
+          parcelas?: number | null
+          taxa?: number | null
+          status?: string
+          observacoes?: string | null
+          usuario_id?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fichas_financiamento_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_financiamento_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_atribuicoes: {
         Row: {
           id: number
