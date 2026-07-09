@@ -44,6 +44,7 @@ export function AutomacoesCard() {
   const [horas, setHoras] = useState('48')
   const [acao, setAcao] = useState('criar_tarefa')
   const [titulo, setTitulo] = useState('')
+  const [prazoDias, setPrazoDias] = useState('0')
   const [templateChave, setTemplateChave] = useState('boas_vindas')
 
   const carregar = useCallback(async (empId: number) => {
@@ -84,6 +85,8 @@ export function AutomacoesCard() {
     } else if (cfg.titulo) {
       oQue += ` "${cfg.titulo as string}"`
     }
+    const prazo = Number(cfg.prazo_dias) || 0
+    if (a.acao === 'criar_tarefa' && prazo > 0) oQue += ` (daqui a ${prazo} dias)`
     return `${quando} → ${oQue}`
   }
 
@@ -94,6 +97,7 @@ export function AutomacoesCard() {
       const config: Record<string, unknown> = {}
       if (acao === 'enviar_whatsapp_template') config.template_chave = templateChave
       else if (titulo.trim()) config.titulo = titulo.trim()
+      if (acao === 'criar_tarefa' && Number(prazoDias) > 0) config.prazo_dias = Number(prazoDias)
       const { error } = await supabase.from('automacoes').insert({
         empresa_id: empresaId,
         gatilho,
@@ -106,6 +110,7 @@ export function AutomacoesCard() {
       if (error) throw new Error(error.message)
       notify.ok('Automação criada')
       setTitulo('')
+      setPrazoDias('0')
       await carregar(empresaId)
     } catch (e) {
       notify.bad('Erro ao criar', e instanceof Error ? e.message : undefined)
@@ -153,6 +158,10 @@ export function AutomacoesCard() {
             </Select>
           ) : (
             <Input label="Título da tarefa (opcional)" value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ex.: Responder o lead" />
+          )}
+          {acao === 'criar_tarefa' && (
+            <Input label="Prazo (dias)" type="number" min={0} value={prazoDias} onChange={e => setPrazoDias(e.target.value)}
+              hint="0 = hoje · pós-venda: 180 / 365" />
           )}
         </div>
         <div className="mt-4">

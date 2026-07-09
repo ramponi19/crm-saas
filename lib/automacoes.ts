@@ -58,10 +58,12 @@ export async function executarAcao(db: Db, empresaId: number, lead: LeadMin, aca
     return
   }
 
-  // criar_tarefa (padrão)
+  // criar_tarefa (padrão) — aceita prazo_dias (vencimento futuro, ex.: pós-venda D+180/D+365)
   const titulo = render((config.titulo as string) || `Ação: lead ${lead.nome ?? ''}`, lead)
   const tipo = (config.tipo as string) || 'ligacao'
-  await db.from('tarefas').insert({ empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo, vencimento: nowIso })
+  const prazoDias = Number(config.prazo_dias) || 0
+  const vencimento = prazoDias > 0 ? new Date(Date.now() + prazoDias * 86400000).toISOString() : nowIso
+  await db.from('tarefas').insert({ empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo, vencimento })
 }
 
 /** Dispara as automações de "entrou_na_etapa" ao mover um lead para `etapaSlug`. */
