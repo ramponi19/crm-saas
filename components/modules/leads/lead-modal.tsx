@@ -10,6 +10,7 @@ import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
 import { LeadMatchPanel } from './lead-match-panel'
 import { LeadInteressePanel } from './lead-interesse-panel'
 import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
+import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
@@ -297,6 +298,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             {segmento === 'concessionaria' && <LeadInteressePanel leadId={lead.id} />}
             {segmento === 'concessionaria' && <LeadFinanciamentoPanel leadId={lead.id} />}
+            <LeadChamadasPanel leadId={lead.id} />
             <Button className="mt-1 w-full" onClick={handleSave} loading={saving}>Salvar</Button>
           </div>
 

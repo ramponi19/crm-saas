@@ -83,6 +83,57 @@ export type Database = {
         }
         Relationships: []
       }
+      chamadas: {
+        Row: {
+          id: number
+          empresa_id: number
+          lead_id: number | null
+          usuario_id: string | null
+          direcao: string
+          resultado: string
+          duracao_seg: number | null
+          observacao: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          lead_id?: number | null
+          usuario_id?: string | null
+          direcao?: string
+          resultado?: string
+          duracao_seg?: number | null
+          observacao?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          lead_id?: number | null
+          usuario_id?: string | null
+          direcao?: string
+          resultado?: string
+          duracao_seg?: number | null
+          observacao?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamadas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamadas_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campanhas_fidelidade: {
         Row: {
           id: number
