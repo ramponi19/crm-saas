@@ -151,6 +151,12 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_marketing: {
+        Row: { id: number; empresa_id: number; item: string; objetivo: string | null; canais: Json; status: string; solicitante_id: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; item: string; objetivo?: string | null; canais?: Json; status?: string; solicitante_id?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; item?: string; objetivo?: string | null; canais?: Json; status?: string; solicitante_id?: string | null; created_at?: string | null }
+        Relationships: []
+      }
       metas: {
         Row: { id: number; empresa_id: number; escopo: string; usuario_id: string | null; tipo: string; alvo: number; periodo: string; created_at: string | null }
         Insert: { id?: never; empresa_id: number; escopo?: string; usuario_id?: string | null; tipo?: string; alvo?: number; periodo: string; created_at?: string | null }

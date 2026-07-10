@@ -127,6 +127,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/clientes', label: 'Clientes', icon: 'Users' },
       { href: '/fila', label: 'Fila do dia', icon: 'ListChecks' },
       { href: '/ranking', label: 'Ranking', icon: 'Trophy' },
+      { href: '/marketing', label: 'Marketing', icon: 'Megaphone' },
       { href: '/propostas', label: 'Propostas', icon: 'FileText', adminOnly: true },
     ],
   },
