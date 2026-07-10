@@ -11,10 +11,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        // ── Precisão: fonte única ──
+        // ── Precisão: fonte única (mono só p/ códigos) ──
         sans: ['var(--font-geist)', 'system-ui', 'sans-serif'],
-        // TEMP ÁPICE — remover ao fim da Fase 2 (ainda usado por views não migradas)
-        serif: ['var(--font-fraunces)', 'Georgia', 'serif'],
         mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },
       colors: {
@@ -40,34 +38,6 @@ const config: Config = {
         bad: { DEFAULT: '#D92D20', soft: 'rgba(217,45,32,.07)' },
         // Vermelho JM — SOMENTE o quadrado do logo Nexus. Nunca em botões/estados/textos.
         jm: '#D7282F',
-
-        // ── TEMP ÁPICE — remover ao fim da Fase 2 (24+ views ainda referenciam) ──
-        navy: {
-          DEFAULT: '#16212E',
-          soft: '#22303F',
-          900: '#111A24',
-        },
-        gold: {
-          DEFAULT: '#C9A24B',
-          deep: '#A8884A',
-          wash: 'rgba(201,162,75,0.14)',
-        },
-        danger: {
-          DEFAULT: '#DC2626',
-          soft: '#F0656B',
-          dark: '#B91C1C',
-        },
-        brand: {
-          DEFAULT: '#16212E',
-          light: '#22303F',
-          dark: '#111A24',
-        },
-        surface: {
-          DEFAULT: '#EEF1F5',
-          card: '#FFFFFF',
-          raised: '#F6F8FB',
-          border: 'rgba(22,32,46,0.08)',
-        },
       },
       borderRadius: {
         // Precisão: 8 (controles) · 10-12 (cards) · 12 (modais)

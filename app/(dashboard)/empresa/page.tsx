@@ -39,7 +39,7 @@ export default function EmpresaConfigPage() {
     nome: '',
     wl_slogan: '',
     wl_whatsapp: '',
-    wl_cor: '#16212E',
+    wl_cor: '#2E5CE6',
     wl_logo_url: '',
   })
 
@@ -49,7 +49,7 @@ export default function EmpresaConfigPage() {
         nome:          empresa.nome         ?? '',
         wl_slogan:     empresa.wl_slogan    ?? '',
         wl_whatsapp:   empresa.wl_whatsapp  ?? '',
-        wl_cor:        empresa.wl_cor       ?? '#16212E',
+        wl_cor:        empresa.wl_cor       ?? '#2E5CE6',
         wl_logo_url:   empresa.wl_logo_url  ?? '',
       })
     }
