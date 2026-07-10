@@ -15,6 +15,7 @@ import { FunisCard } from './funis-card'
 import { PortaisCard } from './portais-card'
 import { CardapioCard } from './cardapio-card'
 import { AgendamentoCard } from './agendamento-card'
+import { VeiculosPortalCard } from './veiculos-portal-card'
 import { FidelidadeCard } from './fidelidade-card'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
@@ -91,6 +92,8 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     ? [...TABS, { id: 'cardapio', label: 'Cardápio', Icon: LinkIcon }]
     : segmento === 'saude'
     ? [...TABS, { id: 'agendamento', label: 'Agendamento', Icon: LinkIcon }]
+    : segmento === 'concessionaria'
+    ? [...TABS, { id: 'veiculos-portais', label: 'Portais', Icon: LinkIcon }]
     : TABS
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
@@ -425,6 +428,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
         {aba === 'portais' && <PortaisCard slug={slug ?? null} />}
         {aba === 'cardapio' && <CardapioCard slug={slug ?? null} />}
         {aba === 'agendamento' && <AgendamentoCard slug={slug ?? null} />}
+        {aba === 'veiculos-portais' && <VeiculosPortalCard slug={slug ?? null} />}
         {aba === 'fidelidade' && <FidelidadeCard />}
 
       </div>
