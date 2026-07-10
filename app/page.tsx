@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
 import Landing from './landing/Landing'
-import type { PlanData } from './landing/Sections'
+import type { PlanData } from './landing/data'
 
 // Usuários já autenticados são mandados para o dashboard.
 // Visitantes veem a landing page institucional.

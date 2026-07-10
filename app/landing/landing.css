@@ -1,0 +1,136 @@
+/* ================================================================== */
+/*  landing.css — camada de efeitos da landing Nexus (escopo .lp)      */
+/*  Dark estendido da marca: ink aprofundado + cobalto como luz.       */
+/*  Nada aqui vaza para o app logado — tudo prefixado em .lp           */
+/* ================================================================== */
+
+.lp {
+  --lp-deep: #0a0c10;          /* ink levado ao fundo — página dark */
+  --lp-deep-2: #0e1116;
+  --lp-panel: #12161d;
+  --lp-white: #f7f8fa;
+  --lp-dim: rgba(247, 248, 250, 0.64);
+  --lp-faint: rgba(247, 248, 250, 0.4);
+  --lp-border: rgba(255, 255, 255, 0.08);
+  --lp-border-soft: rgba(255, 255, 255, 0.05);
+  --lp-cobalt: #2e5ce6;
+  --lp-cobalt-bright: #6e8ff0;
+}
+
+.lp ::selection {
+  background: rgba(46, 92, 230, 0.9);
+  color: #fff;
+}
+
+/* ---------- grain — SVG turbulence, fixo sobre a página toda ------- */
+.lp-grain {
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 80;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- fundo do hero: malha + auroras ------------------------- */
+.lp-grid-bg {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 68px 68px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 30%, transparent 72%);
+  mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 30%, transparent 72%);
+}
+
+.lp-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* ---------- texto com brilho cobalto (assinatura do hero) ---------- */
+.lp-text-glow {
+  background: linear-gradient(135deg, #ffffff 30%, #9db4f5 68%, #6e8ff0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---------- marquee ------------------------------------------------ */
+.lp-marquee {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.lp-marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-width: 100%;
+  will-change: transform;
+}
+
+/* ---------- spotlight dos cards bento ------------------------------ */
+.lp-spot {
+  position: relative;
+  overflow: hidden;
+}
+.lp-spot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(110, 143, 240, 0.13), transparent 65%);
+  pointer-events: none;
+}
+.lp-spot:hover::before {
+  opacity: 1;
+}
+
+/* ---------- barra de progresso do autoplay do seletor -------------- */
+@keyframes lp-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.lp-progress {
+  animation: lp-progress var(--lp-progress-dur, 5s) linear forwards;
+  transform-origin: left center;
+}
+
+/* ---------- indicador "digitando" do story WhatsApp ----------------- */
+@keyframes lp-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.lp-typing-dot {
+  animation: lp-typing 1.1s ease-in-out infinite;
+}
+.lp-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.lp-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* ---------- pulso do dot "ao vivo" ---------------------------------- */
+@keyframes lp-live {
+  0% { box-shadow: 0 0 0 0 rgba(24, 138, 84, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(24, 138, 84, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(24, 138, 84, 0); }
+}
+.lp-live-dot {
+  animation: lp-live 2.4s ease-in-out infinite;
+}
+
+/* ---------- reduced motion: mata tudo o que é decorativo ----------- */
+@media (prefers-reduced-motion: reduce) {
+  .lp-progress,
+  .lp-typing-dot,
+  .lp-live-dot {
+    animation: none;
+  }
+}
