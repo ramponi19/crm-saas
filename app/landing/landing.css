@@ -34,15 +34,7 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ---------- fundo do hero: malha + auroras ------------------------- */
-.lp-grid-bg {
-  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 68px 68px;
-  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 30%, transparent 72%);
-  mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 30%, transparent 72%);
-}
-
+/* ---------- fundo do hero: auroras --------------------------------- */
 .lp-aurora {
   position: absolute;
   border-radius: 9999px;

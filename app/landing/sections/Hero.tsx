@@ -64,8 +64,7 @@ export default function Hero() {
 
   return (
     <section ref={rootRef} className="relative overflow-hidden bg-[color:var(--lp-deep)] pb-24 pt-[124px] text-[color:var(--lp-white)] sm:pt-[148px]">
-      {/* fundo: malha + auroras */}
-      <div aria-hidden className="lp-grid-bg absolute inset-0" />
+      {/* fundo: auroras */}
       <div aria-hidden data-aurora="1" className="lp-aurora left-[8%] top-[-160px] h-[430px] w-[560px] opacity-[0.55]"
         style={{ background: 'radial-gradient(closest-side, rgba(46,92,230,.5), transparent 72%)' }} />
       <div aria-hidden data-aurora="2" className="lp-aurora right-[4%] top-[40px] h-[380px] w-[460px] opacity-[0.35]"
