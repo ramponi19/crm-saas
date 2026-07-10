@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Select, Modal, Badge, EmptyState, ConfirmDialog, notify } from '@/components/ui'
-import { Plus, Pencil, Trash2, Repeat, GripVertical, ArrowUp, ArrowDown, Phone, MessageCircle, Mail, CheckSquare } from 'lucide-react'
+import { Plus, Pencil, Trash2, Repeat, GripVertical, ArrowUp, ArrowDown, Phone, MessageCircle, Mail, CheckSquare, Snowflake, RefreshCw } from 'lucide-react'
+
+export interface ReativacaoCfg { ativo?: boolean; dias_frio?: number; incluir_perdidos?: boolean; cadencia_id?: number | null }
 
 export interface PassoUi { canal: string; dia_offset: number; titulo: string; template_chave: string | null }
 export interface Cadencia {
@@ -32,7 +34,7 @@ const CANAL_ICON: Record<string, typeof Phone> = { ligacao: Phone, whatsapp: Mes
 const CANAL_LABEL: Record<string, string> = { ligacao: 'Ligação', whatsapp: 'WhatsApp', email: 'E-mail', tarefa: 'Tarefa' }
 const novoPasso = (): PassoUi => ({ canal: 'ligacao', dia_offset: 0, titulo: '', template_chave: null })
 
-export function CadenciasView({ cadenciasIniciais, etapas, templates }: { cadenciasIniciais: Cadencia[]; etapas: EtapaOpt[]; templates: string[] }) {
+export function CadenciasView({ cadenciasIniciais, etapas, templates, reativacao }: { cadenciasIniciais: Cadencia[]; etapas: EtapaOpt[]; templates: string[]; reativacao?: ReativacaoCfg }) {
   const router = useRouter()
   const [editor, setEditor] = useState<Editor | null>(null)
   const [salvando, setSalvando] = useState(false)
@@ -102,6 +104,8 @@ export function CadenciasView({ cadenciasIniciais, etapas, templates }: { cadenc
           </div>
           <Button icon={<Plus size={15} strokeWidth={1.8} />} onClick={nova} className="shrink-0">Nova cadência</Button>
         </div>
+
+        <ReativacaoCard cadencias={cadenciasIniciais} inicial={reativacao ?? {}} />
 
         {cadenciasIniciais.length === 0 ? (
           <div className="pt-8">
@@ -229,6 +233,65 @@ export function CadenciasView({ cadenciasIniciais, etapas, templates }: { cadenc
         confirmLabel="Excluir"
         tone="danger"
       />
+    </div>
+  )
+}
+
+function ReativacaoCard({ cadencias, inicial }: { cadencias: Cadencia[]; inicial: ReativacaoCfg }) {
+  const [ativo, setAtivo] = useState(!!inicial.ativo)
+  const [dias, setDias] = useState(String(inicial.dias_frio ?? 30))
+  const [incluirPerdidos, setIncluirPerdidos] = useState(!!inicial.incluir_perdidos)
+  const [cadenciaId, setCadenciaId] = useState(inicial.cadencia_id ? String(inicial.cadencia_id) : '')
+  const [salvando, setSalvando] = useState(false)
+  const [rodando, setRodando] = useState(false)
+
+  async function salvar() {
+    setSalvando(true)
+    const r = await fetch('/api/reativacao', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ativo, dias_frio: Number(dias) || 30, incluir_perdidos: incluirPerdidos, cadencia_id: cadenciaId ? Number(cadenciaId) : null }),
+    })
+    setSalvando(false)
+    if (!r.ok) { notify.bad('Erro ao salvar'); return }
+    notify.ok('Reativação salva')
+  }
+
+  async function reativarAgora() {
+    if (!cadenciaId) { notify.warn('Escolha a cadência de reativação'); return }
+    setRodando(true)
+    const r = await fetch('/api/reativacao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ executar: true }) })
+    setRodando(false)
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) { notify.bad('Erro ao reativar', j.error); return }
+    notify.ok('Reativação executada', `${j.reativados ?? 0} lead(s) recolocado(s) na cadência`)
+  }
+
+  return (
+    <div className="mb-5 rounded-card border border-line bg-card p-4">
+      <div className="mb-3 flex items-center gap-2 text-[13.5px] font-semibold text-ink">
+        <Snowflake size={15} strokeWidth={1.8} className="text-accent" /> Re-aquecimento de leads frios
+      </div>
+      <p className="mb-3 text-[12.5px] text-ink-3">Leads parados há muitos dias (e, se quiser, os perdidos) entram numa cadência de reativação — voltam pra Fila do dia em vez de morrer na etapa.</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[130px_1fr]">
+        <Input type="number" label="Dias parado" value={dias} onChange={(e) => setDias(e.target.value)} />
+        <Select label="Cadência de reativação" value={cadenciaId} onChange={(e) => setCadenciaId(e.target.value)}>
+          <option value="">— selecionar —</option>
+          {cadencias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </Select>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="size-4 accent-accent" /> Reativar automaticamente todo dia
+        </label>
+        <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" checked={incluirPerdidos} onChange={(e) => setIncluirPerdidos(e.target.checked)} className="size-4 accent-accent" /> Incluir leads perdidos
+        </label>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button onClick={salvar} loading={salvando}>Salvar</Button>
+        <Button variant="outline" icon={<RefreshCw size={15} strokeWidth={1.8} />} onClick={reativarAgora} loading={rodando} disabled={cadencias.length === 0}>Reativar agora</Button>
+      </div>
+      {cadencias.length === 0 && <p className="mt-2 text-[11px] text-ink-3">Crie uma cadência acima para usar como trilha de reativação.</p>}
     </div>
   )
 }

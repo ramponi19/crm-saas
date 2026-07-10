@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 import { executarAcao } from '@/lib/automacoes'
 import { reavaliarScores } from '@/lib/scoring-server'
+import { reativarFrios } from '@/lib/reativacao'
 import { atualizarReferencia } from '@/lib/fipe'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -285,7 +286,18 @@ export async function GET(
           } catch (e) { console.error('[cron/scoring]', sc.empresa_id, e) }
         }
 
-        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto, campanhas: campanhasGeradas, scores: scoresEnfileirados })
+        // Sprint 3.3 — reativação (win-back) de leads frios/perdidos na cadência de reativação.
+        let reativados = 0
+        const { data: reativCfgs } = await supabase.from('configuracoes_sistema').select('empresa_id, valor').eq('chave', 'reativacao')
+        for (const rc of (reativCfgs ?? []) as Array<{ empresa_id: number; valor: { ativo?: boolean } | null }>) {
+          if (desativadas.has(rc.empresa_id) || !rc.valor?.ativo) continue
+          try {
+            const r = await reativarFrios(supabase as unknown as SupabaseClient, rc.empresa_id)
+            reativados += r.reativados
+          } catch (e) { console.error('[cron/reativacao]', rc.empresa_id, e) }
+        }
+
+        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto, campanhas: campanhasGeradas, scores: scoresEnfileirados, reativados })
       }
 
       case 'sync-fipe': {
