@@ -18,14 +18,18 @@ export function useReveal<T extends HTMLElement = HTMLElement>() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     gsap.registerPlugin(ScrollTrigger)
 
+    // IMPORTANTE: escopar as buscas ao root da seção — toArray('[selector]')
+    // seria global e, com várias seções usando o hook, criaria tweens from()
+    // duplicados no mesmo elemento (o 2º captura o estado escondido como
+    // destino e o elemento nunca aparece).
     const ctx = gsap.context(() => {
-      gsap.utils.toArray<HTMLElement>('[data-rise]').forEach((el) => {
+      gsap.utils.toArray<HTMLElement>(root.querySelectorAll('[data-rise]')).forEach((el) => {
         gsap.from(el, {
           y: 36, opacity: 0, duration: 0.9, ease: 'power3.out',
           scrollTrigger: { trigger: el, start: 'top 85%' },
         })
       })
-      gsap.utils.toArray<HTMLElement>('[data-stagger]').forEach((grp) => {
+      gsap.utils.toArray<HTMLElement>(root.querySelectorAll('[data-stagger]')).forEach((grp) => {
         gsap.from(Array.from(grp.children), {
           y: 36, opacity: 0, duration: 0.8, stagger: 0.08, ease: 'power3.out',
           scrollTrigger: { trigger: grp, start: 'top 82%' },
