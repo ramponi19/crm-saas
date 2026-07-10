@@ -117,6 +117,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
       { href: '/tarefas', label: 'Tarefas', icon: 'CheckSquare' },
       { href: '/agenda', label: 'Agenda', icon: 'Calendar' },
+      { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true },
     ],
   },
   {

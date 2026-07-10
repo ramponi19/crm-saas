@@ -83,6 +83,44 @@ export type Database = {
         }
         Relationships: []
       }
+      mensagens_internas: {
+        Row: {
+          id: number
+          empresa_id: number
+          autor_id: string
+          tipo: string
+          destinatario_id: string | null
+          conteudo: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          autor_id: string
+          tipo?: string
+          destinatario_id?: string | null
+          conteudo: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          autor_id?: string
+          tipo?: string
+          destinatario_id?: string | null
+          conteudo?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_internas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chamadas: {
         Row: {
           id: number
