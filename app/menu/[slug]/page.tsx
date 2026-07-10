@@ -28,6 +28,7 @@ export default async function MenuPublicoPage({ params }: { params: Promise<{ sl
 
   return (
     <MenuView
+      slug={slug}
       empresaNome={empresa.nome}
       cor={empresa.wl_cor || '#2E5CE6'}
       whatsapp={empresa.wl_whatsapp}

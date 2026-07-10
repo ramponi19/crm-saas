@@ -151,6 +151,12 @@ export type Database = {
           },
         ]
       }
+      pedidos: {
+        Row: { id: number; empresa_id: number; mesa: string | null; cliente_nome: string | null; itens: Json; total: number; status: string; observacoes: string | null; origem: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; mesa?: string | null; cliente_nome?: string | null; itens?: Json; total?: number; status?: string; observacoes?: string | null; origem?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; mesa?: string | null; cliente_nome?: string | null; itens?: Json; total?: number; status?: string; observacoes?: string | null; origem?: string | null; created_at?: string | null }
+        Relationships: []
+      }
       solicitacoes_marketing: {
         Row: { id: number; empresa_id: number; item: string; objetivo: string | null; canais: Json; status: string; solicitante_id: string | null; created_at: string | null }
         Insert: { id?: never; empresa_id: number; item: string; objetivo?: string | null; canais?: Json; status?: string; solicitante_id?: string | null; created_at?: string | null }

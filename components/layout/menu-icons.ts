@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, BarChart3, ScanBarcode, Calculator, ReceiptText, Target,
   Smartphone, Boxes, BookOpen, Users, ShieldCheck, Wrench, ShoppingCart,
-  Wallet, UserCog, Settings, Building2, CreditCard, Home, KeyRound, Calendar, CheckSquare, Palette, GitBranch, SlidersHorizontal, Shield, Gauge, FileText, ClipboardCheck, Car, Key, UtensilsCrossed, MessageSquare, ListChecks, Repeat, Split, Flame, Trophy, Filter, Megaphone,
+  Wallet, UserCog, Settings, Building2, CreditCard, Home, KeyRound, Calendar, CheckSquare, Palette, GitBranch, SlidersHorizontal, Shield, Gauge, FileText, ClipboardCheck, Car, Key, UtensilsCrossed, MessageSquare, ListChecks, Repeat, Split, Flame, Trophy, Filter, Megaphone, CookingPot,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -9,5 +9,5 @@ import type { LucideIcon } from 'lucide-react'
 export const MENU_ICONS: Record<string, LucideIcon> = {
   LayoutDashboard, BarChart3, ScanBarcode, Calculator, ReceiptText, Target,
   Smartphone, Boxes, BookOpen, Users, ShieldCheck, Wrench, ShoppingCart,
-  Wallet, UserCog, Settings, Building2, CreditCard, Home, KeyRound, Calendar, CheckSquare, Palette, GitBranch, SlidersHorizontal, Shield, Gauge, FileText, ClipboardCheck, Car, Key, UtensilsCrossed, MessageSquare, ListChecks, Repeat, Split, Flame, Trophy, Filter, Megaphone,
+  Wallet, UserCog, Settings, Building2, CreditCard, Home, KeyRound, Calendar, CheckSquare, Palette, GitBranch, SlidersHorizontal, Shield, Gauge, FileText, ClipboardCheck, Car, Key, UtensilsCrossed, MessageSquare, ListChecks, Repeat, Split, Flame, Trophy, Filter, Megaphone, CookingPot,
 }

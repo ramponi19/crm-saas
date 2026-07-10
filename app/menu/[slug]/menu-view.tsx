@@ -1,16 +1,22 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Minus, ShoppingBag } from 'lucide-react'
+import { Plus, Minus, ShoppingBag, X, CheckCircle2 } from 'lucide-react'
 
 export interface MenuItem { id: number; nome: string; preco: number | null; descricao: string | null; foto_url: string | null; categoria: string }
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export function MenuView({ empresaNome, cor, whatsapp, logo, itens }: {
-  empresaNome: string; cor: string; whatsapp: string | null; logo: string | null; itens: MenuItem[]
+export function MenuView({ slug, empresaNome, cor, whatsapp, logo, itens }: {
+  slug: string; empresaNome: string; cor: string; whatsapp: string | null; logo: string | null; itens: MenuItem[]
 }) {
   const [qtd, setQtd] = useState<Record<number, number>>({})
+  const [checkout, setCheckout] = useState(false)
+  const [mesa, setMesa] = useState('')
+  const [nome, setNome] = useState('')
+  const [obs, setObs] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [numero, setNumero] = useState<number | null>(null)
   const add = (id: number, d: number) => setQtd((q) => { const n = Math.max(0, (q[id] ?? 0) + d); return { ...q, [id]: n } })
 
   const grupos = useMemo(() => {
@@ -30,11 +36,35 @@ export function MenuView({ empresaNome, cor, whatsapp, logo, itens }: {
 
   const temItens = linhas.length > 0
 
-  function pedir() {
+  async function enviarPedido() {
+    setEnviando(true)
+    const payload = { mesa, cliente_nome: nome, observacoes: obs, itens: itens.filter((i) => (qtd[i.id] ?? 0) > 0).map((i) => ({ produto_id: i.id, qtd: qtd[i.id] })) }
+    const r = await fetch(`/api/menu/${slug}/pedido`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    setEnviando(false)
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) { alert(j.error || 'Não foi possível enviar o pedido.'); return }
+    setNumero(j.numero); setCheckout(false); setQtd({})
+  }
+
+  function pedirWhatsapp() {
     const msg = `Olá, ${empresaNome}! Quero fazer um pedido:\n\n${linhas.join('\n')}\n\n*Total: ${brl(total)}*`
     const num = (whatsapp ?? '').replace(/\D/g, '')
     const alvo = num ? (num.length <= 11 ? '55' + num : num) : ''
     window.open(alvo ? `https://wa.me/${alvo}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  if (numero != null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+        <div className="w-full max-w-[400px] rounded-card border border-line bg-card p-6 text-center">
+          <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full" style={{ background: `${cor}1a`, color: cor }}><CheckCircle2 size={30} strokeWidth={1.7} /></div>
+          <h2 className="text-[18px] font-semibold text-ink">Pedido enviado!</h2>
+          <p className="mt-1 text-[14px] text-ink-2">Seu número é <span className="num font-bold" style={{ color: cor }}>#{numero}</span></p>
+          <p className="mt-3 text-[12.5px] text-ink-3">A cozinha já recebeu. Acompanhe o preparo com o atendente.</p>
+          <button onClick={() => setNumero(null)} className="mt-5 h-11 w-full rounded-control text-[14px] font-semibold text-white" style={{ background: cor }}>Fazer outro pedido</button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -87,16 +117,40 @@ export function MenuView({ empresaNome, cor, whatsapp, logo, itens }: {
         ))}
       </main>
 
-      {temItens && (
+      {temItens && !checkout && (
         <div className="fixed inset-x-0 bottom-0 border-t border-line bg-card px-4 py-3">
           <div className="mx-auto flex max-w-[640px] items-center gap-3">
             <div className="flex-1">
               <div className="text-[11px] text-ink-3">{linhas.length} {linhas.length === 1 ? 'item' : 'itens'}</div>
               <div className="num text-[17px] font-bold text-ink">{brl(total)}</div>
             </div>
-            <button onClick={pedir} className="flex items-center gap-2 rounded-control px-5 py-3 text-[14px] font-semibold text-white" style={{ background: cor }}>
-              <ShoppingBag size={17} strokeWidth={1.9} /> Fazer pedido no WhatsApp
+            <button onClick={() => setCheckout(true)} className="flex items-center gap-2 rounded-control px-5 py-3 text-[14px] font-semibold text-white" style={{ background: cor }}>
+              <ShoppingBag size={17} strokeWidth={1.9} /> Fazer pedido
             </button>
+          </div>
+        </div>
+      )}
+
+      {checkout && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center" onMouseDown={(e) => { if (e.target === e.currentTarget) setCheckout(false) }}>
+          <div className="w-full max-w-[440px] rounded-t-modal bg-card p-5 sm:rounded-modal">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[16px] font-semibold text-ink">Finalizar pedido</h2>
+              <button onClick={() => setCheckout(false)} className="text-ink-3 hover:text-ink"><X size={18} strokeWidth={1.8} /></button>
+            </div>
+            <div className="mb-3 max-h-40 space-y-1 overflow-y-auto rounded-control border border-line-soft bg-bg p-2.5 text-[12.5px] text-ink-2">
+              {linhas.map((l, i) => <div key={i}>{l}</div>)}
+              <div className="mt-1 border-t border-line-soft pt-1 text-right font-bold text-ink">Total: {brl(total)}</div>
+            </div>
+            <div className="space-y-2.5">
+              <input value={mesa} onChange={(e) => setMesa(e.target.value)} placeholder="Mesa (ex.: 5)" className="h-11 w-full rounded-control border border-line bg-bg px-3.5 text-[15px] text-ink outline-none focus:border-accent" />
+              <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome (opcional)" className="h-11 w-full rounded-control border border-line bg-bg px-3.5 text-[15px] text-ink outline-none focus:border-accent" />
+              <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observações (ex.: sem cebola)" className="h-11 w-full rounded-control border border-line bg-bg px-3.5 text-[15px] text-ink outline-none focus:border-accent" />
+              <button onClick={enviarPedido} disabled={enviando} className="h-12 w-full rounded-control text-[15px] font-semibold text-white disabled:opacity-50" style={{ background: cor }}>
+                {enviando ? 'Enviando…' : `Enviar pedido · ${brl(total)}`}
+              </button>
+              <button onClick={pedirWhatsapp} className="h-10 w-full rounded-control border border-line text-[13px] font-medium text-ink-2">Prefiro pedir pelo WhatsApp</button>
+            </div>
           </div>
         </div>
       )}

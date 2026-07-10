@@ -166,6 +166,7 @@ export const CATALOGO: MenuGroupBase[] = [
     label: 'Food',
     items: [
       { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed', opcional: true },
+      { href: '/kds', label: 'Cozinha (KDS)', icon: 'CookingPot', opcional: true },
     ],
   },
   {
