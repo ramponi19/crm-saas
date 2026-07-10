@@ -151,6 +151,30 @@ export type Database = {
           },
         ]
       }
+      cadencias: {
+        Row: { id: number; empresa_id: number; nome: string; descricao: string | null; ativo: boolean; gatilho: string; gatilho_etapa_slug: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; nome: string; descricao?: string | null; ativo?: boolean; gatilho?: string; gatilho_etapa_slug?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; nome?: string; descricao?: string | null; ativo?: boolean; gatilho?: string; gatilho_etapa_slug?: string | null; created_at?: string | null }
+        Relationships: []
+      }
+      cadencia_passos: {
+        Row: { id: number; cadencia_id: number; empresa_id: number; ordem: number; canal: string; dia_offset: number; titulo: string; template_chave: string | null; created_at: string | null }
+        Insert: { id?: never; cadencia_id: number; empresa_id: number; ordem: number; canal?: string; dia_offset?: number; titulo: string; template_chave?: string | null; created_at?: string | null }
+        Update: { id?: never; cadencia_id?: number; empresa_id?: number; ordem?: number; canal?: string; dia_offset?: number; titulo?: string; template_chave?: string | null; created_at?: string | null }
+        Relationships: []
+      }
+      cadencia_inscricoes: {
+        Row: { id: number; empresa_id: number; cadencia_id: number; lead_id: number; responsavel_id: string | null; status: string; passo_ordem: number; proxima_acao_em: string | null; created_at: string | null; concluida_em: string | null }
+        Insert: { id?: never; empresa_id: number; cadencia_id: number; lead_id: number; responsavel_id?: string | null; status?: string; passo_ordem?: number; proxima_acao_em?: string | null; created_at?: string | null; concluida_em?: string | null }
+        Update: { id?: never; empresa_id?: number; cadencia_id?: number; lead_id?: number; responsavel_id?: string | null; status?: string; passo_ordem?: number; proxima_acao_em?: string | null; created_at?: string | null; concluida_em?: string | null }
+        Relationships: []
+      }
+      cadencia_execucoes: {
+        Row: { id: number; empresa_id: number; inscricao_id: number; passo_ordem: number | null; canal: string | null; resultado: string | null; observacao: string | null; executado_por: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; inscricao_id: number; passo_ordem?: number | null; canal?: string | null; resultado?: string | null; observacao?: string | null; executado_por?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; inscricao_id?: number; passo_ordem?: number | null; canal?: string | null; resultado?: string | null; observacao?: string | null; executado_por?: string | null; created_at?: string | null }
+        Relationships: []
+      }
       chamadas: {
         Row: {
           id: number

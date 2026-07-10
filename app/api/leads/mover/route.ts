@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { executarEntradaEtapa } from '@/lib/automacoes'
+import { inscreverPorEtapa } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -43,18 +44,21 @@ export async function POST(req: Request) {
   const { error } = await supabase.from('leads').update(patch as never).eq('id', body.leadId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Automações de entrada — só se a etapa realmente mudou.
+  // Automações e cadências de entrada — só se a etapa realmente mudou.
   if (leadAtual.kanban_status !== body.kanban_status) {
+    const db = supabase as unknown as SupabaseClient
+    const leadMin = { id: leadAtual.id, nome: leadAtual.nome, responsavel_id: leadAtual.responsavel_id }
     try {
-      await executarEntradaEtapa(
-        supabase as unknown as SupabaseClient,
-        empresaId,
-        { id: leadAtual.id, nome: leadAtual.nome, responsavel_id: leadAtual.responsavel_id },
-        body.kanban_status,
-      )
+      await executarEntradaEtapa(db, empresaId, leadMin, body.kanban_status)
     } catch (e) {
       // Automação nunca quebra o move.
       console.error('[leads/mover] automações falharam:', e)
+    }
+    try {
+      await inscreverPorEtapa(db, empresaId, leadMin, body.kanban_status)
+    } catch (e) {
+      // Cadência nunca quebra o move.
+      console.error('[leads/mover] cadências falharam:', e)
     }
   }
 
