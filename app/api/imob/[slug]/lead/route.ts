@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
-import { proximoResponsavel } from '@/lib/roleta'
+import { escolherResponsavel } from '@/lib/distribuicao'
 
 /**
  * Captura de leads do SITE PRÓPRIO da imobiliária.
@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     if (im) produto = im.titulo || im.codigo
   }
 
-  const responsavel = await proximoResponsavel(svc, empresa.id)
+  const responsavel = await escolherResponsavel(svc, empresa.id, { origem: 'site', valor_estimado: null })
   const detalhes = [email ? `E-mail: ${email}` : null, imovelCodigo ? `Imóvel: ${imovelCodigo}` : null, mensagem ? `Mensagem: ${mensagem}` : null].filter(Boolean).join(' · ')
 
   const { data: lead, error } = await svc.from('leads').insert({

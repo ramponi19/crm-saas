@@ -82,8 +82,17 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
       setLoading(false)
       return
     }
+    let criado = data as Lead
+    // Distribuição automática quando o criador não escolheu responsável.
+    if (!form.responsavel_id && criado?.id) {
+      try {
+        const r = await fetch('/api/leads/distribuir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: criado.id }) })
+        const j = await r.json().catch(() => ({}))
+        if (j?.responsavel_id) criado = { ...criado, responsavel_id: j.responsavel_id }
+      } catch { /* silencioso — lead fica na esteira */ }
+    }
     notify.ok('Lead criado', form.nome.trim())
-    onCreate(data as Lead)
+    onCreate(criado)
     setLoading(false)
   }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
-import { proximoResponsavel } from '@/lib/roleta'
+import { escolherResponsavel } from '@/lib/distribuicao'
 
 /**
  * Webhook INBOUND de leads dos portais (Grupo OLX: ZAP, VivaReal, Imovelweb).
@@ -65,8 +65,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     if (im) produto = im.titulo || im.codigo
   }
 
-  // roleta: define o corretor responsável
-  const responsavel = await proximoResponsavel(svc, empresa.id)
+  // motor de distribuição: define o corretor responsável (regras → rodízio; fallback roleta)
+  const responsavel = await escolherResponsavel(svc, empresa.id, { origem: 'grupo-olx', valor_estimado: null })
 
   const detalhes = [
     email ? `E-mail: ${email}` : null,
