@@ -83,6 +83,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          id: number
+          empresa_id: number
+          usuario_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          usuario_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          usuario_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       mensagens_internas: {
         Row: {
           id: number

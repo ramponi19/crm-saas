@@ -23,3 +23,32 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(req).catch(() => caches.match(OFFLINE)))
   }
 })
+
+// --- Web Push (notificação do chat no celular) ---
+self.addEventListener('push', (event) => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch (_) { data = {} }
+  const title = data.title || 'Nexus'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: data.tag || undefined,
+      data: { url: data.url || '/chat' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = (event.notification.data && event.notification.data.url) || '/chat'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      for (const c of clientes) {
+        if (c.url.includes(url) && 'focus' in c) return c.focus()
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+    }),
+  )
+})
