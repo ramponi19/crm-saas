@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
 import { executarAcao } from '@/lib/automacoes'
+import { reavaliarScores } from '@/lib/scoring-server'
 import { atualizarReferencia } from '@/lib/fipe'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -273,7 +274,18 @@ export async function GET(
           }
         }
 
-        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto, campanhas: campanhasGeradas })
+        // Sprint 2.3 — reavaliar scores e enfileirar leads quentes na cadência-gatilho.
+        let scoresEnfileirados = 0
+        const { data: scoreCfgs } = await supabase.from('configuracoes_sistema').select('empresa_id, valor').eq('chave', 'lead_scoring')
+        for (const sc of (scoreCfgs ?? []) as Array<{ empresa_id: number; valor: { gatilho?: { ativo?: boolean } } | null }>) {
+          if (desativadas.has(sc.empresa_id) || !sc.valor?.gatilho?.ativo) continue
+          try {
+            const r = await reavaliarScores(supabase as unknown as SupabaseClient, sc.empresa_id)
+            scoresEnfileirados += r.enfileirados
+          } catch (e) { console.error('[cron/scoring]', sc.empresa_id, e) }
+        }
+
+        return NextResponse.json({ ok: true, job, criadas, automacoes: disparosAuto, campanhas: campanhasGeradas, scores: scoresEnfileirados })
       }
 
       case 'sync-fipe': {

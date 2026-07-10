@@ -181,6 +181,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/funil', label: 'Funil', icon: 'GitBranch', adminOnly: true },
       { href: '/cadencias', label: 'Cadências', icon: 'Repeat', adminOnly: true },
       { href: '/distribuicao', label: 'Distribuição', icon: 'Split', adminOnly: true },
+      { href: '/scoring', label: 'Lead scoring', icon: 'Flame', adminOnly: true },
       { href: '/meu-menu', label: 'Meu menu', icon: 'SlidersHorizontal', adminOnly: true },
       { href: '/permissoes', label: 'Permissões', icon: 'Shield', adminOnly: true },
       { href: '/aparencia', label: 'Aparência', icon: 'Palette', adminOnly: true },

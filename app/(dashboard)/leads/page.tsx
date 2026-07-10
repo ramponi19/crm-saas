@@ -3,6 +3,7 @@ import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/leads/types'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
 
 export const metadata = {
   title: 'Leads — CRM SaaS',
@@ -79,6 +80,10 @@ export default async function LeadsPage() {
   const restringe = !!meuRole && !permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
   const leadsVisiveis = restringe ? leadsComContagem.filter((l) => l.responsavel_id === user?.id) : leadsComContagem
 
+  const { data: scoringRow } = await supabase
+    .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle()
+  const scoreConfig = mergeScoreConfig((scoringRow?.valor ?? null) as Partial<ScoreConfig> | null)
+
   return (
     <LeadsView
       initialLeads={leadsVisiveis}
@@ -88,6 +93,7 @@ export default async function LeadsPage() {
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
       funis={(funisRaw ?? []) as Funil[]}
+      scoreConfig={scoreConfig}
     />
   )
 }

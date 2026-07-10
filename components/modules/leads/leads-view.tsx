@@ -11,6 +11,8 @@ import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
 import { Topbar } from '@/components/layout/topbar'
+import { ScoreConfigProvider } from './score-config-context'
+import { DEFAULT_SCORE_CONFIG, type ScoreConfig } from '@/lib/lead-score'
 
 interface LeadsViewProps {
   initialLeads: Lead[]
@@ -23,9 +25,11 @@ interface LeadsViewProps {
   motivos?: Motivo[]
   /** Funis da empresa (Fase 4.1). */
   funis?: Funil[]
+  /** Config de lead scoring do dono (Sprint 2.3). Fallback = padrão. */
+  scoreConfig?: ScoreConfig
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -138,6 +142,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
       : formatCurrency(v)
 
   return (
+    <ScoreConfigProvider value={scoreConfig}>
     <div className="flex flex-col h-full min-h-0">
 
       <Topbar title="Leads" />
@@ -215,5 +220,6 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
         />
       )}
     </div>
+    </ScoreConfigProvider>
   )
 }

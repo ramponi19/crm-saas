@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Lead, Usuario } from './types'
 import { formatCurrency } from '@/lib/utils'
 import { calcularScore } from '@/lib/lead-score'
+import { useScoreConfig } from './score-config-context'
 
 const TIER_CHIP: Record<string, { label: string; cls: string }> = {
   quente: { label: 'Quente', cls: 'bg-accent-soft text-accent' },
@@ -82,7 +83,8 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
   const lastAt = lead.ultima_mensagem_at ?? lead.ultima_tratativa
   const slaTone = getSlaTone(lastAt, sla)
-  const { score, tier } = calcularScore(lead)
+  const scoreCfg = useScoreConfig()
+  const { score, tier } = calcularScore(lead, scoreCfg)
   const chip = TIER_CHIP[tier]
 
   return (
