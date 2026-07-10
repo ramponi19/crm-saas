@@ -44,7 +44,10 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/proposta/') ||
                         request.nextUrl.pathname.startsWith('/os/') ||
                         request.nextUrl.pathname.startsWith('/api/os/') ||
-                        request.nextUrl.pathname.startsWith('/menu/')
+                        request.nextUrl.pathname.startsWith('/menu/') ||
+                        request.nextUrl.pathname.startsWith('/offline') ||
+                        request.nextUrl.pathname === '/sw.js' ||
+                        request.nextUrl.pathname === '/manifest.webmanifest'
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {

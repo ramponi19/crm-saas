@@ -1,6 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, JetBrains_Mono } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { PwaRegister } from '@/components/pwa-register'
 import './globals.css'
 
 // Precisão: Geist é a fonte do produto; mono só p/ códigos (font-mono).
@@ -13,6 +14,16 @@ export const metadata: Metadata = {
     template: '%s | Nexus',
   },
   description: 'Nexus — CRM por segmento: venda com processo, cresça com controle.',
+  applicationName: 'Nexus',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Nexus' },
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/apple-180.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#15181C',
 }
 
 export default function RootLayout({
@@ -26,6 +37,7 @@ export default function RootLayout({
       className={`${geist.variable} ${mono.variable}`}
     >
       <body>
+        <PwaRegister />
         {children}
         <Toaster
           position="top-right"
