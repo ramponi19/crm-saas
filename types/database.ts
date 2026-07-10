@@ -151,6 +151,12 @@ export type Database = {
           },
         ]
       }
+      metas: {
+        Row: { id: number; empresa_id: number; escopo: string; usuario_id: string | null; tipo: string; alvo: number; periodo: string; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; escopo?: string; usuario_id?: string | null; tipo?: string; alvo?: number; periodo: string; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; escopo?: string; usuario_id?: string | null; tipo?: string; alvo?: number; periodo?: string; created_at?: string | null }
+        Relationships: []
+      }
       distribuicao_regras: {
         Row: { id: number; empresa_id: number; ordem: number; nome: string; ativo: boolean; criterio: string; config: Json; destinatarios: Json; rodizio_ptr: number; created_at: string | null }
         Insert: { id?: never; empresa_id: number; ordem?: number; nome: string; ativo?: boolean; criterio?: string; config?: Json; destinatarios?: Json; rodizio_ptr?: number; created_at?: string | null }
