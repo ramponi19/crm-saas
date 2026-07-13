@@ -1,5 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar'
-import { BottomNav } from '@/components/layout/bottom-nav'
+import { MobileTopbar } from '@/components/layout/mobile-topbar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
@@ -149,13 +149,11 @@ export default async function DashboardLayout({
           segOverride={segOverride}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
-          {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
-          <LimiteBanner />
-          {/* Área da página: flex-1 min-h-0 para caber ANTES da barra inferior no mobile
-              (sem isto o h-full da página empurrava a BottomNav pra fora da tela). */}
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
-          <BottomNav
+          {/* Cabeçalho mobile: ☰ no canto abre o menu completo em gaveta (só no celular). */}
+          <MobileTopbar
+            empresaNome={empresa?.nome}
+            empresaLogo={empresa?.wl_logo_url ?? null}
+            userName={usuario?.nome ?? user.email ?? 'Usuário'}
             segmento={normalizarSegmento(empresa?.segmento)}
             plano={plano}
             role={role}
@@ -165,6 +163,10 @@ export default async function DashboardLayout({
             configDono={menuConfig}
             segOverride={segOverride}
           />
+          {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
+          {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
+          <LimiteBanner />
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
         </div>
       </div>
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
