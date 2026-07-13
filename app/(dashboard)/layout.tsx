@@ -127,7 +127,7 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
-      <div className="flex h-screen overflow-hidden bg-bg">
+      <div className="flex h-[100dvh] overflow-hidden bg-bg">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
           userRole={
@@ -152,7 +152,9 @@ export default async function DashboardLayout({
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <LimiteBanner />
-          {children}
+          {/* Área da página: flex-1 min-h-0 para caber ANTES da barra inferior no mobile
+              (sem isto o h-full da página empurrava a BottomNav pra fora da tela). */}
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
           <BottomNav
             segmento={normalizarSegmento(empresa?.segmento)}
             plano={plano}
