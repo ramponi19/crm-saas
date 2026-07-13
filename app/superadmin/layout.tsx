@@ -1,4 +1,4 @@
-import { SuperAdminSidebar } from '@/components/superadmin/superadmin-sidebar'
+import { SuperAdminShell } from '@/components/superadmin/superadmin-shell'
 import { requireSuperAdmin } from '@/lib/superadmin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -17,11 +17,8 @@ export default async function SuperAdminLayout({
     .single()
 
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
-      <SuperAdminSidebar userName={usuario?.nome ?? 'Super Admin'} />
-      <div className="flex flex-col flex-1 min-w-0 overflow-y-auto">
-        {children}
-      </div>
-    </div>
+    <SuperAdminShell userName={usuario?.nome ?? 'Super Admin'}>
+      {children}
+    </SuperAdminShell>
   )
 }
