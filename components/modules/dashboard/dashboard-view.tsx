@@ -316,7 +316,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
     <>
       <Topbar title="Visão geral" showPeriods activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
 
-      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-bg px-4 py-5 scrollbar-thin sm:px-6 sm:py-6">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
           {/* Header */}

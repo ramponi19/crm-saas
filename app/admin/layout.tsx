@@ -4,8 +4,7 @@ import { requireEmpresaRole } from '@/lib/owner'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { SessionGuard } from '@/components/layout/session-guard'
-import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
-import { AdminSidebar } from '@/components/admin/admin-sidebar'
+import { AdminShell } from '@/components/admin/admin-shell'
 
 /**
  * Área de Administração do DONO (owner/admin), escopada ao tenant.
@@ -24,17 +23,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <EmpresaProvider>
-      <div className="flex h-screen bg-bg overflow-hidden">
-        <AdminSidebar
-          userName={usuario?.nome ?? usuario?.email ?? 'Administrador'}
-          empresaNome={empresa?.nome ?? 'Minha empresa'}
-          role={role}
-        />
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
-          <div className="flex-1 overflow-y-auto scrollbar-thin">{children}</div>
-        </div>
-      </div>
+      <AdminShell
+        userName={usuario?.nome ?? usuario?.email ?? 'Administrador'}
+        empresaNome={empresa?.nome ?? 'Minha empresa'}
+        role={role}
+        impersonationNome={impersonation?.nome ?? null}
+      >
+        {children}
+      </AdminShell>
       <NotificationProvider />
       <SessionGuard />
     </EmpresaProvider>
