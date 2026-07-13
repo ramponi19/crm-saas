@@ -53,9 +53,13 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* TEMP ÁPICE — remover ao fim da Fase 2. Novo código (kit + views migradas) nunca usa serif. */
   h1, h2, h3 {
-    font-family: var(--font-fraunces), Georgia, serif;
+    font-family: var(--font-geist), system-ui, sans-serif;
+  }
+  /* Trava de segurança: nada rola na horizontal no nível da página. */
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
   }
 }
 
