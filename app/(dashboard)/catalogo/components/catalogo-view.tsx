@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Plus, Tag, Package, MoreHorizontal } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
+import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
 import {
   Button,
   IconButton,
@@ -111,6 +113,8 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const [modalPreco, setModalPreco] = useState(false)
   const [precoForm, setPrecoForm] = useState({ modelo: '', armazenamento: '', condicao: 'lacrado', preco_sugerido: '', observacoes: '' })
   const [saving, setSaving] = useState(false)
+  const router = useRouter()
+  const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
 
   const marcasVisiveis = marcas.filter((m) => m.total_produtos > 0)
 
@@ -146,9 +150,9 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
     setSaving(false)
   }
 
+  // Estoque tem módulo próprio (/estoque) — não duplica aqui.
   const TABS: TabItem[] = [
     { value: 'produtos', label: 'Produtos', badge: produtos.length || undefined },
-    { value: 'estoque', label: 'Estoque', badge: unidades.length || undefined },
     { value: 'categorias', label: 'Categorias', badge: categorias.length || undefined },
     { value: 'marcas', label: 'Marcas', badge: marcasVisiveis.length || undefined },
     { value: 'tabela', label: 'Tabela de preços', badge: tabela.length || undefined },
@@ -199,7 +203,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <Topbar title="Catálogo" />
+      <Topbar title="Produtos" />
 
       <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-5">
@@ -211,7 +215,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Tabs items={categTabs} value={filtroCategoria} onValueChange={setFiltroCategoria} className="border-b-0" />
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/produtos'}>Cadastrar produto</Button>
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setEditProd('new')}>Cadastrar produto</Button>
               </div>
 
               <Card flush>
@@ -219,7 +223,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   columns={colsProdutos}
                   rows={prodsFiltrados}
                   rowKey={(p) => p.id}
-                  onRowClick={() => window.location.href = '/produtos'}
+                  onRowClick={(p) => setEditProd(p)}
                   empty={<EmptyState icon={<Package size={22} strokeWidth={1.7} />} title="Nenhum produto encontrado" description="Ajuste o filtro ou cadastre um novo produto." />}
                 />
               </Card>
@@ -372,6 +376,17 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           />
         </form>
       </Modal>
+
+      {editProd !== null && (
+        <ProdutoModal
+          produto={editProd === 'new' ? null : { id: editProd.id, nome: editProd.nome, marca_id: editProd.marca_id, categoria_id: editProd.categoria_id }}
+          marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))}
+          categorias={categorias.map((c) => ({ id: c.id, nome: c.nome }))}
+          onClose={() => setEditProd(null)}
+          onSaved={() => { setEditProd(null); router.refresh() }}
+          onDeleted={() => { setEditProd(null); router.refresh() }}
+        />
+      )}
     </div>
   )
 }
