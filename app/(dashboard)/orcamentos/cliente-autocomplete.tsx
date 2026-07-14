@@ -5,12 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui'
 import { Loader2, Search } from 'lucide-react'
 
-interface Cli { id: number; nome: string; telefone: string | null }
+interface Sug { id: string; nome: string; telefone: string | null; origem: 'cliente' | 'lead' }
+const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 
 /**
- * Busca inteligente de cliente: digita o nome → sugere quem é (clientes da
- * empresa, RLS) → ao selecionar, preenche nome + telefone. Aceita nome novo
- * (digitação livre) quando não há correspondência.
+ * Busca inteligente de cliente/lead: digita o nome → sugere quem é (clientes E
+ * leads da empresa, RLS) → ao selecionar, preenche nome + telefone. Aceita nome
+ * novo (digitação livre) quando não há correspondência.
  */
 export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' }: {
   nome: string
@@ -19,7 +20,7 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
   label?: string
 }) {
   const supabase = createClient()
-  const [res, setRes] = useState<Cli[]>([])
+  const [res, setRes] = useState<Sug[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const skip = useRef(false)
@@ -31,10 +32,24 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
     if (term.length < 2) { setRes([]); setOpen(false); return }
     setLoading(true)
     const id = setTimeout(async () => {
-      const { data } = await supabase.from('clientes')
-        .select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8)
-      setRes((data ?? []) as Cli[])
-      setOpen((data ?? []).length > 0)
+      const [{ data: cls }, { data: lds }] = await Promise.all([
+        supabase.from('clientes').select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
+        supabase.from('leads').select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
+      ])
+      const merged: Sug[] = []
+      const seen = new Set<string>()
+      const key = (n: string, t: string | null) => (t && soDigitos(t) ? soDigitos(t) : n.toLowerCase().trim())
+      for (const c of (cls ?? []) as { id: number; nome: string; telefone: string | null }[]) {
+        const k = key(c.nome, c.telefone); if (seen.has(k)) continue
+        seen.add(k); merged.push({ id: `c${c.id}`, nome: c.nome, telefone: c.telefone, origem: 'cliente' })
+      }
+      for (const l of (lds ?? []) as { id: number; nome: string | null; telefone: string | null }[]) {
+        if (!l.nome) continue
+        const k = key(l.nome, l.telefone); if (seen.has(k)) continue
+        seen.add(k); merged.push({ id: `l${l.id}`, nome: l.nome, telefone: l.telefone, origem: 'lead' })
+      }
+      setRes(merged.slice(0, 10))
+      setOpen(merged.length > 0)
       setLoading(false)
     }, 250)
     return () => clearTimeout(id)
@@ -46,7 +61,7 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  function escolher(c: Cli) {
+  function escolher(c: Sug) {
     skip.current = true
     onSelect({ nome: c.nome, telefone: c.telefone ?? '' })
     setOpen(false); setRes([])
@@ -63,7 +78,10 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
           {res.map((c) => (
             <button key={c.id} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => escolher(c)}
               className="flex w-full items-center justify-between gap-3 border-b border-line-soft px-3 py-2 text-left last:border-0 hover:bg-bg">
-              <span className="truncate text-[13px] font-medium text-ink">{c.nome}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-[13px] font-medium text-ink">{c.nome}</span>
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide ${c.origem === 'cliente' ? 'bg-ok/10 text-ok' : 'bg-accent/10 text-accent'}`}>{c.origem}</span>
+              </span>
               {c.telefone && <span className="num shrink-0 text-[12px] text-ink-3">{c.telefone}</span>}
             </button>
           ))}
