@@ -26,11 +26,23 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
   const [clienteNome, setClienteNome] = useState('')
   const [produto, setProduto] = useState('')
   const [produtoId, setProdutoId] = useState<number | null>(null)
+  const [coresDisp, setCoresDisp] = useState<string[]>([])
+  const [armazDisp, setArmazDisp] = useState<string[]>([])
+  const [cor, setCor] = useState('')
+  const [capacidade, setCapacidade] = useState('')
   const [custo, setCusto] = useState('')
   const [valorVenda, setValorVenda] = useState('')
   const [fornecedorId, setFornecedorId] = useState('')
   const [obs, setObs] = useState('')
   const [salvando, setSalvando] = useState(false)
+
+  async function escolherProduto(p: { id: number; nome: string; preco: number | null }) {
+    setProduto(p.nome); setProdutoId(p.id); setCor(''); setCapacidade('')
+    if (!valorVenda && p.preco) setValorVenda(String(p.preco))
+    const { data } = await supabase.from('produtos').select('cores, armazenamentos').eq('id', p.id).maybeSingle()
+    setCoresDisp(data?.cores ?? []); setArmazDisp(data?.armazenamentos ?? [])
+  }
+  const especif = [capacidade, cor].filter(Boolean).join(' ')
 
   async function salvar() {
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
@@ -42,7 +54,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
       empresa_id: empresa.id,
       fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
-      descricao: `Encomenda: ${produto.trim()}${cliNome ? ` — ${cliNome}` : ''}`,
+      descricao: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}${cliNome ? ` — ${cliNome}` : ''}`,
       valor_total: Number(custo) || 0,
       status: 'aberto',
       usuario_id: user?.id ?? null,
@@ -60,7 +72,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       data_venda: new Date().toISOString(),
       produto_id: produtoId,
       pedido_compra_id: (pedido as { id?: number } | null)?.id ?? null,
-      observacoes: `Encomenda: ${produto.trim()}.${obs.trim() ? ' ' + obs.trim() : ''}${cliNome && !clienteId ? ` Cliente: ${cliNome}.` : ''}`,
+      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${obs.trim() ? ' ' + obs.trim() : ''}${cliNome && !clienteId ? ` Cliente: ${cliNome}.` : ''}`,
     } as never)
 
     setSalvando(false)
@@ -86,8 +98,25 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
         {!clienteId && <Input label="Nome do cliente" value={clienteNome} onChange={(e) => setClienteNome(e.target.value)} placeholder="Se não estiver cadastrado" />}
 
         <ProdutoAutocomplete label="Produto a encomendar" value={produto}
-          onChange={(v) => { setProduto(v); setProdutoId(null) }}
-          onSelect={(p) => { setProduto(p.nome); setProdutoId(p.id); if (!valorVenda && p.preco) setValorVenda(String(p.preco)) }} />
+          onChange={(v) => { setProduto(v); setProdutoId(null); setCoresDisp([]); setArmazDisp([]); setCor(''); setCapacidade('') }}
+          onSelect={escolherProduto} />
+
+        {(coresDisp.length > 0 || armazDisp.length > 0) && (
+          <div className="grid grid-cols-2 gap-3">
+            {armazDisp.length > 0 && (
+              <Select label="Capacidade" value={capacidade} onChange={(e) => setCapacidade(e.target.value)}>
+                <option value="">Selecionar…</option>
+                {armazDisp.map((a) => <option key={a} value={a}>{a}</option>)}
+              </Select>
+            )}
+            {coresDisp.length > 0 && (
+              <Select label="Cor" value={cor} onChange={(e) => setCor(e.target.value)}>
+                <option value="">Selecionar…</option>
+                {coresDisp.map((c) => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Input label="Custo (compra) R$" type="number" value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="0,00" />

@@ -9,6 +9,16 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function HistoricoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [{ data: vinculo }, { data: usuario }, { data: membrosRaw }] = await Promise.all([
+    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
+    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
+  ])
+  const isAdmin = !!((usuario as { is_super_admin?: boolean } | null)?.is_super_admin || (vinculo as { role?: string } | null)?.role === 'owner' || (vinculo as { role?: string } | null)?.role === 'admin')
+  type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
+  const vendedores = ((membrosRaw ?? []) as unknown as MembroRow[]).map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))
 
   const { data: vendasRaw } = await supabase
     .from('vendas')
@@ -47,7 +57,7 @@ export default async function HistoricoPage() {
   return (
     <>
       <Topbar eyebrow="VENDAS · HISTÓRICO" title="Histórico de vendas" />
-      <HistoricoView vendas={vendas} />
+      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} />
     </>
   )
 }

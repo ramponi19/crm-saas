@@ -53,6 +53,8 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
   const [saving, setSaving] = useState(false)
+  // Unidade existente abre em modo VISUALIZAÇÃO; edita só ao clicar "Editar".
+  const [editando, setEditando] = useState(isNew)
   const [confirmDel, setConfirmDel] = useState(false)
   const [produtos, setProdutos] = useState<{ id: number; nome: string; marca_nome: string; cores: string[]; armazenamentos: string[] }[]>([])
   const [fornecedores, setFornecedores] = useState<{ id: number; nome_fantasia: string }[]>([])
@@ -126,12 +128,22 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
                 Remover
               </Button>
             )}
-            <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
-            <Button onClick={salvar} loading={saving}>Salvar</Button>
+            {!editando ? (
+              <>
+                <Button variant="ghost" onClick={onClose}>Fechar</Button>
+                <Button onClick={() => setEditando(true)}>Editar</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+                <Button onClick={salvar} loading={saving}>Salvar</Button>
+              </>
+            )}
           </>
         }
       >
         <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+          <fieldset disabled={!editando} className="contents">
           <Select
             wrapperClassName="col-span-2"
             label={isVeiculo ? 'Modelo' : 'Produto'}
@@ -258,6 +270,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
             onChange={e => set('observacoes', e.target.value || null)}
             placeholder="Defeitos, histórico, detalhes…"
           />
+          </fieldset>
         </form>
       </Modal>
 

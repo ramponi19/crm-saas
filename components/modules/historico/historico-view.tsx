@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Receipt, Check } from 'lucide-react'
+import { Download, Receipt, Check, ArrowLeftRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, notify, type Column } from '@/components/ui'
+import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
   id: number
@@ -21,7 +21,7 @@ interface Venda {
   parcelas: number | null
 }
 
-interface Props { vendas: Venda[] }
+interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[] }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
@@ -59,10 +59,22 @@ function exportCSV(rows: Venda[]) {
   a.click()
 }
 
-export function HistoricoView({ vendas }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [] }: Props) {
   const [filtro, setFiltro] = useState('all')
   const [finalizando, setFinalizando] = useState<number | null>(null)
+  const [transf, setTransf] = useState<Venda | null>(null)
+  const [novoVend, setNovoVend] = useState('')
+  const [transfBusy, setTransfBusy] = useState(false)
   const router = useRouter()
+
+  async function transferir() {
+    if (!transf || !novoVend) return
+    setTransfBusy(true)
+    const { error } = await createClient().from('vendas').update({ vendedor_id: novoVend }).eq('id', transf.id)
+    setTransfBusy(false)
+    if (error) { notify.bad('Erro ao transferir'); return }
+    notify.ok('Venda transferida'); setTransf(null); setNovoVend(''); router.refresh()
+  }
 
   async function finalizarEncomenda(id: number) {
     setFinalizando(id)
@@ -98,7 +110,17 @@ export function HistoricoView({ vendas }: Props) {
     { key: 'data', header: 'Data', className: 'num w-[100px]', render: (v) => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
     { key: 'cliente', header: 'Cliente', render: (v) => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
     { key: 'produto', header: 'Produto', hideOnMobile: true, render: (v) => <span className="text-ink-2">{v.produto_nome ?? v.forma_pagamento ?? '—'}</span> },
-    { key: 'vendedor', header: 'Vendedor', hideOnMobile: true, render: (v) => <span className="text-ink-2">{v.vendedor_nome ?? '—'}</span> },
+    {
+      key: 'vendedor', header: 'Vendedor', hideOnMobile: true,
+      render: (v) => (
+        <span className="flex items-center gap-1.5">
+          <span className="text-ink-2">{v.vendedor_nome ?? '—'}</span>
+          {isAdmin && (
+            <button onClick={(e) => { e.stopPropagation(); setTransf(v); setNovoVend('') }} title="Transferir venda" className="text-ink-3 hover:text-accent"><ArrowLeftRight size={13} strokeWidth={1.8} /></button>
+          )}
+        </span>
+      ),
+    },
     {
       key: 'pgto', header: 'Pagamento', hideOnMobile: true,
       render: (v) => <span className="text-ink-2">{[v.forma_pagamento ?? '', v.parcelas && v.parcelas > 1 ? `${v.parcelas}x` : ''].filter(Boolean).join(' · ') || '—'}</span>,
@@ -128,6 +150,7 @@ export function HistoricoView({ vendas }: Props) {
   ]
 
   return (
+    <>
     <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1240px] space-y-4">
 
@@ -154,5 +177,21 @@ export function HistoricoView({ vendas }: Props) {
 
       </div>
     </main>
+
+    {transf && (
+      <Modal open onClose={() => setTransf(null)} title="Transferir venda" footer={<>
+        <Button variant="ghost" onClick={() => setTransf(null)}>Cancelar</Button>
+        <Button onClick={transferir} loading={transfBusy} disabled={!novoVend}>Transferir</Button>
+      </>}>
+        <div className="space-y-3">
+          <p className="text-[13px] text-ink-2">Venda de <strong className="text-ink">{formatCurrency(transf.valor_venda)}</strong>{transf.cliente_nome ? ` — ${transf.cliente_nome}` : ''}. Atual: {transf.vendedor_nome ?? 'sem vendedor'}.</p>
+          <Select label="Novo vendedor" value={novoVend} onChange={(e) => setNovoVend(e.target.value)}>
+            <option value="">Selecionar…</option>
+            {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+          </Select>
+        </div>
+      </Modal>
+    )}
+    </>
   )
 }
