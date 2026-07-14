@@ -28,7 +28,7 @@ interface Fornecedor {
   email: string | null
   created_at: string | null
 }
-interface Props { pedidos: Pedido[]; fornecedores: Fornecedor[] }
+interface Props { pedidos: Pedido[]; fornecedores: Fornecedor[]; isAdmin?: boolean }
 
 const STATUS_PEDIDO: Record<string, { label: string; tone: 'acc' | 'ok' | 'warn' | 'neutro' }> = {
   aberto:      { label: 'Aberto',      tone: 'acc'    },
@@ -51,7 +51,7 @@ function getInitials(name: string) {
 const FORM_VAZIO = { nome_fantasia: '', razao_social: '', cnpj: '', contato: '', telefone: '', email: '' }
 const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor_total: '', data_pedido: '', observacoes: '', status: 'aberto' }
 
-export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit }: Props) {
+export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit, isAdmin = false }: Props) {
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
   const [pedidos,        setPedidos]        = useState(pedidosInit)
@@ -159,8 +159,8 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
             <StatCard bare label="Investido no mês" value={fmtBRL(stats.investido)} />
           </div>
 
-          {/* Dois painéis */}
-          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+          {/* Painéis: fornecedores só p/ admin/proprietário */}
+          <div className={isAdmin ? 'grid gap-4 lg:grid-cols-[1fr_360px]' : 'grid gap-4'}>
 
             {/* Pedidos */}
             <Card
@@ -188,7 +188,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                       <div key={p.id} className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-ink/[0.03]">
                         <div className="min-w-0">
                           <div className="truncate text-[13px] font-medium text-ink">{p.descricao ?? `Pedido #${p.id}`}</div>
-                          <div className="mt-0.5 truncate text-[11px] text-ink-3">{p.fornecedores?.nome_fantasia ?? '—'} · <span className="num">{fmtData(p.data_pedido ?? p.created_at)}</span></div>
+                          <div className="mt-0.5 truncate text-[11px] text-ink-3">{isAdmin && <>{p.fornecedores?.nome_fantasia ?? '—'} · </>}<span className="num">{fmtData(p.data_pedido ?? p.created_at)}</span></div>
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
                           <span className="num text-[13px] font-semibold text-ink">{fmtBRL(p.valor_total)}</span>
@@ -201,7 +201,8 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               )}
             </Card>
 
-            {/* Fornecedores */}
+            {/* Fornecedores — visível só p/ admin/proprietário */}
+            {isAdmin && (
             <Card
               flush
               title="Fornecedores"
@@ -240,6 +241,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                 </div>
               )}
             </Card>
+            )}
 
           </div>
         </div>
@@ -301,14 +303,16 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
             onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
             placeholder="Ex: Reposição de estoque smartphones"
           />
-          <Select
-            label="Fornecedor"
-            value={formPedido.fornecedor_id}
-            onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
-          >
-            <option value="">— Selecionar —</option>
-            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
-          </Select>
+          {isAdmin && (
+            <Select
+              label="Fornecedor"
+              value={formPedido.fornecedor_id}
+              onChange={e => setFormPedido(f => ({ ...f, fornecedor_id: e.target.value }))}
+            >
+              <option value="">— Selecionar —</option>
+              {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
+            </Select>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Valor total (R$)"
