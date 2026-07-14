@@ -13,6 +13,7 @@ import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadOrcamentoPanel } from './lead-orcamento-panel'
+import { ProdutoAutocomplete } from './produto-autocomplete'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
@@ -280,7 +281,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <Input label="Nome" value={form.nome} onChange={(e) => set('nome', e.target.value)} />
             <Input label="Telefone / WhatsApp" value={form.tel} onChange={(e) => set('tel', e.target.value)} className="num" />
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
-            <Input label={segmento === 'concessionaria' ? 'Veículo interessado' : segmento === 'imobiliaria' ? 'Imóvel interessado' : 'Produto interessado'} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
+            {segmento === 'concessionaria' || segmento === 'imobiliaria' ? (
+              <Input label={segmento === 'concessionaria' ? 'Veículo interessado' : 'Imóvel interessado'} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
+            ) : (
+              <ProdutoAutocomplete label="Produto interessado" value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
+            )}
             <Select label="Status no funil" value={form.status} onChange={(e) => set('status', e.target.value)}>
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>

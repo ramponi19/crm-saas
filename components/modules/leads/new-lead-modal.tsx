@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Lead, Usuario, type KanbanColumn } from './types'
 import { Modal, Input, Select, Textarea, Button, notify } from '@/components/ui'
+import { ProdutoAutocomplete } from './produto-autocomplete'
 import type { TablesInsert } from '@/types/database'
 
 interface NewLeadModalProps {
@@ -26,6 +27,16 @@ const ORIGENS = [
 
 export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: NewLeadModalProps) {
   const [loading, setLoading] = useState(false)
+
+  // Responsável default = vendedor logado (se for da equipe).
+  useEffect(() => {
+    let cancel = false
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (cancel || !user || !usuarios.some((u) => u.id === user.id)) return
+      setForm((f) => (f.responsavel_id ? f : { ...f, responsavel_id: user.id }))
+    })
+    return () => { cancel = true }
+  }, [usuarios])
   const [form, setForm] = useState({
     nome: '', telefone: '', instagram: '', origem: '',
     produto_interessado: '', valor_estimado: '',
@@ -120,7 +131,9 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
         <Select label="Status inicial" value={form.kanban_status} onChange={(e) => set('kanban_status', e.target.value)}>
           {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </Select>
-        <Input label="Produto de interesse" value={form.produto_interessado} onChange={(e) => set('produto_interessado', e.target.value)} placeholder="iPhone 15 Pro…" />
+        <ProdutoAutocomplete label="Produto de interesse" value={form.produto_interessado}
+          onChange={(v) => set('produto_interessado', v)}
+          onSelect={(p) => { set('produto_interessado', p.nome); if (!form.valor_estimado && p.preco) set('valor_estimado', String(p.preco)) }} />
         <Input label="Valor estimado (R$)" value={form.valor_estimado} onChange={(e) => set('valor_estimado', e.target.value.replace(/[^0-9.,]/g, ''))} placeholder="0,00" className="num" />
         <Select wrapperClassName="col-span-2" label="Responsável" value={form.responsavel_id} onChange={(e) => set('responsavel_id', e.target.value)}>
           <option value="">Sem responsável</option>
