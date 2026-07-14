@@ -16,7 +16,7 @@ const brl = (v: number | null) => (v ? v.toLocaleString('pt-BR', { style: 'curre
 export function ProdutoAutocomplete({ value, onChange, onSelect, label = 'Produto interessado' }: {
   value: string
   onChange: (v: string) => void
-  onSelect: (p: { nome: string; preco: number | null }) => void
+  onSelect: (p: { id: number; nome: string; preco: number | null }) => void
   label?: string
 }) {
   const supabase = createClient()
@@ -49,7 +49,7 @@ export function ProdutoAutocomplete({ value, onChange, onSelect, label = 'Produt
 
   function escolher(p: Prod) {
     skip.current = true
-    onSelect({ nome: p.nome, preco: p.preco })
+    onSelect({ id: p.id, nome: p.nome, preco: p.preco })
     setOpen(false); setRes([])
   }
 

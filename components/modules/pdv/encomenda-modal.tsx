@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Modal, Input, Select, Textarea, Button, notify } from '@/components/ui'
+import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
 
 interface Cli { id: number; nome: string }
 interface Forn { id: number; nome_fantasia: string }
@@ -24,6 +25,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
   const [clienteId, setClienteId] = useState('')
   const [clienteNome, setClienteNome] = useState('')
   const [produto, setProduto] = useState('')
+  const [produtoId, setProdutoId] = useState<number | null>(null)
   const [custo, setCusto] = useState('')
   const [valorVenda, setValorVenda] = useState('')
   const [fornecedorId, setFornecedorId] = useState('')
@@ -56,6 +58,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       vendedor_id: user?.id ?? null,
       canal_venda: 'encomenda',
       data_venda: new Date().toISOString(),
+      produto_id: produtoId,
       pedido_compra_id: (pedido as { id?: number } | null)?.id ?? null,
       observacoes: `Encomenda: ${produto.trim()}.${obs.trim() ? ' ' + obs.trim() : ''}${cliNome && !clienteId ? ` Cliente: ${cliNome}.` : ''}`,
     } as never)
@@ -82,7 +85,9 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
         </Select>
         {!clienteId && <Input label="Nome do cliente" value={clienteNome} onChange={(e) => setClienteNome(e.target.value)} placeholder="Se não estiver cadastrado" />}
 
-        <Input label="Produto a encomendar" value={produto} onChange={(e) => setProduto(e.target.value)} placeholder="Ex.: iPhone 15 Pro 256GB Titânio" />
+        <ProdutoAutocomplete label="Produto a encomendar" value={produto}
+          onChange={(v) => { setProduto(v); setProdutoId(null) }}
+          onSelect={(p) => { setProduto(p.nome); setProdutoId(p.id); if (!valorVenda && p.preco) setValorVenda(String(p.preco)) }} />
 
         <div className="grid grid-cols-2 gap-3">
           <Input label="Custo (compra) R$" type="number" value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="0,00" />

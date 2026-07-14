@@ -21,16 +21,17 @@ export async function POST(req: Request) {
 
   // Encomenda vinculada a este pedido?
   const { data: venda } = await supabase.from('vendas')
-    .select('id, unidade_id').eq('pedido_compra_id', pedidoId).eq('status', 'encomenda').maybeSingle()
+    .select('id, unidade_id, produto_id, valor_venda').eq('pedido_compra_id', pedidoId).eq('status', 'encomenda').maybeSingle()
 
-  // Entrada da unidade no estoque.
+  // Entrada da unidade no estoque (com o produto/preço da encomenda quando houver).
   const { data: unidade } = await supabase.from('inventario_unidades').insert({
     empresa_id: empresaId,
-    produto_id: null,
+    produto_id: venda?.produto_id ?? null,
     condicao: 'novo',
     tipo: 'compra',
     status: venda ? 'reservado' : 'disponivel',
     preco_custo: pedido.valor_total ?? null,
+    preco_venda: venda?.valor_venda ?? null,
     observacoes: `Entrada por compra #${pedido.id}${pedido.descricao ? ` — ${pedido.descricao}` : ''}.`,
     ativo: true,
   } as never).select('id').single()
