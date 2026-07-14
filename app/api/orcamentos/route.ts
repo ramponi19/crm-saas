@@ -19,6 +19,7 @@ interface Body {
   valor_novo?: number
   aparelho_usado?: string
   valor_entrada?: number
+  unidade_id?: number | null
   observacoes?: string
 }
 
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
     valor_novo: tipo === 'troca' ? (Number(b.valor_novo) || 0) : null,
     aparelho_usado: b.aparelho_usado?.trim() || null,
     valor_entrada: tipo === 'troca' ? (Number(b.valor_entrada) || 0) : null,
+    unidade_id: tipo === 'venda' ? (b.unidade_id ?? null) : null,
     total,
     observacoes: b.observacoes?.trim() || null,
   }

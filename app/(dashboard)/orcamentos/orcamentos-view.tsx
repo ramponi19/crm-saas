@@ -12,8 +12,9 @@ export interface Orcamento {
   id: number; lead_id: number | null; tipo: string; status: string; cliente_nome: string; cliente_telefone: string | null
   aparelho: string | null; imei: string | null; defeito: string | null; prazo_dias: number | null; garantia_dias: number | null
   itens: ItemOrc[]; aparelho_novo: string | null; valor_novo: number | null; aparelho_usado: string | null; valor_entrada: number | null
-  total: number; observacoes: string | null; token: string; created_at: string | null
+  unidade_id: number | null; total: number; observacoes: string | null; token: string; created_at: string | null
 }
+export interface UnidadeOpt { id: number; label: string; preco: number }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, troca: { label: 'Troca', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
@@ -27,15 +28,15 @@ interface Editor {
   id?: number; lead_id?: number | null; tipo: string; cliente_nome: string; cliente_telefone: string
   aparelho: string; imei: string; defeito: string; prazo_dias: string; garantia_dias: string
   itens: ItemOrc[]; aparelho_novo: string; valor_novo: string; aparelho_usado: string; valor_entrada: string
-  observacoes: string
+  unidade_id: number | null; observacoes: string
 }
 const vazio = (tipo = 'assistencia'): Editor => ({
   tipo, lead_id: null, cliente_nome: '', cliente_telefone: '', aparelho: '', imei: '', defeito: '', prazo_dias: '', garantia_dias: '',
-  itens: [{ descricao: '', qtd: 1, valor: 0 }], aparelho_novo: '', valor_novo: '', aparelho_usado: '', valor_entrada: '', observacoes: '',
+  itens: [{ descricao: '', qtd: 1, valor: 0 }], aparelho_novo: '', valor_novo: '', aparelho_usado: '', valor_entrada: '', unidade_id: null, observacoes: '',
 })
 const LABEL_DESC: Record<string, string> = { assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade', venda: 'Descrição do aparelho' }
 
-export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIniciais: Orcamento[]; segmento?: string }) {
+export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tipoPadrao = segmento === 'assistencia' ? 'assistencia' : 'assistencia'
@@ -76,7 +77,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
       itens: o.itens.length ? o.itens.map((i) => ({ ...i })) : [{ descricao: '', qtd: 1, valor: 0 }],
       aparelho_novo: o.aparelho_novo ?? '', valor_novo: o.valor_novo != null ? String(o.valor_novo) : '',
       aparelho_usado: o.aparelho_usado ?? '', valor_entrada: o.valor_entrada != null ? String(o.valor_entrada) : '',
-      observacoes: o.observacoes ?? '',
+      unidade_id: o.unidade_id, observacoes: o.observacoes ?? '',
     })
   }
 
@@ -99,6 +100,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
         itens: editor.itens,
         aparelho_novo: editor.aparelho_novo, valor_novo: Number(editor.valor_novo) || 0,
         aparelho_usado: editor.aparelho_usado, valor_entrada: Number(editor.valor_entrada) || 0,
+        unidade_id: editor.unidade_id ?? null,
         observacoes: editor.observacoes,
       }),
     })
@@ -211,6 +213,17 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
                   <Input label="Aparelho" value={editor.aparelho} onChange={(e) => setEditor({ ...editor, aparelho: e.target.value })} placeholder="Modelo" />
                   <Input label="IMEI / série (opcional)" value={editor.imei} onChange={(e) => setEditor({ ...editor, imei: e.target.value })} />
                 </div>
+                {editor.tipo === 'venda' && unidades.length > 0 && (
+                  <Select label="Aparelho do estoque (baixa ao aprovar)" value={editor.unidade_id != null ? String(editor.unidade_id) : ''}
+                    onChange={(e) => {
+                      const uid = e.target.value ? Number(e.target.value) : null
+                      const u = unidades.find((x) => x.id === uid)
+                      setEditor({ ...editor, unidade_id: uid, itens: u ? [{ descricao: u.label, qtd: 1, valor: u.preco }] : editor.itens })
+                    }}>
+                    <option value="">Sem baixa de estoque (item livre)</option>
+                    {unidades.map((u) => <option key={u.id} value={u.id}>{u.label} — {brl(u.preco)}</option>)}
+                  </Select>
+                )}
                 <Textarea label={LABEL_DESC[editor.tipo] ?? 'Descrição'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
 
                 <div>

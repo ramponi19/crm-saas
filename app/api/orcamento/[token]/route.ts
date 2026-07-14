@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, lead_id, tipo, status, aparelho, imei, defeito, total, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada')
+    .select('id, empresa_id, lead_id, tipo, status, aparelho, imei, defeito, total, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
@@ -71,6 +71,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         vendedor_id: vendedorId,
         canal_venda: 'troca',
         observacoes: `Troca — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${orc.valor_entrada ?? 0}). Diferença paga: R$ ${orc.total}.`,
+      } as never)
+    }
+
+    // Venda/semi-novo com unidade do estoque → baixa a unidade + registra a venda.
+    if (orc.tipo === 'venda' && orc.unidade_id) {
+      await svc.from('inventario_unidades').update({ status: 'vendido' } as never).eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id)
+      let vendedorId: string | null = null
+      if (orc.lead_id) {
+        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
+        vendedorId = lead?.responsavel_id ?? null
+      }
+      await svc.from('vendas').insert({
+        empresa_id: orc.empresa_id,
+        valor_venda: orc.total ?? 0,
+        data_venda: nowIso,
+        vendedor_id: vendedorId,
+        canal_venda: 'orcamento',
+        observacoes: `Venda por orçamento #${orc.id} — ${orc.cliente_nome}.`,
       } as never)
     }
 
