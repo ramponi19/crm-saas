@@ -49,6 +49,8 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/api/veiculos/') ||
                         request.nextUrl.pathname.startsWith('/agendar/') ||
                         request.nextUrl.pathname.startsWith('/api/agendar/') ||
+                        request.nextUrl.pathname.startsWith('/orcamento/') ||
+                        request.nextUrl.pathname.startsWith('/api/orcamento/') ||
                         request.nextUrl.pathname.startsWith('/offline') ||
                         request.nextUrl.pathname === '/sw.js' ||
                         request.nextUrl.pathname === '/manifest.webmanifest'

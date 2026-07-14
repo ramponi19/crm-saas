@@ -151,6 +151,12 @@ export type Database = {
           },
         ]
       }
+      orcamentos: {
+        Row: { id: number; empresa_id: number; lead_id: number | null; cliente_nome: string; cliente_telefone: string | null; tipo: string; status: string; token: string; aparelho: string | null; imei: string | null; defeito: string | null; prazo_dias: number | null; garantia_dias: number | null; itens: Json; aparelho_novo: string | null; valor_novo: number | null; aparelho_usado: string | null; valor_entrada: number | null; total: number; observacoes: string | null; os_id: number | null; aprovado_em: string | null; recusado_em: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; lead_id?: number | null; cliente_nome: string; cliente_telefone?: string | null; tipo?: string; status?: string; token?: string; aparelho?: string | null; imei?: string | null; defeito?: string | null; prazo_dias?: number | null; garantia_dias?: number | null; itens?: Json; aparelho_novo?: string | null; valor_novo?: number | null; aparelho_usado?: string | null; valor_entrada?: number | null; total?: number; observacoes?: string | null; os_id?: number | null; aprovado_em?: string | null; recusado_em?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; lead_id?: number | null; cliente_nome?: string; cliente_telefone?: string | null; tipo?: string; status?: string; token?: string; aparelho?: string | null; imei?: string | null; defeito?: string | null; prazo_dias?: number | null; garantia_dias?: number | null; itens?: Json; aparelho_novo?: string | null; valor_novo?: number | null; aparelho_usado?: string | null; valor_entrada?: number | null; total?: number; observacoes?: string | null; os_id?: number | null; aprovado_em?: string | null; recusado_em?: string | null; created_at?: string | null }
+        Relationships: []
+      }
       pedidos: {
         Row: { id: number; empresa_id: number; mesa: string | null; cliente_nome: string | null; itens: Json; total: number; status: string; observacoes: string | null; origem: string | null; created_at: string | null }
         Insert: { id?: never; empresa_id: number; mesa?: string | null; cliente_nome?: string | null; itens?: Json; total?: number; status?: string; observacoes?: string | null; origem?: string | null; created_at?: string | null }
