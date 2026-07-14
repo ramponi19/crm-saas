@@ -54,16 +54,16 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
-  const [produtos, setProdutos] = useState<{ id: number; nome: string; marca_nome: string }[]>([])
+  const [produtos, setProdutos] = useState<{ id: number; nome: string; marca_nome: string; cores: string[]; armazenamentos: string[] }[]>([])
   const [fornecedores, setFornecedores] = useState<{ id: number; nome_fantasia: string }[]>([])
 
   useEffect(() => {
-    supabase.from('produtos').select('id, nome, marcas_produtos!marca_id(nome)').eq('ativo', true).order('nome')
+    supabase.from('produtos').select('id, nome, cores, armazenamentos, marcas_produtos!marca_id(nome)').eq('ativo', true).order('nome')
       .then(({ data }) => {
-        type ProdRow = { id: number; nome: string; marcas_produtos: { nome: string | null } | { nome: string | null }[] | null }
+        type ProdRow = { id: number; nome: string; cores: string[] | null; armazenamentos: string[] | null; marcas_produtos: { nome: string | null } | { nome: string | null }[] | null }
         setProdutos(((data ?? []) as unknown as ProdRow[]).map(p => {
           const m = Array.isArray(p.marcas_produtos) ? p.marcas_produtos[0] : p.marcas_produtos
-          return { id: p.id, nome: p.nome, marca_nome: m?.nome ?? '' }
+          return { id: p.id, nome: p.nome, marca_nome: m?.nome ?? '', cores: p.cores ?? [], armazenamentos: p.armazenamentos ?? [] }
         }))
       })
     supabase.from('fornecedores').select('id, nome_fantasia').eq('ativo', true).order('nome_fantasia')
@@ -77,6 +77,9 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const margem = form.preco_venda && form.preco_custo
     ? ((form.preco_venda - form.preco_custo) / form.preco_custo * 100).toFixed(1)
     : null
+
+  // Modelo selecionado → listas exclusivas de cor/armazenamento (se cadastradas).
+  const produtoSel = produtos.find((p) => p.id === form.produto_id)
 
   async function salvar() {
     if (!form.produto_id) { notify.warn('Selecione um produto'); return }
@@ -182,8 +185,24 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
               <Input label="IMEI 2 / Série" value={form.imei2 ?? ''} onChange={e => set('imei2', e.target.value || null)} placeholder="000000000000000" className="num" />
               <Input label="Número de série" value={form.numero_serie ?? ''} onChange={e => set('numero_serie', e.target.value || null)} placeholder="XXXXX" className="num" />
               <Input label="Bateria %" value={form.bateria ?? ''} onChange={e => set('bateria', e.target.value || null)} placeholder="95" className="num" />
-              <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
-              <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
+              {produtoSel && produtoSel.cores.length > 0 ? (
+                <Select label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)}>
+                  <option value="">Selecionar cor…</option>
+                  {produtoSel.cores.map(c => <option key={c} value={c}>{c}</option>)}
+                  {form.cor && !produtoSel.cores.includes(form.cor) && <option value={form.cor}>{form.cor}</option>}
+                </Select>
+              ) : (
+                <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
+              )}
+              {produtoSel && produtoSel.armazenamentos.length > 0 ? (
+                <Select label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)}>
+                  <option value="">Selecionar armazenamento…</option>
+                  {produtoSel.armazenamentos.map(a => <option key={a} value={a}>{a}</option>)}
+                  {form.armazenamento && !produtoSel.armazenamentos.includes(form.armazenamento) && <option value={form.armazenamento}>{form.armazenamento}</option>}
+                </Select>
+              ) : (
+                <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
+              )}
 
               <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
                 <option value="novo">Novo</option>
