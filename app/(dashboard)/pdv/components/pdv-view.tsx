@@ -52,6 +52,15 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
   const [bandeira, setBandeira] = useState<'visa_master' | 'outros'>('visa_master')
   const [desconto, setDesconto] = useState('')
   const [finalizando, setFinalizando] = useState(false)
+  // #3 upsell de acessórios (ofertas editáveis)
+  const [acessorios, setAcessorios] = useState<{ descricao: string; valor: number }[]>([])
+  // #1 aparelho na troca (abate no total + entra no estoque)
+  const [trocaAtiva, setTrocaAtiva] = useState(false)
+  const [trocaAparelho, setTrocaAparelho] = useState('')
+  const [trocaImei, setTrocaImei] = useState('')
+  const [trocaValor, setTrocaValor] = useState('')
+  // #2 entrega pendente (semi-novo que não sai na hora)
+  const [entregaPendente, setEntregaPendente] = useState(false)
   const [pixCobranca, setPixCobranca] = useState<CobrancaPix | null>(null)
   const [pixCopiado, setPixCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
@@ -95,10 +104,13 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
   function removerItem(id: number) { setCarrinho((prev) => prev.filter((c) => c.item.id !== id)) }
 
   const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
+  const acessoriosTotal = acessorios.reduce((a, x) => a + (Number(x.valor) || 0), 0)
+  const trocaNum = trocaAtiva ? (parseFloat(String(trocaValor).replace(',', '.')) || 0) : 0
+  const abatimento = descontoNum + trocaNum
 
   const totais = useMemo(() => {
-    const subtotal = carrinho.reduce((a, c) => a + (c.item.preco_venda ?? 0), 0)
-    const total = Math.max(0, subtotal - descontoNum)
+    const subtotal = carrinho.reduce((a, c) => a + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
+    const total = Math.max(0, subtotal - abatimento)
     const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0), 0)
     let totalComTaxa = total
     if (formaPagamento === 'credito' || formaPagamento === 'link') {
@@ -111,7 +123,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     }
     const taxaPct = totalComTaxa > total ? ((totalComTaxa - total) / total * 100) : 0
     return { subtotal, total, totalComTaxa, custo, lucro: total - custo, taxaPct }
-  }, [carrinho, descontoNum, formaPagamento, parcelas, bandeira, taxas])
+  }, [carrinho, abatimento, acessoriosTotal, formaPagamento, parcelas, bandeira, taxas])
 
   const parcelasOpts = useMemo(() => {
     const fp = formaPagamento === 'credito' ? 'maquininha' : 'link'
@@ -124,9 +136,9 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
 
   async function finalizarVenda() {
     if (carrinho.length === 0) { notify.warn('Carrinho vazio'); return }
-    const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
+    const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
-    if (descontoNum > subtotalBruto) { notify.warn('Desconto maior que o valor total'); return }
+    if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
     setFinalizando(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -139,48 +151,58 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
       if (!vinculo) throw new Error('Empresa não encontrada')
       const empresaId = vinculo.empresa_id
 
-      const totalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0)
+      const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
+      const unitStatus = entregaPendente ? 'reservado' : 'vendido'
+      const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
+      const trocaNota = trocaAtiva && trocaNum > 0 ? ` Troca: ${trocaAparelho || 'aparelho'} (R$ ${trocaNum}).` : ''
       let primeiraVendaId: number | null = null
+      let trocaNotaPendente = trocaNota.length > 0
+
+      // Uma venda por unidade do carrinho (abatimento = desconto + troca, rateado).
       for (const c of carrinho) {
         const precoCheio = c.item.preco_venda ?? 0
-        const descontoItem = totalBruto > 0 ? descontoNum * (precoCheio / totalBruto) : 0
+        const descontoItem = subtotalBruto > 0 ? abatimento * (precoCheio / subtotalBruto) : 0
         const valorItem = precoCheio - descontoItem
 
         const { data: claimed } = await supabase
           .from('inventario_unidades')
-          .update({ status: 'vendido', cliente_id: clienteSelecionado?.id ?? null })
+          .update({ status: unitStatus, cliente_id: clienteSelecionado?.id ?? null })
           .eq('id', c.item.id)
           .eq('status', 'disponivel')
           .select('id')
           .single()
         if (!claimed) throw new Error(`"${c.item.produto_nome}" não está mais disponível`)
 
-        const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
         const valorItemComTaxa = valorItem * taxaMultiplier
 
+        const vendaRow = {
+          empresa_id: empresaId,
+          cliente_id: clienteSelecionado?.id ?? null,
+          vendedor_id: user.id,
+          usuario_id: user.id,
+          valor_venda: valorItem,
+          valor_custo: c.item.preco_custo ?? 0,
+          lucro: valorItem - (c.item.preco_custo ?? 0),
+          forma_pagamento: formaPagamento,
+          parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
+          canal_venda: 'loja_fisica',
+          comanda: isFood ? (comanda.trim() || null) : null,
+          desconto_valor: descontoItem,
+          produto_id: c.item.produto_id,
+          numero_serie: c.item.imei ?? c.item.numero_serie,
+          status: vendaStatus,
+          observacoes: trocaNotaPendente ? trocaNota.trim() : null,
+          data_venda: new Date().toISOString(),
+        }
+        trocaNotaPendente = false
         const { data: venda, error } = await supabase
           .from('vendas')
-          .insert({
-            empresa_id: empresaId,
-            cliente_id: clienteSelecionado?.id ?? null,
-            vendedor_id: user.id,
-            usuario_id: user.id,
-            valor_venda: valorItem,
-            valor_custo: c.item.preco_custo ?? 0,
-            lucro: valorItem - (c.item.preco_custo ?? 0),
-            forma_pagamento: formaPagamento,
-            parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
-            canal_venda: 'loja_fisica',
-            comanda: isFood ? (comanda.trim() || null) : null,
-            desconto_valor: descontoItem,
-            produto_id: c.item.produto_id,
-            numero_serie: c.item.imei ?? c.item.numero_serie,
-            status: 'concluida',
-            data_venda: new Date().toISOString(),
-          })
-          .select().single()
+          .insert(vendaRow as never)
+          .select('id').single<{ id: number }>()
         if (error) throw new Error(error.message)
         if (primeiraVendaId === null) primeiraVendaId = venda.id
+        // Entrega pendente: guarda a unidade reservada p/ baixar ao "Entregar" no Histórico.
+        if (entregaPendente) await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
         await supabase.from('vendas_pagamentos').insert({
           empresa_id: empresaId,
           venda_id: venda.id, forma_pagamento: formaPagamento,
@@ -189,6 +211,35 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
           valor_com_juros: totais.totalComTaxa !== totais.total ? valorItemComTaxa : null,
         })
+      }
+
+      // #3 Acessórios ofertados (kit proteção, fonte…) → venda extra por item.
+      for (const ac of acessorios) {
+        const preco = Number(ac.valor) || 0
+        if (preco <= 0 || !ac.descricao.trim()) continue
+        const descAc = subtotalBruto > 0 ? abatimento * (preco / subtotalBruto) : 0
+        const valorAc = preco - descAc
+        const { data: vAc } = await supabase.from('vendas').insert({
+          empresa_id: empresaId, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
+          valor_venda: valorAc, valor_custo: 0, lucro: valorAc, forma_pagamento: formaPagamento,
+          parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
+          desconto_valor: descAc, status: vendaStatus, observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
+        } as never).select('id').single()
+        if (vAc?.id) await supabase.from('vendas_pagamentos').insert({
+          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: formaPagamento, valor_pago: valorAc,
+          bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
+          parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
+        } as never)
+      }
+
+      // #1 Aparelho recebido na troca entra no estoque (disponível).
+      if (trocaAtiva && trocaNum > 0) {
+        await supabase.from('inventario_unidades').insert({
+          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'disponivel',
+          preco_custo: trocaNum, imei: trocaImei.trim() || null,
+          observacoes: `Entrada por troca no PDV${trocaAparelho ? ` — ${trocaAparelho}` : ''}${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
+          ativo: true,
+        } as never)
       }
       if (formaPagamento === 'pix' && totais.total > 0) {
         try {
@@ -208,8 +259,9 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         } catch { /* não bloqueia a venda */ }
       }
 
-      notify.ok('Venda finalizada')
+      notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
       setCarrinho([]); setDesconto(''); setParcelas(1)
+      setAcessorios([]); setTrocaAtiva(false); setTrocaAparelho(''); setTrocaImei(''); setTrocaValor(''); setEntregaPendente(false)
       if (formaPagamento !== 'pix') setClienteSelecionado(null)
       setComanda('')
       router.refresh()
@@ -450,11 +502,64 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
                   />
                 </div>
               </div>
+              {acessoriosTotal > 0 && (
+                <div className="mt-2 flex items-center justify-between"><span className="text-[13px] text-ink-2">Acessórios</span><span className="num text-[13px] font-semibold text-ok">+ {fmt(acessoriosTotal)}</span></div>
+              )}
+              {trocaNum > 0 && (
+                <div className="mt-2 flex items-center justify-between"><span className="text-[13px] text-ink-2">Troca (abatimento)</span><span className="num text-[13px] font-semibold text-ink-2">− {fmt(trocaNum)}</span></div>
+              )}
               <div className="mt-4 flex items-baseline justify-between border-t border-line-soft pt-3">
-                <span className="text-[14px] font-semibold text-ink">Total</span>
+                <span className="text-[14px] font-semibold text-ink">Total a pagar</span>
                 <span className="num text-[28px] font-bold leading-none tracking-[-0.035em] text-ink">{fmt(totais.total)}</span>
               </div>
             </div>
+
+            {/* #3 Ofertar acessórios */}
+            <div className="mb-4">
+              <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Ofertar acessórios</div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {['Kit proteção', 'Película', 'Capinha', 'Fonte', 'Cabo', 'Fone'].map((s) => (
+                  <button key={s} type="button" onClick={() => setAcessorios((a) => [...a, { descricao: s, valor: 0 }])}
+                    className="rounded-full border border-line px-2.5 py-1 text-[11.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent">+ {s}</button>
+                ))}
+              </div>
+              {acessorios.map((ac, i) => (
+                <div key={i} className="mb-1.5 flex items-center gap-2">
+                  <input value={ac.descricao} onChange={(e) => setAcessorios((a) => a.map((x, idx) => idx === i ? { ...x, descricao: e.target.value } : x))} placeholder="Acessório"
+                    className="h-8 min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
+                  <span className="text-[12px] text-ink-3">R$</span>
+                  <input type="number" value={ac.valor || ''} onChange={(e) => setAcessorios((a) => a.map((x, idx) => idx === i ? { ...x, valor: Number(e.target.value) || 0 } : x))}
+                    className="num h-8 w-[70px] rounded-control border border-line bg-card px-2 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
+                  <button type="button" onClick={() => setAcessorios((a) => a.filter((_, idx) => idx !== i))} className="text-ink-3 hover:text-bad" aria-label="Remover"><Minus size={14} strokeWidth={2} /></button>
+                </div>
+              ))}
+            </div>
+
+            {/* #1 Aparelho na troca */}
+            <div className="mb-4 rounded-card border border-line p-3">
+              <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2">
+                <input type="checkbox" checked={trocaAtiva} onChange={(e) => setTrocaAtiva(e.target.checked)} className="size-4 accent-accent" /> Aparelho na troca (abate no total)
+              </label>
+              {trocaAtiva && (
+                <div className="mt-2.5 space-y-2">
+                  <input value={trocaAparelho} onChange={(e) => setTrocaAparelho(e.target.value)} placeholder="Aparelho recebido (ex.: iPhone 12 64GB Preto)"
+                    className="h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={trocaImei} onChange={(e) => setTrocaImei(e.target.value)} placeholder="IMEI (opcional)"
+                      className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
+                    <input type="number" value={trocaValor} onChange={(e) => setTrocaValor(e.target.value)} placeholder="Valor R$"
+                      className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
+                  </div>
+                  <p className="text-[11px] text-ink-3">O aparelho entra no estoque (disponível) e o valor abate no total.</p>
+                </div>
+              )}
+            </div>
+
+            {/* #2 Entrega pendente */}
+            <label className="mb-4 flex items-center gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">
+              <input type="checkbox" checked={entregaPendente} onChange={(e) => setEntregaPendente(e.target.checked)} className="size-4 accent-accent" />
+              Entrega pendente — baixar depois no Histórico
+            </label>
 
             {/* Forma de pagamento */}
             <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Forma de pagamento</div>

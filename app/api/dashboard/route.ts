@@ -30,7 +30,7 @@ export async function GET() {
     .from('vendas')
     .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
     .eq('empresa_id', empresaId)
-    .neq('status', 'encomenda')
+    .not('status', 'in', '("encomenda","pendente_entrega")')
     .gte('data_venda', inicio12m.toISOString())
 
   type VendaRow = {

@@ -26,6 +26,7 @@ interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string;
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
   encomenda: { label: 'Encomenda', tone: 'warn' },
+  pendente_entrega: { label: 'Pendente entrega', tone: 'warn' },
   pendente: { label: 'Pendente', tone: 'warn' },
   cancelada: { label: 'Cancelada', tone: 'bad' },
   devolvido: { label: 'Devolvido', tone: 'neutro' },
@@ -38,6 +39,7 @@ const CANAL_LABEL: Record<string, string> = {
 const CHIPS = [
   { value: 'all', label: 'Todas' },
   { value: 'encomenda', label: 'Encomendas' },
+  { value: 'pendente_entrega', label: 'Pendente entrega' },
   { value: 'concluida', label: 'Concluídas' },
   { value: 'pendente', label: 'Pendentes' },
   { value: 'cancelada', label: 'Canceladas' },
@@ -87,7 +89,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [] }: Prop
     }
     setFinalizando(null)
     if (error) { notify.bad('Erro ao finalizar'); return }
-    notify.ok('Encomenda finalizada', v?.unidade_id ? 'Venda contabilizada + unidade baixada do estoque' : 'A venda agora conta no faturamento')
+    notify.ok('Venda concluída', v?.unidade_id ? 'Contabilizada + unidade baixada do estoque' : 'A venda agora conta no faturamento')
     router.refresh()
   }
 
@@ -138,10 +140,10 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [] }: Prop
       key: 'status', header: 'Status', align: 'right',
       render: (v) => {
         const s = STATUS[v.status ?? ''] ?? STATUS.pendente
-        if (v.status === 'encomenda') return (
+        if (v.status === 'encomenda' || v.status === 'pendente_entrega') return (
           <div className="flex items-center justify-end gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
-            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); finalizarEncomenda(v.id) }}>Finalizar</Button>
+            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); finalizarEncomenda(v.id) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
           </div>
         )
         return <Badge tone={s.tone}>{s.label}</Badge>

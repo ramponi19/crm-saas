@@ -54,7 +54,7 @@ export async function calcularRanking(db: Db, empresaId: number, periodo: string
   const get = (id: string | null) => (id ? linhas.get(id) : undefined)
 
   for (const v of (vendas ?? []) as { vendedor_id: string | null; valor_venda: number; status: string | null }[]) {
-    if (v.status === 'cancelada' || v.status === 'encomenda') continue
+    if (v.status === 'cancelada' || v.status === 'encomenda' || v.status === 'pendente_entrega') continue
     const l = get(v.vendedor_id); if (!l) continue
     l.vendas += 1; l.faturamento += Number(v.valor_venda) || 0
   }
