@@ -11,7 +11,7 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function EstoquePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }] = await Promise.all([
+  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
       .select(`*, produtos!produto_id(nome, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia)`)
@@ -24,6 +24,7 @@ export default async function EstoquePage() {
     supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
     supabase.from('empresas').select('segmento').eq('id', empresaId).single(),
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
@@ -76,6 +77,7 @@ export default async function EstoquePage() {
       categorias={categorias ?? []}
       produtos={produtos}
       clientes={(clientesRaw ?? []) as { id: number; nome: string }[]}
+      tabelaPrecos={(tabelaRaw ?? []) as unknown as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
       empresaId={empresaId!}
       segmento={normalizarSegmento(empresa?.segmento)}
     />

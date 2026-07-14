@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
@@ -60,9 +60,12 @@ interface Props {
   categorias: { id: number; nome: string }[]
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
   clientes: { id: number; nome: string }[]
+  tabelaPrecos: TabelaPrecoRef[]
   empresaId: number
   segmento: Segmento
 }
+
+export type TabelaPrecoRef = { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }
 
 type Preset = { condicao: string; tipo: string; seminovo: boolean } | null
 
@@ -113,7 +116,7 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, empresaId, segmento }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, empresaId, segmento }: Props) {
   const isVeiculo = segmento === 'concessionaria'
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
@@ -327,6 +330,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                 <UnidadeInlineForm
                   produtos={produtos}
                   clientes={clientes}
+                  tabelaPrecos={tabelaPrecos}
                   empresaId={empresaId}
                   isVeiculo={isVeiculo}
                   preset={preset}
@@ -368,9 +372,10 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, clientes, empresaId, isVeiculo, preset, onSaved }: {
+function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeiculo, preset, onSaved }: {
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
   clientes: { id: number; nome: string }[]
+  tabelaPrecos: TabelaPrecoRef[]
   empresaId: number
   isVeiculo: boolean
   preset: Preset
@@ -389,6 +394,26 @@ function UnidadeInlineForm({ produtos, clientes, empresaId, isVeiculo, preset, o
   const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
   const margem = form.preco_venda && form.preco_custo
     ? (((Number(form.preco_venda) - custoTotal) / Number(form.preco_venda)) * 100).toFixed(1) : null
+
+  // Sugestão de preço de venda a partir da Tabela de preços (modelo + condição + capacidade).
+  const produtoNomeSel = produtos.find(p => p.id === Number(form.produto_id))?.nome ?? ''
+  const sugestaoPreco = useMemo(() => {
+    if (isVeiculo || !produtoNomeSel || tabelaPrecos.length === 0) return null
+    const norm = (s: string) => s.toLowerCase().trim()
+    const pn = norm(produtoNomeSel)
+    const cands = tabelaPrecos.filter(t => { const m = norm(t.modelo); return m === pn || m.includes(pn) || pn.includes(m) })
+    if (!cands.length) return null
+    const byCond = cands.filter(t => t.condicao === form.condicao)
+    const pool = byCond.length ? byCond : cands
+    const arm = norm(form.armazenamento)
+    const exact = arm ? pool.find(t => norm(t.armazenamento ?? '') === arm) : null
+    return (exact ?? pool[0]).preco_sugerido
+  }, [isVeiculo, produtoNomeSel, form.condicao, form.armazenamento, tabelaPrecos])
+
+  // Auto-preenche quando há sugestão e o vendedor ainda não digitou o preço.
+  useEffect(() => {
+    if (sugestaoPreco != null && !form.preco_venda) setForm(f => ({ ...f, preco_venda: String(sugestaoPreco) }))
+  }, [sugestaoPreco]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function salvar() {
     if (!form.produto_id) { notify.warn('Selecione um produto'); return }
@@ -512,6 +537,14 @@ function UnidadeInlineForm({ produtos, clientes, empresaId, isVeiculo, preset, o
         )}
         <Input label="Preço de venda *" type="number" value={form.preco_venda} onChange={e => set('preco_venda', e.target.value)} placeholder="R$ 0,00" className="num" />
       </div>
+
+      {sugestaoPreco != null && (
+        <button type="button" onClick={() => set('preco_venda', String(sugestaoPreco))}
+          className="flex w-full items-center justify-between rounded-control border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px] text-ink-2 transition-colors hover:border-accent">
+          <span>Tabela de preços sugere <strong className="text-ink">{formatCurrency(sugestaoPreco)}</strong> para este modelo/condição</span>
+          <span className="font-semibold text-accent">Aplicar</span>
+        </button>
+      )}
 
       <Textarea
         label="Observações"
