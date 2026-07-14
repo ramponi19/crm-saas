@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Select, Textarea, Modal, Badge, EmptyState, ConfirmDialog, notify } from '@/components/ui'
 import { Plus, Pencil, Trash2, Copy, MessageCircle, FileText, Wrench, Sparkles, Repeat2, X } from 'lucide-react'
+import { ClienteAutocomplete } from './cliente-autocomplete'
 
 export interface ItemOrc { descricao: string; qtd: number; valor: number }
 export interface Orcamento {
@@ -167,7 +168,11 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
                 <option value="melhoria">Upgrade (melhoria)</option>
                 <option value="troca">Troca (com diferença)</option>
               </Select>
-              <Input label="Cliente" value={editor.cliente_nome} onChange={(e) => setEditor({ ...editor, cliente_nome: e.target.value })} />
+              <ClienteAutocomplete
+                nome={editor.cliente_nome}
+                onNome={(v) => setEditor({ ...editor, cliente_nome: v })}
+                onSelect={(c) => setEditor({ ...editor, cliente_nome: c.nome, cliente_telefone: c.telefone })}
+              />
               <Input label="WhatsApp/telefone" value={editor.cliente_telefone} onChange={(e) => setEditor({ ...editor, cliente_telefone: e.target.value })} />
             </div>
 
