@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   // Lead atual (RLS garante que é da empresa do usuário).
   const { data: leadAtual } = await supabase
     .from('leads')
-    .select('id, nome, responsavel_id, kanban_status')
+    .select('id, nome, telefone, responsavel_id, kanban_status')
     .eq('id', body.leadId)
     .maybeSingle()
   if (!leadAtual) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
@@ -59,6 +59,24 @@ export async function POST(req: Request) {
     } catch (e) {
       // Cadência nunca quebra o move.
       console.error('[leads/mover] cadências falharam:', e)
+    }
+    // Entrou em etapa de NEGOCIAÇÃO → cria um orçamento em rascunho vinculado
+    // ao lead (opção A), se ainda não houver um em aberto. Não quebra o move.
+    try {
+      const { data: etapas } = await supabase.from('funil_etapas').select('tipo').eq('empresa_id', empresaId).eq('slug', body.kanban_status).limit(1)
+      if (etapas?.[0]?.tipo === 'negociacao') {
+        const { data: aberto } = await supabase.from('orcamentos').select('id').eq('lead_id', body.leadId).in('status', ['rascunho', 'enviado']).limit(1)
+        if (!aberto?.length) {
+          await supabase.from('orcamentos').insert({
+            empresa_id: empresaId, lead_id: body.leadId,
+            cliente_nome: leadAtual.nome || 'Lead',
+            cliente_telefone: leadAtual.telefone ?? null,
+            tipo: 'venda', status: 'rascunho', total: 0,
+          } as never)
+        }
+      }
+    } catch (e) {
+      console.error('[leads/mover] orçamento de negociação falhou:', e)
     }
   }
 
