@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, ShoppingCart, Building2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, ShoppingCart, Building2, PackageCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { notify } from '@/components/ui'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
@@ -54,6 +56,8 @@ const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor_total: '', data_p
 export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit, isAdmin = false }: Props) {
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
+  const router = useRouter()
+  const [recebendo, setRecebendo] = useState<number | null>(null)
   const [pedidos,        setPedidos]        = useState(pedidosInit)
   const [fornecedores,   setFornecedores]   = useState(fornecedoresInit)
   const [modalFornecedor, setModalFornecedor] = useState(false)
@@ -144,6 +148,17 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     setSalvando(false)
   }
 
+  async function receber(pedidoId: number) {
+    setRecebendo(pedidoId)
+    const r = await fetch('/api/compras/receber', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedidoId }) })
+    setRecebendo(null)
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) { notify.bad('Erro ao receber', j.error); return }
+    setPedidos(ps => ps.map(p => p.id === pedidoId ? { ...p, status: 'recebido' } : p))
+    notify.ok('Pedido recebido', j.encomenda ? 'Unidade reservada no estoque p/ o cliente' : 'Unidade deu entrada no estoque')
+    router.refresh()
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Compras" />
@@ -190,9 +205,19 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                           <div className="truncate text-[13px] font-medium text-ink">{p.descricao ?? `Pedido #${p.id}`}</div>
                           <div className="mt-0.5 truncate text-[11px] text-ink-3">{isAdmin && <>{p.fornecedores?.nome_fantasia ?? '—'} · </>}<span className="num">{fmtData(p.data_pedido ?? p.created_at)}</span></div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-2.5">
                           <span className="num text-[13px] font-semibold text-ink">{fmtBRL(p.valor_total)}</span>
-                          <Badge tone={s.tone}>{s.label}</Badge>
+                          {p.status !== 'recebido' && p.status !== 'cancelado' ? (
+                            <button
+                              onClick={() => receber(p.id)}
+                              disabled={recebendo === p.id}
+                              className="flex items-center gap-1 rounded-control border border-line px-2 py-1 text-[11px] font-semibold text-ink-2 transition-colors hover:border-ok hover:text-ok disabled:opacity-50"
+                            >
+                              <PackageCheck size={13} strokeWidth={1.8} /> Receber
+                            </button>
+                          ) : (
+                            <Badge tone={s.tone}>{s.label}</Badge>
+                          )}
                         </div>
                       </div>
                     )

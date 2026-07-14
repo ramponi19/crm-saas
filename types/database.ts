@@ -3015,6 +3015,8 @@ export type Database = {
           observacoes: string | null
           parcelas: number | null
           produto_id: number | null
+          pedido_compra_id: number | null
+          unidade_id: number | null
           status: string | null
           usuario_id: string | null
           valor_custo: number | null
@@ -3039,6 +3041,8 @@ export type Database = {
           observacoes?: string | null
           parcelas?: number | null
           produto_id?: number | null
+          pedido_compra_id?: number | null
+          unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
           valor_custo?: number | null
@@ -3063,6 +3067,8 @@ export type Database = {
           observacoes?: string | null
           parcelas?: number | null
           produto_id?: number | null
+          pedido_compra_id?: number | null
+          unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
           valor_custo?: number | null

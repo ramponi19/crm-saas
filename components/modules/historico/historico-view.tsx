@@ -66,10 +66,17 @@ export function HistoricoView({ vendas }: Props) {
 
   async function finalizarEncomenda(id: number) {
     setFinalizando(id)
-    const { error } = await createClient().from('vendas').update({ status: 'concluida', data_venda: new Date().toISOString() }).eq('id', id)
+    const supabase = createClient()
+    // Se houver unidade reservada (veio da compra recebida), baixa do estoque.
+    const { data: v } = await supabase.from('vendas').select('unidade_id').eq('id', id).maybeSingle()
+    const { error } = await supabase.from('vendas').update({ status: 'concluida', data_venda: new Date().toISOString() }).eq('id', id)
+    if (!error && v?.unidade_id) {
+      await supabase.from('inventario_unidades').update({ status: 'vendido' }).eq('id', v.unidade_id)
+    }
     setFinalizando(null)
     if (error) { notify.bad('Erro ao finalizar'); return }
-    notify.ok('Encomenda finalizada', 'A venda agora conta no faturamento'); router.refresh()
+    notify.ok('Encomenda finalizada', v?.unidade_id ? 'Venda contabilizada + unidade baixada do estoque' : 'A venda agora conta no faturamento')
+    router.refresh()
   }
 
   const stats = useMemo(() => {

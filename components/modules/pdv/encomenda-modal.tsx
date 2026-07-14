@@ -37,7 +37,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     const { data: { user } } = await supabase.auth.getUser()
     const cliNome = clienteId ? (clientes.find((c) => String(c.id) === clienteId)?.nome ?? '') : clienteNome.trim()
 
-    const { error: e1 } = await supabase.from('pedidos_compra').insert({
+    const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
       empresa_id: empresa.id,
       fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
       descricao: `Encomenda: ${produto.trim()}${cliNome ? ` — ${cliNome}` : ''}`,
@@ -46,7 +46,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       usuario_id: user?.id ?? null,
       data_pedido: new Date().toISOString(),
       observacoes: obs.trim() || null,
-    } as never)
+    } as never).select('id').single()
 
     const { error: e2 } = await supabase.from('vendas').insert({
       empresa_id: empresa.id,
@@ -56,6 +56,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       vendedor_id: user?.id ?? null,
       canal_venda: 'encomenda',
       data_venda: new Date().toISOString(),
+      pedido_compra_id: (pedido as { id?: number } | null)?.id ?? null,
       observacoes: `Encomenda: ${produto.trim()}.${obs.trim() ? ' ' + obs.trim() : ''}${cliNome && !clienteId ? ` Cliente: ${cliNome}.` : ''}`,
     } as never)
 
