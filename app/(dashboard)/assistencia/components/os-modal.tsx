@@ -85,6 +85,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const [saving, setSaving] = useState(false)
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
+  const [servicos, setServicos] = useState<{ id: number; nome: string; preco: number }[]>([])
   const [cobrando, setCobrando] = useState(false)
   const [cobranca, setCobranca] = useState<Cobranca | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -127,10 +128,22 @@ export default function OSModal({ os, isNew, onClose }: Props) {
     if (!empresaId) return
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(data ?? []))
     supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
+    supabase.from('servicos_reparo').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
   }, [empresaId])
 
   function set(field: keyof OS, value: string | boolean | number | null) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  // Adiciona um serviço do catálogo: soma o preço no orçamento e registra no parecer.
+  function addServico(id: string) {
+    const s = servicos.find(x => String(x.id) === id)
+    if (!s) return
+    setForm(f => ({
+      ...f,
+      orcamento_valor: Number(f.orcamento_valor ?? 0) + Number(s.preco),
+      parecer_tecnico: [f.parecer_tecnico?.trim(), `${s.nome} — R$ ${Number(s.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`].filter(Boolean).join('\n'),
+    }))
   }
 
   async function cobrar() {
@@ -256,6 +269,12 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <option value="garantia">Garantia</option>
         </Select>
         <Input label="Orçamento (R$)" type="number" value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} placeholder="0,00" />
+        {servicos.length > 0 && (
+          <Select wrapperClassName="col-span-2" label="Adicionar serviço do catálogo" value="" onChange={e => { addServico(e.target.value); e.target.value = '' }}>
+            <option value="">+ Selecionar serviço (soma no orçamento)…</option>
+            {servicos.map(s => <option key={s.id} value={s.id}>{s.nome} — R$ {Number(s.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</option>)}
+          </Select>
+        )}
         <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder="Ex: Tela trincada..." />
         <Textarea wrapperClassName="col-span-2" label="Defeito relatado" rows={2} value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} placeholder="Descreva o problema..." />
         <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico..." />

@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Tag, Package, MoreHorizontal } from 'lucide-react'
+import { Search, Plus, Tag, Package, Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { useEmpresa } from '@/lib/empresa-context'
 import { Topbar } from '@/components/layout/topbar'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
 import {
   Button,
-  IconButton,
   Input,
   Select,
   Modal,
@@ -97,6 +98,12 @@ const COND: Record<string, { label: string; tone: Tone }> = {
   regular: { label: 'Regular', tone: 'bad' },
 }
 
+const CONDICAO_PRECO: Record<string, { label: string; tone: Tone }> = {
+  novo: { label: 'Novo', tone: 'ok' },
+  seminovo: { label: 'Seminovo', tone: 'acc' },
+  usado: { label: 'Usado', tone: 'warn' },
+}
+
 function getInitials(name: string) {
   const parts = name.trim().split(' ')
   if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -106,15 +113,25 @@ function getInitials(name: string) {
 export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit }: Props) {
   const [tab, setTab] = useState<Tab>('produtos')
   const produtos = produtosInit
-  const [tabela, setTabela] = useState(tabelaInit)
+  const tabela = tabelaInit
   const searchProd: string = ''
   const [searchEst, setSearchEst] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todas')
   const [modalPreco, setModalPreco] = useState(false)
-  const [precoForm, setPrecoForm] = useState({ modelo: '', armazenamento: '', condicao: 'lacrado', preco_sugerido: '', observacoes: '' })
+  const [editPreco, setEditPreco] = useState<TabelaPreco | null>(null)
+  const [precoForm, setPrecoForm] = useState({ modelo: '', armazenamento: '', condicao: 'novo', preco_sugerido: '', observacoes: '' })
   const [saving, setSaving] = useState(false)
+  const [removendoPreco, setRemovendoPreco] = useState<number | null>(null)
   const router = useRouter()
+  const { empresa } = useEmpresa()
   const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
+
+  function abrirNovoPreco() { setEditPreco(null); setPrecoForm({ modelo: '', armazenamento: '', condicao: 'novo', preco_sugerido: '', observacoes: '' }); setModalPreco(true) }
+  function abrirEditPreco(t: TabelaPreco) {
+    setEditPreco(t)
+    setPrecoForm({ modelo: t.modelo, armazenamento: t.armazenamento ?? '', condicao: t.condicao, preco_sugerido: String(t.preco_sugerido), observacoes: t.observacoes ?? '' })
+    setModalPreco(true)
+  }
 
   const marcasVisiveis = marcas.filter((m) => m.total_produtos > 0)
 
@@ -132,22 +149,33 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   async function salvarPreco() {
     if (!precoForm.modelo || !precoForm.preco_sugerido) { notify.bad('Modelo e preço são obrigatórios'); return }
+    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
     setSaving(true)
-    // Tabela de preços usa inventario_unidades de referência ou uma tabela dedicada
-    // Usamos a tabela tabelaprecos se existir, senão só atualiza localmente
-    const novo: TabelaPreco = {
-      id: Date.now(),
-      modelo: precoForm.modelo,
-      armazenamento: precoForm.armazenamento || null,
+    const payload = {
+      empresa_id: empresa.id,
+      modelo: precoForm.modelo.trim(),
+      armazenamento: precoForm.armazenamento.trim() || null,
       condicao: precoForm.condicao,
-      preco_sugerido: Number(precoForm.preco_sugerido),
-      observacoes: precoForm.observacoes || null,
+      preco_sugerido: Number(String(precoForm.preco_sugerido).replace(',', '.')) || 0,
+      observacoes: precoForm.observacoes.trim() || null,
     }
-    setTabela(prev => [novo, ...prev])
-    setModalPreco(false)
-    setPrecoForm({ modelo: '', armazenamento: '', condicao: 'lacrado', preco_sugerido: '', observacoes: '' })
-    notify.ok('Preço adicionado!')
+    const supabase = createClient()
+    const { error } = editPreco
+      ? await supabase.from('tabela_precos').update(payload as never).eq('id', editPreco.id)
+      : await supabase.from('tabela_precos').insert(payload as never)
     setSaving(false)
+    if (error) { notify.bad('Erro ao salvar preço'); return }
+    setModalPreco(false)
+    notify.ok(editPreco ? 'Preço atualizado!' : 'Preço adicionado!')
+    router.refresh()
+  }
+
+  async function removerPreco(t: TabelaPreco) {
+    setRemovendoPreco(t.id)
+    const { error } = await createClient().from('tabela_precos').update({ ativo: false } as never).eq('id', t.id)
+    setRemovendoPreco(null)
+    if (error) { notify.bad('Erro ao remover'); return }
+    notify.ok('Preço removido'); router.refresh()
   }
 
   // Estoque tem módulo próprio (/estoque) — não duplica aqui.
@@ -195,10 +223,18 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const colsTabela: Column<TabelaPreco>[] = [
     { key: 'modelo', header: 'Modelo', render: (t) => <span className="font-semibold text-ink">{t.modelo}</span> },
     { key: 'armazenamento', header: 'Armazenamento', hideOnMobile: true, render: (t) => <span className="text-ink-2">{t.armazenamento ?? '—'}</span> },
-    { key: 'condicao', header: 'Condição', render: (t) => { const c = COND[t.condicao] ?? COND.lacrado; return <Badge tone={c.tone}>{c.label}</Badge> } },
-    { key: 'preco', header: 'Preço sugerido', align: 'right', className: 'num', render: (t) => <span className="font-semibold text-ink">{fmt(t.preco_sugerido)}</span> },
+    { key: 'condicao', header: 'Condição', render: (t) => { const c = CONDICAO_PRECO[t.condicao] ?? { label: t.condicao, tone: 'neutro' as Tone }; return <Badge tone={c.tone}>{c.label}</Badge> } },
+    { key: 'preco', header: 'Preço de venda', align: 'right', className: 'num', render: (t) => <span className="font-semibold text-ink">{fmt(t.preco_sugerido)}</span> },
     { key: 'obs', header: 'Observações', hideOnMobile: true, render: (t) => <span className="text-ink-2">{t.observacoes ?? '—'}</span> },
-    { key: 'acao', header: '', align: 'right', render: () => <IconButton aria-label="Ações" size="sm"><MoreHorizontal size={16} strokeWidth={1.7} /></IconButton> },
+    {
+      key: 'acao', header: '', align: 'right',
+      render: (t) => (
+        <span className="flex items-center justify-end gap-1.5">
+          <button onClick={(e) => { e.stopPropagation(); abrirEditPreco(t) }} title="Editar" className="text-ink-3 hover:text-accent"><Pencil size={14} strokeWidth={1.8} /></button>
+          <button onClick={(e) => { e.stopPropagation(); removerPreco(t) }} disabled={removendoPreco === t.id} title="Remover" className="text-ink-3 hover:text-bad disabled:opacity-40"><Trash2 size={14} strokeWidth={1.8} /></button>
+        </span>
+      ),
+    },
   ]
 
   return (
@@ -307,8 +343,9 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {/* ── TABELA DE PREÇOS ── */}
           {tab === 'tabela' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setModalPreco(true)}>Novo preço</Button>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12.5px] text-ink-3">Preços de venda por modelo/condição — referência rápida para o balcão e o PDV.</p>
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovoPreco}>Novo preço</Button>
               </div>
 
               <Card flush>
@@ -316,7 +353,8 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                   columns={colsTabela}
                   rows={tabela}
                   rowKey={(t) => t.id}
-                  empty={<EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhum preço cadastrado" description='Clique em "Novo preço" para começar.' action={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => setModalPreco(true)}>Novo preço</Button>} />}
+                  onRowClick={abrirEditPreco}
+                  empty={<EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhum preço cadastrado" description='Clique em "Novo preço" para começar.' action={<Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={abrirNovoPreco}>Novo preço</Button>} />}
                 />
               </Card>
             </div>
@@ -328,7 +366,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
       <Modal
         open={modalPreco}
         onClose={() => setModalPreco(false)}
-        title="Novo preço de referência"
+        title={editPreco ? 'Editar preço de venda' : 'Novo preço de venda'}
         footer={
           <>
             <Button variant="ghost" onClick={() => setModalPreco(false)}>Cancelar</Button>
@@ -351,28 +389,27 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             placeholder="Ex: 256GB"
           />
           <Input
-            label="Preço sugerido"
+            label="Preço de venda (R$)"
             required
             type="number"
             value={precoForm.preco_sugerido}
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, preco_sugerido: e.target.value }))}
-            placeholder="0.00"
+            placeholder="0,00"
           />
           <Select
             label="Condição"
             value={precoForm.condicao}
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, condicao: e.target.value }))}
           >
-            <option value="lacrado">Lacrado</option>
-            <option value="excelente">Excelente</option>
-            <option value="bom">Bom</option>
-            <option value="regular">Regular</option>
+            <option value="novo">Novo</option>
+            <option value="seminovo">Seminovo</option>
+            <option value="usado">Usado</option>
           </Select>
           <Input
             label="Observações"
             value={precoForm.observacoes}
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, observacoes: e.target.value }))}
-            placeholder="Ex: Seminovo grade A"
+            placeholder="Ex: à vista / grade A"
           />
         </form>
       </Modal>

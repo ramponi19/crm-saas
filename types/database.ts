@@ -187,6 +187,18 @@ export type Database = {
         Update: { id?: never; empresa_id?: number; nome?: string; descricao?: string | null; ativo?: boolean; gatilho?: string; gatilho_etapa_slug?: string | null; created_at?: string | null }
         Relationships: []
       }
+      servicos_reparo: {
+        Row: { id: number; empresa_id: number; nome: string; categoria: string | null; preco: number; tempo_estimado_min: number | null; ativo: boolean; created_at: string }
+        Insert: { id?: never; empresa_id: number; nome: string; categoria?: string | null; preco?: number; tempo_estimado_min?: number | null; ativo?: boolean; created_at?: string }
+        Update: { id?: never; empresa_id?: number; nome?: string; categoria?: string | null; preco?: number; tempo_estimado_min?: number | null; ativo?: boolean; created_at?: string }
+        Relationships: []
+      }
+      tabela_precos: {
+        Row: { id: number; empresa_id: number; modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number; observacoes: string | null; ativo: boolean; created_at: string }
+        Insert: { id?: never; empresa_id: number; modelo: string; armazenamento?: string | null; condicao?: string; preco_sugerido?: number; observacoes?: string | null; ativo?: boolean; created_at?: string }
+        Update: { id?: never; empresa_id?: number; modelo?: string; armazenamento?: string | null; condicao?: string; preco_sugerido?: number; observacoes?: string | null; ativo?: boolean; created_at?: string }
+        Relationships: []
+      }
       cadencia_passos: {
         Row: { id: number; cadencia_id: number; empresa_id: number; ordem: number; canal: string; dia_offset: number; titulo: string; template_chave: string | null; created_at: string | null }
         Insert: { id?: never; cadencia_id: number; empresa_id: number; ordem: number; canal?: string; dia_offset?: number; titulo: string; template_chave?: string | null; created_at?: string | null }

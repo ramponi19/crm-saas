@@ -4,6 +4,7 @@ import { Plus, Wrench } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, type Column } from '@/components/ui'
 import OSModal from './os-modal'
+import ServicosCatalogo, { type ServicoReparo } from './servicos-catalogo'
 
 interface OS {
   id: number
@@ -27,7 +28,7 @@ interface OS {
   clientes: { nome: string; telefone: string | null } | null
   produtos: { nome: string } | null
 }
-interface Props { ordens: OS[] }
+interface Props { ordens: OS[]; servicos: ServicoReparo[] }
 
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
@@ -56,7 +57,13 @@ const FILTROS = [
   { value: 'concluido',       label: 'Concluídas'       },
 ]
 
-export default function AssistenciaView({ ordens }: Props) {
+const ABAS = [
+  { value: 'ordens', label: 'Ordens de serviço' },
+  { value: 'servicos', label: 'Serviços de reparo' },
+]
+
+export default function AssistenciaView({ ordens, servicos }: Props) {
+  const [aba, setAba] = useState('ordens')
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
   const [selecionada, setSelecionada] = useState<OS | null>(null)
@@ -108,27 +115,35 @@ export default function AssistenciaView({ ordens }: Props) {
 
       <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
-            <StatCard bare label="Em análise" value={stats.emAnalise} />
-            <StatCard bare label="Em reparo" value={stats.emReparo} />
-            <StatCard bare label="Aguardando peça" value={stats.aguardando} />
-            <StatCard bare label="Concluídas no mês" value={stats.concluidasMes} />
-          </div>
+          <Tabs items={ABAS} value={aba} onValueChange={setAba} />
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs items={FILTROS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
-            <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNova}>Nova ordem de serviço</Button>
-          </div>
+          {aba === 'ordens' && (
+            <>
+              <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+                <StatCard bare label="Em análise" value={stats.emAnalise} />
+                <StatCard bare label="Em reparo" value={stats.emReparo} />
+                <StatCard bare label="Aguardando peça" value={stats.aguardando} />
+                <StatCard bare label="Concluídas no mês" value={stats.concluidasMes} />
+              </div>
 
-          <Card flush>
-            <Table
-              columns={cols}
-              rows={filtrados}
-              rowKey={(o) => o.id}
-              onRowClick={openOS}
-              empty={<EmptyState icon={<Wrench size={22} strokeWidth={1.7} />} title="Nenhuma ordem encontrada" description="Ajuste o filtro ou abra uma nova ordem de serviço." action={<Button size="sm" onClick={openNova}>Nova ordem de serviço</Button>} />}
-            />
-          </Card>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Tabs items={FILTROS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNova}>Nova ordem de serviço</Button>
+              </div>
+
+              <Card flush>
+                <Table
+                  columns={cols}
+                  rows={filtrados}
+                  rowKey={(o) => o.id}
+                  onRowClick={openOS}
+                  empty={<EmptyState icon={<Wrench size={22} strokeWidth={1.7} />} title="Nenhuma ordem encontrada" description="Ajuste o filtro ou abra uma nova ordem de serviço." action={<Button size="sm" onClick={openNova}>Nova ordem de serviço</Button>} />}
+                />
+              </Card>
+            </>
+          )}
+
+          {aba === 'servicos' && <ServicosCatalogo servicos={servicos} />}
         </div>
       </main>
 

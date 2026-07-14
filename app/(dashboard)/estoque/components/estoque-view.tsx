@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
@@ -59,9 +59,12 @@ interface Props {
   marcas: { id: number; nome: string }[]
   categorias: { id: number; nome: string }[]
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  clientes: { id: number; nome: string }[]
   empresaId: number
   segmento: Segmento
 }
+
+type Preset = { condicao: string; tipo: string; seminovo: boolean } | null
 
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
@@ -110,7 +113,7 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, empresaId, segmento }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, empresaId, segmento }: Props) {
   const isVeiculo = segmento === 'concessionaria'
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
@@ -119,6 +122,9 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   const [filtroMarca, setFiltroMarca] = useState('todas')
   const [unidadeSel, setUnidadeSel] = useState<Unidade | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [preset, setPreset] = useState<Preset>(null)
+
+  function abrirEntrada(p: Preset) { setPreset(p); setTab('entrada') }
 
   // Stats
   const stats = useMemo(() => {
@@ -284,6 +290,11 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                 <Button icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
                   {isVeiculo ? 'Adicionar veículo' : 'Entrada de estoque'}
                 </Button>
+                {!isVeiculo && (
+                  <Button variant="outline" icon={<RefreshCw size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada({ condicao: 'usado', tipo: 'compra', seminovo: true })}>
+                    Entrada de semi-novo
+                  </Button>
+                )}
               </div>
 
               <Tabs items={STATUS_FILTER} value={filtroStatus} onValueChange={setFiltroStatus} className="border-b-0" />
@@ -306,21 +317,24 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
               <Card>
                 <div className="mb-5 flex items-center gap-3">
                   <span className="grid h-10 w-10 flex-none place-items-center rounded-control bg-ink text-white">
-                    <ArrowDownLeft size={18} strokeWidth={1.7} />
+                    {preset?.seminovo ? <RefreshCw size={18} strokeWidth={1.7} /> : <ArrowDownLeft size={18} strokeWidth={1.7} />}
                   </span>
                   <div>
-                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{isVeiculo ? 'Novo veículo no estoque' : 'Nova entrada de unidade'}</div>
-                    <div className="text-[12px] text-ink-2">{isVeiculo ? 'Cadastre um veículo no estoque por placa / chassi' : 'Cadastre uma unidade física no estoque por IMEI / número de série'}</div>
+                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{preset?.seminovo ? 'Entrada de semi-novo' : isVeiculo ? 'Novo veículo no estoque' : 'Nova entrada de unidade'}</div>
+                    <div className="text-[12px] text-ink-2">{preset?.seminovo ? 'Compra de aparelho usado do cliente — entra disponível para revenda' : isVeiculo ? 'Cadastre um veículo no estoque por placa / chassi' : 'Cadastre uma unidade física no estoque por IMEI / número de série'}</div>
                   </div>
                 </div>
                 <UnidadeInlineForm
                   produtos={produtos}
+                  clientes={clientes}
                   empresaId={empresaId}
                   isVeiculo={isVeiculo}
+                  preset={preset}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
+                    setPreset(null)
                     setTab('lista')
-                    notify.ok('Unidade adicionada ao estoque')
+                    notify.ok(preset?.seminovo ? 'Semi-novo adicionado ao estoque' : 'Unidade adicionada ao estoque')
                   }}
                 />
               </Card>
@@ -354,18 +368,20 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, empresaId, isVeiculo, onSaved }: {
+function UnidadeInlineForm({ produtos, clientes, empresaId, isVeiculo, preset, onSaved }: {
   produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  clientes: { id: number; nome: string }[]
   empresaId: number
   isVeiculo: boolean
+  preset: Preset
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
   const [form, setForm] = useState({
-    produto_id: '', tipo: 'compra', condicao: isVeiculo ? 'usado' : 'novo', estado: isVeiculo ? 'bom' : 'lacrado',
+    produto_id: '', tipo: preset?.tipo ?? 'compra', condicao: preset?.condicao ?? (isVeiculo ? 'usado' : 'novo'), estado: isVeiculo ? 'bom' : (preset?.seminovo ? 'bom' : 'lacrado'),
     status: 'disponivel', cor: '', armazenamento: '', imei: '', bateria: '',
     placa: '', chassi: '', renavam: '', km: '', ano: '',
-    preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor',
+    preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor', cliente_id: '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -395,6 +411,7 @@ function UnidadeInlineForm({ produtos, empresaId, isVeiculo, onSaved }: {
       ano: isVeiculo && form.ano ? Number(form.ano) : null,
       preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
       custo_reparo: Number(form.custo_reparo) || null,
+      cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
       observacoes: form.observacoes || null, ativo: true,
     }
     const { data, error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>).select().single()
@@ -436,8 +453,15 @@ function UnidadeInlineForm({ produtos, empresaId, isVeiculo, onSaved }: {
 
       <div className="grid grid-cols-2 gap-5">
         {field('Tipo de entrada *', btnGroup('tipo', [{ v: 'compra', label: 'Compra' }, { v: 'consignado', label: 'Consignado' }, { v: 'troca', label: 'Troca' }]))}
-        {field('Condição *', btnGroup('condicao', isVeiculo ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }] : [{ v: 'novo', label: 'Novo' }, { v: 'usado', label: 'Usado' }]))}
+        {field('Condição *', btnGroup('condicao', isVeiculo ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }] : [{ v: 'novo', label: 'Novo' }, { v: 'seminovo', label: 'Seminovo' }, { v: 'usado', label: 'Usado' }]))}
       </div>
+
+      {!isVeiculo && (preset?.seminovo || form.condicao !== 'novo') && (
+        <Select label="Cliente (quem vendeu o aparelho)" value={form.cliente_id} onChange={e => set('cliente_id', e.target.value)}>
+          <option value="">— Não vincular —</option>
+          {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </Select>
+      )}
 
       <div className="grid grid-cols-2 gap-5">
         <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}>

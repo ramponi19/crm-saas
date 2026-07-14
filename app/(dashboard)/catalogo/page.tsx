@@ -39,7 +39,7 @@ interface MarcaRow { id: number; nome: string }
 export default async function CatalogoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: produtosRaw }, { data: unidadesRaw }, { data: categsRaw }, { data: subcatsRaw }, { data: marcasRaw }] = await Promise.all([
+  const [{ data: produtosRaw }, { data: unidadesRaw }, { data: categsRaw }, { data: subcatsRaw }, { data: marcasRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase.from('produtos').select(`
       id, nome, marca_id, categoria_id,
       marcas_produtos!marca_id(nome),
@@ -54,6 +54,7 @@ export default async function CatalogoPage() {
     supabase.from('categorias_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
     supabase.from('subcategorias_produtos').select('id, nome, categoria_id').eq('empresa_id', empresaId).order('nome'),
     supabase.from('marcas_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('tabela_precos').select('id, modelo, armazenamento, condicao, preco_sugerido, observacoes').eq('empresa_id', empresaId).eq('ativo', true).order('modelo'),
   ])
 
   const produtosList = (produtosRaw ?? []) as unknown as ProdutoRow[]
@@ -140,7 +141,9 @@ export default async function CatalogoPage() {
       unidades={unidades}
       categorias={categorias}
       marcas={marcas}
-      tabelaPrecos={[]}
+      tabelaPrecos={(tabelaRaw ?? []) as unknown as {
+        id: number; modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number; observacoes: string | null
+      }[]}
     />
   )
 }
