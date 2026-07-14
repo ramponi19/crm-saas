@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Download, Receipt } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Download, Receipt, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, type Column } from '@/components/ui'
+import { createClient } from '@/lib/supabase/client'
+import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, notify, type Column } from '@/components/ui'
 
 interface Venda {
   id: number
@@ -23,6 +25,7 @@ interface Props { vendas: Venda[] }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
+  encomenda: { label: 'Encomenda', tone: 'warn' },
   pendente: { label: 'Pendente', tone: 'warn' },
   cancelada: { label: 'Cancelada', tone: 'bad' },
   devolvido: { label: 'Devolvido', tone: 'neutro' },
@@ -34,6 +37,7 @@ const CANAL_LABEL: Record<string, string> = {
 
 const CHIPS = [
   { value: 'all', label: 'Todas' },
+  { value: 'encomenda', label: 'Encomendas' },
   { value: 'concluida', label: 'Concluídas' },
   { value: 'pendente', label: 'Pendentes' },
   { value: 'cancelada', label: 'Canceladas' },
@@ -57,6 +61,16 @@ function exportCSV(rows: Venda[]) {
 
 export function HistoricoView({ vendas }: Props) {
   const [filtro, setFiltro] = useState('all')
+  const [finalizando, setFinalizando] = useState<number | null>(null)
+  const router = useRouter()
+
+  async function finalizarEncomenda(id: number) {
+    setFinalizando(id)
+    const { error } = await createClient().from('vendas').update({ status: 'concluida', data_venda: new Date().toISOString() }).eq('id', id)
+    setFinalizando(null)
+    if (error) { notify.bad('Erro ao finalizar'); return }
+    notify.ok('Encomenda finalizada', 'A venda agora conta no faturamento'); router.refresh()
+  }
 
   const stats = useMemo(() => {
     const conc = vendas.filter((v) => v.status === 'concluida')
@@ -93,7 +107,16 @@ export function HistoricoView({ vendas }: Props) {
     },
     {
       key: 'status', header: 'Status', align: 'right',
-      render: (v) => { const s = STATUS[v.status ?? ''] ?? STATUS.pendente; return <Badge tone={s.tone}>{s.label}</Badge> },
+      render: (v) => {
+        const s = STATUS[v.status ?? ''] ?? STATUS.pendente
+        if (v.status === 'encomenda') return (
+          <div className="flex items-center justify-end gap-2">
+            <Badge tone={s.tone}>{s.label}</Badge>
+            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); finalizarEncomenda(v.id) }}>Finalizar</Button>
+          </div>
+        )
+        return <Badge tone={s.tone}>{s.label}</Badge>
+      },
     },
   ]
 

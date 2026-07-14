@@ -32,7 +32,7 @@ export default async function RelatoriosPage() {
     supabase
       .from('vendas')
       .select('id, data_venda, valor_venda, desconto_valor, lucro, forma_pagamento, canal_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome), usuarios!vendedor_id(nome)')
-      .eq('empresa_id', empresaId).order('data_venda', { ascending: false }).limit(500),
+      .eq('empresa_id', empresaId).neq('status', 'encomenda').order('data_venda', { ascending: false }).limit(500),
     supabase
       .from('lancamentos_financeiros')
       .select('id, data_venc, descricao, categoria, tipo, valor, status')

@@ -11,12 +11,17 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function PDVPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
+  const { data: { user } } = await supabase.auth.getUser()
+
   const [
     { data: unidades },
     { data: clientes },
     { data: taxas },
     { data: vendasRecentes },
     { data: empresa },
+    { data: fornecedores },
+    vinculoRes,
+    usuarioRes,
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
@@ -31,7 +36,13 @@ export default async function PDVPage() {
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
     supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
+    supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
+    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
+    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
+
+  const role = (vinculoRes?.data as { role?: string } | null)?.role
+  const isAdmin = !!((usuarioRes?.data as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
     produtos: Embed<{ nome: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
@@ -68,6 +79,8 @@ export default async function PDVPage() {
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
           segmento={empresa?.segmento ?? null}
+          fornecedores={fornecedores ?? []}
+          isAdmin={isAdmin}
         />
       </div>
     </>

@@ -42,7 +42,7 @@ export default async function MetasPage() {
   const realizadoPorVend = new Map<string, number>()
   let realizadoTotal = 0
   for (const v of (vendasRaw ?? []) as Array<{ vendedor_id: string | null; valor_venda: number | null; status: string | null }>) {
-    if (v.status === 'cancelada') continue
+    if (v.status === 'cancelada' || v.status === 'encomenda') continue
     const val = Number(v.valor_venda ?? 0)
     realizadoTotal += val
     if (v.vendedor_id) realizadoPorVend.set(v.vendedor_id, (realizadoPorVend.get(v.vendedor_id) ?? 0) + val)

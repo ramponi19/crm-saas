@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, notify } from '@/components/ui'
+import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 
 interface ItemEstoque {
   id: number; produto_id: number; produto_nome: string; marca_nome: string
@@ -20,7 +21,7 @@ interface ClienteSimples { id: number; nome: string; telefone: string | null; cp
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
 interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null }
+interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean }
 interface ItemCarrinho { item: ItemEstoque; desconto: number }
 
 const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
@@ -34,9 +35,10 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, clientes, taxas, segmento }: Props) {
+export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, fornecedores = [], isAdmin = false }: Props) {
   const isFood = segmento === 'food'
   const [comanda, setComanda] = useState('')
+  const [encomendaOpen, setEncomendaOpen] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -284,15 +286,18 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento }:
 
           {/* ── ESQUERDA: catálogo ── */}
           <div>
-            <div className="mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <Input
+                wrapperClassName="flex-1"
                 icon={<ScanBarcode size={17} strokeWidth={1.7} />}
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Escaneie o código de barras ou busque um produto…"
                 className="h-11 text-[14px]"
               />
+              <Button variant="outline" className="h-11 shrink-0" icon={<Package size={16} strokeWidth={1.7} />} onClick={() => setEncomendaOpen(true)}>Encomenda</Button>
             </div>
+            {encomendaOpen && <EncomendaModal clientes={clientes} fornecedores={fornecedores} isAdmin={isAdmin} onClose={() => setEncomendaOpen(false)} />}
 
             {itensFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-ink-3">
