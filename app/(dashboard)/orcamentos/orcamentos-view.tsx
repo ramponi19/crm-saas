@@ -1,22 +1,22 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Select, Textarea, Modal, Badge, EmptyState, ConfirmDialog, notify } from '@/components/ui'
-import { Plus, Pencil, Trash2, Copy, MessageCircle, FileText, Wrench, Sparkles, Repeat2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, MessageCircle, FileText, Wrench, Sparkles, Repeat2, Smartphone, X } from 'lucide-react'
 import { ClienteAutocomplete } from './cliente-autocomplete'
 
 export interface ItemOrc { descricao: string; qtd: number; valor: number }
 export interface Orcamento {
-  id: number; tipo: string; status: string; cliente_nome: string; cliente_telefone: string | null
+  id: number; lead_id: number | null; tipo: string; status: string; cliente_nome: string; cliente_telefone: string | null
   aparelho: string | null; imei: string | null; defeito: string | null; prazo_dias: number | null; garantia_dias: number | null
   itens: ItemOrc[]; aparelho_novo: string | null; valor_novo: number | null; aparelho_usado: string | null; valor_entrada: number | null
   total: number; observacoes: string | null; token: string; created_at: string | null
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, troca: { label: 'Troca', Icon: Repeat2 } } as const
+const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, troca: { label: 'Troca', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
 const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'bad' }> = {
   rascunho: { label: 'Rascunho', tone: 'neutro' }, enviado: { label: 'Enviado', tone: 'acc' },
   aprovado: { label: 'Aprovado', tone: 'ok' }, recusado: { label: 'Recusado', tone: 'bad' },
@@ -24,22 +24,39 @@ const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'b
 const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 
 interface Editor {
-  id?: number; tipo: string; cliente_nome: string; cliente_telefone: string
+  id?: number; lead_id?: number | null; tipo: string; cliente_nome: string; cliente_telefone: string
   aparelho: string; imei: string; defeito: string; prazo_dias: string; garantia_dias: string
   itens: ItemOrc[]; aparelho_novo: string; valor_novo: string; aparelho_usado: string; valor_entrada: string
   observacoes: string
 }
 const vazio = (tipo = 'assistencia'): Editor => ({
-  tipo, cliente_nome: '', cliente_telefone: '', aparelho: '', imei: '', defeito: '', prazo_dias: '', garantia_dias: '',
+  tipo, lead_id: null, cliente_nome: '', cliente_telefone: '', aparelho: '', imei: '', defeito: '', prazo_dias: '', garantia_dias: '',
   itens: [{ descricao: '', qtd: 1, valor: 0 }], aparelho_novo: '', valor_novo: '', aparelho_usado: '', valor_entrada: '', observacoes: '',
 })
+const LABEL_DESC: Record<string, string> = { assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade', venda: 'Descrição do aparelho' }
 
 export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIniciais: Orcamento[]; segmento?: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const tipoPadrao = segmento === 'assistencia' ? 'assistencia' : 'assistencia'
   const [editor, setEditor] = useState<Editor | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [excluir, setExcluir] = useState<Orcamento | null>(null)
+
+  // Pré-preenchimento quando vem do lead (?nome=&tel=&lead=&tipo=).
+  useEffect(() => {
+    const nome = searchParams.get('nome')
+    if (!nome) return
+    const tipoQ = searchParams.get('tipo') ?? 'venda'
+    setEditor({
+      ...vazio(['assistencia', 'melhoria', 'troca', 'venda'].includes(tipoQ) ? tipoQ : 'venda'),
+      cliente_nome: nome,
+      cliente_telefone: searchParams.get('tel') ?? '',
+      lead_id: searchParams.get('lead') ? Number(searchParams.get('lead')) : null,
+    })
+    router.replace('/orcamentos')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const linkDe = (o: Orcamento) => `${base}/orcamento/${o.token}`
@@ -53,7 +70,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
   function abrir(o?: Orcamento) {
     if (!o) { setEditor(vazio(tipoPadrao)); return }
     setEditor({
-      id: o.id, tipo: o.tipo, cliente_nome: o.cliente_nome, cliente_telefone: o.cliente_telefone ?? '',
+      id: o.id, lead_id: o.lead_id, tipo: o.tipo, cliente_nome: o.cliente_nome, cliente_telefone: o.cliente_telefone ?? '',
       aparelho: o.aparelho ?? '', imei: o.imei ?? '', defeito: o.defeito ?? '',
       prazo_dias: o.prazo_dias != null ? String(o.prazo_dias) : '', garantia_dias: o.garantia_dias != null ? String(o.garantia_dias) : '',
       itens: o.itens.length ? o.itens.map((i) => ({ ...i })) : [{ descricao: '', qtd: 1, valor: 0 }],
@@ -74,7 +91,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
     const r = await fetch('/api/orcamentos', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: editor.id, tipo: editor.tipo, status: enviar ? 'enviado' : undefined,
+        id: editor.id, lead_id: editor.lead_id ?? null, tipo: editor.tipo, status: enviar ? 'enviado' : undefined,
         cliente_nome: editor.cliente_nome, cliente_telefone: editor.cliente_telefone,
         aparelho: editor.aparelho, imei: editor.imei, defeito: editor.defeito,
         prazo_dias: editor.prazo_dias ? Number(editor.prazo_dias) : undefined,
@@ -166,6 +183,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
               <Select label="Tipo" value={editor.tipo} onChange={(e) => setEditor({ ...editor, tipo: e.target.value })}>
                 <option value="assistencia">Conserto</option>
                 <option value="melhoria">Upgrade (melhoria)</option>
+                <option value="venda">Venda (novo/semi-novo)</option>
                 <option value="troca">Troca (com diferença)</option>
               </Select>
               <ClienteAutocomplete
@@ -193,7 +211,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento }: { orcamentosIni
                   <Input label="Aparelho" value={editor.aparelho} onChange={(e) => setEditor({ ...editor, aparelho: e.target.value })} placeholder="Modelo" />
                   <Input label="IMEI / série (opcional)" value={editor.imei} onChange={(e) => setEditor({ ...editor, imei: e.target.value })} />
                 </div>
-                <Textarea label={editor.tipo === 'melhoria' ? 'Objetivo do upgrade' : 'Defeito / diagnóstico'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
+                <Textarea label={LABEL_DESC[editor.tipo] ?? 'Descrição'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
 
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">

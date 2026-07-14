@@ -22,7 +22,7 @@ interface Body {
   observacoes?: string
 }
 
-const TIPOS = ['assistencia', 'melhoria', 'troca']
+const TIPOS = ['assistencia', 'melhoria', 'troca', 'venda']
 
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
