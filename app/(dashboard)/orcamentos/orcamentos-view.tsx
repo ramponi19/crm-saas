@@ -15,6 +15,19 @@ export interface Orcamento {
   unidade_id: number | null; total: number; observacoes: string | null; token: string; created_at: string | null
 }
 export interface UnidadeOpt { id: number; label: string; preco: number }
+export interface PrecoRef { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }
+
+// Casa um texto de modelo (ex.: "iPhone 14 128GB") com a tabela de preços.
+function sugerirPreco(texto: string, tabela: PrecoRef[]): number | null {
+  const t = texto.trim().toLowerCase()
+  if (!t || tabela.length === 0) return null
+  const cands = tabela.filter((p) => { const m = p.modelo.toLowerCase(); return m === t || t.includes(m) || m.includes(t) })
+  if (!cands.length) return null
+  // Prioriza quando a capacidade citada no texto bate com o armazenamento.
+  const comArm = cands.find((p) => p.armazenamento && t.includes(p.armazenamento.toLowerCase()))
+  const novo = cands.find((p) => p.condicao === 'novo')
+  return (comArm ?? novo ?? cands[0]).preco_sugerido
+}
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, troca: { label: 'Troca', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
@@ -36,7 +49,7 @@ const vazio = (tipo = 'assistencia'): Editor => ({
 })
 const LABEL_DESC: Record<string, string> = { assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade', venda: 'Descrição do aparelho' }
 
-export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[] }) {
+export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tipoPadrao = segmento === 'assistencia' ? 'assistencia' : 'assistencia'
@@ -127,6 +140,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [] }: 
   }
 
   const isTroca = editor?.tipo === 'troca'
+  const sugTroca = isTroca && editor ? sugerirPreco(editor.aparelho_novo, tabelaPrecos) : null
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
@@ -202,6 +216,13 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [] }: 
                   <Input label="Aparelho novo" value={editor.aparelho_novo} onChange={(e) => setEditor({ ...editor, aparelho_novo: e.target.value })} placeholder="Ex.: iPhone 14 128GB" />
                   <Input label="Valor (R$)" type="number" value={editor.valor_novo} onChange={(e) => setEditor({ ...editor, valor_novo: e.target.value })} />
                 </div>
+                {sugTroca != null && String(sugTroca) !== editor.valor_novo && (
+                  <button type="button" onClick={() => setEditor({ ...editor, valor_novo: String(sugTroca) })}
+                    className="flex w-full items-center justify-between rounded-control border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px] text-ink-2 transition-colors hover:border-accent">
+                    <span>Tabela de preços sugere <strong className="text-ink">{brl(sugTroca)}</strong> para “{editor.aparelho_novo}”</span>
+                    <span className="font-semibold text-accent">Aplicar</span>
+                  </button>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
                   <Input label="Aparelho do cliente (entrada)" value={editor.aparelho_usado} onChange={(e) => setEditor({ ...editor, aparelho_usado: e.target.value })} placeholder="Ex.: iPhone 12 64GB" />
                   <Input label="Vale (R$)" type="number" value={editor.valor_entrada} onChange={(e) => setEditor({ ...editor, valor_entrada: e.target.value })} />
