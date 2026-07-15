@@ -14,7 +14,8 @@ export default async function AgendaPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
-  if (normalizarSegmento(empresa?.segmento) !== 'imobiliaria') redirect('/dashboard')
+  const seg = normalizarSegmento(empresa?.segmento)
+  if (seg !== 'imobiliaria' && seg !== 'saude') redirect('/dashboard')
 
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user!.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')

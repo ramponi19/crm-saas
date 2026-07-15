@@ -202,14 +202,34 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   async function salvar() {
     setSaving(true)
-    const { clientes: _c, produtos: _p, ...payload } = form
-    const base = { ...payload, tipo: 'assistencia' as const, empresa_id: empresaId, protocolo: payload.protocolo || `OS-${Date.now().toString().slice(-6)}` }
+    // Payload explícito só com os campos editáveis pelo técnico. NUNCA reenviamos
+    // token/aprovado_em/recusado_em — senão o Salvar sobrescreveria a aprovação
+    // que o cliente fez pelo link público enquanto o modal estava aberto.
+    const campos = {
+      tipo: 'assistencia' as const,
+      empresa_id: empresaId,
+      protocolo: form.protocolo || `OS-${Date.now().toString().slice(-6)}`,
+      status: form.status,
+      cliente_id: form.cliente_id,
+      produto_id: form.produto_id,
+      imei_serial: form.imei_serial,
+      data_entrada: form.data_entrada,
+      dentro_garantia: form.dentro_garantia,
+      dias_garantia_restantes: form.dias_garantia_restantes,
+      orcamento_valor: form.orcamento_valor,
+      estado_entrada: form.estado_entrada,
+      celular_reserva_fornecido: form.celular_reserva_fornecido,
+      modelo_reserva: form.modelo_reserva,
+      defeito_relatado: form.defeito_relatado,
+      parecer_tecnico: form.parecer_tecnico,
+      observacoes: form.observacoes,
+    }
     if (isNew) {
-      const { error } = await supabase.from('garantias_assistencias').insert(base as TablesInsert<'garantias_assistencias'>)
+      const { error } = await supabase.from('garantias_assistencias').insert(campos as TablesInsert<'garantias_assistencias'>)
       if (error) { notify.bad('Erro ao criar OS'); setSaving(false); return }
       notify.ok('OS criada!')
     } else {
-      const { error } = await supabase.from('garantias_assistencias').update(base as TablesUpdate<'garantias_assistencias'>).eq('id', os!.id!)
+      const { error } = await supabase.from('garantias_assistencias').update(campos as TablesUpdate<'garantias_assistencias'>).eq('id', os!.id!)
       if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
       notify.ok('Salvo!')
     }
