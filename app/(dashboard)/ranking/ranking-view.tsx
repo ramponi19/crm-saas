@@ -53,9 +53,9 @@ export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { peri
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => irPara(shiftMes(periodo, -1))} className="grid size-8 place-items-center rounded-control border border-line text-ink-2 hover:text-ink" aria-label="Mês anterior"><ChevronLeft size={16} strokeWidth={1.8} /></button>
+            <button onClick={() => irPara(shiftMes(periodo, -1))} className="grid size-9 place-items-center rounded-control border border-line text-ink-2 hover:text-ink" aria-label="Mês anterior"><ChevronLeft size={16} strokeWidth={1.8} /></button>
             <span className="min-w-[130px] text-center text-[13.5px] font-semibold capitalize text-ink">{fmtMes(periodo)}</span>
-            <button onClick={() => irPara(shiftMes(periodo, 1))} className="grid size-8 place-items-center rounded-control border border-line text-ink-2 hover:text-ink" aria-label="Próximo mês"><ChevronRight size={16} strokeWidth={1.8} /></button>
+            <button onClick={() => irPara(shiftMes(periodo, 1))} className="grid size-9 place-items-center rounded-control border border-line text-ink-2 hover:text-ink" aria-label="Próximo mês"><ChevronRight size={16} strokeWidth={1.8} /></button>
           </div>
         </div>
 

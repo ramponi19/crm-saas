@@ -360,7 +360,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
             </p>
             <div className="overflow-x-auto">
               <div className="min-w-[520px]">
-                <div className="grid gap-3 border-b border-line-soft px-1 pb-[10px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-ink-3"
+                <div className="grid gap-3 border-b border-line-soft px-1 pb-[10px] text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3"
                   style={{ gridTemplateColumns: '.6fr 1fr 1fr 1fr' }}>
                   <div>Parcelas</div>
                   <div className="text-center">Visa / Master (%)</div>

@@ -161,7 +161,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
       <div className="flex flex-wrap items-end justify-between gap-3 px-6 pt-5 pb-4">
         <div className="flex flex-wrap items-center gap-3">
           {funis && funis.length > 1 && (
-            <div className="flex w-max items-center gap-0.5 rounded-control border border-line bg-card p-0.5">
+            <div className="flex w-max max-w-full items-center gap-0.5 overflow-x-auto rounded-control border border-line bg-card p-0.5">
               {funis.map(f => {
                 const ativo = f.id === funilId
                 return (

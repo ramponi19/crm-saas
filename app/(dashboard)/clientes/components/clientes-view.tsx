@@ -114,7 +114,7 @@ export default function ClientesView({ clientes }: Props) {
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Clientes" />
 
-      <div className="flex shrink-0 items-center gap-3 px-6 py-4">
+      <div className="flex shrink-0 items-center gap-3 px-4 py-4 sm:px-6">
         <Input
           wrapperClassName="flex-1"
           icon={<Search size={15} strokeWidth={1.7} />}
@@ -125,7 +125,7 @@ export default function ClientesView({ clientes }: Props) {
         <Button icon={<UserPlus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo cliente</Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-4 pb-6 sm:px-6">
         <Card flush>
           <Table
             columns={cols}

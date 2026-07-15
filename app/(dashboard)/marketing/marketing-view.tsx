@@ -85,12 +85,12 @@ export function MarketingView({ itensIniciais, meuId }: { itensIniciais: Solicit
                         {s.objetivo && <p className="mt-1 text-[11.5px] text-ink-3">{s.objetivo}</p>}
                         {s.canais.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
-                            {s.canais.map((c) => <span key={c} className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">{CANAL_LABEL[c] ?? c}</span>)}
+                            {s.canais.map((c) => <span key={c} className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-accent">{CANAL_LABEL[c] ?? c}</span>)}
                           </div>
                         )}
                         <div className="mt-2 flex items-center justify-between border-t border-line-soft pt-1.5">
-                          <button onClick={() => mover(s, -1)} disabled={i === 0} className="text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Voltar etapa"><ChevronLeft size={15} strokeWidth={1.8} /></button>
-                          <button onClick={() => mover(s, 1)} disabled={i === ORDEM.length - 1} className="text-ink-3 hover:text-accent disabled:opacity-30" aria-label="Avançar etapa"><ChevronRight size={15} strokeWidth={1.8} /></button>
+                          <button onClick={() => mover(s, -1)} disabled={i === 0} className="-m-1 p-1 text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Voltar etapa"><ChevronLeft size={15} strokeWidth={1.8} /></button>
+                          <button onClick={() => mover(s, 1)} disabled={i === ORDEM.length - 1} className="-m-1 p-1 text-ink-3 hover:text-accent disabled:opacity-30" aria-label="Avançar etapa"><ChevronRight size={15} strokeWidth={1.8} /></button>
                         </div>
                       </div>
                     )

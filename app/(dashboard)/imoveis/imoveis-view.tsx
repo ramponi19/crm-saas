@@ -259,7 +259,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
         }
       >
         <Secao>Identificação</Secao>
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo label="Código" value={form.codigo} onChange={str('codigo')} ph="Ex: AP-102" />
           <Campo label="Título" value={form.titulo} onChange={str('titulo')} ph="Ex: Apto 2 quartos no Centro" />
           <Select label="Tipo" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
@@ -297,7 +297,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
         </div>
 
         <Secao>Valores</Secao>
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo label="Valor de venda (R$)" value={form.valor_venda} onChange={str('valor_venda')} tipo="number" />
           <Campo label="Valor de locação (R$)" value={form.valor_locacao} onChange={str('valor_locacao')} tipo="number" />
           <Campo label="Condomínio (R$)" value={form.valor_condominio} onChange={str('valor_condominio')} tipo="number" />
@@ -309,7 +309,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
         </div>
 
         <Secao>Características</Secao>
-        <div className="mb-5 grid grid-cols-3 gap-3">
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Campo label="Área útil (m²)" value={form.area_util} onChange={str('area_util')} tipo="number" />
           <Campo label="Área total (m²)" value={form.area_total} onChange={str('area_total')} tipo="number" />
           <Campo label="Quartos" value={form.quartos} onChange={str('quartos')} tipo="number" />
@@ -321,7 +321,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
         </div>
 
         <Secao>Endereço</Secao>
-        <div className="mb-2 grid grid-cols-3 gap-3">
+        <div className="mb-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Campo label="CEP" value={form.cep} onChange={str('cep')} />
           <div className="col-span-2"><Campo label="Logradouro" value={form.logradouro} onChange={str('logradouro')} /></div>
           <Campo label="Número" value={form.numero} onChange={str('numero')} />

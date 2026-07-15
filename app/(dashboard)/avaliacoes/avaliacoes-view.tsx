@@ -137,7 +137,7 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
                     </div>
                     <Badge tone={st.tone}>{st.label}</Badge>
                     {a.unidade_id && <Badge tone="ok">no estoque</Badge>}
-                    <select value={a.status} onChange={(e) => mudarStatus(a, e.target.value)} className="h-8 rounded-control border border-line bg-card px-2 text-[12.5px] text-ink">
+                    <select value={a.status} onChange={(e) => mudarStatus(a, e.target.value)} className="h-8 rounded-control border border-line bg-card px-2 text-base text-ink">
                       {Object.entries(STATUS).map(([k, val]) => <option key={k} value={k}>{val.label}</option>)}
                     </select>
                     <Button variant="ghost" size="sm" icon={<Trash2 size={14} strokeWidth={1.7} />} className="text-bad hover:bg-bad/10" onClick={() => excluir(a)}><span className="sr-only">Excluir</span></Button>
@@ -156,7 +156,7 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
         title={editando === 'nova' ? 'Nova avaliação' : 'Editar avaliação'}
         footer={<><Button variant="ghost" onClick={() => setEditando(null)} disabled={salvando}>Cancelar</Button><Button onClick={salvar} loading={salvando}>Salvar</Button></>}
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input label="Categoria" value={veiculo.categoria ?? ''} onChange={(e) => setV({ categoria: e.target.value })} placeholder="Carro, Moto…" />
           <Select label="Cliente (lead)" value={leadId} onChange={(e) => setLeadId(e.target.value)}>
             <option value="">Sem vínculo</option>

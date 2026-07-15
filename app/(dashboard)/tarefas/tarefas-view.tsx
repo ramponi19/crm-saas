@@ -156,7 +156,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
       >
         <div className="space-y-3">
           <Input label="Título" required value={form.titulo} onChange={e => set('titulo', e.target.value)} placeholder="Ex: Ligar para o cliente" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Tipo" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
               {TIPOS.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
             </Select>

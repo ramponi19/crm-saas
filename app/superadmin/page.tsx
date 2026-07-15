@@ -56,7 +56,7 @@ export default async function SuperAdminDashboard() {
   }
 
   return (
-    <div className="min-h-full bg-bg px-8 py-7">
+    <div className="min-h-full bg-bg px-4 py-4 sm:px-8 sm:py-7">
       <div className="mx-auto max-w-[1400px] space-y-5">
 
         {/* Header */}

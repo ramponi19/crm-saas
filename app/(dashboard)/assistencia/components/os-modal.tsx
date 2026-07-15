@@ -262,14 +262,14 @@ export default function OSModal({ os, isNew, onClose }: Props) {
       )}
 
       {!isNew && (
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Stat label="Entrada" value={new Date(os?.data_entrada ?? os?.created_at ?? '').toLocaleDateString('pt-BR')} />
           <Stat label="Orçamento" value={os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
           <Stat label="Aparelho" value={os?.produtos?.nome ?? '—'} />
         </div>
       )}
 
-      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input label="Nº OS" value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} placeholder="OS-000001" />
         <Select label="Status" value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)}>
           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

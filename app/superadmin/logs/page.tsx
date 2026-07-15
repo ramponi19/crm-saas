@@ -41,11 +41,11 @@ export default async function LogsPage() {
     { key: 'data', header: 'Data', className: 'num whitespace-nowrap', render: (log) => <span className="text-ink-2">{fmtDataHora(log.created_at)}</span> },
     { key: 'admin', header: 'Admin', render: (log) => <span className="text-ink">{log.admin?.nome ?? '—'}</span> },
     { key: 'acao', header: 'Ação', render: (log) => <span className="font-semibold text-ink">{ACAO_LABEL[log.acao] ?? log.acao}</span> },
-    { key: 'empresa', header: 'Empresa', render: (log) => <span className="text-ink-2">{log.empresa?.nome ?? '—'}</span> },
+    { key: 'empresa', header: 'Empresa', hideOnMobile: true, render: (log) => <span className="text-ink-2">{log.empresa?.nome ?? '—'}</span> },
   ]
 
   return (
-    <div className="min-h-full bg-bg px-8 py-7">
+    <div className="min-h-full bg-bg px-4 py-4 sm:px-8 sm:py-7">
       <div className="mx-auto max-w-[1400px] space-y-5">
         <div>
           <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Logs de atividade</h1>

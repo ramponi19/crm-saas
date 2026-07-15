@@ -109,7 +109,7 @@ export function CardapioView({ initial, categorias, empresaId, slug }: { initial
 
       <Modal open={editando !== null} onClose={() => !salvando && setEditando(null)} title={editando === 'novo' ? 'Novo item' : 'Editar item'}
         footer={<><Button variant="ghost" onClick={() => setEditando(null)} disabled={salvando}>Cancelar</Button><Button onClick={salvar} loading={salvando}>Salvar</Button></>}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input wrapperClassName="col-span-2" label="Nome do item" value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Ex: X-Burger" />
           <Select label="Categoria" value={form.categoria_id} onChange={(e) => setForm((f) => ({ ...f, categoria_id: e.target.value }))}>
             <option value="">Sem categoria</option>

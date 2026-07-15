@@ -188,7 +188,7 @@ export function AvisosManager({ avisosInit, empresas, planos }: {
                       {a.expira_em && ` · expira ${fmtData(a.expira_em)}`}
                     </div>
                   </div>
-                  <div className="flex flex-none items-center gap-2">
+                  <div className="flex flex-none flex-wrap items-center justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => toggle(a)}>
                       {a.ativo ? 'Desativar' : 'Ativar'}
                     </Button>

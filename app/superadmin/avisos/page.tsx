@@ -17,7 +17,7 @@ export default async function AvisosPage() {
   ])
 
   return (
-    <div className="min-h-full bg-bg px-8 py-7">
+    <div className="min-h-full bg-bg px-4 py-4 sm:px-8 sm:py-7">
       <div className="mx-auto max-w-[1100px]">
         <div className="mb-6">
           <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Avisos da plataforma</h1>

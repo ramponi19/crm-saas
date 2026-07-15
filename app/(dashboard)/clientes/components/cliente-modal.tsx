@@ -162,7 +162,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
         }
       >
         {!isNew && (
-          <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Stat label="Compras" value={tv} />
             <Stat label="Total gasto" value={vt > 0 ? formatCurrency(vt) : '—'} tone="ok" />
             <Stat label="Última compra" value={fmtUltima(uc)} />

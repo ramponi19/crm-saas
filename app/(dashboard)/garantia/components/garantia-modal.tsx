@@ -140,14 +140,14 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
       )}
 
       {!isNew && (
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Stat label="Entrada" value={new Date(garantia?.data_entrada ?? garantia?.created_at ?? '').toLocaleDateString('pt-BR')} />
           <Stat label="Prazo" value={garantia?.dias_garantia_restantes != null ? `${garantia.dias_garantia_restantes}d` : '—'} />
           <Stat label="Orçamento" value={garantia?.orcamento_valor ? `R$ ${Number(garantia.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
         </div>
       )}
 
-      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+      <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input label="Protocolo" value={form.protocolo ?? ''} onChange={e => set('protocolo', e.target.value)} placeholder="GAR-000001" />
         <Select label="Status" value={form.status ?? 'em_analise'} onChange={e => set('status', e.target.value)}>
           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

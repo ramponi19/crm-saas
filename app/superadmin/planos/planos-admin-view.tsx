@@ -76,13 +76,13 @@ export default function PlanosAdminView({ planos: initial }: { planos: Plano[] }
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 border-b border-line px-8 py-5">
+      <div className="shrink-0 border-b border-line px-4 py-4 sm:px-8 sm:py-5">
         <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: PLATFORM }}>Super Admin</p>
         <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Gestão de Planos</h1>
         <p className="mt-0.5 text-[14px] text-ink-2">Edite preços, limites e funcionalidades de cada plano</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 scrollbar-thin">
         {/* Cards dos planos */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {planos.map(p => (

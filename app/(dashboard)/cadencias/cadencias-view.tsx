@@ -194,8 +194,8 @@ export function CadenciasView({ cadenciasIniciais, etapas, templates, reativacao
                         <span className="text-[12px] font-semibold text-ink-2">Passo {i + 1}</span>
                         <Icon size={14} strokeWidth={1.7} className="text-accent" />
                         <div className="ml-auto flex items-center gap-1">
-                          <button onClick={() => mover(i, -1)} disabled={i === 0} className="grid size-6 place-items-center rounded text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Subir"><ArrowUp size={13} strokeWidth={1.8} /></button>
-                          <button onClick={() => mover(i, 1)} disabled={i === editor.passos.length - 1} className="grid size-6 place-items-center rounded text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Descer"><ArrowDown size={13} strokeWidth={1.8} /></button>
+                          <button onClick={() => mover(i, -1)} disabled={i === 0} className="grid size-8 place-items-center rounded text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Subir"><ArrowUp size={13} strokeWidth={1.8} /></button>
+                          <button onClick={() => mover(i, 1)} disabled={i === editor.passos.length - 1} className="grid size-8 place-items-center rounded text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Descer"><ArrowDown size={13} strokeWidth={1.8} /></button>
                           <button onClick={() => setEditor({ ...editor, passos: editor.passos.filter((_, idx) => idx !== i) })} className="grid size-6 place-items-center rounded text-ink-3 hover:text-bad" aria-label="Remover"><Trash2 size={13} strokeWidth={1.8} /></button>
                         </div>
                       </div>

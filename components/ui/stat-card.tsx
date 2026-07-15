@@ -37,7 +37,7 @@ export function StatCard({
       {...props}
     >
       <div className="text-[11px] font-medium text-ink-3">{label}</div>
-      <div className="num mt-[5px] mb-[2px] text-[26px] font-bold leading-none tracking-[-0.035em] text-ink">
+      <div className="num mt-[5px] mb-[2px] truncate text-[22px] font-bold leading-none tracking-[-0.035em] text-ink sm:text-[26px]">
         {value}
       </div>
       {delta && <div className={cn('text-[11.5px] font-semibold', DELTA[deltaTone])}>{delta}</div>}

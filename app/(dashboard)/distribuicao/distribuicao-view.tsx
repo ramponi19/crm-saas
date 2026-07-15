@@ -143,8 +143,8 @@ export function DistribuicaoView({ regrasIniciais, membros, semDono }: { regrasI
             {regras.map((r, i) => (
               <div key={r.id} className="flex items-center gap-3 rounded-card border border-line bg-card p-4">
                 <div className="flex flex-col">
-                  <button onClick={() => mover(i, -1)} disabled={i === 0} className="text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Subir"><ArrowUp size={14} strokeWidth={1.8} /></button>
-                  <button onClick={() => mover(i, 1)} disabled={i === regras.length - 1} className="text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Descer"><ArrowDown size={14} strokeWidth={1.8} /></button>
+                  <button onClick={() => mover(i, -1)} disabled={i === 0} className="-m-1 p-1 text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Subir"><ArrowUp size={14} strokeWidth={1.8} /></button>
+                  <button onClick={() => mover(i, 1)} disabled={i === regras.length - 1} className="-m-1 p-1 text-ink-3 hover:text-ink disabled:opacity-30" aria-label="Descer"><ArrowDown size={14} strokeWidth={1.8} /></button>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

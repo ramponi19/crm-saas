@@ -120,7 +120,7 @@ export default async function EmpresasPage({ searchParams }: PageProps) {
   ]
 
   return (
-    <div className="max-w-[1400px] px-8 py-7">
+    <div className="max-w-[1400px] px-4 py-4 sm:px-8 sm:py-7">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink">Empresas</h1>

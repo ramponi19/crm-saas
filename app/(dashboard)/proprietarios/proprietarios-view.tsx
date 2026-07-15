@@ -106,7 +106,7 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Proprietários" />
 
-      <div className="flex shrink-0 items-center gap-3 px-6 py-4">
+      <div className="flex flex-wrap shrink-0 items-center gap-3 px-6 py-4">
         <Input
           wrapperClassName="flex-1 max-w-[360px]"
           icon={<Search size={15} strokeWidth={1.7} />}
@@ -142,7 +142,7 @@ export default function ProprietariosView({ inicial, empresaId }: { inicial: Pro
           </>
         }
       >
-        <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input wrapperClassName="col-span-2" label="Nome" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome do proprietário" />
           <Input label="CPF/CNPJ" value={form.cpf_cnpj} onChange={(e) => set('cpf_cnpj', e.target.value)} />
           <Input label="Telefone" value={form.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="(00) 00000-0000" />

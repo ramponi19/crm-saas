@@ -410,7 +410,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           </>
         }
       >
-        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Tipo */}
           <div className="col-span-2 grid grid-cols-2 gap-2">
             {(['receita','despesa'] as const).map(t => (

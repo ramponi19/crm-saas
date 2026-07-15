@@ -92,7 +92,7 @@ export function ScoringView({ configInicial, cadencias }: { configInicial: Score
             </Secao>
 
             <Secao titulo="Engajamento (comportamento real)">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <NumField label="Respondeu" value={cfg.engajamento.por_resposta} onChange={(v) => setEng('por_resposta', v)} />
                 <NumField label="Por contato" value={cfg.engajamento.por_contato} onChange={(v) => setEng('por_contato', v)} hint="× nº de ligações" />
                 <NumField label="Máx." value={cfg.engajamento.max} onChange={(v) => setEng('max', v)} />
@@ -100,7 +100,7 @@ export function ScoringView({ configInicial, cadencias }: { configInicial: Score
             </Secao>
 
             <Secao titulo="Recência do último contato">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {cfg.recencia.map((b, i) => (
                   <NumField key={i} label={`≤ ${b.ate_dias}d`} value={b.pts}
                     onChange={(v) => setCfg({ ...cfg, recencia: cfg.recencia.map((x, idx) => idx === i ? { ...x, pts: v } : x) })} />

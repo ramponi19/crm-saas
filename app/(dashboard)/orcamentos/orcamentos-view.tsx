@@ -176,10 +176,10 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
                     </div>
                     <div className="truncate text-[12px] text-ink-3">{o.aparelho || o.aparelho_novo || '—'} · <span className="num font-medium text-ink-2">{brl(o.total)}</span></div>
                   </div>
-                  <button onClick={() => { navigator.clipboard?.writeText(linkDe(o)); notify.ok('Link copiado') }} className="grid size-8 place-items-center rounded-control text-ink-3 hover:text-ink" aria-label="Copiar link"><Copy size={15} strokeWidth={1.7} /></button>
-                  <button onClick={() => whatsapp(o)} disabled={!o.cliente_telefone} className="grid size-8 place-items-center rounded-control text-ink-3 hover:text-ok disabled:opacity-30" aria-label="WhatsApp"><MessageCircle size={15} strokeWidth={1.7} /></button>
-                  <button onClick={() => abrir(o)} className="grid size-8 place-items-center rounded-control text-ink-3 hover:text-ink" aria-label="Editar"><Pencil size={15} strokeWidth={1.7} /></button>
-                  <button onClick={() => setExcluir(o)} className="grid size-8 place-items-center rounded-control text-ink-3 hover:text-bad" aria-label="Excluir"><Trash2 size={15} strokeWidth={1.7} /></button>
+                  <button onClick={() => { navigator.clipboard?.writeText(linkDe(o)); notify.ok('Link copiado') }} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-ink" aria-label="Copiar link"><Copy size={15} strokeWidth={1.7} /></button>
+                  <button onClick={() => whatsapp(o)} disabled={!o.cliente_telefone} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-ok disabled:opacity-30" aria-label="WhatsApp"><MessageCircle size={15} strokeWidth={1.7} /></button>
+                  <button onClick={() => abrir(o)} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-ink" aria-label="Editar"><Pencil size={15} strokeWidth={1.7} /></button>
+                  <button onClick={() => setExcluir(o)} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-bad" aria-label="Excluir"><Trash2 size={15} strokeWidth={1.7} /></button>
                 </div>
               )
             })}

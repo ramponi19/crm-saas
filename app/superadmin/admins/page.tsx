@@ -14,7 +14,7 @@ export default async function AdminsPage() {
     .order('nome')
 
   return (
-    <div className="min-h-full bg-bg px-8 py-7">
+    <div className="min-h-full bg-bg px-4 py-4 sm:px-8 sm:py-7">
       <div className="mx-auto max-w-[800px] space-y-5">
         <div>
           <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Administradores</h1>

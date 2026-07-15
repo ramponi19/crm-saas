@@ -119,7 +119,7 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-[900px] px-8 py-7">
+    <div className="mx-auto max-w-[900px] px-4 py-4 sm:px-8 sm:py-7">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-[24px] font-bold tracking-[-0.03em] text-ink">Segmentos</h1>

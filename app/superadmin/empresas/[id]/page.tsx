@@ -117,7 +117,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   ]
 
   return (
-    <div className="max-w-[1100px] px-8 py-7">
+    <div className="max-w-[1100px] px-4 py-4 sm:px-8 sm:py-7">
       {/* Voltar */}
       <Link
         href="/superadmin/empresas"
@@ -128,7 +128,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
       </Link>
 
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-ink text-[15px] font-bold text-white">
             {getInitials(empresa.nome)}

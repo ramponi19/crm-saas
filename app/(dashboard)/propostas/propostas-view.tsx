@@ -101,7 +101,7 @@ export function PropostasView({ initial, baseUrl }: { initial: Proposta[]; baseU
                       <a href={link(p)} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-control px-2 text-ink-2 hover:text-ink"><ExternalLink size={15} strokeWidth={1.7} /></a>
                       <Button variant="outline" size="sm" onClick={() => whatsapp(p)}>WhatsApp</Button>
                     </div>
-                    <select value={p.status} onChange={e => mudarStatus(p, e.target.value)} className="h-8 rounded-control border border-line bg-card px-2 text-[12.5px] text-ink">
+                    <select value={p.status} onChange={e => mudarStatus(p, e.target.value)} className="h-8 rounded-control border border-line bg-card px-2 text-base text-ink">
                       {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                     <Button variant="ghost" size="sm" icon={<Trash2 size={14} strokeWidth={1.7} />} className="text-bad hover:bg-bad/10" onClick={() => excluir(p)}><span className="sr-only">Excluir</span></Button>

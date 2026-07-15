@@ -338,7 +338,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
             </Select>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Valor total (R$)"
               value={formPedido.valor_total}
