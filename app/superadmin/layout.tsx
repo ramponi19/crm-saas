@@ -1,4 +1,5 @@
 import { SuperAdminShell } from '@/components/superadmin/superadmin-shell'
+import { SessionGuard } from '@/components/layout/session-guard'
 import { requireSuperAdmin } from '@/lib/superadmin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -19,6 +20,7 @@ export default async function SuperAdminLayout({
   return (
     <SuperAdminShell userName={usuario?.nome ?? 'Super Admin'}>
       {children}
+      <SessionGuard />
     </SuperAdminShell>
   )
 }

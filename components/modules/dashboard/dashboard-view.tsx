@@ -30,6 +30,7 @@ interface DashboardData {
   leadsRecentes: Array<{ id: number; nome: string | null; kanban_status: string | null; created_at: string | null }>
   topProdutos: Array<{ nome: string; qtd: number }>
   funilLeads: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number }
+  porCanal?: Record<string, number>
 }
 interface PeriodKpis { receita: number; lucro: number; qtdVendas: number; ticketMedio: number }
 
@@ -54,9 +55,7 @@ const CANAL_META: Record<string, { color: string; label: string }> = {
   loja_fisica: { color: INK3, label: 'Loja física' },
   site: { color: INK2, label: 'Site' },
 }
-function DonutCanais({ vendas }: { vendas: VendaRecente[] }) {
-  const counts: Record<string, number> = {}
-  vendas.forEach((v) => { const c = v.canal_venda ?? 'loja_fisica'; counts[c] = (counts[c] ?? 0) + 1 })
+function DonutCanais({ counts }: { counts: Record<string, number> }) {
   const total = Object.values(counts).reduce((s, v) => s + v, 0)
   if (!total) return <div className="py-8 text-center text-[13px] text-ink-3">Sem dados ainda.</div>
   const segs = Object.entries(counts).map(([c, n]) => ({
@@ -371,7 +370,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               <AreaChart data={faturamentoMensal} />
             </Card>
             <Card title="Vendas por canal">
-              <DonutCanais vendas={vendasRecentes} />
+              <DonutCanais counts={initialData.porCanal ?? {}} />
             </Card>
           </div>
 

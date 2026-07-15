@@ -149,8 +149,13 @@ export async function GET() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
+  // Distribuição por canal — só vendas concluídas (o donut antes usava as 6
+  // recentes, incluindo canceladas/encomendas).
+  const porCanal: Record<string, number> = {}
+  for (const v of concluidas) { const c = v.canal_venda ?? 'loja_fisica'; porCanal[c] = (porCanal[c] ?? 0) + 1 }
+
   return NextResponse.json({
-    periods, faturamentoMensal,
+    periods, faturamentoMensal, porCanal,
     globais: {
       totalClientes: totalClientes ?? 0, leadsAtivos: leadsAtivos ?? 0,
       leadsNovos: leadsNovos ?? 0, estoqueDisponivel: estoqueDisponivel ?? 0,

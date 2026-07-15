@@ -49,7 +49,7 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
     const supabase = createClient()
     async function load() {
       const { data: msgs } = await supabase
-        .from('lead_mensagens').select('lead_id').eq('lida', false).eq('direcao', 'recebida')
+        .from('lead_mensagens').select('lead_id').eq('lida', false).eq('direcao', 'recebida').limit(500)
       if (!msgs) return
       const contagem: Record<number, number> = {}
       for (const m of msgs as Array<{ lead_id: number | null }>) {
@@ -67,10 +67,15 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
     }
     load()
 
+    // Debounce: uma rajada de eventos (ex.: marcar várias como lidas) coalesce
+    // em um único reload, em vez de refazer a contagem inteira a cada linha.
+    let debounceT: ReturnType<typeof setTimeout> | null = null
+    const scheduleLoad = () => { if (debounceT) clearTimeout(debounceT); debounceT = setTimeout(load, 800) }
+
     const channel = supabase
       .channel(`topbar_notifs_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; conteudo: string | null }>) => {
-        load()
+        scheduleLoad()
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             let titulo = 'Nova mensagem'
@@ -94,7 +99,7 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { if (debounceT) clearTimeout(debounceT); supabase.removeChannel(channel) }
   }, [router])
 
   useEffect(() => {
