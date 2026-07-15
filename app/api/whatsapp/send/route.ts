@@ -17,7 +17,9 @@ export async function POST(req: Request) {
     }
 
     const result = await sendWhatsApp({ to, message, empresaId })
-    return NextResponse.json(result)
+    // Propaga o status real: se nenhum provedor está ativo ou a Graph/Evolution
+    // falhou, NÃO devolver 200 — senão a loja vê "enviado" e o cliente não recebe.
+    return NextResponse.json(result, { status: result.success ? 200 : 502 })
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Erro interno' },

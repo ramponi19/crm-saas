@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireOwnerOrAdminApi } from '@/lib/owner'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireOwnerOrAdminApi()
+    if (auth.error) return auth.error
+    const { supabase, empresaId } = auth
     const body = await req.json()
-    const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
     const { error } = await supabase
       .from('configuracoes_sistema')
