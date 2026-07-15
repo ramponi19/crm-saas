@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
@@ -47,6 +48,7 @@ async function getConfigs() {
 }
 
 export default async function ConfiguracoesPage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
 
   return (

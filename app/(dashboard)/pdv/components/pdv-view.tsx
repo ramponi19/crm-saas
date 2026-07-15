@@ -304,7 +304,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     if (!clienteSelecionado?.telefone || !pixCobranca) return
     setEnviandoWpp(true)
     const chave = pixCobranca.linha_digitavel ?? pixCobranca.qr_code ?? pixCobranca.link_pagamento ?? ''
-    const msg = `Olá ${clienteSelecionado.nome}! Segue o Pix para pagamento da sua compra no valor de *${fmt(totais.total)}*:\n\n${chave}`
+    const msg = `Olá ${clienteSelecionado.nome}! Segue o Pix para pagamento da sua compra no valor de *${fmt(ultimaVenda?.total ?? totais.total)}*:\n\n${chave}`
     try {
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -359,7 +359,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         <div className="space-y-4">
           <div className="rounded-card border border-ok/20 bg-ok-soft p-4 text-center">
             <p className="text-[11px] text-ink-3">Valor a pagar</p>
-            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(totais.total)}</p>
+            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimaVenda?.total ?? totais.total)}</p>
           </div>
           {pixCobranca?.qr_code_base64 && (
             <div className="flex justify-center">

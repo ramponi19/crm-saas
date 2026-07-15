@@ -1,10 +1,12 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { PropostasView, type Proposta } from './propostas-view'
 
 export const metadata = { title: 'Propostas' }
 
 export default async function PropostasPage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data } = await supabase
     .from('propostas')

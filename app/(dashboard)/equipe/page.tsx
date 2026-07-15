@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import EquipeView from './components/equipe-view'
 import type { Tables } from '@/types/database'
 
@@ -6,6 +7,7 @@ type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function EquipePage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const mesAtual = new Date().toISOString().slice(0, 7) // "2026-06"

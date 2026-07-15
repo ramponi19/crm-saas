@@ -1,7 +1,9 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import FinanceiroView from './components/financeiro-view'
 
 export default async function FinanceiroPage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const [{ data: lancamentos }, { data: cobrancas }] = await Promise.all([
     supabase.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaId).order('data_venc', { ascending: false }),

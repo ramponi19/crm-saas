@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/relatorios/relatorios-imob-view'
@@ -14,6 +15,7 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 // Roteador único de relatórios por segmento (imobiliária → relatório imob;
 // demais → BI genérico, plan-gated). Substitui a rota órfã /relatorios-imob.
 export default async function RelatoriosPage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
 

@@ -90,23 +90,24 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     const data = { ...payload, ativo: true }
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: vinculo } = await supabase
-          .from('empresa_usuarios').select('empresa_id, empresas(limite_leads)')
-          .eq('usuario_id', user.id).eq('ativo', true).single()
-        const limite = (vinculo?.empresas as unknown as { limite_leads: number } | null)?.limite_leads ?? 0
-        if (limite > 0) {
-          const { count } = await supabase.from('clientes')
-            .select('*', { count: 'exact', head: true })
-            .eq('empresa_id', (vinculo as { empresa_id: number }).empresa_id).eq('ativo', true)
-          if ((count ?? 0) >= limite) {
-            notify.bad('Limite de clientes atingido', `${count}/${limite}. Faça upgrade para continuar.`)
-            setSaving(false); return
-          }
+      if (!user) { notify.bad('Não autenticado'); setSaving(false); return }
+      const { data: vinculo } = await supabase
+        .from('empresa_usuarios').select('empresa_id, empresas(limite_leads)')
+        .eq('usuario_id', user.id).eq('ativo', true).maybeSingle()
+      if (!vinculo) { notify.bad('Empresa não encontrada'); setSaving(false); return }
+      const empId = (vinculo as { empresa_id: number }).empresa_id
+      const limite = (vinculo?.empresas as unknown as { limite_leads: number } | null)?.limite_leads ?? 0
+      if (limite > 0) {
+        const { count } = await supabase.from('clientes')
+          .select('*', { count: 'exact', head: true })
+          .eq('empresa_id', empId).eq('ativo', true)
+        if ((count ?? 0) >= limite) {
+          notify.bad('Limite de clientes atingido', `${count}/${limite}. Faça upgrade para continuar.`)
+          setSaving(false); return
         }
       }
-      const { error } = await supabase.from('clientes').insert(data as TablesInsert<'clientes'>)
-      if (error) { notify.bad('Erro ao cadastrar'); setSaving(false); return }
+      const { error } = await supabase.from('clientes').insert({ ...data, empresa_id: empId } as TablesInsert<'clientes'>)
+      if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
       notify.ok('Cliente cadastrado')
     } else {
       const { error } = await supabase.from('clientes').update(data as TablesUpdate<'clientes'>).eq('id', cliente!.id!)

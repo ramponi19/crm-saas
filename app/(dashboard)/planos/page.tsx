@@ -1,7 +1,9 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRole } from '@/lib/owner'
 import PlanosView from './planos-view'
 
 export default async function PlanosPage() {
+  await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: empresa }, { data: planos }] = await Promise.all([
