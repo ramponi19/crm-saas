@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react'
+import { TrendingUp } from 'lucide-react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { MODULES } from '../data'
@@ -94,7 +95,7 @@ function VisualAtendimento() {
         ))}
       </div>
       <div className="max-w-[75%] rounded-[10px_10px_10px_3px] bg-white/[0.07] px-3 py-2 text-[12px]">Qual o prazo de entrega?</div>
-      <div className="ml-auto mt-2 max-w-[75%] rounded-[10px_10px_3px_10px] bg-[color:var(--lp-cobalt)] px-3 py-2 text-[12px] text-white">Chega amanhã até 12h 🚚</div>
+      <div className="ml-auto mt-2 max-w-[75%] rounded-[10px_10px_3px_10px] bg-[color:var(--lp-cobalt)] px-3 py-2 text-[12px] text-white">Chega amanhã até 12h</div>
       <div className="mt-3 flex items-center justify-between border-t border-[color:var(--lp-border-soft)] pt-2.5 text-[10.5px] text-[color:var(--lp-faint)]">
         <span>distribuído para <b className="text-[color:var(--lp-dim)]">Rafael</b></span>
         <span className="font-bold text-[#3ECF8E]">SLA 2min ✓</span>
@@ -127,7 +128,7 @@ function VisualPix() {
     <div className="rounded-[12px] border border-dashed border-[color:var(--lp-cobalt-bright)]/45 bg-[color:var(--lp-cobalt)]/[0.08] p-4 text-center">
       <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Pix copia-e-cola</div>
       <div className="mt-1 text-[22px] font-extrabold tabular-nums tracking-[-0.03em]">R$ 4.299</div>
-      <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#3ECF8E]">● pago em 3 min</div>
+      <div className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#3ECF8E]"><span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />pago em 3 min</div>
     </div>
   )
 }
@@ -174,7 +175,7 @@ function VisualRelatorios() {
     <div className="group rounded-[12px] border border-[color:var(--lp-border-soft)] bg-black/20 p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Receita · últimas 7 semanas</span>
-        <span className="text-[12px] font-extrabold text-[#3ECF8E]">▲ 23%</span>
+        <span className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#3ECF8E]"><TrendingUp size={12} strokeWidth={2.5} />23%</span>
       </div>
       <div className="flex h-[72px] items-end gap-2">
         {bars.map((h, i) => (

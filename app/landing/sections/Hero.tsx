@@ -47,19 +47,26 @@ export default function Hero() {
 
     // o SplitText espera as fontes p/ quebrar as linhas no lugar certo
     let cancelled = false
+    // Failsafe: se SplitText/plugin/fonts falharem, a headline NUNCA fica invisível.
+    const failsafe = setTimeout(() => { gsap.set(h1, { opacity: 1 }) }, 1400)
     const ready = document.fonts?.ready ?? Promise.resolve()
     ready.then(() => {
       if (cancelled) return
       ctx.add(() => {
-        split = new SplitText(h1, { type: 'lines', mask: 'lines', linesClass: 'lp-line' })
-        gsap.set(h1, { opacity: 1 })
-        const tl = gsap.timeline({ defaults: { ease: 'power4.out' } })
-        tl.from(split.lines, { yPercent: 112, duration: 1.15, stagger: 0.11 }, 0.05)
-          .from('[data-hero]', { y: 22, opacity: 0, duration: 0.9, stagger: 0.08, ease: 'power3.out' }, 0.45)
+        gsap.set(h1, { opacity: 1 }) // visível ANTES de tentar o split
+        try {
+          split = new SplitText(h1, { type: 'lines', mask: 'lines', linesClass: 'lp-line' })
+          const tl = gsap.timeline({ defaults: { ease: 'power4.out' } })
+          tl.from(split.lines, { yPercent: 112, duration: 1.15, stagger: 0.11 }, 0.05)
+            .from('[data-hero]', { y: 22, opacity: 0, duration: 0.9, stagger: 0.08, ease: 'power3.out' }, 0.45)
+        } catch {
+          // SplitText indisponível → mostra tudo, sem a animação de linhas
+          gsap.set('[data-hero]', { opacity: 1, y: 0 })
+        }
       })
     })
 
-    return () => { cancelled = true; split?.revert(); ctx.revert() }
+    return () => { cancelled = true; clearTimeout(failsafe); split?.revert(); ctx.revert() }
   }, [])
 
   return (

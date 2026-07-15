@@ -150,8 +150,8 @@ export default function LeadStory() {
             </div>
 
             <div data-beat="sla" className="mt-3 flex justify-end">
-              <span className="rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-[11px] font-bold text-[#3ECF8E]">
-                ⏱ respondido em 1min 52s — dentro do SLA
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-[11px] font-bold text-[#3ECF8E]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />respondido em 1min 52s — dentro do SLA
               </span>
             </div>
 

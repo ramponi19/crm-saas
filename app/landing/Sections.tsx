@@ -159,7 +159,7 @@ export default function Sections({ plans }: { plans?: PlanData[] }) {
       </section>
 
       {/* ---------- 6 · MÓDULOS ---------- */}
-      <section className="border-t border-line-soft bg-card py-[84px]">
+      <section id="produto" className="scroll-mt-24 border-t border-line-soft bg-card py-[84px]">
         <div className="mx-auto max-w-[1080px] px-6">
           <div className="mb-11 max-w-[600px]" data-rise>
             <div className="text-[12px] font-semibold uppercase tracking-[0.04em] text-ink-3">Um núcleo, toda a operação</div>

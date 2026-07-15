@@ -9,8 +9,8 @@
   --lp-deep-2: #0e1116;
   --lp-panel: #12161d;
   --lp-white: #f7f8fa;
-  --lp-dim: rgba(247, 248, 250, 0.64);
-  --lp-faint: rgba(247, 248, 250, 0.4);
+  --lp-dim: rgba(247, 248, 250, 0.66);
+  --lp-faint: rgba(247, 248, 250, 0.56); /* subido de .4 → legível (WCAG) em textos pequenos */
   --lp-border: rgba(255, 255, 255, 0.08);
   --lp-border-soft: rgba(255, 255, 255, 0.05);
   --lp-cobalt: #2e5ce6;
@@ -20,6 +20,16 @@
 .lp ::selection {
   background: rgba(46, 92, 230, 0.9);
   color: #fff;
+}
+
+/* ---------- foco visível (teclado) — anel cobalto legível no dark ---- */
+.lp a:focus-visible,
+.lp button:focus-visible,
+.lp summary:focus-visible,
+.lp [tabindex]:focus-visible {
+  outline: 2px solid var(--lp-cobalt-bright);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 
 /* ---------- grain — SVG turbulence, fixo sobre a página toda ------- */
