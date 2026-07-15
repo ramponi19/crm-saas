@@ -76,6 +76,10 @@ async function getDashboardData() {
     funilCount[s] = (funilCount[s] ?? 0) + 1
   })
 
+  // Distribuição por canal (donut) — só vendas concluídas do mês.
+  const porCanal: Record<string, number> = {}
+  for (const v of vendasMes) { const c = v.canal_venda ?? 'loja_fisica'; porCanal[c] = (porCanal[c] ?? 0) + 1 }
+
   const receitaMes = vendasMes.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0)
   const lucroMes = vendasMes.reduce((sum, v) => sum + (Number(v.lucro) || 0), 0)
   const qtdVendasMes = vendasMes.length
@@ -93,6 +97,7 @@ async function getDashboardData() {
     vendasRecentes,
     leadsRecentes: [],
     topProdutos,
+    porCanal,
     funilLeads: {
       novo: funilCount['novo'] ?? 0,
       em_contato: funilCount['em_contato'] ?? 0,
