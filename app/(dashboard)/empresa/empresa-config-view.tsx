@@ -6,7 +6,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { Building2, Palette, CreditCard, Users, Check, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/plano'
 import { Topbar } from '@/components/layout/topbar'
-import { Button, Input, Card, Badge, Tabs, type TabItem } from '@/components/ui'
+import { Button, Input, Card, Badge, Tabs, notify, type TabItem } from '@/components/ui'
 
 type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
 
@@ -98,7 +98,7 @@ export default function EmpresaConfigPage() {
     setSucesso(false)
     const supabase = createClient()
 
-    await supabase
+    const { error } = await supabase
       .from('empresas')
       .update({
         nome:        form.nome,
@@ -111,6 +111,8 @@ export default function EmpresaConfigPage() {
         } : {}),
       })
       .eq('id', empresa.id)
+
+    if (error) { setLoading(false); notify.bad('Erro ao salvar', error.message); return }
 
     document.documentElement.style.setProperty('--color-primary', form.wl_cor)
 

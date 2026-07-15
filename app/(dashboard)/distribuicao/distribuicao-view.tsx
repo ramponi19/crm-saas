@@ -87,10 +87,13 @@ export function DistribuicaoView({ regrasIniciais, membros, semDono }: { regrasI
   async function mover(i: number, dir: -1 | 1) {
     const j = i + dir
     if (j < 0 || j >= regras.length) return
+    const anterior = regras
     const nova = [...regras]
     ;[nova[i], nova[j]] = [nova[j], nova[i]]
     setRegras(nova)
-    await fetch('/api/distribuicao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordens: nova.map((r, idx) => ({ id: r.id, ordem: idx + 1 })) }) })
+    const r = await fetch('/api/distribuicao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordens: nova.map((r, idx) => ({ id: r.id, ordem: idx + 1 })) }) })
+    if (!r.ok) { setRegras(anterior); notify.bad('Erro ao reordenar'); return } // reverte se a gravação falhar
+    router.refresh()
   }
 
   async function distribuirEsteira() {

@@ -110,7 +110,7 @@ export async function GET() {
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     monthlyMap[k] = (monthlyMap[k] ?? 0) + (Number(v.valor_venda) || 0)
   })
-  const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total }))
+  const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total })).sort((a, b) => a.mes.localeCompare(b.mes))
 
   // Vendas recentes (últimas 6) com nomes
   const recentes = [...vendas]

@@ -217,7 +217,10 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         vendaIds.push(venda.id)
         if (primeiraVendaId === null) primeiraVendaId = venda.id
         // Entrega pendente: guarda a unidade reservada p/ baixar ao "Entregar" no Histórico.
-        if (entregaPendente) await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
+        if (entregaPendente) {
+          const { error: eUid } = await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
+          if (eUid) throw new Error('Falha ao vincular a unidade à venda pendente')
+        }
         await supabase.from('vendas_pagamentos').insert({
           empresa_id: empresaId,
           venda_id: venda.id, forma_pagamento: formaPagamento,
@@ -238,7 +241,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           empresa_id: empresaId, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, lucro: valorAc, forma_pagamento: formaPagamento,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
-          desconto_valor: descAc, status: vendaStatus, observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
+          desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
         if (vAc?.id) vendaIds.push(vAc.id)
         if (vAc?.id) await supabase.from('vendas_pagamentos').insert({
