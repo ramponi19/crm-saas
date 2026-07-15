@@ -78,6 +78,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     obs: lead.observacoes ?? '',
   })
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
+  const [abaMobile, setAbaMobile] = useState<'dados' | 'conversa'>('conversa') // mobile: mostra uma coluna por vez
 
   const [chat, setChat] = useState<ChatMsg[]>([])
   const [loadingChat, setLoadingChat] = useState(true)
@@ -267,10 +268,10 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 p-4 sm:p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 p-0 sm:p-6"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="flex h-[620px] max-h-[92vh] w-[1000px] max-w-[96vw] flex-col overflow-hidden rounded-modal border border-line bg-card shadow-[0_30px_70px_-20px_rgba(21,24,28,0.4)]">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden border border-line bg-card shadow-[0_30px_70px_-20px_rgba(21,24,28,0.4)] sm:h-[620px] sm:max-h-[92vh] sm:w-[1000px] sm:max-w-[96vw] sm:rounded-modal">
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 border-b border-line-soft px-5 py-3.5">
@@ -291,11 +292,25 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
           </IconButton>
         </div>
 
-        {/* Body: 2 colunas */}
-        <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: '340px 1fr' }}>
+        {/* Abas — só no mobile (no desktop as 2 colunas aparecem juntas) */}
+        <div className="flex border-b border-line-soft lg:hidden">
+          {(['dados', 'conversa'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setAbaMobile(t)}
+              className={'flex-1 py-2.5 text-[13px] font-semibold transition-colors ' + (abaMobile === t ? 'border-b-2 border-accent text-accent' : 'text-ink-3')}
+            >
+              {t === 'dados' ? 'Dados' : 'Conversa'}
+            </button>
+          ))}
+        </div>
+
+        {/* Body: 2 colunas no desktop; 1 aba por vez no mobile */}
+        <div className="grid flex-1 overflow-hidden lg:[grid-template-columns:340px_1fr]">
 
           {/* Esquerda: formulário */}
-          <div className="flex flex-col gap-3 overflow-y-auto border-r border-line-soft p-5 scrollbar-thin">
+          <div className={'flex-col gap-3 overflow-y-auto border-r border-line-soft p-5 scrollbar-thin lg:flex ' + (abaMobile === 'dados' ? 'flex' : 'hidden')}>
             <Input label="Nome" value={form.nome} onChange={(e) => set('nome', e.target.value)} />
             <Input label="Telefone / WhatsApp" value={form.tel} onChange={(e) => set('tel', e.target.value)} className="num" />
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
@@ -330,7 +345,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
           </div>
 
           {/* Direita: chat */}
-          <div className="flex flex-col overflow-hidden bg-bg">
+          <div className={'flex-col overflow-hidden bg-bg lg:flex ' + (abaMobile === 'conversa' ? 'flex' : 'hidden')}>
             <div className="border-b border-line-soft px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
               Histórico de mensagens
             </div>

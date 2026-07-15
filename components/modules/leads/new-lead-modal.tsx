@@ -120,7 +120,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
         </>
       }
     >
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="grid grid-cols-2 gap-4">
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input wrapperClassName="col-span-2" label="Nome" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome do lead" autoFocus />
         <Input label="Telefone / WhatsApp" value={form.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="(19) 99999-0000" className="num" />
         <Input label="Instagram" value={form.instagram} onChange={(e) => set('instagram', e.target.value)} placeholder="@usuario" />

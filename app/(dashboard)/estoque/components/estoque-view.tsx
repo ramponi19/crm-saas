@@ -476,7 +476,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
         {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} — {p.marca_nome}</option>)}
       </Select>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {field('Tipo de entrada *', btnGroup('tipo', [{ v: 'compra', label: 'Compra' }, { v: 'consignado', label: 'Consignado' }, { v: 'troca', label: 'Troca' }]))}
         {field('Condição *', btnGroup('condicao', isVeiculo ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }] : [{ v: 'novo', label: 'Novo' }, { v: 'seminovo', label: 'Seminovo' }, { v: 'usado', label: 'Usado' }]))}
       </div>
@@ -488,7 +488,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
         </Select>
       )}
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}>
           {(isVeiculo ? ['excelente', 'otimo', 'bom', 'regular'] : ['lacrado', 'excelente', 'bom', 'regular']).map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>)}
         </Select>
@@ -497,38 +497,38 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
 
       {isVeiculo ? (
         <>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Input label="Placa" value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC1D23" className="num" />
             <Input label="Ano/modelo" type="number" value={form.ano} onChange={e => set('ano', e.target.value)} placeholder="2022" className="num" />
           </div>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Input label="Chassi" value={form.chassi} onChange={e => set('chassi', e.target.value.toUpperCase())} placeholder="9BW…" className="num" />
             <Input label="Km" type="number" value={form.km} onChange={e => set('km', e.target.value)} placeholder="45000" className="num" />
           </div>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Prata" />
             <Input label="Renavam" value={form.renavam} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" className="num" />
           </div>
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
             <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
           </div>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Input label="IMEI / Número de série" value={form.imei} onChange={e => set('imei', e.target.value)} placeholder="354 88•••• ••••" className="num" />
             <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
           </div>
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />
         <Input label="Custo de reparo" type="number" value={form.custo_reparo} onChange={e => set('custo_reparo', e.target.value)} placeholder="R$ 0,00" className="num" />
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {field('Custo total (auto)',
           <div className="num rounded-control border border-ok/20 bg-ok-soft px-3 py-2 text-[13px] font-semibold text-ok">
             {formatCurrency(custoTotal)}

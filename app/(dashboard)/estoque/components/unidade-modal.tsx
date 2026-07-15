@@ -153,7 +153,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
           </>
         }
       >
-        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset disabled={!editando} className="contents">
           <Select
             wrapperClassName="col-span-2"

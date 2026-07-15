@@ -429,8 +429,8 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         </div>
       </Modal>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
-        <div className="mx-auto grid max-w-[1320px] items-start gap-5" style={{ gridTemplateColumns: '1.55fr 1fr' }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
+        <div className="mx-auto grid max-w-[1320px] grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
 
           {/* ── ESQUERDA: catálogo ── */}
           <div>
@@ -453,7 +453,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
                 <p className="text-[13px]">Nenhum produto disponível no estoque</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3">
                 {itensFiltrados.map((item) => {
                   const noCarrinho = carrinho.some((c) => c.item.id === item.id)
                   return (
@@ -491,7 +491,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           </div>
 
           {/* ── DIREITA: carrinho ── */}
-          <div className="sticky top-5 rounded-card border border-line bg-card p-5">
+          <div className="rounded-card border border-line bg-card p-5 lg:sticky lg:top-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Carrinho</h3>
               <span className="num text-[11px] text-ink-3">{carrinho.length} {carrinho.length === 1 ? 'item' : 'itens'}</span>
@@ -566,11 +566,11 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-semibold text-ink">{item.produto_nome}</div>
                     <div className="mt-1 flex items-center gap-2">
-                      <button type="button" onClick={() => removerItem(item.id)} className="grid h-[22px] w-[22px] place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04]">
+                      <button type="button" onClick={() => removerItem(item.id)} className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] sm:h-[22px] sm:w-[22px]">
                         <Minus size={13} strokeWidth={1.7} />
                       </button>
                       <span className="num text-[12.5px] font-bold text-ink">1</span>
-                      <span className="grid h-[22px] w-[22px] place-items-center rounded-[6px] border border-line text-ink-3 opacity-40">
+                      <span className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink-3 opacity-40 sm:h-[22px] sm:w-[22px]">
                         <Plus size={13} strokeWidth={1.7} />
                       </span>
                     </div>
@@ -626,7 +626,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
                   <span className="text-[12px] text-ink-3">R$</span>
                   <input type="number" value={ac.valor || ''} onChange={(e) => setAcessorios((a) => a.map((x, idx) => idx === i ? { ...x, valor: Number(e.target.value) || 0 } : x))}
                     className="num h-8 w-[70px] rounded-control border border-line bg-card px-2 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
-                  <button type="button" onClick={() => setAcessorios((a) => a.filter((_, idx) => idx !== i))} className="text-ink-3 hover:text-bad" aria-label="Remover"><Minus size={14} strokeWidth={2} /></button>
+                  <button type="button" onClick={() => setAcessorios((a) => a.filter((_, idx) => idx !== i))} className="-m-1.5 p-1.5 text-ink-3 hover:text-bad" aria-label="Remover"><Minus size={14} strokeWidth={2} /></button>
                 </div>
               ))}
             </div>
@@ -699,7 +699,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
                   </div>
                 )}
                 <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Parcelas</div>
-                <div className="grid grid-cols-6 gap-1.5">
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
                   {(parcelasOpts.length > 0 ? parcelasOpts : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map((p) => (
                     <button
                       key={p}
