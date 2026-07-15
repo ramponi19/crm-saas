@@ -22,17 +22,21 @@ export function useReveal<T extends HTMLElement = HTMLElement>() {
     // seria global e, com várias seções usando o hook, criaria tweens from()
     // duplicados no mesmo elemento (o 2º captura o estado escondido como
     // destino e o elemento nunca aparece).
+    // fromTo + immediateRender:false → o elemento fica VISÍVEL por padrão e só
+    // some/anima quando o trigger dispara. Se o ScrollTrigger calcular posição
+    // errada (o pin da LeadStory muda a altura), o conteúdo NUNCA fica preso
+    // invisível — no pior caso, aparece sem a animação.
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>(root.querySelectorAll('[data-rise]')).forEach((el) => {
-        gsap.from(el, {
-          y: 36, opacity: 0, duration: 0.9, ease: 'power3.out',
-          scrollTrigger: { trigger: el, start: 'top 85%' },
+        gsap.fromTo(el, { y: 36, opacity: 0 }, {
+          y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', immediateRender: false,
+          scrollTrigger: { trigger: el, start: 'top 88%' },
         })
       })
       gsap.utils.toArray<HTMLElement>(root.querySelectorAll('[data-stagger]')).forEach((grp) => {
-        gsap.from(Array.from(grp.children), {
-          y: 36, opacity: 0, duration: 0.8, stagger: 0.08, ease: 'power3.out',
-          scrollTrigger: { trigger: grp, start: 'top 82%' },
+        gsap.fromTo(Array.from(grp.children), { y: 36, opacity: 0 }, {
+          y: 0, opacity: 1, duration: 0.8, stagger: 0.08, ease: 'power3.out', immediateRender: false,
+          scrollTrigger: { trigger: grp, start: 'top 85%' },
         })
       })
     }, root)
