@@ -94,6 +94,8 @@ export default async function LeadsPage() {
       motivos={(motivosRaw ?? []) as Motivo[]}
       funis={(funisRaw ?? []) as Funil[]}
       scoreConfig={scoreConfig}
+      restringe={restringe}
+      meuId={user?.id}
     />
   )
 }

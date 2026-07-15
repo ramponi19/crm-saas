@@ -27,9 +27,13 @@ interface LeadsViewProps {
   funis?: Funil[]
   /** Config de lead scoring do dono (Sprint 2.3). Fallback = padrão. */
   scoreConfig?: ScoreConfig
+  /** Restringe a ver só os próprios leads (sem permissão verLeadsOutros). */
+  restringe?: boolean
+  /** ID do usuário logado (usado com `restringe` no realtime). */
+  meuId?: string
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -100,6 +104,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
         (payload: RealtimePostgresChangesPayload<Lead>) => {
           const novo = payload.new as Lead
           if (novo.ativo === false) return
+          if (restringe && novo.responsavel_id !== meuId) return // sem permissão de ver leads de outros
           setLeads(prev =>
             prev.some(l => l.id === novo.id)
               ? prev
@@ -110,6 +115,11 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
         { event: 'UPDATE', schema: 'public', table: 'leads' },
         (payload: RealtimePostgresChangesPayload<Lead>) => {
           const l = payload.new as Lead
+          // Sem permissão de ver leads de outros: se foi reatribuído p/ outra pessoa, some da lista.
+          if (restringe && l.responsavel_id !== meuId) {
+            setLeads(prev => prev.filter(x => x.id !== l.id))
+            return
+          }
           setLeads(prev =>
             l.ativo === false
               ? prev.filter(x => x.id !== l.id)

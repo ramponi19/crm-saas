@@ -3,6 +3,18 @@ import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { parseFeedImoveis } from '@/lib/importar-imoveis'
 
+// Bloqueia alvos internos (SSRF): localhost, IPs privados/loopback/link-local e metadata.
+function hostBloqueado(u: string): boolean {
+  try {
+    const h = new URL(u).hostname.toLowerCase()
+    if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal') || h.endsWith('.local')) return true
+    if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h)) return true
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true
+    if (h === '0.0.0.0' || h === '::1' || h.startsWith('[')) return true
+    return false
+  } catch { return true }
+}
+
 /**
  * Importa imóveis do XML do site/sistema da imobiliária (site = fonte da verdade).
  * Upsert por código, escopado à empresa do dono/admin logado. Salva a URL do feed
@@ -28,6 +40,9 @@ export async function POST(req: Request) {
   }
   if (!feedUrl || !/^https?:\/\//i.test(feedUrl)) {
     return NextResponse.json({ error: 'Informe uma URL de feed válida (http/https).' }, { status: 400 })
+  }
+  if (hostBloqueado(feedUrl)) {
+    return NextResponse.json({ error: 'URL não permitida.' }, { status: 400 })
   }
 
   let xml: string
