@@ -13,6 +13,12 @@ const SUGESTOES = [
   'Onde vejo o faturamento do mês?',
   'Como lanço um orçamento de troca?',
 ]
+const CRIAR = [
+  'Criar uma descrição de produto',
+  'Criar um post para o Instagram',
+  'Escrever uma mensagem para o cliente',
+  'Melhorar um texto que eu vou colar',
+]
 
 function telaLabel(path: string): string {
   const seg = path.split('/').filter(Boolean)[0] ?? 'dashboard'
@@ -144,12 +150,23 @@ export function AssistenteWidget() {
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3.5 scrollbar-thin">
             {msgs.length === 0 && (
-              <div className="space-y-3">
-                <p className="text-[12.5px] text-ink-2">Olá! 👋 Posso te ajudar a usar o CRM. Pergunte à vontade — ou comece por:</p>
-                <div className="flex flex-col gap-1.5">
-                  {SUGESTOES.map((s) => (
-                    <button key={s} onClick={() => enviar(s)} className="rounded-control border border-line px-3 py-2 text-left text-[12.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent">{s}</button>
-                  ))}
+              <div className="space-y-4">
+                <p className="text-[12.5px] text-ink-2">Olá! 👋 Posso ajudar a <strong className="text-ink">usar o CRM</strong> e a <strong className="text-ink">criar conteúdo</strong> (descrição, post, mensagem).</p>
+                <div>
+                  <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Dúvidas rápidas</div>
+                  <div className="flex flex-col gap-1.5">
+                    {SUGESTOES.map((s) => (
+                      <button key={s} onClick={() => enviar(s)} className="rounded-control border border-line px-3 py-2 text-left text-[12.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent">{s}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Criar conteúdo</div>
+                  <div className="flex flex-col gap-1.5">
+                    {CRIAR.map((s) => (
+                      <button key={s} onClick={() => enviar(s)} className="rounded-control border border-line px-3 py-2 text-left text-[12.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent">✍️ {s}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
