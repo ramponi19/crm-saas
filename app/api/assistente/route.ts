@@ -4,9 +4,6 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
-const LIMITE_POR_MIN = 20 // por empresa — segura abuso do tier grátis compartilhado
-
 const SEGMENTO_CTX: Record<string, string> = {
   varejo: 'loja de varejo/celulares (PDV, estoque, produtos, garantia, assistência, orçamentos)',
   assistencia: 'assistência técnica (ordens de serviço, garantia, orçamentos)',
@@ -17,7 +14,7 @@ const SEGMENTO_CTX: Record<string, string> = {
   concessionaria: 'loja de veículos (avaliações, consulta FIPE, financiamento)',
 }
 
-function systemPrompt(segmento: string | null): string {
+function systemPrompt(segmento: string | null, extra: string | null): string {
   const ctx = SEGMENTO_CTX[segmento ?? ''] ?? 'pequeno negócio'
   return `Você é o assistente do Nexus, um CRM. Esta empresa é uma ${ctx}.
 Ajude o usuário a USAR o sistema: onde encontrar telas e como executar tarefas (vender no PDV, lançar orçamento, cadastrar produto/lead/cliente, gerar contrato, ver relatórios, etc.).
@@ -25,7 +22,7 @@ Regras:
 - Responda em português do Brasil, curto e direto. Use **negrito** para nomes de menus/botões e listas numeradas para passos.
 - Você NÃO tem acesso aos dados da empresa. Se pedirem números/relatórios específicos, oriente em qual menu ver (ex.: "veja em **Relatórios**").
 - Não invente funcionalidades. Se não souber, diga que não tem certeza e sugira onde procurar.
-- Nunca ofereça enviar mensagens por você; você só orienta.`
+- Nunca ofereça enviar mensagens por você; você só orienta.${extra ? `\n${extra}` : ''}`
 }
 
 interface Msg { role: 'user' | 'model'; text: string }
@@ -44,24 +41,33 @@ export async function POST(req: Request) {
     .slice(-12)
   if (mensagens.length === 0) return NextResponse.json({ error: 'Mensagem vazia' }, { status: 400 })
 
-  // Rate-limit por empresa (service client — bypassa RLS da tabela de uso).
   const svc = createServiceClient()
+
+  // Config global (superadmin): liga/desliga, limite/min e modelo.
+  const { data: cfg } = await svc.from('assistente_config').select('ativo, limite_por_min, modelo, system_extra').eq('id', 1).maybeSingle()
+  const ativo = cfg?.ativo ?? true
+  const limite = cfg?.limite_por_min ?? 20
+  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  if (!ativo) return NextResponse.json({ error: 'O assistente está temporariamente desativado.' }, { status: 503 })
+
+  // Rate-limit por empresa (service client — bypassa RLS da tabela de uso).
   const desdeIso = new Date(Date.now() - 60_000).toISOString()
   const { count } = await svc.from('assistente_uso').select('*', { count: 'exact', head: true })
     .eq('empresa_id', empresaId).gte('created_at', desdeIso)
-  if ((count ?? 0) >= LIMITE_POR_MIN) {
+  if ((count ?? 0) >= limite) {
     return NextResponse.json({ error: 'Muitas perguntas em pouco tempo. Aguarde alguns segundos e tente de novo.' }, { status: 429 })
   }
-  await svc.from('assistente_uso').insert({ empresa_id: empresaId } as never)
+  const { data: uso } = await svc.from('assistente_uso').insert({ empresa_id: empresaId } as never).select('id').single()
+  const usoId = (uso as { id?: number } | null)?.id ?? null
 
   // Contexto do segmento p/ respostas mais úteis.
   const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
-  let systemText = systemPrompt((emp as { segmento?: string | null } | null)?.segmento ?? null)
+  let systemText = systemPrompt((emp as { segmento?: string | null } | null)?.segmento ?? null, cfg?.system_extra ?? null)
   if (body.contexto) systemText += `\n\nContexto: o usuário está na tela "${String(body.contexto).slice(0, 60)}".`
 
   try {
     const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:streamGenerateContent?alt=sse&key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -78,15 +84,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: j?.error?.message ?? 'Erro no assistente' }, { status: 502 })
     }
 
-    // Reencaminha só o TEXTO dos chunks SSE do Gemini como um stream de texto puro.
     const reader = upstream.body.getReader()
     const decoder = new TextDecoder()
     const encoder = new TextEncoder()
     let buf = ''
+    let tokIn = 0, tokOut = 0
     const stream = new ReadableStream<Uint8Array>({
       async pull(controller) {
         const { done, value } = await reader.read()
-        if (done) { controller.close(); return }
+        if (done) {
+          // Registra os tokens do uso (para o dashboard do superadmin).
+          if (usoId && (tokIn || tokOut)) {
+            await svc.from('assistente_uso').update({ tokens_in: tokIn, tokens_out: tokOut } as never).eq('id', usoId)
+          }
+          controller.close(); return
+        }
         buf += decoder.decode(value, { stream: true })
         const linhas = buf.split('\n')
         buf = linhas.pop() ?? ''
@@ -99,6 +111,8 @@ export async function POST(req: Request) {
             const obj = JSON.parse(payload)
             const txt = obj?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
             if (txt) controller.enqueue(encoder.encode(txt))
+            const um = obj?.usageMetadata
+            if (um) { tokIn = um.promptTokenCount ?? tokIn; tokOut = um.candidatesTokenCount ?? tokOut }
           } catch { /* chunk parcial — ignora */ }
         }
       },

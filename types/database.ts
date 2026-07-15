@@ -194,9 +194,15 @@ export type Database = {
         Relationships: []
       }
       assistente_uso: {
-        Row: { id: number; empresa_id: number; created_at: string }
-        Insert: { id?: never; empresa_id: number; created_at?: string }
-        Update: { id?: never; empresa_id?: number; created_at?: string }
+        Row: { id: number; empresa_id: number; created_at: string; tokens_in: number | null; tokens_out: number | null }
+        Insert: { id?: never; empresa_id: number; created_at?: string; tokens_in?: number | null; tokens_out?: number | null }
+        Update: { id?: never; empresa_id?: number; created_at?: string; tokens_in?: number | null; tokens_out?: number | null }
+        Relationships: []
+      }
+      assistente_config: {
+        Row: { id: number; ativo: boolean; limite_por_min: number; modelo: string; system_extra: string | null; updated_at: string }
+        Insert: { id?: number; ativo?: boolean; limite_por_min?: number; modelo?: string; system_extra?: string | null; updated_at?: string }
+        Update: { id?: number; ativo?: boolean; limite_por_min?: number; modelo?: string; system_extra?: string | null; updated_at?: string }
         Relationships: []
       }
       tabela_precos: {
