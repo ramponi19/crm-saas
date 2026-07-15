@@ -70,7 +70,7 @@ export default function Hero() {
   }, [])
 
   return (
-    <section ref={rootRef} className="relative overflow-hidden bg-[color:var(--lp-deep)] pb-24 pt-[124px] text-[color:var(--lp-white)] sm:pt-[148px]">
+    <section ref={rootRef} className="relative overflow-hidden bg-[color:var(--lp-deep)] pb-16 pt-[112px] text-[color:var(--lp-white)] sm:pt-[128px]">
       {/* fundo: auroras */}
       <div aria-hidden data-aurora="1" className="lp-aurora left-[8%] top-[-160px] h-[430px] w-[560px] opacity-[0.55]"
         style={{ background: 'radial-gradient(closest-side, rgba(46,92,230,.5), transparent 72%)' }} />
@@ -122,8 +122,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* palco 3D do produto */}
-      <div data-hero className="mt-16 sm:mt-20">
+      {/* palco 3D do produto — puxado pra dentro da dobra (co-protagonista) */}
+      <div data-hero className="mt-9 sm:mt-11">
         <ProductStage />
       </div>
     </section>

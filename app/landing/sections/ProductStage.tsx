@@ -58,6 +58,9 @@ export default function ProductStage() {
           scrollTrigger: { trigger: stage, start: 'top 96%', end: 'top 34%', scrub: 0.5 },
         },
       )
+      // flutuação contínua sutil — dá "vida"/profundidade ao mock (y do tilt não
+      // conflita com o rotateX/Y do mouse nem com o y do scrub, que agem no mock)
+      gsap.to(tilt, { y: -10, duration: 5, ease: 'sine.inOut', repeat: -1, yoyo: true, delay: 0.8 })
     }, stage)
 
     // tilt sutil só em ponteiro fino (desktop)
@@ -69,8 +72,8 @@ export default function ProductStage() {
         const r = stage.getBoundingClientRect()
         const px = (e.clientX - r.left) / r.width - 0.5
         const py = (e.clientY - r.top) / r.height - 0.5
-        ry(px * 3.2)
-        rx(py * -2.4)
+        ry(px * 4.4)
+        rx(py * -3.2)
       }
       const onLeave = () => { rx(0); ry(0) }
       stage.addEventListener('mousemove', onMove)
@@ -104,8 +107,14 @@ export default function ProductStage() {
       {/* glow cobalto atrás do mock */}
       <div
         aria-hidden
-        className="absolute left-1/2 top-8 -z-10 h-[70%] w-[88%] -translate-x-1/2 rounded-[48px] opacity-60"
-        style={{ background: 'radial-gradient(52% 52% at 50% 42%, rgba(46,92,230,.34), transparent 70%)', filter: 'blur(64px)' }}
+        className="absolute left-1/2 top-4 -z-10 h-[78%] w-[92%] -translate-x-1/2 rounded-[48px] opacity-70"
+        style={{ background: 'radial-gradient(52% 52% at 50% 40%, rgba(46,92,230,.42), transparent 70%)', filter: 'blur(72px)' }}
+      />
+      {/* chão/reflexo — ancora o mock no espaço (profundidade) */}
+      <div
+        aria-hidden
+        className="absolute inset-x-[12%] bottom-[-6%] -z-10 h-[22%] rounded-[50%] opacity-70"
+        style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(0,0,0,.55), transparent 72%)', filter: 'blur(30px)' }}
       />
 
       {/* seletor de segmento */}
