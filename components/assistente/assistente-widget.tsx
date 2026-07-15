@@ -217,7 +217,7 @@ export function AssistenteWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Escreva sua dúvida…"
-              className="h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-[12.5px] text-ink outline-none focus:border-accent"
+              className="h-10 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-base text-ink outline-none focus:border-accent sm:h-9 sm:text-[12.5px]"
             />
             <button type="submit" disabled={!input.trim() || loading} className="grid size-9 flex-none place-items-center rounded-control bg-accent text-white disabled:opacity-40" aria-label="Enviar">
               <Send size={16} strokeWidth={1.9} />

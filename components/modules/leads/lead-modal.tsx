@@ -377,7 +377,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMsg()}
                 placeholder="Digite uma mensagem…"
-                className="h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-[13px] text-ink placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+                className="h-10 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-base text-ink placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 sm:h-9 sm:text-[13px]"
               />
               <IconButton aria-label="Enviar mensagem" variant="primary" onClick={sendMsg}>
                 <Send size={16} strokeWidth={1.7} />

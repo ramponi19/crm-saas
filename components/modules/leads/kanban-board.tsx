@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
-  PointerSensor, useSensor, useSensors, DragOverlay, closestCorners,
+  MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, closestCorners,
 } from '@dnd-kit/core'
 import { Lead, Usuario, type KanbanColumn as KanbanColumnDef, type Motivo, CAMPOS_QUALIFICACAO } from './types'
 import { KanbanColumn } from './kanban-column'
@@ -29,7 +29,12 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
 
   useEffect(() => { if (!activeId) setLocalLeads(leads) }, [leads, activeId])
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  // Mouse: arrasta de imediato (distance). Touch: press-and-hold p/ arrastar,
+  // deixando o swipe rápido rolar o board/coluna no celular.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
 
   const getLeadsByStatus = useCallback(
     (status: string) => localLeads.filter(l => (l.kanban_status ?? 'novo') === status),
