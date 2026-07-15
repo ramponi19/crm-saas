@@ -250,7 +250,8 @@ function FollowupsCard() {
 }
 
 const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
-  concluida: 'ok', pendente: 'warn', cancelada: 'bad', devolvida: 'neutro',
+  concluida: 'ok', pendente: 'warn', encomenda: 'warn', pendente_entrega: 'warn',
+  cancelada: 'bad', devolvido: 'neutro',
 }
 
 export function DashboardView({ data: initialData }: { data: DashboardData }) {

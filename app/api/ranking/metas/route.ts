@@ -40,7 +40,7 @@ export async function DELETE(req: Request) {
 
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { error } = await supabase.from('metas').delete().eq('id', id)
+  const { error } = await supabase.from('metas').delete().eq('id', id).eq('empresa_id', empresaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

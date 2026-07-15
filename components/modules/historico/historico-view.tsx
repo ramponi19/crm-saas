@@ -50,6 +50,12 @@ const CHIPS = [
   { value: 'devolvido', label: 'Devolvidos' },
 ]
 
+// Escapa célula CSV: aspas quando há vírgula, aspas ou quebra de linha.
+const csvCell = (v: string | number) => {
+  const s = String(v ?? '')
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
 function exportCSV(rows: Venda[]) {
   const header = 'Data,Cliente,Produto,Vendedor,Canal,Pagamento,Valor,Lucro,Status'
   const lines = rows.map((v) => [
@@ -57,8 +63,9 @@ function exportCSV(rows: Venda[]) {
     v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
     CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
     v.forma_pagamento ?? '', v.valor_venda, v.lucro ?? 0, v.status ?? '',
-  ].join(','))
-  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+  ].map(csvCell).join(','))
+  // BOM (﻿) p/ o Excel abrir os acentos corretamente.
+  const blob = new Blob(['﻿' + [header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = `historico_${new Date().toISOString().slice(0, 10)}.csv`
