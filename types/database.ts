@@ -193,6 +193,12 @@ export type Database = {
         Update: { id?: never; empresa_id?: number; nome?: string; categoria?: string | null; preco?: number; tempo_estimado_min?: number | null; ativo?: boolean; created_at?: string }
         Relationships: []
       }
+      assistente_uso: {
+        Row: { id: number; empresa_id: number; created_at: string }
+        Insert: { id?: never; empresa_id: number; created_at?: string }
+        Update: { id?: never; empresa_id?: number; created_at?: string }
+        Relationships: []
+      }
       tabela_precos: {
         Row: { id: number; empresa_id: number; modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number; observacoes: string | null; ativo: boolean; created_at: string }
         Insert: { id?: never; empresa_id: number; modelo: string; armazenamento?: string | null; condicao?: string; preco_sugerido?: number; observacoes?: string | null; ativo?: boolean; created_at?: string }
