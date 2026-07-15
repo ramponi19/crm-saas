@@ -14,8 +14,13 @@ export default function Segments() {
   const rootRef = useReveal<HTMLElement>()
 
   return (
-    <section ref={rootRef} className="rounded-t-[28px] bg-bg py-28 text-ink sm:rounded-t-[40px]">
-      <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+    <section ref={rootRef} className="relative overflow-hidden rounded-t-[28px] bg-bg pb-28 pt-32 text-ink shadow-[0_-40px_80px_-40px_rgba(46,92,230,.35)] sm:rounded-t-[40px]">
+      {/* costura dark→light: a luz "acende" — brilho cobalto vazando na borda */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-48"
+        style={{ background: 'radial-gradient(64% 100% at 50% 0%, rgba(46,92,230,.16), transparent 68%)' }} />
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-px w-[60%] -translate-x-1/2"
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(46,92,230,.6), transparent)' }} />
+      <div className="relative mx-auto max-w-[1120px] px-5 sm:px-6">
         <div data-rise className="mb-14 max-w-[640px]">
           <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent">Seis segmentos, um sistema</div>
           <h2 className="mt-4 text-[clamp(30px,4vw,44px)] font-extrabold leading-[1.04] tracking-[-0.04em]">

@@ -13,6 +13,13 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 const QUOTE =
   'Saímos de três planilhas e um caderno para um sistema só. Em dois meses o tempo de resposta no WhatsApp caiu para menos de 2 minutos e paramos de perder venda por esquecimento.'
 
+// ⚠️ Placeholders — trocar por depoimentos reais (nome/foto) quando houver.
+const MAIS = [
+  { ini: 'AC', nome: 'Ana Carolina', papel: 'Imobiliária', txt: 'Os lembretes de visita pararam de furar. Cada corretor abre o dia sabendo exatamente o que fazer.' },
+  { ini: 'PM', nome: 'Dr. Paulo', papel: 'Clínica', txt: 'O agendamento online 24h encheu minha agenda sem eu precisar contratar recepção.' },
+  { ini: 'RS', nome: 'Rafael', papel: 'Loja de veículos', txt: 'Todo lead do Instagram vira card com dono e prazo. Nada mais se perde no meio do caminho.' },
+]
+
 export default function Testimonial() {
   const rootRef = useRef<HTMLElement>(null)
 
@@ -48,12 +55,28 @@ export default function Testimonial() {
           ))}
         </blockquote>
         <figcaption data-author className="mt-9 flex items-center gap-3.5">
-          <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[15px] font-bold text-white">J</span>
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[15px] font-bold text-white">M</span>
           <div>
             <div className="text-[15px] font-bold">Matheus · JM Store</div>
             <div className="text-[13px] text-ink-3">Varejo de eletrônicos · cliente desde 2025</div>
           </div>
         </figcaption>
+
+        {/* mais vozes — por segmento */}
+        <div data-stagger className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {MAIS.map((m) => (
+            <div key={m.nome} className="rounded-card border border-line bg-card p-5">
+              <p className="text-[13.5px] leading-relaxed text-ink-2">“{m.txt}”</p>
+              <div className="mt-4 flex items-center gap-2.5">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{m.ini}</span>
+                <div>
+                  <div className="text-[12.5px] font-bold text-ink">{m.nome}</div>
+                  <div className="text-[11.5px] text-ink-3">{m.papel}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
