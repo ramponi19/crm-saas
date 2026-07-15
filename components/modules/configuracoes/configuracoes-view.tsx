@@ -147,9 +147,6 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     const empresa_id = empresaId
     setSavingTaxas(true)
     try {
-
-      await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
-
       const rows: Array<{ empresa_id: number; forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number; ativo: boolean }> = []
       for (let p = 1; p <= 18; p++) {
         const visa   = taxasVisa[p]   ? parseFloat(taxasVisa[p].replace(',', '.'))   : null
@@ -159,9 +156,20 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
         if (outros != null && !isNaN(outros)) rows.push({ empresa_id, forma_pagamento: 'maquininha', bandeira: 'outros',      parcelas: p, percentual_taxa: outros, ativo: true })
         if (link   != null && !isNaN(link))   rows.push({ empresa_id, forma_pagamento: 'link',        bandeira: null,          parcelas: p, percentual_taxa: link,   ativo: true })
       }
+
+      // Backup p/ rollback: DELETE+INSERT não é transacional no client. Se o insert
+      // falhar, restauramos as taxas antigas — o PDV nunca fica sem taxas.
+      const { data: backup } = await supabase.from('taxas_pagamento')
+        .select('forma_pagamento, bandeira, parcelas, percentual_taxa, ativo').eq('empresa_id', empresa_id)
+
+      await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
+
       if (rows.length > 0) {
         const { error } = await supabase.from('taxas_pagamento').insert(rows)
-        if (error) { notify.bad('Erro ao salvar taxas: ' + error.message); return }
+        if (error) {
+          if (backup?.length) await supabase.from('taxas_pagamento').insert(backup.map((b) => ({ ...b, empresa_id })))
+          notify.bad('Erro ao salvar taxas: ' + error.message); return
+        }
       }
       notify.ok('Taxas salvas com sucesso!')
     } finally { setSavingTaxas(false) }

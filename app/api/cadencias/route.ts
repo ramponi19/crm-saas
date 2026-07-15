@@ -67,6 +67,14 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Realinha inscrições ativas cujo passo_ordem ficou fora do novo range — senão a
+  // inscrição não casa com nenhum passo e o lead some da Fila do dia em silêncio.
+  const maxOrdem = passos.length
+  if (maxOrdem > 0) {
+    await supabase.from('cadencia_inscricoes').update({ passo_ordem: maxOrdem } as never)
+      .eq('cadencia_id', cadenciaId).eq('status', 'ativa').gt('passo_ordem', maxOrdem)
+  }
+
   return NextResponse.json({ ok: true, id: cadenciaId })
 }
 
