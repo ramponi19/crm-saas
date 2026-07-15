@@ -41,7 +41,8 @@ export function Field({ label, hint, error, required, className, children }: Fie
 /** Classe base compartilhada dos controles de formulário (input/select/textarea). */
 export function controlClass(hasError: boolean) {
   return cn(
-    'w-full rounded-control bg-card text-[13px] text-ink placeholder:text-ink-3',
+    // 16px no mobile evita o zoom automático do Safari iOS ao focar; 13px no desktop.
+    'w-full rounded-control bg-card text-base sm:text-[13px] text-ink placeholder:text-ink-3',
     'border transition-colors',
     'focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
     'disabled:opacity-50 disabled:bg-bg',

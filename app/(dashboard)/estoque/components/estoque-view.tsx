@@ -276,25 +276,25 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           {/* ── LISTA ── */}
           {tab === 'lista' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
-                  wrapperClassName="min-w-[240px] flex-1"
+                  wrapperClassName="w-full sm:min-w-[240px] sm:flex-1"
                   icon={<Search size={15} strokeWidth={1.7} />}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder={isVeiculo ? 'Buscar por modelo, marca, placa ou chassi…' : 'Buscar por produto, marca, IMEI ou número de série…'}
                 />
                 {marcasUnicas.length > 0 && (
-                  <Select wrapperClassName="w-[190px]" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
+                  <Select wrapperClassName="w-full sm:w-[190px]" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
                     <option value="todas">Todas as marcas</option>
                     {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
                   </Select>
                 )}
-                <Button icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
+                <Button className="w-full sm:w-auto" icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
                   {isVeiculo ? 'Adicionar veículo' : 'Entrada de estoque'}
                 </Button>
                 {!isVeiculo && (
-                  <Button variant="outline" icon={<RefreshCw size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada({ condicao: 'usado', tipo: 'compra', seminovo: true })}>
+                  <Button variant="outline" className="w-full sm:w-auto" icon={<RefreshCw size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada({ condicao: 'usado', tipo: 'compra', seminovo: true })}>
                     Entrada de semi-novo
                   </Button>
                 )}
