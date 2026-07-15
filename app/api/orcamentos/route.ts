@@ -44,13 +44,16 @@ export async function POST(req: Request) {
     ? Math.max(0, (Number(b.valor_novo) || 0) - (Number(b.valor_entrada) || 0))
     : itens.reduce((s, i) => s + i.qtd * i.valor, 0)
 
+  // status só é aplicado quando explicitamente enviado; senão preserva o atual
+  // (nunca reverte um orçamento aprovado para rascunho — evita re-aprovação/venda duplicada).
+  const statusEnviado = ['rascunho', 'enviado', 'aprovado', 'recusado'].includes(b.status || '') ? b.status! : undefined
+
   const dados = {
     empresa_id: empresaId,
     lead_id: b.lead_id ?? null,
     cliente_nome: nome,
     cliente_telefone: b.cliente_telefone?.trim() || null,
     tipo,
-    status: ['rascunho', 'enviado', 'aprovado', 'recusado'].includes(b.status || '') ? b.status! : 'rascunho',
     aparelho: b.aparelho?.trim() || null,
     imei: b.imei?.trim() || null,
     defeito: b.defeito?.trim() || null,
@@ -67,11 +70,12 @@ export async function POST(req: Request) {
   }
 
   if (b.id) {
-    const { error } = await supabase.from('orcamentos').update(dados).eq('id', b.id)
+    const patch = statusEnviado ? { ...dados, status: statusEnviado } : dados
+    const { data, error } = await supabase.from('orcamentos').update(patch).eq('id', b.id).select('id, token').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, id: b.id })
+    return NextResponse.json({ ok: true, id: b.id, token: data?.token })
   }
-  const { data, error } = await supabase.from('orcamentos').insert(dados).select('id, token').single()
+  const { data, error } = await supabase.from('orcamentos').insert({ ...dados, status: statusEnviado ?? 'rascunho' }).select('id, token').single()
   if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
   return NextResponse.json({ ok: true, id: data.id, token: data.token })
 }

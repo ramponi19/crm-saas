@@ -10,24 +10,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, lead_id, tipo, status, aparelho, imei, defeito, total, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
+    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, total, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
   const b = (await req.json().catch(() => ({}))) as { acao?: string }
   const nowIso = new Date().toISOString()
 
-  // Idempotência: se já foi aprovado, não repete as automações (evita venda/estoque duplicados).
-  if (b.acao === 'aprovar' && orc.status === 'aprovado') {
-    return NextResponse.json({ ok: true, status: 'aprovado' }, { headers: CORS })
-  }
-
   if (b.acao === 'recusar') {
-    await svc.from('orcamentos').update({ status: 'recusado', recusado_em: nowIso }).eq('id', orc.id)
+    // Idempotente: só recusa se ainda não foi aprovado nem recusado.
+    const { data: claimed } = await svc.from('orcamentos')
+      .update({ status: 'recusado', recusado_em: nowIso } as never)
+      .eq('id', orc.id).is('aprovado_em', null).is('recusado_em', null)
+      .select('id').maybeSingle()
+    if (!claimed) return NextResponse.json({ ok: true, status: orc.aprovado_em ? 'aprovado' : 'recusado' }, { headers: CORS })
     return NextResponse.json({ ok: true, status: 'recusado' }, { headers: CORS })
   }
 
   if (b.acao === 'aprovar') {
+    // Claim atômico: marca aprovado ANTES das automações. Só um request concorrente
+    // vence (aprovado_em IS NULL) — evita venda/estoque duplicados por replay/corrida.
+    const { data: claimed } = await svc.from('orcamentos')
+      .update({ status: 'aprovado', aprovado_em: nowIso } as never)
+      .eq('id', orc.id).is('aprovado_em', null).is('recusado_em', null)
+      .select('id').maybeSingle()
+    if (!claimed) return NextResponse.json({ ok: true, status: orc.recusado_em ? 'recusado' : 'aprovado' }, { headers: CORS })
+
     // Assistência/melhoria aprovada → abre uma OS (reusa garantias_assistencias).
     let osId = orc.os_id
     if (!osId && (orc.tipo === 'assistencia' || orc.tipo === 'melhoria')) {
@@ -92,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       } as never)
     }
 
-    await svc.from('orcamentos').update({ status: 'aprovado', aprovado_em: nowIso, os_id: osId }).eq('id', orc.id)
+    if (osId && osId !== orc.os_id) await svc.from('orcamentos').update({ os_id: osId } as never).eq('id', orc.id)
     return NextResponse.json({ ok: true, status: 'aprovado' }, { headers: CORS })
   }
 

@@ -149,6 +149,10 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
     if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
     setFinalizando(true)
+    // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
+    // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
+    const claimedIds: number[] = []
+    const vendaIds: number[] = []
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
@@ -181,6 +185,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           .select('id')
           .single()
         if (!claimed) throw new Error(`"${c.item.produto_nome}" não está mais disponível`)
+        claimedIds.push(c.item.id)
 
         const valorItemComTaxa = valorItem * taxaMultiplier
 
@@ -209,6 +214,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           .insert(vendaRow as never)
           .select('id').single<{ id: number }>()
         if (error) throw new Error(error.message)
+        vendaIds.push(venda.id)
         if (primeiraVendaId === null) primeiraVendaId = venda.id
         // Entrega pendente: guarda a unidade reservada p/ baixar ao "Entregar" no Histórico.
         if (entregaPendente) await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
@@ -234,6 +240,7 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
           desconto_valor: descAc, status: vendaStatus, observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
+        if (vAc?.id) vendaIds.push(vAc.id)
         if (vAc?.id) await supabase.from('vendas_pagamentos').insert({
           empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: formaPagamento, valor_pago: valorAc,
           bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
@@ -286,6 +293,16 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
       setComanda('')
       router.refresh()
     } catch (e) {
+      // Desfaz a tentativa parcial para o operador poder repetir sem estoque/venda presos.
+      try {
+        if (vendaIds.length) {
+          await supabase.from('vendas_pagamentos').delete().in('venda_id', vendaIds)
+          await supabase.from('vendas').delete().in('id', vendaIds)
+        }
+        if (claimedIds.length) {
+          await supabase.from('inventario_unidades').update({ status: 'disponivel', cliente_id: null } as never).in('id', claimedIds)
+        }
+      } catch { /* rollback best-effort */ }
       notify.bad('Erro ao finalizar', e instanceof Error ? e.message : String(e))
     } finally {
       setFinalizando(false)

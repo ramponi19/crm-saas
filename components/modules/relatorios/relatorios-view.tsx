@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { TrendingUp, Boxes, Users, Download, Search, Receipt, Wallet } from 'lucide-react'
+import { TrendingUp, Users, Download, Search, Receipt, Wallet } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -45,7 +45,7 @@ const CANAL_LABEL: Record<string, string> = {
 
 const TABS = [
   { id: 'vendas',    label: 'Vendas',   Icon: TrendingUp },
-  { id: 'estoque',   label: 'Estoque',  Icon: Boxes      },
+  { id: 'caixa',     label: 'Livro-caixa', Icon: Wallet   },
   { id: 'clientes',  label: 'Clientes', Icon: Users      },
   { id: 'exportar',  label: 'Exportar', Icon: Download   },
 ]
@@ -278,8 +278,8 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           </Card>
         </>)}
 
-        {/* ── ABA ESTOQUE ── */}
-        {aba === 'estoque' && (
+        {/* ── ABA LIVRO-CAIXA ── */}
+        {aba === 'caixa' && (
           <Card
             flush
             title={<>Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</>}

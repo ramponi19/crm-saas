@@ -314,7 +314,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     const [{ data: v }, { data: m }, { data: p }] = await Promise.all([
       supabase.from('vendas').select('vendedor_id, valor_venda, status').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
-      supabase.from('comissoes').select('*').gte('created_at', inicio).lt('created_at', fim).eq('status', 'pago'),
+      supabase.from('comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
     ])
     setVendas(v ?? []); setMetas(m ?? []); setPagas(p ?? [])
   }, [mes])
@@ -323,14 +323,18 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
   async function quitar(uid: string, valorComissao: number, percentual: number) {
     setQuitando(uid)
-    const { data: euMe } = await supabase.from('empresa_usuarios').select('empresa_id').single()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: euMe } = await supabase.from('empresa_usuarios')
+      .select('empresa_id').eq('usuario_id', user?.id ?? '').eq('ativo', true).maybeSingle()
     const empresa_id = euMe?.empresa_id
     if (!empresa_id) { notify.bad('Empresa não encontrada'); setQuitando(null); return }
+    // já quitado neste mês de referência? evita dupla quitação
+    if (pagas.some(p => p.usuario_id === uid)) { notify.warn('Comissão já quitada neste mês'); setQuitando(null); return }
     const { error } = await supabase.from('comissoes').insert({
-      usuario_id: uid, valor_comissao: valorComissao, percentual,
+      usuario_id: uid, valor_comissao: valorComissao, percentual, mes_referencia: mes,
       status: 'pago', data_pagamento: new Date().toISOString().split('T')[0], empresa_id,
     })
-    if (error) { notify.bad('Erro ao quitar'); setQuitando(null); return }
+    if (error) { notify.bad('Erro ao quitar', error.message); setQuitando(null); return }
     notify.ok('Comissão quitada!'); await load(); setQuitando(null)
   }
 

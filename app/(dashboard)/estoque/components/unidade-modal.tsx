@@ -86,7 +86,18 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   async function salvar() {
     if (!form.produto_id) { notify.warn('Selecione um produto'); return }
     setSaving(true)
-    const payload = { ...form, ativo: true, empresa_id: empresaId }
+    // Payload explícito com as colunas reais da tabela — o form pode carregar
+    // chaves derivadas (produto_nome/marca_nome/fornecedor_nome) que quebrariam o insert/update.
+    const num = (v: unknown) => (v === '' || v == null ? null : Number(v))
+    const payload = {
+      empresa_id: empresaId, ativo: true,
+      produto_id: form.produto_id,
+      imei: form.imei, imei2: form.imei2, numero_serie: form.numero_serie, bateria: form.bateria,
+      condicao: form.condicao, cor: form.cor, armazenamento: form.armazenamento,
+      preco_custo: num(form.preco_custo), preco_venda: num(form.preco_venda), custo_reparo: num(form.custo_reparo),
+      fornecedor_id: form.fornecedor_id, observacoes: form.observacoes, status: form.status, tipo: form.tipo, estado: form.estado,
+      placa: form.placa, chassi: form.chassi, renavam: form.renavam, km: num(form.km), ano: num(form.ano),
+    }
 
     if (isNew) {
       const { error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>)
@@ -94,7 +105,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
       notify.ok('Unidade adicionada ao estoque')
     } else {
       const { error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!)
-      if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
       notify.ok('Unidade atualizada')
     }
     router.refresh()

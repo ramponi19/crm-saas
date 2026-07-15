@@ -38,11 +38,12 @@ export default async function MetasPage() {
 
   const metaEmpresa = Number((prefRow?.valor as { meta_vendas_mes?: number } | null)?.meta_vendas_mes ?? 0)
 
-  // Realizado do mês por vendedor + total (ignora canceladas).
+  // Realizado do mês por vendedor + total (só vendas concluídas — mesma regra
+  // do dashboard/equipe; pendente/encomenda/pendente_entrega/devolvido não contam).
   const realizadoPorVend = new Map<string, number>()
   let realizadoTotal = 0
   for (const v of (vendasRaw ?? []) as Array<{ vendedor_id: string | null; valor_venda: number | null; status: string | null }>) {
-    if (v.status === 'cancelada' || v.status === 'encomenda' || v.status === 'pendente_entrega') continue
+    if (v.status !== 'concluida') continue
     const val = Number(v.valor_venda ?? 0)
     realizadoTotal += val
     if (v.vendedor_id) realizadoPorVend.set(v.vendedor_id, (realizadoPorVend.get(v.vendedor_id) ?? 0) + val)

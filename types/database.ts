@@ -1111,6 +1111,7 @@ export type Database = {
           data_pagamento: string | null
           empresa_id: number
           id: number
+          mes_referencia: string | null
           percentual: number | null
           status: string | null
           usuario_id: string | null
@@ -1124,6 +1125,7 @@ export type Database = {
           data_pagamento?: string | null
           empresa_id: number
           id?: never
+          mes_referencia?: string | null
           percentual?: number | null
           status?: string | null
           usuario_id?: string | null
@@ -1137,6 +1139,7 @@ export type Database = {
           data_pagamento?: string | null
           empresa_id?: number
           id?: never
+          mes_referencia?: string | null
           percentual?: number | null
           status?: string | null
           usuario_id?: string | null
