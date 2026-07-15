@@ -84,6 +84,21 @@ export function AssistenteWidget() {
     try { await navigator.clipboard.writeText(texto); setCopiado(i); setTimeout(() => setCopiado(null), 1500) } catch { /* ignore */ }
   }
 
+  async function iniciarDia() {
+    if (loading) return
+    setMsgs((m) => [...m, { role: 'user', text: '☀️ Como iniciar meu dia?' }])
+    setLoading(true)
+    try {
+      const r = await fetch('/api/assistente/meu-dia', { method: 'POST' })
+      const j = await r.json().catch(() => ({}))
+      setMsgs((m) => [...m, { role: 'model', text: r.ok && j.roteiro ? j.roteiro : (j.error ?? 'Não consegui montar o roteiro agora.') }])
+    } catch {
+      setMsgs((m) => [...m, { role: 'model', text: 'Falha de conexão. Tente de novo.' }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function enviar(texto: string) {
     const t = texto.trim()
     if (!t || loading) return
@@ -152,6 +167,9 @@ export function AssistenteWidget() {
             {msgs.length === 0 && (
               <div className="space-y-4">
                 <p className="text-[12.5px] text-ink-2">Olá! 👋 Posso ajudar a <strong className="text-ink">usar o CRM</strong> e a <strong className="text-ink">criar conteúdo</strong> (descrição, post, mensagem).</p>
+                <button onClick={iniciarDia} className="flex w-full items-center justify-center gap-2 rounded-control bg-accent px-3 py-2.5 text-[13px] font-semibold text-white transition-transform hover:scale-[1.01] active:scale-95">
+                  ☀️ Iniciar o dia — meu roteiro
+                </button>
                 <div>
                   <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Dúvidas rápidas</div>
                   <div className="flex flex-col gap-1.5">
