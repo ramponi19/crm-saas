@@ -25,10 +25,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useSmoothScroll } from './hooks/useSmoothScroll'
 import type { PlanData } from './data'
 import Hero from './sections/Hero'
-import Marquee from './sections/Marquee'
 import LeadStory from './sections/LeadStory'
 import Modules from './sections/Modules'
-import Numbers from './sections/Numbers'
 import Segments from './sections/Segments'
 import Testimonial from './sections/Testimonial'
 import Compare from './sections/Compare'
@@ -45,10 +43,8 @@ export default function Landing({ plans }: { plans?: PlanData[] }) {
       <Nav />
       <main>
         <Hero />
-        <Marquee />
         <LeadStory />
         <Modules />
-        <Numbers />
         {/* zona clara — a nav observa este wrapper para trocar de tema */}
         <div data-nav-light>
           <Segments />
@@ -139,7 +135,7 @@ function Nav() {
                 : 'bg-white text-ink hover:shadow-[0_0_28px_-6px_rgba(46,92,230,.8)]')
             }
           >
-            Testar grátis
+            Criar Conta
           </Link>
         </div>
       </div>

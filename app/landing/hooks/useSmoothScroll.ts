@@ -37,6 +37,14 @@ export function useSmoothScroll(enabled = true) {
     gsap.ticker.add(raf)
     gsap.ticker.lagSmoothing(0)
 
+    // Recalcula posições dos ScrollTriggers depois que fontes/imagens assentam.
+    // Sem isso, o pin da LeadStory muda a altura do documento e os reveals abaixo
+    // (ex.: cards de Segmentos) podem ficar presos invisíveis / abrir buracos.
+    const refresh = () => ScrollTrigger.refresh()
+    const ready = document.fonts?.ready ?? Promise.resolve()
+    ready.then(() => requestAnimationFrame(refresh))
+    window.addEventListener('load', refresh)
+
     // Âncoras internas (#planos etc.) rolam com o Lenis
     const onAnchorClick = (e: Event) => {
       const target = (e.target as HTMLElement).closest('a[href^="#"]')
@@ -52,6 +60,7 @@ export function useSmoothScroll(enabled = true) {
 
     return () => {
       document.removeEventListener('click', onAnchorClick)
+      window.removeEventListener('load', refresh)
       gsap.ticker.remove(raf)
       lenis.destroy()
     }

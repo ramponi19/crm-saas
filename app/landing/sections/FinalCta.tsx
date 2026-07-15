@@ -44,9 +44,6 @@ export default function FinalCta() {
             Já tenho conta
           </Link>
         </div>
-        <div data-rise className="mt-6 text-[12.5px] text-[color:var(--lp-faint)]">
-          14 dias grátis · sem cartão de crédito · sem fidelidade
-        </div>
       </div>
 
       {/* ---------- footer ---------- */}
@@ -70,7 +67,7 @@ export default function FinalCta() {
             ]} />
             <FooterCol title="Segmentos" links={SEG_CARDS.map((c) => [`/para/${SEGS[c.key].para}`, c.title] as [string, string])} />
             <FooterCol title="Conta" links={[
-              ['/register', 'Testar grátis'],
+              ['/register', 'Criar minha conta'],
               ['/login', 'Entrar'],
               ['/privacy', 'Privacidade'],
             ]} />

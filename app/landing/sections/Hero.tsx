@@ -11,7 +11,6 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowDown } from 'lucide-react'
 import { gsap } from 'gsap'
 import { SplitText } from 'gsap/SplitText'
 import { useMagnetic } from '../hooks/useMagnetic'
@@ -21,7 +20,6 @@ export default function Hero() {
   const rootRef = useRef<HTMLElement>(null)
   const h1Ref = useRef<HTMLHeadingElement>(null)
   const cta1 = useMagnetic<HTMLAnchorElement>(0.24)
-  const cta2 = useMagnetic<HTMLAnchorElement>(0.2)
 
   useEffect(() => {
     const root = rootRef.current
@@ -98,27 +96,15 @@ export default function Hero() {
           Leads do WhatsApp, vendas com Pix, estoque, agenda e financeiro num sistema só — que fala a língua do seu segmento.
         </p>
 
-        {/* CTAs magnéticos */}
-        <div data-hero className="mt-9 flex flex-wrap items-center justify-center gap-3">
+        {/* CTA */}
+        <div data-hero className="mt-9 flex justify-center">
           <Link
             ref={cta1.ref}
             href="/register"
-            className="inline-flex items-center gap-2 rounded-[11px] bg-white px-7 py-[15px] text-[15px] font-bold text-ink shadow-[0_0_40px_-8px_rgba(46,92,230,.6)] transition-shadow hover:shadow-[0_0_56px_-6px_rgba(46,92,230,.85)]"
+            className="inline-flex items-center gap-2 rounded-[11px] bg-white px-8 py-[15px] text-[15px] font-bold text-ink shadow-[0_0_40px_-8px_rgba(46,92,230,.6)] transition-shadow hover:shadow-[0_0_56px_-6px_rgba(46,92,230,.85)]"
           >
-            Começar grátis por 14 dias
+            Criar minha conta
           </Link>
-          <a
-            ref={cta2.ref}
-            href="#segmentos"
-            className="inline-flex items-center gap-2 rounded-[11px] border border-[color:var(--lp-border)] bg-white/[0.04] px-7 py-[15px] text-[15px] font-semibold text-[color:var(--lp-white)] backdrop-blur-sm transition-colors hover:border-white/25 hover:bg-white/[0.07]"
-          >
-            Ver o produto
-            <ArrowDown size={16} className="opacity-70" />
-          </a>
-        </div>
-
-        <div data-hero className="mt-5 text-[12.5px] text-[color:var(--lp-faint)]">
-          Sem cartão de crédito · migração assistida · <b className="font-semibold text-[color:var(--lp-dim)]">configuração em 10 minutos</b>
         </div>
       </div>
 

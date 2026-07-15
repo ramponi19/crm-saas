@@ -23,7 +23,7 @@ export default function Plans({ plans }: { plans?: PlanData[] }) {
           <h2 className="mt-4 text-[clamp(30px,4vw,44px)] font-extrabold leading-[1.04] tracking-[-0.04em]">
             Preço honesto. Sem pegadinha.
           </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-2">Comece grátis por 14 dias. Cancele quando quiser.</p>
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-2">Escolha o plano do seu momento. Cancele quando quiser.</p>
         </div>
 
         {planList.length === 0 ? (

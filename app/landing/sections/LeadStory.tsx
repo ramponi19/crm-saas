@@ -50,7 +50,7 @@ export default function LeadStory() {
       const tl = gsap.timeline({
         defaults: { ease: 'power3.out', duration: 0.45 },
         scrollTrigger: {
-          trigger: root, start: 'top top', end: '+=2600',
+          trigger: root, start: 'top top', end: '+=1700',
           pin: true, scrub: 0.65, anticipatePin: 1,
         },
       })
