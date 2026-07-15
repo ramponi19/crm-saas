@@ -20,6 +20,7 @@ export async function sendViaOfficial(
         type: 'text',
         text: { body: params.message },
       }),
+      signal: AbortSignal.timeout(12000), // não trava a request se a Graph pendurar
     })
 
     if (!res.ok) {

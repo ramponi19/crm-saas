@@ -17,6 +17,7 @@ export async function sendViaEvolution(
         number: params.to,
         text: params.message,
       }),
+      signal: AbortSignal.timeout(12000), // não trava a request se a Evolution pendurar
     })
 
     if (!res.ok) {

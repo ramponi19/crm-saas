@@ -26,19 +26,22 @@ export async function getActiveProvider(empresaId: number): Promise<WhatsAppProv
 
 export async function sendWhatsApp(params: SendMessageParams & { empresaId: number }): Promise<SendMessageResult> {
   const { empresaId } = params
-  const provider = params.provider ?? (await getActiveProvider(empresaId))
+  // Busca as duas configs de uma vez (antes eram até 3 selects por envio).
+  const [official, evolution] = await Promise.all([
+    getConfig<OfficialConfig>('whatsapp_official', empresaId),
+    getConfig<EvolutionConfig>('whatsapp_evolution', empresaId),
+  ])
+  const provider = params.provider ?? (official?.ativo ? 'official' : evolution?.ativo ? 'evolution' : null)
 
   if (!provider) {
     return { success: false, error: 'Nenhum provedor de WhatsApp ativo', provider: 'evolution' }
   }
 
   if (provider === 'official') {
-    const config = await getConfig<OfficialConfig>('whatsapp_official', empresaId)
-    if (!config) return { success: false, error: 'Configuração da API Oficial não encontrada', provider: 'official' }
-    return sendViaOfficial(config, params)
+    if (!official) return { success: false, error: 'Configuração da API Oficial não encontrada', provider: 'official' }
+    return sendViaOfficial(official, params)
   }
 
-  const config = await getConfig<EvolutionConfig>('whatsapp_evolution', empresaId)
-  if (!config) return { success: false, error: 'Configuração do Evolution não encontrada', provider: 'evolution' }
-  return sendViaEvolution(config, params)
+  if (!evolution) return { success: false, error: 'Configuração do Evolution não encontrada', provider: 'evolution' }
+  return sendViaEvolution(evolution, params)
 }
