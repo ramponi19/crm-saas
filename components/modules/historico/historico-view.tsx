@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Receipt, Check, ArrowLeftRight } from 'lucide-react'
+import { Download, Receipt, Check, ArrowLeftRight, FileText } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { imprimirContratoVenda, type ContratoLoja } from '@/lib/contrato-venda'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
@@ -19,9 +20,12 @@ interface Venda {
   lucro: number | null
   status: string | null
   parcelas: number | null
+  cliente_id: number | null
+  numero_serie: string | null
+  desconto_valor: number | null
 }
 
-interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[] }
+interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; loja: ContratoLoja }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
@@ -61,13 +65,44 @@ function exportCSV(rows: Venda[]) {
   a.click()
 }
 
-export function HistoricoView({ vendas, isAdmin = false, vendedores = [] }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja }: Props) {
   const [filtro, setFiltro] = useState('all')
   const [finalizando, setFinalizando] = useState<number | null>(null)
   const [transf, setTransf] = useState<Venda | null>(null)
   const [novoVend, setNovoVend] = useState('')
   const [transfBusy, setTransfBusy] = useState(false)
+  const [contratoBusy, setContratoBusy] = useState<number | null>(null)
   const router = useRouter()
+
+  async function gerarContrato(v: Venda) {
+    setContratoBusy(v.id)
+    let comprador = {
+      nome: v.cliente_nome ?? '', cpf_cnpj: null as string | null, nacionalidade: null as string | null,
+      estado_civil: null as string | null, profissao: null as string | null, data_nascimento: null as string | null,
+      telefone: null as string | null, endereco: null as string | null, numero: null as string | null,
+      complemento: null as string | null, bairro: null as string | null, cidade: null as string | null,
+      estado: null as string | null, cep: null as string | null,
+    }
+    if (v.cliente_id) {
+      const { data: c } = await createClient().from('clientes')
+        .select('nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, endereco, numero, complemento, bairro, cidade, estado, cep')
+        .eq('id', v.cliente_id).maybeSingle()
+      if (c) comprador = { ...comprador, ...(c as typeof comprador) }
+    }
+    setContratoBusy(null)
+    const ok = imprimirContratoVenda({
+      loja,
+      comprador,
+      itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda }],
+      total: v.valor_venda,
+      desconto: v.desconto_valor ?? 0,
+      forma_pagamento: v.forma_pagamento,
+      parcelas: v.parcelas,
+      vendedor: v.vendedor_nome,
+      data: v.data_venda ?? undefined,
+    })
+    if (!ok) notify.warn('Permita pop-ups para gerar o contrato')
+  }
 
   async function transferir() {
     if (!transf || !novoVend) return
@@ -140,13 +175,16 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [] }: Prop
       key: 'status', header: 'Status', align: 'right',
       render: (v) => {
         const s = STATUS[v.status ?? ''] ?? STATUS.pendente
+        const contrato = v.status !== 'cancelada' && v.status !== 'devolvido' && (
+          <button onClick={(e) => { e.stopPropagation(); gerarContrato(v) }} disabled={contratoBusy === v.id} title="Gerar contrato de venda" className="text-ink-3 hover:text-accent disabled:opacity-40"><FileText size={14} strokeWidth={1.8} /></button>
+        )
         if (v.status === 'encomenda' || v.status === 'pendente_entrega') return (
           <div className="flex items-center justify-end gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
             <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); finalizarEncomenda(v.id) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
           </div>
         )
-        return <Badge tone={s.tone}>{s.label}</Badge>
+        return <div className="flex items-center justify-end gap-2">{contrato}<Badge tone={s.tone}>{s.label}</Badge></div>
       },
     },
   ]

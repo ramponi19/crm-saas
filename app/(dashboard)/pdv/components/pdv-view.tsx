@@ -3,13 +3,14 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   ScanBarcode, Plus, Minus, ChevronDown, UserPlus, CheckCircle2, QrCode, Copy, Check, Send,
-  Package, Banknote, Zap, CreditCard, Link2,
+  Package, Banknote, Zap, CreditCard, Link2, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
+import { imprimirContratoVenda } from '@/lib/contrato-venda'
 
 interface ItemEstoque {
   id: number; produto_id: number; produto_nome: string; marca_nome: string
@@ -64,6 +65,14 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
   const [pixCobranca, setPixCobranca] = useState<CobrancaPix | null>(null)
   const [pixCopiado, setPixCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
+  // Snapshot da última venda p/ gerar o contrato (o carrinho é limpo ao finalizar).
+  const [ultimaVenda, setUltimaVenda] = useState<{
+    itens: { descricao: string; imei: string | null; valor: number }[]
+    total: number; desconto: number; forma_pagamento: string; parcelas: number
+    clienteId: number | null; empresaId: number
+  } | null>(null)
+  const [sucessoOpen, setSucessoOpen] = useState(false)
+  const [contratoBusy, setContratoBusy] = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -259,6 +268,17 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         } catch { /* não bloqueia a venda */ }
       }
 
+      // Snapshot p/ contrato (antes de limpar o carrinho).
+      setUltimaVenda({
+        itens: [
+          ...carrinho.map((c) => ({ descricao: c.item.produto_nome, imei: c.item.imei ?? c.item.numero_serie, valor: c.item.preco_venda ?? 0 })),
+          ...acessorios.filter((a) => a.descricao.trim() && a.valor > 0).map((a) => ({ descricao: `Acessório: ${a.descricao.trim()}`, imei: null, valor: a.valor })),
+        ],
+        total: totais.total, desconto: abatimento, forma_pagamento: formaPagamento, parcelas,
+        clienteId: clienteSelecionado?.id ?? null, empresaId,
+      })
+      if (formaPagamento !== 'pix') setSucessoOpen(true)
+
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
       setCarrinho([]); setDesconto(''); setParcelas(1)
       setAcessorios([]); setTrocaAtiva(false); setTrocaAparelho(''); setTrocaImei(''); setTrocaValor(''); setEntregaPendente(false)
@@ -296,13 +316,43 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     finally { setEnviandoWpp(false) }
   }
 
+  async function gerarContrato() {
+    if (!ultimaVenda) return
+    setContratoBusy(true)
+    const supabase = createClient()
+    const [{ data: emp }, cliRes] = await Promise.all([
+      supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', ultimaVenda.empresaId).maybeSingle(),
+      ultimaVenda.clienteId
+        ? supabase.from('clientes').select('nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, endereco, numero, complemento, bairro, cidade, estado, cep').eq('id', ultimaVenda.clienteId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
+    setContratoBusy(false)
+    const e = emp as { nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null } | null
+    const c = cliRes.data as Record<string, string | null> | null
+    const ok = imprimirContratoVenda({
+      loja: { nome: e?.nome ?? 'Loja', cnpj: e?.cnpj ?? null, telefone: e?.telefone ?? null, logoUrl: e?.wl_logo_url ?? null },
+      comprador: {
+        nome: c?.nome ?? '', cpf_cnpj: c?.cpf_cnpj ?? null, nacionalidade: c?.nacionalidade ?? null,
+        estado_civil: c?.estado_civil ?? null, profissao: c?.profissao ?? null, data_nascimento: c?.data_nascimento ?? null,
+        telefone: c?.telefone ?? null, endereco: c?.endereco ?? null, numero: c?.numero ?? null, complemento: c?.complemento ?? null,
+        bairro: c?.bairro ?? null, cidade: c?.cidade ?? null, estado: c?.estado ?? null, cep: c?.cep ?? null,
+      },
+      itens: ultimaVenda.itens,
+      total: ultimaVenda.total,
+      desconto: ultimaVenda.desconto,
+      forma_pagamento: ultimaVenda.forma_pagamento,
+      parcelas: ultimaVenda.parcelas,
+    })
+    if (!ok) notify.warn('Permita pop-ups para gerar o contrato')
+  }
+
   const isCartaoOuLink = formaPagamento === 'credito' || formaPagamento === 'link'
 
   return (
     <>
       <Modal
         open={!!pixCobranca}
-        onClose={() => { setPixCobranca(null); setClienteSelecionado(null) }}
+        onClose={() => { setPixCobranca(null); setClienteSelecionado(null); setUltimaVenda(null) }}
         size="sm"
         title={<span className="flex items-center gap-2"><QrCode size={17} strokeWidth={1.7} className="text-ok" /> Pix gerado</span>}
       >
@@ -330,6 +380,32 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
               Enviar via WhatsApp para {clienteSelecionado.nome}
             </Button>
           )}
+          {ultimaVenda && (
+            <Button variant="outline" className="w-full" loading={contratoBusy} onClick={gerarContrato} icon={<FileText size={14} strokeWidth={1.7} />}>
+              Imprimir contrato
+            </Button>
+          )}
+        </div>
+      </Modal>
+
+      {/* Sucesso da venda (não-Pix) — oferece o contrato na hora */}
+      <Modal
+        open={sucessoOpen}
+        onClose={() => { setSucessoOpen(false); setUltimaVenda(null); setClienteSelecionado(null) }}
+        size="sm"
+        title={<span className="flex items-center gap-2"><CheckCircle2 size={17} strokeWidth={1.7} className="text-ok" /> Venda registrada</span>}
+      >
+        <div className="space-y-4">
+          <div className="rounded-card border border-ok/20 bg-ok-soft p-4 text-center">
+            <p className="text-[11px] text-ink-3">Total da venda</p>
+            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimaVenda?.total ?? 0)}</p>
+          </div>
+          <Button className="w-full" loading={contratoBusy} onClick={gerarContrato} icon={<FileText size={15} strokeWidth={1.7} />}>
+            Imprimir contrato
+          </Button>
+          <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setUltimaVenda(null); setClienteSelecionado(null) }}>
+            Nova venda
+          </Button>
         </div>
       </Modal>
 

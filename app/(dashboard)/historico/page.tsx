@@ -20,22 +20,26 @@ export default async function HistoricoPage() {
   type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
   const vendedores = ((membrosRaw ?? []) as unknown as MembroRow[]).map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))
 
-  const { data: vendasRaw } = await supabase
-    .from('vendas')
-    .select(`
-      id, data_venda, valor_venda, lucro, forma_pagamento,
-      canal_venda, status, parcelas,
-      clientes!cliente_id(nome),
-      produtos!produto_id(nome),
-      usuarios!vendedor_id(nome)
-    `)
-    .eq('empresa_id', empresaId)
-    .order('data_venda', { ascending: false })
-    .limit(500)
+  const [{ data: vendasRaw }, { data: empresa }] = await Promise.all([
+    supabase
+      .from('vendas')
+      .select(`
+        id, data_venda, valor_venda, lucro, forma_pagamento,
+        canal_venda, status, parcelas, cliente_id, numero_serie, desconto_valor, observacoes,
+        clientes!cliente_id(nome),
+        produtos!produto_id(nome),
+        usuarios!vendedor_id(nome)
+      `)
+      .eq('empresa_id', empresaId)
+      .order('data_venda', { ascending: false })
+      .limit(500),
+    supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', empresaId).maybeSingle(),
+  ])
 
   type VendaRow = {
     id: number; data_venda: string | null; valor_venda: number; lucro: number | null
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
+    cliente_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
@@ -49,15 +53,25 @@ export default async function HistoricoPage() {
     canal_venda:   v.canal_venda,
     status:        v.status,
     parcelas:      v.parcelas,
+    cliente_id:    v.cliente_id,
+    numero_serie:  v.numero_serie,
+    desconto_valor: v.desconto_valor != null ? Number(v.desconto_valor) : null,
     cliente_nome:  one(v.clientes)?.nome  ?? null,
     produto_nome:  one(v.produtos)?.nome  ?? null,
     vendedor_nome: one(v.usuarios)?.nome  ?? null,
   }))
 
+  const loja = {
+    nome: (empresa as { nome?: string } | null)?.nome ?? 'Loja',
+    cnpj: (empresa as { cnpj?: string | null } | null)?.cnpj ?? null,
+    telefone: (empresa as { telefone?: string | null } | null)?.telefone ?? null,
+    logoUrl: (empresa as { wl_logo_url?: string | null } | null)?.wl_logo_url ?? null,
+  }
+
   return (
     <>
       <Topbar eyebrow="VENDAS · HISTÓRICO" title="Histórico de vendas" />
-      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} />
+      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} loja={loja} />
     </>
   )
 }
