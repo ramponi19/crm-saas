@@ -77,11 +77,11 @@ export function KdsView({ empresaId, inicial }: { empresaId: number; inicial: Pe
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Cozinha (KDS)" />
-      <div className="flex flex-1 gap-3 overflow-hidden p-4">
+      <div className="flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden p-4 scrollbar-none lg:snap-none lg:overflow-hidden">
         {COLS.map((col) => {
           const cards = pedidos.filter((p) => p.status === col.id)
           return (
-            <div key={col.id} className="flex min-w-0 flex-1 flex-col">
+            <div key={col.id} className="flex w-[80vw] min-w-[240px] flex-none snap-start flex-col lg:w-auto lg:min-w-0 lg:flex-1">
               <div className="mb-2 flex items-center justify-between px-1">
                 <span className="text-[13px] font-semibold text-ink">{col.label}</span>
                 <span className="num rounded-full bg-ink/[0.06] px-2 py-0.5 text-[11px] text-ink-2">{cards.length}</span>

@@ -86,13 +86,13 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
         <Card flush>
           {etapas.map((e, i) => (
             <div key={e.id ?? `novo-${i}`} className={cn('border-b border-line-soft px-4 py-3 last:border-0', !e.ativo && 'opacity-55')}>
-             <div className="flex items-center gap-3">
+             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-col">
                 <button onClick={() => move(i, -1)} disabled={i === 0} className="text-ink-3 hover:text-ink disabled:opacity-30"><ChevronUp size={15} strokeWidth={1.7} /></button>
                 <button onClick={() => move(i, 1)} disabled={i === etapas.length - 1} className="text-ink-3 hover:text-ink disabled:opacity-30"><ChevronDown size={15} strokeWidth={1.7} /></button>
               </div>
               <input type="color" value={e.cor} onChange={(ev) => set(i, { cor: ev.target.value })} className="h-8 w-8 flex-none cursor-pointer rounded-control border border-line bg-transparent p-0.5" aria-label="Cor" />
-              <Input wrapperClassName="flex-1" value={e.label} onChange={(ev) => set(i, { label: ev.target.value })} />
+              <Input wrapperClassName="min-w-[140px] flex-1" value={e.label} onChange={(ev) => set(i, { label: ev.target.value })} />
               <Select wrapperClassName="w-[140px]" value={e.tipo} onChange={(ev) => set(i, { tipo: ev.target.value })}>
                 {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
               </Select>

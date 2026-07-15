@@ -190,7 +190,7 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
                     {m.conteudo}
                     <div className={`mt-1 flex items-center gap-2 text-[9.5px] ${meu ? 'text-white/55' : 'text-ink-3'}`}>
                       <span className="num">{hora(m.created_at)}</span>
-                      {meu && <button onClick={() => apagar(m.id, aba)} className="opacity-0 transition-opacity group-hover:opacity-100" aria-label="Apagar"><Trash2 size={11} strokeWidth={1.8} /></button>}
+                      {meu && <button onClick={() => apagar(m.id, aba)} className="-m-1 p-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100" aria-label="Apagar"><Trash2 size={13} strokeWidth={1.8} /></button>}
                     </div>
                   </div>
                 </div>

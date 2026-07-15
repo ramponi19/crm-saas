@@ -70,6 +70,9 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(22,32,46,0.15) transparent;
   }
+  /* Scroll horizontal sem barra visível — usado em trilhas de abas no mobile. */
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
   .scrollbar-thin::-webkit-scrollbar { width: 8px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb {

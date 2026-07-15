@@ -169,7 +169,7 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
           </div>
         )}
 
-        <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-2 gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input wrapperClassName="col-span-2" label="Nome completo" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome completo" />
           <Input label="Telefone / WhatsApp" value={form.telefone ?? ''} onChange={(e) => set('telefone', e.target.value)} placeholder="(11) 99999-9999" />
           <Input label="E-mail" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} placeholder="email@exemplo.com" />

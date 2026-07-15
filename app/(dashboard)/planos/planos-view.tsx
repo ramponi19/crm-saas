@@ -83,7 +83,7 @@ export default function PlanosView({ empresa, planos }: Props) {
     }
   }
 
-  const gridCols = planos.length === 2 ? 'grid-cols-2' : planos.length >= 3 ? 'grid-cols-3' : 'grid-cols-1'
+  const gridCols = planos.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : planos.length >= 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'
 
   return (
     <div className="flex h-full flex-col bg-bg">
@@ -217,7 +217,7 @@ export default function PlanosView({ empresa, planos }: Props) {
           </Card>
         )}
 
-        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-4">
+        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
           {[
             { q: 'Preciso de cartão para o trial?', r: 'Sim, mas o cartão só é cobrado após os 14 dias.' },
             { q: 'Posso cancelar a qualquer momento?', r: 'Sim. Pelo portal do cliente você cancela em segundos.' },

@@ -102,11 +102,11 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-[88px] right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
       {toasts.map(t => (
         <div
           key={t.id}
-          className="pointer-events-auto flex w-[320px] items-start gap-3 rounded-card border border-line bg-card p-4 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]"
+          className="pointer-events-auto flex w-[320px] max-w-[calc(100vw-2.5rem)] items-start gap-3 rounded-card border border-line bg-card p-4 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]"
           style={{ animation: 'slideInRight 0.22s ease' }}
         >
           <div className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-control bg-accent-soft">

@@ -365,7 +365,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
           <FollowupsCard />
 
           {/* Gráfico + Donut */}
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.85fr) minmax(0,1fr)' }}>
+          <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.85fr)_minmax(0,1fr)]">
             <Card title="Tendência de faturamento" actions={<span className="num text-[11px] text-ink-3">12 meses</span>}>
               <AreaChart data={faturamentoMensal} />
             </Card>
@@ -382,7 +382,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
           </div>
 
           {/* Vendas recentes + Top vendedores */}
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)' }}>
+          <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.7fr)_minmax(0,1fr)]">
             <Card title="Vendas recentes" flush>
               {vendasRecentes.length === 0 ? (
                 <div className="px-4 py-8 text-center text-[13px] text-ink-3">Nenhuma venda ainda.</div>
