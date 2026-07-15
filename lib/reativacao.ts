@@ -28,8 +28,9 @@ export async function reativarFrios(svc: Db, empresaId: number): Promise<{ reati
   const primeiro = passos?.[0] as { ordem: number; dia_offset: number } | undefined
   if (!primeiro) return { reativados: 0 }
 
-  const { data: etapasPerd } = await svc.from('funil_etapas').select('slug').eq('empresa_id', empresaId).eq('tipo', 'perdido')
-  const perdidoSlugs = new Set((etapasPerd ?? []).map((e) => e.slug))
+  const { data: etapasEsp } = await svc.from('funil_etapas').select('slug, tipo').eq('empresa_id', empresaId).in('tipo', ['perdido', 'ganho'])
+  const perdidoSlugs = new Set((etapasEsp ?? []).filter((e) => e.tipo === 'perdido').map((e) => e.slug))
+  const ganhoSlugs = new Set((etapasEsp ?? []).filter((e) => e.tipo === 'ganho').map((e) => e.slug))
 
   const { data: leads } = await svc.from('leads')
     .select('id, responsavel_id, kanban_status, ultima_tratativa, ultima_mensagem_at, created_at, perdido_em, ativo')
@@ -37,9 +38,10 @@ export async function reativarFrios(svc: Db, empresaId: number): Promise<{ reati
 
   const candidatos = new Map<number, string | null>()
   for (const l of (leads ?? []) as Array<{ id: number; responsavel_id: string | null; kanban_status: string | null; ultima_tratativa: string | null; ultima_mensagem_at: string | null; created_at: string | null; perdido_em: string | null; ativo: boolean | null }>) {
+    if (l.ativo === false) continue // lead excluído nunca reativa
+    if (ganhoSlugs.has(l.kanban_status ?? '')) continue // já ganho/convertido — não reprospecção
     const perdido = l.perdido_em != null || perdidoSlugs.has(l.kanban_status ?? '')
     if (perdido) { if (cfg.incluir_perdidos) candidatos.set(l.id, l.responsavel_id); continue }
-    if (l.ativo === false) continue
     const ultAtiv = l.ultima_tratativa ?? l.ultima_mensagem_at ?? l.created_at
     if (!ultAtiv || ultAtiv < corte) candidatos.set(l.id, l.responsavel_id) // frio (ou sem atividade)
   }

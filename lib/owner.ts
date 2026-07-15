@@ -45,7 +45,8 @@ async function resolveEmpresaERole(
     .select('empresa_id, role')
     .eq('usuario_id', userId)
     .eq('ativo', true)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (!vinculo) return { empresaId: null, role: 'member', isSuper }
   return {

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { getStripe, getPlanos, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
-    const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+    const auth = await requireOwnerOrAdminApi()
+    if (auth.error) return auth.error
+    const { empresaId, supabase } = auth
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
     const { planoId } = await req.json() as { planoId: PlanoId }
     const planos = await getPlanos()
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const customerId = await getOrCreateCustomer(empresaId, empresaData.nome, user.email!)
+    const customerId = await getOrCreateCustomer(empresaId, empresaData.nome, user?.email ?? '')
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
     const stripe = getStripe()
 

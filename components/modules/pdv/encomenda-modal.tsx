@@ -62,6 +62,9 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       observacoes: obs.trim() || null,
     } as never).select('id').single()
 
+    // Sem pedido de compra não há como "Receber" depois → não cria venda órfã.
+    if (e1 || !pedido) { setSalvando(false); notify.bad('Erro ao criar o pedido de compra'); return }
+
     const { error: e2 } = await supabase.from('vendas').insert({
       empresa_id: empresa.id,
       valor_venda: Number(valorVenda) || 0,
@@ -76,7 +79,11 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     } as never)
 
     setSalvando(false)
-    if (e1 || e2) { notify.bad('Erro ao lançar encomenda'); return }
+    if (e2) {
+      // Venda falhou: remove o pedido recém-criado para não deixar pedido sem venda.
+      await supabase.from('pedidos_compra').delete().eq('id', (pedido as { id: number }).id)
+      notify.bad('Erro ao lançar encomenda'); return
+    }
     notify.ok('Encomenda lançada', 'Pedido de compra criado + venda pendente registrada')
     onClose(); router.refresh()
   }

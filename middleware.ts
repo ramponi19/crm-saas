@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute = request.nextUrl.pathname === '/' ||
                         request.nextUrl.pathname.startsWith('/privacy') ||
+                        request.nextUrl.pathname.startsWith('/para/') ||
                         request.nextUrl.pathname.startsWith('/entrar') ||
                         request.nextUrl.pathname.startsWith('/register') ||
                         request.nextUrl.pathname.startsWith('/reset-senha') ||
@@ -62,7 +63,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && isAuthRoute) {
+  // Logado em /login → roteador. /register fica acessível para logado (usuário
+  // sem empresa precisa criar uma — senão vira loop /entrar ↔ /register).
+  if (user && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/entrar', request.url))
   }
 

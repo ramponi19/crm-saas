@@ -43,6 +43,7 @@ export async function calcularConversao(db: Db, empresaId: number): Promise<Conv
 
   const countPorSlug = new Map<string, number>()
   for (const l of (leadsAll ?? []) as { kanban_status: string | null; ativo: boolean | null }[]) {
+    if (l.ativo === false) continue // não conta leads excluídos (alinha com o dashboard)
     const s = l.kanban_status ?? ''
     countPorSlug.set(s, (countPorSlug.get(s) ?? 0) + 1)
   }

@@ -25,7 +25,8 @@ export default async function EntrarPage() {
     .select('empresa_id, role')
     .eq('usuario_id', user.id)
     .eq('ativo', true)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (!vinculo) redirect('/register')
 

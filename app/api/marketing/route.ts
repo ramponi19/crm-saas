@@ -15,12 +15,12 @@ export async function POST(req: Request) {
   if (!item) return NextResponse.json({ error: 'Descreva o que divulgar' }, { status: 400 })
   const canais = (Array.isArray(b.canais) ? b.canais : []).filter((c) => CANAIS.includes(c))
 
-  const { error } = await supabase.from('solicitacoes_marketing').insert({
+  const { data, error } = await supabase.from('solicitacoes_marketing').insert({
     empresa_id: empresaId, item, objetivo: b.objetivo?.trim() || null, canais: canais as never,
     status: 'solicitado', solicitante_id: user.id,
-  })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  }).select('id, item, objetivo, canais, status, solicitante_id, created_at').single()
+  if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
+  return NextResponse.json({ ok: true, solicitacao: data })
 }
 
 // Move de status (kanban).

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 
 // Promover (por email) ou revogar (por id) super admins.
@@ -30,11 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Este usuário já é super admin.' }, { status: 400 })
   }
 
-  const serviceClient = createServiceClient()
-  const { error } = await serviceClient
-    .from('usuarios')
-    .update({ is_super_admin: true })
-    .eq('id', alvo.id)
+  const { error } = await supabase.rpc('set_super_admin', { p_target: alvo.id, p_value: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -77,11 +72,7 @@ export async function DELETE(req: NextRequest) {
     .eq('id', id)
     .single()
 
-  const serviceClient = createServiceClient()
-  const { error } = await serviceClient
-    .from('usuarios')
-    .update({ is_super_admin: false })
-    .eq('id', id)
+  const { error } = await supabase.rpc('set_super_admin', { p_target: id, p_value: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

@@ -203,9 +203,11 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
 
   async function salvarMeta(uid: string) {
     setSaving(uid)
-    await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', uid).single()
-    // fallback: get empresa_id from any empresa_usuario of current session
-    const { data: euMe } = await supabase.from('empresa_usuarios').select('empresa_id').single()
+    // empresa_id da SESSÃO (não do alvo) — filtra pelo usuário logado p/ não quebrar
+    // com 2+ vínculos e não pegar a empresa errada.
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: euMe } = await supabase.from('empresa_usuarios')
+      .select('empresa_id').eq('usuario_id', user?.id ?? '').eq('ativo', true).maybeSingle()
     const empresa_id = euMe?.empresa_id
     if (!empresa_id) { notify.bad('Empresa não encontrada'); setSaving(null); return }
 

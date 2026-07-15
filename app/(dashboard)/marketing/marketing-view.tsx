@@ -102,12 +102,12 @@ export function MarketingView({ itensIniciais, meuId }: { itensIniciais: Solicit
         </div>
       </div>
 
-      {novo && <NovaSolicitacao onClose={() => setNovo(false)} onCreate={(s) => { setItens((prev) => [s, ...prev]); setNovo(false) }} meuId={meuId} />}
+      {novo && <NovaSolicitacao onClose={() => setNovo(false)} onCreate={(s) => { setItens((prev) => [s, ...prev]); setNovo(false) }} />}
     </div>
   )
 }
 
-function NovaSolicitacao({ onClose, onCreate, meuId }: { onClose: () => void; onCreate: (s: Solicitacao) => void; meuId: string }) {
+function NovaSolicitacao({ onClose, onCreate }: { onClose: () => void; onCreate: (s: Solicitacao) => void }) {
   const [item, setItem] = useState('')
   const [objetivo, setObjetivo] = useState('')
   const [canais, setCanais] = useState<string[]>([])
@@ -120,9 +120,10 @@ function NovaSolicitacao({ onClose, onCreate, meuId }: { onClose: () => void; on
     setSalvando(true)
     const r = await fetch('/api/marketing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item, objetivo, canais }) })
     setSalvando(false)
-    if (!r.ok) { const j = await r.json().catch(() => ({})); notify.bad('Erro ao solicitar', j.error); return }
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j.solicitacao) { notify.bad('Erro ao solicitar', j.error); return }
     notify.ok('Solicitação criada')
-    onCreate({ id: Date.now(), item: item.trim(), objetivo: objetivo.trim() || null, canais, status: 'solicitado', solicitante_id: meuId, created_at: new Date().toISOString() })
+    onCreate(j.solicitacao as Solicitacao)
   }
 
   return (

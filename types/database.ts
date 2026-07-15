@@ -3252,6 +3252,11 @@ export type Database = {
         Args: { p_empresa_id: number | null; p_ttl_seconds?: number }
         Returns: undefined
       }
+      set_super_admin: {
+        Args: { p_target: string; p_value: boolean }
+        Returns: undefined
+      }
+      is_empresa_admin: { Args: { emp: number }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

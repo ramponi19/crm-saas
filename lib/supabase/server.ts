@@ -61,7 +61,8 @@ export async function getEmpresaId(): Promise<number> {
     .select('empresa_id')
     .eq('usuario_id', user.id)
     .eq('ativo', true)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (!vinculo) redirect('/login')
   return vinculo.empresa_id

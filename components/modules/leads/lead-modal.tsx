@@ -65,7 +65,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   useLockScroll(true)
   useEscape(true, onClose)
 
-  const responsavelInicial = usuarios.find((u) => u.id === lead.responsavel_id)?.nome ?? ''
+  const responsavelInicial = lead.responsavel_id ?? '' // guarda o ID (não o nome)
   const canalNome = CANAL_NOME[lead.origem ?? 'manual'] ?? 'Loja'
 
   const [form, setForm] = useState({
@@ -179,22 +179,40 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   }
 
   async function handleSave() {
-    setSaving(true)
     const statusKey = form.status || lead.kanban_status || 'novo'
-    const respId = usuarios.find((u) => u.nome === form.responsavel)?.id ?? lead.responsavel_id
+    const respId = form.responsavel || null // Select agora guarda o ID; '' = sem responsável
+    const mudouEtapa = statusKey !== (lead.kanban_status ?? 'novo')
+    const alvo = columns.find((c) => c.id === statusKey)
 
+    // Marcar como "Perdido" exige motivo → só pelo quadro (kanban), não pelo modal.
+    if (mudouEtapa && alvo?.tipo === 'perdido') {
+      notify.warn('Para marcar como Perdido, arraste o lead no quadro (é preciso informar o motivo da perda).')
+      return
+    }
+
+    setSaving(true)
+    // Campos editáveis (sem a etapa — a etapa vai pelo endpoint que dispara as automações).
     const { error } = await supabase.from('leads').update({
       nome: form.nome.trim() || null,
       telefone: form.tel.trim() || null,
       instagram: form.ig.trim() || null,
       produto_interessado: form.produto.trim() || null,
-      kanban_status: statusKey,
       responsavel_id: respId,
       observacoes: form.obs.trim() || null,
     }).eq('id', lead.id)
+    if (error) { setSaving(false); notify.bad('Erro ao salvar'); return }
+
+    // Mudança de etapa → /api/leads/mover (motivo de perda já barrado acima;
+    // aqui dispara automações, cadência por etapa e orçamento de negociação).
+    if (mudouEtapa) {
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, kanban_status: statusKey }),
+      })
+      if (!r.ok) { setSaving(false); notify.bad('Erro ao mover de etapa'); return }
+    }
 
     setSaving(false)
-    if (error) { notify.bad('Erro ao salvar'); return }
     notify.ok('Lead atualizado')
     onUpdate({
       ...lead, nome: form.nome, telefone: form.tel, instagram: form.ig,
@@ -291,7 +309,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             </Select>
             <Select label="Responsável" value={form.responsavel} onChange={(e) => set('responsavel', e.target.value)}>
               <option value="">Sem responsável</option>
-              {usuarios.map((u) => <option key={u.id} value={u.nome}>{u.nome}</option>)}
+              {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </Select>
             <Textarea label="Observações" rows={3} value={form.obs} onChange={(e) => set('obs', e.target.value)} placeholder="Contexto, anotações…" />
 
@@ -300,7 +318,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               leadId={lead.id}
               usuarios={usuarios}
               responsavelInicial={lead.responsavel_id}
-              onChange={(id) => { setForm((f) => ({ ...f, responsavel: usuarios.find((u) => u.id === id)?.nome ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
+              onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
             />
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             {segmento === 'concessionaria' && <LeadInteressePanel leadId={lead.id} />}
