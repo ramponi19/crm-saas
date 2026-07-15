@@ -71,7 +71,10 @@ const EMPTY_FORM = {
   observacoes: '',
 }
 
-const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
+const fmtBRL = (v: number | null) => v != null ? formatCurrency(v) : '—'
+// "A pagar/receber" = ainda em aberto (pendente ou atrasado); nunca conta cancelado.
+const emAberto = (s: string | null) => s === 'pendente' || s === 'atrasado'
+const naoCancelado = (s: string | null) => s !== 'cancelado'
 
 export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId }: Props) {
   const supabase = createClient()
@@ -86,29 +89,29 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
   const [erro, setErro] = useState<string | null>(null)
 
   const stats = useMemo(() => {
-    const receitas = lancamentos.filter(l => l.tipo === 'receita')
-    const despesas = lancamentos.filter(l => l.tipo === 'despesa')
-    const aReceber = receitas.filter(l => l.status === 'pendente').reduce((s, l) => s + (l.valor ?? 0), 0)
-    const aPagar   = despesas.filter(l => l.status === 'pendente').reduce((s, l) => s + (l.valor ?? 0), 0)
+    const receitas = lancamentos.filter(l => l.tipo === 'receita' && naoCancelado(l.status))
+    const despesas = lancamentos.filter(l => l.tipo === 'despesa' && naoCancelado(l.status))
+    const aReceber = receitas.filter(l => emAberto(l.status)).reduce((s, l) => s + (l.valor ?? 0), 0)
+    const aPagar   = despesas.filter(l => emAberto(l.status)).reduce((s, l) => s + (l.valor ?? 0), 0)
     const totalDespesas = despesas.reduce((s, l) => s + (l.valor ?? 0), 0)
     const resultado = receitas.reduce((s, l) => s + (l.valor ?? 0), 0) - totalDespesas
     return { aReceber, aPagar, despesas: totalDespesas, resultado }
   }, [lancamentos])
 
-  const listaReceber = lancamentos.filter(l => l.tipo === 'receita' && l.status === 'pendente')
-  const listaPagar   = lancamentos.filter(l => l.tipo === 'despesa' && l.status === 'pendente')
+  const listaReceber = lancamentos.filter(l => l.tipo === 'receita' && emAberto(l.status))
+  const listaPagar   = lancamentos.filter(l => l.tipo === 'despesa' && emAberto(l.status))
   const todos        = lancamentos
 
   // DRE — Demonstração do Resultado: receita bruta, despesas agrupadas por
   // categoria e resultado líquido com margem.
   const dre = useMemo(() => {
     const receitaBruta = lancamentos
-      .filter(l => l.tipo === 'receita')
+      .filter(l => l.tipo === 'receita' && naoCancelado(l.status))
       .reduce((s, l) => s + (l.valor ?? 0), 0)
 
     const porCategoria = new Map<string, number>()
     for (const l of lancamentos) {
-      if (l.tipo !== 'despesa') continue
+      if (l.tipo !== 'despesa' || !naoCancelado(l.status)) continue
       const cat = l.categoria?.trim() || 'Sem categoria'
       porCategoria.set(cat, (porCategoria.get(cat) ?? 0) + (l.valor ?? 0))
     }
@@ -281,7 +284,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
             <StatCard bare label="À receber" value={fmtBRL(stats.aReceber)} delta={`${listaReceber.length} lançamentos`} deltaTone="ok" />
             <StatCard bare label="À pagar" value={fmtBRL(stats.aPagar)} delta={`${listaPagar.length} contas em aberto`} deltaTone="warn" />
-            <StatCard bare label="Despesas do mês" value={fmtBRL(stats.despesas)} delta="custo operacional" deltaTone="neutral" />
+            <StatCard bare label="Despesas (total)" value={fmtBRL(stats.despesas)} delta="custo operacional" deltaTone="neutral" />
             <StatCard bare label="Resultado líquido" value={fmtBRL(stats.resultado)} delta="receitas − despesas" deltaTone={stats.resultado >= 0 ? 'ok' : 'bad'} />
           </div>
 
@@ -430,10 +433,10 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           <Input label="Valor (R$)" required type="number" step="0.01" min="0" value={form.valor} onChange={e => set('valor', e.target.value)} placeholder="0,00" />
           <Input label="Vencimento" required type="date" value={form.data_venc} onChange={e => set('data_venc', e.target.value)} />
 
-          <Select label="Categoria" value={form.categoria} onChange={e => set('categoria', e.target.value)}>
-            <option value="">— Selecionar —</option>
-            {catsFiltradas.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-          </Select>
+          <Input label="Categoria" list="fin-categorias" value={form.categoria} onChange={e => set('categoria', e.target.value)} placeholder="Ex: Fornecedor, Aluguel, Marketing…" />
+          <datalist id="fin-categorias">
+            {[...new Set([...catsFiltradas.map(c => c.nome), 'Vendas', 'Fornecedor', 'Aluguel', 'Salários', 'Marketing', 'Impostos', 'Serviços', 'Outros'])].map(c => <option key={c} value={c} />)}
+          </datalist>
           <Select label="Forma de pagamento" value={form.forma_pgto} onChange={e => set('forma_pgto', e.target.value)}>
             <option value="">— Selecionar —</option>
             {FORMAS.map(f => <option key={f} value={f}>{FORMAS_LABEL[f]}</option>)}
