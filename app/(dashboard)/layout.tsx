@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { SessionGuard } from '@/components/layout/session-guard'
+import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
 import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
@@ -171,6 +172,7 @@ export default async function DashboardLayout({
       </div>
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
       <SessionGuard />
+      <AssistenteWidget />
     </EmpresaProvider>
   )
 }
