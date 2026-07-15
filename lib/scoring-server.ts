@@ -20,11 +20,15 @@ export async function reavaliarScores(svc: Db, empresaId: number): Promise<{ ava
   const cfg = await carregarConfig(svc, empresaId)
 
   const { data: leads } = await svc.from('leads')
-    .select('id, origem, valor_estimado, telefone, instagram, ultima_mensagem_at, ultima_tratativa, created_at, msgs_nao_lidas, primeira_msg, responsavel_id')
+    .select('id, origem, valor_estimado, telefone, instagram, ultima_mensagem_at, ultima_tratativa, created_at, msgs_nao_lidas, primeira_msg, responsavel_id, kanban_status')
     .eq('empresa_id', empresaId).eq('ativo', true).limit(1000)
   if (!leads?.length) return { avaliados: 0, enfileirados: 0 }
 
   const ids = leads.map((l) => l.id)
+
+  // Etapas terminais (ganho/perdido) não devem ser reprospectadas pela cadência-gatilho.
+  const { data: etapasTerm } = await svc.from('funil_etapas').select('slug').eq('empresa_id', empresaId).in('tipo', ['ganho', 'perdido'])
+  const terminalSlugs = new Set((etapasTerm ?? []).map((e) => e.slug))
 
   // Engajamento real: nº de chamadas registradas por lead.
   const { data: chamadas } = await svc.from('chamadas').select('lead_id').eq('empresa_id', empresaId).in('lead_id', ids)
@@ -46,7 +50,7 @@ export async function reavaliarScores(svc: Db, empresaId: number): Promise<{ ava
   const nowIso = new Date().toISOString()
   for (const l of leads) {
     const { score } = calcularScore({ ...l, contatos: contatos[l.id] ?? 0 }, cfg)
-    if (gatilhoOn && cadenciaId && primeiro && score >= cfg.gatilho.score_min && !jaAtivas.has(l.id)) {
+    if (gatilhoOn && cadenciaId && primeiro && score >= cfg.gatilho.score_min && !jaAtivas.has(l.id) && !terminalSlugs.has(l.kanban_status ?? '')) {
       const { error } = await svc.from('cadencia_inscricoes').insert({
         empresa_id: empresaId, cadencia_id: cadenciaId, lead_id: l.id, responsavel_id: l.responsavel_id,
         status: 'ativa', passo_ordem: primeiro.ordem, proxima_acao_em: dataDaAcao(nowIso, primeiro.dia_offset),

@@ -329,7 +329,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />}>Exportar</Button>
+              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => router.push('/relatorios')}>Exportar</Button>
               <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>
             </div>
           </div>

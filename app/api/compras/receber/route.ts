@@ -23,25 +23,31 @@ export async function POST(req: Request) {
   const { data: venda } = await supabase.from('vendas')
     .select('id, unidade_id, produto_id, valor_venda').eq('pedido_compra_id', pedidoId).eq('status', 'encomenda').maybeSingle()
 
-  // Entrada da unidade no estoque (com o produto/preço da encomenda quando houver).
-  const { data: unidade } = await supabase.from('inventario_unidades').insert({
-    empresa_id: empresaId,
-    produto_id: venda?.produto_id ?? null,
-    condicao: 'novo',
-    tipo: 'compra',
-    status: venda ? 'reservado' : 'disponivel',
-    preco_custo: pedido.valor_total ?? null,
-    preco_venda: venda?.valor_venda ?? null,
-    observacoes: `Entrada por compra #${pedido.id}${pedido.descricao ? ` — ${pedido.descricao}` : ''}.`,
-    ativo: true,
-  } as never).select('id').single()
-
-  await supabase.from('pedidos_compra').update({ status: 'recebido' } as never).eq('id', pedidoId)
-
-  const unidadeId = (unidade as { id?: number } | null)?.id ?? null
-  if (venda && unidadeId && !venda.unidade_id) {
-    await supabase.from('vendas').update({ unidade_id: unidadeId } as never).eq('id', venda.id)
+  // Só a ENCOMENDA gera unidade automática (reservada p/ a venda). Compra comum
+  // (reposição em lote) NÃO cria unidade-fantasma — o operador dá entrada no
+  // estoque com os dados reais (IMEI, cor, qtd…) pelo módulo de Estoque.
+  let unidadeId: number | null = null
+  if (venda) {
+    const { data: unidade, error: eUni } = await supabase.from('inventario_unidades').insert({
+      empresa_id: empresaId,
+      produto_id: venda.produto_id ?? null,
+      condicao: 'novo',
+      tipo: 'compra',
+      status: 'reservado',
+      preco_custo: pedido.valor_total ?? null,
+      preco_venda: venda.valor_venda ?? null,
+      observacoes: `Entrada por encomenda #${pedido.id}${pedido.descricao ? ` — ${pedido.descricao}` : ''}.`,
+      ativo: true,
+    } as never).select('id').single()
+    if (eUni) return NextResponse.json({ error: eUni.message }, { status: 500 })
+    unidadeId = (unidade as { id?: number } | null)?.id ?? null
+    if (unidadeId && !venda.unidade_id) {
+      await supabase.from('vendas').update({ unidade_id: unidadeId } as never).eq('id', venda.id)
+    }
   }
+
+  const { error: ePed } = await supabase.from('pedidos_compra').update({ status: 'recebido' } as never).eq('id', pedidoId)
+  if (ePed) return NextResponse.json({ error: ePed.message }, { status: 500 })
 
   return NextResponse.json({ ok: true, unidadeId, encomenda: !!venda })
 }

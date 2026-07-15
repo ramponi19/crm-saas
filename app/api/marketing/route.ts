@@ -37,12 +37,18 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const supabase = await createClient()
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { error } = await supabase.from('solicitacoes_marketing').delete().eq('id', id)
+
+  // Só o solicitante ou um admin/owner pode excluir.
+  const { data: eu } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle()
+  const isAdmin = ['owner', 'admin'].includes(eu?.role ?? '')
+  let del = supabase.from('solicitacoes_marketing').delete().eq('id', id).eq('empresa_id', empresaId)
+  if (!isAdmin) del = del.eq('solicitante_id', user.id)
+  const { error } = await del
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

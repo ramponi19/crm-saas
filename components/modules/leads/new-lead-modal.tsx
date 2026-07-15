@@ -77,7 +77,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
       instagram: form.instagram.trim() || null,
       origem: form.origem || null,
       produto_interessado: form.produto_interessado.trim() || null,
-      valor_estimado: form.valor_estimado ? Number(form.valor_estimado.replace(',', '.')) : null,
+      valor_estimado: form.valor_estimado ? (Number(form.valor_estimado.replace(/\./g, '').replace(',', '.')) || null) : null,
       kanban_status: form.kanban_status,
       responsavel_id: form.responsavel_id || null,
       observacoes: form.observacoes.trim() || null,

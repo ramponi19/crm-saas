@@ -14,13 +14,19 @@ export default function ResetSenhaPage() {
   const [showPw, setShowPw]     = useState(false)
   const [loading, setLoading]   = useState(false)
   const [ready, setReady]       = useState(false)
+  const [erro, setErro]         = useState(false)
 
   useEffect(() => {
     // Supabase injeta o token na URL como hash; o cliente o troca por sessão automaticamente.
     const supabase = createClient()
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') { setReady(true); setErro(false) }
     })
+    // O evento pode ter ocorrido antes do listener: se já há sessão, libera.
+    supabase.auth.getSession().then(({ data }) => { if (data.session) setReady(true) })
+    // Link inválido/expirado: não trava em "Validando…" pra sempre.
+    const t = setTimeout(() => setReady((r) => { if (!r) setErro(true); return r }), 5000)
+    return () => { sub.subscription.unsubscribe(); clearTimeout(t) }
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -46,8 +52,14 @@ export default function ResetSenhaPage() {
         <div className="mt-8 rounded-card border border-line bg-card p-7">
           <h1 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Redefinir senha</h1>
           <p className="mt-1 text-[13px] text-ink-2">
-            {ready ? 'Digite sua nova senha abaixo.' : 'Validando link de recuperação…'}
+            {ready ? 'Digite sua nova senha abaixo.' : erro ? 'Link inválido ou expirado.' : 'Validando link de recuperação…'}
           </p>
+
+          {erro && !ready && (
+            <Button size="lg" className="mt-5 w-full" onClick={() => router.replace('/login')}>
+              Voltar e solicitar novo link
+            </Button>
+          )}
 
           {ready && (
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">

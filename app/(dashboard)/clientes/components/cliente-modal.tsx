@@ -110,8 +110,10 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
       if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
       notify.ok('Cliente cadastrado')
     } else {
-      const { error } = await supabase.from('clientes').update(data as TablesUpdate<'clientes'>).eq('id', cliente!.id!)
-      if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      // Não reenvia `ativo` na edição — senão reativa silenciosamente um cliente desativado.
+      const { ativo: _ativo, ...semAtivo } = data
+      const { error } = await supabase.from('clientes').update(semAtivo as TablesUpdate<'clientes'>).eq('id', cliente!.id!)
+      if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
       notify.ok('Alterações salvas')
     }
     router.refresh()
@@ -119,7 +121,8 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
   }
 
   async function excluir() {
-    await supabase.from('clientes').update({ ativo: false }).eq('id', cliente!.id!)
+    const { error } = await supabase.from('clientes').update({ ativo: false }).eq('id', cliente!.id!)
+    if (error) { notify.bad('Erro ao remover', error.message); return }
     notify.ok('Cliente desativado')
     router.refresh()
     onClose()
