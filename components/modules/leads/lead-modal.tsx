@@ -13,6 +13,7 @@ import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadOrcamentoPanel } from './lead-orcamento-panel'
+import { LeadReservaPanel } from './lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
@@ -435,6 +436,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
             {segmento === 'concessionaria' && <LeadInteressePanel leadId={lead.id} />}
             {segmento === 'concessionaria' && <LeadFinanciamentoPanel leadId={lead.id} />}
+            <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
             <LeadChamadasPanel leadId={lead.id} />
             <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} />
             <LeadCadenciaPanel leadId={lead.id} />

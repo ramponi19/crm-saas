@@ -13,8 +13,18 @@ export default async function PDVPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Expiração preguiçosa das reservas de lead (48h): vencida volta a disponível.
+  await supabase
+    .from('inventario_unidades')
+    .update({ status: 'disponivel', reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null })
+    .eq('empresa_id', empresaId)
+    .eq('status', 'reservado')
+    .not('reservado_lead_id', 'is', null)
+    .lt('reserva_expira_em', new Date().toISOString())
+
   const [
     { data: unidades },
+    { data: reservadas },
     { data: clientes },
     { data: taxas },
     { data: vendasRecentes },
@@ -29,6 +39,14 @@ export default async function PDVPage() {
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
+    // Reservas de lead ativas (aba Reservas do PDV).
+    supabase
+      .from('inventario_unidades')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
+      .eq('empresa_id', empresaId)
+      .eq('ativo', true).eq('status', 'reservado')
+      .not('reservado_lead_id', 'is', null)
+      .order('reserva_expira_em', { ascending: true }),
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('taxas_pagamento').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas')
@@ -58,6 +76,22 @@ export default async function PDVPage() {
     }
   })
 
+  type ReservaRow = UnidadeRow & { leads: Embed<{ nome: string | null }> }
+  const reservas = ((reservadas ?? []) as unknown as ReservaRow[]).map(u => {
+    const prod = one(u.produtos)
+    return {
+      ...u,
+      produto_id: u.produto_id ?? 0,
+      status: u.status ?? 'reservado',
+      produto_nome: prod?.nome ?? '—',
+      marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
+      lead_nome: one(u.leads)?.nome ?? '—',
+      reservado_lead_id: u.reservado_lead_id ?? 0,
+      reserva_expira_em: u.reserva_expira_em,
+      reservado_por: u.reservado_por,
+    }
+  })
+
   type VendaRow = Tables<'vendas'> & {
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
@@ -75,6 +109,7 @@ export default async function PDVPage() {
       <div className="flex-1 overflow-hidden">
         <PDVView
           itensDisponiveis={itens}
+          reservas={reservas}
           clientes={clientes ?? []}
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}

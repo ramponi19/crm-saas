@@ -22,8 +22,10 @@ interface ClienteSimples { id: number; nome: string; telefone: string | null; cp
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
 interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean }
-interface ItemCarrinho { item: ItemEstoque; desconto: number }
+// Unidade reservada para um lead (feita no modal do lead; vendida aqui).
+interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean }
+interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean }
 
 const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
   { key: 'dinheiro', label: 'Dinheiro', icon: Banknote },
@@ -36,7 +38,7 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, fornecedores = [], isAdmin = false }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false }: Props) {
   const isFood = segmento === 'food'
   const [comanda, setComanda] = useState('')
   const [encomendaOpen, setEncomendaOpen] = useState(false)
@@ -106,11 +108,40 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     return base.slice(0, 8)
   }, [clientes, buscaCliente])
 
-  function adicionarItem(item: ItemEstoque) {
+  function adicionarItem(item: ItemEstoque, reserva = false) {
     if (carrinho.some((c) => c.item.id === item.id)) { notify.warn('Item já está no carrinho'); return }
-    setCarrinho((prev) => [...prev, { item, desconto: 0 }])
+    setCarrinho((prev) => [...prev, { item, desconto: 0, reserva }])
   }
   function removerItem(id: number) { setCarrinho((prev) => prev.filter((c) => c.item.id !== id)) }
+
+  // Aba do catálogo: estoque disponível ou reservas de lead.
+  const [abaCat, setAbaCat] = useState<'estoque' | 'reservas'>('estoque')
+  const [cancelandoReserva, setCancelandoReserva] = useState<number | null>(null)
+
+  async function cancelarReserva(id: number) {
+    setCancelandoReserva(id)
+    try {
+      const r = await fetch('/api/reservas', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unidadeId: id }),
+      })
+      const j = await r.json().catch(() => ({} as Record<string, unknown>))
+      if (!r.ok) throw new Error((j as { error?: string }).error ?? 'Não foi possível cancelar')
+      notify.ok('Reserva cancelada', 'A unidade voltou para o estoque disponível.')
+      removerItem(id)
+      router.refresh()
+    } catch (e) {
+      notify.bad('Erro ao cancelar reserva', e instanceof Error ? e.message : 'Tente novamente.')
+    } finally { setCancelandoReserva(null) }
+  }
+
+  const horasReserva = (iso: string | null) => {
+    if (!iso) return '—'
+    const ms = new Date(iso).getTime() - Date.now()
+    if (ms <= 0) return 'expirada'
+    const h = Math.floor(ms / 3600_000)
+    return h >= 1 ? `${h}h restantes` : `${Math.max(1, Math.round(ms / 60_000))}min restantes`
+  }
 
   const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
   const acessoriosTotal = acessorios.reduce((a, x) => a + (Number(x.valor) || 0), 0)
@@ -151,7 +182,8 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
     setFinalizando(true)
     // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
     // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
-    const claimedIds: number[] = []
+    // Guarda o status anterior: item de reserva volta a 'reservado', não 'disponivel'.
+    const claimed: { id: number; statusAnterior: string }[] = []
     const vendaIds: number[] = []
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -177,15 +209,18 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         const descontoItem = subtotalBruto > 0 ? abatimento * (precoCheio / subtotalBruto) : 0
         const valorItem = precoCheio - descontoItem
 
-        const { data: claimed } = await supabase
+        // Item de reserva só é vendável enquanto AINDA está reservado (a reserva
+        // trava a peça); item comum exige 'disponivel' — protege contra corrida.
+        const statusEsperado = c.reserva ? 'reservado' : 'disponivel'
+        const { data: unidadeClaim } = await supabase
           .from('inventario_unidades')
           .update({ status: unitStatus, cliente_id: clienteSelecionado?.id ?? null })
           .eq('id', c.item.id)
-          .eq('status', 'disponivel')
+          .eq('status', statusEsperado)
           .select('id')
           .single()
-        if (!claimed) throw new Error(`"${c.item.produto_nome}" não está mais disponível`)
-        claimedIds.push(c.item.id)
+        if (!unidadeClaim) throw new Error(c.reserva ? `A reserva de "${c.item.produto_nome}" não está mais ativa` : `"${c.item.produto_nome}" não está mais disponível`)
+        claimed.push({ id: c.item.id, statusAnterior: statusEsperado })
 
         const valorItemComTaxa = valorItem * taxaMultiplier
 
@@ -278,6 +313,14 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
         } catch { /* não bloqueia a venda */ }
       }
 
+      // Reserva consumida pela venda: limpa o vínculo com o lead.
+      const reservaIds = carrinho.filter((c) => c.reserva).map((c) => c.item.id)
+      if (reservaIds.length) {
+        await supabase.from('inventario_unidades')
+          .update({ reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null } as never)
+          .in('id', reservaIds)
+      }
+
       // Snapshot p/ contrato (antes de limpar o carrinho).
       setUltimaVenda({
         itens: [
@@ -302,8 +345,8 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
           await supabase.from('vendas_pagamentos').delete().in('venda_id', vendaIds)
           await supabase.from('vendas').delete().in('id', vendaIds)
         }
-        if (claimedIds.length) {
-          await supabase.from('inventario_unidades').update({ status: 'disponivel', cliente_id: null } as never).in('id', claimedIds)
+        for (const cl of claimed) {
+          await supabase.from('inventario_unidades').update({ status: cl.statusAnterior, cliente_id: null } as never).eq('id', cl.id)
         }
       } catch { /* rollback best-effort */ }
       notify.bad('Erro ao finalizar', e instanceof Error ? e.message : String(e))
@@ -434,6 +477,23 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
 
           {/* ── ESQUERDA: catálogo ── */}
           <div>
+            {reservas.length > 0 && (
+              <div className="mb-3 flex items-center gap-1.5">
+                {([['estoque', 'Estoque'], ['reservas', `Reservas (${reservas.length})`]] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setAbaCat(k)}
+                    className={cn(
+                      'rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors',
+                      abaCat === k ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-card text-ink-2 hover:text-ink',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mb-4 flex items-center gap-2">
               <Input
                 wrapperClassName="flex-1"
@@ -447,7 +507,47 @@ export default function PDVView({ itensDisponiveis, clientes, taxas, segmento, f
             </div>
             {encomendaOpen && <EncomendaModal clientes={clientes} fornecedores={fornecedores} isAdmin={isAdmin} onClose={() => setEncomendaOpen(false)} />}
 
-            {itensFiltrados.length === 0 ? (
+            {abaCat === 'reservas' && reservas.length > 0 ? (
+              <div className="space-y-2.5">
+                {reservas.map((r) => {
+                  const noCarrinho = carrinho.some((c) => c.item.id === r.id)
+                  return (
+                    <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-card p-4">
+                      <div className="grid h-10 w-10 flex-none place-items-center rounded-control bg-accent-soft text-accent">
+                        <Package size={18} strokeWidth={1.7} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold text-ink">
+                          {r.produto_nome}{r.armazenamento ? ` · ${r.armazenamento}` : ''}{r.cor ? ` · ${r.cor}` : ''}
+                        </div>
+                        <div className="truncate text-[11.5px] text-ink-3">
+                          Reservado para <span className="font-medium text-ink-2">{r.lead_nome}</span> · {horasReserva(r.reserva_expira_em)}
+                        </div>
+                      </div>
+                      <span className="num text-[15px] font-bold text-ink">{fmt(r.preco_venda ?? 0)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          disabled={noCarrinho}
+                          icon={noCarrinho ? <CheckCircle2 size={14} strokeWidth={1.7} /> : <Plus size={14} strokeWidth={1.7} />}
+                          onClick={() => adicionarItem(r, true)}
+                        >
+                          {noCarrinho ? 'No carrinho' : 'Vender'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          loading={cancelandoReserva === r.id}
+                          onClick={() => cancelarReserva(r.id)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : itensFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-ink-3">
                 <ScanBarcode size={38} strokeWidth={1.5} className="mb-3 opacity-40" />
                 <p className="text-[13px]">Nenhum produto disponível no estoque</p>

@@ -1909,6 +1909,10 @@ export type Database = {
           preco_venda: number | null
           produto_id: number | null
           renavam: string | null
+          reserva_expira_em: string | null
+          reservado_em: string | null
+          reservado_lead_id: number | null
+          reservado_por: string | null
           status: string | null
           tipo: string | null
           usuario_id: string | null
@@ -1940,6 +1944,10 @@ export type Database = {
           preco_venda?: number | null
           produto_id?: number | null
           renavam?: string | null
+          reserva_expira_em?: string | null
+          reservado_em?: string | null
+          reservado_lead_id?: number | null
+          reservado_por?: string | null
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
@@ -1971,6 +1979,10 @@ export type Database = {
           preco_venda?: number | null
           produto_id?: number | null
           renavam?: string | null
+          reserva_expira_em?: string | null
+          reservado_em?: string | null
+          reservado_lead_id?: number | null
+          reservado_por?: string | null
           status?: string | null
           tipo?: string | null
           usuario_id?: string | null
