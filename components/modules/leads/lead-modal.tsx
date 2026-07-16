@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -52,7 +52,11 @@ async function entregarViaEdge(action: 'send' | 'send_meta', payload: Record<str
   }
 }
 
-interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string }
+interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null }
+
+// Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
+const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia)\]$/.test(t)
+const TIPO_DB: Record<'image' | 'video' | 'audio', string> = { image: 'imagem', video: 'video', audio: 'audio' }
 
 export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate }: LeadModalProps) {
   const supabase = createClient()
@@ -90,15 +94,17 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at')
+        .select('direcao, conteudo, created_at, tipo, midia_url')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
-      type MsgRow = { direcao: string | null; conteudo: string | null; created_at: string }
+      type MsgRow = { direcao: string | null; conteudo: string | null; created_at: string; tipo: string | null; midia_url: string | null }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
         text: m.conteudo ?? '',
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        tipo: m.tipo ?? 'texto',
+        midiaUrl: m.midia_url,
       }))
       setChat(msgs)
       setLoadingChat(false)
@@ -115,16 +121,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       .channel(`lead_msgs_${lead.id}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
-        (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null }>) => {
-          const m = payload.new as { id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null }
+        (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null; tipo: string | null; midia_url: string | null }>) => {
+          const m = payload.new as { id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null; tipo: string | null; midia_url: string | null }
           setChat((prev) => {
             const novaMsg: ChatMsg = {
               from: m.direcao === 'enviada' ? 'loja' : 'cliente',
               text: m.conteudo ?? '',
               time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+              tipo: m.tipo ?? 'texto',
+              midiaUrl: m.midia_url,
             }
             if (novaMsg.from === 'loja') {
-              const idx = prev.findIndex((x) => x.from === 'loja' && x.text === novaMsg.text && x.time === 'agora')
+              // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
+              const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && (x.midiaUrl ? x.midiaUrl === novaMsg.midiaUrl : x.text === novaMsg.text))
               if (idx >= 0) { const copy = [...prev]; copy[idx] = novaMsg; return copy }
             }
             return [...prev, novaMsg]
@@ -176,6 +185,94 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     } catch (e) {
       rollback()
       notify.bad('Erro ao enviar', e instanceof Error ? e.message : 'Tente novamente.')
+    }
+  }
+
+  // ── Mídia (imagem/vídeo/áudio) ────────────────────────────────────────────
+  // Fluxo: upload p/ /api/chat/upload (bucket chat-midia) → Edge envia ao canal
+  // com a URL pública → o insert da Edge chega via realtime e substitui a bolha
+  // otimista. Canal "manual" grava direto no banco.
+  const [enviandoMidia, setEnviandoMidia] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function sendMedia(file: File) {
+    const canal = lead.origem ?? 'manual'
+    setEnviandoMidia(true)
+    let bolhaUrl: string | null = null
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/chat/upload', { method: 'POST', body: fd })
+      const up = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok) throw new Error((up as { error?: string }).error ?? 'Falha ao subir o arquivo')
+      const { url, tipoMidia } = up as { url: string; tipoMidia: 'image' | 'video' | 'audio' }
+      const tipoDb = TIPO_DB[tipoMidia]
+      bolhaUrl = url
+      setChat((prev) => [...prev, { from: 'loja', text: `[${tipoDb}]`, time: 'agora', tipo: tipoDb, midiaUrl: url }])
+
+      if (canal === 'instagram' || canal === 'messenger') {
+        await entregarViaEdge('send_meta', { leadId: lead.id, canal, midiaUrl: url, tipoMidia })
+      } else if (canal === 'whatsapp') {
+        if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
+        await entregarViaEdge('send', { number: lead.telefone, leadId: lead.id, midiaUrl: url, tipoMidia })
+      } else {
+        if (!empresa?.id) throw new Error('Empresa não encontrada')
+        const { error } = await supabase.from('lead_mensagens').insert({
+          empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
+          conteudo: `[${tipoDb}]`, origem: canal, lida: true, tipo: tipoDb, midia_url: url,
+        })
+        if (error) throw new Error(error.message)
+      }
+      await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
+    } catch (e) {
+      if (bolhaUrl) setChat((prev) => {
+        const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && x.midiaUrl === bolhaUrl)
+        if (idx < 0) return prev
+        const copy = [...prev]; copy.splice(idx, 1); return copy
+      })
+      notify.bad('Erro ao enviar mídia', e instanceof Error ? e.message : 'Tente novamente.')
+    } finally {
+      setEnviandoMidia(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  // Gravação de áudio (MediaRecorder). Prefere audio/mp4 (aceito por WhatsApp
+  // e Instagram); webm/opus é o fallback de navegadores antigos.
+  const [gravando, setGravando] = useState(false)
+  const recRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const cancelGravacaoRef = useRef(false)
+
+  useEffect(() => () => {
+    cancelGravacaoRef.current = true
+    if (recRef.current?.state === 'recording') recRef.current.stop()
+  }, [])
+
+  async function toggleGravacao() {
+    if (gravando) { recRef.current?.stop(); return }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+        : 'audio/webm'
+      const rec = new MediaRecorder(stream, { mimeType: mime })
+      chunksRef.current = []
+      cancelGravacaoRef.current = false
+      rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data) }
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setGravando(false)
+        if (cancelGravacaoRef.current) return
+        const tipoBase = mime.split(';')[0]
+        const blob = new Blob(chunksRef.current, { type: tipoBase })
+        if (blob.size > 0) sendMedia(new File([blob], `audio.${tipoBase === 'audio/mp4' ? 'm4a' : 'webm'}`, { type: tipoBase }))
+      }
+      recRef.current = rec
+      rec.start()
+      setGravando(true)
+    } catch {
+      notify.bad('Microfone indisponível', 'Permita o acesso ao microfone para gravar áudio.')
     }
   }
 
@@ -363,7 +460,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                 return (
                   <div key={i} className={`flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[72%] rounded-[12px] px-3.5 py-2.5 text-[13px] ${isLoja ? 'rounded-br-[3px] bg-ink text-white' : 'rounded-bl-[3px] bg-card text-ink border border-line'}`}>
-                      {m.text}
+                      {m.midiaUrl && m.tipo === 'imagem' && (
+                        <a href={m.midiaUrl} target="_blank" rel="noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={m.midiaUrl} alt="Imagem da conversa" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
+                        </a>
+                      )}
+                      {m.midiaUrl && m.tipo === 'video' && (
+                        <video src={m.midiaUrl} controls preload="metadata" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
+                      )}
+                      {m.midiaUrl && m.tipo === 'audio' && (
+                        <audio src={m.midiaUrl} controls preload="metadata" className="mb-1 w-[220px] max-w-full" />
+                      )}
+                      {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && m.text}
                       <div className={`mt-1 text-[9.5px] ${isLoja ? 'text-white/60' : 'text-ink-3'}`}>{m.time}</div>
                     </div>
                   </div>
@@ -371,13 +480,32 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               })}
               <div ref={chatEndRef} />
             </div>
-            <div className="flex items-center gap-2 border-t border-line-soft px-5 py-3.5">
+            <div className="flex items-center gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) sendMedia(f) }}
+              />
+              <IconButton aria-label="Anexar imagem ou vídeo" onClick={() => fileRef.current?.click()} disabled={enviandoMidia || gravando}>
+                {enviandoMidia ? <Loader2 size={16} strokeWidth={1.7} className="animate-spin" /> : <Paperclip size={16} strokeWidth={1.7} />}
+              </IconButton>
+              <IconButton
+                aria-label={gravando ? 'Parar e enviar áudio' : 'Gravar áudio'}
+                variant={gravando ? 'danger' : undefined}
+                onClick={toggleGravacao}
+                disabled={enviandoMidia}
+              >
+                {gravando ? <Square size={15} strokeWidth={1.7} className="animate-pulse" /> : <Mic size={16} strokeWidth={1.7} />}
+              </IconButton>
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMsg()}
-                placeholder="Digite uma mensagem…"
-                className="h-10 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-base text-ink placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 sm:h-9 sm:text-[13px]"
+                placeholder={gravando ? 'Gravando áudio…' : 'Digite uma mensagem…'}
+                disabled={gravando}
+                className="h-10 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-base text-ink placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 disabled:opacity-60 sm:h-9 sm:text-[13px]"
               />
               <IconButton aria-label="Enviar mensagem" variant="primary" onClick={sendMsg}>
                 <Send size={16} strokeWidth={1.7} />

@@ -2088,30 +2088,39 @@ export type Database = {
           created_at: string | null
           direcao: string
           empresa_id: number
+          external_id: string | null
           id: number
           lead_id: number | null
           lida: boolean | null
+          midia_url: string | null
           origem: string | null
+          tipo: string
         }
         Insert: {
           conteudo: string
           created_at?: string | null
           direcao: string
           empresa_id: number
+          external_id?: string | null
           id?: never
           lead_id?: number | null
           lida?: boolean | null
+          midia_url?: string | null
           origem?: string | null
+          tipo?: string
         }
         Update: {
           conteudo?: string
           created_at?: string | null
           direcao?: string
           empresa_id?: number
+          external_id?: string | null
           id?: never
           lead_id?: number | null
           lida?: boolean | null
+          midia_url?: string | null
           origem?: string | null
+          tipo?: string
         }
         Relationships: [
           {
