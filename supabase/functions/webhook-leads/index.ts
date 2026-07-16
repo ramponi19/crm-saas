@@ -1,5 +1,5 @@
 // ⚠️ Snapshot versionado da Edge Function `webhook-leads` (deploy real no Supabase,
-// projeto guiuzbcqkvelqcuogxtd, v24). NÃO é buildada pelo Next — é o código-fonte
+// projeto guiuzbcqkvelqcuogxtd, v25). NÃO é buildada pelo Next — é o código-fonte
 // de referência da função que recebe/envia mensagens Meta (WhatsApp/IG/Messenger).
 // Para alterar em produção é preciso `supabase functions deploy webhook-leads`.
 //
@@ -98,7 +98,9 @@ serve(async (req: Request) => {
       });
       const data = await r.json();
       if (!r.ok) { console.error(`${canal} Graph API error:`, JSON.stringify(data)); return json({ error: data?.error?.message || `Erro ao enviar pelo ${canal}` }, r.status); }
-      await supabase.from("lead_mensagens").insert([{ empresa_id: EMPRESA_ID, lead_id: leadId, direcao: "enviada", conteudo: texto, origem: canal, lida: true }]);
+      // external_id = message_id da Graph: deduplica contra o echo que a Meta
+      // devolve deste mesmo envio (indice unico lead_mensagens_external_id_uidx).
+      await supabase.from("lead_mensagens").insert([{ empresa_id: EMPRESA_ID, lead_id: leadId, direcao: "enviada", conteudo: texto, origem: canal, lida: true, external_id: (data?.message_id as string) ?? null }]);
       return json({ success: true });
     } catch (e) { console.error("send_meta error:", e); return json({ error: (e as Error).message }, 500); }
   }
@@ -152,7 +154,13 @@ serve(async (req: Request) => {
         const message = msg.message as Record<string, unknown> | undefined;
         const mid = message?.mid as string | undefined;
         const texto = (message?.text as string) || "[midia]";
-        if (message?.is_echo) continue;
+        if (message?.is_echo) {
+          // Echo = mensagem enviada pela Pagina (inbox/app/outra ferramenta OU o
+          // proprio CRM — o dedup por external_id ignora a segunda copia).
+          // No echo o cliente e o recipient. So anexa a lead existente; nunca cria.
+          await registrarEcho((msg.recipient as Record<string, unknown>)?.id as string | undefined, mid, texto, "messenger");
+          continue;
+        }
         if (psid) {
           let nome: string | null = null;
           if (fbToken) { const p = await fetchProfile(psid, fbToken, "name,first_name"); nome = p?.name || p?.first_name || null; }
@@ -168,7 +176,10 @@ serve(async (req: Request) => {
       const message = msg.message as Record<string, unknown> | undefined;
       const mid = message?.mid as string | undefined;
       const texto = (message?.text as string) || "[midia]";
-      if (message?.is_echo) continue;
+      if (message?.is_echo) {
+        await registrarEcho((msg.recipient as Record<string, unknown>)?.id as string | undefined, mid, texto, "instagram");
+        continue;
+      }
       if (senderId) {
         let nome: string | null = null, username: string | null = null;
         if (igToken) { const p = await fetchProfile(senderId, igToken, "name,username"); nome = p?.name || p?.username || null; username = p?.username || null; }
@@ -179,6 +190,21 @@ serve(async (req: Request) => {
 
   return new Response("ok", { status: 200, headers: corsHeaders });
 });
+
+// Grava mensagem ENVIADA por fora do CRM (echo da Meta) na conversa do lead.
+// Regras de seguranca: exige mid (sem ele nao ha dedup → ignora), so anexa a
+// lead ja existente (nunca cria lead a partir de envio) e nunca lanca erro
+// (um echo com problema nao pode derrubar os demais eventos do batch).
+async function registrarEcho(recipientId: string | undefined, mid: string | undefined, texto: string, origem: "instagram" | "messenger") {
+  try {
+    if (!recipientId || !mid) return;
+    const { data: lead } = await supabase.from("leads").select("id").eq("origem_id", recipientId).eq("ativo", true).maybeSingle();
+    if (!lead?.id) return;
+    const { error } = await supabase.from("lead_mensagens")
+      .insert([{ empresa_id: EMPRESA_ID, lead_id: lead.id, direcao: "enviada", conteudo: texto, origem, lida: true, external_id: mid }]);
+    if (error) console.log("Echo duplicado ignorado:", mid, error.message);
+  } catch (e) { console.error("registrarEcho error:", e); }
+}
 
 async function getChannelToken(chave: string): Promise<string | null> {
   const { data } = await supabase.from("configuracoes_sistema").select("valor").eq("chave", chave).single();
