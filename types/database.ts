@@ -2185,6 +2185,9 @@ export type Database = {
           midia_url: string | null
           origem: string | null
           tipo: string
+          status_entrega: string | null
+          erro_envio: string | null
+          status_em: string | null
         }
         Insert: {
           conteudo: string
@@ -2198,6 +2201,9 @@ export type Database = {
           midia_url?: string | null
           origem?: string | null
           tipo?: string
+          status_entrega?: string | null
+          erro_envio?: string | null
+          status_em?: string | null
         }
         Update: {
           conteudo?: string
@@ -2211,6 +2217,9 @@ export type Database = {
           midia_url?: string | null
           origem?: string | null
           tipo?: string
+          status_entrega?: string | null
+          erro_envio?: string | null
+          status_em?: string | null
         }
         Relationships: [
           {

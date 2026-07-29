@@ -31,6 +31,7 @@ if (!APP_ID || !SECRET) {
 const EXIGIDO = {
   whatsapp_business_account: {
     messages: 'mensagem que o cliente final manda',
+    statuses: 'confirmação de enviada / entregue / lida / falhou',
     smb_message_echoes: 'mensagem que o vendedor manda pelo app do celular (coexistência)',
     smb_app_state_sync: 'contatos da agenda do celular',
     history: 'histórico de 6 meses na conexão',
@@ -39,6 +40,8 @@ const EXIGIDO = {
   page: {
     messages: 'mensagem no Messenger',
     message_echoes: 'mensagem enviada pelo app do Messenger',
+    message_deliveries: 'confirmação de entrega',
+    message_reads: 'confirmação de leitura',
   },
   instagram: {
     messages: 'mensagem no Instagram Direct (o echo vem dentro deste campo)',

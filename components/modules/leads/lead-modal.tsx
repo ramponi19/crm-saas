@@ -65,7 +65,25 @@ async function entregarViaEdge(
   }
 }
 
-interface ChatMsg { from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null }
+interface ChatMsg {
+  from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null
+  /** Confirmação da Meta (só em mensagem enviada): enviada | entregue | lida | falhou. */
+  status?: string | null
+  erro?: string | null
+  /** id da Meta — é por ele que a confirmação de entrega encontra a bolha. */
+  externalId?: string | null
+}
+
+const ROTULO_ENTREGA: Record<string, string> = {
+  enviada: 'Enviada', entregue: 'Entregue no aparelho', lida: 'Lida pelo cliente', falhou: 'Não enviada',
+}
+
+/** Linha de lead_mensagens como ela chega pelo realtime. */
+type LinhaMsg = {
+  id: number; direcao: string; conteudo: string | null; created_at: string
+  lida: boolean | null; tipo: string | null; midia_url: string | null
+  status_entrega?: string | null; erro_envio?: string | null; external_id?: string | null
+}
 
 // Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
 const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia)\]$/.test(t)
@@ -107,17 +125,24 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at, tipo, midia_url')
+        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
-      type MsgRow = { direcao: string | null; conteudo: string | null; created_at: string; tipo: string | null; midia_url: string | null }
+      type MsgRow = {
+        direcao: string | null; conteudo: string | null; created_at: string
+        tipo: string | null; midia_url: string | null
+        status_entrega: string | null; erro_envio: string | null; external_id: string | null
+      }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
         text: m.conteudo ?? '',
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
         tipo: m.tipo ?? 'texto',
         midiaUrl: m.midia_url,
+        status: m.status_entrega,
+        erro: m.erro_envio,
+        externalId: m.external_id,
       }))
       setChat(msgs)
       setLoadingChat(false)
@@ -134,8 +159,8 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       .channel(`lead_msgs_${lead.id}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
-        (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null; tipo: string | null; midia_url: string | null }>) => {
-          const m = payload.new as { id: number; direcao: string; conteudo: string | null; created_at: string; lida: boolean | null; tipo: string | null; midia_url: string | null }
+        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+          const m = payload.new as LinhaMsg
           setChat((prev) => {
             const novaMsg: ChatMsg = {
               from: m.direcao === 'enviada' ? 'loja' : 'cliente',
@@ -143,6 +168,9 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
               tipo: m.tipo ?? 'texto',
               midiaUrl: m.midia_url,
+              status: m.status_entrega ?? null,
+              erro: m.erro_envio ?? null,
+              externalId: m.external_id ?? null,
             }
             if (novaMsg.from === 'loja') {
               // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
@@ -154,6 +182,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
           if (m.direcao === 'recebida' && !m.lida) {
             supabase.from('lead_mensagens').update({ lida: true }).eq('id', m.id)
           }
+        })
+      // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
+      // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
+        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+          const m = payload.new as LinhaMsg
+          if (!m.external_id && !m.status_entrega) return
+          setChat((prev) => prev.map((x) =>
+            x.externalId && x.externalId === m.external_id
+              ? { ...x, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? x.erro, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
+              : x,
+          ))
         })
       .subscribe()
 
@@ -487,7 +528,18 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         <audio src={m.midiaUrl} controls preload="metadata" className="mb-1 w-[220px] max-w-full" />
                       )}
                       {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && m.text}
-                      <div className={`mt-1 text-[9.5px] ${isLoja ? 'text-white/60' : 'text-ink-3'}`}>{m.time}</div>
+                      <div className={`mt-1 flex items-center gap-1 text-[9.5px] ${isLoja ? 'text-white/60' : 'text-ink-3'}`}>
+                        <span>{m.time}</span>
+                        {/* Confirmação da Meta: um tique saiu, dois chegou, dois
+                            claros foi lido. Falha aparece com o motivo no title. */}
+                        {isLoja && m.status && (
+                          m.status === 'falhou'
+                            ? <span className="text-[10px] text-bad" title={m.erro ?? 'Falha no envio'}>não enviada</span>
+                            : <span className={m.status === 'lida' ? 'text-white' : ''} title={ROTULO_ENTREGA[m.status]}>
+                                {m.status === 'enviada' ? '✓' : '✓✓'}
+                              </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )

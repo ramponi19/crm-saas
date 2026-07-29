@@ -475,6 +475,8 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
         empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo,
         origem: "whatsapp", lida: true, tipo: tipoDb, midia_url: midiaUrl ?? null,
         external_id: (data?.messages?.[0]?.id as string) ?? null,
+        // Primeiro estado; o webhook depois promove para entregue/lida.
+        status_entrega: "enviada", status_em: new Date().toISOString(),
       }]);
     }
     return json({ success: true, provider: "oficial", data });
@@ -544,6 +546,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
     empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
     conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, lida: true,
     tipo: tipoDb, midia_url: midiaUrl ?? null, external_id: (data?.message_id as string) ?? null,
+    status_entrega: "enviada", status_em: new Date().toISOString(),
   }]);
   return json({ success: true });
 }
@@ -712,6 +715,32 @@ serve(async (req: Request) => {
             }
           }
 
+          // Confirmação de entrega: a Meta avisa enviada → entregue → lida, ou
+          // falhou com motivo. Vem minutos depois e casa pelo id da mensagem.
+          if (campo === "statuses" || (!campo && value?.statuses)) {
+            for (const s of (value?.statuses as Record<string, unknown>[] ?? [])) {
+              const id = s.id as string | undefined;
+              if (!id) continue;
+              const bruto = String(s.status ?? "");
+              const mapa: Record<string, string> = {
+                sent: "enviada", delivered: "entregue", read: "lida", failed: "falhou",
+              };
+              const status = mapa[bruto];
+              if (!status) continue;
+
+              const erro = (s.errors as Record<string, unknown>[] | undefined)?.[0];
+              const patch: Record<string, unknown> = {
+                status_entrega: status,
+                status_em: s.timestamp ? new Date(Number(s.timestamp) * 1000).toISOString() : new Date().toISOString(),
+              };
+              if (status === "falhou" && erro) {
+                patch.erro_envio = String(erro.title ?? erro.message ?? "falha no envio").slice(0, 300);
+              }
+              await db.from("lead_mensagens").update(patch)
+                .eq("empresa_id", canal.empresa_id).eq("external_id", id);
+            }
+          }
+
           // COEXISTÊNCIA: o vendedor respondeu pelo app do celular
           if (campo === "smb_message_echoes") {
             for (const e of (value?.message_echoes as Record<string, unknown>[] ?? [])) {
@@ -762,6 +791,36 @@ serve(async (req: Request) => {
         const canal = await canalPorExternalId(tipo, entry?.id as string | undefined);
         if (!canal) continue;
         for (const m of (entry.messaging as Record<string, unknown>[] ?? [])) {
+          // IG/Messenger confirmam entrega e leitura em eventos próprios, que
+          // trazem a lista de ids (delivery) ou um marco de tempo (read).
+          const entrega = m.delivery as Record<string, unknown> | undefined;
+          if (entrega?.mids) {
+            for (const mid of (entrega.mids as string[])) {
+              await db.from("lead_mensagens")
+                .update({ status_entrega: "entregue", status_em: new Date().toISOString() })
+                .eq("empresa_id", canal.empresa_id).eq("external_id", mid);
+            }
+            continue;
+          }
+          const leitura = m.read as Record<string, unknown> | undefined;
+          if (leitura) {
+            // Só há o "até quando" foi lido: marca como lidas as enviadas ao
+            // cliente até esse instante, que é a semântica do evento.
+            const cliente = (m.sender as Record<string, unknown> | undefined)?.id as string | undefined;
+            const ate = leitura.watermark ? new Date(Number(leitura.watermark)).toISOString() : null;
+            if (cliente && ate) {
+              const { data: lead } = await db.from("leads").select("id")
+                .eq("empresa_id", canal.empresa_id).eq("origem_id", cliente).eq("ativo", true).maybeSingle();
+              if (lead?.id) {
+                await db.from("lead_mensagens")
+                  .update({ status_entrega: "lida", status_em: new Date().toISOString() })
+                  .eq("lead_id", lead.id).eq("direcao", "enviada").lte("created_at", ate)
+                  .in("status_entrega", ["enviada", "entregue"]);
+              }
+            }
+            continue;
+          }
+
           const message = m.message as Record<string, unknown> | undefined;
           const mid = message?.mid as string | undefined;
           const midia = await extrairMidiaMeta(canal, message);
