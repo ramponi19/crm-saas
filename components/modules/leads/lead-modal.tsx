@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2 } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -67,6 +67,8 @@ async function entregarViaEdge(
 
 interface ChatMsg {
   from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null
+  /** Marca de tempo crua — usada para calcular a janela de 24h. */
+  iso?: string
   /** Confirmação da Meta (só em mensagem enviada): enviada | entregue | lida | falhou. */
   status?: string | null
   erro?: string | null
@@ -119,6 +121,14 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   const [loadingChat, setLoadingChat] = useState(true)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  // A janela de 24h vale só para o WhatsApp: Instagram e Messenger não têm essa
+  // restrição, e avisar onde não se aplica seria ruído.
+  const ultimaDoCliente = [...chat].reverse().find((m) => m.from === 'cliente' && m.iso)?.iso
+  const janelaFechada =
+    lead.origem === 'whatsapp' &&
+    chat.length > 0 &&
+    (!ultimaDoCliente || Date.now() - new Date(ultimaDoCliente).getTime() > 24 * 60 * 60 * 1000)
+
   useEffect(() => {
     let cancel = false
     async function load() {
@@ -143,6 +153,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         status: m.status_entrega,
         erro: m.erro_envio,
         externalId: m.external_id,
+        iso: m.created_at,
       }))
       setChat(msgs)
       setLoadingChat(false)
@@ -171,6 +182,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               status: m.status_entrega ?? null,
               erro: m.erro_envio ?? null,
               externalId: m.external_id ?? null,
+              iso: m.created_at,
             }
             if (novaMsg.from === 'loja') {
               // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
@@ -546,6 +558,21 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               })}
               <div ref={chatEndRef} />
             </div>
+
+            {/* Janela de atendimento do WhatsApp: passadas 24h da última mensagem
+                do cliente, a Meta só aceita modelo aprovado. Avisar ANTES é o que
+                evita o vendedor escrever, tomar erro e não entender o motivo. */}
+            {janelaFechada && (
+              <div className="flex items-start gap-2 border-t border-warn/25 bg-warn-soft px-3 py-2.5 sm:px-5">
+                <Clock size={14} strokeWidth={1.8} className="mt-0.5 flex-none text-warn" />
+                <p className="text-[11.5px] leading-relaxed text-ink-2">
+                  <strong className="text-ink">Faz mais de 24h que o cliente não escreve.</strong>{' '}
+                  O WhatsApp só permite retomar por <strong className="text-ink">modelo aprovado</strong> pela Meta —
+                  mensagem livre vai ser recusada. Uma ligação ou uma mensagem do próprio cliente reabre a conversa.
+                </p>
+              </div>
+            )}
+
             <div className="flex items-center gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
               <input
                 ref={fileRef}
