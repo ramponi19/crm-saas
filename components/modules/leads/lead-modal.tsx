@@ -38,12 +38,24 @@ const CANAL_NOME: Record<string, string> = {
 // NÃO alterar a lógica abaixo sem alinhamento — impacta a aprovação de API da Meta.
 const FUNCTIONS_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
 
-async function entregarViaEdge(action: 'send' | 'send_meta', payload: Record<string, unknown>) {
+// Manda o token da SESSÃO, não a anon key. A anon key é pública (vai no bundle do
+// front), então antes qualquer pessoa que a copiasse conseguia disparar mensagem
+// pela conta do cliente. A Edge agora exige este token e confere se o usuário
+// pertence à empresa dona do lead.
+async function entregarViaEdge(
+  supabase: ReturnType<typeof createClient>,
+  action: 'send' | 'send_meta',
+  payload: Record<string, unknown>,
+) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Sessão expirada. Entre novamente para enviar.')
+
   const res = await fetch(`${FUNCTIONS_URL}?action=${action}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify(payload),
   })
@@ -170,10 +182,10 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
 
     try {
       if (canal === 'instagram' || canal === 'messenger') {
-        await entregarViaEdge('send_meta', { leadId: lead.id, texto: t, canal })
+        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, texto: t, canal })
       } else if (canal === 'whatsapp') {
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
-        await entregarViaEdge('send', { number: lead.telefone, text: t, leadId: lead.id })
+        await entregarViaEdge(supabase, 'send', { number: lead.telefone, text: t, leadId: lead.id })
       } else {
         if (!empresa?.id) throw new Error('Empresa não encontrada')
         const { error } = await supabase.from('lead_mensagens').insert({
@@ -212,10 +224,10 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       setChat((prev) => [...prev, { from: 'loja', text: `[${tipoDb}]`, time: 'agora', tipo: tipoDb, midiaUrl: url }])
 
       if (canal === 'instagram' || canal === 'messenger') {
-        await entregarViaEdge('send_meta', { leadId: lead.id, canal, midiaUrl: url, tipoMidia })
+        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, canal, midiaUrl: url, tipoMidia })
       } else if (canal === 'whatsapp') {
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
-        await entregarViaEdge('send', { number: lead.telefone, leadId: lead.id, midiaUrl: url, tipoMidia })
+        await entregarViaEdge(supabase, 'send', { number: lead.telefone, leadId: lead.id, midiaUrl: url, tipoMidia })
       } else {
         if (!empresa?.id) throw new Error('Empresa não encontrada')
         const { error } = await supabase.from('lead_mensagens').insert({
