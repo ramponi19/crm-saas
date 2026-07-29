@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      canais_conectados: {
+        Row: {
+          id: number
+          empresa_id: number
+          tipo: string
+          external_id: string
+          waba_id: string | null
+          ig_user_id: string | null
+          nome_exibicao: string | null
+          access_token_enc: string | null
+          token_expira_em: string | null
+          data_access_expira_em: string | null
+          coexistencia: boolean
+          status: string
+          ultimo_erro: string | null
+          ultimo_erro_em: string | null
+          conectado_em: string
+          ultima_msg_em: string | null
+          sync_contatos_em: string | null
+          sync_historico_em: string | null
+          sync_request_ids: Json
+          sync_historico_pct: number | null
+          criado_por: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          tipo: string
+          external_id: string
+          waba_id?: string | null
+          ig_user_id?: string | null
+          nome_exibicao?: string | null
+          access_token_enc?: string | null
+          token_expira_em?: string | null
+          data_access_expira_em?: string | null
+          coexistencia?: boolean
+          status?: string
+          ultimo_erro?: string | null
+          ultimo_erro_em?: string | null
+          conectado_em?: string
+          ultima_msg_em?: string | null
+          sync_contatos_em?: string | null
+          sync_historico_em?: string | null
+          sync_request_ids?: Json
+          sync_historico_pct?: number | null
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          tipo?: string
+          external_id?: string
+          waba_id?: string | null
+          ig_user_id?: string | null
+          nome_exibicao?: string | null
+          access_token_enc?: string | null
+          token_expira_em?: string | null
+          data_access_expira_em?: string | null
+          coexistencia?: boolean
+          status?: string
+          ultimo_erro?: string | null
+          ultimo_erro_em?: string | null
+          conectado_em?: string
+          ultima_msg_em?: string | null
+          sync_contatos_em?: string | null
+          sync_historico_em?: string | null
+          sync_request_ids?: Json
+          sync_historico_pct?: number | null
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fipe_referencia: {
         Row: {
           id: number
