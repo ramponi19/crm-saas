@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loader2, Info } from 'lucide-react'
 import { Button, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 
@@ -46,6 +46,12 @@ declare global {
   }
 }
 
+// A janela da Meta pode NUNCA chamar de volta — domínio não autorizado no app,
+// pop-up bloqueado pelo navegador, ou o usuário fechando a aba. Sem um limite de
+// espera, a tela fica travada para sempre (foi o que aconteceu na primeira
+// tentativa real). Este teto devolve o controle e explica o motivo provável.
+const ESPERA_MAX_MS = 75_000
+
 function carregarSdk(appId: string): Promise<boolean> {
   return new Promise((resolve) => {
     if (window.FB) return resolve(true)
@@ -76,6 +82,22 @@ export function CanaisView({ appId }: { appId: string }) {
   // Cliente com mais de uma Página: guarda o código para reenviar com a escolha
   // dele, em vez de conectar a primeira no escuro.
   const [escolha, setEscolha] = useState<{ code: string; paginas: { id: string; nome: string }[] } | null>(null)
+
+  // Libera a tela quando a janela da Meta não responde. Guardado em ref para o
+  // callback poder cancelar o relógio se ele chegar antes.
+  const relogio = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pararRelogio = () => { if (relogio.current) { clearTimeout(relogio.current); relogio.current = null } }
+  function armarRelogio() {
+    pararRelogio()
+    relogio.current = setTimeout(() => {
+      setConectando(null)
+      notify.warn(
+        'A janela da Meta não respondeu.',
+        'Verifique se o navegador bloqueou o pop-up. Se não foi isso, o domínio do CRM ainda não está autorizado no app da Meta — me chame para configurar.',
+      )
+    }, ESPERA_MAX_MS)
+  }
+  useEffect(() => pararRelogio, [])
 
   const buscar = useCallback(async () => {
     const r = await fetch('/api/canais')
@@ -113,7 +135,9 @@ export function CanaisView({ appId }: { appId: string }) {
     }
     window.addEventListener('message', ouvir)
 
+    armarRelogio()
     window.FB!.login(async (resp) => {
+      pararRelogio()
       window.removeEventListener('message', ouvir)
       const code = resp?.authResponse?.code
       if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
@@ -155,7 +179,9 @@ export function CanaisView({ appId }: { appId: string }) {
 
     if (!(await carregarSdk(appId))) { setConectando(null); return notify.bad('Não foi possível carregar o conector da Meta.') }
 
+    armarRelogio()
     window.FB!.login(async (resp) => {
+      pararRelogio()
       const code = resp?.authResponse?.code
       if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
       await gravarMeta(code)
@@ -269,11 +295,14 @@ export function CanaisView({ appId }: { appId: string }) {
                     <Button
                       variant="ghost" size="sm"
                       onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : conectarMeta())}
-                      disabled={!!conectando || !!faltaConfig}
+                      disabled={conectando === tipo || !!faltaConfig}
                     >
-                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Reconectar
+                      {conectando === tipo
+                        ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                      Reconectar
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setADesconectar(c)} disabled={!!conectando}>
+                    <Button variant="ghost" size="sm" onClick={() => setADesconectar(c)} disabled={conectando === tipo}>
                       <Unplug className="mr-1.5 h-3.5 w-3.5" /> Desconectar
                     </Button>
                   </>
@@ -281,10 +310,10 @@ export function CanaisView({ appId }: { appId: string }) {
                   <Button
                     size="sm"
                     onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : conectarMeta())}
-                    disabled={!!conectando || !!faltaConfig}
+                    disabled={conectando === tipo || !!faltaConfig}
                   >
                     {conectando === tipo ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                    Conectar
+                    {conectando === tipo ? 'Aguardando a Meta…' : 'Conectar'}
                   </Button>
                 )}
               </div>
