@@ -40,7 +40,16 @@ declare global {
   interface Window {
     FB?: {
       init: (o: Record<string, unknown>) => void
-      login: (cb: (r: { authResponse?: { code?: string } | null; status?: string }) => void, o: Record<string, unknown>) => void
+      /**
+       * O callback tem retorno `void` de propósito: passar uma função `async`
+       * faz o SDK estourar com "Expression is of type asyncfunction, not
+       * function". A assinatura aqui existe para o TypeScript reclamar antes de
+       * o erro acontecer no navegador.
+       */
+      login: (
+        cb: (r: { authResponse?: { code?: string } | null; status?: string }) => void,
+        o: Record<string, unknown>,
+      ) => void
     }
     fbAsyncInit?: () => void
   }
@@ -148,13 +157,10 @@ export function CanaisView({ appId }: { appId: string }) {
     }
     window.addEventListener('message', ouvir)
 
-    armarRelogio()
-    try {
-      window.FB.login(async (resp) => {
-      pararRelogio()
-      window.removeEventListener('message', ouvir)
-      const code = resp?.authResponse?.code
-      if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
+    // O callback NÃO pode ser async: o SDK do Facebook valida o tipo e recusa
+    // com "Expression is of type asyncfunction, not function". Por isso ele é
+    // síncrono e só dispara o trabalho assíncrono.
+    const gravarWhatsApp = async (code: string) => {
       try {
         const r = await fetch('/api/canais/whatsapp', {
           method: 'POST',
@@ -172,6 +178,16 @@ export function CanaisView({ appId }: { appId: string }) {
       } finally {
         setConectando(null)
       }
+    }
+
+    armarRelogio()
+    try {
+      window.FB.login((resp) => {
+        pararRelogio()
+        window.removeEventListener('message', ouvir)
+        const code = resp?.authResponse?.code
+        if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
+        void gravarWhatsApp(code)
       }, {
         config_id: configId,
         response_type: 'code',
@@ -202,11 +218,12 @@ export function CanaisView({ appId }: { appId: string }) {
     setConectando('instagram')
     armarRelogio()
     try {
-      window.FB.login(async (resp) => {
+      // Callback síncrono de propósito — o SDK recusa função async.
+      window.FB.login((resp) => {
         pararRelogio()
         const code = resp?.authResponse?.code
-        if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
-        await gravarMeta(code)
+        if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
+        void gravarMeta(code)
       }, { config_id: configId, response_type: 'code', override_default_response_type: true })
     } catch (e) {
       pararRelogio()
