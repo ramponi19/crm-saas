@@ -30,8 +30,9 @@ if (!APP_ID || !SECRET) {
 // O que cada canal precisa ter assinado para o CRM funcionar por completo.
 const EXIGIDO = {
   whatsapp_business_account: {
-    messages: 'mensagem que o cliente final manda',
-    statuses: 'confirmação de enviada / entregue / lida / falhou',
+    // NÃO existe campo "statuses" para assinar: a confirmação de entrega chega
+    // dentro deste mesmo campo, com um bloco `statuses` no lugar de `messages`.
+    messages: 'mensagem do cliente E confirmação de enviada/entregue/lida/falhou',
     smb_message_echoes: 'mensagem que o vendedor manda pelo app do celular (coexistência)',
     smb_app_state_sync: 'contatos da agenda do celular',
     history: 'histórico de 6 meses na conexão',

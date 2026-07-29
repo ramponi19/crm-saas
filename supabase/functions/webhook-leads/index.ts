@@ -778,9 +778,12 @@ serve(async (req: Request) => {
             }
           }
 
-          // Confirmação de entrega: a Meta avisa enviada → entregue → lida, ou
-          // falhou com motivo. Vem minutos depois e casa pelo id da mensagem.
-          if (campo === "statuses" || (!campo && value?.statuses)) {
+          // Confirmação de entrega: enviada → entregue → lida, ou falhou com motivo.
+          // ATENÇÃO: NÃO existe campo "statuses" para assinar. A Meta manda isto no
+          // MESMO campo `messages`, com um bloco `statuses` no lugar de `messages`
+          // (confirmado na referência oficial do webhook). Por isso a condição olha
+          // o CONTEÚDO e não o nome do campo — checar o nome deixaria isto morto.
+          if (value?.statuses) {
             for (const s of (value?.statuses as Record<string, unknown>[] ?? [])) {
               const id = s.id as string | undefined;
               if (!id) continue;
@@ -797,7 +800,18 @@ serve(async (req: Request) => {
                 status_em: s.timestamp ? new Date(Number(s.timestamp) * 1000).toISOString() : new Date().toISOString(),
               };
               if (status === "falhou" && erro) {
-                patch.erro_envio = String(erro.title ?? erro.message ?? "falha no envio").slice(0, 300);
+                const cod = Number(erro.code);
+                // Traduz os motivos que o lojista vê com mais frequência; o resto
+                // usa o texto da própria Meta.
+                const conhecidos: Record<number, string> = {
+                  131049: "Não entregue: a Meta limitou o envio para proteger o ecossistema. Espere o cliente responder.",
+                  131047: "Fora da janela de 24h — só modelo aprovado é aceito.",
+                  131026: "Número não tem WhatsApp ou não pode receber mensagem.",
+                  131042: "A conta da Meta está sem forma de pagamento.",
+                  470: "Fora da janela de 24h — use um modelo aprovado.",
+                };
+                patch.erro_envio = (conhecidos[cod]
+                  ?? String(erro.title ?? erro.message ?? "falha no envio")).slice(0, 300);
               }
               await db.from("lead_mensagens").update(patch)
                 .eq("empresa_id", canal.empresa_id).eq("external_id", id);
