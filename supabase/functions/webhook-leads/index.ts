@@ -120,11 +120,16 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
   return canal;
 }
 
+// Escolhe o canal de ENVIO da empresa. Uma empresa pode ter mais de um número ou
+// página no mesmo canal, então aqui NÃO se usa maybeSingle (que erra com 2 linhas
+// e derrubaria o envio) — pega o conectado mais recentemente, de forma determinística.
 async function canalPorEmpresa(empresaId: number, tipo: string): Promise<Canal | null> {
   const { data } = await db.from("canais_conectados")
     .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia")
-    .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo").maybeSingle();
-  return data ? montar(data, await decifrarToken(data.access_token_enc as string | null)) : null;
+    .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
+    .order("conectado_em", { ascending: false }).limit(1);
+  const linha = data?.[0];
+  return linha ? montar(linha, await decifrarToken(linha.access_token_enc as string | null)) : null;
 }
 
 async function marcarErroNoCanal(canalId: number, erro: string, status = "erro") {
