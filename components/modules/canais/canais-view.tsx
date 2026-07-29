@@ -83,6 +83,18 @@ export function CanaisView({ appId }: { appId: string }) {
   // dele, em vez de conectar a primeira no escuro.
   const [escolha, setEscolha] = useState<{ code: string; paginas: { id: string; nome: string }[] } | null>(null)
 
+  // O SDK é carregado no CARREGAMENTO DA TELA, não no clique. Motivo: carregar
+  // depois do clique exige `await`, e o await quebra a cadeia do gesto do usuário
+  // — o navegador passa a tratar a janela da Meta como pop-up automático e
+  // BLOQUEIA em silêncio (nenhuma janela abre, e a tela fica girando).
+  const [sdkPronto, setSdkPronto] = useState(false)
+  useEffect(() => {
+    if (!appId) return
+    let vivo = true
+    carregarSdk(appId).then((ok) => { if (vivo) setSdkPronto(ok) })
+    return () => { vivo = false }
+  }, [appId])
+
   // Libera a tela quando a janela da Meta não responde. Guardado em ref para o
   // callback poder cancelar o relógio se ele chegar antes.
   const relogio = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -112,13 +124,14 @@ export function CanaisView({ appId }: { appId: string }) {
   const por = (t: Canal['tipo']) => canais.find((c) => c.tipo === t)
 
   // ── WhatsApp: Embedded Signup com coexistência ────────────────────────────
-  async function conectarWhatsApp() {
+  function conectarWhatsApp() {
     setAvisoWhats(false)
     const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID_WA
     if (!configId) return notify.bad('Configuração do WhatsApp ausente no servidor.')
+    if (!window.FB) {
+      return notify.warn('O conector da Meta ainda está carregando.', 'Tente novamente em alguns segundos.')
+    }
     setConectando('whatsapp')
-
-    if (!(await carregarSdk(appId))) { setConectando(null); return notify.bad('Não foi possível carregar o conector da Meta.') }
 
     // O fluxo devolve os identificadores por mensagem de janela; o código de
     // troca vem no retorno do login. Precisamos dos dois, então escutamos antes.
@@ -136,7 +149,8 @@ export function CanaisView({ appId }: { appId: string }) {
     window.addEventListener('message', ouvir)
 
     armarRelogio()
-    window.FB!.login(async (resp) => {
+    try {
+      window.FB.login(async (resp) => {
       pararRelogio()
       window.removeEventListener('message', ouvir)
       const code = resp?.authResponse?.code
@@ -158,34 +172,47 @@ export function CanaisView({ appId }: { appId: string }) {
       } finally {
         setConectando(null)
       }
-    }, {
-      config_id: configId,
-      response_type: 'code',
-      override_default_response_type: true,
-      extras: {
-        setup: {},
-        // É esta linha que oferece "usar o número que já está no meu celular".
-        featureType: 'whatsapp_business_app_onboarding',
-        sessionInfoVersion: '3',
-      },
-    })
+      }, {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          // É esta linha que oferece "usar o número que já está no meu celular".
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
+        },
+      })
+    } catch (e) {
+      // Se o SDK estourar aqui, sem o catch o estado ficaria preso girando.
+      pararRelogio()
+      window.removeEventListener('message', ouvir)
+      setConectando(null)
+      notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
+    }
   }
 
   // ── Instagram + Messenger: um login serve os dois ─────────────────────────
-  async function conectarMeta() {
+  function conectarMeta() {
     const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG
     if (!configId) return notify.bad('Configuração do Instagram/Messenger ausente no servidor.')
+    if (!window.FB) {
+      return notify.warn('O conector da Meta ainda está carregando.', 'Tente novamente em alguns segundos.')
+    }
     setConectando('instagram')
-
-    if (!(await carregarSdk(appId))) { setConectando(null); return notify.bad('Não foi possível carregar o conector da Meta.') }
-
     armarRelogio()
-    window.FB!.login(async (resp) => {
+    try {
+      window.FB.login(async (resp) => {
+        pararRelogio()
+        const code = resp?.authResponse?.code
+        if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
+        await gravarMeta(code)
+      }, { config_id: configId, response_type: 'code', override_default_response_type: true })
+    } catch (e) {
       pararRelogio()
-      const code = resp?.authResponse?.code
-      if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
-      await gravarMeta(code)
-    }, { config_id: configId, response_type: 'code', override_default_response_type: true })
+      setConectando(null)
+      notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
+    }
   }
 
   async function gravarMeta(code: string, pageId?: string) {
@@ -230,6 +257,24 @@ export function CanaisView({ appId }: { appId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Estado do conector visível: sem isto, qualquer falha de carregamento
+          aparece só como um botão girando, sem explicação. */}
+      {(!appId || !sdkPronto) && !faltaConfig && (
+        <div className="flex gap-3 rounded-control border border-warn/30 bg-warn-soft p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-warn" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {!appId ? 'Conector da Meta não configurado' : 'Carregando o conector da Meta…'}
+            </p>
+            <p className="mt-1 text-ink-2">
+              {!appId
+                ? 'Falta o identificador do aplicativo no servidor. Conectar canal está indisponível até isso ser corrigido.'
+                : 'Aguarde alguns segundos. Se esta mensagem não sair, algum bloqueador de scripts pode estar impedindo o carregamento.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {faltaConfig && (
         <div className="flex gap-3 rounded-control border border-bad/30 bg-bad-soft p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-bad" />
