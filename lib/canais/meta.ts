@@ -189,6 +189,27 @@ export async function assinarPagina(pageId: string, tokenPagina: string): Promis
 }
 
 /**
+ * Descobre a conta WhatsApp (WABA) a partir do próprio token do cliente.
+ *
+ * Necessário no fluxo por REDIRECIONAMENTO: sem o pop-up do SDK não existe o
+ * `postMessage` que entrega o waba_id, então ele é derivado dos escopos
+ * concedidos ao token — `granular_scopes` traz os ids dos ativos autorizados.
+ */
+export async function wabaDoToken(token: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${G}/debug_token?input_token=${token}&access_token=${APP_ID}|${APP_SECRET}`)
+    const j = await r.json()
+    const escopos = j?.data?.granular_scopes as { scope?: string; target_ids?: string[] }[] | undefined
+    if (!escopos) return null
+    const alvo = escopos.find((e) => e.scope === 'whatsapp_business_management')
+      ?? escopos.find((e) => e.scope === 'whatsapp_business_messaging')
+    return alvo?.target_ids?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Domínios autorizados no app da Meta. O SDK de login recusa em SILÊNCIO quando a
  * página está num domínio fora desta lista — nenhuma janela abre, nenhum erro
  * aparece. Ler isto permite a tela dizer o motivo em vez de deixar o usuário

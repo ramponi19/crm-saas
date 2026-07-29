@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { cifrarToken } from '@/lib/canais/crypto'
 import {
   trocarCodigoPorToken, inspecionarToken, assinarWaba, statusDoNumero,
-  sincronizarAppDoCelular, numerosDaWaba, metaConfigurada, ehErro,
+  sincronizarAppDoCelular, numerosDaWaba, wabaDoToken, metaConfigurada, ehErro,
 } from '@/lib/canais/meta'
 
 /**
@@ -38,8 +38,8 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as { code?: string; wabaId?: string; phoneNumberId?: string }
-    const { code, wabaId } = body
-    if (!code || !wabaId) {
+    const { code } = body
+    if (!code) {
       return NextResponse.json(
         { error: 'Conexão incompleta. Refaça o processo pelo botão Conectar.' },
         { status: 400 },
@@ -49,6 +49,19 @@ export async function POST(req: Request) {
     // 1. código → token do cliente
     const troca = await trocarCodigoPorToken(code)
     if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
+
+    // No fluxo por redirecionamento não existe o postMessage do SDK, então o id da
+    // conta WhatsApp é derivado dos escopos concedidos ao próprio token.
+    let wabaId = body.wabaId
+    if (!wabaId) {
+      wabaId = (await wabaDoToken(troca.token)) ?? undefined
+      if (!wabaId) {
+        return NextResponse.json(
+          { error: 'Conectou na Meta, mas nenhuma conta WhatsApp foi autorizada. Refaça e marque a conta na tela da Meta.' },
+          { status: 502 },
+        )
+      }
+    }
 
     // O fluxo de coexistência às vezes devolve só o id da CONTA. Sem o id do
     // número não há roteamento nem envio, então busca na conta quando faltar.

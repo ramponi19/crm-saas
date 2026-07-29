@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loader2, Info } from 'lucide-react'
 import { Button, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 
@@ -36,47 +36,6 @@ const ROTULO_STATUS: Record<Canal['status'], { texto: string; tom: 'ok' | 'warn'
   desconectado: { texto: 'Desconectado', tom: 'warn' },
 }
 
-declare global {
-  interface Window {
-    FB?: {
-      init: (o: Record<string, unknown>) => void
-      /**
-       * O callback tem retorno `void` de propósito: passar uma função `async`
-       * faz o SDK estourar com "Expression is of type asyncfunction, not
-       * function". A assinatura aqui existe para o TypeScript reclamar antes de
-       * o erro acontecer no navegador.
-       */
-      login: (
-        cb: (r: { authResponse?: { code?: string } | null; status?: string }) => void,
-        o: Record<string, unknown>,
-      ) => void
-    }
-    fbAsyncInit?: () => void
-  }
-}
-
-// A janela da Meta pode NUNCA chamar de volta — domínio não autorizado no app,
-// pop-up bloqueado pelo navegador, ou o usuário fechando a aba. Sem um limite de
-// espera, a tela fica travada para sempre (foi o que aconteceu na primeira
-// tentativa real). Este teto devolve o controle e explica o motivo provável.
-const ESPERA_MAX_MS = 75_000
-
-function carregarSdk(appId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (window.FB) return resolve(true)
-    window.fbAsyncInit = () => {
-      window.FB?.init({ appId, autoLogAppEvents: true, xfbml: false, version: 'v25.0' })
-      resolve(true)
-    }
-    const s = document.createElement('script')
-    s.src = 'https://connect.facebook.net/pt_BR/sdk.js'
-    s.async = true
-    s.defer = true
-    s.crossOrigin = 'anonymous'
-    s.onerror = () => resolve(false)
-    document.head.appendChild(s)
-  })
-}
 
 const dataBr = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null
@@ -108,7 +67,6 @@ export function CanaisView({ appId }: { appId: string }) {
             temAppId: !!appId,
             temConfigWa: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_WA,
             temConfigIg: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG,
-            sdkCarregado: typeof window !== 'undefined' && !!window.FB,
             navegador: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 120) : null,
           },
         }),
@@ -117,38 +75,39 @@ export function CanaisView({ appId }: { appId: string }) {
     } catch { /* diagnóstico nunca pode atrapalhar o fluxo */ }
   }, [appId])
 
-  // O SDK é carregado no CARREGAMENTO DA TELA, não no clique. Motivo: carregar
-  // depois do clique exige `await`, e o await quebra a cadeia do gesto do usuário
-  // — o navegador passa a tratar a janela da Meta como pop-up automático e
-  // BLOQUEIA em silêncio (nenhuma janela abre, e a tela fica girando).
-  const [sdkPronto, setSdkPronto] = useState(false)
-  useEffect(() => {
-    if (!appId) { registrar('carregou', { resultado: 'sem appId' }); return }
-    let vivo = true
-    carregarSdk(appId).then((ok) => {
-      if (!vivo) return
-      setSdkPronto(ok)
-      registrar('carregou', { resultado: ok ? 'sdk ok' : 'sdk falhou' })
-    })
-    return () => { vivo = false }
-  }, [appId, registrar])
 
-  // Libera a tela quando a janela da Meta não responde. Guardado em ref para o
-  // callback poder cancelar o relógio se ele chegar antes.
-  const relogio = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pararRelogio = () => { if (relogio.current) { clearTimeout(relogio.current); relogio.current = null } }
-  function armarRelogio() {
-    pararRelogio()
-    relogio.current = setTimeout(() => {
-      setConectando(null)
-      registrar('timeout', { esperaMs: ESPERA_MAX_MS })
-      notify.warn(
-        'A janela da Meta não respondeu.',
-        'Verifique se o navegador bloqueou o pop-up. Se não foi isso, o domínio do CRM ainda não está autorizado no app da Meta — me chame para configurar.',
-      )
-    }, ESPERA_MAX_MS)
+  // ── Conexão por REDIRECIONAMENTO (sem pop-up) ─────────────────────────────
+  // O caminho do SDK depende de pop-up, e pop-up é bloqueado por navegador,
+  // extensão e política de privacidade — no primeiro teste real a janela nunca
+  // abriu, sem erro nenhum. Aqui a página inteira vai para a Meta e volta com o
+  // código na URL. Volta para /canais, que já é um endereço autorizado no app,
+  // então não exige configuração nova.
+  function irParaMeta(tipo: 'whatsapp' | 'meta') {
+    const configId = tipo === 'whatsapp'
+      ? process.env.NEXT_PUBLIC_META_CONFIG_ID_WA
+      : process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG
+    if (!configId || !appId) return notify.bad('Conector da Meta não configurado no servidor.')
+
+    try { sessionStorage.setItem('canal_conectando', tipo) } catch { /* modo privado */ }
+    registrar('redirecionando', { canal: tipo })
+
+    const retorno = `${window.location.origin}/canais`
+    const p = new URLSearchParams({
+      client_id: appId,
+      config_id: configId,
+      response_type: 'code',
+      override_default_response_type: 'true',
+      redirect_uri: retorno,
+    })
+    // Liga a coexistência também neste caminho — é o que oferece usar o número
+    // que já está no celular do cliente.
+    if (tipo === 'whatsapp') {
+      p.set('extras', JSON.stringify({
+        setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3',
+      }))
+    }
+    window.location.assign(`https://www.facebook.com/v25.0/dialog/oauth?${p.toString()}`)
   }
-  useEffect(() => pararRelogio, [])
 
   const buscar = useCallback(async () => {
     const r = await fetch('/api/canais')
@@ -160,114 +119,61 @@ export function CanaisView({ appId }: { appId: string }) {
 
   useEffect(() => { buscar() }, [buscar])
 
+  // Volta da Meta: o código chega na própria URL. Conclui a conexão e limpa o
+  // endereço, para um F5 não tentar reusar um código já gasto.
+  const [voltandoDaMeta, setVoltandoDaMeta] = useState(false)
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code')
+    const erroMeta = url.searchParams.get('error_description') ?? url.searchParams.get('error')
+    if (!code && !erroMeta) return
+
+    const tipo = (() => { try { return sessionStorage.getItem('canal_conectando') } catch { return null } })()
+    try { sessionStorage.removeItem('canal_conectando') } catch { /* ignora */ }
+    window.history.replaceState({}, '', '/canais')
+
+    if (erroMeta) {
+      registrar('retorno_erro', { erro: erroMeta, canal: tipo })
+      notify.bad('A Meta recusou a conexão.', erroMeta)
+      return
+    }
+    registrar('retorno', { canal: tipo, temCode: true })
+    setVoltandoDaMeta(true)
+
+    const finalizar = async () => {
+      try {
+        const rota = tipo === 'whatsapp' ? '/api/canais/whatsapp' : '/api/canais/meta'
+        const r = await fetch(rota, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code! }),
+        })
+        const j = await r.json()
+        if (!r.ok) throw new Error(j.error ?? 'Falha ao concluir a conexão.')
+        if (tipo === 'whatsapp') {
+          notify.ok(j.coexistencia ? 'WhatsApp conectado — segue funcionando no seu celular também.' : 'WhatsApp conectado.')
+          if (j.instrucao) notify.info(j.instrucao)
+        } else if (j.outrasPaginas?.length) {
+          setEscolha({ code: code!, paginas: j.outrasPaginas })
+        } else {
+          notify.ok(`Conectado: ${j.pagina}${j.instagram ? ` e ${j.instagram}` : ''}`)
+        }
+        ;(j.avisos ?? []).forEach((a: string) => notify.info(a))
+        registrar('gravado', { canal: tipo })
+        await buscar()
+      } catch (e) {
+        registrar('retorno_falhou', { canal: tipo, msg: (e as Error).message })
+        notify.bad((e as Error).message)
+      } finally {
+        setVoltandoDaMeta(false)
+      }
+    }
+    void finalizar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const por = (t: Canal['tipo']) => canais.find((c) => c.tipo === t)
 
   // ── WhatsApp: Embedded Signup com coexistência ────────────────────────────
-  function conectarWhatsApp() {
-    setAvisoWhats(false)
-    const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID_WA
-    if (!configId) return notify.bad('Configuração do WhatsApp ausente no servidor.')
-    if (!window.FB) {
-      return notify.warn('O conector da Meta ainda está carregando.', 'Tente novamente em alguns segundos.')
-    }
-    setConectando('whatsapp')
-
-    // O fluxo devolve os identificadores por mensagem de janela; o código de
-    // troca vem no retorno do login. Precisamos dos dois, então escutamos antes.
-    let waba: string | null = null
-    let numero: string | null = null
-    const ouvir = (ev: MessageEvent) => {
-      if (!/facebook\.com$/.test(new URL(ev.origin).hostname)) return
-      try {
-        const d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data
-        if (d?.type !== 'WA_EMBEDDED_SIGNUP') return
-        if (d.data?.waba_id) waba = String(d.data.waba_id)
-        if (d.data?.phone_number_id) numero = String(d.data.phone_number_id)
-      } catch { /* mensagem de outro formato: ignora */ }
-    }
-    window.addEventListener('message', ouvir)
-
-    // O callback NÃO pode ser async: o SDK do Facebook valida o tipo e recusa
-    // com "Expression is of type asyncfunction, not function". Por isso ele é
-    // síncrono e só dispara o trabalho assíncrono.
-    const gravarWhatsApp = async (code: string) => {
-      try {
-        const r = await fetch('/api/canais/whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, wabaId: waba, phoneNumberId: numero }),
-        })
-        const j = await r.json()
-        if (!r.ok) throw new Error(j.error ?? 'Falha ao conectar.')
-        notify.ok(j.coexistencia ? 'WhatsApp conectado — segue funcionando no seu celular também.' : 'WhatsApp conectado.')
-        ;(j.avisos ?? []).forEach((a: string) => notify.info(a))
-        if (j.instrucao) notify.info(j.instrucao)
-        await buscar()
-      } catch (e) {
-        notify.bad((e as Error).message)
-      } finally {
-        setConectando(null)
-      }
-    }
-
-    registrar('clique', { canal: 'whatsapp', configId })
-    armarRelogio()
-    try {
-      window.FB.login((resp) => {
-        pararRelogio()
-        registrar('callback', { canal: 'whatsapp', status: resp?.status ?? null, temCode: !!resp?.authResponse?.code, waba, numero })
-        window.removeEventListener('message', ouvir)
-        const code = resp?.authResponse?.code
-        if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
-        void gravarWhatsApp(code)
-      }, {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: {
-          setup: {},
-          // É esta linha que oferece "usar o número que já está no meu celular".
-          featureType: 'whatsapp_business_app_onboarding',
-          sessionInfoVersion: '3',
-        },
-      })
-    } catch (e) {
-      // Se o SDK estourar aqui, sem o catch o estado ficaria preso girando.
-      pararRelogio()
-      window.removeEventListener('message', ouvir)
-      setConectando(null)
-      registrar('erro', { canal: 'whatsapp', msg: (e as Error).message })
-      notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
-    }
-  }
-
-  // ── Instagram + Messenger: um login serve os dois ─────────────────────────
-  function conectarMeta() {
-    const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG
-    if (!configId) return notify.bad('Configuração do Instagram/Messenger ausente no servidor.')
-    if (!window.FB) {
-      return notify.warn('O conector da Meta ainda está carregando.', 'Tente novamente em alguns segundos.')
-    }
-    setConectando('instagram')
-    registrar('clique', { canal: 'instagram_messenger', configId })
-    armarRelogio()
-    try {
-      // Callback síncrono de propósito — o SDK recusa função async.
-      window.FB.login((resp) => {
-        pararRelogio()
-        registrar('callback', { canal: 'instagram_messenger', status: resp?.status ?? null, temCode: !!resp?.authResponse?.code })
-        const code = resp?.authResponse?.code
-        if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
-        void gravarMeta(code)
-      }, { config_id: configId, response_type: 'code', override_default_response_type: true })
-    } catch (e) {
-      pararRelogio()
-      setConectando(null)
-      registrar('erro', { canal: 'instagram_messenger', msg: (e as Error).message })
-      notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
-    }
-  }
-
   async function gravarMeta(code: string, pageId?: string) {
     try {
       const r = await fetch('/api/canais/meta', {
@@ -312,17 +218,15 @@ export function CanaisView({ appId }: { appId: string }) {
     <div className="space-y-4">
       {/* Estado do conector visível: sem isto, qualquer falha de carregamento
           aparece só como um botão girando, sem explicação. */}
-      {(!appId || !sdkPronto) && !faltaConfig && (
+      {!appId && !faltaConfig && (
         <div className="flex gap-3 rounded-control border border-warn/30 bg-warn-soft p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-warn" />
           <div className="text-sm">
             <p className="font-semibold">
-              {!appId ? 'Conector da Meta não configurado' : 'Carregando o conector da Meta…'}
+              Conector da Meta não configurado
             </p>
             <p className="mt-1 text-ink-2">
-              {!appId
-                ? 'Falta o identificador do aplicativo no servidor. Conectar canal está indisponível até isso ser corrigido.'
-                : 'Aguarde alguns segundos. Se esta mensagem não sair, algum bloqueador de scripts pode estar impedindo o carregamento.'}
+              Falta o identificador do aplicativo no servidor. Conectar canal está indisponível até isso ser corrigido.
             </p>
           </div>
         </div>
@@ -392,8 +296,8 @@ export function CanaisView({ appId }: { appId: string }) {
                   <>
                     <Button
                       variant="ghost" size="sm"
-                      onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : conectarMeta())}
-                      disabled={conectando === tipo || !!faltaConfig}
+                      onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
+                      disabled={conectando === tipo || voltandoDaMeta || !!faltaConfig}
                     >
                       {conectando === tipo
                         ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -407,11 +311,11 @@ export function CanaisView({ appId }: { appId: string }) {
                 ) : (
                   <Button
                     size="sm"
-                    onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : conectarMeta())}
-                    disabled={conectando === tipo || !!faltaConfig}
+                    onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
+                    disabled={voltandoDaMeta || !!faltaConfig}
                   >
-                    {conectando === tipo ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                    {conectando === tipo ? 'Aguardando a Meta…' : 'Conectar'}
+                    {voltandoDaMeta ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                    {voltandoDaMeta ? 'Concluindo…' : 'Conectar'}
                   </Button>
                 )}
               </div>
@@ -433,7 +337,7 @@ export function CanaisView({ appId }: { appId: string }) {
         open={avisoWhats}
         title="Antes de conectar o WhatsApp"
         confirmLabel="Entendi, conectar"
-        onConfirm={conectarWhatsApp}
+        onConfirm={() => { setAvisoWhats(false); irParaMeta('whatsapp') }}
         onClose={() => setAvisoWhats(false)}
         description={
           <span className="block space-y-3">
