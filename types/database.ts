@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      modelos_mensagem: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          idioma: string
+          categoria: string
+          corpo: string
+          variaveis: Json
+          status: string
+          motivo_recusa: string | null
+          meta_id: string | null
+          ultima_sync_em: string | null
+          criado_por: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          empresa_id: number
+          nome: string
+          idioma?: string
+          categoria?: string
+          corpo: string
+          variaveis?: Json
+          status?: string
+          motivo_recusa?: string | null
+          meta_id?: string | null
+          ultima_sync_em?: string | null
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          empresa_id?: number
+          nome?: string
+          idioma?: string
+          categoria?: string
+          corpo?: string
+          variaveis?: Json
+          status?: string
+          motivo_recusa?: string | null
+          meta_id?: string | null
+          ultima_sync_em?: string | null
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       canais_conectados: {
         Row: {
           id: number

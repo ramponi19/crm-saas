@@ -183,6 +183,7 @@ export const CATALOGO: MenuGroupBase[] = [
     label: 'Sistema',
     items: [
       { href: '/canais', label: 'Canais', icon: 'Plug', adminOnly: true },
+      { href: '/modelos', label: 'Modelos', icon: 'MessageSquareText', adminOnly: true },
       { href: '/funil', label: 'Funil', icon: 'GitBranch', adminOnly: true },
       { href: '/cadencias', label: 'Cadências', icon: 'Repeat', adminOnly: true },
       { href: '/distribuicao', label: 'Distribuição', icon: 'Split', adminOnly: true },

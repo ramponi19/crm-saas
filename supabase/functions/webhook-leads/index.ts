@@ -508,6 +508,63 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
   return json({ success: true, provider: "evolution", data });
 }
 
+// Envio por MODELO APROVADO. É o único caminho aceito pela Meta quando passaram
+// 24h sem o cliente escrever. O texto que fica gravado na conversa é o corpo do
+// modelo já com as variáveis trocadas — senão o histórico mostraria "{{1}}".
+async function enviarModelo(canal: Canal, body: Record<string, unknown>) {
+  const number = String(body.number ?? '')
+  const leadId = body.leadId as string | undefined
+  const nome = String(body.modelo ?? '')
+  const idioma = String(body.idioma ?? 'pt_BR')
+  const params = (body.parametros as string[] | undefined) ?? []
+  const previa = body.previa as string | undefined
+
+  if (!canal.token || !canal.external_id) {
+    return json({ error: 'WhatsApp sem token válido nesta empresa. Reconecte em Canais.' }, 502);
+  }
+  if (!nome || !number) return json({ error: "modelo e number são obrigatórios" }, 400);
+
+  const num = number.replace(/\D/g, "");
+  const destino = num.startsWith("55") ? num : "55" + num;
+
+  const componentes = params.length
+    ? [{ type: "body", parameters: params.map((p) => ({ type: "text", text: String(p) })) }]
+    : undefined;
+
+  const r = await fetch(`https://graph.facebook.com/${GRAPH}/${canal.external_id}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${canal.token}` },
+    body: JSON.stringify({
+      messaging_product: "whatsapp", recipient_type: "individual", to: destino,
+      type: "template",
+      template: { name: nome, language: { code: idioma }, ...(componentes ? { components: componentes } : {}) },
+    }),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    const cod = data?.error?.code as number | undefined;
+    let msg = data?.error?.message ?? "erro ao enviar o modelo";
+    if (cod === 132001) msg = "Este modelo não está aprovado (ou o idioma não bate). Confira em Modelos.";
+    if (cod === 132000) msg = "O número de variáveis não bate com o modelo aprovado.";
+    if (cod === 190) await marcarErroNoCanal(canal.id, msg, "expirado");
+    if (cod === 131042) {
+      msg = "A conta da Meta não tem forma de pagamento. Cadastre um cartão no WhatsApp Manager para enviar.";
+      await marcarErroNoCanal(canal.id, msg, "erro");
+    }
+    return json({ error: msg }, r.status);
+  }
+
+  if (leadId) {
+    await db.from("lead_mensagens").insert([{
+      empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
+      conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
+      tipo: "texto", external_id: (data?.messages?.[0]?.id as string) ?? null,
+      status_entrega: "enviada", status_em: new Date().toISOString(),
+    }]);
+  }
+  return json({ success: true, modelo: nome });
+}
+
 async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>) {
   const leadId = body.leadId as string;
   const texto = body.texto as string | undefined;
@@ -575,7 +632,7 @@ serve(async (req: Request) => {
   const action = url.searchParams.get("action");
 
   // ── Envio pelo CRM ────────────────────────────────────────────────────────
-  if (action === "send" || action === "send_meta") {
+  if (action === "send" || action === "send_meta" || action === "send_template") {
     try {
       const leadId = body.leadId as string | undefined;
       if (!leadId) return json({ error: "leadId obrigatório" }, 400);
@@ -586,6 +643,12 @@ serve(async (req: Request) => {
 
       if (!(await usuarioAutorizado(req, lead.empresa_id as number))) {
         return json({ error: "não autorizado" }, 401);
+      }
+
+      if (action === "send_template") {
+        const canal = await canalPorEmpresa(lead.empresa_id as number, "whatsapp");
+        if (!canal) return json({ error: "WhatsApp não conectado nesta empresa" }, 502);
+        return await enviarModelo(canal, body);
       }
 
       if (action === "send") {

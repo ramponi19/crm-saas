@@ -188,5 +188,73 @@ export async function assinarPagina(pageId: string, tokenPagina: string): Promis
   return true
 }
 
+// ── Modelos de mensagem (templates) ─────────────────────────────────────────
+// São o único caminho para retomar conversa depois de 24h sem o cliente escrever.
+// O modelo é criado NA META, em nome da empresa, e passa por análise dela.
+
+/** Submete um modelo à análise da Meta. `corpo` usa {{1}}, {{2}}… */
+export async function criarModelo(
+  wabaId: string, token: string,
+  m: { nome: string; idioma: string; categoria: string; corpo: string; exemplos?: string[] },
+): Promise<{ metaId: string | null; status: string } | Erro> {
+  const componente: Record<string, unknown> = { type: 'BODY', text: m.corpo }
+  // A Meta exige exemplo para cada variável, senão recusa por falta de contexto.
+  if (m.exemplos?.length) componente.example = { body_text: [m.exemplos] }
+
+  const r = await fetch(`${G}/${wabaId}/message_templates`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: m.nome, language: m.idioma, category: m.categoria, components: [componente],
+    }),
+  })
+  const j = await r.json()
+  if (!r.ok) return falha(j, 'A Meta não aceitou o modelo.')
+  return { metaId: (j.id as string) ?? null, status: String(j.status ?? 'PENDING') }
+}
+
+/** Estado atual dos modelos na Meta — a análise pode levar minutos ou horas. */
+export async function listarModelos(wabaId: string, token: string): Promise<{
+  modelos: { metaId: string; nome: string; idioma: string; categoria: string; status: string; corpo: string; motivo: string | null }[]
+} | Erro> {
+  const campos = 'id,name,language,category,status,components,rejected_reason'
+  const r = await fetch(`${G}/${wabaId}/message_templates?fields=${campos}&limit=200&access_token=${token}`)
+  const j = await r.json()
+  if (!r.ok || !Array.isArray(j.data)) return falha(j, 'Não foi possível ler os modelos.')
+  return {
+    modelos: (j.data as Record<string, unknown>[]).map((t) => {
+      const body = (t.components as Record<string, unknown>[] | undefined)
+        ?.find((c) => c.type === 'BODY')
+      return {
+        metaId: String(t.id), nome: String(t.name ?? ''), idioma: String(t.language ?? ''),
+        categoria: String(t.category ?? ''), status: String(t.status ?? ''),
+        corpo: String(body?.text ?? ''),
+        motivo: (t.rejected_reason as string) && t.rejected_reason !== 'NONE'
+          ? String(t.rejected_reason) : null,
+      }
+    }),
+  }
+}
+
+/** Apaga o modelo na Meta (ela apaga por NOME, não por id). */
+export async function apagarModelo(wabaId: string, token: string, nome: string): Promise<true | Erro> {
+  const r = await fetch(`${G}/${wabaId}/message_templates?name=${encodeURIComponent(nome)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+  })
+  const j = await r.json()
+  if (!r.ok || !j.success) return falha(j, 'Não foi possível apagar o modelo na Meta.')
+  return true
+}
+
+// Status da Meta → status guardado aqui.
+export function statusDoModelo(metaStatus: string): string {
+  const m: Record<string, string> = {
+    APPROVED: 'aprovado', PENDING: 'pendente', IN_APPEAL: 'pendente',
+    REJECTED: 'rejeitado', PAUSED: 'pausado', DISABLED: 'desativado',
+    PENDING_DELETION: 'desativado',
+  }
+  return m[metaStatus] ?? 'pendente'
+}
+
 export const ehErro = (x: unknown): x is Erro =>
   typeof x === 'object' && x !== null && 'erro' in x

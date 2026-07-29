@@ -18,7 +18,7 @@ import { ProdutoAutocomplete } from './produto-autocomplete'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
-import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, notify } from '@/components/ui'
+import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
 
 interface LeadModalProps {
@@ -44,7 +44,7 @@ const FUNCTIONS_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webh
 // pertence à empresa dona do lead.
 async function entregarViaEdge(
   supabase: ReturnType<typeof createClient>,
-  action: 'send' | 'send_meta',
+  action: 'send' | 'send_meta' | 'send_template',
   payload: Record<string, unknown>,
 ) {
   const { data: { session } } = await supabase.auth.getSession()
@@ -128,6 +128,59 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     lead.origem === 'whatsapp' &&
     chat.length > 0 &&
     (!ultimaDoCliente || Date.now() - new Date(ultimaDoCliente).getTime() > 24 * 60 * 60 * 1000)
+
+  // Retomada por modelo aprovado — só carrega a lista quando o vendedor pede.
+  type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string }
+  const [modelosAbertos, setModelosAbertos] = useState(false)
+  const [carregandoModelos, setCarregandoModelos] = useState(false)
+  const [modelosAprovados, setModelosAprovados] = useState<ModeloAprovado[]>([])
+  const [modeloEscolhido, setModeloEscolhido] = useState<ModeloAprovado | null>(null)
+  const [paramsModelo, setParamsModelo] = useState<string[]>([])
+  const [enviandoModelo, setEnviandoModelo] = useState(false)
+
+  // Prévia com as variáveis já trocadas — é este texto que fica no histórico.
+  const previaModelo = modeloEscolhido
+    ? modeloEscolhido.corpo.replace(/\{\{(\d+)\}\}/g, (_, n) => paramsModelo[Number(n) - 1] || `{{${n}}}`)
+    : ''
+
+  async function abrirModelos() {
+    setModelosAbertos(true)
+    setModeloEscolhido(null)
+    setCarregandoModelos(true)
+    try {
+      const r = await fetch('/api/modelos')
+      const j = await r.json()
+      setModelosAprovados(
+        ((j.modelos ?? []) as (ModeloAprovado & { status: string })[]).filter((m) => m.status === 'aprovado'),
+      )
+    } catch {
+      notify.bad('Não foi possível carregar os modelos.')
+    } finally {
+      setCarregandoModelos(false)
+    }
+  }
+
+  async function enviarModelo() {
+    if (!modeloEscolhido) return
+    const faltam = (modeloEscolhido.corpo.match(/\{\{\d+\}\}/g) ?? []).length
+    if (paramsModelo.filter((p) => p?.trim()).length < faltam) {
+      return notify.warn('Preencha todas as variáveis do modelo.')
+    }
+    setEnviandoModelo(true)
+    try {
+      await entregarViaEdge(supabase, 'send_template', {
+        leadId: lead.id, number: lead.telefone, modelo: modeloEscolhido.nome,
+        idioma: modeloEscolhido.idioma, parametros: paramsModelo, previa: previaModelo,
+      })
+      setChat((p) => [...p, { from: 'loja', text: previaModelo, time: 'agora', status: 'enviada' }])
+      setModelosAbertos(false)
+      notify.ok('Modelo enviado. A conversa reabre quando o cliente responder.')
+    } catch (e) {
+      notify.bad((e as Error).message)
+    } finally {
+      setEnviandoModelo(false)
+    }
+  }
 
   useEffect(() => {
     let cancel = false
@@ -565,13 +618,72 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             {janelaFechada && (
               <div className="flex items-start gap-2 border-t border-warn/25 bg-warn-soft px-3 py-2.5 sm:px-5">
                 <Clock size={14} strokeWidth={1.8} className="mt-0.5 flex-none text-warn" />
-                <p className="text-[11.5px] leading-relaxed text-ink-2">
-                  <strong className="text-ink">Faz mais de 24h que o cliente não escreve.</strong>{' '}
-                  O WhatsApp só permite retomar por <strong className="text-ink">modelo aprovado</strong> pela Meta —
-                  mensagem livre vai ser recusada. Uma ligação ou uma mensagem do próprio cliente reabre a conversa.
-                </p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11.5px] leading-relaxed text-ink-2">
+                    <strong className="text-ink">Faz mais de 24h que o cliente não escreve.</strong>{' '}
+                    O WhatsApp só permite retomar por <strong className="text-ink">modelo aprovado</strong> pela Meta —
+                    mensagem livre vai ser recusada.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={abrirModelos}
+                    className="mt-1.5 text-[11.5px] font-semibold text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent"
+                  >
+                    Retomar com um modelo aprovado
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* Escolha do modelo + preenchimento das variáveis, sem sair da conversa. */}
+            <Modal open={modelosAbertos} onClose={() => setModelosAbertos(false)} title="Retomar a conversa" size="sm">
+              {carregandoModelos ? (
+                <div className="flex items-center gap-2 py-6 text-[13px] text-ink-3">
+                  <Loader2 size={15} className="animate-spin" /> Buscando modelos aprovados…
+                </div>
+              ) : modelosAprovados.length === 0 ? (
+                <div className="py-2 text-[13px] text-ink-2">
+                  <p className="font-semibold text-ink">Nenhum modelo aprovado ainda.</p>
+                  <p className="mt-1">
+                    Modelos são criados em <strong>Sistema → Modelos</strong> e passam por análise da Meta.
+                    Enquanto não houver um aprovado, a única forma de reabrir a conversa é o cliente escrever
+                    — ou você ligar para ele.
+                  </p>
+                </div>
+              ) : modeloEscolhido ? (
+                <div className="flex flex-col gap-3">
+                  <p className="rounded-control bg-raised p-3 text-[12.5px] text-ink-2">{previaModelo}</p>
+                  {(modeloEscolhido.corpo.match(/\{\{\d+\}\}/g) ?? []).map((_, idx) => (
+                    <Input
+                      key={idx}
+                      label={`Variável ${idx + 1}`}
+                      value={paramsModelo[idx] ?? ''}
+                      onChange={(e) => {
+                        const novo = [...paramsModelo]; novo[idx] = e.target.value; setParamsModelo(novo)
+                      }}
+                    />
+                  ))}
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setModeloEscolhido(null)} disabled={enviandoModelo}>Voltar</Button>
+                    <Button onClick={enviarModelo} loading={enviandoModelo}>Enviar</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {modelosAprovados.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => { setModeloEscolhido(m); setParamsModelo([]) }}
+                      className="rounded-control border border-line bg-raised px-3 py-2.5 text-left hover:border-accent"
+                    >
+                      <span className="block font-mono text-[12px] font-semibold text-ink">{m.nome}</span>
+                      <span className="mt-0.5 block whitespace-pre-wrap text-[12px] text-ink-2">{m.corpo}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Modal>
 
             <div className="flex items-center gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
               <input
