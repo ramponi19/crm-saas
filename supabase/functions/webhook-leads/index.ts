@@ -665,6 +665,31 @@ serve(async (req: Request) => {
             for (const m of msgs ?? []) {
               const fone = m.from as string;
               const t = m.type as string | undefined;
+
+              // Sob coexistência o app ganha editar e apagar mensagem, e isso
+              // chega como tipo de mensagem. Tratado de forma defensiva: a doc
+              // não fecha o formato do payload, então tenta os caminhos
+              // conhecidos e REGISTRA quando não reconhece — assim o tráfego
+              // real nos ensina o formato em vez de falhar calado.
+              if (t === "edit" || t === "revoke") {
+                const alvo = (m.edit as Record<string, unknown> | undefined)?.message_id
+                  ?? (m.revoke as Record<string, unknown> | undefined)?.message_id
+                  ?? (m.context as Record<string, unknown> | undefined)?.id;
+                if (!alvo) { console.log(`${t} sem id da mensagem original — payload:`, JSON.stringify(m).slice(0, 300)); continue; }
+                if (t === "revoke") {
+                  await db.from("lead_mensagens")
+                    .update({ conteudo: "[mensagem apagada]", tipo: "texto", midia_url: null })
+                    .eq("empresa_id", canal.empresa_id).eq("external_id", String(alvo));
+                } else {
+                  const novo = ((m.edit as Record<string, unknown> | undefined)?.text as Record<string, unknown> | undefined)?.body
+                    ?? (m.text as Record<string, unknown> | undefined)?.body;
+                  if (novo) {
+                    await db.from("lead_mensagens").update({ conteudo: String(novo) })
+                      .eq("empresa_id", canal.empresa_id).eq("external_id", String(alvo));
+                  }
+                }
+                continue;
+              }
               let texto = ((m.text as Record<string, unknown> | undefined)?.body as string)
                 || ((m.image as Record<string, unknown> | undefined)?.caption as string) || "[midia]";
               let tipo = "texto";
