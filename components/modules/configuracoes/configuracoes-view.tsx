@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
@@ -318,12 +319,18 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
           onValueChange={setAba}
         />
 
-        {/* ── INTEGRAÇÕES ── */}
+        {/* ── INTEGRAÇÕES ──
+            Conectar canal saiu daqui e virou a tela /canais, que usa o fluxo
+            oficial da Meta (um clique, sem colar token). Este card virou ponte:
+            manter o formulário antigo criaria duas verdades para a mesma coisa —
+            e a antiga grava em chaves que o recebedor novo já não lê. */}
         {aba === 'integracoes' && (
-          <Card title="Integrações">
+          <Card title="Canais de atendimento">
             <p className="-mt-0.5 mb-[18px] text-[12.5px] text-ink-2">
-              WhatsApp, Instagram e Messenger via <strong className="text-ink">Meta Cloud API</strong>.
-              Conecte cada canal para a caixa de entrada unificada dos leads.
+              WhatsApp, Instagram e Messenger agora se conectam em{' '}
+              <strong className="text-ink">Sistema → Canais</strong>, pelo fluxo oficial da Meta:
+              você autoriza numa janela e pronto — sem copiar token nem preencher nada.
+              No WhatsApp, o número continua funcionando no seu celular.
             </p>
             <div className="flex flex-col gap-3">
               {integracoes.map(i => (
@@ -334,9 +341,17 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
                     <div className="text-[11.5px] text-ink-2">{i.desc}</div>
                   </div>
                   <Badge tone={i.ativo ? 'ok' : 'neutro'} dot>{i.ativo ? 'Conectado' : 'Inativo'}</Badge>
-                  <Button variant="outline" size="sm" onClick={() => openModal(i)}>Configurar</Button>
+                  <Button variant="ghost" size="sm" onClick={() => openModal(i)}>Manual</Button>
                 </div>
               ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link href="/canais">
+                <Button icon={<Plug size={15} strokeWidth={1.7} />}>Abrir Canais</Button>
+              </Link>
+              <span className="text-[11.5px] text-ink-3">
+                &quot;Manual&quot; é para casos especiais (credencial fornecida pelo suporte). O caminho normal é Canais.
+              </span>
             </div>
           </Card>
         )}

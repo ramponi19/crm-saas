@@ -390,6 +390,35 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
   console.log(`histórico: ${importadas} mensagens, ${semLead} conversas sem lead (ignoradas), progresso ${progresso ?? "?"}%`);
 }
 
+// A mídia do histórico chega DEPOIS, num aviso separado que usa a chave "messages"
+// em vez de "threads" — e só para mensagens dos últimos 14 dias. A mensagem já
+// existe como placeholder "[midia]"; aqui ela é enriquecida com o arquivo.
+// Só ATUALIZA (nunca insere): sem o destinatário no payload, inserir arriscaria
+// pendurar a mídia na conversa errada.
+async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string, unknown>[]) {
+  let enriquecidas = 0, semPlaceholder = 0;
+  for (const m of mensagens) {
+    try {
+      const tipoMsg = String(m.type ?? "");
+      const tipoDb = TIPO_DB[tipoMsg];
+      const externalId = m.id as string | undefined;
+      if (!tipoDb || !externalId) continue;
+
+      const midia = m[tipoMsg] as Record<string, unknown> | undefined;
+      const url = await salvarMidiaWhatsApp(canal, midia?.id as string | undefined);
+      if (!url) continue;
+
+      const legenda = midia?.caption as string | undefined;
+      const { data } = await db.from("lead_mensagens")
+        .update({ tipo: tipoDb, midia_url: url, ...(legenda ? { conteudo: legenda } : {}) })
+        .eq("empresa_id", canal.empresa_id).eq("external_id", externalId)
+        .select("id");
+      if (data?.length) enriquecidas++; else semPlaceholder++;
+    } catch (e) { console.error("midia do histórico:", e); }
+  }
+  console.log(`mídia do histórico: ${enriquecidas} anexada(s), ${semPlaceholder} sem mensagem correspondente`);
+}
+
 // ── Envio ───────────────────────────────────────────────────────────────────
 async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
   const number = body.number as string;
@@ -420,8 +449,20 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
     });
     const data = await r.json();
     if (!r.ok) {
-      const msg = data?.error?.message ?? "erro ao enviar pelo WhatsApp";
-      if (data?.error?.code === 190) await marcarErroNoCanal(canal.id, msg, "expirado");
+      const cod = data?.error?.code as number | undefined;
+      let msg = data?.error?.message ?? "erro ao enviar pelo WhatsApp";
+      if (cod === 190) {
+        await marcarErroNoCanal(canal.id, msg, "expirado");
+      } else if (cod === 131042) {
+        // A Meta cobra o uso da API do titular da conta. Sem cartão cadastrado
+        // ela recusa o envio — e o erro cru não diz isso a ninguém.
+        msg = "O WhatsApp está conectado, mas a conta da Meta não tem forma de pagamento. "
+            + "Cadastre um cartão no WhatsApp Manager para conseguir enviar mensagens.";
+        await marcarErroNoCanal(canal.id, msg, "erro");
+      } else if (cod === 131047 || cod === 131051) {
+        msg = "Faz mais de 24 horas desde a última mensagem do cliente. "
+            + "Nesse caso o WhatsApp só permite responder por modelo aprovado.";
+      }
       return json({ error: msg }, r.status);
     }
     if (leadId) {
@@ -665,8 +706,9 @@ serve(async (req: Request) => {
           if (campo === "history") {
             const h = value?.history as Record<string, unknown>[] | undefined;
             if (h) await importarHistorico(canal, h);
+            // Mesmo campo "history", outra forma: aviso só com as mídias.
             const soltas = value?.messages as Record<string, unknown>[] | undefined;
-            if (soltas && soltas.length) console.log(`histórico: ${soltas.length} mídia(s) em aviso separado`);
+            if (soltas?.length) await enriquecerMidiaDoHistorico(canal, soltas);
           }
 
           // Canal caiu: marca em vez de morrer calado

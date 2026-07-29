@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loader2, Info } from 'lucide-react'
-import { Button, Badge, ConfirmDialog, notify } from '@/components/ui'
+import { Button, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 
 // ⚠️ Zona sensível (Meta). Esta tela dispara o fluxo oficial de conexão.
 // O token do cliente nunca passa por aqui: o navegador recebe só um código de
@@ -73,6 +73,9 @@ export function CanaisView({ appId }: { appId: string }) {
   const [conectando, setConectando] = useState<Canal['tipo'] | null>(null)
   const [aDesconectar, setADesconectar] = useState<Canal | null>(null)
   const [avisoWhats, setAvisoWhats] = useState(false)
+  // Cliente com mais de uma Página: guarda o código para reenviar com a escolha
+  // dele, em vez de conectar a primeira no escuro.
+  const [escolha, setEscolha] = useState<{ code: string; paginas: { id: string; nome: string }[] } | null>(null)
 
   const buscar = useCallback(async () => {
     const r = await fetch('/api/canais')
@@ -155,23 +158,33 @@ export function CanaisView({ appId }: { appId: string }) {
     window.FB!.login(async (resp) => {
       const code = resp?.authResponse?.code
       if (!code) { setConectando(null); return notify.info('Conexão cancelada.') }
-      try {
-        const r = await fetch('/api/canais/meta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
-        })
-        const j = await r.json()
-        if (!r.ok) throw new Error(j.error ?? 'Falha ao conectar.')
-        notify.ok(`Conectado: ${j.pagina}${j.instagram ? ` e ${j.instagram}` : ''}`)
-        ;(j.avisos ?? []).forEach((a: string) => notify.info(a))
-        await buscar()
-      } catch (e) {
-        notify.bad((e as Error).message)
-      } finally {
-        setConectando(null)
-      }
+      await gravarMeta(code)
     }, { config_id: configId, response_type: 'code', override_default_response_type: true })
+  }
+
+  async function gravarMeta(code: string, pageId?: string) {
+    try {
+      const r = await fetch('/api/canais/meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, pageId }),
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error ?? 'Falha ao conectar.')
+
+      // Autorizou várias Páginas e ainda não escolheu: pergunta em vez de adivinhar.
+      if (!pageId && j.outrasPaginas?.length) {
+        setEscolha({ code, paginas: j.outrasPaginas })
+        return
+      }
+      notify.ok(`Conectado: ${j.pagina}${j.instagram ? ` e ${j.instagram}` : ''}`)
+      ;(j.avisos ?? []).forEach((a: string) => notify.info(a))
+      await buscar()
+    } catch (e) {
+      notify.bad((e as Error).message)
+    } finally {
+      setConectando(null)
+    }
   }
 
   async function desconectar(c: Canal) {
@@ -309,6 +322,30 @@ export function CanaisView({ appId }: { appId: string }) {
           </span>
         }
       />
+
+      {/* Mais de uma Página autorizada: quem decide é o cliente. */}
+      <Modal
+        open={!!escolha}
+        onClose={() => { setEscolha(null); setConectando(null) }}
+        title="Qual Página você quer conectar?"
+        size="sm"
+      >
+        <p className="mb-3 text-[13px] text-ink-2">
+          Você autorizou mais de uma Página. As mensagens dessa Página e do Instagram vinculado a ela
+          passam a aparecer no CRM.
+        </p>
+        <div className="flex flex-col gap-2">
+          {escolha?.paginas.map((p) => (
+            <Button
+              key={p.id}
+              variant="outline"
+              onClick={() => { const c = escolha.code; setEscolha(null); setConectando('instagram'); gravarMeta(c, p.id) }}
+            >
+              {p.nome}
+            </Button>
+          ))}
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={!!aDesconectar}
