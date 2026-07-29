@@ -188,6 +188,24 @@ export async function assinarPagina(pageId: string, tokenPagina: string): Promis
   return true
 }
 
+/**
+ * Domínios autorizados no app da Meta. O SDK de login recusa em SILÊNCIO quando a
+ * página está num domínio fora desta lista — nenhuma janela abre, nenhum erro
+ * aparece. Ler isto permite a tela dizer o motivo em vez de deixar o usuário
+ * adivinhando (foi exatamente o que travou o primeiro teste real).
+ */
+export async function dominiosDoApp(): Promise<string[] | null> {
+  try {
+    if (!metaConfigurada()) return null
+    const r = await fetch(`${G}/${APP_ID}?fields=app_domains&access_token=${APP_ID}|${APP_SECRET}`)
+    const j = await r.json()
+    if (!r.ok || !Array.isArray(j.app_domains)) return null
+    return j.app_domains as string[]
+  } catch {
+    return null
+  }
+}
+
 // ── Modelos de mensagem (templates) ─────────────────────────────────────────
 // São o único caminho para retomar conversa depois de 24h sem o cliente escrever.
 // O modelo é criado NA META, em nome da empresa, e passa por análise dela.

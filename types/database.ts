@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      diagnostico_canais: {
+        Row: {
+          id: number
+          empresa_id: number | null
+          etapa: string
+          origem_url: string | null
+          dados: Json
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          empresa_id?: number | null
+          etapa: string
+          origem_url?: string | null
+          dados?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          empresa_id?: number | null
+          etapa?: string
+          origem_url?: string | null
+          dados?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       modelos_mensagem: {
         Row: {
           id: number

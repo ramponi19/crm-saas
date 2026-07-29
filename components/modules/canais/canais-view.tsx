@@ -92,17 +92,46 @@ export function CanaisView({ appId }: { appId: string }) {
   // dele, em vez de conectar a primeira no escuro.
   const [escolha, setEscolha] = useState<{ code: string; paginas: { id: string; nome: string }[] } | null>(null)
 
+  // Caixa-preta: o SDK da Meta falha no NAVEGADOR, antes de qualquer chamada ao
+  // servidor. Sem isto a única fonte de verdade seria o console do usuário.
+  // Nunca quebra o fluxo: falha de log é ignorada de propósito.
+  const registrar = useCallback((etapa: string, dados: Record<string, unknown> = {}) => {
+    try {
+      fetch('/api/canais/diagnostico', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          etapa,
+          origemUrl: typeof window !== 'undefined' ? window.location.href : null,
+          dados: {
+            ...dados,
+            temAppId: !!appId,
+            temConfigWa: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_WA,
+            temConfigIg: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG,
+            sdkCarregado: typeof window !== 'undefined' && !!window.FB,
+            navegador: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 120) : null,
+          },
+        }),
+        keepalive: true,
+      }).catch(() => {})
+    } catch { /* diagnóstico nunca pode atrapalhar o fluxo */ }
+  }, [appId])
+
   // O SDK é carregado no CARREGAMENTO DA TELA, não no clique. Motivo: carregar
   // depois do clique exige `await`, e o await quebra a cadeia do gesto do usuário
   // — o navegador passa a tratar a janela da Meta como pop-up automático e
   // BLOQUEIA em silêncio (nenhuma janela abre, e a tela fica girando).
   const [sdkPronto, setSdkPronto] = useState(false)
   useEffect(() => {
-    if (!appId) return
+    if (!appId) { registrar('carregou', { resultado: 'sem appId' }); return }
     let vivo = true
-    carregarSdk(appId).then((ok) => { if (vivo) setSdkPronto(ok) })
+    carregarSdk(appId).then((ok) => {
+      if (!vivo) return
+      setSdkPronto(ok)
+      registrar('carregou', { resultado: ok ? 'sdk ok' : 'sdk falhou' })
+    })
     return () => { vivo = false }
-  }, [appId])
+  }, [appId, registrar])
 
   // Libera a tela quando a janela da Meta não responde. Guardado em ref para o
   // callback poder cancelar o relógio se ele chegar antes.
@@ -112,6 +141,7 @@ export function CanaisView({ appId }: { appId: string }) {
     pararRelogio()
     relogio.current = setTimeout(() => {
       setConectando(null)
+      registrar('timeout', { esperaMs: ESPERA_MAX_MS })
       notify.warn(
         'A janela da Meta não respondeu.',
         'Verifique se o navegador bloqueou o pop-up. Se não foi isso, o domínio do CRM ainda não está autorizado no app da Meta — me chame para configurar.',
@@ -180,10 +210,12 @@ export function CanaisView({ appId }: { appId: string }) {
       }
     }
 
+    registrar('clique', { canal: 'whatsapp', configId })
     armarRelogio()
     try {
       window.FB.login((resp) => {
         pararRelogio()
+        registrar('callback', { canal: 'whatsapp', status: resp?.status ?? null, temCode: !!resp?.authResponse?.code, waba, numero })
         window.removeEventListener('message', ouvir)
         const code = resp?.authResponse?.code
         if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
@@ -204,6 +236,7 @@ export function CanaisView({ appId }: { appId: string }) {
       pararRelogio()
       window.removeEventListener('message', ouvir)
       setConectando(null)
+      registrar('erro', { canal: 'whatsapp', msg: (e as Error).message })
       notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
     }
   }
@@ -216,11 +249,13 @@ export function CanaisView({ appId }: { appId: string }) {
       return notify.warn('O conector da Meta ainda está carregando.', 'Tente novamente em alguns segundos.')
     }
     setConectando('instagram')
+    registrar('clique', { canal: 'instagram_messenger', configId })
     armarRelogio()
     try {
       // Callback síncrono de propósito — o SDK recusa função async.
       window.FB.login((resp) => {
         pararRelogio()
+        registrar('callback', { canal: 'instagram_messenger', status: resp?.status ?? null, temCode: !!resp?.authResponse?.code })
         const code = resp?.authResponse?.code
         if (!code) { setConectando(null); notify.info('Conexão cancelada.'); return }
         void gravarMeta(code)
@@ -228,6 +263,7 @@ export function CanaisView({ appId }: { appId: string }) {
     } catch (e) {
       pararRelogio()
       setConectando(null)
+      registrar('erro', { canal: 'instagram_messenger', msg: (e as Error).message })
       notify.bad('O conector da Meta falhou ao abrir.', (e as Error).message)
     }
   }
