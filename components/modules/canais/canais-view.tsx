@@ -145,7 +145,8 @@ export function CanaisView({ appId }: { appId: string }) {
         const rota = tipo === 'whatsapp' ? '/api/canais/whatsapp' : '/api/canais/meta'
         const r = await fetch(rota, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: code! }),
+          // O mesmo endereço enviado no diálogo — a Meta compara os dois.
+          body: JSON.stringify({ code: code!, redirectUri: `${window.location.origin}/canais` }),
         })
         const j = await r.json()
         if (!r.ok) throw new Error(j.error ?? 'Falha ao concluir a conexão.')
@@ -179,7 +180,8 @@ export function CanaisView({ appId }: { appId: string }) {
       const r = await fetch('/api/canais/meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, pageId }),
+        // redirectUri idêntico ao do diálogo: a Meta recusa o código sem ele.
+        body: JSON.stringify({ code, pageId, redirectUri: `${window.location.origin}/canais` }),
       })
       const j = await r.json()
       if (!r.ok) throw new Error(j.error ?? 'Falha ao conectar.')

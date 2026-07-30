@@ -24,11 +24,24 @@ const falha = (j: Record<string, unknown>, padrao: string): Erro => {
 /**
  * Troca o código devolvido pelo fluxo de login pelo token do CLIENTE.
  * Precisa do App Secret, por isso só roda no servidor.
+ *
+ * `redirectUri` é OBRIGATÓRIO no fluxo por redirecionamento e tem de ser
+ * IDÊNTICO ao usado no diálogo — a Meta responde "Error validating verification
+ * code. Please make sure your redirect_uri is identical..." quando ele falta ou
+ * difere. (No fluxo antigo, com o SDK, ele não era enviado — foi a origem do erro.)
  */
-export async function trocarCodigoPorToken(code: string): Promise<{ token: string } | Erro> {
-  const r = await fetch(
-    `${G}/oauth/access_token?client_id=${APP_ID}&client_secret=${APP_SECRET}&code=${encodeURIComponent(code)}`,
-  )
+export async function trocarCodigoPorToken(
+  code: string,
+  redirectUri?: string,
+): Promise<{ token: string } | Erro> {
+  const p = new URLSearchParams({
+    client_id: APP_ID,
+    client_secret: APP_SECRET,
+    code,
+  })
+  if (redirectUri) p.set('redirect_uri', redirectUri)
+
+  const r = await fetch(`${G}/oauth/access_token?${p.toString()}`)
   const j = await r.json()
   if (!r.ok || !j.access_token) return falha(j, 'Não foi possível concluir a conexão com a Meta.')
   return { token: j.access_token as string }

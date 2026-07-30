@@ -29,12 +29,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Integração Meta não configurada no servidor.' }, { status: 503 })
     }
 
-    const { code, pageId } = (await req.json()) as { code?: string; pageId?: string }
+    const { code, pageId, redirectUri } = (await req.json()) as {
+      code?: string; pageId?: string; redirectUri?: string
+    }
     if (!code) {
       return NextResponse.json({ error: 'Conexão incompleta. Refaça pelo botão Conectar.' }, { status: 400 })
     }
 
-    const troca = await trocarCodigoPorToken(code)
+    // Tem de ser o MESMO endereço usado no diálogo, senão a Meta recusa o código.
+    const troca = await trocarCodigoPorToken(code, redirectUri)
     if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
 
     const lista = await listarPaginas(troca.token)

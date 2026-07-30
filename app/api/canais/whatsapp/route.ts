@@ -37,7 +37,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Integração Meta não configurada no servidor.' }, { status: 503 })
     }
 
-    const body = (await req.json()) as { code?: string; wabaId?: string; phoneNumberId?: string }
+    const body = (await req.json()) as {
+      code?: string; wabaId?: string; phoneNumberId?: string; redirectUri?: string
+    }
     const { code } = body
     if (!code) {
       return NextResponse.json(
@@ -46,8 +48,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // 1. código → token do cliente
-    const troca = await trocarCodigoPorToken(code)
+    // 1. código → token do cliente. O redirect_uri tem de ser IDÊNTICO ao do
+    //    diálogo, senão a Meta recusa o código de verificação.
+    const troca = await trocarCodigoPorToken(code, body.redirectUri)
     if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
 
     // No fluxo por redirecionamento não existe o postMessage do SDK, então o id da
