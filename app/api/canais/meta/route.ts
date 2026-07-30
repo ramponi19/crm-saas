@@ -29,18 +29,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Integração Meta não configurada no servidor.' }, { status: 503 })
     }
 
-    const { code, pageId, redirectUri } = (await req.json()) as {
-      code?: string; pageId?: string; redirectUri?: string
+    const { code, pageId, redirectUri, token: tokenDireto } = (await req.json()) as {
+      code?: string; pageId?: string; redirectUri?: string; token?: string
     }
-    if (!code) {
+    if (!code && !tokenDireto) {
       return NextResponse.json({ error: 'Conexão incompleta. Refaça pelo botão Conectar.' }, { status: 400 })
     }
 
-    // Tem de ser o MESMO endereço usado no diálogo, senão a Meta recusa o código.
-    const troca = await trocarCodigoPorToken(code, redirectUri)
-    if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
+    // Dois caminhos de entrada:
+    //  - code: o cliente autorizou pelo fluxo da Meta (autoatendimento);
+    //  - token: token de usuário de sistema colado pelo admin. Necessário porque a
+    //    Meta PROÍBE o portfólio dono do app de se conectar pelo fluxo de cliente
+    //    — então a própria loja do fornecedor só entra por aqui.
+    let token: string
+    if (tokenDireto) {
+      token = tokenDireto.trim()
+    } else {
+      // O redirect_uri tem de ser o MESMO do diálogo, senão a Meta recusa o código.
+      const troca = await trocarCodigoPorToken(code!, redirectUri)
+      if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
+      token = troca.token
+    }
 
-    const lista = await listarPaginas(troca.token)
+    const lista = await listarPaginas(token)
     if (ehErro(lista)) return NextResponse.json({ error: lista.erro }, { status: 502 })
     if (!lista.paginas.length) {
       return NextResponse.json(

@@ -38,19 +38,25 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as {
-      code?: string; wabaId?: string; phoneNumberId?: string; redirectUri?: string
+      code?: string; wabaId?: string; phoneNumberId?: string; redirectUri?: string; token?: string
     }
     const { code } = body
-    if (!code) {
+    if (!code && !body.token) {
       return NextResponse.json(
         { error: 'Conexão incompleta. Refaça o processo pelo botão Conectar.' },
         { status: 400 },
       )
     }
 
-    // 1. código → token do cliente. O redirect_uri tem de ser IDÊNTICO ao do
-    //    diálogo, senão a Meta recusa o código de verificação.
-    const troca = await trocarCodigoPorToken(code, body.redirectUri)
+    // 1. Token do cliente, por um de dois caminhos:
+    //    - `code`: o cliente autorizou pelo fluxo da Meta (autoatendimento);
+    //    - `token`: token de usuário de sistema colado pelo admin. Este é o ÚNICO
+    //      caminho possível para a própria loja do fornecedor, porque a Meta
+    //      proíbe o portfólio dono do app de se conectar pelo fluxo de cliente.
+    //    No caminho do código, o redirect_uri tem de ser IDÊNTICO ao do diálogo.
+    const troca = body.token
+      ? { token: body.token.trim() }
+      : await trocarCodigoPorToken(code!, body.redirectUri)
     if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
 
     // No fluxo por redirecionamento não existe o postMessage do SDK, então o id da

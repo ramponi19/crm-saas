@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loader2, Info } from 'lucide-react'
-import { Button, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
+import { Button, Badge, ConfirmDialog, Modal, Textarea, notify } from '@/components/ui'
 
 // ⚠️ Zona sensível (Meta). Esta tela dispara o fluxo oficial de conexão.
 // O token do cliente nunca passa por aqui: o navegador recebe só um código de
@@ -201,6 +201,37 @@ export function CanaisView({ appId }: { appId: string }) {
     }
   }
 
+  const [tokenManual, setTokenManual] = useState('')
+  const [salvandoToken, setSalvandoToken] = useState<'meta' | 'whatsapp' | null>(null)
+
+  async function conectarComToken(destino: 'meta' | 'whatsapp') {
+    const token = tokenManual.trim()
+    if (!token) return
+    setSalvandoToken(destino)
+    registrar('token_manual', { destino })
+    try {
+      const r = await fetch(destino === 'whatsapp' ? '/api/canais/whatsapp' : '/api/canais/meta', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error ?? 'Não foi possível conectar com este token.')
+      if (destino === 'whatsapp') {
+        notify.ok(j.coexistencia ? 'WhatsApp conectado — segue funcionando no celular também.' : 'WhatsApp conectado.')
+        if (j.instrucao) notify.info(j.instrucao)
+      } else {
+        notify.ok(`Conectado: ${j.pagina}${j.instagram ? ` e ${j.instagram}` : ''}`)
+      }
+      ;(j.avisos ?? []).forEach((a: string) => notify.info(a))
+      setTokenManual('')
+      await buscar()
+    } catch (e) {
+      notify.bad((e as Error).message)
+    } finally {
+      setSalvandoToken(null)
+    }
+  }
+
   async function desconectar(c: Canal) {
     setADesconectar(null)
     const r = await fetch(`/api/canais/${c.id}`, { method: 'DELETE' })
@@ -355,6 +386,51 @@ export function CanaisView({ appId }: { appId: string }) {
           </span>
         }
       />
+
+      {/* Conexão por token de usuário de sistema.
+          Existe porque a Meta PROÍBE o portfólio dono do app de se conectar pelo
+          fluxo de cliente — "não se pode ser cliente de si mesmo". Para clientes,
+          o botão Conectar resolve; para a loja do próprio fornecedor, é por aqui. */}
+      <details className="rounded-control border border-line bg-surface px-4 py-3">
+        <summary className="cursor-pointer text-[12.5px] font-semibold text-ink-2">
+          Conectar com token de usuário de sistema (avançado)
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-[12px] leading-relaxed text-ink-2">
+            Use este caminho quando os ativos pertencem ao <strong>mesmo portfólio que é dono do
+            aplicativo</strong> — a Meta bloqueia o fluxo normal nesse caso. Gere o token em
+            Business Settings → Usuários → Usuários do sistema, atribua a Página, a conta do
+            Instagram e a conta do WhatsApp, e marque as permissões dos canais.
+            <strong> Escolha “nunca expira”.</strong>
+          </p>
+          <Textarea
+            label="Token de usuário de sistema"
+            rows={3}
+            placeholder="EAAN..."
+            value={tokenManual}
+            onChange={(e) => setTokenManual(e.target.value)}
+            hint="Vai cifrado para o banco e nunca é devolvido para o navegador."
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm" variant="outline"
+              onClick={() => conectarComToken('meta')}
+              loading={salvandoToken === 'meta'}
+              disabled={!tokenManual.trim() || !!salvandoToken}
+            >
+              Conectar Instagram e Messenger
+            </Button>
+            <Button
+              size="sm" variant="outline"
+              onClick={() => conectarComToken('whatsapp')}
+              loading={salvandoToken === 'whatsapp'}
+              disabled={!tokenManual.trim() || !!salvandoToken}
+            >
+              Conectar WhatsApp
+            </Button>
+          </div>
+        </div>
+      </details>
 
       {/* Mais de uma Página autorizada: quem decide é o cliente. */}
       <Modal
