@@ -156,15 +156,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5. sincronizações — 24h de prazo, uma chamada só cada
+    // 5. Sincronizações da coexistência — 24h de prazo e UMA chamada só cada.
+    //    GUARDA: só dispara se a Meta confirmou coexistência. Se o número não
+    //    estiver nesse modo, estas chamadas não fazem sentido e ainda gastariam
+    //    tentativas que não têm segunda vez. Nada aqui desconecta o número do
+    //    aparelho — quem faria isso é o registro na Cloud API, que NÃO é chamado.
     const requestIds: Record<string, string | null> = {}
-    const contatos = await sincronizarAppDoCelular(String(phoneNumberId), troca.token, 'smb_app_state_sync')
-    if (ehErro(contatos)) avisos.push(`Contatos não sincronizados: ${contatos.erro}`)
-    else requestIds.contatos = contatos.requestId
+    if (coexistencia) {
+      const contatos = await sincronizarAppDoCelular(String(phoneNumberId), troca.token, 'smb_app_state_sync')
+      if (ehErro(contatos)) avisos.push(`Contatos não sincronizados: ${contatos.erro}`)
+      else requestIds.contatos = contatos.requestId
 
-    const historico = await sincronizarAppDoCelular(String(phoneNumberId), troca.token, 'history')
-    if (ehErro(historico)) avisos.push(`Histórico não solicitado: ${historico.erro}`)
-    else requestIds.historico = historico.requestId
+      const historico = await sincronizarAppDoCelular(String(phoneNumberId), troca.token, 'history')
+      if (ehErro(historico)) avisos.push(`Histórico não solicitado: ${historico.erro}`)
+      else requestIds.historico = historico.requestId
+    } else {
+      avisos.push(
+        'Número conectado, mas a Meta não reportou modo coexistência. '
+        + 'Não pedi a cópia de contatos e conversas: essas chamadas só valem uma vez por número, '
+        + 'e gastá-las fora do momento certo faria você perder o histórico. Seu WhatsApp no celular não foi afetado.',
+      )
+    }
 
     await svc.from('canais_conectados').update({
       coexistencia,
