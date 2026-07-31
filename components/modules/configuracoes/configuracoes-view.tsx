@@ -19,13 +19,12 @@ import { AgendamentoCard } from './agendamento-card'
 import { VeiculosPortalCard } from './veiculos-portal-card'
 import { FidelidadeCard } from './fidelidade-card'
 import { ContratoCard } from './contrato-card'
-import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
+import type { OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
 interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
 
 interface Props {
-  evolution: EvolutionConfig | null
   official: OfficialConfig | null
   instagram: MetaConfig | null
   messenger: MetaConfig | null
@@ -54,7 +53,7 @@ const TABS = [
   { id: 'dados',       label: 'Dados',            Icon: Download },
 ]
 
-type Provider = 'evolution' | 'meta'
+type Provider = 'oficial' | 'meta'
 
 interface IntegracaoCanal {
   id: string
@@ -68,11 +67,6 @@ interface IntegracaoCanal {
 
 // Campos por provider (espelha o modelo)
 const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeholder: string }>> = {
-  evolution: [
-    { key: 'url',     label: 'URL da API',   placeholder: 'https://evo.suaempresa.com' },
-    { key: 'inst',    label: 'Instância',    placeholder: 'jmstore-01' },
-    { key: 'apikey',  label: 'API Key',      placeholder: '••••••••••••' },
-  ],
   oficial: [
     { key: 'phone_number_id', label: 'Phone Number ID',          placeholder: '123456789012345' },
     { key: 'waba_id',         label: 'WABA ID',                  placeholder: '123456789012345' },
@@ -87,7 +81,7 @@ const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeh
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ evolution, official, instagram, messenger, taxas, segmento, slug }: Props) {
+export function ConfiguracoesView({ official, instagram, messenger, taxas, segmento, slug }: Props) {
   const [aba, setAba]       = useState('integracoes')
   const tabs = segmento === 'imobiliaria'
     ? [...TABS, { id: 'portais', label: 'Portais', Icon: LinkIcon }]
@@ -101,7 +95,6 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [waProvider, setWaProvider] = useState<'evolution' | 'oficial'>('evolution')
   const [empresaId, setEmpresaId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -192,12 +185,10 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
 
   const integracoes: IntegracaoCanal[] = [
     {
-      id: 'whatsapp', nome: 'WhatsApp', color: '#25D366', provider: 'evolution',
-      ativo: !!evolution?.ativo || !!official?.ativo,
+      id: 'whatsapp', nome: 'WhatsApp', color: '#25D366', provider: 'oficial',
+      ativo: !!official?.ativo,
       desc: official?.phone_number_id
         ? 'Meta Cloud API · número oficial'
-        : evolution?.instance
-        ? 'Meta Cloud API · conectado'
         : 'Meta Cloud API · configure sua conta',
       svg: <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.66-.61-2.93-1.27-4.85-4.22-5-4.42-.15-.2-1.2-1.59-1.2-3.03 0-1.44.76-2.15 1.02-2.44.27-.29.59-.37.79-.37.2 0 .39 0 .57.01.18.01.43-.07.67.51.24.6.83 2.04.9 2.19.07.15.12.32.02.51-.09.2-.14.32-.27.49-.14.17-.29.38-.41.51-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.2.68-.79.86-1.06.18-.27.36-.22.61-.13.25.09 1.58.74 1.86.88.27.14.46.2.52.31.07.12.07.66-.17 1.34z" fill="currentColor"/>,
     },
@@ -219,12 +210,6 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
     setModalCanal(canal)
     const init: Record<string, string> = {}
     if (canal.id === 'whatsapp') {
-      setWaProvider('oficial')
-      if (evolution) {
-        init.url = evolution.api_url ?? ''
-        init.inst = evolution.instance ?? ''
-        init.apikey = evolution.api_key ?? ''
-      }
       if (official) {
         init.phone_number_id = official.phone_number_id ?? ''
         init.waba_id = official.waba_id ?? ''
@@ -255,29 +240,17 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
         .upsert({ empresa_id: empresaId, chave, valor: valor as Json }, { onConflict: 'empresa_id,chave' })
     try {
       if (modalCanal.id === 'whatsapp') {
-        if (waProvider === 'evolution') {
-          const cfg: EvolutionConfig = {
-            ativo: true,
-            api_url: modalValues.url ?? '',
-            api_key: modalValues.apikey ?? '',
-            instance: modalValues.inst ?? '',
-          }
-          await upsert('whatsapp_evolution', cfg)
-          if (official) await upsert('whatsapp_official', { ...official, ativo: false })
-        } else {
-          const cfg: OfficialConfig = {
-            ativo: true,
-            provider: 'meta',
-            phone_number_id: modalValues.phone_number_id ?? '',
-            waba_id: modalValues.waba_id ?? '',
-            access_token: modalValues.access_token ?? '',
-            webhook_verify_token: modalValues.webhook_verify_token ?? '',
-            api_version: official?.api_version ?? 'v19.0',
-            api_url: official?.api_url ?? 'https://graph.facebook.com',
-          }
-          await upsert('whatsapp_official', cfg)
-          if (evolution) await upsert('whatsapp_evolution', { ...evolution, ativo: false })
+        const cfg: OfficialConfig = {
+          ativo: true,
+          provider: 'meta',
+          phone_number_id: modalValues.phone_number_id ?? '',
+          waba_id: modalValues.waba_id ?? '',
+          access_token: modalValues.access_token ?? '',
+          webhook_verify_token: modalValues.webhook_verify_token ?? '',
+          api_version: official?.api_version ?? 'v19.0',
+          api_url: official?.api_url ?? 'https://graph.facebook.com',
         }
+        await upsert('whatsapp_official', cfg)
       } else {
         await upsert(`meta_${modalCanal.id}`, {
           ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
@@ -491,7 +464,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
           )}
 
           <div className="flex flex-col gap-4">
-            {(PROVIDER_FIELDS[modalCanal.id === 'whatsapp' ? waProvider : modalCanal.provider]).map(f => (
+            {(PROVIDER_FIELDS[modalCanal.provider]).map(f => (
               <Input
                 key={f.key}
                 label={f.label}

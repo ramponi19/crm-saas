@@ -34,7 +34,7 @@ const CANAL_NOME: Record<string, string> = {
   whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', site: 'Site', manual: 'Loja',
 }
 
-// ⚠️ Zona sensível (Meta). Entrega real acontece na Edge Function (Graph API / Evolution).
+// ⚠️ Zona sensível (Meta). Entrega real acontece na Edge Function, pela Graph API.
 // NÃO alterar a lógica abaixo sem alinhamento — impacta a aprovação de API da Meta.
 const FUNCTIONS_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
 

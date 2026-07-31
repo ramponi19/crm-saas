@@ -1,4 +1,8 @@
-export type WhatsAppProvider = 'evolution' | 'official'
+// Só existe um provedor de WhatsApp: a API oficial da Meta. A Evolution foi
+// aposentada em 31/07/2026 — ela acessa o WhatsApp por fora dos termos e expõe o
+// número do lojista a banimento sem recurso. O tipo continua sendo um união de
+// um só membro para não espalhar mudança de assinatura por quem já o importa.
+export type WhatsAppProvider = 'official'
 
 export interface SendMessageParams {
   to: string        // número no formato 5511999999999
@@ -11,14 +15,6 @@ export interface SendMessageResult {
   messageId?: string
   error?: string
   provider: WhatsAppProvider
-}
-
-// Estrutura salva no banco — Evolution
-export interface EvolutionConfig {
-  ativo: boolean
-  api_url: string
-  api_key: string
-  instance: string
 }
 
 // Estrutura salva no banco — API Oficial Meta

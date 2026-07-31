@@ -139,15 +139,6 @@ async function marcarErroNoCanal(canalId: number, erro: string, status = "erro")
     .eq("id", canalId);
 }
 
-// Config legada por empresa (Evolution segue como fallback de WhatsApp).
-// Diferente da v26: SEMPRE filtra empresa_id — sem o filtro, com dois tenants a
-// consulta devolvia 2 linhas e o `.single()` quebrava o envio para todos.
-async function configDaEmpresa(empresaId: number, chave: string): Promise<Record<string, string> | null> {
-  const { data } = await db.from("configuracoes_sistema")
-    .select("valor").eq("empresa_id", empresaId).eq("chave", chave).maybeSingle();
-  return (data?.valor as Record<string, string> | undefined) ?? null;
-}
-
 // ── Autenticação do envio ───────────────────────────────────────────────────
 // Antes: qualquer um com a anon key (pública, vai no bundle do front) enviava.
 // Agora: exige JWT de usuário e confere vínculo com a empresa dona do lead.
@@ -509,30 +500,12 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
     return json({ success: true, provider: "oficial", data });
   }
 
-  // Fallback Evolution (por empresa). Sai quando a Evolution for aposentada.
-  const ev = await configDaEmpresa(canal.empresa_id, "whatsapp_evolution");
-  if (!ev || !ev.ativo || !ev.instance || !ev.api_key || !ev.api_url) {
-    return json({ error: "WhatsApp sem token válido nesta empresa. Reconecte em Configurações." }, 502);
-  }
-  const base = ev.api_url.replace(/\/$/, "");
-  const req = comMidia
-    ? (tipoMidia === "audio"
-        ? { url: `${base}/message/sendWhatsAppAudio/${ev.instance}`, body: { number: destino, audio: midiaUrl } }
-        : { url: `${base}/message/sendMedia/${ev.instance}`, body: { number: destino, mediatype: tipoMidia, media: midiaUrl, caption: text || undefined } })
-    : { url: `${base}/message/sendText/${ev.instance}`, body: { number: destino, text } };
-  const r = await fetch(req.url, {
-    method: "POST", headers: { "Content-Type": "application/json", apikey: ev.api_key },
-    body: JSON.stringify(req.body),
-  });
-  const data = await r.json();
-  if (!r.ok) return json({ error: data?.message ?? "erro ao enviar mensagem" }, r.status);
-  if (leadId) {
-    await db.from("lead_mensagens").insert([{
-      empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo,
-      origem: "whatsapp", lida: true, tipo: tipoDb, midia_url: midiaUrl ?? null,
-    }]);
-  }
-  return json({ success: true, provider: "evolution", data });
+  // Sem token oficial não há por onde enviar. A Evolution era o fallback daqui
+  // até 31/07/2026 e foi aposentada: ela usa o WhatsApp por dentro, fora dos
+  // termos, e o número do cliente pode ser banido sem recurso. O motivo de
+  // existir era o lojista não querer perder o WhatsApp do celular — e a
+  // coexistência, aprovada agora, resolve isso pelo caminho oficial.
+  return json({ error: "WhatsApp não conectado nesta empresa. Conecte em Administração > Canais." }, 502);
 }
 
 // Envio por MODELO APROVADO. É o único caminho aceito pela Meta quando passaram
@@ -707,38 +680,11 @@ serve(async (req: Request) => {
   // ── Recebimento ───────────────────────────────────────────────────────────
   const objeto = body?.object as string | undefined;
 
-  // Payload da Evolution não é assinado pela Meta — trata antes da validação.
-  // (Sai inteiro quando a Evolution for aposentada.)
-  if (!objeto) {
-    const evento = body?.event as string | undefined;
-    if (evento === "MESSAGES_UPSERT" || evento === "messages.upsert") {
-      const data = body?.data as Record<string, unknown> | undefined;
-      const key = data?.key as Record<string, unknown> | undefined;
-      if (!data || key?.fromMe) return ok();
-      const jid = key?.remoteJid as string | undefined;
-      if (!jid || jid.endsWith("@g.us")) return ok();
-      const { data: cfgs } = await db.from("configuracoes_sistema")
-        .select("empresa_id, valor").eq("chave", "whatsapp_evolution");
-      const empresa = (cfgs ?? []).find((c) => (c.valor as Record<string, unknown>)?.ativo)?.empresa_id;
-      if (!empresa) { console.log("evolution: nenhuma empresa com instância ativa — ignorado"); return ok(); }
-      const canal = (await canalPorEmpresa(empresa as number, "whatsapp")) ?? {
-        id: 0, empresa_id: empresa as number, tipo: "whatsapp",
-        external_id: "", waba_id: null, token: null, coexistencia: false,
-      };
-      const fone = jid.replace("@s.whatsapp.net", "").replace("@lid", "");
-      const msg = data.message as Record<string, unknown> | undefined;
-      const t = data.messageType as string | undefined;
-      let texto = "[midia]";
-      if (t === "conversation") texto = (msg?.conversation as string) ?? "[midia]";
-      else if (t === "extendedTextMessage") texto = ((msg?.extendedTextMessage as Record<string, unknown>)?.text as string) ?? "[midia]";
-      else if (t === "imageMessage") texto = ((msg?.imageMessage as Record<string, unknown>)?.caption as string) || "[imagem]";
-      await upsertLead(canal, {
-        nome: (data.pushName as string) ?? null, telefone: fone, instagramUser: null,
-        origem: "whatsapp", origemId: fone, texto, externalId: (key?.id as string) ?? null,
-      });
-    }
-    return ok();
-  }
+  // Sem `object` não é a Meta. Era por aqui que entrava o webhook da Evolution,
+  // aposentada em 31/07/2026 — e aquele payload não era assinado por ninguém, o
+  // que fazia deste o único caminho de entrada sem verificação de origem.
+  // Agora quem não se identifica como Meta é simplesmente ignorado.
+  if (!objeto) return ok();
 
   // Daqui para baixo é Meta: assinatura obrigatória.
   if (!(await assinaturaValida(req, corpoCru))) {

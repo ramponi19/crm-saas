@@ -23,7 +23,7 @@ export function OnboardingCard() {
     ;(async () => {
       const [prod, wpp, leads, vendas] = await Promise.all([
         supabase.from('produtos').select('*', { count: 'exact', head: true }).eq('ativo', true),
-        supabase.from('configuracoes_sistema').select('*', { count: 'exact', head: true }).in('chave', ['whatsapp_official', 'whatsapp_evolution']),
+        supabase.from('configuracoes_sistema').select('*', { count: 'exact', head: true }).in('chave', ['whatsapp_official']),
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
         supabase.from('vendas').select('*', { count: 'exact', head: true }),
       ])
