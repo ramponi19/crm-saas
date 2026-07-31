@@ -221,6 +221,27 @@ async function extrairMidiaMeta(
 }
 
 // ── Persistência ────────────────────────────────────────────────────────────
+// Copia a foto de perfil para o Storage. A URL que a Meta devolve é de CDN e
+// EXPIRA — guardá-la direto no banco daria foto quebrada em pouco tempo.
+// Caminho por empresa. Qualquer falha devolve null: foto é enfeite, não pode
+// atrapalhar o recebimento da mensagem.
+async function salvarFotoPerfil(canal: Canal, origemId: string, url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 3 * 1024 * 1024) return null; // avatar não precisa ser grande
+    const ct = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+    // Nome estável por contato: refazer o upload substitui a foto antiga em vez
+    // de acumular arquivo a cada mensagem.
+    const path = `${canal.empresa_id}/avatares/${canal.tipo}-${origemId}.${EXT[ct] ?? "jpg"}`;
+    const { error } = await db.storage.from("chat-midia")
+      .upload(path, buf, { contentType: ct, upsert: true });
+    if (error) { console.error("foto upload:", error.message); return null; }
+    return db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl;
+  } catch (e) { console.error("salvarFotoPerfil:", e); return null; }
+}
+
 async function fetchProfile(id: string, token: string, fields: string) {
   try {
     const r = await fetch(`https://graph.facebook.com/${GRAPH}/${id}?fields=${fields}&access_token=${token}`);
@@ -232,7 +253,7 @@ async function fetchProfile(id: string, token: string, fields: string) {
 async function upsertLead(canal: Canal, p: {
   nome: string | null; telefone: string | null; instagramUser: string | null;
   origem: string; origemId: string; texto: string; externalId: string | null;
-  tipo?: string; midiaUrl?: string | null;
+  tipo?: string; midiaUrl?: string | null; fotoUrl?: string | null;
 }) {
   const empresaId = canal.empresa_id;
   const tipo = p.tipo ?? "texto";
@@ -241,9 +262,9 @@ async function upsertLead(canal: Canal, p: {
   // TODA busca de lead filtra empresa_id. Sem isso (v26), dois clientes com o
   // mesmo consumidor tinham a conversa misturada — vazamento entre empresas.
   const { data: byId } = await db.from("leads")
-    .select("id, nome, instagram")
+    .select("id, nome, instagram, foto_url")
     .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true).maybeSingle();
-  let existente = byId as { id: number; nome: string | null; instagram: string | null } | null;
+  let existente = byId as { id: number; nome: string | null; instagram: string | null; foto_url?: string | null } | null;
 
   // Lead criado à mão tem telefone e origem_id nulo — casa pelos últimos 8 dígitos.
   if (!existente && p.origem === "whatsapp") {
@@ -269,7 +290,7 @@ async function upsertLead(canal: Canal, p: {
     const { data: novo, error } = await db.from("leads").insert([{
       empresa_id: empresaId, nome: p.nome, telefone: p.telefone, instagram: p.instagramUser,
       origem: p.origem, origem_id: p.origemId, primeira_msg: p.texto,
-      kanban_status: "novo", ativo: true,
+      kanban_status: "novo", ativo: true, foto_url: p.fotoUrl ?? null,
     }]).select("id").single();
     if (error) {
       const { data: again } = await db.from("leads").select("id")
@@ -281,6 +302,9 @@ async function upsertLead(canal: Canal, p: {
     const patch: Record<string, unknown> = {};
     if (p.nome && !existente?.nome) patch.nome = p.nome;
     if (p.instagramUser && !existente?.instagram) patch.instagram = p.instagramUser;
+    // A foto SEMPRE atualiza quando vem: a pessoa pode ter trocado o avatar, e o
+    // arquivo é sobrescrito no mesmo caminho (não acumula lixo no Storage).
+    if (p.fotoUrl) patch.foto_url = p.fotoUrl;
     if (Object.keys(patch).length) await db.from("leads").update(patch).eq("id", leadId);
   }
 
@@ -309,6 +333,9 @@ async function registrarEcho(
     const { error } = await db.from("lead_mensagens").insert([{
       empresa_id: canal.empresa_id, lead_id: lead.id, direcao: "enviada", conteudo: texto,
       origem, lida: true, external_id: mid, tipo, midia_url: midiaUrl,
+      // Echo = a mensagem comprovadamente saiu (foi enviada pelo app do celular).
+      // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
+      status_entrega: "enviada", status_em: new Date().toISOString(),
     }]);
     if (error) console.log("echo duplicado ignorado:", mid);
   } catch (e) { console.error("registrarEcho:", e); }
@@ -912,15 +939,20 @@ serve(async (req: Request) => {
 
           let nome: string | null = null;
           let username: string | null = null;
+          let fotoUrl: string | null = null;
           if (canal.token) {
-            const p = await fetchProfile(remetente, canal.token, tipo === "instagram" ? "name,username" : "name,first_name");
+            // profile_pic vem em IG e Messenger; a URL é de CDN e EXPIRA, por isso
+            // a imagem é copiada para o Storage logo abaixo.
+            const campos = tipo === "instagram" ? "name,username,profile_pic" : "name,first_name,profile_pic";
+            const p = await fetchProfile(remetente, canal.token, campos);
             nome = p?.name || p?.username || p?.first_name || null;
             username = p?.username || null;
+            if (p?.profile_pic) fotoUrl = await salvarFotoPerfil(canal, remetente, p.profile_pic);
           }
           await upsertLead(canal, {
             nome, telefone: null, instagramUser: tipo === "instagram" ? username : null,
             origem: tipo, origemId: remetente, texto: midia.texto, externalId: mid ?? null,
-            tipo: midia.tipo, midiaUrl: midia.midiaUrl,
+            tipo: midia.tipo, midiaUrl: midia.midiaUrl, fotoUrl,
           });
         }
       }

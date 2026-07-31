@@ -22,6 +22,8 @@ export interface Lead {
   motivo_perda_id?: number | null
   perdido_em?: string | null
   funil_id?: number | null
+  /** Foto de perfil (Instagram/Messenger). WhatsApp não expõe foto. */
+  foto_url?: string | null
 }
 
 /** Funil (Fase 4.1) — uma empresa pode ter vários. */

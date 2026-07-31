@@ -119,6 +119,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
 
   const [chat, setChat] = useState<ChatMsg[]>([])
   const [loadingChat, setLoadingChat] = useState(true)
+  const [fotoQuebrada, setFotoQuebrada] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // A janela de 24h vale só para o WhatsApp: Instagram e Messenger não têm essa
@@ -491,9 +492,22 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 border-b border-line-soft px-5 py-3.5">
-          <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-white">
-            <UserRound size={19} strokeWidth={1.7} />
-          </span>
+          {/* Foto do contato quando existe. Instagram e Messenger fornecem;
+              WhatsApp não expõe foto por privacidade, então ali cai no ícone.
+              onError volta para o ícone se a imagem falhar. */}
+          {lead.foto_url && !fotoQuebrada ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={lead.foto_url}
+              alt={form.nome || 'Contato'}
+              className="h-9 w-9 flex-none rounded-full object-cover"
+              onError={() => setFotoQuebrada(true)}
+            />
+          ) : (
+            <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-white">
+              <UserRound size={19} strokeWidth={1.7} />
+            </span>
+          )}
           <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">{form.nome || 'Lead'}</h2>
           <Badge tone="acc">{canalNome}</Badge>
           <div className="flex-1" />
@@ -600,7 +614,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         {isLoja && m.status && (
                           m.status === 'falhou'
                             ? <span className="text-[10px] text-bad" title={m.erro ?? 'Falha no envio'}>não enviada</span>
-                            : <span className={m.status === 'lida' ? 'text-white' : ''} title={ROTULO_ENTREGA[m.status]}>
+                            : <span
+                                // Lida ganha azul claro (o padrão que todo mundo já
+                                // entende); sobre a bolha escura, azul claro é o que
+                                // tem contraste.
+                                className={m.status === 'lida' ? 'font-semibold text-[#53BDEB]' : ''}
+                                title={ROTULO_ENTREGA[m.status]}
+                              >
                                 {m.status === 'enviada' ? '✓' : '✓✓'}
                               </span>
                         )}

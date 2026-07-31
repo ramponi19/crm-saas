@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { gerarContratoHTML, type ContratoItem, type ContratoComprador, type DadosContrato } from './contrato-venda'
+import { renderizarModelo, type ModeloContrato, type PaginaModelo } from './contrato-modelo'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>
@@ -31,6 +32,19 @@ export async function garantiaPadraoLoja(supabase: Client, empresaId: number): P
     .select('valor').eq('empresa_id', empresaId).eq('chave', 'contrato').maybeSingle()
   const n = Number((data?.valor as { garantia_dias?: unknown } | null)?.garantia_dias)
   return Number.isFinite(n) && n > 0 ? Math.round(n) : GARANTIA_PADRAO_DIAS
+}
+
+/** Modelo ativo da empresa, ou null se ela ainda nao subiu o dela. */
+export async function modeloAtivo(supabase: Client, empresaId: number): Promise<ModeloContrato | null> {
+  const { data } = await supabase
+    .from('contrato_modelos')
+    .select('id, versao, paginas')
+    .eq('empresa_id', empresaId).eq('ativo', true)
+    .maybeSingle()
+  if (!data) return null
+  const paginas = (data.paginas ?? []) as PaginaModelo[]
+  if (!Array.isArray(paginas) || paginas.length === 0) return null
+  return { id: data.id as number, versao: data.versao as number, paginas }
 }
 
 export interface EmitirContratoInput {
@@ -64,12 +78,13 @@ export interface ContratoEmitido {
  * poder avisar que a 2ª via não vai existir.
  */
 export async function emitirContrato(supabase: Client, input: EmitirContratoInput): Promise<ContratoEmitido> {
-  const [empRes, cliRes, garantiaLoja] = await Promise.all([
+  const [empRes, cliRes, garantiaLoja, modelo] = await Promise.all([
     supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', input.empresaId).maybeSingle(),
     input.clienteId
       ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()
       : Promise.resolve({ data: null }),
     garantiaPadraoLoja(supabase, input.empresaId),
+    modeloAtivo(supabase, input.empresaId),
   ])
 
   const e = empRes.data as { nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null } | null
@@ -90,7 +105,11 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     data: input.data,
   }
 
-  const html = gerarContratoHTML(dados)
+  // Modelo da propria empresa quando existe; senao o termo embutido, para a loja
+  // que ainda nao subiu o dela nao ficar sem contrato nenhum.
+  const html = modelo
+    ? renderizarModelo(modelo, { ...dados, garantia_dias: garantiaLoja })
+    : gerarContratoHTML(dados)
 
   const { error } = await supabase.from('contratos_venda').insert({
     empresa_id: input.empresaId,

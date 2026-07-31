@@ -2391,6 +2391,7 @@ export type Database = {
           origem: string | null
           origem_id: string | null
           primeira_msg: string | null
+          foto_url: string | null
           produto_interessado: string | null
           responsavel_id: string | null
           telefone: string | null
@@ -2418,6 +2419,7 @@ export type Database = {
           origem?: string | null
           origem_id?: string | null
           primeira_msg?: string | null
+          foto_url?: string | null
           produto_interessado?: string | null
           responsavel_id?: string | null
           telefone?: string | null
@@ -2445,6 +2447,7 @@ export type Database = {
           origem?: string | null
           origem_id?: string | null
           primeira_msg?: string | null
+          foto_url?: string | null
           produto_interessado?: string | null
           responsavel_id?: string | null
           telefone?: string | null
