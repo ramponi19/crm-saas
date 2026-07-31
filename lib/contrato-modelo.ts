@@ -5,7 +5,7 @@
 // emitirContrato arquiva em contratos_venda.html — e a 2a via so reimprime.
 
 import { valorPorExtenso } from './contrato-extenso'
-import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-venda'
+import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
 
 export interface PaginaModelo {
   ordem: number

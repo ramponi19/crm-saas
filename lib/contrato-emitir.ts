@@ -7,8 +7,8 @@
 // por item em `vendas`, uma venda de 3 produtos virava 3 contratos de 1 item.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { gerarContratoHTML, type ContratoItem, type ContratoComprador, type DadosContrato } from './contrato-venda'
-import { renderizarModelo, type ModeloContrato, type PaginaModelo } from './contrato-modelo'
+import type { ContratoItem, ContratoComprador } from './contrato-tipos'
+import { renderizarModelo, type ModeloContrato, type PaginaModelo, type DadosMescla } from './contrato-modelo'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>
@@ -64,13 +64,20 @@ export interface EmitirContratoInput {
 }
 
 export interface ContratoEmitido {
-  html: string
+  /** null quando a empresa não tem modelo — não existe contrato a emitir. */
+  html: string | null
   /** false = o documento foi montado mas não chegou ao banco (não haverá 2ª via). */
   salvo: boolean
+  /** A loja ainda não configurou o modelo dela em /admin/contrato. */
+  semModelo: boolean
 }
 
 /**
  * Monta o contrato com os dados do momento e arquiva.
+ *
+ * SEM MODELO DA EMPRESA, NÃO EMITE. O produto não traz contrato pronto de
+ * propósito: as cláusulas (garantia, foro, rescisão) são do lojista, e um texto
+ * nosso passaria a responsabilidade por um contrato errado para nós.
  *
  * Nunca lança: a venda já aconteceu quando isto roda, e falhar aqui não pode
  * derrubar o fechamento. Se a gravação falhar, devolve o HTML mesmo assim para
@@ -87,10 +94,13 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     modeloAtivo(supabase, input.empresaId),
   ])
 
+  // Sem modelo não há contrato. Sai antes de montar dado nenhum.
+  if (!modelo) return { html: null, salvo: false, semModelo: true }
+
   const e = empRes.data as { nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null } | null
   const c = cliRes.data as Partial<ContratoComprador> | null
 
-  const dados: DadosContrato = {
+  const dados: DadosMescla = {
     loja: { nome: e?.nome ?? 'Loja', cnpj: e?.cnpj ?? null, telefone: e?.telefone ?? null, logoUrl: e?.wl_logo_url ?? null },
     comprador: { ...COMPRADOR_VAZIO, ...(c ?? {}) },
     // Congela a garantia item a item: o produto pode mudar de política depois,
@@ -105,11 +115,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     data: input.data,
   }
 
-  // Modelo da propria empresa quando existe; senao o termo embutido, para a loja
-  // que ainda nao subiu o dela nao ficar sem contrato nenhum.
-  const html = modelo
-    ? renderizarModelo(modelo, { ...dados, garantia_dias: garantiaLoja })
-    : gerarContratoHTML(dados)
+  const html = renderizarModelo(modelo, dados)
 
   const { error } = await supabase.from('contratos_venda').insert({
     empresa_id: input.empresaId,
@@ -121,7 +127,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     criado_por: input.criadoPor ?? null,
   } as never)
 
-  return { html, salvo: !error }
+  return { html, salvo: !error, semModelo: false }
 }
 
 /** 2ª via: o contrato arquivado que contém esta linha de venda, se existir. */

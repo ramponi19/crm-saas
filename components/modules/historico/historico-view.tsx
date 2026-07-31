@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Download, Receipt, Check, ArrowLeftRight, FileText } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { imprimirContratoVenda, imprimirContratoHTML, type ContratoLoja } from '@/lib/contrato-venda'
+import { imprimirContratoHTML, type ContratoLoja } from '@/lib/contrato-tipos'
 import { buscarContratoDaVenda, emitirContrato } from '@/lib/contrato-emitir'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
@@ -85,49 +85,24 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
   const router = useRouter()
 
   /**
-   * 2ª via. O caminho normal é reimprimir o documento arquivado no fechamento
-   * — cópia fiel do que foi assinado, com todos os itens da venda.
+   * 2ª via: reimprime o documento arquivado no fechamento — cópia fiel do que
+   * foi assinado, com todos os itens da venda.
    *
-   * Vendas anteriores ao arquivamento não têm documento. Para essas, remonta a
-   * partir do cadastro atual, mas marcado como reconstituído: sem o aviso, a
-   * folha passaria por 2ª via fiel podendo divergir do original — e, como o PDV
-   * grava uma linha por item, sairia só o item desta linha.
+   * Venda sem documento arquivado NÃO gera contrato. Remontar exigiria um texto
+   * de cláusulas que não é nosso: o modelo é do lojista, e um termo escrito por
+   * nós jogaria para o produto a responsabilidade por um contrato errado. Além
+   * disso o modelo de hoje pode não ser o que a pessoa assinou.
    */
   async function gerarContrato(v: Venda) {
     setContratoBusy(v.id)
     const arquivado = await buscarContratoDaVenda(createClient(), v.id)
-    if (arquivado) {
-      setContratoBusy(null)
-      if (!imprimirContratoHTML(arquivado)) notify.warn('Permita pop-ups para imprimir o contrato')
+    setContratoBusy(null)
+    if (!arquivado) {
+      notify.warn('Esta venda não tem contrato arquivado',
+        'Só vendas fechadas depois de o modelo da loja ser configurado têm 2ª via.')
       return
     }
-    let comprador = {
-      nome: v.cliente_nome ?? '', cpf_cnpj: null as string | null, nacionalidade: null as string | null,
-      estado_civil: null as string | null, profissao: null as string | null, data_nascimento: null as string | null,
-      telefone: null as string | null, endereco: null as string | null, numero: null as string | null,
-      complemento: null as string | null, bairro: null as string | null, cidade: null as string | null,
-      estado: null as string | null, cep: null as string | null,
-    }
-    if (v.cliente_id) {
-      const { data: c } = await createClient().from('clientes')
-        .select('nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, endereco, numero, complemento, bairro, cidade, estado, cep')
-        .eq('id', v.cliente_id).maybeSingle()
-      if (c) comprador = { ...comprador, ...(c as typeof comprador) }
-    }
-    setContratoBusy(null)
-    const ok = imprimirContratoVenda({
-      loja,
-      comprador,
-      itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda }],
-      total: v.valor_venda,
-      desconto: v.desconto_valor ?? 0,
-      forma_pagamento: v.forma_pagamento,
-      parcelas: v.parcelas,
-      vendedor: v.vendedor_nome,
-      data: v.data_venda ?? undefined,
-      reconstituido: true,
-    })
-    if (!ok) notify.warn('Permita pop-ups para gerar o contrato')
+    if (!imprimirContratoHTML(arquivado)) notify.warn('Permita pop-ups para imprimir o contrato')
   }
 
   async function transferir() {

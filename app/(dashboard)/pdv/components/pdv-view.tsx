@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
-import { imprimirContratoHTML } from '@/lib/contrato-venda'
+import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato } from '@/lib/contrato-emitir'
 
 interface ItemEstoque {
@@ -73,6 +73,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   // Contrato JÁ EMITIDO da última venda. O documento é montado e arquivado no
   // fechamento; o botão só imprime — igual à 2ª via do Histórico.
   const [ultimoContrato, setUltimoContrato] = useState<{ html: string; salvo: boolean; total: number } | null>(null)
+  // Total da última venda — separado do contrato, porque a venda acontece mesmo
+  // quando a loja não tem modelo configurado e nenhum contrato é emitido.
+  const [ultimoTotal, setUltimoTotal] = useState(0)
   const [sucessoOpen, setSucessoOpen] = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
 
@@ -325,6 +328,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // Uma venda = N linhas em `vendas`, mas UM contrato: `vendaIds` amarra as
       // duas coisas, e é por ele que o Histórico acha a 2ª via.
       // Nunca derruba o fechamento: a venda já está gravada a esta altura.
+      setUltimoTotal(totais.total)
       try {
         const emitido = await emitirContrato(supabase, {
           empresaId,
@@ -347,8 +351,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           parcelas,
           criadoPor: user.id,
         })
-        setUltimoContrato({ ...emitido, total: totais.total })
-        if (!emitido.salvo) notify.warn('Contrato não foi arquivado', 'Dá para imprimir agora, mas não haverá 2ª via no Histórico')
+        if (emitido.semModelo) {
+          // Sem modelo da loja não há contrato — e o CRM não entrega um pronto.
+          setUltimoContrato(null)
+          notify.warn('Venda registrada sem contrato', 'Configure o modelo da loja em Administração → Contrato')
+        } else if (emitido.html) {
+          setUltimoContrato({ html: emitido.html, salvo: emitido.salvo, total: totais.total })
+          if (!emitido.salvo) notify.warn('Contrato não foi arquivado', 'Dá para imprimir agora, mas não haverá 2ª via no Histórico')
+        }
       } catch {
         setUltimoContrato(null)
       }
@@ -389,7 +399,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     if (!clienteSelecionado?.telefone || !pixCobranca) return
     setEnviandoWpp(true)
     const chave = pixCobranca.linha_digitavel ?? pixCobranca.qr_code ?? pixCobranca.link_pagamento ?? ''
-    const msg = `Olá ${clienteSelecionado.nome}! Segue o Pix para pagamento da sua compra no valor de *${fmt(ultimoContrato?.total ?? totais.total)}*:\n\n${chave}`
+    const msg = `Olá ${clienteSelecionado.nome}! Segue o Pix para pagamento da sua compra no valor de *${fmt(ultimoTotal || totais.total)}*:\n\n${chave}`
     try {
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -420,7 +430,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         <div className="space-y-4">
           <div className="rounded-card border border-ok/20 bg-ok-soft p-4 text-center">
             <p className="text-[11px] text-ink-3">Valor a pagar</p>
-            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoContrato?.total ?? totais.total)}</p>
+            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoTotal || totais.total)}</p>
           </div>
           {pixCobranca?.qr_code_base64 && (
             <div className="flex justify-center">
@@ -459,11 +469,18 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         <div className="space-y-4">
           <div className="rounded-card border border-ok/20 bg-ok-soft p-4 text-center">
             <p className="text-[11px] text-ink-3">Total da venda</p>
-            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoContrato?.total ?? 0)}</p>
+            <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoTotal)}</p>
           </div>
-          <Button className="w-full" onClick={gerarContrato} icon={<FileText size={15} strokeWidth={1.7} />}>
-            Imprimir contrato
-          </Button>
+          {ultimoContrato ? (
+            <Button className="w-full" onClick={gerarContrato} icon={<FileText size={15} strokeWidth={1.7} />}>
+              Imprimir contrato
+            </Button>
+          ) : (
+            <p className="rounded-control border border-line bg-raised px-3 py-2.5 text-[12px] text-ink-2">
+              Sem contrato: a loja ainda não tem um modelo configurado. O dono monta em{' '}
+              <strong className="text-ink">Administração → Contrato</strong>.
+            </p>
+          )}
           <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setUltimoContrato(null); setClienteSelecionado(null) }}>
             Nova venda
           </Button>

@@ -115,6 +115,36 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     obs: lead.observacoes ?? '',
   })
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
+
+  // Valores como estão no banco. Comparar contra eles (e não contra um "sujo"
+  // qualquer) é o que faz o botão DESAPARECER quando o funcionário desfaz a
+  // edição — apagar o que digitou volta ao estado original e nada fica pendente.
+  const original: Record<string, string> = {
+    nome: lead.nome ?? '',
+    tel: lead.telefone ?? '',
+    ig: lead.instagram ?? '',
+    produto: lead.produto_interessado ?? '',
+    status: lead.kanban_status ?? 'novo',
+    responsavel: lead.responsavel_id ?? '',
+    obs: lead.observacoes ?? '',
+  }
+  const mudou = (campo: string) =>
+    (form[campo as keyof typeof form] ?? '') !== (original[campo] ?? '')
+  const algoMudou = Object.keys(original).some(mudou)
+
+  /**
+   * Botão de salvar logo abaixo do campo alterado. Existe para o vendedor não
+   * precisar rolar até o fim da coluna — o motivo é operacional: informação
+   * digitada e não salva é informação perdida.
+   * Salva TODAS as alterações pendentes, não só a do campo (evita salvar metade).
+   */
+  const salvarAqui = (campo: string) =>
+    mudou(campo) ? (
+      <div className="-mt-1 flex items-center gap-2">
+        <Button size="sm" onClick={handleSave} loading={saving}>Salvar</Button>
+        <span className="text-[11px] text-warn">alteração não salva</span>
+      </div>
+    ) : null
   const [abaMobile, setAbaMobile] = useState<'dados' | 'conversa'>('conversa') // mobile: mostra uma coluna por vez
 
   const [chat, setChat] = useState<ChatMsg[]>([])
@@ -542,21 +572,28 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
           {/* Esquerda: formulário */}
           <div className={'flex-col gap-3 overflow-y-auto border-r border-line-soft p-5 scrollbar-thin lg:flex ' + (abaMobile === 'dados' ? 'flex' : 'hidden')}>
             <Input label="Nome" value={form.nome} onChange={(e) => set('nome', e.target.value)} />
+            {salvarAqui('nome')}
             <Input label="Telefone / WhatsApp" value={form.tel} onChange={(e) => set('tel', e.target.value)} className="num" />
+            {salvarAqui('tel')}
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
+            {salvarAqui('ig')}
             {segmento === 'concessionaria' || segmento === 'imobiliaria' ? (
               <Input label={segmento === 'concessionaria' ? 'Veículo interessado' : 'Imóvel interessado'} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
             ) : (
               <ProdutoAutocomplete label="Produto interessado" value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
             )}
+            {salvarAqui('produto')}
             <Select label="Status no funil" value={form.status} onChange={(e) => set('status', e.target.value)}>
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
+            {salvarAqui('status')}
             <Select label="Responsável" value={form.responsavel} onChange={(e) => set('responsavel', e.target.value)}>
               <option value="">Sem responsável</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </Select>
+            {salvarAqui('responsavel')}
             <Textarea label="Observações" rows={3} value={form.obs} onChange={(e) => set('obs', e.target.value)} placeholder="Contexto, anotações…" />
+            {salvarAqui('obs')}
 
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} segmento={segmento} />}
             <ResponsavelPanel
@@ -572,7 +609,16 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <LeadChamadasPanel leadId={lead.id} />
             <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} />
             <LeadCadenciaPanel leadId={lead.id} />
-            <Button className="mt-1 w-full" onClick={handleSave} loading={saving}>Salvar</Button>
+            {/* Continua existindo para quem já rolou até aqui, mas agora reflete o
+                estado: sem alteração pendente não há o que salvar. */}
+            <Button
+              className="mt-1 w-full"
+              onClick={handleSave}
+              loading={saving}
+              disabled={!algoMudou}
+            >
+              {algoMudou ? 'Salvar alterações' : 'Nada a salvar'}
+            </Button>
           </div>
 
           {/* Direita: chat */}
