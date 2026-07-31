@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Image from 'next/image'
-import { Save, Upload, Plus, Trash2, Eye, ChevronUp, ChevronDown, FileText, Sun, Moon } from 'lucide-react'
+import { Save, Upload, Plus, Trash2, Eye, ChevronUp, ChevronDown, FileText, Sun, Moon, FileUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Badge, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -48,8 +48,11 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
   const [enviando, setEnviando] = useState(false)
   const [sujo, setSujo] = useState(false)
   const [focada, setFocada] = useState(0)
+  const [importando, setImportando] = useState<string | null>(null)
+  const [naoMapeados, setNaoMapeados] = useState<string[]>([])
   const areas = useRef<(HTMLTextAreaElement | null)[]>([])
   const inputVarios = useRef<HTMLInputElement>(null)
+  const inputPdf = useRef<HTMLInputElement>(null)
 
   const alterar = (i: number, campo: keyof PaginaModelo, valor: unknown) => {
     setPaginas((ps) => ps.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)))
@@ -100,6 +103,48 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
     setSujo(true)
     setEnviando(false)
     notify.ok(`${urls.length} ${urls.length === 1 ? 'fundo enviado' : 'fundos enviados'}`, 'Agora escreva o texto de cada página')
+  }
+
+  /**
+   * Importa o contrato de um PDF: fatia os fundos (sem o texto vir grudado),
+   * extrai o texto de cada página e converte os campos em vermelho que dá para
+   * reconhecer em marcador. O que não reconhecer fica em vermelho no editor.
+   */
+  async function importarPdf(file: File) {
+    setImportando('Lendo o PDF…')
+    try {
+      const { importarContratoPDF } = await import('@/lib/contrato-importar-pdf')
+      const r = await importarContratoPDF(file, {
+        onProgresso: (feito, total) => setImportando(`Processando página ${feito} de ${total}…`),
+      })
+
+      // Sobe os fundos e monta as páginas.
+      const prontas: PaginaModelo[] = []
+      for (let i = 0; i < r.paginas.length; i++) {
+        const p = r.paginas[i]
+        setImportando(`Enviando fundo ${i + 1} de ${r.paginas.length}…`)
+        let url: string | null = null
+        if (p.fundo) {
+          url = await subir(new File([p.fundo], `pagina-${i + 1}.jpg`, { type: 'image/jpeg' }))
+          if (!url) { setImportando(null); return }
+        }
+        prontas.push({ ordem: i + 1, fundo_url: url, escuro: p.escuro, texto_html: p.texto_html })
+      }
+
+      setPaginas(prontas)
+      setNaoMapeados([...new Set(r.paginas.flatMap((p) => p.camposNaoMapeados))])
+      setSujo(true)
+      setImportando(null)
+      notify.ok(
+        `${prontas.length} ${prontas.length === 1 ? 'página importada' : 'páginas importadas'}`,
+        r.totalNaoMapeados > 0
+          ? `${r.totalMarcadores} campos já viraram marcador; ${r.totalNaoMapeados} ficaram em vermelho para você decidir`
+          : `${r.totalMarcadores} campos viraram marcador`,
+      )
+    } catch (e) {
+      setImportando(null)
+      notify.bad('Não foi possível importar o PDF', e instanceof Error ? e.message : undefined)
+    }
   }
 
   function inserirMarcador(chave: string) {
@@ -163,19 +208,45 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
             {sujo && <Badge tone="warn">Alterações não salvas</Badge>}
           </div>
 
-          <div className="mt-4 rounded-control border border-dashed border-line bg-raised p-4">
+          <div className="mt-4 space-y-3 rounded-control border border-dashed border-line bg-raised p-4">
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="outline" loading={enviando} onClick={() => inputVarios.current?.click()}
-                icon={<Upload size={15} strokeWidth={1.7} />}>
-                Enviar os fundos do contrato
+              <Button loading={!!importando} disabled={enviando} onClick={() => inputPdf.current?.click()}
+                icon={<FileUp size={15} strokeWidth={1.7} />}>
+                Importar contrato de um PDF
               </Button>
               <span className="text-[12px] text-ink-3">
-                Pode selecionar todas as páginas de uma vez — a ordem segue o nome do arquivo (1, 2, 3…).
+                {importando ?? 'Um arquivo só: o sistema separa as páginas, extrai o texto e marca os campos.'}
+              </span>
+            </div>
+            <input ref={inputPdf} type="file" accept="application/pdf" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) importarPdf(f); e.target.value = '' }} />
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-3">
+              <Button variant="outline" size="sm" loading={enviando} disabled={!!importando}
+                onClick={() => inputVarios.current?.click()} icon={<Upload size={14} strokeWidth={1.7} />}>
+                Ou enviar os fundos como imagem
+              </Button>
+              <span className="text-[12px] text-ink-3">
+                Para quem já tem as páginas em JPG/PNG — a ordem segue o nome do arquivo.
               </span>
             </div>
             <input ref={inputVarios} type="file" accept="image/*" multiple className="hidden"
               onChange={(e) => { if (e.target.files?.length) enviarVarios(e.target.files); e.target.value = '' }} />
           </div>
+
+          {naoMapeados.length > 0 && (
+            <div className="mt-3 rounded-control border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2.5 text-[12px] text-[#92400e]">
+              <strong>{naoMapeados.length} campo(s) do molde ficaram sem marcador.</strong> Eles seguem em vermelho no
+              texto das páginas. Troque por um marcador quando for dado da venda, ou escreva o valor fixo quando for
+              dado da sua loja (CNPJ, sede, representante, banco).
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {naoMapeados.slice(0, 24).map((c, i) => (
+                  <code key={`${c}-${i}`} className="rounded bg-white/70 px-1.5 py-0.5">{c || '(vazio)'}</code>
+                ))}
+                {naoMapeados.length > 24 && <span>+{naoMapeados.length - 24}</span>}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card title="Marcadores disponíveis">
