@@ -35,14 +35,14 @@ export default async function PDVPage() {
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, produtos!produto_id(nome, marcas_produtos!marca_id(nome))')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, produtos!produto_id(nome, garantia_dias, marcas_produtos!marca_id(nome))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
     // Reservas de lead ativas (aba Reservas do PDV).
     supabase
       .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, garantia_dias, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'reservado')
       .not('reservado_lead_id', 'is', null)
@@ -63,7 +63,7 @@ export default async function PDVPage() {
   const isAdmin = !!((usuarioRes?.data as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
-    produtos: Embed<{ nome: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
+    produtos: Embed<{ nome: string | null; garantia_dias: number | null; marcas_produtos: Embed<{ nome: string | null }> }>
   }
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
@@ -72,6 +72,7 @@ export default async function PDVPage() {
       produto_id: u.produto_id ?? 0,
       status: u.status ?? 'disponivel',
       produto_nome: prod?.nome ?? '—',
+      produto_garantia_dias: prod?.garantia_dias ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
     }
   })
@@ -84,6 +85,7 @@ export default async function PDVPage() {
       produto_id: u.produto_id ?? 0,
       status: u.status ?? 'reservado',
       produto_nome: prod?.nome ?? '—',
+      produto_garantia_dias: prod?.garantia_dias ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       lead_nome: one(u.leads)?.nome ?? '—',
       reservado_lead_id: u.reservado_lead_id ?? 0,

@@ -1354,6 +1354,57 @@ export type Database = {
           },
         ]
       }
+      contratos_venda: {
+        Row: {
+          id: number
+          empresa_id: number
+          cliente_id: number | null
+          venda_ids: number[]
+          dados: Json
+          html: string
+          garantia_dias: number | null
+          criado_por: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          cliente_id?: number | null
+          venda_ids: number[]
+          dados: Json
+          html: string
+          garantia_dias?: number | null
+          criado_por?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          cliente_id?: number | null
+          venda_ids?: number[]
+          dados?: Json
+          html?: string
+          garantia_dias?: number | null
+          criado_por?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_venda_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_venda_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_sistema: {
         Row: {
           chave: string
@@ -2847,6 +2898,7 @@ export type Database = {
           descricao: string | null
           foto_url: string | null
           disponivel: boolean | null
+          garantia_dias: number | null
         }
         Insert: {
           armazenamentos?: string[] | null
@@ -2865,6 +2917,7 @@ export type Database = {
           descricao?: string | null
           foto_url?: string | null
           disponivel?: boolean | null
+          garantia_dias?: number | null
         }
         Update: {
           armazenamentos?: string[] | null
@@ -2883,6 +2936,7 @@ export type Database = {
           descricao?: string | null
           foto_url?: string | null
           disponivel?: boolean | null
+          garantia_dias?: number | null
         }
         Relationships: [
           {

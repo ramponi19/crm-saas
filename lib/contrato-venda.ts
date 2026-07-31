@@ -23,7 +23,13 @@ export interface ContratoComprador {
   estado: string | null
   cep: string | null
 }
-export interface ContratoItem { descricao: string; imei: string | null; valor: number }
+export interface ContratoItem {
+  descricao: string
+  imei: string | null
+  valor: number
+  /** Garantia deste produto. Ausente = cai no `garantia_dias` do contrato. */
+  garantia_dias?: number | null
+}
 export interface DadosContrato {
   loja: ContratoLoja
   comprador: ContratoComprador
@@ -32,9 +38,16 @@ export interface DadosContrato {
   desconto?: number
   forma_pagamento: string | null
   parcelas?: number | null
+  /** Padrão da loja; vale para os itens sem garantia própria. */
   garantia_dias?: number
   vendedor?: string | null
   data?: string // ISO; default: agora
+  /**
+   * Documento remontado a partir do cadastro ATUAL, não o emitido na venda
+   * (vendas anteriores ao contrato salvo). Imprime um aviso — sem ele, a folha
+   * passaria por 2ª via fiel podendo divergir do que foi assinado.
+   */
+  reconstituido?: boolean
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -63,10 +76,16 @@ function dataExtenso(iso?: string): string {
 export function gerarContratoHTML(d: DadosContrato): string {
   const garantia = d.garantia_dias ?? 90
   const itens = d.itens.filter((i) => i.descricao?.trim())
+  // Produtos podem ter garantias diferentes (novo x seminovo). Quando divergem,
+  // a tabela ganha uma coluna e a cláusula aponta para ela — uma cláusula única
+  // com um número só estaria errada para parte dos itens.
+  const garantiaDoItem = (i: ContratoItem) => i.garantia_dias ?? garantia
+  const garantiasVariam = new Set(itens.map(garantiaDoItem)).size > 1
   const linhasItens = itens.map((i) => `
     <tr>
       <td>${esc(i.descricao)}</td>
       <td class="num">${i.imei ? esc(i.imei) : '—'}</td>
+      ${garantiasVariam ? `<td class="num">${garantiaDoItem(i)} dias</td>` : ''}
       <td class="num">${brl(i.valor)}</td>
     </tr>`).join('')
   const pgto = PGTO[d.forma_pagamento ?? ''] ?? (d.forma_pagamento ?? '—')
@@ -98,9 +117,11 @@ export function gerarContratoHTML(d: DadosContrato): string {
   .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 56px; }
   .assinaturas div { border-top: 1px solid #0f172a; padding-top: 6px; text-align: center; font-size: 11px; }
   .local { margin-top: 34px; }
+  .aviso { border: 1px solid #f59e0b; background: #fffbeb; color: #92400e; border-radius: 6px; padding: 8px 10px; font-size: 11px; margin-bottom: 14px; }
   @media print { .page { padding: 16px 24px; } @page { margin: 12mm; } }
 </style></head>
 <body><div class="page">
+  ${d.reconstituido ? `<div class="aviso"><b>Documento reconstituído.</b> Esta venda é anterior ao arquivamento automático de contratos, então esta folha foi remontada a partir do cadastro atual do cliente — pode divergir do contrato originalmente assinado.</div>` : ''}
   <header>
     ${d.loja.logoUrl ? `<img src="${esc(d.loja.logoUrl)}" alt="">` : ''}
     <div>
@@ -125,8 +146,8 @@ export function gerarContratoHTML(d: DadosContrato): string {
   <h2>Objeto</h2>
   <p>Pelo presente instrumento, o(a) <b>${esc(d.loja.nome)}</b> (VENDEDOR) vende ao COMPRADOR acima qualificado o(s) produto(s) descrito(s) abaixo, no estado em que se encontra(m):</p>
   <table>
-    <thead><tr><th>Produto</th><th class="num">IMEI / Nº série</th><th class="num">Valor</th></tr></thead>
-    <tbody>${linhasItens || '<tr><td colspan="3">—</td></tr>'}</tbody>
+    <thead><tr><th>Produto</th><th class="num">IMEI / Nº série</th>${garantiasVariam ? '<th class="num">Garantia</th>' : ''}<th class="num">Valor</th></tr></thead>
+    <tbody>${linhasItens || `<tr><td colspan="${garantiasVariam ? 4 : 3}">—</td></tr>`}</tbody>
   </table>
   ${d.desconto && d.desconto > 0 ? `<div class="f num"><b>Desconto:</b> − ${brl(d.desconto)}</div>` : ''}
   <div class="total"><span>Total</span><span>${brl(d.total)}</span></div>
@@ -135,7 +156,10 @@ export function gerarContratoHTML(d: DadosContrato): string {
   <p>Forma de pagamento: <b>${esc(pgto)}${parcelaTxt}</b>, no valor total de <b>${brl(d.total)}</b>, dando plena e geral quitação com a assinatura deste termo.</p>
 
   <h2>Garantia</h2>
-  <p>O produto possui garantia de <b>${garantia} dias</b> contra defeitos de fabricação, a contar da data desta venda. A garantia não cobre danos causados por mau uso, quedas, contato com líquidos, violação do lacre/assistência não autorizada, ou desgaste natural. Aparelhos seminovos/usados seguem as condições informadas no ato da compra.</p>
+  <p>${garantiasVariam
+      ? 'Cada produto possui a garantia indicada na coluna <b>Garantia</b> da tabela acima'
+      : `O produto possui garantia de <b>${garantia} dias</b>`
+    } contra defeitos de fabricação, a contar da data desta venda. A garantia não cobre danos causados por mau uso, quedas, contato com líquidos, violação do lacre/assistência não autorizada, ou desgaste natural. Aparelhos seminovos/usados seguem as condições informadas no ato da compra.</p>
 
   <h2>Disposições gerais</h2>
   <p>O COMPRADOR declara ter conferido e testado o(s) produto(s), aceitando-o(s) nas condições apresentadas. As partes elegem o foro da comarca da loja para dirimir quaisquer dúvidas oriundas deste contrato.</p>
@@ -149,6 +173,19 @@ export function gerarContratoHTML(d: DadosContrato): string {
 </div>
 <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
 </body></html>`
+}
+
+/**
+ * Imprime um documento JÁ EMITIDO (2ª via). É o caminho do Histórico: abre
+ * exatamente o HTML arquivado no fechamento da venda, sem remontar nada.
+ */
+export function imprimirContratoHTML(html: string): boolean {
+  const w = window.open('', '_blank', 'width=820,height=900')
+  if (!w) return false
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  return true
 }
 
 export function imprimirContratoVenda(d: DadosContrato): boolean {

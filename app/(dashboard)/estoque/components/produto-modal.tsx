@@ -63,6 +63,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
     nome: produto?.nome ?? '',
     marca_id: produto?.marca_id ? String(produto.marca_id) : '',
     categoria_id: produto?.categoria_id ? String(produto.categoria_id) : '',
+    garantia_dias: '',
   })
   const [cores, setCores] = useState<string[]>([])
   const [armazenamentos, setArmazenamentos] = useState<string[]>([])
@@ -70,12 +71,13 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
 
-  // Ao editar, carrega cores/armazenamentos salvos.
+  // Ao editar, carrega cores/armazenamentos/garantia salvos.
   useEffect(() => {
     if (!produto?.id) return
-    supabase.from('produtos').select('cores, armazenamentos').eq('id', produto.id).maybeSingle().then(({ data }) => {
+    supabase.from('produtos').select('cores, armazenamentos, garantia_dias').eq('id', produto.id).maybeSingle().then(({ data }) => {
       if (data?.cores) setCores(data.cores)
       if (data?.armazenamentos) setArmazenamentos(data.armazenamentos)
+      if (data?.garantia_dias != null) setForm((f) => ({ ...f, garantia_dias: String(data.garantia_dias) }))
     })
   }, [produto?.id, supabase])
 
@@ -99,6 +101,8 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
       categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
       cores: cores.length ? cores : null,
       armazenamentos: armazenamentos.length ? armazenamentos : null,
+      // Vazio = usa o padrão da loja (/admin/configuracoes → Contrato).
+      garantia_dias: form.garantia_dias.trim() ? Number(form.garantia_dias) : null,
       ativo: true,
     }
     if (isNew) {
@@ -182,6 +186,14 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
             <option value="">Sem categoria</option>
             {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </Select>
+          <Input
+            label="Garantia (dias)"
+            type="number"
+            min={0}
+            value={form.garantia_dias}
+            onChange={e => setForm(f => ({ ...f, garantia_dias: e.target.value }))}
+            placeholder="Em branco = padrão da loja"
+          />
           <ChipsField label="Cores do modelo" values={cores} onChange={setCores} placeholder="Ex.: Titânio Preto (Enter p/ adicionar)" />
           <ChipsField label="Armazenamentos" values={armazenamentos} onChange={setArmazenamentos} placeholder="Ex.: 256GB (Enter p/ adicionar)" />
           <p className="-mt-1 text-[11px] text-ink-3">No estoque, ao escolher este modelo, Cor e Armazenamento viram listas com estas opções.</p>

@@ -25,7 +25,7 @@ export default async function HistoricoPage() {
       .from('vendas')
       .select(`
         id, data_venda, valor_venda, lucro, forma_pagamento,
-        canal_venda, status, parcelas, cliente_id, numero_serie, desconto_valor, observacoes,
+        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes,
         clientes!cliente_id(nome),
         produtos!produto_id(nome),
         usuarios!vendedor_id(nome)
@@ -39,7 +39,7 @@ export default async function HistoricoPage() {
   type VendaRow = {
     id: number; data_venda: string | null; valor_venda: number; lucro: number | null
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
-    cliente_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
+    cliente_id: number | null; produto_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
@@ -54,6 +54,7 @@ export default async function HistoricoPage() {
     status:        v.status,
     parcelas:      v.parcelas,
     cliente_id:    v.cliente_id,
+    produto_id:    v.produto_id,
     numero_serie:  v.numero_serie,
     desconto_valor: v.desconto_valor != null ? Number(v.desconto_valor) : null,
     cliente_nome:  one(v.clientes)?.nome  ?? null,
@@ -71,7 +72,7 @@ export default async function HistoricoPage() {
   return (
     <>
       <Topbar eyebrow="VENDAS · HISTÓRICO" title="Histórico de vendas" />
-      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} loja={loja} />
+      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} loja={loja} empresaId={empresaId!} />
     </>
   )
 }

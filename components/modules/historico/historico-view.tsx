@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Download, Receipt, Check, ArrowLeftRight, FileText } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { imprimirContratoVenda, type ContratoLoja } from '@/lib/contrato-venda'
+import { imprimirContratoVenda, imprimirContratoHTML, type ContratoLoja } from '@/lib/contrato-venda'
+import { buscarContratoDaVenda, emitirContrato } from '@/lib/contrato-emitir'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
@@ -21,11 +22,12 @@ interface Venda {
   status: string | null
   parcelas: number | null
   cliente_id: number | null
+  produto_id: number | null
   numero_serie: string | null
   desconto_valor: number | null
 }
 
-interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; loja: ContratoLoja }
+interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; loja: ContratoLoja; empresaId: number }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
@@ -72,7 +74,7 @@ function exportCSV(rows: Venda[]) {
   a.click()
 }
 
-export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, empresaId }: Props) {
   const [filtro, setFiltro] = useState('all')
   const [finalizando, setFinalizando] = useState<number | null>(null)
   const [transf, setTransf] = useState<Venda | null>(null)
@@ -81,8 +83,23 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja }
   const [contratoBusy, setContratoBusy] = useState<number | null>(null)
   const router = useRouter()
 
+  /**
+   * 2ª via. O caminho normal é reimprimir o documento arquivado no fechamento
+   * — cópia fiel do que foi assinado, com todos os itens da venda.
+   *
+   * Vendas anteriores ao arquivamento não têm documento. Para essas, remonta a
+   * partir do cadastro atual, mas marcado como reconstituído: sem o aviso, a
+   * folha passaria por 2ª via fiel podendo divergir do original — e, como o PDV
+   * grava uma linha por item, sairia só o item desta linha.
+   */
   async function gerarContrato(v: Venda) {
     setContratoBusy(v.id)
+    const arquivado = await buscarContratoDaVenda(createClient(), v.id)
+    if (arquivado) {
+      setContratoBusy(null)
+      if (!imprimirContratoHTML(arquivado)) notify.warn('Permita pop-ups para imprimir o contrato')
+      return
+    }
     let comprador = {
       nome: v.cliente_nome ?? '', cpf_cnpj: null as string | null, nacionalidade: null as string | null,
       estado_civil: null as string | null, profissao: null as string | null, data_nascimento: null as string | null,
@@ -107,6 +124,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja }
       parcelas: v.parcelas,
       vendedor: v.vendedor_nome,
       data: v.data_venda ?? undefined,
+      reconstituido: true,
     })
     if (!ok) notify.warn('Permita pop-ups para gerar o contrato')
   }
@@ -129,9 +147,43 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja }
     if (!error && v?.unidade_id) {
       await supabase.from('inventario_unidades').update({ status: 'vendido' }).eq('id', v.unidade_id)
     }
+
+    // A encomenda só vira venda de verdade aqui — é este o momento de emitir o
+    // contrato, não o da criação. Nunca derruba a entrega: se falhar, resta a
+    // reconstituição na 2ª via.
+    let contratoOk = false
+    const venda = vendas.find((x) => x.id === id)
+    if (!error && venda) {
+      try {
+        const garantiaProduto = venda.produto_id
+          ? ((await supabase.from('produtos').select('garantia_dias').eq('id', venda.produto_id).maybeSingle()).data as { garantia_dias?: number | null } | null)?.garantia_dias ?? null
+          : null
+        const r = await emitirContrato(supabase, {
+          empresaId,
+          clienteId: venda.cliente_id,
+          vendaIds: [id],
+          itens: [{
+            descricao: venda.produto_nome ?? 'Produto',
+            imei: venda.numero_serie,
+            valor: venda.valor_venda,
+            garantia_dias: garantiaProduto,
+          }],
+          total: venda.valor_venda,
+          desconto: venda.desconto_valor ?? 0,
+          forma_pagamento: venda.forma_pagamento,
+          parcelas: venda.parcelas,
+          vendedor: venda.vendedor_nome,
+        })
+        contratoOk = r.salvo
+      } catch { /* entrega não depende do contrato */ }
+    }
+
     setFinalizando(null)
     if (error) { notify.bad('Erro ao finalizar'); return }
-    notify.ok('Venda concluída', v?.unidade_id ? 'Contabilizada + unidade baixada do estoque' : 'A venda agora conta no faturamento')
+    notify.ok('Venda concluída', [
+      v?.unidade_id ? 'Unidade baixada do estoque' : 'Contabilizada no faturamento',
+      contratoOk ? 'contrato emitido' : null,
+    ].filter(Boolean).join(' · '))
     router.refresh()
   }
 
