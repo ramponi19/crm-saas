@@ -230,7 +230,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           usuario_id: user.id,
           valor_venda: valorItem,
           valor_custo: c.item.preco_custo ?? 0,
-          lucro: valorItem - (c.item.preco_custo ?? 0),
+          // `lucro` NAO entra: e coluna gerada (valor_venda - valor_custo). Mandar
+          // valor faz o Postgres recusar o INSERT inteiro com 428C9.
           forma_pagamento: formaPagamento,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
           canal_venda: 'loja_fisica',
@@ -273,7 +274,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         const valorAc = preco - descAc
         const { data: vAc } = await supabase.from('vendas').insert({
           empresa_id: empresaId, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
-          valor_venda: valorAc, valor_custo: 0, lucro: valorAc, forma_pagamento: formaPagamento,
+          valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
           desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
