@@ -19,22 +19,32 @@ function trio(x: number): string {
   return r
 }
 
-/** Escreve a parte inteira, tratando milhar e milhao. */
+/**
+ * Escreve a parte inteira, tratando milhar e milhao.
+ *
+ * A ligacao do ultimo bloco segue a regra do portugues: "e" quando o resto e
+ * menor que cem ou centena redonda ("mil e duzentos", "mil e cinquenta"), e
+ * nada quando nao e ("mil duzentos e cinquenta").
+ */
 function inteiro(n: number): string {
   if (n === 0) return 'zero'
-  const partes: string[] = []
   const milhoes = Math.floor(n / 1_000_000)
   const milhares = Math.floor((n % 1_000_000) / 1000)
   const resto = n % 1000
 
-  if (milhoes) partes.push(milhoes === 1 ? 'um milhão' : `${trio(milhoes)} milhões`)
-  if (milhares) partes.push(milhares === 1 ? 'mil' : `${trio(milhares)} mil`)
-  if (resto) partes.push(trio(resto))
+  const blocos: string[] = []
+  if (milhoes) blocos.push(milhoes === 1 ? 'um milhão' : `${trio(milhoes)} milhões`)
+  if (milhares) blocos.push(milhares === 1 ? 'mil' : `${trio(milhares)} mil`)
+  if (resto) blocos.push(trio(resto))
 
-  // "mil e duzentos" / "um milhão e quinhentos mil"; vírgula quando ha 3 blocos.
-  if (partes.length === 1) return partes[0]
-  if (partes.length === 2) return `${partes[0]} e ${partes[1]}`
-  return `${partes[0]}, ${partes[1]} e ${partes[2]}`
+  if (blocos.length === 1) return blocos[0]
+
+  // O último bloco é o `resto` só quando ele existe; senão é um bloco de escala
+  // (mil/milhões), que sempre liga com "e": "dois milhões e quinhentos mil".
+  const ligaComE = resto === 0 || resto < 100 || resto % 100 === 0
+  const ultimo = blocos[blocos.length - 1]
+  const anteriores = blocos.slice(0, -1).join(', ')
+  return `${anteriores}${ligaComE ? ' e ' : ' '}${ultimo}`
 }
 
 /**

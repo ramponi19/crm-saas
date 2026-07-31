@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
-  SlidersHorizontal, Link2,
+  SlidersHorizontal, Link2, FileSignature,
 } from 'lucide-react'
 
 /**
@@ -40,6 +40,7 @@ const navGroups = [
   {
     label: 'Sistema',
     items: [
+      { href: '/admin/contrato', label: 'Contrato', icon: FileSignature },
       { href: '/admin/canais', label: 'Canais', icon: Plug },
       { href: '/admin/integracoes', label: 'Integrações', icon: Link2 },
       { href: '/admin/permissoes', label: 'Permissões', icon: Shield },

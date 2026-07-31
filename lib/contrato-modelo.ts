@@ -141,9 +141,18 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'loja.cnpj', rotulo: 'CNPJ da loja' },
 ]
 
-/** Troca os {{marcadores}} pelos valores. Marcador desconhecido sai vazio. */
+/**
+ * Troca os {{marcadores}} pelos valores.
+ *
+ * A busca ignora maiúsculas: quem escreve o modelo é o lojista, e
+ * {{Cliente.Nome}} ou {{CLIENTE.NOME}} têm de funcionar igual. Sem isso o
+ * marcador viraria string vazia e o dado desapareceria do contrato sem avisar.
+ * Marcador realmente inexistente sai vazio.
+ */
 export function mesclar(texto: string, valores: Record<string, string>): string {
-  return texto.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_, chave: string) => valores[chave] ?? '')
+  const porMinuscula = new Map(Object.entries(valores).map(([k, v]) => [k.toLowerCase(), v]))
+  return texto.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_, chave: string) =>
+    porMinuscula.get(chave.toLowerCase()) ?? '')
 }
 
 const CSS_PAGINA = `

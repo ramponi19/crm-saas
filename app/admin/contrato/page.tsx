@@ -24,7 +24,7 @@ export default async function ContratoPage() {
       <ContratoModeloView
         empresaId={empresaId!}
         versao={(modelo?.versao as number | undefined) ?? null}
-        paginasIniciais={((modelo?.paginas ?? []) as PaginaModelo[])}
+        paginasIniciais={((modelo?.paginas ?? []) as unknown as PaginaModelo[])}
         garantiaPadrao={garantia}
         contratosEmitidos={emitidos ?? 0}
       />

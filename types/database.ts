@@ -1354,6 +1354,44 @@ export type Database = {
           },
         ]
       }
+      contrato_modelos: {
+        Row: {
+          id: number
+          empresa_id: number
+          versao: number
+          paginas: Json
+          ativo: boolean
+          criado_por: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          versao: number
+          paginas?: Json
+          ativo?: boolean
+          criado_por?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          versao?: number
+          paginas?: Json
+          ativo?: boolean
+          criado_por?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_modelos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contratos_venda: {
         Row: {
           id: number
