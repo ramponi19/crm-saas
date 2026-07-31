@@ -1354,10 +1354,49 @@ export type Database = {
           },
         ]
       }
+      contrato_documentos: {
+        Row: {
+          id: number
+          empresa_id: number
+          nome: string
+          arquivado: boolean
+          criado_por: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: never
+          empresa_id: number
+          nome: string
+          arquivado?: boolean
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: never
+          empresa_id?: number
+          nome?: string
+          arquivado?: boolean
+          criado_por?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_documentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contrato_modelos: {
         Row: {
           id: number
           empresa_id: number
+          documento_id: number
           versao: number
           paginas: Json
           ativo: boolean
@@ -1367,6 +1406,7 @@ export type Database = {
         Insert: {
           id?: never
           empresa_id: number
+          documento_id: number
           versao: number
           paginas?: Json
           ativo?: boolean
@@ -1376,6 +1416,7 @@ export type Database = {
         Update: {
           id?: never
           empresa_id?: number
+          documento_id?: number
           versao?: number
           paginas?: Json
           ativo?: boolean
@@ -1402,6 +1443,8 @@ export type Database = {
           html: string
           garantia_dias: number | null
           criado_por: string | null
+          documento_id: number | null
+          nome_documento: string | null
           created_at: string
         }
         Insert: {
@@ -1413,6 +1456,8 @@ export type Database = {
           html: string
           garantia_dias?: number | null
           criado_por?: string | null
+          documento_id?: number | null
+          nome_documento?: string | null
           created_at?: string
         }
         Update: {
@@ -1424,6 +1469,8 @@ export type Database = {
           html?: string
           garantia_dias?: number | null
           criado_por?: string | null
+          documento_id?: number | null
+          nome_documento?: string | null
           created_at?: string
         }
         Relationships: [

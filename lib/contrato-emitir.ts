@@ -34,12 +34,25 @@ export async function garantiaPadraoLoja(supabase: Client, empresaId: number): P
   return Number.isFinite(n) && n > 0 ? Math.round(n) : GARANTIA_PADRAO_DIAS
 }
 
-/** Modelo ativo da empresa, ou null se ela ainda nao subiu o dela. */
-export async function modeloAtivo(supabase: Client, empresaId: number): Promise<ModeloContrato | null> {
+/** Documentos da loja que estao prontos para emitir (tem versao ativa). */
+export interface DocumentoDisponivel { id: number; nome: string }
+
+export async function documentosDisponiveis(supabase: Client, empresaId: number): Promise<DocumentoDisponivel[]> {
+  const { data } = await supabase
+    .from('contrato_documentos')
+    .select('id, nome, contrato_modelos!inner(id)')
+    .eq('empresa_id', empresaId).eq('arquivado', false)
+    .eq('contrato_modelos.ativo', true)
+    .order('nome')
+  return ((data ?? []) as { id: number; nome: string }[]).map((d) => ({ id: d.id, nome: d.nome }))
+}
+
+/** Versao ativa de UM documento. */
+export async function modeloAtivo(supabase: Client, documentoId: number): Promise<ModeloContrato | null> {
   const { data } = await supabase
     .from('contrato_modelos')
     .select('id, versao, paginas')
-    .eq('empresa_id', empresaId).eq('ativo', true)
+    .eq('documento_id', documentoId).eq('ativo', true)
     .maybeSingle()
   if (!data) return null
   const paginas = (data.paginas ?? []) as PaginaModelo[]
@@ -49,6 +62,9 @@ export async function modeloAtivo(supabase: Client, empresaId: number): Promise<
 
 export interface EmitirContratoInput {
   empresaId: number
+  /** Qual documento da biblioteca emitir. O vendedor escolhe. */
+  documentoId: number
+  nomeDocumento: string
   clienteId: number | null
   /** Todas as linhas de `vendas` desta venda — é o que amarra o contrato a ela. */
   vendaIds: number[]
@@ -68,7 +84,7 @@ export interface ContratoEmitido {
   html: string | null
   /** false = o documento foi montado mas não chegou ao banco (não haverá 2ª via). */
   salvo: boolean
-  /** A loja ainda não configurou o modelo dela em /admin/contrato. */
+  /** O documento escolhido nao tem versao salva (nada a emitir). */
   semModelo: boolean
 }
 
@@ -91,7 +107,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
       ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()
       : Promise.resolve({ data: null }),
     garantiaPadraoLoja(supabase, input.empresaId),
-    modeloAtivo(supabase, input.empresaId),
+    modeloAtivo(supabase, input.documentoId),
   ])
 
   // Sem modelo não há contrato. Sai antes de montar dado nenhum.
@@ -124,20 +140,24 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     dados: dados as unknown as Record<string, unknown>,
     html,
     garantia_dias: garantiaLoja,
+    documento_id: input.documentoId,
+    // Nome congelado: renomear o documento depois nao muda o que foi assinado.
+    nome_documento: input.nomeDocumento,
     criado_por: input.criadoPor ?? null,
   } as never)
 
   return { html, salvo: !error, semModelo: false }
 }
 
-/** 2ª via: o contrato arquivado que contém esta linha de venda, se existir. */
-export async function buscarContratoDaVenda(supabase: Client, vendaId: number): Promise<string | null> {
+export interface ContratoArquivado { id: number; nome: string | null; html: string; created_at: string }
+
+/** Todos os documentos JA emitidos para esta venda — a 2a via de cada um. */
+export async function contratosDaVenda(supabase: Client, vendaId: number): Promise<ContratoArquivado[]> {
   const { data } = await supabase
     .from('contratos_venda')
-    .select('html')
+    .select('id, nome_documento, html, created_at')
     .contains('venda_ids', [vendaId])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return (data as { html?: string } | null)?.html ?? null
+    .order('created_at', { ascending: true })
+  return ((data ?? []) as { id: number; nome_documento: string | null; html: string; created_at: string }[])
+    .map((c) => ({ id: c.id, nome: c.nome_documento, html: c.html, created_at: c.created_at }))
 }

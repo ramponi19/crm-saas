@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
 import type { Tables } from '@/types/database'
@@ -59,6 +60,8 @@ export default async function PDVPage() {
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])
 
+  const documentos = await documentosDisponiveis(supabase, empresaId!)
+
   const role = (vinculoRes?.data as { role?: string } | null)?.role
   const isAdmin = !!((usuarioRes?.data as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
@@ -118,7 +121,7 @@ export default async function PDVPage() {
           segmento={empresa?.segmento ?? null}
           fornecedores={fornecedores ?? []}
           isAdmin={isAdmin}
-        />
+        documentos={documentos} />
       </div>
     </>
   )

@@ -15,6 +15,8 @@ import {
 
 interface Props {
   empresaId: number
+  documentoId: number
+  nome: string
   versao: number | null
   paginasIniciais: PaginaModelo[]
   garantiaPadrao: number
@@ -91,7 +93,7 @@ function BlocoEditavel({
   )
 }
 
-export function ContratoModeloView({ empresaId, versao, paginasIniciais, garantiaPadrao, contratosEmitidos }: Props) {
+export function ContratoModeloView({ empresaId, documentoId, nome, versao, paginasIniciais, garantiaPadrao, contratosEmitidos }: Props) {
   const supabase = createClient()
   const [paginas, setPaginas] = useState<PaginaModelo[]>(() =>
     paginasIniciais.length
@@ -234,7 +236,7 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
     setSalvando(true)
     const r = await fetch('/api/contrato-modelo', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paginas: paginas.map((p, k) => ({ ...p, ordem: k + 1 })) }),
+      body: JSON.stringify({ documentoId, paginas: paginas.map((p, k) => ({ ...p, ordem: k + 1 })) }),
     })
     const j = await r.json().catch(() => ({}))
     setSalvando(false)
@@ -260,7 +262,7 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
 
       <div className="mx-auto max-w-[1000px] space-y-4">
         <Card
-          title="Modelo do contrato"
+          title={nome}
           actions={
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={prever} icon={<Eye size={15} strokeWidth={1.7} />}>Pré-visualizar</Button>

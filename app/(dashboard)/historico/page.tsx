@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { Topbar } from '@/components/layout/topbar'
 import { HistoricoView } from '@/components/modules/historico/historico-view'
 
@@ -63,17 +64,13 @@ export default async function HistoricoPage() {
     vendedor_nome: one(v.usuarios)?.nome  ?? null,
   }))
 
-  const loja = {
-    nome: (empresa as { nome?: string } | null)?.nome ?? 'Loja',
-    cnpj: (empresa as { cnpj?: string | null } | null)?.cnpj ?? null,
-    telefone: (empresa as { telefone?: string | null } | null)?.telefone ?? null,
-    logoUrl: (empresa as { wl_logo_url?: string | null } | null)?.wl_logo_url ?? null,
-  }
+  const documentos = await documentosDisponiveis(supabase, empresaId!)
+
 
   return (
     <>
       <Topbar eyebrow="VENDAS · HISTÓRICO" title="Histórico de vendas" />
-      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} loja={loja} empresaId={empresaId!} />
+      <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} empresaId={empresaId!} documentos={documentos} />
     </>
   )
 }

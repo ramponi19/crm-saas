@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Download, Receipt, Check, ArrowLeftRight, FileText } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { imprimirContratoHTML, type ContratoLoja } from '@/lib/contrato-tipos'
-import { buscarContratoDaVenda, emitirContrato } from '@/lib/contrato-emitir'
+import { imprimirContratoHTML } from '@/lib/contrato-tipos'
+import { contratosDaVenda, emitirContrato, type DocumentoDisponivel, type ContratoArquivado } from '@/lib/contrato-emitir'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
@@ -28,7 +28,7 @@ interface Venda {
   observacoes: string | null
 }
 
-interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; loja: ContratoLoja; empresaId: number }
+interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; empresaId: number; documentos?: DocumentoDisponivel[] }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
@@ -75,13 +75,15 @@ function exportCSV(rows: Venda[]) {
   a.click()
 }
 
-export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, empresaId }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [] }: Props) {
   const [filtro, setFiltro] = useState('all')
   const [finalizando, setFinalizando] = useState<number | null>(null)
   const [transf, setTransf] = useState<Venda | null>(null)
   const [novoVend, setNovoVend] = useState('')
   const [transfBusy, setTransfBusy] = useState(false)
   const [contratoBusy, setContratoBusy] = useState<number | null>(null)
+  const [docsVenda, setDocsVenda] = useState<{ venda: Venda; arquivados: ContratoArquivado[] } | null>(null)
+  const [emitindo, setEmitindo] = useState<number | null>(null)
   const router = useRouter()
 
   /**
@@ -93,16 +95,39 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
    * nós jogaria para o produto a responsabilidade por um contrato errado. Além
    * disso o modelo de hoje pode não ser o que a pessoa assinou.
    */
-  async function gerarContrato(v: Venda) {
+  async function abrirDocumentos(v: Venda) {
     setContratoBusy(v.id)
-    const arquivado = await buscarContratoDaVenda(createClient(), v.id)
+    const arquivados = await contratosDaVenda(createClient(), v.id)
     setContratoBusy(null)
-    if (!arquivado) {
-      notify.warn('Esta venda não tem contrato arquivado',
-        'Só vendas fechadas depois de o modelo da loja ser configurado têm 2ª via.')
-      return
+    setDocsVenda({ venda: v, arquivados })
+  }
+
+  /** Emite agora um documento que não foi emitido no fechamento. */
+  async function emitirAgora(v: Venda, doc: DocumentoDisponivel) {
+    setEmitindo(doc.id)
+    const supabase = createClient()
+    try {
+      const garantiaProduto = v.produto_id
+        ? ((await supabase.from('produtos').select('garantia_dias').eq('id', v.produto_id).maybeSingle())
+            .data as { garantia_dias?: number | null } | null)?.garantia_dias ?? null
+        : null
+      const r = await emitirContrato(supabase, {
+        empresaId, documentoId: doc.id, nomeDocumento: doc.nome,
+        clienteId: v.cliente_id, vendaIds: [v.id],
+        itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda, garantia_dias: garantiaProduto }],
+        total: v.valor_venda, desconto: v.desconto_valor ?? 0,
+        forma_pagamento: v.forma_pagamento, parcelas: v.parcelas,
+        vendedor: v.vendedor_nome, data: v.data_venda ?? undefined,
+      })
+      setEmitindo(null)
+      if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`); return }
+      if (!r.html) { notify.bad('Não foi possível emitir'); return }
+      if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
+      abrirDocumentos(v)
+    } catch (e) {
+      setEmitindo(null)
+      notify.bad('Erro ao emitir', e instanceof Error ? e.message : undefined)
     }
-    if (!imprimirContratoHTML(arquivado)) notify.warn('Permita pop-ups para imprimir o contrato')
   }
 
   async function transferir() {
@@ -124,42 +149,10 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
       await supabase.from('inventario_unidades').update({ status: 'vendido' }).eq('id', v.unidade_id)
     }
 
-    // A encomenda só vira venda de verdade aqui — é este o momento de emitir o
-    // contrato, não o da criação. Nunca derruba a entrega: se falhar, resta a
-    // reconstituição na 2ª via.
-    let contratoOk = false
-    const venda = vendas.find((x) => x.id === id)
-    if (!error && venda) {
-      try {
-        const garantiaProduto = venda.produto_id
-          ? ((await supabase.from('produtos').select('garantia_dias').eq('id', venda.produto_id).maybeSingle()).data as { garantia_dias?: number | null } | null)?.garantia_dias ?? null
-          : null
-        const r = await emitirContrato(supabase, {
-          empresaId,
-          clienteId: venda.cliente_id,
-          vendaIds: [id],
-          itens: [{
-            descricao: venda.produto_nome ?? 'Produto',
-            imei: venda.numero_serie,
-            valor: venda.valor_venda,
-            garantia_dias: garantiaProduto,
-          }],
-          total: venda.valor_venda,
-          desconto: venda.desconto_valor ?? 0,
-          forma_pagamento: venda.forma_pagamento,
-          parcelas: venda.parcelas,
-          vendedor: venda.vendedor_nome,
-        })
-        contratoOk = r.salvo
-      } catch { /* entrega não depende do contrato */ }
-    }
-
     setFinalizando(null)
     if (error) { notify.bad('Erro ao finalizar'); return }
-    notify.ok('Venda concluída', [
-      v?.unidade_id ? 'Unidade baixada do estoque' : 'Contabilizada no faturamento',
-      contratoOk ? 'contrato emitido' : null,
-    ].filter(Boolean).join(' · '))
+    notify.ok('Venda concluída',
+      v?.unidade_id ? 'Unidade baixada do estoque · emita os documentos no ícone 📄' : 'Contabilizada no faturamento')
     router.refresh()
   }
 
@@ -214,7 +207,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
       render: (v) => {
         const s = STATUS[v.status ?? ''] ?? STATUS.pendente
         const contrato = v.status !== 'cancelada' && v.status !== 'devolvido' && (
-          <button onClick={(e) => { e.stopPropagation(); gerarContrato(v) }} disabled={contratoBusy === v.id} title="Gerar contrato de venda" className="text-ink-3 hover:text-accent disabled:opacity-40"><FileText size={14} strokeWidth={1.8} /></button>
+          <button onClick={(e) => { e.stopPropagation(); abrirDocumentos(v) }} disabled={contratoBusy === v.id} title="Documentos desta venda" className="text-ink-3 hover:text-accent disabled:opacity-40"><FileText size={14} strokeWidth={1.8} /></button>
         )
         if (v.status === 'encomenda' || v.status === 'pendente_entrega') return (
           <div className="flex items-center justify-end gap-2">
@@ -255,6 +248,48 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
 
       </div>
     </main>
+
+    {/* Documentos desta venda: 2ª via dos emitidos + emitir os que faltam. */}
+      <Modal open={!!docsVenda} onClose={() => setDocsVenda(null)} size="sm"
+        title={`Documentos — ${docsVenda?.venda.cliente_nome ?? 'venda'}`}>
+        <div className="space-y-4">
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Emitidos</p>
+            {docsVenda?.arquivados.length ? (
+              <div className="space-y-1.5">
+                {docsVenda.arquivados.map((c) => (
+                  <Button key={c.id} variant="outline" className="w-full justify-start"
+                    icon={<FileText size={14} strokeWidth={1.7} />}
+                    onClick={() => { if (!imprimirContratoHTML(c.html)) notify.warn('Permita pop-ups para imprimir') }}>
+                    2ª via de {c.nome ?? 'documento'} · {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-ink-3">Nenhum documento foi emitido nesta venda.</p>
+            )}
+          </div>
+
+          {documentos.length > 0 && docsVenda && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Emitir agora</p>
+              <div className="space-y-1.5">
+                {documentos.map((d) => (
+                  <Button key={d.id} variant="ghost" className="w-full justify-start"
+                    loading={emitindo === d.id}
+                    onClick={() => emitirAgora(docsVenda.venda, d)}>
+                    {d.nome}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-ink-3">
+                Emitir agora usa o cadastro ATUAL do cliente e o modelo de hoje — para uma venda antiga, pode divergir
+                do que foi assinado.
+              </p>
+            </div>
+          )}
+        </div>
+      </Modal>
 
     {transf && (
       <Modal open onClose={() => setTransf(null)} title="Transferir venda" footer={<>

@@ -10,15 +10,19 @@ import type { PaginaModelo } from '@/lib/contrato-modelo'
  * para os fundos daquela versão no Storage.
  */
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
 
+  const documentoId = Number(new URL(req.url).searchParams.get('documento'))
+  if (!Number.isFinite(documentoId)) {
+    return NextResponse.json({ error: 'Informe o documento' }, { status: 400 })
+  }
   const { data, error } = await supabase
     .from('contrato_modelos')
     .select('id, versao, paginas, created_at')
-    .eq('empresa_id', empresaId).eq('ativo', true)
+    .eq('empresa_id', empresaId).eq('documento_id', documentoId).eq('ativo', true)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ modelo: data ?? null })
@@ -29,9 +33,13 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error
   const { supabase, empresaId, userId } = auth
 
-  let body: { paginas?: unknown }
+  let body: { paginas?: unknown; documentoId?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }
 
+  const documentoId = Number(body.documentoId)
+  if (!Number.isFinite(documentoId)) {
+    return NextResponse.json({ error: 'Informe o documento' }, { status: 400 })
+  }
   if (!Array.isArray(body.paginas)) {
     return NextResponse.json({ error: 'Envie a lista de páginas' }, { status: 400 })
   }
@@ -70,18 +78,18 @@ export async function POST(req: Request) {
 
   const { data: ult } = await supabase
     .from('contrato_modelos').select('versao')
-    .eq('empresa_id', empresaId).order('versao', { ascending: false }).limit(1).maybeSingle()
+    .eq('documento_id', documentoId).order('versao', { ascending: false }).limit(1).maybeSingle()
   const versao = ((ult?.versao as number | undefined) ?? 0) + 1
 
   // Desativa a anterior ANTES de inserir: o índice único de "um ativo por
   // empresa" recusaria as duas ativas ao mesmo tempo.
   const { error: eOff } = await supabase
-    .from('contrato_modelos').update({ ativo: false }).eq('empresa_id', empresaId).eq('ativo', true)
+    .from('contrato_modelos').update({ ativo: false }).eq('documento_id', documentoId).eq('ativo', true)
   if (eOff) return NextResponse.json({ error: eOff.message }, { status: 500 })
 
   const { data, error } = await supabase
     .from('contrato_modelos')
-    .insert({ empresa_id: empresaId, versao, paginas, ativo: true, criado_por: userId } as never)
+    .insert({ empresa_id: empresaId, documento_id: documentoId, versao, paginas, ativo: true, criado_por: userId } as never)
     .select('id, versao').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

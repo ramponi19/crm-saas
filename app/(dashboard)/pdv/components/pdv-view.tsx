@@ -11,7 +11,7 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
-import { emitirContrato } from '@/lib/contrato-emitir'
+import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 
 interface ItemEstoque {
   id: number; produto_id: number; produto_nome: string; marca_nome: string
@@ -27,8 +27,13 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean }
+/**
+ * Contexto da venda fechada, guardado para emitir o documento escolhido.
+ * Inclui `empresaId` porque ele é resolvido dentro do fechamento.
+ */
+type ContextoVenda = Omit<EmitirContratoInput, 'documentoId' | 'nomeDocumento'>
 
 const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
   { key: 'dinheiro', label: 'Dinheiro', icon: Banknote },
@@ -41,7 +46,7 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [] }: Props) {
   const isFood = segmento === 'food'
   const [comanda, setComanda] = useState('')
   const [encomendaOpen, setEncomendaOpen] = useState(false)
@@ -70,9 +75,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [pixCobranca, setPixCobranca] = useState<CobrancaPix | null>(null)
   const [pixCopiado, setPixCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
-  // Contrato JÁ EMITIDO da última venda. O documento é montado e arquivado no
-  // fechamento; o botão só imprime — igual à 2ª via do Histórico.
-  const [ultimoContrato, setUltimoContrato] = useState<{ html: string; salvo: boolean; total: number } | null>(null)
+  // Contexto da última venda: guardado para emitir o documento que o vendedor
+  // escolher no modal de sucesso (o carrinho já foi limpo a essa altura).
+  const [contexto, setContexto] = useState<ContextoVenda | null>(null)
+  /** ids dos documentos já emitidos para esta venda, para não repetir. */
+  const [emitidos, setEmitidos] = useState<number[]>([])
+  const [emitindo, setEmitindo] = useState<number | null>(null)
   // Total da última venda — separado do contrato, porque a venda acontece mesmo
   // quando a loja não tem modelo configurado e nenhum contrato é emitido.
   const [ultimoTotal, setUltimoTotal] = useState(0)
@@ -324,44 +332,33 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           .in('id', reservaIds)
       }
 
-      // Emite e arquiva o contrato da venda INTEIRA (antes de limpar o carrinho).
-      // Uma venda = N linhas em `vendas`, mas UM contrato: `vendaIds` amarra as
-      // duas coisas, e é por ele que o Histórico acha a 2ª via.
-      // Nunca derruba o fechamento: a venda já está gravada a esta altura.
+      // Guarda o contexto da venda para emitir o documento que o vendedor
+      // escolher — a emissão deixou de ser automática. Uma venda = N linhas em
+      // `vendas`, mas UM documento por emissão: `vendaIds` amarra as duas
+      // coisas, e é por ele que o Histórico acha a 2ª via.
       setUltimoTotal(totais.total)
-      try {
-        const emitido = await emitirContrato(supabase, {
-          empresaId,
-          clienteId: clienteSelecionado?.id ?? null,
-          vendaIds,
-          itens: [
-            ...carrinho.map((c) => ({
-              descricao: c.item.produto_nome,
-              imei: c.item.imei ?? c.item.numero_serie,
-              valor: c.item.preco_venda ?? 0,
-              garantia_dias: c.item.produto_garantia_dias ?? null,
-            })),
-            // Acessório não tem cadastro de produto — segue o padrão da loja.
-            ...acessorios.filter((a) => a.descricao.trim() && a.valor > 0)
-              .map((a) => ({ descricao: `Acessório: ${a.descricao.trim()}`, imei: null, valor: a.valor })),
-          ],
-          total: totais.total,
-          desconto: abatimento,
-          forma_pagamento: formaPagamento,
-          parcelas,
-          criadoPor: user.id,
-        })
-        if (emitido.semModelo) {
-          // Sem modelo da loja não há contrato — e o CRM não entrega um pronto.
-          setUltimoContrato(null)
-          notify.warn('Venda registrada sem contrato', 'Configure o modelo da loja em Administração → Contrato')
-        } else if (emitido.html) {
-          setUltimoContrato({ html: emitido.html, salvo: emitido.salvo, total: totais.total })
-          if (!emitido.salvo) notify.warn('Contrato não foi arquivado', 'Dá para imprimir agora, mas não haverá 2ª via no Histórico')
-        }
-      } catch {
-        setUltimoContrato(null)
-      }
+      setContexto({
+        empresaId,
+        vendaIds,
+        clienteId: clienteSelecionado?.id ?? null,
+        itens: [
+          ...carrinho.map((c) => ({
+            descricao: c.item.produto_nome,
+            imei: c.item.imei ?? c.item.numero_serie,
+            valor: c.item.preco_venda ?? 0,
+            garantia_dias: c.item.produto_garantia_dias ?? null,
+          })),
+          // Acessório não tem cadastro de produto — segue o padrão da loja.
+          ...acessorios.filter((a) => a.descricao.trim() && a.valor > 0)
+            .map((a) => ({ descricao: `Acessório: ${a.descricao.trim()}`, imei: null, valor: a.valor })),
+        ],
+        total: totais.total,
+        desconto: abatimento,
+        forma_pagamento: formaPagamento,
+        parcelas,
+        criadoPor: user.id,
+      })
+      setEmitidos([])
       if (formaPagamento !== 'pix') setSucessoOpen(true)
 
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
@@ -411,11 +408,60 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     finally { setEnviandoWpp(false) }
   }
 
-  // O documento já existe (emitido no fechamento) — aqui é só imprimir.
-  function gerarContrato() {
-    if (!ultimoContrato) return
-    if (!imprimirContratoHTML(ultimoContrato.html)) notify.warn('Permita pop-ups para imprimir o contrato')
+  /**
+   * Emite o documento escolhido: monta com os dados da venda, arquiva e imprime.
+   * A venda já está gravada — falhar aqui não a desfaz.
+   */
+  async function emitir(doc: { id: number; nome: string }) {
+    if (!contexto) return
+    setEmitindo(doc.id)
+    try {
+      const r = await emitirContrato(supabase, {
+        ...contexto, documentoId: doc.id, nomeDocumento: doc.nome,
+      })
+      setEmitindo(null)
+      if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`, 'Monte o documento em Administração → Documentos'); return }
+      if (!r.html) { notify.bad('Não foi possível emitir'); return }
+      setEmitidos((e) => [...e, doc.id])
+      if (!r.salvo) notify.warn('Documento não foi arquivado', 'Dá para imprimir agora, mas não haverá 2ª via no Histórico')
+      if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
+    } catch (e) {
+      setEmitindo(null)
+      notify.bad('Erro ao emitir', e instanceof Error ? e.message : undefined)
+    }
   }
+
+  /**
+   * Documentos que o vendedor pode emitir para a venda que acabou de fechar.
+   * A escolha é dele: o CRM não decide qual contrato a loja usa.
+   */
+  const ListaDocumentos = () => (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Documentos</p>
+      {documentos.length === 0 ? (
+        <p className="rounded-control border border-line bg-raised px-3 py-2.5 text-[12px] text-ink-2">
+          Nenhum documento cadastrado. O dono monta em{' '}
+          <strong className="text-ink">Administração → Documentos</strong>.
+        </p>
+      ) : (
+        documentos.map((d) => {
+          const feito = emitidos.includes(d.id)
+          return (
+            <Button key={d.id} variant={feito ? 'outline' : 'primary'} className="w-full justify-start"
+              loading={emitindo === d.id} onClick={() => emitir(d)}
+              icon={feito ? <Check size={14} strokeWidth={2} /> : <FileText size={14} strokeWidth={1.7} />}>
+              {feito ? `${d.nome} — emitir de novo` : `Emitir ${d.nome}`}
+            </Button>
+          )
+        })
+      )}
+      {documentos.length > 0 && (
+        <p className="pt-0.5 text-[11px] text-ink-3">
+          O que você emitir fica arquivado: a 2ª via sai do Histórico, idêntica.
+        </p>
+      )}
+    </div>
+  )
 
   const isCartaoOuLink = formaPagamento === 'credito' || formaPagamento === 'link'
 
@@ -423,7 +469,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     <>
       <Modal
         open={!!pixCobranca}
-        onClose={() => { setPixCobranca(null); setClienteSelecionado(null); setUltimoContrato(null) }}
+        onClose={() => { setPixCobranca(null); setClienteSelecionado(null); setContexto(null) }}
         size="sm"
         title={<span className="flex items-center gap-2"><QrCode size={17} strokeWidth={1.7} className="text-ok" /> Pix gerado</span>}
       >
@@ -451,18 +497,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               Enviar via WhatsApp para {clienteSelecionado.nome}
             </Button>
           )}
-          {ultimoContrato && (
-            <Button variant="outline" className="w-full" onClick={gerarContrato} icon={<FileText size={14} strokeWidth={1.7} />}>
-              Imprimir contrato
-            </Button>
-          )}
+          {contexto && <ListaDocumentos />}
         </div>
       </Modal>
 
       {/* Sucesso da venda (não-Pix) — oferece o contrato na hora */}
       <Modal
         open={sucessoOpen}
-        onClose={() => { setSucessoOpen(false); setUltimoContrato(null); setClienteSelecionado(null) }}
+        onClose={() => { setSucessoOpen(false); setContexto(null); setClienteSelecionado(null) }}
         size="sm"
         title={<span className="flex items-center gap-2"><CheckCircle2 size={17} strokeWidth={1.7} className="text-ok" /> Venda registrada</span>}
       >
@@ -471,17 +513,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             <p className="text-[11px] text-ink-3">Total da venda</p>
             <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoTotal)}</p>
           </div>
-          {ultimoContrato ? (
-            <Button className="w-full" onClick={gerarContrato} icon={<FileText size={15} strokeWidth={1.7} />}>
-              Imprimir contrato
-            </Button>
-          ) : (
-            <p className="rounded-control border border-line bg-raised px-3 py-2.5 text-[12px] text-ink-2">
-              Sem contrato: a loja ainda não tem um modelo configurado. O dono monta em{' '}
-              <strong className="text-ink">Administração → Contrato</strong>.
-            </p>
-          )}
-          <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setUltimoContrato(null); setClienteSelecionado(null) }}>
+          <ListaDocumentos />
+          <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setContexto(null); setClienteSelecionado(null) }}>
             Nova venda
           </Button>
         </div>
