@@ -64,6 +64,28 @@ function fundirRuns(runs: Run[]): Run[] {
   return out
 }
 
+/**
+ * Byte a byte, sem passar por codificação de texto.
+ *
+ * NÃO usar TextDecoder('latin1'): esse rótulo é windows-1252, que mapeia
+ * 0x80–0x9F para outros pontos Unicode. O ciclo ida-e-volta corrompe o content
+ * stream (0x93 volta como 0x1C) e o desenho da página se perde. Foi o que fez as
+ * imagens desaparecerem: no Node eu usei Buffer.toString('latin1'), que
+ * preserva, e no navegador a variante que não preserva.
+ */
+function bytesParaTexto(b: Uint8Array): string {
+  let s = ''
+  const PASSO = 8192 // evita estourar a pilha no spread
+  for (let i = 0; i < b.length; i += PASSO) s += String.fromCharCode(...b.subarray(i, i + PASSO))
+  return s
+}
+
+function textoParaBytes(s: string): Uint8Array {
+  const out = new Uint8Array(s.length)
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff
+  return out
+}
+
 /** Remove os blocos de texto (BT..ET), inclusive dentro de Form XObjects. */
 async function pdfSemTexto(bytes: ArrayBuffer): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(bytes, { updateMetadata: false })
@@ -91,11 +113,10 @@ async function pdfSemTexto(bytes: ArrayBuffer): Promise<Uint8Array> {
     if (!(st instanceof PDFRawStream)) return
 
     let bruto = ''
-    try { bruto = new TextDecoder('latin1').decode(decodePDFRawStream(st).decode()) } catch { return }
+    try { bruto = bytesParaTexto(decodePDFRawStream(st).decode()) } catch { return }
     const limpo = bruto.replace(/\bBT\b[\s\S]*?\bET\b/g, '')
     if (limpo !== bruto) {
-      const bytesLimpos = Uint8Array.from(limpo, (ch) => ch.charCodeAt(0) & 0xff)
-      const novo = ctx.flateStream(bytesLimpos)
+      const novo = ctx.flateStream(textoParaBytes(limpo))
       // Preserva /Subtype /Form, /BBox, /Matrix e /Resources do original.
       for (const [k, v] of st.dict.entries()) {
         const nome = k.asString()
@@ -203,6 +224,24 @@ async function lerPagina(pg: any, W: number): Promise<{ blocos: Bloco[] }> {
       b.linhas.push(l); b.ultimoY = l.y; b.x1 = Math.max(b.x1, l.x1)
     } else {
       blocos.push({ x0: l.x0, x1: l.x1, y0: l.y, ultimoY: l.y, linhas: [l], paragrafos: [] })
+    }
+  }
+
+  // Título de cláusula sai numa linha mais curta que o corpo, então o passo
+  // anterior o deixava em bloco separado — o editor ficava cheio de caixinhas.
+  // Junta ao bloco de baixo quando e a mesma coluna e estao encostados.
+  for (let i = blocos.length - 2; i >= 0; i--) {
+    const a = blocos[i], b = blocos[i + 1]
+    const umaLinha = a.linhas.length === 1
+    const mesmaColuna = Math.abs(a.x0 - b.x0) < W * 0.04
+    const cabeNaColuna = a.x1 <= b.x1 + TOL
+    const encostados = a.ultimoY - b.y0 < a.linhas[0].alt * 3.5
+    if (umaLinha && mesmaColuna && cabeNaColuna && encostados) {
+      b.linhas.unshift(...a.linhas)
+      b.y0 = a.y0
+      b.x0 = Math.min(a.x0, b.x0)
+      b.x1 = Math.max(a.x1, b.x1)
+      blocos.splice(i, 1)
     }
   }
 

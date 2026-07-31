@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Save, Upload, Plus, Trash2, Eye, ChevronUp, ChevronDown, FileText, Sun, Moon,
-  FileUp, Bold, Type, Braces,
+  FileUp, Bold, Type, Braces, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Badge, notify } from '@/components/ui'
@@ -78,7 +78,13 @@ function BlocoEditavel({
         escuro ? 'text-[#e8e8e8]' : 'text-black')}
       style={{
         left: `${bloco.x}%`, top: `${bloco.y}%`, width: `${bloco.largura}%`,
-        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '1.42%', lineHeight: 1.6,
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        // 10pt numa página A4 de 794px = 13,33px = 1,679% da largura. Em `cqw`
+        // isso acompanha o zoom da tela e casa com a impressão.
+        // (Antes eu usei `1.42%`, que em CSS é 1,42% da fonte do PAI — daí a
+        // letra sair minúscula.)
+        fontSize: '1.679cqw',
+        lineHeight: 1.6,
         textAlign: 'justify',
       }}
     />
@@ -93,6 +99,8 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
         .map((p) => ({ ...p, blocos: blocosDaPagina(p) }))
       : [paginaVazia(1)])
   const [revisao, setRevisao] = useState(0)
+  // Uma página por vez, como num editor de PDF.
+  const [atual, setAtual] = useState(0)
   const [sel, setSel] = useState<{ p: number; b: number } | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -240,9 +248,12 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
   return (
     <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
       {/* O texto dentro do bloco editável imita a impressão. */}
+      {/* Em `em` para casar exatamente com o CSS de impressão (10pt/15pt/8pt). */}
       <style>{`
-        .contrato-bloco p{margin:0 0 1.9% 0}
-        .contrato-bloco p.cl{font-weight:bold;margin:2.6% 0 1.4%;font-size:1.1em}
+        .contrato-folha{container-type:inline-size}
+        .contrato-bloco p{margin:0 0 1em 0}
+        .contrato-bloco p:last-child{margin-bottom:0}
+        .contrato-bloco p.cl{font-weight:bold;margin:1.5em 0 .8em;font-size:1.1em}
         .contrato-bloco .var{color:#c0392b;background:rgba(192,57,43,.10);border-radius:2px}
         .contrato-bloco:empty::before{content:'Clique para escrever';color:#94a3b8}
       `}</style>
@@ -354,8 +365,38 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
           )}
         </div>
 
-        {paginas.map((p, i) => (
-          <Card key={i} title={`Página ${i + 1}`} actions={
+        {/* Navegação: uma página por vez, como num editor de PDF. */}
+        <div className="flex items-center justify-between gap-2 rounded-card border border-line bg-card px-3 py-2">
+          <Button variant="outline" size="sm" disabled={atual === 0}
+            icon={<ChevronLeft size={15} strokeWidth={1.9} />}
+            onClick={() => { setAtual((v) => Math.max(0, v - 1)); setSel(null); setRevisao((v) => v + 1) }}>
+            Anterior
+          </Button>
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
+            {paginas.map((_, k) => (
+              <button key={k} type="button"
+                onClick={() => { setAtual(k); setSel(null); setRevisao((v) => v + 1) }}
+                className={cn('h-7 min-w-7 shrink-0 rounded-control px-2 text-[12px] font-semibold transition-colors',
+                  k === atual ? 'bg-accent text-white' : 'border border-line text-ink-2 hover:border-accent hover:text-accent')}>
+                {k + 1}
+              </button>
+            ))}
+            <Button variant="ghost" size="sm" icon={<Plus size={14} strokeWidth={1.8} />}
+              onClick={() => {
+                setPaginas((ps) => [...ps, paginaVazia(ps.length + 1)])
+                setAtual(paginas.length); setSel(null); setRevisao((v) => v + 1); setSujo(true)
+              }}>
+              <span className="sr-only">Adicionar página</span>
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" disabled={atual >= paginas.length - 1}
+            onClick={() => { setAtual((v) => Math.min(paginas.length - 1, v + 1)); setSel(null); setRevisao((v) => v + 1) }}>
+            Próxima <ChevronRight size={15} strokeWidth={1.9} />
+          </Button>
+        </div>
+
+        {[paginas[atual]].filter(Boolean).map((p) => { const i = atual; return (
+          <Card key={i} title={`Página ${i + 1} de ${paginas.length}`} actions={
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="sm" onClick={() => mudarPagina(i, 'escuro', !p.escuro)}
                 icon={p.escuro ? <Moon size={14} strokeWidth={1.8} /> : <Sun size={14} strokeWidth={1.8} />}>
@@ -382,17 +423,17 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
                 <span className="sr-only">Descer</span>
               </Button>
               <Button variant="ghost" size="sm" className="text-bad hover:bg-bad/10" icon={<Trash2 size={14} strokeWidth={1.7} />}
-                onClick={() => { setPaginas((ps) => ps.filter((_, j) => j !== i)); setSel(null); setRevisao(v => v + 1); setSujo(true) }}>
+                onClick={() => { setPaginas((ps) => ps.length > 1 ? ps.filter((_, j) => j !== i) : ps); setAtual((v) => Math.max(0, Math.min(v, paginas.length - 2))); setSel(null); setRevisao(v => v + 1); setSujo(true) }}>
                 <span className="sr-only">Remover página</span>
               </Button>
             </div>
           }>
             <div
-              className={cn('relative mx-auto w-full overflow-hidden rounded-control border border-line',
+              className={cn('contrato-folha relative mx-auto w-full overflow-hidden rounded-control border border-line',
                 p.escuro ? 'bg-ink' : 'bg-white')}
               style={{
                 aspectRatio: `${A4.w} / ${A4.h}`,
-                maxWidth: 680,
+                maxWidth: 760,
                 backgroundImage: p.fundo_url ? `url('${p.fundo_url}')` : undefined,
                 backgroundSize: 'cover', backgroundPosition: 'center top',
               }}
@@ -423,12 +464,7 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
               )}
             </div>
           </Card>
-        ))}
-
-        <Button variant="outline" icon={<Plus size={15} strokeWidth={1.7} />}
-          onClick={() => { setPaginas((ps) => [...ps, paginaVazia(ps.length + 1)]); setSujo(true) }}>
-          Adicionar página
-        </Button>
+        ) })}
 
         <div className="flex items-start gap-2 rounded-control border border-line bg-raised px-3 py-2.5 text-[12px] text-ink-2">
           <FileText size={14} strokeWidth={1.7} className="mt-0.5 shrink-0 text-ink-3" />
