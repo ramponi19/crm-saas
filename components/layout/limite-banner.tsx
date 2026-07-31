@@ -76,7 +76,7 @@ export function LimiteBanner() {
         ))}
       </span>
       <Link
-        href="/planos"
+        href="/admin/planos"
         className="flex items-center gap-1 text-xs font-semibold shrink-0 hover:underline"
         style={{ color: critico ? '#16212E' : '#92400E' }}
       >

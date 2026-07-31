@@ -346,7 +346,7 @@ export function ConfiguracoesView({ evolution, official, instagram, messenger, t
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href="/canais">
+              <Link href="/admin/canais">
                 <Button icon={<Plug size={15} strokeWidth={1.7} />}>Abrir Canais</Button>
               </Link>
               <span className="text-[11.5px] text-ink-3">

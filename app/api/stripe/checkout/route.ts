@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
         metadata: { empresa_id: String(empresaId) },
       },
       metadata: { empresa_id: String(empresaId), plano_id: planoId },
-      success_url: `${baseUrl}/planos/sucesso?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${baseUrl}/planos`,
+      success_url: `${baseUrl}/admin/planos/sucesso?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${baseUrl}/admin/planos`,
       locale: 'pt-BR',
       allow_promotion_codes: true,
     })

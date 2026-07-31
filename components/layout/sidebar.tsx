@@ -98,7 +98,7 @@ export function Sidebar({
               {group.items.map((item) => {
                 const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
                 const isActive = !item.locked && (pathname === item.href || pathname.startsWith(item.href + '/'))
-                const href = item.locked ? `/planos?upgrade=${item.modulo}` : item.href
+                const href = item.locked ? `/admin/planos?upgrade=${item.modulo}` : item.href
                 const badge = item.locked ? 0 : badgeCount(item.badge)
 
                 return (

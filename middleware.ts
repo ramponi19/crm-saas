@@ -3,6 +3,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
+/**
+ * Telas de parametrização que saíram do CRM e passaram a viver em /admin
+ * (o antigo grupo "Sistema" da sidebar). Mantemos o redirect para não quebrar
+ * links salvos, retorno do Stripe e URLs antigas.
+ */
+const LEGADO_ADMIN = [
+  '/canais', '/modelos', '/funil', '/cadencias', '/distribuicao', '/scoring',
+  '/meu-menu', '/permissoes', '/aparencia', '/configuracoes', '/empresa', '/planos',
+]
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -67,6 +77,17 @@ export async function middleware(request: NextRequest) {
   // sem empresa precisa criar uma — senão vira loop /entrar ↔ /register).
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/entrar', request.url))
+  }
+
+  // Rotas antigas do grupo "Sistema" → /admin/... (preserva a query string).
+  if (user) {
+    const p = request.nextUrl.pathname
+    const legado = LEGADO_ADMIN.find((h) => p === h || p.startsWith(h + '/'))
+    if (legado) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/admin${p}`
+      return NextResponse.redirect(url)
+    }
   }
 
   // Guarda de /superadmin: além da checagem no layout (defesa em profundidade),

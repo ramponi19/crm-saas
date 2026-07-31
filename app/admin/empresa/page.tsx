@@ -1,9 +1,9 @@
-import EmpresaConfigPage from '@/app/(dashboard)/empresa/page'
+import { requireEmpresaRole } from '@/lib/owner'
+import EmpresaConfigView from './empresa-config-view'
 
 export const metadata = { title: 'Minha empresa' }
 
-// Reaproveita a tela de configurações da empresa dentro do painel /admin.
-// (EmpresaProvider é fornecido pelo layout de /admin.)
-export default function AdminEmpresaPage() {
-  return <EmpresaConfigPage />
+export default async function EmpresaPage() {
+  await requireEmpresaRole(['owner', 'admin'])
+  return <EmpresaConfigView />
 }

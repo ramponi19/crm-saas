@@ -9,7 +9,7 @@ import { LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MenuGroup } from '@/lib/menu'
 
-const PROTEGIDOS = new Set(['/dashboard', '/configuracoes'])
+const PROTEGIDOS = new Set(['/dashboard'])
 
 export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   grupos: MenuGroup[]

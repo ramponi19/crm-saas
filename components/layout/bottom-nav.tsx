@@ -87,7 +87,7 @@ export function BottomNav({ segmento = 'varejo', plano, role = 'owner', isSuperA
                   return (
                     <Link
                       key={it.href}
-                      href={it.locked ? `/planos?upgrade=${it.modulo}` : it.href}
+                      href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href}
                       onClick={() => setMaisOpen(false)}
                       className={cn('flex items-center gap-2.5 rounded-control border border-line px-3 py-2.5 text-[13px] font-medium', isActive(it.href) ? 'bg-accent-soft text-accent' : 'text-ink')}
                     >

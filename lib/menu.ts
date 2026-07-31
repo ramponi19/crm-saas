@@ -84,7 +84,7 @@ export interface ResolverMenuInput {
 }
 
 // Nunca podem ser ocultados pela config do dono (camada 4).
-const PROTEGIDOS = new Set(['/dashboard', '/configuracoes'])
+const PROTEGIDOS = new Set(['/dashboard'])
 
 // Núcleo: sempre habilitado, independente do opt-in do segmento.
 const NUCLEO = new Set(['/dashboard', '/leads', '/clientes'])
@@ -179,23 +179,9 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/equipe', label: 'Equipe', icon: 'UserCog', modulo: 'multi_usuario', adminOnly: true },
     ],
   },
-  {
-    label: 'Sistema',
-    items: [
-      { href: '/canais', label: 'Canais', icon: 'Plug', adminOnly: true },
-      { href: '/modelos', label: 'Modelos', icon: 'MessageSquareText', adminOnly: true },
-      { href: '/funil', label: 'Funil', icon: 'GitBranch', adminOnly: true },
-      { href: '/cadencias', label: 'Cadências', icon: 'Repeat', adminOnly: true },
-      { href: '/distribuicao', label: 'Distribuição', icon: 'Split', adminOnly: true },
-      { href: '/scoring', label: 'Lead scoring', icon: 'Flame', adminOnly: true },
-      { href: '/meu-menu', label: 'Meu menu', icon: 'SlidersHorizontal', adminOnly: true },
-      { href: '/permissoes', label: 'Permissões', icon: 'Shield', adminOnly: true },
-      { href: '/aparencia', label: 'Aparência', icon: 'Palette', adminOnly: true },
-      { href: '/configuracoes', label: 'Configurações', icon: 'Settings', adminOnly: true },
-      { href: '/empresa', label: 'Minha empresa', icon: 'Building2', adminOnly: true },
-      { href: '/planos', label: 'Planos', icon: 'CreditCard', adminOnly: true },
-    ],
-  },
+  // O antigo grupo "Sistema" (canais, funil, cadências, permissões, aparência,
+  // configurações, empresa, planos…) saiu do CRM: é parametrização do DONO e
+  // vive em /admin (app/admin/*), fora do menu operacional do funcionário.
 ]
 
 export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {

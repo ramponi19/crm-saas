@@ -2,7 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
-const PROTEGIDOS = ['/dashboard', '/configuracoes']
+const PROTEGIDOS = ['/dashboard']
 
 export async function POST(req: Request) {
   const supabase = await createClient()

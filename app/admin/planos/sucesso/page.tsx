@@ -15,7 +15,7 @@ export default function CheckoutSucessoPage() {
   const [contador, setContador] = useState(5)
 
   useEffect(() => {
-    if (!sessionId) { router.push('/planos'); return }
+    if (!sessionId) { router.push('/admin/planos'); return }
 
     fetch(`/api/stripe/verificar-sessao?session_id=${encodeURIComponent(sessionId)}`)
       .then(r => r.json())
@@ -63,7 +63,7 @@ export default function CheckoutSucessoPage() {
             Não conseguimos verificar o pagamento. Se você foi cobrado, entre em contato com o suporte.
           </p>
           <div className="mt-6 flex justify-center">
-            <Button onClick={() => router.push('/planos')}>Voltar aos planos</Button>
+            <Button onClick={() => router.push('/admin/planos')}>Voltar aos planos</Button>
           </div>
         </div>
       </div>

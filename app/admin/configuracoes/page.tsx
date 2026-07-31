@@ -1,17 +1,17 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
+import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
+import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import type { EvolutionConfig, OfficialConfig } from '@/lib/whatsapp/types'
 
 type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
 
 export const metadata = { title: 'Configurações' }
 
-// Mesma carga de dados da tela /configuracoes, reaproveitada dentro do painel /admin.
 async function getConfigs() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: configs }, { data: taxas }] = await Promise.all([
+  const [{ data: configs }, { data: taxas }, { data: empresa }] = await Promise.all([
     supabase
       .from('configuracoes_sistema')
       .select('chave, valor')
@@ -22,6 +22,7 @@ async function getConfigs() {
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
+    supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
   ])
 
   const evolution    = configs?.find(d => d.chave === 'whatsapp_evolution')?.valor as EvolutionConfig | undefined
@@ -35,6 +36,8 @@ async function getConfigs() {
     evolution: evolution ?? null,
     official: official ?? null,
     instagram, messenger, dadosLoja, preferencias,
+    segmento: empresa?.segmento ?? null,
+    slug: empresa?.slug ?? null,
     taxas: ((taxas ?? []) as Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>).map(t => ({
       forma_pagamento: t.forma_pagamento,
       bandeira: t.bandeira,
@@ -44,12 +47,13 @@ async function getConfigs() {
   }
 }
 
-export default async function AdminConfiguracoesPage() {
-  const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas } = await getConfigs()
+export default async function ConfiguracoesPage() {
+  await requireEmpresaRole(['owner', 'admin'])
+  const { evolution, official, instagram, messenger, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
 
   return (
-    <div className="flex flex-col h-full">
-      <Topbar title="Configurações" />
+    <>
+      <Topbar eyebrow="SISTEMA" title="Configurações" />
       <ConfiguracoesView
         evolution={evolution}
         official={official}
@@ -58,7 +62,9 @@ export default async function AdminConfiguracoesPage() {
         dadosLoja={dadosLoja}
         preferencias={preferencias}
         taxas={taxas}
+        segmento={segmento}
+        slug={slug}
       />
-    </div>
+    </>
   )
 }

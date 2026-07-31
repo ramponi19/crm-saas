@@ -9,17 +9,47 @@ import { ImpersonationBanner } from '@/components/superadmin/impersonation-banne
 import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
+  GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
+  SlidersHorizontal, Link2,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
-  { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
-  { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
-  { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
-  { href: '/admin/empresa', label: 'Minha empresa', icon: Building2 },
-  { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
-  { href: '/admin/integracoes', label: 'Integrações', icon: Plug },
-  { href: '/admin/planos', label: 'Planos', icon: CreditCard },
+/**
+ * Nav do painel do DONO. Aqui vive TODA a parametrização da empresa — o antigo
+ * grupo "Sistema" do CRM foi movido pra cá (funcionário não parametriza nada).
+ */
+const navGroups = [
+  {
+    label: 'Administração',
+    items: [
+      { href: '/admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
+      { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
+      { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
+      { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
+    ],
+  },
+  {
+    label: 'Motor de vendas',
+    items: [
+      { href: '/admin/funil', label: 'Funil', icon: GitBranch },
+      { href: '/admin/cadencias', label: 'Cadências', icon: Repeat },
+      { href: '/admin/distribuicao', label: 'Distribuição', icon: Split },
+      { href: '/admin/scoring', label: 'Lead scoring', icon: Flame },
+      { href: '/admin/modelos', label: 'Modelos', icon: MessageSquareText },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { href: '/admin/canais', label: 'Canais', icon: Plug },
+      { href: '/admin/integracoes', label: 'Integrações', icon: Link2 },
+      { href: '/admin/permissoes', label: 'Permissões', icon: Shield },
+      { href: '/admin/meu-menu', label: 'Menu do CRM', icon: SlidersHorizontal },
+      { href: '/admin/aparencia', label: 'Aparência', icon: Palette },
+      { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
+      { href: '/admin/empresa', label: 'Minha empresa', icon: Building2 },
+      { href: '/admin/planos', label: 'Planos', icon: CreditCard },
+    ],
+  },
 ]
 
 export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha empresa', role = 'owner', impersonationNome = null, children }: {
@@ -45,21 +75,26 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
-        <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">Administração</p>
-        <div className="space-y-px">
-          {navItems.map((item) => {
-            const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
-            const Icon = item.icon
-            return (
-              <Link key={item.href} href={item.href} onClick={onNavigate}
-                className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
-                  isActive ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
-                <Icon size={16} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
-                <span className="flex-1 truncate">{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">{group.label}</p>
+            <div className="space-y-px">
+              {group.items.map((item) => {
+                const exact = 'exact' in item && item.exact
+                const isActive = exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
+                const Icon = item.icon
+                return (
+                  <Link key={item.href} href={item.href} onClick={onNavigate}
+                    className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
+                      isActive ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
+                    <Icon size={16} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
+                    <span className="flex-1 truncate">{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
         <div className="mt-4 border-t border-line-soft pt-3">
           <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold text-accent transition-colors hover:bg-accent-soft">
             <ArrowUpRight size={16} strokeWidth={1.7} className="shrink-0" /><span className="flex-1 truncate">Acessar o CRM</span>
@@ -105,7 +140,10 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
           </div>
         </header>
         {impersonationNome && <ImpersonationBanner empresaNome={impersonationNome} />}
-        <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
+        {/* Mesmo contexto do <main> do CRM: as telas movidas do grupo "Sistema"
+            usam `flex-1 overflow-y-auto` / `h-full` e precisam da coluna flex.
+            O overflow aqui cobre as telas simples, que rolam por fora. */}
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">{children}</main>
       </div>
     </div>
   )

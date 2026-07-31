@@ -291,7 +291,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {tab === 'categorias' && (
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/configuracoes'}>Nova categoria</Button>
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/admin/configuracoes'}>Nova categoria</Button>
               </div>
               {categorias.length === 0 ? (
                 <Card><EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhuma categoria cadastrada" /></Card>
@@ -320,7 +320,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {tab === 'marcas' && (
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/configuracoes'}>Nova marca</Button>
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/admin/configuracoes'}>Nova marca</Button>
               </div>
               {marcasVisiveis.length === 0 ? (
                 <Card><EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhuma marca com produtos" /></Card>

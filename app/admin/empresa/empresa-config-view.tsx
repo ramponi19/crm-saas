@@ -181,7 +181,7 @@ export default function EmpresaConfigPage() {
                 <p className="text-[13px] font-semibold text-ink">Recurso exclusivo do plano Pro</p>
                 <p className="mt-0.5 text-[12px] text-ink-2">Faça upgrade para personalizar cores, logo e slogan da sua loja.</p>
               </div>
-              <a href="/planos?upgrade=white_label" className="ml-auto whitespace-nowrap text-[12px] font-semibold text-accent hover:underline">Ver planos →</a>
+              <a href="/admin/planos?upgrade=white_label" className="ml-auto whitespace-nowrap text-[12px] font-semibold text-accent hover:underline">Ver planos →</a>
             </div>
           )}
 

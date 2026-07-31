@@ -130,7 +130,7 @@ export function CanaisView({ appId }: { appId: string }) {
 
     const tipo = (() => { try { return sessionStorage.getItem('canal_conectando') } catch { return null } })()
     try { sessionStorage.removeItem('canal_conectando') } catch { /* ignora */ }
-    window.history.replaceState({}, '', '/canais')
+    window.history.replaceState({}, '', '/admin/canais')
 
     if (erroMeta) {
       registrar('retorno_erro', { erro: erroMeta, canal: tipo })

@@ -29,7 +29,7 @@ export function OnboardingCard() {
       ])
       setPassos([
         { key: 'prod', label: 'Cadastre seus produtos', href: '/produtos', feito: (prod.count ?? 0) >= 3 },
-        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/configuracoes', feito: (wpp.count ?? 0) >= 1 },
+        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/admin/configuracoes', feito: (wpp.count ?? 0) >= 1 },
         { key: 'lead', label: 'Registre seu primeiro lead', href: '/leads', feito: (leads.count ?? 0) >= 1 },
         { key: 'venda', label: 'Faça uma venda no PDV', href: '/pdv', feito: (vendas.count ?? 0) >= 1 },
       ])
