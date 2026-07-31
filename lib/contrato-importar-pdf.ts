@@ -119,6 +119,109 @@ async function pdfSemTexto(bytes: ArrayBuffer): Promise<Uint8Array> {
   return pdf.save({ useObjectStreams: false })
 }
 
+interface Linha { y: number; x0: number; x1: number; alt: number; runs: Run[] }
+interface Bloco { x0: number; x1: number; y0: number; ultimoY: number; linhas: Linha[]; paragrafos: Linha[][] }
+
+/**
+ * Lê uma página: linhas → blocos (colunas) → parágrafos, marcando os trechos
+ * vermelhos. Três cuidados que a versão ingênua errava:
+ *
+ *  - ESPAÇO: o PDF separa palavras por posicionamento, não por caractere. Sem
+ *    repor o espaço no vão, sai "importadoeoriginaldalinhaApple".
+ *  - COLUNA: uma coluna é definida pela borda direita MÁXIMA. Linha curta (fim
+ *    de parágrafo) não abre coluna nova; linha que ALARGA, sim — é assim que a
+ *    coluna estreita ao lado da figura se separa do texto de largura cheia.
+ *  - PARÁGRAFO: linha não é parágrafo. Agrupa até a linha terminar antes da
+ *    borda ou o vão vertical crescer; só então o texto reflui de verdade.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function lerPagina(pg: any, W: number): Promise<{ blocos: Bloco[] }> {
+  const OPS = pdfjs.OPS
+  const ol = await pg.getOperatorList()
+
+  // Onde houve texto vermelho (posição), para cruzar com os trechos extraídos.
+  let cor: [number, number, number] = [0, 0, 0]
+  let tm: [number, number] | null = null
+  const vermelhos: { x: number; y: number; larg: number }[] = []
+  for (let i = 0; i < ol.fnArray.length; i++) {
+    const fn = ol.fnArray[i]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = ol.argsArray[i] as any
+    if (fn === OPS.setFillRGBColor) cor = [a[0] / 255, a[1] / 255, a[2] / 255]
+    else if (fn === OPS.setTextMatrix) tm = [a[4], a[5]]
+    else if (fn === OPS.moveText && tm) tm = [tm[0] + a[0], tm[1] + a[1]]
+    else if ((fn === OPS.showText || fn === OPS.showSpacedText) && tm && ehVermelho(cor)) {
+      const glifos = (fn === OPS.showText ? a[0] : a[0].flat()) ?? []
+      const larg = glifos.reduce(
+        (s: number, g: unknown) => s + (g && typeof g === 'object' ? ((g as { width?: number }).width ?? 0) / 100 : 0), 0)
+      vermelhos.push({ x: tm[0], y: tm[1], larg })
+    }
+  }
+  const temVermelho = (x: number, y: number, w: number) => vermelhos.some((v) =>
+    Math.abs(v.y - y) < 3 && x < v.x + Math.max(v.larg, 4) + 2 && v.x < x + w + 2)
+
+  // Linhas, repondo o espaço perdido no vão entre trechos.
+  const tc = await pg.getTextContent()
+  const mapa = new Map<number, { y: number; trechos: { x: number; w: number; h: number; s: string }[] }>()
+  for (const it of tc.items) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const item = it as any
+    if (!item.str) continue
+    const y = item.transform[5]
+    const chave = [...mapa.keys()].find((k) => Math.abs(k - y) <= 2) ?? y
+    const l = mapa.get(chave) ?? { y: chave, trechos: [] as { x: number; w: number; h: number; s: string }[] }
+    l.trechos.push({ x: item.transform[4], w: item.width ?? 0, h: item.height ?? 10, s: item.str })
+    mapa.set(chave, l)
+  }
+
+  const linhas: Linha[] = [...mapa.values()].map((l) => {
+    l.trechos.sort((a, b) => a.x - b.x)
+    const alt = Math.max(...l.trechos.map((t) => t.h), 8)
+    const runs: Run[] = []
+    let fim: number | null = null
+    let txt = ''
+    for (const t of l.trechos) {
+      if (fim !== null && t.x - fim > alt * 0.22 && !/\s$/.test(txt) && !/^\s/.test(t.s)) {
+        runs.push({ s: ' ', vermelho: false }); txt += ' '
+      }
+      runs.push({ s: t.s, vermelho: temVermelho(t.x, l.y, t.w) })
+      txt += t.s
+      fim = t.x + t.w
+    }
+    return { y: l.y, x0: l.trechos[0].x, x1: fim ?? l.trechos[0].x, alt, runs }
+  }).filter((l) => l.runs.some((r) => r.s.trim())).sort((a, b) => b.y - a.y)
+
+  // Blocos (colunas).
+  const TOL = W * 0.06
+  const blocos: Bloco[] = []
+  for (const l of linhas) {
+    const b = blocos[blocos.length - 1]
+    const alinhado = b && l.x0 > b.x0 - TOL && l.x0 < b.x0 + W * 0.10
+    const naoAlargou = b && l.x1 <= b.x1 + TOL
+    const perto = b && b.ultimoY - l.y < l.alt * 3.2
+    if (b && alinhado && naoAlargou && perto) {
+      b.linhas.push(l); b.ultimoY = l.y; b.x1 = Math.max(b.x1, l.x1)
+    } else {
+      blocos.push({ x0: l.x0, x1: l.x1, y0: l.y, ultimoY: l.y, linhas: [l], paragrafos: [] })
+    }
+  }
+
+  // Parágrafos dentro de cada bloco.
+  for (const b of blocos) {
+    let atual: Linha[] = []
+    for (let i = 0; i < b.linhas.length; i++) {
+      const l = b.linhas[i], ant = b.linhas[i - 1]
+      const curtaAntes = ant && ant.x1 < b.x1 - b.linhas[0].alt * 1.2
+      const vaoGrande = ant && ant.y - l.y > ant.alt * 1.6
+      if (atual.length && (curtaAntes || vaoGrande)) { b.paragrafos.push(atual); atual = [] }
+      atual.push(l)
+    }
+    if (atual.length) b.paragrafos.push(atual)
+  }
+
+  return { blocos }
+}
+
 /** Média de luminância da imagem — decide se a página é escura. */
 function luminanciaMedia(ctx: CanvasRenderingContext2D, w: number, h: number): number {
   const amostra = ctx.getImageData(0, 0, w, Math.min(h, 400))
@@ -184,52 +287,35 @@ export async function importarContratoPDF(
 
     // ---------- texto ----------
     const pg = await docOriginal.getPage(n)
-    const ol = await pg.getOperatorList()
-    const OPS = pdfjs.OPS
-    let cor: [number, number, number] = [0, 0, 0]
-    let yAtual: number | null = null
-    const linhas: Run[][] = []
-    let linha: Run[] = []
+    const [, , W, H] = pg.view
+    const { blocos } = await lerPagina(pg, W)
 
-    const quebrar = (y: number) => {
-      if (yAtual !== null && Math.abs(y - yAtual) > 1.5) {
-        if (linha.length) linhas.push(linha)
-        linha = []
-      }
-      yAtual = y
-    }
-
-    for (let i = 0; i < ol.fnArray.length; i++) {
-      const fn = ol.fnArray[i]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const a = ol.argsArray[i] as any
-      if (fn === OPS.setFillRGBColor) cor = [a[0] / 255, a[1] / 255, a[2] / 255]
-      else if (fn === OPS.setTextMatrix) quebrar(a[5])
-      else if (fn === OPS.moveText) { if (a[1] !== 0) quebrar((yAtual ?? 0) + a[1]) }
-      else if (fn === OPS.showText || fn === OPS.showSpacedText) {
-        const glifos = (fn === OPS.showText ? a[0] : a[0].flat()) ?? []
-        const s = glifos
-          .map((g: unknown) => (g && typeof g === 'object' ? ((g as { unicode?: string }).unicode ?? '') : ''))
-          .join('')
-        if (s) linha.push({ s, vermelho: ehVermelho(cor) })
-      }
-    }
-    if (linha.length) linhas.push(linha)
-
-    // ---------- monta o HTML ----------
+    // ---------- monta os blocos com marcadores ----------
     const naoMapeados: string[] = []
-    const paragrafos = linhas.map((l) => {
-      const runs = fundirRuns(l)
-      const corpo = runs.map((r) => {
-        if (!r.vermelho) return escapar(r.s)
-        const marcador = sugerir(r.s)
-        if (marcador) { totalMarcadores++; return `{{${marcador}}}` }
-        naoMapeados.push(r.s.trim())
-        // Fica em vermelho, como no molde, para o lojista ver o que falta.
-        return `<span class="var">${escapar(r.s)}</span>`
-      }).join('')
-      return corpo.trim() ? `<p>${corpo}</p>` : ''
-    }).filter(Boolean)
+    const blocosHtml = blocos.map((b) => {
+      const paras = b.paragrafos.map((p) => {
+        // Linhas do mesmo parágrafo viram UM texto corrido: é isso que permite
+        // o dado longo refluir dentro da coluna em vez de estourar.
+        const runs = fundirRuns(p.flatMap((l, i) => (i ? [{ s: ' ', vermelho: false }, ...l.runs] : l.runs)))
+        const corpo = runs.map((r) => {
+          if (!r.vermelho) return escapar(r.s)
+          const marcador = sugerir(r.s)
+          if (marcador) { totalMarcadores++; return `{{${marcador}}}` }
+          naoMapeados.push(r.s.trim())
+          return `<span class="var">${escapar(r.s)}</span>`
+        }).join('')
+        return corpo.trim() ? `<p>${corpo.replace(/\s+/g, ' ').trim()}</p>` : ''
+      }).filter(Boolean)
+
+      return {
+        x: +(b.x0 / W * 100).toFixed(2),
+        y: +((H - b.y0 - b.linhas[0].alt) / H * 100).toFixed(2),
+        // Um respiro na largura: a medida vem do texto renderizado, e a fonte
+        // do navegador não é a do PDF.
+        largura: +Math.min(100 - (b.x0 / W * 100), (b.x1 - b.x0) / W * 100 + 2).toFixed(2),
+        texto_html: paras.join('\n'),
+      }
+    }).filter((b) => b.texto_html.trim())
 
     totalNaoMapeados += naoMapeados.length
     opts.onProgresso?.(n, total)
@@ -238,7 +324,7 @@ export async function importarContratoPDF(
       ordem: n,
       fundo_url: null,
       escuro,
-      texto_html: paragrafos.join('\n'),
+      blocos: blocosHtml,
       fundo,
       camposNaoMapeados: [...new Set(naoMapeados)],
     })

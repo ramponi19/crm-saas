@@ -42,16 +42,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Máximo de 40 páginas' }, { status: 400 })
   }
 
-  // Normaliza: descarta campo estranho e reordena de 1..N.
+  // Normaliza: descarta campo estranho, reordena de 1..N e prende a geometria
+  // dos blocos dentro da página (nada fora de 0..100%).
+  const limite = (v: unknown, min: number, max: number, padrao: number) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, +n.toFixed(2))) : padrao
+  }
   const paginas: PaginaModelo[] = (body.paginas as Record<string, unknown>[]).map((p, i) => ({
     ordem: i + 1,
     fundo_url: typeof p.fundo_url === 'string' && p.fundo_url.trim() ? p.fundo_url.trim() : null,
     escuro: p.escuro === true,
-    texto_html: typeof p.texto_html === 'string' ? p.texto_html : '',
+    blocos: (Array.isArray(p.blocos) ? (p.blocos as Record<string, unknown>[]) : [])
+      .map((b) => ({
+        x: limite(b.x, 0, 99, 9),
+        y: limite(b.y, 0, 99, 7),
+        largura: limite(b.largura, 3, 100, 82),
+        texto_html: typeof b.texto_html === 'string' ? b.texto_html : '',
+      }))
+      .filter((b) => b.texto_html.trim()),
   }))
 
   // Uma página sem fundo E sem texto não imprime nada — barra antes de gravar.
-  if (paginas.every((p) => !p.fundo_url && !p.texto_html.trim())) {
+  const vazia = (p: PaginaModelo) => !p.fundo_url && !(p.blocos ?? []).length
+  if (paginas.every(vazia)) {
     return NextResponse.json({ error: 'O modelo está vazio: nenhuma página tem fundo ou texto' }, { status: 400 })
   }
 

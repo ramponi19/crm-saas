@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import Image from 'next/image'
-import { Save, Upload, Plus, Trash2, Eye, ChevronUp, ChevronDown, FileText, Sun, Moon, FileUp } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  Save, Upload, Plus, Trash2, Eye, ChevronUp, ChevronDown, FileText, Sun, Moon,
+  FileUp, Bold, Type, Braces,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Badge, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
-  renderizarModelo, MARCADORES_DISPONIVEIS,
-  type PaginaModelo, type DadosMescla,
+  renderizarModelo, blocosDaPagina, MARCADORES_DISPONIVEIS,
+  type PaginaModelo, type BlocoTexto, type DadosMescla,
 } from '@/lib/contrato-modelo'
 
 interface Props {
@@ -20,9 +22,14 @@ interface Props {
 }
 
 const BUCKET = 'contratos'
-const paginaVazia = (ordem: number): PaginaModelo => ({ ordem, fundo_url: null, escuro: false, texto_html: '' })
+/** Proporção A4 — a página na tela é só uma escala disto. */
+const A4 = { w: 794, h: 1123 }
 
-// Dados de exemplo para a pré-visualização — nenhuma venda é tocada.
+const paginaVazia = (ordem: number): PaginaModelo =>
+  ({ ordem, fundo_url: null, escuro: false, blocos: [] })
+const blocoVazio = (): BlocoTexto => ({ x: 9, y: 8, largura: 82, texto_html: '<p>Escreva aqui…</p>' })
+
+// Dados de exemplo da pré-visualização — nenhuma venda é tocada.
 const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
   loja: { nome: 'Sua Loja', cnpj: '00.000.000/0001-00', telefone: '(00) 0000-0000', logoUrl: null },
   comprador: {
@@ -39,25 +46,72 @@ const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
   vendedor: 'Vendedor Exemplo', data: undefined,
 }
 
+/** Bloco editável posicionado sobre a página. */
+function BlocoEditavel({
+  bloco, escuro, revisao, selecionado, onSelecionar, onTexto,
+}: {
+  bloco: BlocoTexto; escuro: boolean; revisao: number; selecionado: boolean
+  onSelecionar: () => void; onTexto: (html: string) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  // O conteúdo é NÃO controlado de propósito: reescrever o innerHTML a cada
+  // tecla mataria o cursor. Só sincroniza quando a revisão muda (import, troca
+  // de página), nunca durante a digitação.
+  useEffect(() => {
+    if (ref.current && ref.current.innerHTML !== bloco.texto_html) {
+      ref.current.innerHTML = bloco.texto_html
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisao])
+
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      onMouseDown={onSelecionar}
+      onFocus={onSelecionar}
+      onInput={(e) => onTexto(e.currentTarget.innerHTML)}
+      className={cn('contrato-bloco absolute outline-none transition-shadow',
+        selecionado ? 'ring-2 ring-accent/70' : 'hover:ring-1 hover:ring-accent/30',
+        escuro ? 'text-[#e8e8e8]' : 'text-black')}
+      style={{
+        left: `${bloco.x}%`, top: `${bloco.y}%`, width: `${bloco.largura}%`,
+        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '1.42%', lineHeight: 1.6,
+        textAlign: 'justify',
+      }}
+    />
+  )
+}
+
 export function ContratoModeloView({ empresaId, versao, paginasIniciais, garantiaPadrao, contratosEmitidos }: Props) {
   const supabase = createClient()
-  const [paginas, setPaginas] = useState<PaginaModelo[]>(
-    paginasIniciais.length ? [...paginasIniciais].sort((a, b) => a.ordem - b.ordem) : [paginaVazia(1)],
-  )
+  const [paginas, setPaginas] = useState<PaginaModelo[]>(() =>
+    paginasIniciais.length
+      ? [...paginasIniciais].sort((a, b) => a.ordem - b.ordem)
+        .map((p) => ({ ...p, blocos: blocosDaPagina(p) }))
+      : [paginaVazia(1)])
+  const [revisao, setRevisao] = useState(0)
+  const [sel, setSel] = useState<{ p: number; b: number } | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const [sujo, setSujo] = useState(false)
-  const [focada, setFocada] = useState(0)
   const [importando, setImportando] = useState<string | null>(null)
   const [naoMapeados, setNaoMapeados] = useState<string[]>([])
-  const areas = useRef<(HTMLTextAreaElement | null)[]>([])
+  const [sujo, setSujo] = useState(false)
   const inputVarios = useRef<HTMLInputElement>(null)
   const inputPdf = useRef<HTMLInputElement>(null)
 
-  const alterar = (i: number, campo: keyof PaginaModelo, valor: unknown) => {
+  const mudarPagina = (i: number, campo: keyof PaginaModelo, valor: unknown) => {
     setPaginas((ps) => ps.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)))
     setSujo(true)
   }
+  const mudarBloco = useCallback((pi: number, bi: number, campo: keyof BlocoTexto, valor: unknown) => {
+    setPaginas((ps) => ps.map((p, j) => j !== pi ? p : {
+      ...p, blocos: (p.blocos ?? []).map((b, k) => (k === bi ? { ...b, [campo]: valor } : b)),
+    }))
+    setSujo(true)
+  }, [])
 
   /** Sobe um arquivo e devolve a URL pública. Caminho único: nunca sobrescreve. */
   async function subir(file: File): Promise<string | null> {
@@ -70,18 +124,45 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
     return supabase.storage.from(BUCKET).getPublicUrl(caminho).data.publicUrl
   }
 
-  async function enviarFundoDaPagina(i: number, file: File) {
-    setEnviando(true)
-    const url = await subir(file)
-    setEnviando(false)
-    if (url) alterar(i, 'fundo_url', url)
+  /**
+   * Importa o contrato de um PDF: fatia os fundos (sem o texto vir grudado),
+   * detecta as colunas de texto e converte os campos em vermelho que dá para
+   * reconhecer em marcador. O resto fica em vermelho para o lojista decidir.
+   */
+  async function importarPdf(file: File) {
+    setImportando('Lendo o PDF…')
+    try {
+      const { importarContratoPDF } = await import('@/lib/contrato-importar-pdf')
+      const r = await importarContratoPDF(file, {
+        onProgresso: (feito, total) => setImportando(`Processando página ${feito} de ${total}…`),
+      })
+      const prontas: PaginaModelo[] = []
+      for (let i = 0; i < r.paginas.length; i++) {
+        const p = r.paginas[i]
+        setImportando(`Enviando fundo ${i + 1} de ${r.paginas.length}…`)
+        let url: string | null = null
+        if (p.fundo) {
+          url = await subir(new File([p.fundo], `pagina-${i + 1}.jpg`, { type: 'image/jpeg' }))
+          if (!url) { setImportando(null); return }
+        }
+        prontas.push({ ordem: i + 1, fundo_url: url, escuro: p.escuro, blocos: p.blocos ?? [] })
+      }
+      setPaginas(prontas)
+      setNaoMapeados([...new Set(r.paginas.flatMap((p) => p.camposNaoMapeados))])
+      setRevisao((v) => v + 1)
+      setSel(null)
+      setSujo(true)
+      setImportando(null)
+      notify.ok(`${prontas.length} página(s) importada(s)`,
+        r.totalNaoMapeados > 0
+          ? `${r.totalMarcadores} campos viraram marcador; ${r.totalNaoMapeados} ficaram em vermelho para você decidir`
+          : `${r.totalMarcadores} campos viraram marcador`)
+    } catch (e) {
+      setImportando(null)
+      notify.bad('Não foi possível importar o PDF', e instanceof Error ? e.message : undefined)
+    }
   }
 
-  /**
-   * Sobe vários fundos de uma vez, na ordem alfabética do nome — é o caminho
-   * para um contrato de N páginas desenhadas (1.jpg, 2.jpg, …).
-   * Reaproveita as páginas existentes e cria as que faltarem.
-   */
   async function enviarVarios(files: FileList) {
     const lista = [...files].sort((a, b) =>
       a.name.localeCompare(b.name, 'pt-BR', { numeric: true, sensitivity: 'base' }))
@@ -100,62 +181,35 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
       })
       return out.map((p, k) => ({ ...p, ordem: k + 1 }))
     })
-    setSujo(true)
-    setEnviando(false)
-    notify.ok(`${urls.length} ${urls.length === 1 ? 'fundo enviado' : 'fundos enviados'}`, 'Agora escreva o texto de cada página')
+    setSujo(true); setEnviando(false)
+    notify.ok(`${urls.length} fundo(s) enviado(s)`)
   }
 
-  /**
-   * Importa o contrato de um PDF: fatia os fundos (sem o texto vir grudado),
-   * extrai o texto de cada página e converte os campos em vermelho que dá para
-   * reconhecer em marcador. O que não reconhecer fica em vermelho no editor.
-   */
-  async function importarPdf(file: File) {
-    setImportando('Lendo o PDF…')
-    try {
-      const { importarContratoPDF } = await import('@/lib/contrato-importar-pdf')
-      const r = await importarContratoPDF(file, {
-        onProgresso: (feito, total) => setImportando(`Processando página ${feito} de ${total}…`),
-      })
-
-      // Sobe os fundos e monta as páginas.
-      const prontas: PaginaModelo[] = []
-      for (let i = 0; i < r.paginas.length; i++) {
-        const p = r.paginas[i]
-        setImportando(`Enviando fundo ${i + 1} de ${r.paginas.length}…`)
-        let url: string | null = null
-        if (p.fundo) {
-          url = await subir(new File([p.fundo], `pagina-${i + 1}.jpg`, { type: 'image/jpeg' }))
-          if (!url) { setImportando(null); return }
-        }
-        prontas.push({ ordem: i + 1, fundo_url: url, escuro: p.escuro, texto_html: p.texto_html })
-      }
-
-      setPaginas(prontas)
-      setNaoMapeados([...new Set(r.paginas.flatMap((p) => p.camposNaoMapeados))])
-      setSujo(true)
-      setImportando(null)
-      notify.ok(
-        `${prontas.length} ${prontas.length === 1 ? 'página importada' : 'páginas importadas'}`,
-        r.totalNaoMapeados > 0
-          ? `${r.totalMarcadores} campos já viraram marcador; ${r.totalNaoMapeados} ficaram em vermelho para você decidir`
-          : `${r.totalMarcadores} campos viraram marcador`,
-      )
-    } catch (e) {
-      setImportando(null)
-      notify.bad('Não foi possível importar o PDF', e instanceof Error ? e.message : undefined)
-    }
+  /** Aplica formato no trecho selecionado do bloco em foco. */
+  function formatar(cmd: 'bold' | 'clausula') {
+    if (cmd === 'bold') { document.execCommand('bold'); return }
+    // Título de cláusula: parágrafo em negrito, um pouco maior.
+    document.execCommand('formatBlock', false, 'p')
+    const s = window.getSelection()
+    const bloco = s?.anchorNode?.parentElement?.closest('p')
+    if (bloco) bloco.className = bloco.className === 'cl' ? '' : 'cl'
+    sincronizarFoco()
   }
 
   function inserirMarcador(chave: string) {
-    const el = areas.current[focada]
     const marca = `{{${chave}}}`
-    if (!el) { navigator.clipboard.writeText(marca); notify.ok('Marcador copiado', marca); return }
-    const ini = el.selectionStart ?? el.value.length
-    const fim = el.selectionEnd ?? ini
-    const novo = el.value.slice(0, ini) + marca + el.value.slice(fim)
-    alterar(focada, 'texto_html', novo)
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(ini + marca.length, ini + marca.length) })
+    if (!sel) { navigator.clipboard.writeText(marca); notify.ok('Marcador copiado', marca); return }
+    document.execCommand('insertText', false, marca)
+    sincronizarFoco()
+  }
+
+  /** Lê de volta o HTML do bloco em foco (após execCommand). */
+  function sincronizarFoco() {
+    if (!sel) return
+    const el = document.activeElement
+    if (el instanceof HTMLElement && el.classList.contains('contrato-bloco')) {
+      mudarBloco(sel.p, sel.b, 'texto_html', el.innerHTML)
+    }
   }
 
   function prever() {
@@ -163,8 +217,7 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
       { id: 0, versao: 0, paginas: paginas.map((p, k) => ({ ...p, ordem: k + 1 })) },
       { ...EXEMPLO, garantia_dias: garantiaPadrao },
     )
-    // Tira a impressão automática: aqui é só conferir na tela.
-    const w = window.open('', '_blank', 'width=860,height=980')
+    const w = window.open('', '_blank', 'width=880,height=1000')
     if (!w) { notify.warn('Permita pop-ups para pré-visualizar'); return }
     w.document.open(); w.document.write(html.replace(/<script>[\s\S]*?<\/script>/, '')); w.document.close()
   }
@@ -182,28 +235,38 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
     notify.ok(`Modelo salvo (versão ${j.modelo?.versao ?? '—'})`, 'Vale para as próximas vendas')
   }
 
+  const blocoSel = sel ? (paginas[sel.p]?.blocos ?? [])[sel.b] : null
+
   return (
     <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
+      {/* O texto dentro do bloco editável imita a impressão. */}
+      <style>{`
+        .contrato-bloco p{margin:0 0 1.9% 0}
+        .contrato-bloco p.cl{font-weight:bold;margin:2.6% 0 1.4%;font-size:1.1em}
+        .contrato-bloco .var{color:#c0392b;background:rgba(192,57,43,.10);border-radius:2px}
+        .contrato-bloco:empty::before{content:'Clique para escrever';color:#94a3b8}
+      `}</style>
+
       <div className="mx-auto max-w-[1000px] space-y-4">
         <Card
           title="Modelo do contrato"
           actions={
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={prever} icon={<Eye size={15} strokeWidth={1.7} />}>Pré-visualizar</Button>
-              <Button onClick={salvar} loading={salvando} disabled={enviando} icon={<Save size={15} strokeWidth={1.7} />}>
+              <Button onClick={salvar} loading={salvando} disabled={enviando || !!importando} icon={<Save size={15} strokeWidth={1.7} />}>
                 {salvando ? 'Salvando…' : 'Salvar modelo'}
               </Button>
             </div>
           }
         >
           <p className="-mt-0.5 text-[12.5px] text-ink-2">
-            O contrato da sua loja: uma ou mais páginas A4, cada uma com uma imagem de fundo (o layout) e o texto
-            por cima. Onde entram os dados da venda, use um marcador — o sistema preenche na hora de finalizar.
+            O contrato da sua loja. Escreva direto sobre a página, como vai imprimir. Onde entram os dados da venda,
+            use um marcador — o sistema preenche ao finalizar.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-ink-3">
             {versao ? <Badge tone="ok">Versão {versao} em uso</Badge> : <Badge tone="warn">Nenhum modelo salvo</Badge>}
             {contratosEmitidos > 0 && (
-              <span>{contratosEmitidos} contrato{contratosEmitidos === 1 ? '' : 's'} já emitido{contratosEmitidos === 1 ? '' : 's'} — salvar uma versão nova não altera nenhum deles.</span>
+              <span>{contratosEmitidos} contrato(s) já emitido(s) — salvar uma versão nova não altera nenhum deles.</span>
             )}
             {sujo && <Badge tone="warn">Alterações não salvas</Badge>}
           </div>
@@ -215,20 +278,17 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
                 Importar contrato de um PDF
               </Button>
               <span className="text-[12px] text-ink-3">
-                {importando ?? 'Um arquivo só: o sistema separa as páginas, extrai o texto e marca os campos.'}
+                {importando ?? 'Um arquivo só: separa as páginas, detecta as colunas de texto e marca os campos.'}
               </span>
             </div>
             <input ref={inputPdf} type="file" accept="application/pdf" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) importarPdf(f); e.target.value = '' }} />
-
             <div className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-3">
               <Button variant="outline" size="sm" loading={enviando} disabled={!!importando}
                 onClick={() => inputVarios.current?.click()} icon={<Upload size={14} strokeWidth={1.7} />}>
                 Ou enviar os fundos como imagem
               </Button>
-              <span className="text-[12px] text-ink-3">
-                Para quem já tem as páginas em JPG/PNG — a ordem segue o nome do arquivo.
-              </span>
+              <span className="text-[12px] text-ink-3">Para quem já tem as páginas em JPG/PNG.</span>
             </div>
             <input ref={inputVarios} type="file" accept="image/*" multiple className="hidden"
               onChange={(e) => { if (e.target.files?.length) enviarVarios(e.target.files); e.target.value = '' }} />
@@ -236,98 +296,131 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
 
           {naoMapeados.length > 0 && (
             <div className="mt-3 rounded-control border border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2.5 text-[12px] text-[#92400e]">
-              <strong>{naoMapeados.length} campo(s) do molde ficaram sem marcador.</strong> Eles seguem em vermelho no
-              texto das páginas. Troque por um marcador quando for dado da venda, ou escreva o valor fixo quando for
-              dado da sua loja (CNPJ, sede, representante, banco).
+              <strong>{naoMapeados.length} campo(s) do molde ficaram sem marcador.</strong> Aparecem em vermelho no
+              texto. Troque por um marcador quando for dado da venda; escreva o valor fixo quando for dado da sua loja
+              (CNPJ, sede, representante, banco).
               <div className="mt-1.5 flex flex-wrap gap-1">
-                {naoMapeados.slice(0, 24).map((c, i) => (
+                {naoMapeados.slice(0, 20).map((c, i) => (
                   <code key={`${c}-${i}`} className="rounded bg-white/70 px-1.5 py-0.5">{c || '(vazio)'}</code>
                 ))}
-                {naoMapeados.length > 24 && <span>+{naoMapeados.length - 24}</span>}
+                {naoMapeados.length > 20 && <span>+{naoMapeados.length - 20}</span>}
               </div>
             </div>
           )}
         </Card>
 
-        <Card title="Marcadores disponíveis">
-          <p className="-mt-0.5 mb-3 text-[12.5px] text-ink-2">
-            Clique para inserir no texto da página em que você está. Os dados fixos da loja (CNPJ, endereço,
-            representante legal, banco) você escreve como texto normal.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {MARCADORES_DISPONIVEIS.map((m) => (
-              <button key={m.chave} type="button" title={m.rotulo} onClick={() => inserirMarcador(m.chave)}
-                className="rounded-full border border-line bg-card px-2.5 py-1 text-[11.5px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
-                {`{{${m.chave}}}`}
-              </button>
-            ))}
-          </div>
-        </Card>
+        {/* Barra de edição do bloco selecionado */}
+        <div className="sticky top-0 z-20 rounded-card border border-line bg-card/95 p-3 backdrop-blur">
+          {blocoSel && sel ? (
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                  Página {sel.p + 1} · bloco {sel.b + 1}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => formatar('bold')} icon={<Bold size={13} strokeWidth={2} />}>Negrito</Button>
+                <Button variant="outline" size="sm" onClick={() => formatar('clausula')} icon={<Type size={13} strokeWidth={1.8} />}>Título de cláusula</Button>
+                <div className="ml-auto flex items-center gap-2">
+                  {(['x', 'y', 'largura'] as const).map((campo) => (
+                    <label key={campo} className="flex items-center gap-1 text-[11px] text-ink-3">
+                      {campo === 'largura' ? 'larg' : campo}
+                      <input type="number" min={0} max={100} step={0.5} value={blocoSel[campo]}
+                        onChange={(e) => mudarBloco(sel.p, sel.b, campo, Number(e.target.value))}
+                        className="h-7 w-16 rounded-control border border-line bg-bg px-1.5 text-right text-[12px] text-ink outline-none focus:border-accent" />
+                      %
+                    </label>
+                  ))}
+                  <Button variant="ghost" size="sm" className="text-bad hover:bg-bad/10" icon={<Trash2 size={13} strokeWidth={1.7} />}
+                    onClick={() => {
+                      setPaginas((ps) => ps.map((p, j) => j !== sel.p ? p
+                        : { ...p, blocos: (p.blocos ?? []).filter((_, k) => k !== sel.b) }))
+                      setSel(null); setRevisao((v) => v + 1); setSujo(true)
+                    }}>
+                    <span className="sr-only">Remover bloco</span>
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Braces size={13} strokeWidth={1.8} className="mr-0.5 text-ink-3" />
+                {MARCADORES_DISPONIVEIS.map((m) => (
+                  <button key={m.chave} type="button" title={m.rotulo} onClick={() => inserirMarcador(m.chave)}
+                    className="rounded-full border border-line bg-card px-2 py-0.5 text-[11px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
+                    {m.rotulo}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-ink-3">Clique num texto da página para editar, ou em “Adicionar bloco de texto”.</p>
+          )}
+        </div>
 
         {paginas.map((p, i) => (
           <Card key={i} title={`Página ${i + 1}`} actions={
             <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => mudarPagina(i, 'escuro', !p.escuro)}
+                icon={p.escuro ? <Moon size={14} strokeWidth={1.8} /> : <Sun size={14} strokeWidth={1.8} />}>
+                {p.escuro ? 'Escura' : 'Clara'}
+              </Button>
+              <label className="cursor-pointer">
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0]; e.target.value = ''
+                    if (!f) return
+                    setEnviando(true); const u = await subir(f); setEnviando(false)
+                    if (u) mudarPagina(i, 'fundo_url', u)
+                  }} />
+                <span className="flex h-8 items-center gap-1.5 rounded-control px-2.5 text-[12.5px] font-medium text-ink-2 hover:bg-line-soft hover:text-ink">
+                  <Upload size={13} strokeWidth={1.8} /> Fundo
+                </span>
+              </label>
               <Button variant="ghost" size="sm" disabled={i === 0} icon={<ChevronUp size={14} strokeWidth={1.8} />}
-                onClick={() => setPaginas((ps) => { const o = [...ps]; [o[i - 1], o[i]] = [o[i], o[i - 1]]; setSujo(true); return o })}>
+                onClick={() => { setPaginas((ps) => { const o = [...ps]; [o[i - 1], o[i]] = [o[i], o[i - 1]]; return o }); setSel(null); setRevisao(v => v + 1); setSujo(true) }}>
                 <span className="sr-only">Subir</span>
               </Button>
               <Button variant="ghost" size="sm" disabled={i === paginas.length - 1} icon={<ChevronDown size={14} strokeWidth={1.8} />}
-                onClick={() => setPaginas((ps) => { const o = [...ps]; [o[i + 1], o[i]] = [o[i], o[i + 1]]; setSujo(true); return o })}>
+                onClick={() => { setPaginas((ps) => { const o = [...ps]; [o[i + 1], o[i]] = [o[i], o[i + 1]]; return o }); setSel(null); setRevisao(v => v + 1); setSujo(true) }}>
                 <span className="sr-only">Descer</span>
               </Button>
               <Button variant="ghost" size="sm" className="text-bad hover:bg-bad/10" icon={<Trash2 size={14} strokeWidth={1.7} />}
-                onClick={() => { setPaginas((ps) => ps.filter((_, j) => j !== i)); setSujo(true) }}>
+                onClick={() => { setPaginas((ps) => ps.filter((_, j) => j !== i)); setSel(null); setRevisao(v => v + 1); setSujo(true) }}>
                 <span className="sr-only">Remover página</span>
               </Button>
             </div>
           }>
-            <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
-              <div>
-                <div className={cn('relative mb-2 grid aspect-[794/1123] place-items-center overflow-hidden rounded-control border border-line',
-                  p.escuro ? 'bg-ink' : 'bg-raised')}>
-                  {p.fundo_url
-                    ? <Image src={p.fundo_url} alt={`Fundo da página ${i + 1}`} fill sizes="200px" className="object-cover" unoptimized />
-                    : <span className="px-2 text-center text-[11px] text-ink-3">Sem fundo<br />(página branca)</span>}
-                </div>
-                <label className="block">
-                  <span className="sr-only">Enviar fundo</span>
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFundoDaPagina(i, f); e.target.value = '' }} />
-                  <span className="flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-line text-[12px] font-medium text-ink-2 hover:border-accent hover:text-accent">
-                    <Upload size={13} strokeWidth={1.8} /> {p.fundo_url ? 'Trocar fundo' : 'Enviar fundo'}
-                  </span>
-                </label>
-                <button type="button" onClick={() => alterar(i, 'escuro', !p.escuro)}
-                  className="mt-1.5 flex h-8 w-full items-center justify-center gap-1.5 rounded-control border border-line text-[12px] font-medium text-ink-2 hover:border-accent hover:text-accent">
-                  {p.escuro ? <Moon size={13} strokeWidth={1.8} /> : <Sun size={13} strokeWidth={1.8} />}
-                  {p.escuro ? 'Fundo escuro' : 'Fundo claro'}
-                </button>
-                {p.fundo_url && (
-                  <button type="button" onClick={() => alterar(i, 'fundo_url', null)}
-                    className="mt-1.5 w-full text-[11px] text-ink-3 hover:text-bad">Remover fundo</button>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[12.5px] font-medium text-ink-2">
-                  Texto sobre o fundo <span className="font-normal text-ink-3">— deixe vazio para página só de imagem (capa)</span>
-                </label>
-                <textarea
-                  ref={(el) => { areas.current[i] = el }}
-                  value={p.texto_html}
-                  onFocus={() => setFocada(i)}
-                  onChange={(e) => alterar(i, 'texto_html', e.target.value)}
-                  rows={12}
-                  spellCheck={false}
-                  placeholder={'<p><strong>COMPRADOR</strong></p>\n<p>{{cliente.nome}}, {{cliente.nacionalidade}}, CPF {{cliente.cpf}}…</p>'}
-                  className="w-full rounded-control border border-line bg-bg px-3 py-2 font-mono text-[12px] leading-relaxed text-ink outline-none focus:border-accent"
+            <div
+              className={cn('relative mx-auto w-full overflow-hidden rounded-control border border-line',
+                p.escuro ? 'bg-ink' : 'bg-white')}
+              style={{
+                aspectRatio: `${A4.w} / ${A4.h}`,
+                maxWidth: 680,
+                backgroundImage: p.fundo_url ? `url('${p.fundo_url}')` : undefined,
+                backgroundSize: 'cover', backgroundPosition: 'center top',
+              }}
+            >
+              {(p.blocos ?? []).map((b, j) => (
+                <BlocoEditavel
+                  key={`${revisao}-${i}-${j}`}
+                  bloco={b}
+                  escuro={p.escuro}
+                  revisao={revisao}
+                  selecionado={sel?.p === i && sel?.b === j}
+                  onSelecionar={() => setSel({ p: i, b: j })}
+                  onTexto={(html) => mudarBloco(i, j, 'texto_html', html)}
                 />
-                <p className="mt-1 text-[11px] text-ink-3">
-                  Aceita HTML simples: <code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>,
-                  <code>&lt;p class=&quot;cl&quot;&gt;</code> para título de cláusula,
-                  <code>class=&quot;i1&quot;/&quot;i2&quot;</code> para recuo.
-                </p>
-              </div>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <Button variant="outline" size="sm" icon={<Plus size={13} strokeWidth={1.8} />}
+                onClick={() => {
+                  setPaginas((ps) => ps.map((pp, j) => j !== i ? pp : { ...pp, blocos: [...(pp.blocos ?? []), blocoVazio()] }))
+                  setSel({ p: i, b: (p.blocos ?? []).length }); setRevisao((v) => v + 1); setSujo(true)
+                }}>
+                Adicionar bloco de texto
+              </Button>
+              {p.fundo_url && (
+                <button type="button" onClick={() => mudarPagina(i, 'fundo_url', null)}
+                  className="text-[11px] text-ink-3 hover:text-bad">Remover fundo</button>
+              )}
             </div>
           </Card>
         ))}
@@ -341,7 +434,8 @@ export function ContratoModeloView({ empresaId, versao, paginasIniciais, garanti
           <FileText size={14} strokeWidth={1.7} className="mt-0.5 shrink-0 text-ink-3" />
           <span>
             Ao finalizar uma venda, o contrato é preenchido, impresso e <strong className="text-ink">arquivado</strong>.
-            No Histórico, a 2ª via reimprime o documento arquivado — nunca gera um novo.
+            No Histórico, a 2ª via reimprime o documento arquivado — nunca gera um novo. Sem modelo salvo, a venda
+            acontece mas nenhum contrato é emitido.
           </span>
         </div>
       </div>

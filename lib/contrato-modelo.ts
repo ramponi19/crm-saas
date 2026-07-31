@@ -7,14 +7,49 @@
 import { valorPorExtenso } from './contrato-extenso'
 import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
 
+/**
+ * Um bloco de texto posicionado na página, em PORCENTAGEM (escala com o papel).
+ *
+ * A geometria existe por causa das figuras: quando a página tem uma foto de
+ * produto à direita, o texto vive numa coluna estreita à esquerda. Uma caixa
+ * única de página inteira faria o texto atravessar a imagem assim que um dado
+ * mais longo refluísse as linhas.
+ */
+export interface BlocoTexto {
+  /** Canto superior esquerdo, em % da largura/altura da página. */
+  x: number
+  y: number
+  /** Largura em % — é ela que define onde a linha quebra. */
+  largura: number
+  /** HTML do texto, com {{marcadores}}. */
+  texto_html: string
+}
+
 export interface PaginaModelo {
   ordem: number
   /** URL publica do fundo no Storage. Vazio = pagina sem fundo (branca). */
   fundo_url: string | null
   /** Fundo escuro → texto claro. */
   escuro: boolean
-  /** HTML do bloco de texto, com {{marcadores}}. */
-  texto_html: string
+  /** Blocos de texto posicionados. Página só de capa vem com lista vazia. */
+  blocos?: BlocoTexto[]
+  /**
+   * Modelo salvo antes dos blocos: um texto único ocupando a página com margem
+   * padrão. Mantido para não quebrar quem já salvou — `blocosDaPagina` converte.
+   */
+  texto_html?: string
+}
+
+/** Margem padrão (em %) do bloco herdado de um modelo sem geometria. */
+const MARGEM_LEGADO = { x: 9, y: 7, largura: 82 }
+
+/** Blocos da página, convertendo o formato antigo quando for o caso. */
+export function blocosDaPagina(p: PaginaModelo): BlocoTexto[] {
+  if (p.blocos?.length) return p.blocos
+  if (p.texto_html?.trim()) {
+    return [{ ...MARGEM_LEGADO, texto_html: p.texto_html }]
+  }
+  return []
 }
 
 export interface ModeloContrato {
@@ -163,10 +198,9 @@ const CSS_PAGINA = `
     background-size:cover;background-position:center top;background-repeat:no-repeat;
     background-color:#fff;page-break-after:always}
   .page:last-child{margin-bottom:0}
-  .tl{position:absolute;inset:0;padding:75px 70px 50px;font-size:10pt;line-height:1.6;
-    color:#000;text-align:justify}
-  .dk .tl{color:#e8e8e8}
-  .dk .tl strong{color:#fff}
+  .bl{position:absolute;font-size:10pt;line-height:1.6;color:#000;text-align:justify}
+  .dk .bl{color:#e8e8e8}
+  .dk .bl strong{color:#fff}
   p{margin-bottom:10pt}
   .cl{font-weight:bold;margin-top:15pt;margin-bottom:8pt;font-size:11pt}
   .i1{padding-left:0}
@@ -193,7 +227,9 @@ export function renderizarModelo(
 
   const corpo = paginas.map((p, i) => {
     const fundo = p.fundo_url ? `background-image:url('${p.fundo_url}')` : ''
-    const texto = p.texto_html?.trim() ? `<div class="tl">${mesclar(p.texto_html, valores)}</div>` : ''
+    const texto = blocosDaPagina(p).map((b) =>
+      `<div class="bl" style="left:${b.x}%;top:${b.y}%;width:${b.largura}%">${mesclar(b.texto_html, valores)}</div>`,
+    ).join('')
     const aviso = i === 0 && opts.reconstituido
       ? '<div class="aviso"><b>Documento reconstituído.</b> Remontado a partir do cadastro atual — pode divergir do contrato assinado.</div>'
       : ''
