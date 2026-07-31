@@ -45,7 +45,7 @@ omnichannel comparável a Kommo/Intercom:
 | 6 | `lead_mensagens` sem `external_id` (idempotência) nem `status` | Fase 4 |
 | 7 | Sem mídia, sem janela de 24h, sem templates | Fase 4 |
 | 8 | Webhook não valida `X-Hub-Signature-256` | Fase 1 |
-| 9 | WhatsApp via Evolution (não-oficial, risco de ban) | Fase 5 |
+| 9 | ~~WhatsApp via Evolution (não-oficial, risco de ban)~~ RESOLVIDO 31/07/2026: removida | — |
 
 ---
 
@@ -87,7 +87,7 @@ Substitui as chaves soltas de `configuracoes_sistema` (`instagram`, `messenger`,
 create table canais_conectados (
   id              bigint generated always as identity primary key,
   empresa_id      bigint not null references empresas(id) on delete cascade,
-  tipo            text   not null check (tipo in ('whatsapp_cloud','whatsapp_evolution','instagram','messenger')),
+  tipo            text   not null check (tipo in ('whatsapp_cloud','instagram','messenger')),
   -- Identificador que CHEGA no webhook e roteia para o tenant certo:
   -- whatsapp_cloud -> phone_number_id ; instagram -> ig account id ; messenger -> page_id
   external_id     text   not null,
@@ -293,7 +293,6 @@ lib/channels/
   index.ts        -> enviarMensagem({ empresaId, conversaId, texto, midia? })
   types.ts
   meta.ts         -> Instagram + Messenger + WhatsApp Cloud (Graph API)
-  evolution.ts    -> WhatsApp não-oficial (legado, removível na Fase 5)
   crypto.ts       -> decifra token do canal
 ```
 
@@ -306,10 +305,11 @@ Edge chamando essa lógica ou compartilhando o módulo.
 
 ## 11. WhatsApp oficial (Fase 5)
 
-Migrar de Evolution (QR/Baileys, risco de ban) para **WhatsApp Cloud API**:
+FEITO. Evolution (QR/Baileys) removida em 31/07/2026; só existe **WhatsApp Cloud API**:
 - `canais_conectados.tipo = 'whatsapp_cloud'` com `phone_number_id` + `waba_id`.
 - Recebimento já suportado no webhook (`object = whatsapp_business_account`).
-- Manter Evolution como opção de fallback até a Cloud API estar redonda.
+- Sem fallback não oficial: oferecê-lo poria em risco o app da Meta, e a coexistência
+  já resolve o motivo pelo qual o lojista resistia ao caminho oficial.
 
 ---
 
@@ -350,7 +350,7 @@ Para "ser como a Kommo" (cliente conecta a própria conta em 1 clique):
   `lib/channels`.
 
 - **Fase 5 — Oficial e limpeza**
-  WhatsApp Cloud API; aposentar Evolution; remover `lead`/`lead_mensagens`
+  WhatsApp Cloud API; Evolution aposentada (31/07/2026); remover `lead`/`lead_mensagens`
   legados; (opcional) Embedded Signup.
 
 ---

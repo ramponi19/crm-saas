@@ -196,8 +196,10 @@ já está feita.
 1. **Cobrança da API pela Meta direto no cliente** — como entra na proposta comercial.
 2. **Trilha do Instagram:** seguir com Facebook Login (as 8 permissões aprovadas são dessa
    trilha) ou migrar para Instagram Login (sem Página, mas exige nova submissão).
-3. **Evolution API:** aposentar agora que o Cloud API está aprovado? Hoje está escondida da UI
-   mas ativa como fallback no backend — e é risco de ban.
+3. ~~**Evolution API:** aposentar agora que o Cloud API está aprovado?~~ **DECIDIDO 31/07/2026:
+   removida por inteiro** — código, tela, rota e a linha no banco (que ainda guardava uma API
+   key em texto claro). O risco maior não era o número do cliente ser banido, era o app da
+   Meta; e a coexistência resolveu o motivo pelo qual o lojista resistia ao caminho oficial.
 4. **Limite de 10 clientes novos/7 dias** — sobe para 200 com Access Verification. Correr atrás
    antes do lançamento se a expectativa de venda for maior.
 

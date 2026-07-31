@@ -4,10 +4,7 @@ import { NextResponse } from 'next/server'
 
 // Chaves de integração cujo `ativo=true` bloqueia a exclusão (protege o
 // recebimento de mensagens da Meta em análise).
-// `whatsapp_evolution` continua na lista de propósito: a Evolution foi aposentada
-// em 31/07/2026, mas linhas antigas seguem no banco e precisam ser conferidas e
-// apagadas junto com a empresa. Não é resquício esquecido.
-const CHAVES_META = ['meta_instagram', 'meta_messenger', 'whatsapp_official', 'whatsapp_evolution']
+const CHAVES_META = ['meta_instagram', 'meta_messenger', 'whatsapp_official']
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireSuperAdminApi()
