@@ -25,6 +25,7 @@ interface Venda {
   produto_id: number | null
   numero_serie: string | null
   desconto_valor: number | null
+  observacoes: string | null
 }
 
 interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; loja: ContratoLoja; empresaId: number }
@@ -205,7 +206,10 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], loja, 
   const cols: Column<Venda>[] = [
     { key: 'data', header: 'Data', className: 'num w-[100px]', render: (v) => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
     { key: 'cliente', header: 'Cliente', render: (v) => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
-    { key: 'produto', header: 'Produto', hideOnMobile: true, render: (v) => <span className="text-ink-2">{v.produto_nome ?? v.forma_pagamento ?? '—'}</span> },
+    // Acessório é venda sem produto_id: a descrição vive em `observacoes`.
+    // O fallback anterior era `forma_pagamento`, que imprimia "credito" na
+    // coluna Produto.
+    { key: 'produto', header: 'Produto', hideOnMobile: true, render: (v) => <span className="text-ink-2">{v.produto_nome ?? v.observacoes ?? '—'}</span> },
     {
       key: 'vendedor', header: 'Vendedor', hideOnMobile: true,
       render: (v) => (

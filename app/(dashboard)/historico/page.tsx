@@ -55,6 +55,7 @@ export default async function HistoricoPage() {
     parcelas:      v.parcelas,
     cliente_id:    v.cliente_id,
     produto_id:    v.produto_id,
+    observacoes:   v.observacoes,
     numero_serie:  v.numero_serie,
     desconto_valor: v.desconto_valor != null ? Number(v.desconto_valor) : null,
     cliente_nome:  one(v.clientes)?.nome  ?? null,
