@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { cifrarToken } from '@/lib/canais/crypto'
 import {
   trocarCodigoPorToken, inspecionarToken, assinarWaba, statusDoNumero,
-  sincronizarAppDoCelular, numerosDaWaba, wabaDoToken, metaConfigurada, ehErro,
+  sincronizarAppDoCelular, numerosDaWaba, wabaDoToken, descobrirWhatsApp, metaConfigurada, ehErro,
 } from '@/lib/canais/meta'
 
 /**
@@ -59,17 +59,22 @@ export async function POST(req: Request) {
       : await trocarCodigoPorToken(code!, body.redirectUri)
     if (ehErro(troca)) return NextResponse.json({ error: troca.erro }, { status: 502 })
 
-    // No fluxo por redirecionamento não existe o postMessage do SDK, então o id da
-    // conta WhatsApp é derivado dos escopos concedidos ao próprio token.
+    // Sem o postMessage do SDK não chega o id da conta. Duas tentativas, nesta
+    // ordem: os escopos do token (funciona no fluxo de cliente) e, se vierem sem
+    // alvo — o caso de token de usuário de sistema —, a descoberta pelo portfólio.
     let wabaId = body.wabaId
+    let numeroDescoberto: string | null = null
     if (!wabaId) {
       wabaId = (await wabaDoToken(troca.token)) ?? undefined
-      if (!wabaId) {
-        return NextResponse.json(
-          { error: 'Conectou na Meta, mas nenhuma conta WhatsApp foi autorizada. Refaça e marque a conta na tela da Meta.' },
-          { status: 502 },
-        )
-      }
+    }
+    if (!wabaId) {
+      const achado = await descobrirWhatsApp(troca.token)
+      if (ehErro(achado)) return NextResponse.json({ error: achado.erro }, { status: 502 })
+      wabaId = achado.wabaId
+      // Já vem o número certo (prefere o que está em coexistência), o que evita
+      // conectar por engano um número que não recebe.
+      if (!body.phoneNumberId) body.phoneNumberId = achado.phoneNumberId
+      numeroDescoberto = achado.numero
     }
 
     // O fluxo de coexistência às vezes devolve só o id da CONTA. Sem o id do
@@ -148,6 +153,10 @@ export async function POST(req: Request) {
     if (!ehErro(status)) {
       coexistencia = status.coexistencia
       nome = status.numero ? `${status.numero}${status.nomeVerificado ? ` · ${status.nomeVerificado}` : ''}` : null
+    } else if (numeroDescoberto) {
+      // Se a leitura de status falhar, ao menos mostra o número que foi escolhido
+      // na descoberta — melhor que deixar o canal sem identificação na tela.
+      nome = numeroDescoberto
       if (!coexistencia) {
         avisos.push(
           'O número conectou, mas a Meta ainda não confirmou o modo coexistência. ' +

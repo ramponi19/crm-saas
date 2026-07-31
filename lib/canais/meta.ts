@@ -202,6 +202,84 @@ export async function assinarPagina(pageId: string, tokenPagina: string): Promis
 }
 
 /**
+ * Descobre sozinho a conta WhatsApp e o número a conectar, partindo só do token.
+ *
+ * Existe porque em token de USUÁRIO DE SISTEMA os `granular_scopes` vêm sem lista
+ * de alvos ("todos"), então não há de onde derivar a WABA — e as arestas
+ * `assigned_whatsapp_business_accounts` voltam vazias. O caminho que funciona:
+ *   token → Página → portfólio dono da Página → contas WhatsApp do portfólio →
+ *   números → escolher o que está em COEXISTÊNCIA.
+ *
+ * Preferência de escolha, nesta ordem:
+ *   1. número em coexistência (is_on_biz_app + CLOUD_API) — o que roda no celular;
+ *   2. qualquer número já na Cloud API;
+ *   Nunca escolhe número fora da Cloud API: conectar ali não receberia nada.
+ */
+export async function descobrirWhatsApp(token: string): Promise<{
+  wabaId: string
+  phoneNumberId: string
+  numero: string | null
+  nome: string | null
+  coexistencia: boolean
+  outros: { numero: string | null; coexistencia: boolean }[]
+} | Erro> {
+  const pega = async (p: string) => {
+    const r = await fetch(`${G}/${p}${p.includes('?') ? '&' : '?'}access_token=${token}`)
+    return { ok: r.ok, body: await r.json() as Record<string, unknown> }
+  }
+
+  const pgs = await pega('me/accounts?fields=id&limit=25')
+  const primeira = (pgs.body?.data as Record<string, unknown>[] | undefined)?.[0]
+  if (!primeira?.id) return falha(pgs.body, 'O token não alcança nenhuma Página — sem ela não consigo achar o portfólio.')
+
+  const pg = await pega(`${primeira.id}?fields=business`)
+  const negocio = (pg.body?.business as Record<string, unknown> | undefined)?.id
+  if (!negocio) return falha(pg.body, 'Não consegui identificar o portfólio de negócios da Página.')
+
+  const wabas = await pega(`${negocio}/owned_whatsapp_business_accounts?fields=id,name&limit=50`)
+  const lista = (wabas.body?.data as Record<string, unknown>[] | undefined) ?? []
+  if (!lista.length) return falha(wabas.body, 'Nenhuma conta de WhatsApp encontrada neste portfólio.')
+
+  type Cand = { wabaId: string; phoneNumberId: string; numero: string | null; nome: string | null; coexistencia: boolean; naApi: boolean }
+  const candidatos: Cand[] = []
+
+  for (const w of lista) {
+    const campos = 'id,display_phone_number,verified_name,is_on_biz_app,platform_type'
+    const nums = await pega(`${w.id}/phone_numbers?fields=${campos}&limit=25`)
+    for (const n of ((nums.body?.data as Record<string, unknown>[] | undefined) ?? [])) {
+      const naApi = n.platform_type === 'CLOUD_API'
+      candidatos.push({
+        wabaId: String(w.id),
+        phoneNumberId: String(n.id),
+        numero: (n.display_phone_number as string) ?? null,
+        nome: (n.verified_name as string) ?? null,
+        coexistencia: !!n.is_on_biz_app && naApi,
+        naApi,
+      })
+    }
+  }
+
+  const escolhido = candidatos.find((c) => c.coexistencia) ?? candidatos.find((c) => c.naApi)
+  if (!escolhido) {
+    return {
+      erro: 'Nenhum número está na Cloud API neste portfólio. '
+        + 'Conectar um número fora dela não receberia mensagem — verifique no WhatsApp Manager.',
+    }
+  }
+
+  return {
+    wabaId: escolhido.wabaId,
+    phoneNumberId: escolhido.phoneNumberId,
+    numero: escolhido.numero,
+    nome: escolhido.nome,
+    coexistencia: escolhido.coexistencia,
+    outros: candidatos
+      .filter((c) => c.phoneNumberId !== escolhido.phoneNumberId)
+      .map((c) => ({ numero: c.numero, coexistencia: c.coexistencia })),
+  }
+}
+
+/**
  * Descobre a conta WhatsApp (WABA) a partir do próprio token do cliente.
  *
  * Necessário no fluxo por REDIRECIONAMENTO: sem o pop-up do SDK não existe o
