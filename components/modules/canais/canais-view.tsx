@@ -173,11 +173,14 @@ export function CanaisView({ appId }: { appId: string }) {
         //   v4 → featureType `whatsapp_business_app_onboarding`, feature `app_only_install`
         // `app_only_install` NÃO é coexistência (é acesso por token de negócio),
         // por isso `features` fica de fora.
+        // Idêntico ao que o construtor da PRÓPRIA Meta gera para esta
+        // configuração (conferido na URL que ele monta). Sem `setup: {}`: a
+        // documentação mostra, o construtor não — e copiar a ferramenta deles
+        // elimina a última variável em jogo.
         extras: {
-          version: 'v4',
-          setup: {},
           featureType: 'whatsapp_business_app_onboarding',
           sessionInfoVersion: '3',
+          version: 'v4',
         },
       })
     } catch (e) {
