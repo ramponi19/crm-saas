@@ -164,7 +164,21 @@ export function CanaisView({ appId }: { appId: string }) {
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' },
+        // `version` é OBRIGATÓRIO, e a página de coexistência da documentação
+        // não o mostra. Sem ele a Meta usa a versão padrão do Embedded Signup,
+        // que é anterior à v3 e não conhece `featureType` — então ignora o
+        // pedido de coexistência EM SILÊNCIO. Foi o que aconteceu em 31/07: o
+        // SDK abriu, o extras foi enviado, e nenhum evento voltou.
+        // A tabela oficial de versões diz quem suporta o quê:
+        //   v4 → featureType `whatsapp_business_app_onboarding`, feature `app_only_install`
+        // `app_only_install` NÃO é coexistência (é acesso por token de negócio),
+        // por isso `features` fica de fora.
+        extras: {
+          version: 'v4',
+          setup: {},
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
+        },
       })
     } catch (e) {
       setConectando(null)
