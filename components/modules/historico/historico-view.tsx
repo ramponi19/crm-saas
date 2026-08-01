@@ -261,13 +261,17 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
                   <Button key={c.id} variant="outline" className="w-full justify-start"
                     icon={<FileText size={14} strokeWidth={1.7} />}
                     onClick={() => { if (!imprimirContratoHTML(c.html)) notify.warn('Permita pop-ups para imprimir') }}>
-                    2ª via de {c.nome ?? 'documento'} · {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                    2ª via de {c.nome ?? 'documento anterior à biblioteca'} · {new Date(c.created_at).toLocaleDateString('pt-BR')}
                   </Button>
                 ))}
               </div>
             ) : (
               <p className="text-[12px] text-ink-3">Nenhum documento foi emitido nesta venda.</p>
             )}
+            <p className="mt-1.5 text-[11px] text-ink-3">
+              A 2ª via reimprime a cópia arquivada no dia da emissão — por isso ela não muda quando você edita o
+              modelo. Para sair no layout novo, emita de novo abaixo.
+            </p>
           </div>
 
           {documentos.length > 0 && docsVenda && (
