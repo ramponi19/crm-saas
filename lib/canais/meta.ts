@@ -240,7 +240,7 @@ export async function descobrirWhatsApp(token: string): Promise<{
   const lista = (wabas.body?.data as Record<string, unknown>[] | undefined) ?? []
   if (!lista.length) return falha(wabas.body, 'Nenhuma conta de WhatsApp encontrada neste portfólio.')
 
-  type Cand = { wabaId: string; phoneNumberId: string; numero: string | null; nome: string | null; coexistencia: boolean; naApi: boolean }
+  type Cand = { wabaId: string; phoneNumberId: string; numero: string | null; nome: string | null; coexistencia: boolean; naApi: boolean; noApp: boolean }
   const candidatos: Cand[] = []
 
   for (const w of lista) {
@@ -255,15 +255,25 @@ export async function descobrirWhatsApp(token: string): Promise<{
         nome: (n.verified_name as string) ?? null,
         coexistencia: !!n.is_on_biz_app && naApi,
         naApi,
+        noApp: !!n.is_on_biz_app,
       })
     }
   }
 
-  const escolhido = candidatos.find((c) => c.coexistencia) ?? candidatos.find((c) => c.naApi)
+  // Ordem de preferência. O terceiro caso existe por uma situação real: número
+  // recém-liberado de outro provedor fica um tempo FORA da Cloud API (aparece
+  // como ON_PREMISE / DISCONNECTED) antes de entrar na nova. Rejeitá-lo aqui
+  // faria a conexão falhar dizendo "nenhum número na Cloud API", quando na
+  // verdade é o número certo, em trânsito. Ele segue no app do celular, então
+  // `is_on_biz_app` é o sinal de que pertence mesmo ao lojista.
+  const escolhido = candidatos.find((c) => c.coexistencia)
+    ?? candidatos.find((c) => c.naApi)
+    ?? candidatos.find((c) => c.noApp)
   if (!escolhido) {
     return {
-      erro: 'Nenhum número está na Cloud API neste portfólio. '
-        + 'Conectar um número fora dela não receberia mensagem — verifique no WhatsApp Manager.',
+      erro: 'Nenhum número utilizável foi encontrado neste portfólio. '
+        + 'Se o número acabou de sair de outro provedor, aguarde alguns minutos e tente de novo; '
+        + 'caso contrário, verifique o número no WhatsApp Manager.',
     }
   }
 

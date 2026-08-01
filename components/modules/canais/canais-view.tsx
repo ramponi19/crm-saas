@@ -128,6 +128,13 @@ export function CanaisView({ appId }: { appId: string }) {
     const erroMeta = url.searchParams.get('error_description') ?? url.searchParams.get('error')
     if (!code && !erroMeta) return
 
+    // O Embedded Signup devolve os ids junto do código. Aproveitar isso não é
+    // luxo: sem eles a rota cai na descoberta automática, que só aceita número
+    // já em CLOUD_API — e um número recém-liberado de outro provedor fica um
+    // tempo fora dela, o que faria a conexão falhar sem motivo aparente.
+    const phoneNumberId = url.searchParams.get('phone_number_id') ?? undefined
+    const wabaId = url.searchParams.get('waba_id') ?? undefined
+
     const tipo = (() => { try { return sessionStorage.getItem('canal_conectando') } catch { return null } })()
     try { sessionStorage.removeItem('canal_conectando') } catch { /* ignora */ }
     window.history.replaceState({}, '', '/admin/canais')
@@ -137,7 +144,7 @@ export function CanaisView({ appId }: { appId: string }) {
       notify.bad('A Meta recusou a conexão.', erroMeta)
       return
     }
-    registrar('retorno', { canal: tipo, temCode: true })
+    registrar('retorno', { canal: tipo, temCode: true, temPhoneId: !!phoneNumberId, temWabaId: !!wabaId })
     setVoltandoDaMeta(true)
 
     const finalizar = async () => {
@@ -146,7 +153,12 @@ export function CanaisView({ appId }: { appId: string }) {
         const r = await fetch(rota, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           // O mesmo endereço enviado no diálogo — a Meta compara os dois.
-          body: JSON.stringify({ code: code!, redirectUri: `${window.location.origin}/canais` }),
+          body: JSON.stringify({
+            code: code!,
+            redirectUri: `${window.location.origin}/canais`,
+            ...(phoneNumberId ? { phoneNumberId } : {}),
+            ...(wabaId ? { wabaId } : {}),
+          }),
         })
         const j = await r.json()
         if (!r.ok) throw new Error(j.error ?? 'Falha ao concluir a conexão.')
