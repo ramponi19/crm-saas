@@ -106,6 +106,24 @@ function montar(data: Record<string, unknown>, token: string | null): Canal {
   };
 }
 
+// Mensagem que chega para um identificador que não conhecemos era DESCARTADA em
+// silêncio. Cenário real e iminente: ao migrar o número para outra conta da Meta
+// ele ganha um `phone_number_id` NOVO, e entre a migração e a reconexão as
+// mensagens do cliente sumiriam sem deixar rastro em lugar nenhum.
+// Agora sobra registro: fica no log da função e numa linha de diagnóstico, para
+// eu conseguir dizer QUANTAS e DE QUAL id se perderam — e reconectar sabendo.
+// Nunca quebra o recebimento: falha ao registrar é ignorada de propósito.
+async function eventoOrfao(tipo: string, externalId: string | undefined, campo: string | null) {
+  console.error(`evento orfao: ${tipo} id=${externalId ?? "(sem id)"} campo=${campo ?? "-"} — nenhum canal conectado com este id`);
+  try {
+    await db.from("diagnostico_canais").insert({
+      etapa: "evento_orfao",
+      origem_url: null,
+      dados: { tipo, externalId: externalId ?? null, campo },
+    });
+  } catch { /* diagnóstico nunca pode atrapalhar o recebimento */ }
+}
+
 async function canalPorExternalId(tipo: string, externalId: string | undefined): Promise<Canal | null> {
   if (!externalId) return null;
   const chave = `${tipo}:${externalId}`;
@@ -700,7 +718,7 @@ serve(async (req: Request) => {
           const value = ch.value as Record<string, unknown> | undefined;
           const meta = value?.metadata as Record<string, unknown> | undefined;
           const canal = await canalPorExternalId("whatsapp", meta?.phone_number_id as string | undefined);
-          if (!canal) continue;
+          if (!canal) { await eventoOrfao("whatsapp", meta?.phone_number_id as string | undefined, campo); continue; }
 
           // Mensagem recebida do cliente final
           if (campo === "messages" || (!campo && value?.messages)) {
@@ -839,7 +857,7 @@ serve(async (req: Request) => {
       const tipo = objeto === "page" ? "messenger" : "instagram";
       for (const entry of (body.entry as Record<string, unknown>[] ?? [])) {
         const canal = await canalPorExternalId(tipo, entry?.id as string | undefined);
-        if (!canal) continue;
+        if (!canal) { await eventoOrfao(tipo, entry?.id as string | undefined, null); continue; }
         for (const m of (entry.messaging as Record<string, unknown>[] ?? [])) {
           // IG/Messenger confirmam entrega e leitura em eventos próprios, que
           // trazem a lista de ids (delivery) ou um marco de tempo (read).
