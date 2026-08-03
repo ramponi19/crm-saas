@@ -18,7 +18,7 @@ interface Meta {
   meta_vendas_valor: number | null; meta_vendas_qtd: number | null
   percentual_comissao_padrao: number | null; empresa_id?: number
 }
-interface VendaResumo { vendedor_id: string | null; valor_venda: number | null; status: string | null }
+interface VendaResumo { vendedor_id: string | null; valor_venda: number | null; status: string | null; grupo_pdv?: string | null }
 interface ComissaoPaga {
   id: number; usuario_id: string | null; valor_comissao: number | null
   data_pagamento: string | null; created_at: string | null
@@ -307,18 +307,30 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
   const [metas, setMetas] = useState<Array<Meta & { empresa_id: number }>>([])
   const [pagas, setPagas] = useState<ComissaoPaga[]>([])
   const [quitando, setQuitando] = useState<string | null>(null)
+  /** Fechamentos com aparelho de troca ainda não recebido — comissão retida. */
+  const [gruposRetidos, setGruposRetidos] = useState<Set<string>>(new Set())
 
   const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 
   const load = useCallback(async () => {
     const inicio = `${mes}-01`
     const fim = new Date(new Date(inicio).getFullYear(), new Date(inicio).getMonth() + 1, 1).toISOString()
-    const [{ data: v }, { data: m }, { data: p }] = await Promise.all([
-      supabase.from('vendas').select('vendedor_id, valor_venda, status').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
+    const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
+      supabase.from('vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
       supabase.from('comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
+      // Aparelhos aceitos em troca que ainda não chegaram na loja. Cada um segura
+      // a comissão do fechamento inteiro que o trouxe — não só da primeira linha,
+      // porque o PDV cria uma venda por item do carrinho.
+      //
+      // `ativo` no filtro é a saída para o caso do cliente nunca entregar: excluir
+      // a unidade no estoque (que a desativa) libera a comissão. Sem esse filtro a
+      // retenção não teria fim e o vendedor ficaria refém de uma troca que morreu.
+      supabase.from('inventario_unidades').select('grupo_pdv')
+        .eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
     ])
     setVendas(v ?? []); setMetas(m ?? []); setPagas(p ?? [])
+    setGruposRetidos(new Set(((pend ?? []) as { grupo_pdv: string | null }[]).map((u) => u.grupo_pdv).filter((g): g is string => !!g)))
   }, [mes])
 
   useEffect(() => { load() }, [load])
@@ -340,13 +352,25 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     notify.ok('Comissão quitada!'); await load(); setQuitando(null)
   }
 
-  // Aggregations
-  const vendasPorUser: Record<string, { qtd: number; total: number }> = {}
+  // Aggregations.
+  //
+  // `total` é a base que gera comissão. Venda de um fechamento cujo aparelho de
+  // troca ainda não chegou NÃO entra aqui: vai para `retido` e só migra quando
+  // alguém confirmar a chegada no estoque. Sem isso a loja pagaria comissão por
+  // um aparelho que pode nunca aparecer.
+  const vendasPorUser: Record<string, { qtd: number; total: number; retido: number; qtdRetida: number }> = {}
   vendas.forEach(v => {
     if (!v.vendedor_id) return
-    if (!vendasPorUser[v.vendedor_id]) vendasPorUser[v.vendedor_id] = { qtd: 0, total: 0 }
-    vendasPorUser[v.vendedor_id].qtd += 1
-    vendasPorUser[v.vendedor_id].total += Number(v.valor_venda ?? 0)
+    if (!vendasPorUser[v.vendedor_id]) vendasPorUser[v.vendedor_id] = { qtd: 0, total: 0, retido: 0, qtdRetida: 0 }
+    const linha = vendasPorUser[v.vendedor_id]
+    const valor = Number(v.valor_venda ?? 0)
+    if (v.grupo_pdv && gruposRetidos.has(v.grupo_pdv)) {
+      linha.retido += valor
+      linha.qtdRetida += 1
+      return
+    }
+    linha.qtd += 1
+    linha.total += valor
   })
 
   const metaMap: Record<string, Meta> = {}
@@ -381,7 +405,24 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
       },
     },
     { key: 'vendas', header: 'Vendas', align: 'right', className: 'num', render: (u) => <span className="text-ink-2">{vendasPorUser[u.id]?.qtd ?? 0}</span> },
-    { key: 'faturado', header: 'Faturado', align: 'right', className: 'num', render: (u) => <span className="font-semibold text-ink">{formatCurrency(vendasPorUser[u.id]?.total ?? 0)}</span> },
+    {
+      key: 'faturado', header: 'Faturado', align: 'right', className: 'num',
+      render: (u) => {
+        const l = vendasPorUser[u.id]
+        return (
+          <div className="flex flex-col items-end">
+            <span className="font-semibold text-ink">{formatCurrency(l?.total ?? 0)}</span>
+            {/* O que está fora da conta precisa aparecer, senão o vendedor só vê
+                um número menor do que esperava e ninguém sabe explicar. */}
+            {(l?.retido ?? 0) > 0 && (
+              <span className="text-[10.5px] text-warn">
+                + {formatCurrency(l.retido)} retido ({l.qtdRetida} {l.qtdRetida === 1 ? 'venda' : 'vendas'})
+              </span>
+            )}
+          </div>
+        )
+      },
+    },
     {
       key: 'pct', header: '% Comissão', align: 'right', className: 'num',
       render: (u) => { const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0); return pct > 0 ? <span className="text-ink-2">{pct}%</span> : <span className="text-ink-3">—</span> },
@@ -402,12 +443,17 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
       key: 'situacao', header: 'Situação', align: 'right',
       render: (u) => {
         const pct = Number(metaMap[u.id]?.percentual_comissao_padrao ?? 0)
-        const calculado = ((vendasPorUser[u.id]?.total ?? 0) * pct) / 100
+        const l = vendasPorUser[u.id]
+        const calculado = ((l?.total ?? 0) * pct) / 100
+        const retidoComissao = ((l?.retido ?? 0) * pct) / 100
         const pago = pagaMap[u.id] ?? 0
         const pendente = Math.max(0, calculado - pago)
-        if (calculado <= 0) return <span className="text-[11px] text-ink-3">Sem comissão</span>
-        if (pendente <= 0) return <Badge tone="ok"><Check size={11} strokeWidth={1.7} /> Quitado</Badge>
-        return <Badge tone="warn">{formatCurrency(pendente)} pendente</Badge>
+        const aviso = retidoComissao > 0 && pct > 0
+          ? <div className="mt-0.5 text-[10.5px] text-warn">{formatCurrency(retidoComissao)} aguardando aparelho chegar</div>
+          : null
+        if (calculado <= 0) return <div>{retidoComissao > 0 && pct > 0 ? <Badge tone="warn">Retida</Badge> : <span className="text-[11px] text-ink-3">Sem comissão</span>}{aviso}</div>
+        if (pendente <= 0) return <div><Badge tone="ok"><Check size={11} strokeWidth={1.7} /> Quitado</Badge>{aviso}</div>
+        return <div><Badge tone="warn">{formatCurrency(pendente)} pendente</Badge>{aviso}</div>
       },
     },
     {

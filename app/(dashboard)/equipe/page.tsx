@@ -23,7 +23,7 @@ export default async function EquipePage() {
       .order('usuario_id'),
     supabase.from('metas_comissoes').select('*').eq('empresa_id', empresaId).eq('mes_ano', mesAtual),
     supabase.from('vendas')
-      .select('vendedor_id, valor_venda, status')
+      .select('vendedor_id, valor_venda, status, grupo_pdv')
       .eq('empresa_id', empresaId)
       .gte('data_venda', inicioMes)
       .lt('data_venda', fimMes)

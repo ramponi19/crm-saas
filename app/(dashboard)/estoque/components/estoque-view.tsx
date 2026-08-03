@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify,
+  Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog,
   type Column,
 } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
@@ -39,6 +39,8 @@ export interface Unidade {
   fotos_urls: string | null
   /** Foto do modelo; usada quando a unidade não tem foto própria. */
   produto_foto?: string | null
+  /** Em entrada por troca: quem aceitou o aparelho e responde por ele até chegar. */
+  responsavel_nome?: string | null
   created_at: string | null
   // Veículos (segmento concessionaria)
   placa: string | null
@@ -81,6 +83,9 @@ const STATUS_BADGE: Record<string, { label: string; tone: Tone; dot?: boolean }>
   reservado:   { label: 'Reservado',  tone: 'warn' },
   vendido:     { label: 'Vendido',    tone: 'neutro' },
   assistencia: { label: 'Em reparo',  tone: 'acc' },
+  // `pendente` já era gravável no cadastro manual mas não tinha rótulo aqui: o
+  // fallback do render mostrava a unidade como "Disponível", justamente o oposto.
+  pendente:    { label: 'A receber',  tone: 'warn' },
 }
 
 const CONDICAO_BADGE: Record<string, { label: string; tone: Tone }> = {
@@ -101,6 +106,7 @@ const TIPO_BADGE: Record<string, { label: string; tone: Tone }> = {
 const STATUS_FILTER = [
   { value: 'todos', label: 'Todos' },
   { value: 'disponivel', label: 'Disponível' },
+  { value: 'pendente', label: 'A receber' },
   { value: 'reservado', label: 'Reservado' },
   { value: 'assistencia', label: 'Em reparo' },
   { value: 'vendido', label: 'Vendido' },
@@ -131,6 +137,29 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   const [unidadeSel, setUnidadeSel] = useState<Unidade | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [preset, setPreset] = useState<Preset>(null)
+  const [confirmar, setConfirmar] = useState<Unidade | null>(null)
+  const [confirmando, setConfirmando] = useState<number | null>(null)
+
+  // Confirma a chegada física do aparelho aceito em troca. É o que tira a unidade
+  // do limbo: entra no PDV e a comissão do fechamento é liberada.
+  async function confirmarChegada() {
+    if (!confirmar) return
+    const alvo = confirmar
+    setConfirmando(alvo.id)
+    try {
+      const r = await fetch('/api/estoque/confirmar-chegada', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: alvo.id }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { notify.bad('Não foi possível confirmar', j.error); return }
+      setItens((prev) => prev.map((i) => i.id === alvo.id ? { ...i, status: 'disponivel' } : i))
+      notify.ok('Chegada confirmada', 'A unidade entrou no estoque e a comissão foi liberada.')
+    } finally {
+      setConfirmando(null)
+      setConfirmar(null)
+    }
+  }
 
   function abrirEntrada(p: Preset) { setPreset(p); setTab('entrada') }
 
@@ -140,9 +169,11 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     const reservados = itens.filter(i => i.status === 'reservado').length
     const reparo = itens.filter(i => i.status === 'assistencia').length
     const vendidos = itens.filter(i => i.status === 'vendido').length
+    const pendentes = itens.filter(i => i.status === 'pendente').length
     const total = itens.length
+    // Só o que está na loja soma no valor do estoque — pendente ainda não chegou.
     const valorEstoque = itens.filter(i => i.status === 'disponivel').reduce((acc, i) => acc + (i.preco_venda ?? 0), 0)
-    return { total, disponiveis, reservados, reparo, vendidos, valorEstoque }
+    return { total, disponiveis, reservados, reparo, vendidos, pendentes, valorEstoque }
   }, [itens])
 
   const marcasUnicas = useMemo(() => [...new Set(itens.map(i => i.marca_nome))].filter(Boolean), [itens])
@@ -232,7 +263,28 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     },
     {
       key: 'status', header: 'Status', align: 'right',
-      render: (u) => { const s = STATUS_BADGE[u.status ?? 'disponivel'] ?? STATUS_BADGE.disponivel; return <Badge tone={s.tone} dot={s.dot}>{s.label}</Badge> },
+      render: (u) => {
+        const s = STATUS_BADGE[u.status ?? 'disponivel'] ?? STATUS_BADGE.disponivel
+        return (
+          <div className="flex flex-col items-end gap-0.5">
+            <Badge tone={s.tone} dot={s.dot}>{s.label}</Badge>
+            {/* Pendente sem dono visível não cobra ninguém. O nome de quem aceitou
+                a troca é o que faz a pendência ter responsável. */}
+            {u.status === 'pendente' && u.responsavel_nome && (
+              <span className="text-[11px] text-ink-3">com {u.responsavel_nome}</span>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'chegada', header: '', align: 'right',
+      render: (u) => u.status === 'pendente' ? (
+        <Button size="sm" variant="outline" icon={<PackageCheck size={12} strokeWidth={1.8} />}
+          loading={confirmando === u.id} onClick={() => setConfirmar(u)}>
+          Confirmar chegada
+        </Button>
+      ) : null,
     },
   ]
 
@@ -386,6 +438,20 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirmar}
+        onClose={() => setConfirmar(null)}
+        onConfirm={confirmarChegada}
+        loading={confirmando != null}
+        title="Confirmar que o aparelho chegou?"
+        description={
+          `"${confirmar?.produto_nome ?? 'Aparelho'}"${confirmar?.imei ? ` (IMEI ${confirmar.imei})` : ''} passa a disponível para venda`
+          + `${confirmar?.responsavel_nome ? ` e a comissão de ${confirmar.responsavel_nome} pela venda que trouxe este aparelho é liberada` : ' e a comissão da venda que trouxe este aparelho é liberada'}.`
+          + ' Confirme apenas com o aparelho em mãos.'
+        }
+        confirmLabel="Chegou, confirmar"
+      />
     </div>
   )
 }

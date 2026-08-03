@@ -2190,11 +2190,14 @@ export type Database = {
           estado: string | null
           fornecedor_id: number | null
           fotos_urls: string | null
+          grupo_pdv: string | null
           id: number
           imei: string | null
           imei2: string | null
           km: number | null
           numero_serie: string | null
+          recebido_em: string | null
+          recebido_por: string | null
           observacoes: string | null
           placa: string | null
           preco_custo: number | null
@@ -2225,6 +2228,7 @@ export type Database = {
           estado?: string | null
           fornecedor_id?: number | null
           fotos_urls?: string | null
+          grupo_pdv?: string | null
           id?: number
           imei?: string | null
           imei2?: string | null
@@ -2235,6 +2239,8 @@ export type Database = {
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          recebido_em?: string | null
+          recebido_por?: string | null
           renavam?: string | null
           reserva_expira_em?: string | null
           reservado_em?: string | null
@@ -2260,6 +2266,7 @@ export type Database = {
           estado?: string | null
           fornecedor_id?: number | null
           fotos_urls?: string | null
+          grupo_pdv?: string | null
           id?: number
           imei?: string | null
           imei2?: string | null
@@ -2270,6 +2277,8 @@ export type Database = {
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          recebido_em?: string | null
+          recebido_por?: string | null
           renavam?: string | null
           reserva_expira_em?: string | null
           reservado_em?: string | null
@@ -3364,6 +3373,7 @@ export type Database = {
           desconto_valor: number | null
           empresa_id: number
           forma_pagamento: string | null
+          grupo_pdv: string | null
           id: number
           lucro: number | null
           numero_serie: string | null
@@ -3390,6 +3400,7 @@ export type Database = {
           desconto_valor?: number | null
           empresa_id: number
           forma_pagamento?: string | null
+          grupo_pdv?: string | null
           id?: never
           lucro?: number | null
           numero_serie?: string | null
@@ -3416,6 +3427,7 @@ export type Database = {
           desconto_valor?: number | null
           empresa_id?: number
           forma_pagamento?: string | null
+          grupo_pdv?: string | null
           id?: never
           lucro?: number | null
           numero_serie?: string | null

@@ -14,7 +14,9 @@ export default async function EstoquePage() {
   const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
-      .select(`*, produtos!produto_id(nome, foto_url, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia)`)
+      // `usuarios!usuario_id` é o responsável pela unidade — em entrada por troca,
+      // quem aceitou o aparelho e responde por ele até chegar na loja.
+      .select(`*, produtos!produto_id(nome, foto_url, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia), usuarios!usuario_id(nome)`)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('created_at', { ascending: false }),
@@ -30,6 +32,7 @@ export default async function EstoquePage() {
   type UnidadeRow = Tables<'inventario_unidades'> & {
     produtos: Embed<{ nome: string | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
     fornecedores: Embed<{ nome_fantasia: string | null }>
+    usuarios: Embed<{ nome: string | null }>
   }
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
@@ -40,6 +43,7 @@ export default async function EstoquePage() {
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       fornecedor_nome: one(u.fornecedores)?.nome_fantasia ?? null,
+      responsavel_nome: one(u.usuarios)?.nome ?? null,
     }
   })
 

@@ -55,6 +55,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
     // Downgrade aprovado → dá entrada do usado no estoque + registra a venda.
     if (orc.tipo === 'downgrade') {
+      let vendedorId: string | null = null
+      if (orc.lead_id) {
+        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
+        vendedorId = lead?.responsavel_id ?? null
+      }
+
+      // Amarra a unidade recebida à venda gerada aqui — mesmo mecanismo do PDV,
+      // que é o que segura a comissão até a chegada ser confirmada.
+      const grupoPdv = crypto.randomUUID()
+
+      // PENDENTE, não disponível: o cliente aprovou por link, o aparelho dele
+      // ainda não passou pelo balcão. Fica no nome do responsável pelo lead.
       await svc.from('inventario_unidades').insert({
         empresa_id: orc.empresa_id,
         produto_id: null,
@@ -63,17 +75,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         // `tipo` da UNIDADE segue 'troca': é o tipo de entrada da peça no estoque,
         // o mesmo que o PDV usa. Não acompanha o nome do tipo de orçamento.
         tipo: 'troca',
-        status: 'disponivel',
+        status: 'pendente',
+        grupo_pdv: grupoPdv,
+        usuario_id: vendedorId,
         preco_custo: orc.valor_entrada ?? null,
         observacoes: `Entrada por downgrade — orçamento #${orc.id}${orc.aparelho_usado ? ` (${orc.aparelho_usado})` : ''}, cliente ${orc.cliente_nome}.`,
         ativo: true,
       } as never)
-
-      let vendedorId: string | null = null
-      if (orc.lead_id) {
-        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
-        vendedorId = lead?.responsavel_id ?? null
-      }
       // A venda vale o aparelho que sai MAIS os itens da negociação. O aparelho
       // recebido não abate daqui: ele é pagamento em espécie, igual ao PDV. Abater
       // registraria prejuízo numa venda lucrativa.
@@ -87,6 +95,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
       const { data: venda } = await svc.from('vendas').insert({
         empresa_id: orc.empresa_id,
+        grupo_pdv: grupoPdv,
         valor_venda: valorVenda,
         data_venda: nowIso,
         vendedor_id: vendedorId,

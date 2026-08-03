@@ -242,6 +242,10 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       if (!vinculo) throw new Error('Empresa não encontrada')
       const empresaId = vinculo.empresa_id
 
+      // Um fechamento gera VÁRIAS vendas (uma por item do carrinho). O grupo as
+      // amarra: é por ele que um aparelho de troca ainda não recebido segura a
+      // comissão do fechamento inteiro, e não só da primeira linha.
+      const grupoPdv = crypto.randomUUID()
       const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
       const unitStatus = entregaPendente ? 'reservado' : 'vendido'
       const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
@@ -284,6 +288,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
         const vendaRow = {
           empresa_id: empresaId,
+          grupo_pdv: grupoPdv,
           cliente_id: clienteSelecionado?.id ?? null,
           vendedor_id: user.id,
           usuario_id: user.id,
@@ -353,7 +358,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         const valorAc = preco - descAc
         const caixaAc = Math.max(0, valorAc - trocaAc)
         const { data: vAc } = await supabase.from('vendas').insert({
-          empresa_id: empresaId, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
+          empresa_id: empresaId, grupo_pdv: grupoPdv, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
           desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
@@ -373,9 +378,15 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // #1 Cada aparelho recebido na troca entra no estoque como UMA unidade
       // própria — com o IMEI e o custo dele. Somar tudo numa unidade só perderia
       // o rastro de qual aparelho é qual na hora de revender.
+      // Entra como PENDENTE, não disponível: no ato da venda o aparelho ainda não
+      // está na loja — o cliente pode levar dias para entregar, ou não entregar.
+      // Vender uma peça que não chegou é pior que não tê-la no estoque. Fica no
+      // nome de quem fechou (`usuario_id`) e a comissão do fechamento espera a
+      // confirmação de chegada.
       for (const t of trocasValidas) {
         await supabase.from('inventario_unidades').insert({
-          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'disponivel',
+          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'pendente',
+          grupo_pdv: grupoPdv, usuario_id: user.id,
           preco_custo: t.num, imei: t.imei.trim() || null,
           observacoes: `${t.aparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
           ativo: true,
