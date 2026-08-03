@@ -71,6 +71,63 @@ export async function POST(req: Request) {
   return NextResponse.json({ documento: data })
 }
 
+/**
+ * Excluir de verdade — para quando o documento subiu errado.
+ *
+ * Recusa se já houve emissão: contrato assinado guarda a própria cópia e
+ * sobreviveria, mas perderia o vínculo com o modelo, e apagar a origem de um
+ * documento que alguém assinou não deveria ser um clique. Nesse caso, arquivar.
+ *
+ * Limpa também os fundos no Storage — sem isso cada reimportação deixaria as
+ * imagens da versão anterior para trás.
+ */
+export async function DELETE(req: Request) {
+  const auth = await requireEmpresaRoleApi(['owner', 'admin'])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
+
+  let body: { id?: unknown }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }
+  const id = Number(body.id)
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Documento inválido' }, { status: 400 })
+
+  const { count: emitidos } = await supabase
+    .from('contratos_venda').select('*', { count: 'exact', head: true })
+    .eq('documento_id', id)
+  if ((emitidos ?? 0) > 0) {
+    return NextResponse.json({
+      error: `Este documento já foi emitido ${emitidos} vez(es). Arquive em vez de excluir — os contratos assinados perderiam o vínculo com o modelo.`,
+    }, { status: 409 })
+  }
+
+  // Reúne os fundos de TODAS as versões antes de apagar as linhas.
+  const { data: versoes } = await supabase
+    .from('contrato_modelos').select('paginas').eq('documento_id', id)
+  const caminhos: string[] = []
+  for (const v of (versoes ?? []) as { paginas: unknown }[]) {
+    for (const p of (Array.isArray(v.paginas) ? v.paginas : []) as { fundo_url?: string | null }[]) {
+      const url = p?.fundo_url
+      if (typeof url !== 'string') continue
+      // .../storage/v1/object/public/contratos/<empresa>/<arquivo>
+      const m = url.match(/\/object\/public\/contratos\/(.+)$/)
+      if (m?.[1]?.startsWith(`${empresaId}/`)) caminhos.push(decodeURIComponent(m[1]))
+    }
+  }
+
+  const { error } = await supabase
+    .from('contrato_documentos').delete().eq('id', id).eq('empresa_id', empresaId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Best-effort: o documento já foi. Falhar aqui só deixa imagem órfã.
+  let fundosRemovidos = 0
+  if (caminhos.length) {
+    const { data } = await supabase.storage.from('contratos').remove([...new Set(caminhos)])
+    fundosRemovidos = data?.length ?? 0
+  }
+
+  return NextResponse.json({ ok: true, fundosRemovidos })
+}
+
 /** Renomear e arquivar/desarquivar. */
 export async function PATCH(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])

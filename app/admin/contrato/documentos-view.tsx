@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FilePlus2, FileText, Pencil, Archive, ChevronRight, Info } from 'lucide-react'
+import { FilePlus2, FileText, Pencil, Archive, Trash2, ChevronRight, Info } from 'lucide-react'
 import { Card, Button, Badge, Modal, Input, EmptyState, ConfirmDialog, notify } from '@/components/ui'
 
 export interface DocumentoLista {
@@ -22,6 +22,7 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
   const [salvando, setSalvando] = useState(false)
   const [renomear, setRenomear] = useState<DocumentoLista | null>(null)
   const [arquivar, setArquivar] = useState<DocumentoLista | null>(null)
+  const [excluir, setExcluir] = useState<DocumentoLista | null>(null)
 
   async function criar() {
     if (!nome.trim()) { notify.warn('Dê um nome ao documento'); return }
@@ -102,9 +103,18 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
                     onClick={() => setRenomear(d)}>
                     <span className="sr-only">Renomear</span>
                   </Button>
-                  <Button variant="ghost" size="sm" icon={<Archive size={14} strokeWidth={1.7} />}
+                  <Button variant="ghost" size="sm" title="Arquivar" icon={<Archive size={14} strokeWidth={1.7} />}
                     onClick={() => setArquivar(d)}>
                     <span className="sr-only">Arquivar</span>
+                  </Button>
+                  {/* Excluir só faz sentido enquanto nada foi emitido — depois,
+                      apagar a origem de um documento assinado não é um clique. */}
+                  <Button variant="ghost" size="sm" className="text-bad hover:bg-bad/10"
+                    title={d.emitidos > 0 ? 'Já emitido — use Arquivar' : 'Excluir'}
+                    disabled={d.emitidos > 0}
+                    icon={<Trash2 size={14} strokeWidth={1.7} />}
+                    onClick={() => setExcluir(d)}>
+                    <span className="sr-only">Excluir</span>
                   </Button>
                   <Link href={`/admin/contrato/${d.id}`}
                     className="inline-flex h-9 items-center gap-1 rounded-control bg-ink px-3 text-[13px] font-medium text-white transition-colors hover:bg-ink/90">
@@ -150,6 +160,27 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
           Documentos já emitidos guardam o nome de quando foram assinados — renomear aqui não muda o passado.
         </p>
       </Modal>
+
+      <ConfirmDialog
+        open={!!excluir}
+        onClose={() => setExcluir(null)}
+        onConfirm={async () => {
+          if (!excluir) return
+          const r = await fetch('/api/contrato-documentos', {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: excluir.id }),
+          })
+          const j = await r.json().catch(() => ({}))
+          if (!r.ok) { notify.bad('Não foi possível excluir', j.error); return }
+          notify.ok('Documento excluído',
+            j.fundosRemovidos ? `${j.fundosRemovidos} imagem(ns) de fundo também removida(s)` : undefined)
+          router.refresh()
+        }}
+        title="Excluir documento?"
+        description={`"${excluir?.nome ?? ''}" e todas as versões dele são apagados, junto com as imagens de fundo. Não tem volta. Use isto quando o documento subiu errado; se for algo que você pode querer de novo, prefira Arquivar.`}
+        confirmLabel="Excluir de vez"
+        tone="danger"
+      />
 
       <ConfirmDialog
         open={!!arquivar}
