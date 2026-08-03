@@ -248,7 +248,7 @@ export function ContratoModeloView({ empresaId, documentoId, nome, versao, pagin
   const blocoSel = sel ? (paginas[sel.p]?.blocos ?? [])[sel.b] : null
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
       {/* O texto dentro do bloco editável imita a impressão. */}
       {/* Em `em` para casar exatamente com o CSS de impressão (10pt/15pt/8pt). */}
       <style>{`

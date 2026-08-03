@@ -125,7 +125,7 @@ export default function ClientesView({ clientes }: Props) {
         <Button icon={<UserPlus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo cliente</Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 sm:px-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 sm:px-6">
         <Card flush>
           <Table
             columns={cols}

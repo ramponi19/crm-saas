@@ -45,7 +45,9 @@ export function SuperAdminShell({ userName = 'Super Admin', children }: { userNa
           <div className="text-[10px] font-medium text-ink-3">Painel da plataforma</div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
+          sai da tela em vez de o menu ganhar rolagem. */}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
         <div className="space-y-px">
           {navItems.map((item) => {
             const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
@@ -97,7 +99,7 @@ export function SuperAdminShell({ userName = 'Super Admin', children }: { userNa
             <span className="truncate text-[14px] font-bold tracking-[-0.02em] text-ink">Super Admin</span>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">{children}</main>
       </div>
     </div>
   )

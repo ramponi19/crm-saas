@@ -186,7 +186,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         <div className="mx-auto max-w-[1200px]">
           {filtrada.length === 0 ? (
             <Card flush>

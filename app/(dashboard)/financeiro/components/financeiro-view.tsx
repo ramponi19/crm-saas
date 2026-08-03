@@ -277,7 +277,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Financeiro" />
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
           {/* Stats */}

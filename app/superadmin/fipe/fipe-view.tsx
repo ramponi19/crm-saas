@@ -27,7 +27,7 @@ export function FipeView({ mes, atualizadoEm, totalCache }: { mes: string | null
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[760px] space-y-4">
         <div className="flex items-center gap-2.5">
           <Car size={20} strokeWidth={1.7} className="text-ink" />

@@ -67,7 +67,7 @@ export function SimularParcelaView() {
   const rowMax = rows.length > 0 ? rows[rows.length - 1] : undefined
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto grid max-w-[1000px] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card title="Dados da venda">
           <div className="grid gap-4">

@@ -241,7 +241,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Produtos" />
 
-      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-5">
 
           <Tabs items={TABS} value={tab} onValueChange={(v) => setTab(v as Tab)} />

@@ -86,7 +86,7 @@ export function ChavesView({ initial, empresaId, imoveis }: { initial: Chave[]; 
   const atrasada = (c: Chave) => c.status === 'emprestada' && c.devolucao_prevista && new Date(c.devolucao_prevista) < new Date(new Date().toDateString())
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[900px] space-y-4">
         <div className="flex justify-end">
           <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setNova(true)}>Nova chave</Button>

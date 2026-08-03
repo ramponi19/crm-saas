@@ -73,7 +73,9 @@ export function MobileTopbar({
               <span className="truncate text-[14px] font-bold tracking-[-0.02em] text-ink">{empresaNome ?? 'Nexus'}</span>
               <button aria-label="Fechar" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-control text-ink-3 hover:text-ink"><X size={18} strokeWidth={1.8} /></button>
             </div>
-            <nav className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin">
+            {/* `min-h-0`: sem ele a gaveta não rola e os últimos itens do menu
+                ficam inalcançáveis em tela baixa. */}
+            <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2 scrollbar-thin">
               {grupos.map((g) => (
                 <div key={g.label} className="mb-1.5">
                   <p className="px-2.5 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">{g.label}</p>

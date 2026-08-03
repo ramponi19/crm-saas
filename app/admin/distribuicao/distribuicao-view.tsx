@@ -108,7 +108,7 @@ export function DistribuicaoView({ regrasIniciais, membros, semDono }: { regrasI
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Distribuição de leads" />
-      <div className="mx-auto w-full max-w-[820px] flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
+      <div className="mx-auto w-full max-w-[820px] min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-[18px] font-semibold text-ink">Distribuição de leads</h1>

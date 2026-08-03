@@ -75,7 +75,9 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
           <div className="text-[10px] font-medium text-ink-3">Administração</div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
+          sai da tela em vez de o menu ganhar rolagem. */}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
         {navGroups.map((group) => (
           <div key={group.label}>
             <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">{group.label}</p>

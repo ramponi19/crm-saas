@@ -60,7 +60,7 @@ export function AdminSidebar({ userName = 'Administrador', empresaNome = 'Minha 
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
         <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">Administração</p>
         <div className="space-y-px">
           {navItems.map((item) => {

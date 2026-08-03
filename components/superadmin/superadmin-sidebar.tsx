@@ -66,7 +66,7 @@ export function SuperAdminSidebar({ userName = 'Super Admin' }: SuperAdminSideba
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
         <div className="space-y-px">
           {navItems.map((item) => {
             const isActive = item.exact

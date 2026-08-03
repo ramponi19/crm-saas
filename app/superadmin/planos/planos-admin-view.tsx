@@ -82,7 +82,7 @@ export default function PlanosAdminView({ planos: initial }: { planos: Plano[] }
         <p className="mt-0.5 text-[14px] text-ink-2">Edite preços, limites e funcionalidades de cada plano</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 scrollbar-thin">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 scrollbar-thin">
         {/* Cards dos planos */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {planos.map(p => (

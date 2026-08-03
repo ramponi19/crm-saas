@@ -308,7 +308,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Estoque" />
 
-      <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
           <Tabs items={TABS} value={tab} onValueChange={(v) => setTab(v as Tab)} />

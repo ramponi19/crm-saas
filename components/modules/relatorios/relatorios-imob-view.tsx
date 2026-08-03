@@ -127,7 +127,7 @@ export async function RelatoriosImobView() {
   const maxTipo = Math.max(1, ...porTipo.map((t) => t.valor))
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1100px] space-y-4">
         <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
           {kpis.map((k) => <StatCard key={k.label} bare label={k.label} value={k.valor} delta={k.sub} deltaTone="neutral" />)}

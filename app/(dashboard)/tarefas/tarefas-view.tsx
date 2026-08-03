@@ -120,7 +120,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
     <>
       <Topbar title="Tarefas" />
 
-      <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[820px] space-y-4">
           <div className="flex items-center justify-end">
             <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setModal(true)}>Nova tarefa</Button>

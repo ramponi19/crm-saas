@@ -255,7 +255,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   }))
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1240px] space-y-4">
 
         {/* Tabs */}

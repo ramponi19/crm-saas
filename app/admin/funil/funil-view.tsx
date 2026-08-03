@@ -60,7 +60,7 @@ export function FunilView({ initial, funilId, funis = [] }: { initial: EtapaEdit
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[760px] space-y-4">
         {funis.length > 1 && (
           <div className="flex w-max items-center gap-0.5 rounded-control border border-line bg-card p-0.5">

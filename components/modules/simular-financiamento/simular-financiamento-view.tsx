@@ -49,7 +49,7 @@ export function SimularFinanciamentoView() {
   }, [prazo, taxa, sistema, r])
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto grid max-w-[1000px] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card title="Dados do financiamento">
           <div className="grid gap-4">

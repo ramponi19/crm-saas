@@ -50,7 +50,7 @@ export function Drawer({ open, onClose, title, footer, children }: DrawerProps) 
             <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{title}</h2>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (
           <div className="flex items-center justify-end gap-2 border-t border-line-soft px-5 py-3.5">
             {footer}

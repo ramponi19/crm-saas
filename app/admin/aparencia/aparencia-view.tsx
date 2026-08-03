@@ -93,7 +93,7 @@ export function AparenciaView({ initial }: { initial: WlMenu | null }) {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[820px] space-y-4">
         <p className="text-[13px] text-ink-2">
           Personalize a <b className="text-ink">barra lateral</b> da sua empresa. O resto do sistema mantém o tema padrão para preservar a legibilidade.

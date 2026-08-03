@@ -132,7 +132,7 @@ export default function GarantiaView({ garantias }: Props) {
         <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo protocolo</Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         <Card flush>
           <Table
             columns={cols}

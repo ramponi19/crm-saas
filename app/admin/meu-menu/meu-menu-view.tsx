@@ -47,7 +47,7 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[720px] space-y-4">
         <p className="text-[13px] text-ink-2">
           Oculte módulos que sua empresa não usa e renomeie itens (ex.: <b className="text-ink">Clientes → Pacientes</b>).

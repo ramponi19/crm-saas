@@ -590,7 +590,7 @@ export default function EquipeView({ usuarios }: Props) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
         {tab === 'usuarios' && (
           <Card flush>
             <Table

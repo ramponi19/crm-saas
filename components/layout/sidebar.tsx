@@ -68,8 +68,11 @@ export function Sidebar({
   const faint = t.dark ? 'text-white/55' : 'text-ink-3'
 
   return (
+    // `h-full`, não `h-screen`: o pai é h-[100dvh] com overflow-hidden. Com 100vh
+    // a sidebar ficava MAIOR que o pai onde a barra do navegador ocupa espaço
+    // (Safari/Chrome no Mac, celular), e o pai cortava o rodapé fora da tela.
     <aside
-      className="hidden h-screen w-[216px] shrink-0 flex-col md:flex"
+      className="hidden h-full min-h-0 w-[216px] shrink-0 flex-col md:flex"
       style={{ ...themeVars(t), background: 'var(--sb-bg)', borderRight: '1px solid color-mix(in srgb, var(--sb-text) 14%, transparent)' }}
     >
       {/* Brand */}
@@ -90,7 +93,10 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin" style={{ color: 'var(--sb-text)' }}>
+      {/* `min-h-0` é o que faz o overflow funcionar: em coluna flex o item tem
+          min-height:auto por padrão e NÃO encolhe abaixo do próprio conteúdo —
+          então o nav crescia empurrando o rodapé para fora em vez de rolar. */}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin" style={{ color: 'var(--sb-text)' }}>
         {grupos.map((group) => (
           <div key={group.label}>
             <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] opacity-60">{group.label}</p>

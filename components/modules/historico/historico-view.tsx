@@ -224,7 +224,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
 
   return (
     <>
-    <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
       <div className="mx-auto max-w-[1240px] space-y-4">
 
         <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">

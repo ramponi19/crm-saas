@@ -41,7 +41,7 @@ export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { peri
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Ranking & Metas" />
-      <div className="mx-auto w-full max-w-[960px] flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
+      <div className="mx-auto w-full max-w-[960px] min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
         {/* Cabeçalho: abas + seletor de mês */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1">

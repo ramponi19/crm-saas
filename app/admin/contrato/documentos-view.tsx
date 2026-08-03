@@ -53,7 +53,7 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
       <div className="mx-auto max-w-[900px] space-y-4">
         <Card
           title="Documentos da loja"

@@ -67,7 +67,7 @@ export function FilaView({ itens: iniciais, templates }: { itens: ItemFila[]; te
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Fila do dia" />
-      <div className="mx-auto w-full max-w-[640px] flex-1 overflow-y-auto p-4 scrollbar-thin">
+      <div className="mx-auto w-full max-w-[640px] min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin">
         {/* Progresso */}
         <div className="mb-4 flex items-center justify-between">
           <div>

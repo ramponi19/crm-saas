@@ -88,7 +88,7 @@ export default function PlanosView({ empresa, planos }: Props) {
   return (
     <div className="flex h-full flex-col bg-bg">
       <Topbar title="Planos" />
-      <main className="flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
 
         <div className="mb-8 text-center">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Planos e preços</h1>

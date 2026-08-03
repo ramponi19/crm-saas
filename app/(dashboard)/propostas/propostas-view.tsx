@@ -76,7 +76,7 @@ export function PropostasView({ initial, baseUrl }: { initial: Proposta[]; baseU
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1000px] space-y-4">
         <div className="flex justify-end">
           <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => abrir('nova')}>Nova proposta</Button>

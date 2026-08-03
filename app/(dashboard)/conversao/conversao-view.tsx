@@ -19,7 +19,7 @@ export function ConversaoView({ dados }: { dados: Conversao }) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Conversão" />
-      <div className="mx-auto w-full max-w-[900px] flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
+      <div className="mx-auto w-full max-w-[900px] min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
         <div className="mb-5">
           <h1 className="text-[18px] font-semibold text-ink">Conversão & tempo de resposta</h1>
           <p className="mt-0.5 max-w-[560px] text-[13px] text-ink-3">Onde o mês trava: taxa de passagem entre etapas do funil (pipeline atual) e quanto o time demora para o 1º contato (últimos 90 dias).</p>

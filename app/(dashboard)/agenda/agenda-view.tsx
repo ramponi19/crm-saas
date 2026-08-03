@@ -106,7 +106,7 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
         <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => { setForm(vazio); setModal(true) }}>{L.agendar}</Button>
       </div>
 
-      <main className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
+      <main className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 scrollbar-thin">
         <div className="mx-auto w-full max-w-[820px]">
           {isSaude && (
             <div className="mb-5">

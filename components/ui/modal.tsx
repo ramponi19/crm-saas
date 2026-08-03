@@ -70,7 +70,11 @@ export function Modal({
             </button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">{children}</div>
+        {/* `min-h-0` é obrigatório aqui: sem ele o corpo não encolhe dentro do
+            max-h do modal, então formulário longo estoura para fora em vez de
+            rolar — e o rodapé com Salvar/Cancelar fica inalcançável. Vale para
+            TODO modal do app, que usa este componente. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">{children}</div>
         {footer && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line-soft px-5 py-3.5">
             {footer}
