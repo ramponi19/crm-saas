@@ -36,6 +36,8 @@ export interface Unidade {
   observacoes: string | null
   /** Fotos desta unidade — URLs separadas por vírgula. */
   fotos_urls: string | null
+  /** Foto do modelo; usada quando a unidade não tem foto própria. */
+  produto_foto?: string | null
   created_at: string | null
   // Veículos (segmento concessionaria)
   placa: string | null
@@ -191,12 +193,26 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   const listaCols: Column<Unidade>[] = [
     {
       key: 'produto', header: isVeiculo ? 'Veículo' : 'Produto',
-      render: (u) => (
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-ink">{u.produto_nome}</div>
-          <div className="text-[11.5px] text-ink-3">{u.marca_nome}</div>
-        </div>
-      ),
+      render: (u) => {
+        // Miniatura junto do nome: não gasta coluna nova e já mostra se a foto
+        // da unidade foi salva. A da unidade ganha da do modelo — é o aparelho
+        // real que o cliente vai levar.
+        const foto = (u.fotos_urls ?? '').split(',').map((s) => s.trim()).find(Boolean) ?? u.produto_foto ?? null
+        return (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-control border border-line-soft bg-ink/[0.03] text-ink-3">
+              {foto
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={foto} alt="" className="h-full w-full object-cover" />
+                : <Package size={15} strokeWidth={1.7} />}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-ink">{u.produto_nome}</div>
+              <div className="text-[11.5px] text-ink-3">{u.marca_nome}</div>
+            </div>
+          </div>
+        )
+      },
     },
     idCol,
     {
