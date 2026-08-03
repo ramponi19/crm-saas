@@ -15,6 +15,7 @@
 import * as pdfjs from 'pdfjs-dist'
 import { PDFDocument, PDFName, PDFArray, PDFDict, PDFRawStream, decodePDFRawStream } from 'pdf-lib'
 import type { PaginaModelo } from './contrato-modelo'
+import { sugerirCampo, aplicarSugestao, partesDoCampo, detectarSecao, type Secao } from './contrato-molde-campos'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -28,27 +29,6 @@ const ehVermelho = (c: [number, number, number]) => c[0] > 0.6 && c[1] < 0.35 &&
 const LIMITE_ESCURO = 110
 
 interface Run { s: string; vermelho: boolean }
-
-/**
- * Campos de molde que dá para reconhecer com segurança e já virar marcador.
- * Só entram os do COMPRADOR e os da venda — dado da própria loja (CNPJ, sede,
- * representante, banco) fica como texto literal, porque é a loja que escreve.
- */
-const SUGESTOES: { teste: RegExp; marcador: string }[] = [
-  { teste: /^nome\s+completo$/i, marcador: 'cliente.nome' },
-  { teste: /^nacionalidade$/i, marcador: 'cliente.nacionalidade' },
-  { teste: /^estado\s+civil$/i, marcador: 'cliente.estado_civil' },
-  { teste: /^profiss[ãa]o$/i, marcador: 'cliente.profissao' },
-  { teste: /^x{2,}$/i, marcador: 'cliente.cpf' },
-  { teste: /^x{4,}$/i, marcador: 'cliente.endereco' },
-  { teste: /^x{3,}\s*[–-]\s*x{2}$/i, marcador: 'cliente.cidade' },
-]
-
-function sugerir(texto: string): string | null {
-  const limpo = texto.trim().replace(/[,.;:]$/, '')
-  for (const s of SUGESTOES) if (s.teste.test(limpo)) return s.marcador
-  return null
-}
 
 const escapar = (s: string) =>
   s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))
@@ -140,6 +120,15 @@ async function pdfSemTexto(bytes: ArrayBuffer): Promise<Uint8Array> {
   return pdf.save({ useObjectStreams: false })
 }
 
+/** Matriz 2D do PDF: [a, b, c, d, e, f]. */
+type Matriz = [number, number, number, number, number, number]
+
+const mult = (a: Matriz, b: Matriz): Matriz => [
+  a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+  a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+  a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
+]
+
 interface Linha { y: number; x0: number; x1: number; alt: number; runs: Run[] }
 interface Bloco { x0: number; x1: number; y0: number; ultimoY: number; linhas: Linha[]; paragrafos: Linha[][] }
 
@@ -160,22 +149,37 @@ async function lerPagina(pg: any, W: number): Promise<{ blocos: Bloco[] }> {
   const OPS = pdfjs.OPS
   const ol = await pg.getOperatorList()
 
-  // Onde houve texto vermelho (posição), para cruzar com os trechos extraídos.
+  // Onde houve texto vermelho, para cruzar com os trechos extraídos.
+  //
+  // A posição do operador PRECISA ser levada ao espaço da página pela matriz do
+  // contexto (CTM). Sem isso os dois `y` não casam quando o conteúdo está dentro
+  // de um Form XObject com escala — e o vermelho deixa de ser detectado quase
+  // por completo (medido: 3 de 25 linhas casavam; com a CTM, 25 de 25).
   let cor: [number, number, number] = [0, 0, 0]
-  let tm: [number, number] | null = null
+  let ctm: Matriz = [1, 0, 0, 1, 0, 0]
+  const pilha: Matriz[] = []
+  let tm: Matriz | null = null
+  let tlm: Matriz | null = null
   const vermelhos: { x: number; y: number; larg: number }[] = []
+
   for (let i = 0; i < ol.fnArray.length; i++) {
     const fn = ol.fnArray[i]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const a = ol.argsArray[i] as any
-    if (fn === OPS.setFillRGBColor) cor = [a[0] / 255, a[1] / 255, a[2] / 255]
-    else if (fn === OPS.setTextMatrix) tm = [a[4], a[5]]
-    else if (fn === OPS.moveText && tm) tm = [tm[0] + a[0], tm[1] + a[1]]
+    if (fn === OPS.save) pilha.push([...ctm] as Matriz)
+    else if (fn === OPS.restore) ctm = pilha.pop() ?? ctm
+    else if (fn === OPS.transform) ctm = mult(ctm, a as Matriz)
+    else if (fn === OPS.setFillRGBColor) cor = [a[0] / 255, a[1] / 255, a[2] / 255]
+    else if (fn === OPS.beginText) { tm = [1, 0, 0, 1, 0, 0]; tlm = [...tm] as Matriz }
+    else if (fn === OPS.setTextMatrix) { tm = [a[0], a[1], a[2], a[3], a[4], a[5]]; tlm = [...tm] as Matriz }
+    else if (fn === OPS.nextLine && tlm) { tm = mult([1, 0, 0, 1, 0, -12], tlm); tlm = [...tm] as Matriz }
+    else if (fn === OPS.moveText && tlm) { tm = mult([1, 0, 0, 1, a[0], a[1]], tlm); tlm = [...tm] as Matriz }
     else if ((fn === OPS.showText || fn === OPS.showSpacedText) && tm && ehVermelho(cor)) {
+      const p = mult(ctm, tm)
       const glifos = (fn === OPS.showText ? a[0] : a[0].flat()) ?? []
       const larg = glifos.reduce(
         (s: number, g: unknown) => s + (g && typeof g === 'object' ? ((g as { width?: number }).width ?? 0) / 100 : 0), 0)
-      vermelhos.push({ x: tm[0], y: tm[1], larg })
+      vermelhos.push({ x: p[4], y: p[5], larg })
     }
   }
   const temVermelho = (x: number, y: number, w: number) => vermelhos.some((v) =>
@@ -331,17 +335,30 @@ export async function importarContratoPDF(
 
     // ---------- monta os blocos com marcadores ----------
     const naoMapeados: string[] = []
+    let antes = ''
+    let secao: Secao = null
     const blocosHtml = blocos.map((b) => {
       const paras = b.paragrafos.map((p) => {
         // Linhas do mesmo parágrafo viram UM texto corrido: é isso que permite
         // o dado longo refluir dentro da coluna em vez de estourar.
         const runs = fundirRuns(p.flatMap((l, i) => (i ? [{ s: ' ', vermelho: false }, ...l.runs] : l.runs)))
+        // `antes` acumula o texto já emitido do parágrafo: é o contexto que
+        // distingue CPF de CEP de endereço, todos escritos como "vários X".
         const corpo = runs.map((r) => {
-          if (!r.vermelho) return escapar(r.s)
-          const marcador = sugerir(r.s)
-          if (marcador) { totalMarcadores++; return `{{${marcador}}}` }
-          naoMapeados.push(r.s.trim())
-          return `<span class="var">${escapar(r.s)}</span>`
+          if (!r.vermelho) {
+            antes += r.s
+            secao = detectarSecao(antes, secao)
+            return escapar(r.s)
+          }
+          // O molde encadeia campos numa tirada só; trata parte por parte.
+          const saida = partesDoCampo(r.s).map((parte, i, todas) => {
+            const s = sugerirCampo(parte, antes, secao)
+            antes += parte + (i < todas.length - 1 ? ', ' : '')
+            if (s) { totalMarcadores += s.marcadores.length; return aplicarSugestao(s) }
+            naoMapeados.push(parte.trim())
+            return `<span class="var">${escapar(parte)}</span>`
+          })
+          return saida.join(', ')
         }).join('')
         return corpo.trim() ? `<p>${corpo.replace(/\s+/g, ' ').trim()}</p>` : ''
       }).filter(Boolean)
