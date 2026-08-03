@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { apiFetch } from '@/lib/api-cliente'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
@@ -113,20 +114,22 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
     setSaving(true)
     try {
       if (isNew) {
-        const r = await fetch('/api/equipe/criar-usuario', {
+        const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string; readmitido?: boolean }>('/api/equipe/criar-usuario', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nome: form.nome, email: form.email, senha: form.senha, role: form.role }),
         })
-        const j = await r.json()
-        if (!r.ok) { notify.bad(j.error ?? 'Erro ao criar'); return }
-        notify.ok(j.readmitido ? 'Usuário readmitido na equipe!' : 'Usuário criado!')
+        // Sessão expirada já avisou e está redirecionando: não empilha um segundo
+        // toast dizendo "erro ao criar", que sugeriria problema no cadastro.
+        if (sessaoExpirada) return
+        if (!ok) { notify.bad(json.error ?? 'Erro ao criar'); return }
+        notify.ok(json.readmitido ? 'Usuário readmitido na equipe!' : 'Usuário criado!')
       } else {
-        const r = await fetch('/api/equipe/atualizar-usuario', {
+        const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: usuario!.id, nome: form.nome, role: form.role }),
         })
-        const j = await r.json()
-        if (!r.ok) { notify.bad(j.error ?? 'Erro ao salvar'); return }
+        if (sessaoExpirada) return
+        if (!ok) { notify.bad(json.error ?? 'Erro ao salvar'); return }
         notify.ok('Salvo!')
       }
       onSaved()
@@ -514,12 +517,12 @@ export default function EquipeView({ usuarios }: Props) {
     if (!remover || removendo) return
     setRemovendo(true)
     try {
-      const r = await fetch('/api/equipe/remover-usuario', {
+      const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/remover-usuario', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: remover.id }),
       })
-      const j = await r.json().catch(() => ({}))
-      if (!r.ok) { notify.bad('Não foi possível remover', j.error); return }
+      if (sessaoExpirada) return
+      if (!ok) { notify.bad('Não foi possível remover', json.error); return }
       notify.ok(`${remover.nome} saiu da equipe`, 'O histórico de vendas dele continua no sistema')
       router.refresh()
     } finally {

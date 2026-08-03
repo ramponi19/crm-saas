@@ -6,6 +6,7 @@ import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
+import { apiFetch } from '@/lib/api-cliente'
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog,
   type Column,
@@ -147,12 +148,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     const alvo = confirmar
     setConfirmando(alvo.id)
     try {
-      const r = await fetch('/api/estoque/confirmar-chegada', {
+      const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/estoque/confirmar-chegada', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: alvo.id }),
       })
-      const j = await r.json().catch(() => ({}))
-      if (!r.ok) { notify.bad('Não foi possível confirmar', j.error); return }
+      if (sessaoExpirada) return
+      if (!ok) { notify.bad('Não foi possível confirmar', json.error); return }
       setItens((prev) => prev.map((i) => i.id === alvo.id ? { ...i, status: 'disponivel' } : i))
       notify.ok('Chegada confirmada', 'A unidade entrou no estoque e a comissão foi liberada.')
     } finally {

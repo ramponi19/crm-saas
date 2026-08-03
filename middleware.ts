@@ -68,7 +68,14 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      // A mensagem chega como toast na tela. "Unauthorized" fazia sessão expirada
+      // parecer falta de PERMISSÃO — o dono da empresa clicava em criar usuário,
+      // via "Unauthorized" e concluía que o próprio CRM o estava limitando. Aqui
+      // não há juízo de permissão nenhum: só não há mais sessão.
+      return NextResponse.json(
+        { error: 'Sua sessão expirou. Entre novamente para continuar.', code: 'sessao_expirada' },
+        { status: 401 },
+      )
     }
     return NextResponse.redirect(new URL('/login', request.url))
   }
