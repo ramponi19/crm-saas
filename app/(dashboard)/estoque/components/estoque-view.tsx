@@ -15,7 +15,8 @@ import type { Segmento } from '@/lib/segmentos'
 
 export interface Unidade {
   id: number
-  produto_id: number
+  /** Nulo em unidade sem cadastro de produto (aparelho recebido em troca). */
+  produto_id: number | null
   produto_nome: string
   marca_nome: string
   fornecedor_nome: string | null

@@ -8,7 +8,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
-import { Modal, Input, Button, notify } from '@/components/ui'
+import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
@@ -93,6 +93,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   // quando a loja não tem modelo configurado e nenhum contrato é emitido.
   const [ultimoTotal, setUltimoTotal] = useState(0)
   const [sucessoOpen, setSucessoOpen] = useState(false)
+  const [confirmarSemPreco, setConfirmarSemPreco] = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -192,11 +193,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       .filter(Boolean)
   }, [taxas, formaPagamento, bandeira])
 
-  async function finalizarVenda() {
+  /**
+   * Itens do carrinho sem preço de venda. Acontece de verdade com aparelho que
+   * entrou por troca: nasce com custo e sem preço, e a venda fecharia por R$ 0
+   * sem ninguém notar. Não bloqueio — brinde e troca em garantia são legítimos —
+   * mas confirmo apontando qual item está sem preço.
+   */
+  const semPreco = carrinho.filter((c) => !c.item.preco_venda)
+
+  async function finalizarVenda(jaConfirmado = false) {
     if (carrinho.length === 0) { notify.warn('Carrinho vazio'); return }
     const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
     if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
+    if (!jaConfirmado && semPreco.length > 0) { setConfirmarSemPreco(true); return }
     setFinalizando(true)
     // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
     // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
@@ -259,7 +269,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           produto_id: c.item.produto_id,
           numero_serie: c.item.imei ?? c.item.numero_serie,
           status: vendaStatus,
-          observacoes: trocaNotaPendente ? trocaNota.trim() : null,
+          // Sem cadastro de produto (aparelho de troca), a descricao vai para a
+          // observacao: e a unica coisa que o Historico tera para exibir depois.
+          observacoes: [
+            c.item.produto_id ? null : c.item.produto_nome,
+            trocaNotaPendente ? trocaNota.trim() : null,
+          ].filter(Boolean).join(' · ') || null,
           data_venda: new Date().toISOString(),
         }
         trocaNotaPendente = false
@@ -508,6 +523,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           {contexto && <ListaDocumentos />}
         </div>
       </Modal>
+
+      {/* Item sem preço: confirma em vez de bloquear (brinde e garantia existem). */}
+      <ConfirmDialog
+        open={confirmarSemPreco}
+        onClose={() => setConfirmarSemPreco(false)}
+        onConfirm={() => { setConfirmarSemPreco(false); finalizarVenda(true) }}
+        title={semPreco.length === 1 ? 'Item sem preço de venda' : 'Itens sem preço de venda'}
+        description={
+          `${semPreco.map((c) => c.item.produto_nome).join(', ')} — sem preço cadastrado, então entra na venda por R$ 0,00. `
+          + `Total a pagar: ${fmt(totais.total)}. Se for brinde ou troca em garantia, siga; senão, cancele e defina o preço no estoque.`
+        }
+        confirmLabel="Finalizar assim mesmo"
+        tone="danger"
+      />
 
       {/* Sucesso da venda (não-Pix) — oferece o contrato na hora */}
       <Modal
@@ -892,7 +921,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               className="w-full"
               loading={finalizando}
               disabled={carrinho.length === 0}
-              onClick={finalizarVenda}
+              onClick={() => finalizarVenda()}
               icon={!finalizando ? <CheckCircle2 size={19} strokeWidth={1.7} /> : undefined}
             >
               {finalizando ? 'Finalizando…' : `Finalizar venda · ${fmt(totais.totalComTaxa || totais.total)}`}

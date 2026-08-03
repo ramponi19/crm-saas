@@ -86,7 +86,10 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const produtoSel = produtos.find((p) => p.id === form.produto_id)
 
   async function salvar() {
-    if (!form.produto_id) { notify.warn('Selecione um produto'); return }
+    // Aparelho recebido em troca não tem cadastro de produto — é o celular usado
+    // do cliente. Exigir um aqui impediria precificar a revenda, que é justamente
+    // o passo seguinte à troca. Para os outros tipos o produto continua obrigatório.
+    if (!form.produto_id && form.tipo !== 'troca') { notify.warn('Selecione um produto'); return }
     setSaving(true)
     // Payload explícito com as colunas reais da tabela — o form pode carregar
     // chaves derivadas (produto_nome/marca_nome/fornecedor_nome) que quebrariam o insert/update.

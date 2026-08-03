@@ -35,8 +35,8 @@ export default async function EstoquePage() {
     const prod = one(u.produtos)
     return {
       ...u,
-      produto_id: u.produto_id ?? 0,
-      produto_nome: prod?.nome ?? '—',
+      produto_id: u.produto_id ?? null,
+      produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       fornecedor_nome: one(u.fornecedores)?.nome_fantasia ?? null,
