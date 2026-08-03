@@ -7,7 +7,7 @@ import { Receipt, Plus, Copy, Loader2 } from 'lucide-react'
 import { Button, Badge, notify } from '@/components/ui'
 
 interface Orc { id: number; tipo: string; status: string; total: number; token: string }
-const TIPO_LABEL: Record<string, string> = { assistencia: 'Conserto', melhoria: 'Upgrade', troca: 'Troca', venda: 'Venda' }
+const TIPO_LABEL: Record<string, string> = { assistencia: 'Conserto', melhoria: 'Upgrade', downgrade: 'Downgrade', venda: 'Venda' }
 const STATUS: Record<string, { l: string; t: 'neutro' | 'acc' | 'ok' | 'bad' }> = {
   rascunho: { l: 'Rascunho', t: 'neutro' }, enviado: { l: 'Enviado', t: 'acc' }, aprovado: { l: 'Aprovado', t: 'ok' }, recusado: { l: 'Recusado', t: 'bad' },
 }
@@ -66,7 +66,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone }: { leadId:
 
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('venda')}>Venda / semi-novo</Button>
-        <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('troca')}>Troca</Button>
+        <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('downgrade')}>Downgrade</Button>
         <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('assistencia')}>Conserto</Button>
       </div>
     </div>

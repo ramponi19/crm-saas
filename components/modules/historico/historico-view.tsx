@@ -41,6 +41,8 @@ const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neu
 
 const CANAL_LABEL: Record<string, string> = {
   loja_fisica: 'Loja física', whatsapp: 'WhatsApp', instagram: 'Instagram', site: 'Site', link: 'Link',
+  // Venda gerada por orçamento de downgrade aprovado no link público.
+  downgrade: 'Downgrade',
 }
 
 const CHIPS = [

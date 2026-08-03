@@ -81,8 +81,8 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
             </>
           )}
 
-          {/* Troca */}
-          {dados.tipo === 'troca' && (
+          {/* Downgrade */}
+          {dados.tipo === 'downgrade' && (
             <div className="space-y-2 text-[13.5px]">
               <div className="flex items-center justify-between rounded-control border border-line-soft px-3 py-2.5">
                 <span>{dados.aparelho_novo || 'Aparelho novo'}</span>
@@ -98,7 +98,7 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
           {/* Total */}
           <div className="mt-4 flex items-end justify-between border-t border-line pt-3">
             <div>
-              <div className="text-[12px] text-ink-3">{dados.tipo === 'troca' ? 'Você paga' : 'Total'}</div>
+              <div className="text-[12px] text-ink-3">{dados.tipo === 'downgrade' ? 'Você paga' : 'Total'}</div>
               {dados.prazo_dias ? <div className="text-[11px] text-ink-3">Prazo: {dados.prazo_dias} dias{dados.garantia_dias ? ` · Garantia: ${dados.garantia_dias} dias` : ''}</div> : null}
             </div>
             <div className="num text-[26px] font-bold" style={{ color: cor }}>{brl(dados.total)}</div>

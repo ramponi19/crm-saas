@@ -30,7 +30,12 @@ function sugerirPreco(texto: string, tabela: PrecoRef[]): number | null {
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, troca: { label: 'Troca', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
+// `downgrade` era 'troca'. Renomeado tambem no valor gravado, nao so no rotulo:
+// nao havia nenhum orcamento no banco nem CHECK na coluna, entao renomear evita
+// codigo dizendo 'troca' e tela dizendo outra coisa. NAO confundir com
+// `inventario_unidades.tipo = 'troca'`, que continua 'troca' — e o tipo de ENTRADA
+// da peca no estoque, outro dominio, usado pelo PDV.
+const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, downgrade: { label: 'Downgrade', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
 const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'bad' }> = {
   rascunho: { label: 'Rascunho', tone: 'neutro' }, enviado: { label: 'Enviado', tone: 'acc' },
   aprovado: { label: 'Aprovado', tone: 'ok' }, recusado: { label: 'Recusado', tone: 'bad' },
@@ -63,7 +68,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
     if (!nome) return
     const tipoQ = searchParams.get('tipo') ?? 'venda'
     setEditor({
-      ...vazio(['assistencia', 'melhoria', 'troca', 'venda'].includes(tipoQ) ? tipoQ : 'venda'),
+      ...vazio(['assistencia', 'melhoria', 'downgrade', 'venda'].includes(tipoQ) ? tipoQ : 'venda'),
       cliente_nome: nome,
       cliente_telefone: searchParams.get('tel') ?? '',
       lead_id: searchParams.get('lead') ? Number(searchParams.get('lead')) : null,
@@ -76,7 +81,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
   const linkDe = (o: Orcamento) => `${base}/orcamento/${o.token}`
 
   const totalEditor = editor
-    ? editor.tipo === 'troca'
+    ? editor.tipo === 'downgrade'
       ? Math.max(0, (Number(editor.valor_novo) || 0) - (Number(editor.valor_entrada) || 0))
       : editor.itens.reduce((s, i) => s + Math.max(1, i.qtd) * (Number(i.valor) || 0), 0)
     : 0
@@ -139,8 +144,8 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
-  const isTroca = editor?.tipo === 'troca'
-  const sugTroca = isTroca && editor ? sugerirPreco(editor.aparelho_novo, tabelaPrecos) : null
+  const isDowngrade = editor?.tipo === 'downgrade'
+  const sugDowngrade = isDowngrade && editor ? sugerirPreco(editor.aparelho_novo, tabelaPrecos) : null
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
@@ -200,7 +205,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
                 <option value="assistencia">Conserto</option>
                 <option value="melhoria">Upgrade (melhoria)</option>
                 <option value="venda">Venda (novo/semi-novo)</option>
-                <option value="troca">Troca (com diferença)</option>
+                <option value="downgrade">Downgrade (com diferença)</option>
               </Select>
               <ClienteAutocomplete
                 nome={editor.cliente_nome}
@@ -210,16 +215,16 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
               <Input label="WhatsApp/telefone" value={editor.cliente_telefone} onChange={(e) => setEditor({ ...editor, cliente_telefone: e.target.value })} />
             </div>
 
-            {isTroca ? (
+            {isDowngrade ? (
               <div className="space-y-3 rounded-control border border-line-soft p-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
                   <Input label="Aparelho novo" value={editor.aparelho_novo} onChange={(e) => setEditor({ ...editor, aparelho_novo: e.target.value })} placeholder="Ex.: iPhone 14 128GB" />
                   <Input label="Valor (R$)" type="number" value={editor.valor_novo} onChange={(e) => setEditor({ ...editor, valor_novo: e.target.value })} />
                 </div>
-                {sugTroca != null && String(sugTroca) !== editor.valor_novo && (
-                  <button type="button" onClick={() => setEditor({ ...editor, valor_novo: String(sugTroca) })}
+                {sugDowngrade != null && String(sugDowngrade) !== editor.valor_novo && (
+                  <button type="button" onClick={() => setEditor({ ...editor, valor_novo: String(sugDowngrade) })}
                     className="flex w-full items-center justify-between rounded-control border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px] text-ink-2 transition-colors hover:border-accent">
-                    <span>Tabela de preços sugere <strong className="text-ink">{brl(sugTroca)}</strong> para “{editor.aparelho_novo}”</span>
+                    <span>Tabela de preços sugere <strong className="text-ink">{brl(sugDowngrade)}</strong> para “{editor.aparelho_novo}”</span>
                     <span className="font-semibold text-accent">Aplicar</span>
                   </button>
                 )}
@@ -274,7 +279,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
             <Textarea label="Observações (opcional)" rows={2} value={editor.observacoes} onChange={(e) => setEditor({ ...editor, observacoes: e.target.value })} />
 
             <div className="flex items-center justify-between rounded-control bg-accent-soft px-4 py-3">
-              <span className="text-[13px] font-medium text-ink-2">{isTroca ? 'Cliente paga' : 'Total'}</span>
+              <span className="text-[13px] font-medium text-ink-2">{isDowngrade ? 'Cliente paga' : 'Total'}</span>
               <span className="num text-[20px] font-bold text-accent">{brl(totalEditor)}</span>
             </div>
           </div>

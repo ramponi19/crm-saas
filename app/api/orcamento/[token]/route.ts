@@ -53,17 +53,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       osId = os?.id ?? null
     }
 
-    // Troca aprovada → dá entrada do usado no estoque + registra a venda.
-    if (orc.tipo === 'troca') {
+    // Downgrade aprovado → dá entrada do usado no estoque + registra a venda.
+    if (orc.tipo === 'downgrade') {
       await svc.from('inventario_unidades').insert({
         empresa_id: orc.empresa_id,
         produto_id: null,
         condicao: 'usado',
         estado: 'bom',
+        // `tipo` da UNIDADE segue 'troca': é o tipo de entrada da peça no estoque,
+        // o mesmo que o PDV usa. Não acompanha o nome do tipo de orçamento.
         tipo: 'troca',
         status: 'disponivel',
         preco_custo: orc.valor_entrada ?? null,
-        observacoes: `Entrada por troca — orçamento #${orc.id}${orc.aparelho_usado ? ` (${orc.aparelho_usado})` : ''}, cliente ${orc.cliente_nome}.`,
+        observacoes: `Entrada por downgrade — orçamento #${orc.id}${orc.aparelho_usado ? ` (${orc.aparelho_usado})` : ''}, cliente ${orc.cliente_nome}.`,
         ativo: true,
       } as never)
 
@@ -77,8 +79,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         valor_venda: (Number(orc.valor_novo) || orc.total) ?? 0,
         data_venda: nowIso,
         vendedor_id: vendedorId,
-        canal_venda: 'troca',
-        observacoes: `Troca — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${orc.valor_entrada ?? 0}). Diferença paga: R$ ${orc.total}.`,
+        canal_venda: 'downgrade',
+        observacoes: `Downgrade — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${orc.valor_entrada ?? 0}). Diferença paga: R$ ${orc.total}.`,
       } as never)
     }
 
