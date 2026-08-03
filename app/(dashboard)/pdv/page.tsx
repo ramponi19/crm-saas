@@ -36,14 +36,14 @@ export default async function PDVPage() {
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome))')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
     // Reservas de lead ativas (aba Reservas do PDV).
     supabase
       .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'reservado')
       .not('reservado_lead_id', 'is', null)
