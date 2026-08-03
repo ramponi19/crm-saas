@@ -14,7 +14,7 @@ import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 
 interface ItemEstoque {
-  id: number; produto_id: number; produto_nome: string; marca_nome: string
+  id: number; produto_id: number | null; produto_nome: string; marca_nome: string
   imei: string | null; numero_serie: string | null; cor: string | null
   armazenamento: string | null; bateria: string | null; condicao: string | null
   estado: string | null; preco_custo: number | null; preco_venda: number | null; status: string
@@ -23,6 +23,7 @@ interface ItemEstoque {
   /** Fotos desta unidade (URLs separadas por vírgula) e foto do modelo. */
   fotos_urls?: string | null
   produto_foto?: string | null
+  observacoes?: string | null
 }
 
 /** Foto da unidade tem prioridade: é o aparelho real, não o do catálogo. */
@@ -309,7 +310,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         await supabase.from('inventario_unidades').insert({
           empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'disponivel',
           preco_custo: trocaNum, imei: trocaImei.trim() || null,
-          observacoes: `Entrada por troca no PDV${trocaAparelho ? ` — ${trocaAparelho}` : ''}${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
+          observacoes: `${trocaAparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
           ativo: true,
         } as never)
       }

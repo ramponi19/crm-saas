@@ -72,9 +72,9 @@ export default async function PDVPage() {
     const prod = one(u.produtos)
     return {
       ...u,
-      produto_id: u.produto_id ?? 0,
+      produto_id: u.produto_id ?? null,
       status: u.status ?? 'disponivel',
-      produto_nome: prod?.nome ?? '—',
+      produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
@@ -86,9 +86,9 @@ export default async function PDVPage() {
     const prod = one(u.produtos)
     return {
       ...u,
-      produto_id: u.produto_id ?? 0,
+      produto_id: u.produto_id ?? null,
       status: u.status ?? 'reservado',
-      produto_nome: prod?.nome ?? '—',
+      produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
