@@ -23,6 +23,8 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
   const [renomear, setRenomear] = useState<DocumentoLista | null>(null)
   const [arquivar, setArquivar] = useState<DocumentoLista | null>(null)
   const [excluir, setExcluir] = useState<DocumentoLista | null>(null)
+  /** O ConfirmDialog não se fecha sozinho — quem chama fecha, e mostra progresso. */
+  const [agindo, setAgindo] = useState(false)
 
   async function criar() {
     if (!nome.trim()) { notify.warn('Dê um nome ao documento'); return }
@@ -163,18 +165,27 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
       <ConfirmDialog
         open={!!excluir}
         onClose={() => setExcluir(null)}
+        loading={agindo}
         onConfirm={async () => {
-          if (!excluir) return
-          const r = await fetch('/api/contrato-documentos', {
-            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-            // A confirmação já explicou o efeito nas emissões.
-            body: JSON.stringify({ id: excluir.id, cienteDasEmissoes: true }),
-          })
-          const j = await r.json().catch(() => ({}))
-          if (!r.ok) { notify.bad('Não foi possível excluir', j.error); return }
-          notify.ok('Documento excluído',
-            j.fundosRemovidos ? `${j.fundosRemovidos} imagem(ns) de fundo também removida(s)` : undefined)
-          router.refresh()
+          if (!excluir || agindo) return
+          setAgindo(true)
+          try {
+            const r = await fetch('/api/contrato-documentos', {
+              method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+              // A confirmação já explicou o efeito nas emissões.
+              body: JSON.stringify({ id: excluir.id, cienteDasEmissoes: true }),
+            })
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) { notify.bad('Não foi possível excluir', j.error); return }
+            notify.ok('Documento excluído',
+              j.fundosRemovidos ? `${j.fundosRemovidos} imagem(ns) de fundo também removida(s)` : undefined)
+            router.refresh()
+          } finally {
+            // Fecha em qualquer caso: modal aberto com o erro num toast atrás
+            // deixa o usuário sem saber se a ação valeu.
+            setAgindo(false)
+            setExcluir(null)
+          }
         }}
         title="Excluir documento?"
         description={
@@ -190,7 +201,13 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
       <ConfirmDialog
         open={!!arquivar}
         onClose={() => setArquivar(null)}
-        onConfirm={() => { if (arquivar) patch(arquivar.id, { arquivado: true }, 'Documento arquivado') }}
+        loading={agindo}
+        onConfirm={async () => {
+          if (!arquivar || agindo) return
+          setAgindo(true)
+          try { await patch(arquivar.id, { arquivado: true }, 'Documento arquivado') }
+          finally { setAgindo(false); setArquivar(null) }
+        }}
         title="Arquivar documento?"
         description={`"${arquivar?.nome ?? ''}" sai da lista e deixa de aparecer na venda. As versões ficam guardadas e os ${arquivar?.emitidos ?? 0} contrato(s) já emitido(s) continuam intactos.`}
         confirmLabel="Arquivar"
