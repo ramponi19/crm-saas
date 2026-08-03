@@ -57,6 +57,42 @@ export async function POST(req: NextRequest) {
   // usam o client autenticado para que as políticas RLS continuem valendo.
   const service = createServiceClient()
 
+  // READMISSÃO. Remover da equipe desativa o vínculo, mas o usuário do Auth
+  // continua existindo — então "criar de novo com o mesmo e-mail" falharia com
+  // "e-mail já registrado" e o dono ficaria sem caminho de volta. Aqui, e-mail
+  // já conhecido com vínculo INATIVO nesta empresa reativa em vez de recusar.
+  const emailNormalizado = String(email).trim().toLowerCase()
+  const { data: existente } = await service
+    .from('usuarios').select('id').ilike('email', emailNormalizado).maybeSingle()
+
+  if (existente?.id) {
+    const { data: vinculo } = await service
+      .from('empresa_usuarios').select('ativo')
+      .eq('usuario_id', existente.id).eq('empresa_id', empresaId).maybeSingle()
+
+    if (vinculo?.ativo) {
+      return NextResponse.json({ error: 'Este e-mail já está na equipe.' }, { status: 409 })
+    }
+    if (!vinculo) {
+      // Existe, mas nunca foi desta empresa. Não anexo o usuário de outra conta
+      // a esta loja por causa de um e-mail coincidente.
+      return NextResponse.json({
+        error: 'Este e-mail já pertence a outra conta do sistema. Use outro e-mail.',
+      }, { status: 409 })
+    }
+
+    const { error: reErr } = await service
+      .from('empresa_usuarios').update({ role, ativo: true })
+      .eq('usuario_id', existente.id).eq('empresa_id', empresaId)
+    if (reErr) return NextResponse.json({ error: reErr.message }, { status: 400 })
+
+    // Nome pode ter mudado; a senha NÃO é redefinida aqui — quem volta entra com
+    // a que já tinha, e "esqueci a senha" resolve o resto.
+    await service.from('usuarios').update({ nome }).eq('id', existente.id)
+
+    return NextResponse.json({ ok: true, id: existente.id, readmitido: true })
+  }
+
   const { data: authData, error: authError } = await service.auth.admin.createUser({
     email,
     password: senha,

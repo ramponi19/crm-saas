@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
+import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
-import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, notify, type Column } from '@/components/ui'
+import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
         })
         const j = await r.json()
         if (!r.ok) { notify.bad(j.error ?? 'Erro ao criar'); return }
-        notify.ok('Usuário criado!')
+        notify.ok(j.readmitido ? 'Usuário readmitido na equipe!' : 'Usuário criado!')
       } else {
         const r = await fetch('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -454,8 +454,35 @@ export default function EquipeView({ usuarios }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState('usuarios')
   const [modal, setModal] = useState<{ open: boolean; usuario: Usuario | null }>({ open: false, usuario: null })
+  const [remover, setRemover] = useState<Usuario | null>(null)
+  const [removendo, setRemovendo] = useState(false)
+  // Quem sou eu: para não oferecer "remover" no próprio usuário.
+  const [meuId, setMeuId] = useState<string | null>(null)
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => setMeuId(data.user?.id ?? null))
+  }, [])
 
   function onSaved() { setModal({ open: false, usuario: null }); router.refresh() }
+
+  async function confirmarRemocao() {
+    if (!remover || removendo) return
+    setRemovendo(true)
+    try {
+      const r = await fetch('/api/equipe/remover-usuario', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: remover.id }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { notify.bad('Não foi possível remover', j.error); return }
+      notify.ok(`${remover.nome} saiu da equipe`, 'O histórico de vendas dele continua no sistema')
+      router.refresh()
+    } finally {
+      // Fecha em qualquer caso: modal aberto com o erro num toast atrás não diz
+      // se a ação valeu.
+      setRemovendo(false)
+      setRemover(null)
+    }
+  }
 
   const cols: Column<Usuario>[] = [
     {
@@ -476,6 +503,29 @@ export default function EquipeView({ usuarios }: Props) {
       render: (u) => { const rb = ROLES.find(r => r.value === u.role); return <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge> },
     },
     { key: 'acesso', header: 'Último acesso', align: 'right', hideOnMobile: true, render: (u) => <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span> },
+    {
+      key: 'acoes', header: '', align: 'right',
+      // O proprietário não sai da equipe (é o dono da conta) e ninguém remove a
+      // si mesmo — nos dois casos o botão nem aparece, em vez de aparecer e
+      // recusar depois.
+      render: (u) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="sm" title="Editar"
+            icon={<Pencil size={14} strokeWidth={1.7} />}
+            onClick={() => setModal({ open: true, usuario: u })}>
+            <span className="sr-only">Editar</span>
+          </Button>
+          {u.role !== 'owner' && u.id !== meuId && (
+            <Button variant="ghost" size="sm" title="Remover da equipe"
+              className="text-bad hover:bg-bad/10"
+              icon={<UserMinus size={14} strokeWidth={1.7} />}
+              onClick={() => setRemover(u)}>
+              <span className="sr-only">Remover da equipe</span>
+            </Button>
+          )}
+        </div>
+      ),
+    },
   ]
 
   return (
@@ -514,6 +564,22 @@ export default function EquipeView({ usuarios }: Props) {
           onSaved={onSaved}
         />
       )}
+
+      <ConfirmDialog
+        open={!!remover}
+        loading={removendo}
+        onClose={() => setRemover(null)}
+        onConfirm={confirmarRemocao}
+        title="Remover da equipe?"
+        description={
+          `${remover?.nome ?? 'Esta pessoa'} perde o acesso ao CRM imediatamente. `
+          + 'O histórico de vendas, comissões e ranking dela CONTINUA no sistema — nada do passado é apagado, '
+          + 'porque "quem vendeu" é dado que a loja precisa manter. Se ela tiver reservas de estoque abertas, '
+          + 'as unidades voltam para o PDV. Para readmitir, é só criar o usuário de novo com o mesmo e-mail.'
+        }
+        confirmLabel="Remover do time"
+        tone="danger"
+      />
     </div>
   )
 }
