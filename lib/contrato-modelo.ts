@@ -134,7 +134,7 @@ export function marcadores(d: DadosMescla): Record<string, string> {
     'cliente.estado_civil': esc(c.estado_civil ?? ''),
     'cliente.profissao': esc(c.profissao ?? ''),
     'cliente.telefone': esc(c.telefone ?? ''),
-    'cliente.email': '',
+    'cliente.email': esc(c.email ?? ''),
     'cliente.endereco': esc(enderecoLinha(c)),
     'cliente.cidade': esc([c.cidade, c.estado].filter(Boolean).join('/')),
     'cliente.cep': esc(c.cep ?? ''),

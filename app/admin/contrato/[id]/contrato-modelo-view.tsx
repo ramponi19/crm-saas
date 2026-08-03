@@ -36,7 +36,7 @@ const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
   loja: { nome: 'Sua Loja', cnpj: '00.000.000/0001-00', telefone: '(00) 0000-0000', logoUrl: null },
   comprador: {
     nome: 'Maria Souza Lima', cpf_cnpj: '000.000.000-00', nacionalidade: 'brasileira',
-    estado_civil: 'solteira', profissao: 'designer', data_nascimento: null, telefone: '(11) 90000-0000',
+    estado_civil: 'solteira', profissao: 'designer', data_nascimento: null, telefone: '(11) 90000-0000', email: 'maria@exemplo.com',
     endereco: 'Rua das Flores', numero: '100', complemento: 'Apto 12', bairro: 'Centro',
     cidade: 'São Paulo', estado: 'SP', cep: '01000-000',
   },

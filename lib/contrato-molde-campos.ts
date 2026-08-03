@@ -43,6 +43,9 @@ const REGRAS: Regra[] = [
   { campo: /^estado\s+civil$/i, marcadores: ['cliente.estado_civil'], motivo: 'o molde diz “estado civil”' },
   { campo: /^profiss[ãa]o$/i, marcadores: ['cliente.profissao'], motivo: 'o molde diz “profissão”' },
   { campo: /^cidade\s*[–-]\s*estado$/i, marcadores: ['cliente.cidade'], motivo: 'o molde diz “cidade - Estado”' },
+  // Aqui o rótulo É o campo: o molde escreve "endereço eletrônico" no lugar do
+  // e-mail, então não há contexto antes para reconhecer.
+  { campo: /^(endere[çc]o\s+eletr[ôo]nico|e-?mail)$/i, marcadores: ['cliente.email'], motivo: 'o molde diz “endereço eletrônico”' },
 
   // ---- pela forma, só quando é inequívoca ----
   // "XXXXX – XX" = cidade/UF. Vem antes dos genéricos de X.

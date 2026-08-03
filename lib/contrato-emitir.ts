@@ -17,11 +17,11 @@ type Client = SupabaseClient<any>
 export const GARANTIA_PADRAO_DIAS = 90
 
 const CAMPOS_COMPRADOR =
-  'nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, endereco, numero, complemento, bairro, cidade, estado, cep'
+  'nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, email, endereco, numero, complemento, bairro, cidade, estado, cep'
 
 const COMPRADOR_VAZIO: ContratoComprador = {
   nome: '', cpf_cnpj: null, nacionalidade: null, estado_civil: null, profissao: null,
-  data_nascimento: null, telefone: null, endereco: null, numero: null, complemento: null,
+  data_nascimento: null, telefone: null, email: null, endereco: null, numero: null, complemento: null,
   bairro: null, cidade: null, estado: null, cep: null,
 }
 

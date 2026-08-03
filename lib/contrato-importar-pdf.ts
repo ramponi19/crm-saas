@@ -160,7 +160,16 @@ async function lerPagina(pg: any, W: number): Promise<{ blocos: Bloco[] }> {
   const pilha: Matriz[] = []
   let tm: Matriz | null = null
   let tlm: Matriz | null = null
-  const vermelhos: { x: number; y: number; larg: number }[] = []
+  /**
+   * TODA marca de texto com sua cor — não só as vermelhas.
+   *
+   * Guardar só as vermelhas obrigava a estimar a largura delas pelos glifos, e a
+   * estimativa errava para cima: o trecho vermelho engolia o texto preto vizinho
+   * ("residente e domiciliado na Rua XXXX" virava campo inteiro). Com todas as
+   * marcas, cada pedaço herda a cor da última marca antes dele — não precisa de
+   * largura nenhuma.
+   */
+  const marcas: { x: number; y: number; vermelho: boolean }[] = []
 
   for (let i = 0; i < ol.fnArray.length; i++) {
     const fn = ol.fnArray[i]
@@ -174,16 +183,22 @@ async function lerPagina(pg: any, W: number): Promise<{ blocos: Bloco[] }> {
     else if (fn === OPS.setTextMatrix) { tm = [a[0], a[1], a[2], a[3], a[4], a[5]]; tlm = [...tm] as Matriz }
     else if (fn === OPS.nextLine && tlm) { tm = mult([1, 0, 0, 1, 0, -12], tlm); tlm = [...tm] as Matriz }
     else if (fn === OPS.moveText && tlm) { tm = mult([1, 0, 0, 1, a[0], a[1]], tlm); tlm = [...tm] as Matriz }
-    else if ((fn === OPS.showText || fn === OPS.showSpacedText) && tm && ehVermelho(cor)) {
+    else if ((fn === OPS.showText || fn === OPS.showSpacedText) && tm) {
       const p = mult(ctm, tm)
-      const glifos = (fn === OPS.showText ? a[0] : a[0].flat()) ?? []
-      const larg = glifos.reduce(
-        (s: number, g: unknown) => s + (g && typeof g === 'object' ? ((g as { width?: number }).width ?? 0) / 100 : 0), 0)
-      vermelhos.push({ x: p[4], y: p[5], larg })
+      marcas.push({ x: p[4], y: p[5], vermelho: ehVermelho(cor) })
     }
   }
-  const temVermelho = (x: number, y: number, w: number) => vermelhos.some((v) =>
-    Math.abs(v.y - y) < 3 && x < v.x + Math.max(v.larg, 4) + 2 && v.x < x + w + 2)
+
+  /** Cor do trecho: a da última marca à esquerda do seu meio, na mesma linha. */
+  const temVermelho = (x: number, y: number, w: number) => {
+    const meio = x + w / 2
+    let melhor: { x: number; vermelho: boolean } | null = null
+    for (const m of marcas) {
+      if (Math.abs(m.y - y) > 3 || m.x > meio + 1) continue
+      if (!melhor || m.x > melhor.x) melhor = m
+    }
+    return melhor?.vermelho ?? false
+  }
 
   // Linhas, repondo o espaço perdido no vão entre trechos.
   const tc = await pg.getTextContent()

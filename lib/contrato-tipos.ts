@@ -20,6 +20,7 @@ export interface ContratoComprador {
   profissao: string | null
   data_nascimento: string | null
   telefone: string | null
+  email: string | null
   endereco: string | null
   numero: string | null
   complemento: string | null
