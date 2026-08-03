@@ -74,9 +74,11 @@ export async function POST(req: Request) {
 /**
  * Excluir de verdade — para quando o documento subiu errado.
  *
- * Recusa se já houve emissão: contrato assinado guarda a própria cópia e
- * sobreviveria, mas perderia o vínculo com o modelo, e apagar a origem de um
- * documento que alguém assinou não deveria ser um clique. Nesse caso, arquivar.
+ * Se já houve emissão, exige `cienteDasEmissoes`. Não é para atrapalhar: é para
+ * a exclusão ser uma decisão informada, e não um clique. Os contratos já
+ * emitidos NÃO se perdem — cada um guarda a própria cópia do HTML e o nome
+ * congelado, então a 2ª via continua saindo. O que eles perdem é o vínculo com o
+ * modelo (a coluna vira nula), o que só afeta a contagem por documento.
  *
  * Limpa também os fundos no Storage — sem isso cada reimportação deixaria as
  * imagens da versão anterior para trás.
@@ -86,7 +88,7 @@ export async function DELETE(req: Request) {
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
 
-  let body: { id?: unknown }
+  let body: { id?: unknown; cienteDasEmissoes?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }
   const id = Number(body.id)
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Documento inválido' }, { status: 400 })
@@ -94,9 +96,10 @@ export async function DELETE(req: Request) {
   const { count: emitidos } = await supabase
     .from('contratos_venda').select('*', { count: 'exact', head: true })
     .eq('documento_id', id)
-  if ((emitidos ?? 0) > 0) {
+  if ((emitidos ?? 0) > 0 && body.cienteDasEmissoes !== true) {
     return NextResponse.json({
-      error: `Este documento já foi emitido ${emitidos} vez(es). Arquive em vez de excluir — os contratos assinados perderiam o vínculo com o modelo.`,
+      error: `Este documento já foi emitido ${emitidos} vez(es) — confirme que está ciente para excluir.`,
+      emitidos,
     }, { status: 409 })
   }
 

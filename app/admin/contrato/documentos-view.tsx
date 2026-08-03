@@ -107,12 +107,11 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
                     onClick={() => setArquivar(d)}>
                     <span className="sr-only">Arquivar</span>
                   </Button>
-                  {/* Excluir só faz sentido enquanto nada foi emitido — depois,
-                      apagar a origem de um documento assinado não é um clique. */}
+                  {/* Sempre habilitado: botão apagado sem explicação só deixa o
+                      dono sem saída. Quem avisa é a confirmação, que muda de
+                      texto quando o documento já foi emitido. */}
                   <Button variant="ghost" size="sm" className="text-bad hover:bg-bad/10"
-                    title={d.emitidos > 0 ? 'Já emitido — use Arquivar' : 'Excluir'}
-                    disabled={d.emitidos > 0}
-                    icon={<Trash2 size={14} strokeWidth={1.7} />}
+                    title="Excluir" icon={<Trash2 size={14} strokeWidth={1.7} />}
                     onClick={() => setExcluir(d)}>
                     <span className="sr-only">Excluir</span>
                   </Button>
@@ -168,7 +167,8 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
           if (!excluir) return
           const r = await fetch('/api/contrato-documentos', {
             method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: excluir.id }),
+            // A confirmação já explicou o efeito nas emissões.
+            body: JSON.stringify({ id: excluir.id, cienteDasEmissoes: true }),
           })
           const j = await r.json().catch(() => ({}))
           if (!r.ok) { notify.bad('Não foi possível excluir', j.error); return }
@@ -177,7 +177,12 @@ export function DocumentosView({ documentos }: { documentos: DocumentoLista[] })
           router.refresh()
         }}
         title="Excluir documento?"
-        description={`"${excluir?.nome ?? ''}" e todas as versões dele são apagados, junto com as imagens de fundo. Não tem volta. Use isto quando o documento subiu errado; se for algo que você pode querer de novo, prefira Arquivar.`}
+        description={
+          `"${excluir?.nome ?? ''}" e todas as versões dele são apagados, junto com as imagens de fundo. Não tem volta.`
+          + (excluir && excluir.emitidos > 0
+            ? ` Atenção: ${excluir.emitidos} contrato(s) já foram emitidos deste documento. Eles NÃO se perdem — cada um guarda a própria cópia e a 2ª via continua saindo do Histórico. O que eles perdem é o vínculo com este modelo.`
+            : ' Use isto quando o documento subiu errado; se for algo que você pode querer de novo, prefira Arquivar.')
+        }
         confirmLabel="Excluir de vez"
         tone="danger"
       />
