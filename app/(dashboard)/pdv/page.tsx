@@ -113,7 +113,11 @@ export default async function PDVPage() {
   return (
     <>
       <Topbar eyebrow="VENDAS" title="PDV — Ponto de Venda" />
-      <div className="flex-1 overflow-hidden">
+      {/* Precisa ser coluna FLEX: o container de rolagem do PDV usa `flex-1`, e
+          num pai block ele ignora o limite e cresce até o conteúdo. O pai então
+          corta o excedente com overflow-hidden e nada rola — só aparecia com a
+          janela restaurada, porque maximizada o conteúdo caberia. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PDVView
           itensDisponiveis={itens}
           reservas={reservas}
