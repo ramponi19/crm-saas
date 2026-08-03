@@ -68,13 +68,24 @@ export async function POST(req: NextRequest) {
   const userId = authData.user.id
 
   // O trigger on_auth_user_created (handle_new_user) já insere a linha em
-  // public.usuarios com role 'vendedor' assim que o usuário é criado no Auth.
-  // Portanto NÃO inserimos de novo (causaria duplicate key na pkey) — apenas
-  // atualizamos nome e role para os valores desejados. Usamos o service client
-  // para não depender de timing de RLS logo após a criação.
+  // public.usuarios assim que o usuário é criado no Auth. Portanto NÃO inserimos
+  // de novo (causaria duplicate key na pkey) — apenas atualizamos os dados de
+  // cadastro. Usamos o service client para não depender de timing de RLS logo
+  // após a criação.
+  //
+  // `role` NÃO entra aqui de propósito. O papel do usuário na empresa vive em
+  // `empresa_usuarios.role`, gravado logo abaixo — é de lá que todo o
+  // enforcement lê (lib/owner.ts, sidebar, guards). Escrever `usuarios.role`
+  // era inútil e batia no gatilho trg_prevent_privilege_escalation, que barra
+  // alteração de papel para quem não é super admin: com o service client
+  // `auth.uid()` é nulo, então o gatilho concluía "não é super admin" e
+  // abortava. Efeito prático: criar VENDEDOR funcionava (o papel não mudava do
+  // padrão) e criar ADMINISTRADOR falhava sempre com
+  // "Permission denied: cannot modify role". A rota de atualizar-usuario já
+  // fazia certo; esta era a fora do padrão.
   const { error: uErr } = await service
     .from('usuarios')
-    .update({ nome, email, role })
+    .update({ nome, email })
     .eq('id', userId)
   if (uErr) {
     // Desfaz o usuário recém-criado no Auth para não deixar órfãos.
