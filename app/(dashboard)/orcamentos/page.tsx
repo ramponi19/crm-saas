@@ -16,7 +16,7 @@ export default async function OrcamentosPage() {
 
   const [{ data }, { data: emp }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase.from('orcamentos')
-      .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, observacoes, token, created_at')
+      .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, valor_devolver, acerto, observacoes, token, created_at')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(200),
     supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
     supabase.from('inventario_unidades')

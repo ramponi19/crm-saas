@@ -12,7 +12,8 @@ export interface Orcamento {
   id: number; lead_id: number | null; tipo: string; status: string; cliente_nome: string; cliente_telefone: string | null
   aparelho: string | null; imei: string | null; defeito: string | null; prazo_dias: number | null; garantia_dias: number | null
   itens: ItemOrc[]; aparelho_novo: string | null; valor_novo: number | null; aparelho_usado: string | null; valor_entrada: number | null
-  unidade_id: number | null; total: number; observacoes: string | null; token: string; created_at: string | null
+  unidade_id: number | null; total: number; valor_devolver: number | null; acerto: string | null
+  observacoes: string | null; token: string; created_at: string | null
 }
 export interface UnidadeOpt { id: number; label: string; preco: number }
 export interface PrecoRef { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }
@@ -46,13 +47,29 @@ interface Editor {
   id?: number; lead_id?: number | null; tipo: string; cliente_nome: string; cliente_telefone: string
   aparelho: string; imei: string; defeito: string; prazo_dias: string; garantia_dias: string
   itens: ItemOrc[]; aparelho_novo: string; valor_novo: string; aparelho_usado: string; valor_entrada: string
-  unidade_id: number | null; observacoes: string
+  unidade_id: number | null; observacoes: string; acerto: string
 }
 const vazio = (tipo = 'assistencia'): Editor => ({
   tipo, lead_id: null, cliente_nome: '', cliente_telefone: '', aparelho: '', imei: '', defeito: '', prazo_dias: '', garantia_dias: '',
   itens: [{ descricao: '', qtd: 1, valor: 0 }], aparelho_novo: '', valor_novo: '', aparelho_usado: '', valor_entrada: '', unidade_id: null, observacoes: '',
+  acerto: 'dinheiro',
 })
 const LABEL_DESC: Record<string, string> = { assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade', venda: 'Descrição do aparelho' }
+
+// Quando o aparelho que o cliente entrega vale MAIS que o que ele leva, sobra
+// saldo a favor dele. Como isso se acerta nao tem regra: depende da negociacao.
+// As quatro saidas ficam disponiveis no ato, e a escolhida vai escrita no
+// orcamento e no link que o cliente aprova.
+const ACERTO: Record<string, { label: string; curto: string; nota: string }> = {
+  dinheiro: { label: 'Devolver em dinheiro', curto: 'em dinheiro',
+    nota: 'Gera uma despesa a pagar no Financeiro quando o cliente aprovar.' },
+  credito: { label: 'Crédito na loja', curto: 'como crédito na loja',
+    nota: 'Fica como despesa a pagar no Financeiro, para não ser esquecido. Atenção: o PDV ainda não abate crédito automaticamente — o desconto é aplicado na mão na próxima compra.' },
+  produto: { label: 'Abater em produto/serviço', curto: 'abatido em produto ou serviço',
+    nota: 'Lance os acessórios ou o serviço nos itens acima até o saldo fechar. Nada é gerado no Financeiro.' },
+  nenhum: { label: 'Sem devolução (negociado)', curto: 'sem devolução, conforme negociado',
+    nota: 'O cliente concordou em não receber a diferença. Nada é gerado no Financeiro.' },
+}
 
 export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
   const router = useRouter()
@@ -80,11 +97,20 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const linkDe = (o: Orcamento) => `${base}/orcamento/${o.token}`
 
-  const totalEditor = editor
-    ? editor.tipo === 'downgrade'
-      ? Math.max(0, (Number(editor.valor_novo) || 0) - (Number(editor.valor_entrada) || 0))
-      : editor.itens.reduce((s, i) => s + Math.max(1, i.qtd) * (Number(i.valor) || 0), 0)
+  // Mesma conta da rota de salvar (app/api/orcamentos/route.ts). No downgrade o
+  // saldo cai para qualquer lado: positivo o cliente paga, negativo a loja acerta
+  // com ele. Os itens entram do lado do cliente — é assim que se abate o saldo em
+  // acessório ou serviço.
+  const itensTotalEditor = editor
+    ? editor.itens.reduce((s, i) => s + Math.max(1, i.qtd) * (Number(i.valor) || 0), 0)
     : 0
+  const saldoEditor = editor
+    ? editor.tipo === 'downgrade'
+      ? (Number(editor.valor_novo) || 0) + itensTotalEditor - (Number(editor.valor_entrada) || 0)
+      : itensTotalEditor
+    : 0
+  const totalEditor = Math.max(0, saldoEditor)
+  const devolverEditor = editor?.tipo === 'downgrade' ? Math.max(0, -saldoEditor) : 0
 
   function abrir(o?: Orcamento) {
     if (!o) { setEditor(vazio(tipoPadrao)); return }
@@ -96,11 +122,36 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
       aparelho_novo: o.aparelho_novo ?? '', valor_novo: o.valor_novo != null ? String(o.valor_novo) : '',
       aparelho_usado: o.aparelho_usado ?? '', valor_entrada: o.valor_entrada != null ? String(o.valor_entrada) : '',
       unidade_id: o.unidade_id, observacoes: o.observacoes ?? '',
+      acerto: o.acerto ?? 'dinheiro',
     })
   }
 
   function setItem(i: number, patch: Partial<ItemOrc>) {
     setEditor((e) => e && ({ ...e, itens: e.itens.map((x, idx) => idx === i ? { ...x, ...patch } : x) }))
+  }
+
+  // Mesma lista de itens nos dois formatos de orçamento — no conserto são peças e
+  // mão de obra, no downgrade são acessórios e serviços que abatem o saldo.
+  function blocoItens(titulo: string) {
+    if (!editor) return null
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-ink">{titulo}</span>
+          <button onClick={() => setEditor({ ...editor, itens: [...editor.itens, { descricao: '', qtd: 1, valor: 0 }] })} className="flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline"><Plus size={13} strokeWidth={2} /> Adicionar</button>
+        </div>
+        <div className="space-y-2">
+          {editor.itens.map((it, i) => (
+            <div key={i} className="grid grid-cols-[1fr_60px_100px_auto] items-center gap-2">
+              <Input value={it.descricao} onChange={(e) => setItem(i, { descricao: e.target.value })} placeholder="Descrição" />
+              <Input type="number" value={String(it.qtd)} onChange={(e) => setItem(i, { qtd: Math.max(1, Number(e.target.value) || 1) })} title="Qtd" />
+              <Input type="number" value={String(it.valor)} onChange={(e) => setItem(i, { valor: Number(e.target.value) || 0 })} title="Valor unit." />
+              <button onClick={() => setEditor({ ...editor, itens: editor.itens.filter((_, idx) => idx !== i) })} className="text-ink-3 hover:text-bad" aria-label="Remover"><X size={15} strokeWidth={1.8} /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   async function salvar(enviar: boolean) {
@@ -120,6 +171,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
         aparelho_usado: editor.aparelho_usado, valor_entrada: Number(editor.valor_entrada) || 0,
         unidade_id: editor.unidade_id ?? null,
         observacoes: editor.observacoes,
+        acerto: editor.acerto,
       }),
     })
     setSalvando(false)
@@ -179,7 +231,12 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
                       <Badge tone="neutro">{t.label}</Badge>
                       <Badge tone={st.tone}>{st.label}</Badge>
                     </div>
-                    <div className="truncate text-[12px] text-ink-3">{o.aparelho || o.aparelho_novo || '—'} · <span className="num font-medium text-ink-2">{brl(o.total)}</span></div>
+                    <div className="truncate text-[12px] text-ink-3">
+                      {o.aparelho || o.aparelho_novo || '—'} ·{' '}
+                      {(o.valor_devolver ?? 0) > 0
+                        ? <span className="num font-medium text-ok">a devolver {brl(o.valor_devolver ?? 0)}</span>
+                        : <span className="num font-medium text-ink-2">{brl(o.total)}</span>}
+                    </div>
                   </div>
                   <button onClick={() => { navigator.clipboard?.writeText(linkDe(o)); notify.ok('Link copiado') }} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-ink" aria-label="Copiar link"><Copy size={15} strokeWidth={1.7} /></button>
                   <button onClick={() => whatsapp(o)} disabled={!o.cliente_telefone} className="grid size-9 place-items-center rounded-control text-ink-3 hover:text-ok disabled:opacity-30" aria-label="WhatsApp"><MessageCircle size={15} strokeWidth={1.7} /></button>
@@ -232,6 +289,22 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
                   <Input label="Aparelho do cliente (entrada)" value={editor.aparelho_usado} onChange={(e) => setEditor({ ...editor, aparelho_usado: e.target.value })} placeholder="Ex.: iPhone 12 64GB" />
                   <Input label="Vale (R$)" type="number" value={editor.valor_entrada} onChange={(e) => setEditor({ ...editor, valor_entrada: e.target.value })} />
                 </div>
+
+                {/* Itens valem no downgrade também: é por aqui que o saldo a favor
+                    do cliente é abatido em acessório, película ou serviço. */}
+                {blocoItens('Acessórios / serviços na negociação (opcional)')}
+
+                {devolverEditor > 0 && (
+                  <div className="space-y-2 rounded-control border border-ok/30 bg-ok/[0.05] p-3">
+                    <div className="text-[12.5px] text-ink-2">
+                      O aparelho do cliente vale <strong className="text-ink">{brl(devolverEditor)}</strong> mais que o que ele leva.
+                    </div>
+                    <Select label="Acerto da diferença" value={editor.acerto} onChange={(e) => setEditor({ ...editor, acerto: e.target.value })}>
+                      {Object.entries(ACERTO).map(([v, a]) => <option key={v} value={v}>{a.label}</option>)}
+                    </Select>
+                    <div className="text-[11.5px] text-ink-3">{ACERTO[editor.acerto]?.nota}</div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -252,22 +325,7 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
                 )}
                 <Textarea label={LABEL_DESC[editor.tipo] ?? 'Descrição'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
 
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-ink">Itens (peças + mão de obra)</span>
-                    <button onClick={() => setEditor({ ...editor, itens: [...editor.itens, { descricao: '', qtd: 1, valor: 0 }] })} className="flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline"><Plus size={13} strokeWidth={2} /> Adicionar</button>
-                  </div>
-                  <div className="space-y-2">
-                    {editor.itens.map((it, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_60px_100px_auto] items-center gap-2">
-                        <Input value={it.descricao} onChange={(e) => setItem(i, { descricao: e.target.value })} placeholder="Descrição" />
-                        <Input type="number" value={String(it.qtd)} onChange={(e) => setItem(i, { qtd: Math.max(1, Number(e.target.value) || 1) })} title="Qtd" />
-                        <Input type="number" value={String(it.valor)} onChange={(e) => setItem(i, { valor: Number(e.target.value) || 0 })} title="Valor unit." />
-                        <button onClick={() => setEditor({ ...editor, itens: editor.itens.filter((_, idx) => idx !== i) })} className="text-ink-3 hover:text-bad" aria-label="Remover"><X size={15} strokeWidth={1.8} /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {blocoItens('Itens (peças + mão de obra)')}
 
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="Prazo (dias)" type="number" value={editor.prazo_dias} onChange={(e) => setEditor({ ...editor, prazo_dias: e.target.value })} />
@@ -278,10 +336,22 @@ export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], ta
 
             <Textarea label="Observações (opcional)" rows={2} value={editor.observacoes} onChange={(e) => setEditor({ ...editor, observacoes: e.target.value })} />
 
-            <div className="flex items-center justify-between rounded-control bg-accent-soft px-4 py-3">
-              <span className="text-[13px] font-medium text-ink-2">{isDowngrade ? 'Cliente paga' : 'Total'}</span>
-              <span className="num text-[20px] font-bold text-accent">{brl(totalEditor)}</span>
-            </div>
+            {/* Um dos dois lados, nunca os dois: ou o cliente paga, ou a loja
+                acerta com ele. Antes o segundo caso era zerado e sumia da tela. */}
+            {devolverEditor > 0 ? (
+              <div className="rounded-control bg-ok/10 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-ink-2">Loja acerta com o cliente</span>
+                  <span className="num text-[20px] font-bold text-ok">{brl(devolverEditor)}</span>
+                </div>
+                <div className="mt-0.5 text-[11.5px] text-ink-3">{ACERTO[editor.acerto]?.curto}</div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-control bg-accent-soft px-4 py-3">
+                <span className="text-[13px] font-medium text-ink-2">{isDowngrade ? 'Cliente paga' : 'Total'}</span>
+                <span className="num text-[20px] font-bold text-accent">{brl(totalEditor)}</span>
+              </div>
+            )}
           </div>
         )}
       </Modal>

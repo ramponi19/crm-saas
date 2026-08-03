@@ -18,12 +18,22 @@ export interface OrcamentoPublico {
   aparelho_usado: string | null
   valor_entrada: number | null
   total: number
+  valor_devolver: number
+  acerto: string | null
   observacoes: string | null
   created_at: string | null
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const TIPO_LABEL: Record<string, string> = { assistencia: 'Orçamento de conserto', melhoria: 'Orçamento de upgrade', troca: 'Proposta de troca' }
+const TIPO_LABEL: Record<string, string> = { assistencia: 'Orçamento de conserto', melhoria: 'Orçamento de upgrade', downgrade: 'Proposta de downgrade' }
+// Como a loja acerta o saldo que sobrou a favor do cliente. Texto na voz dele,
+// porque é ele que lê esta página.
+const ACERTO_CLIENTE: Record<string, string> = {
+  dinheiro: 'Você recebe em dinheiro',
+  credito: 'Você recebe como crédito na loja',
+  produto: 'Abatido em produto ou serviço',
+  nenhum: 'Sem devolução, conforme combinado',
+}
 
 export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados: OrcamentoPublico; empresaNome: string; cor: string; logo: string | null }) {
   const [status, setStatus] = useState(dados.status)
@@ -92,16 +102,31 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
                 <span>Entrada: {dados.aparelho_usado || 'seu aparelho'}</span>
                 <span className="num font-medium">− {brl(dados.valor_entrada || 0)}</span>
               </div>
+              {/* Acessórios/serviços que entraram na negociação. */}
+              {dados.itens.filter((it) => it.descricao).map((it, i) => (
+                <div key={i} className="flex items-center justify-between rounded-control border border-line-soft px-3 py-2.5">
+                  <span>{it.qtd > 1 ? `${it.qtd}× ` : ''}{it.descricao}</span>
+                  <span className="num font-medium">{brl(it.qtd * it.valor)}</span>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Total */}
+          {/* Total — ou o cliente paga, ou a loja acerta com ele. */}
           <div className="mt-4 flex items-end justify-between border-t border-line pt-3">
             <div>
-              <div className="text-[12px] text-ink-3">{dados.tipo === 'downgrade' ? 'Você paga' : 'Total'}</div>
+              <div className="text-[12px] text-ink-3">
+                {dados.valor_devolver > 0
+                  ? (ACERTO_CLIENTE[dados.acerto ?? ''] ?? 'Você recebe')
+                  : dados.tipo === 'downgrade' ? 'Você paga' : 'Total'}
+              </div>
               {dados.prazo_dias ? <div className="text-[11px] text-ink-3">Prazo: {dados.prazo_dias} dias{dados.garantia_dias ? ` · Garantia: ${dados.garantia_dias} dias` : ''}</div> : null}
             </div>
-            <div className="num text-[26px] font-bold" style={{ color: cor }}>{brl(dados.total)}</div>
+            {dados.valor_devolver > 0 ? (
+              <div className="num text-[26px] font-bold text-ok">{brl(dados.valor_devolver)}</div>
+            ) : (
+              <div className="num text-[26px] font-bold" style={{ color: cor }}>{brl(dados.total)}</div>
+            )}
           </div>
 
           {dados.observacoes && <p className="mt-3 text-[12px] text-ink-3">{dados.observacoes}</p>}

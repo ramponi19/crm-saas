@@ -9,7 +9,7 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, tipo, status, cliente_nome, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, total, observacoes, created_at')
+    .select('id, empresa_id, tipo, status, cliente_nome, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, total, valor_devolver, acerto, observacoes, created_at')
     .eq('token', token).maybeSingle()
   if (!orc) notFound()
 
@@ -31,6 +31,8 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
     aparelho_usado: orc.aparelho_usado,
     valor_entrada: orc.valor_entrada,
     total: Number(orc.total) || 0,
+    valor_devolver: Number(orc.valor_devolver) || 0,
+    acerto: orc.acerto,
     observacoes: orc.observacoes,
     created_at: orc.created_at,
   }

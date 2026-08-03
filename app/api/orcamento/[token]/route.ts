@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, total, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
+    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
@@ -74,14 +74,58 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
         vendedorId = lead?.responsavel_id ?? null
       }
-      await svc.from('vendas').insert({
+      // A venda vale o aparelho que sai MAIS os itens da negociação. O aparelho
+      // recebido não abate daqui: ele é pagamento em espécie, igual ao PDV. Abater
+      // registraria prejuízo numa venda lucrativa.
+      const itensOrc = Array.isArray(orc.itens) ? (orc.itens as unknown as { qtd?: number; valor?: number }[]) : []
+      const itensTotal = itensOrc.reduce((s, i) => s + Math.max(1, Number(i.qtd) || 1) * (Number(i.valor) || 0), 0)
+      const valorVenda = (Number(orc.valor_novo) || 0) + itensTotal
+      const vale = Number(orc.valor_entrada) || 0
+      // O aparelho paga até o valor da venda; o que passar disso é o saldo do
+      // cliente, acertado por fora (dinheiro/crédito/produto), não pagamento.
+      const trocaPaga = Math.min(vale, valorVenda)
+
+      const { data: venda } = await svc.from('vendas').insert({
         empresa_id: orc.empresa_id,
-        valor_venda: (Number(orc.valor_novo) || orc.total) ?? 0,
+        valor_venda: valorVenda,
         data_venda: nowIso,
         vendedor_id: vendedorId,
         canal_venda: 'downgrade',
-        observacoes: `Downgrade — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${orc.valor_entrada ?? 0}). Diferença paga: R$ ${orc.total}.`,
-      } as never)
+        observacoes: `Downgrade — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${vale}). Cliente pagou: R$ ${orc.total}.${Number(orc.valor_devolver) > 0 ? ` Saldo a favor do cliente: R$ ${orc.valor_devolver} (${orc.acerto}).` : ''}`,
+      } as never).select('id').single<{ id: number }>()
+
+      // Registra SÓ o pagamento em aparelho, mesma convenção do PDV (`troca`
+      // como forma de pagamento). A parte em dinheiro fica de fora de propósito:
+      // aprovar o link não diz COMO o cliente vai pagar, e `forma_pagamento` é
+      // NOT NULL — inventar um método afirmaria que o dinheiro entrou. Aqui só
+      // entra o que de fato aconteceu: o aparelho trocou de mãos.
+      if (venda?.id && trocaPaga > 0.005) {
+        await svc.from('vendas_pagamentos').insert({
+          empresa_id: orc.empresa_id, venda_id: venda.id,
+          forma_pagamento: 'troca', valor_pago: trocaPaga,
+        } as never)
+      }
+
+      // Saldo a favor do cliente: dinheiro e crédito são OBRIGAÇÃO da loja, então
+      // viram conta a pagar no Financeiro — senão o combinado na negociação
+      // dependeria da memória de quem atendeu. 'produto' já foi abatido nos itens
+      // e 'nenhum' foi negociado a zero: nada a lançar.
+      const devolver = Number(orc.valor_devolver) || 0
+      if (devolver > 0 && (orc.acerto === 'dinheiro' || orc.acerto === 'credito')) {
+        const ehCredito = orc.acerto === 'credito'
+        await svc.from('lancamentos_financeiros').insert({
+          empresa_id: orc.empresa_id,
+          tipo: 'despesa',
+          descricao: `${ehCredito ? 'Crédito' : 'Devolução'} — downgrade de ${orc.cliente_nome}`,
+          valor: devolver,
+          data_venc: nowIso.slice(0, 10),
+          status: 'pendente',
+          categoria: ehCredito ? 'Crédito de cliente' : 'Devolução de troca',
+          referencia_id: orc.id,
+          referencia_tp: 'orcamento',
+          observacoes: `Orçamento #${orc.id}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${vale}) por ${orc.aparelho_novo ?? ''} (R$ ${orc.valor_novo ?? 0}).${ehCredito ? ' Crédito para usar em compra futura — o PDV não abate automaticamente.' : ''}`,
+        } as never)
+      }
     }
 
     // Venda/semi-novo com unidade do estoque → baixa a unidade + registra a venda.

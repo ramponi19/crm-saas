@@ -21,9 +21,15 @@ interface Body {
   valor_entrada?: number
   unidade_id?: number | null
   observacoes?: string
+  acerto?: string
 }
 
 const TIPOS = ['assistencia', 'melhoria', 'downgrade', 'venda']
+
+// Como a loja acerta o saldo que ficou A FAVOR DO CLIENTE num downgrade. Nao ha
+// resposta certa: cada negociacao fecha de um jeito, entao as quatro ficam
+// disponiveis para o vendedor escolher na hora.
+const ACERTOS = ['dinheiro', 'credito', 'produto', 'nenhum']
 
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -39,10 +45,24 @@ export async function POST(req: Request) {
     .map((i) => ({ descricao: (i.descricao || '').trim(), qtd: Math.max(1, Number(i.qtd) || 1), valor: Math.max(0, Number(i.valor) || 0) }))
     .filter((i) => i.descricao)
 
-  // Total: itens (assistência/melhoria) ou diferença (downgrade).
-  const total = tipo === 'downgrade'
-    ? Math.max(0, (Number(b.valor_novo) || 0) - (Number(b.valor_entrada) || 0))
-    : itens.reduce((s, i) => s + i.qtd * i.valor, 0)
+  const itensTotal = itens.reduce((s, i) => s + i.qtd * i.valor, 0)
+
+  // No downgrade a diferença pode cair para qualquer lado, e os itens
+  // (acessório, serviço, película) entram do lado do cliente — é assim que se
+  // "abate em produto" na negociação.
+  //
+  // `total` = o que o CLIENTE paga · `devolver` = o que a LOJA acerta com ele.
+  // Exclusivos: um dos dois é sempre zero. Guardar os dois separados, em vez de
+  // um número com sinal, evita total negativo vazando para relatório e venda.
+  const saldo = tipo === 'downgrade'
+    ? (Number(b.valor_novo) || 0) + itensTotal - (Number(b.valor_entrada) || 0)
+    : itensTotal
+  const total = Math.max(0, saldo)
+  const devolver = tipo === 'downgrade' ? Math.max(0, -saldo) : 0
+  // `acerto` só significa algo quando sobra saldo para o cliente.
+  const acerto = devolver > 0
+    ? (ACERTOS.includes(b.acerto || '') ? b.acerto! : 'dinheiro')
+    : null
 
   // status só é aplicado quando explicitamente enviado; senão preserva o atual
   // (nunca reverte um orçamento aprovado para rascunho — evita re-aprovação/venda duplicada).
@@ -66,6 +86,8 @@ export async function POST(req: Request) {
     valor_entrada: tipo === 'downgrade' ? (Number(b.valor_entrada) || 0) : null,
     unidade_id: tipo === 'venda' ? (b.unidade_id ?? null) : null,
     total,
+    valor_devolver: devolver,
+    acerto,
     observacoes: b.observacoes?.trim() || null,
   }
 
