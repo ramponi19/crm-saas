@@ -20,6 +20,8 @@ interface Venda {
   lucro: number | null
   forma_pagamento: string | null
   status: string | null
+  /** Aparelho aceito em troca nesta venda ainda não chegou na loja. */
+  troca_pendente?: boolean
 }
 
 interface Lancamento {
@@ -73,12 +75,15 @@ function exportCSV(rows: Venda[]) {
   if (rows.length === 0) { toast.info('Nenhuma venda para exportar'); return }
   downloadCSV(
     'vendas',
-    ['Data', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro'],
+    // Coluna de troca também no CSV: quem fecha o mês na planilha precisa poder
+    // separar lá o que a tela separa aqui.
+    ['Data', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro', 'Troca pendente'],
     rows.map(v => [
       v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
       v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
+      v.troca_pendente ? 'sim' : 'nao',
     ])
   )
 }
@@ -196,6 +201,19 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     ]
   }, [vendasFiltradas])
 
+  // Separação, não subtração: o "Total vendas" acima continua sendo o número real
+  // do mês — esconder o pendente faria o faturamento mentir para menos. O que
+  // falta é saber quanto dele ainda depende de um aparelho de troca entrar na
+  // loja, e isso é aviso, não KPI de rotina: fica em faixa própria e só aparece
+  // quando existe pendência.
+  const troca = useMemo(() => {
+    const conc = vendasFiltradas.filter(v => v.status === 'concluida')
+    const pendentes = conc.filter(v => v.troca_pendente)
+    const valorPendente = pendentes.reduce((s, v) => s + v.valor_venda, 0)
+    const total = conc.reduce((s, v) => s + v.valor_venda, 0)
+    return { qtd: pendentes.length, valorPendente, firme: total - valorPendente }
+  }, [vendasFiltradas])
+
   const mesAtual  = new Date().toISOString().slice(0, 7)
   const lancMes   = lancamentos.filter(l => l.data_venc.startsWith(mesAtual))
   const entradas  = lancMes.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
@@ -208,7 +226,16 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     { key: 'produto', header: 'Produto', hideOnMobile: true, render: v => <span className="text-ink-2">{v.produto_nome ?? v.forma_pagamento ?? '—'}</span> },
     { key: 'vendedor', header: 'Vendedor', hideOnMobile: true, render: v => <span className="text-ink-2">{v.vendedor_nome ?? '—'}</span> },
     { key: 'canal', header: 'Canal', hideOnMobile: true, render: v => <Badge tone="neutro">{CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}</Badge> },
-    { key: 'valor', header: 'Valor', align: 'right', className: 'num', render: v => <span className="font-semibold text-ink">{formatCurrency(v.valor_venda)}</span> },
+    {
+      key: 'valor', header: 'Valor', align: 'right', className: 'num',
+      render: v => (
+        <div className="flex flex-col items-end">
+          <span className="font-semibold text-ink">{formatCurrency(v.valor_venda)}</span>
+          {/* Saber o valor pendente sem saber QUAL venda é não deixa ninguém agir. */}
+          {v.troca_pendente && <span className="text-[10.5px] text-warn">troca não chegou</span>}
+        </div>
+      ),
+    },
     { key: 'desc', header: 'Desc.', align: 'right', className: 'num', hideOnMobile: true, render: v => <span className="text-bad">{v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}</span> },
     { key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: v => <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> },
   ]
@@ -263,6 +290,24 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               <StatCard key={k.label} bare label={k.label} value={k.value} />
             ))}
           </div>
+
+          {/* Quanto do total ainda depende de um aparelho de troca chegar. */}
+          {troca.qtd > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-card border border-warn/30 bg-warn-soft px-4 py-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3">Faturamento firme</div>
+                <div className="num text-[18px] font-bold text-ink">{formatCurrency(troca.firme)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3">Aguardando troca</div>
+                <div className="num text-[18px] font-bold text-warn">{formatCurrency(troca.valorPendente)}</div>
+              </div>
+              <p className="min-w-[220px] flex-1 text-[12px] text-ink-2">
+                {troca.qtd === 1 ? '1 venda depende' : `${troca.qtd} vendas dependem`} de um aparelho aceito em troca que ainda não chegou na loja.
+                O total acima já inclui esse valor — confirme a chegada no Estoque para liberar comissão e ranking.
+              </p>
+            </div>
+          )}
 
           {/* Gráfico */}
           <Card title="Vendas por dia" actions={<span className="num text-[11px] text-ink-3">Últimos 7 dias</span>}>
