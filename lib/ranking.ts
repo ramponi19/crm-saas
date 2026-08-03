@@ -17,6 +17,9 @@ export interface LinhaRanking {
   propostas: number
   conversao: number
   score: number
+  /** Vendas que ainda não contam: aparelho aceito em troca não chegou na loja. */
+  vendasRetidas: number
+  faturamentoRetido: number
 }
 
 type Embed<T> = T | T[] | null
@@ -30,13 +33,27 @@ export function janelaDoPeriodo(periodo: string): { ini: string; fim: string } {
 export async function calcularRanking(db: Db, empresaId: number, periodo: string): Promise<LinhaRanking[]> {
   const { ini, fim } = janelaDoPeriodo(periodo)
 
-  const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }] = await Promise.all([
+  const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }, { data: trocasPendentes }] = await Promise.all([
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    db.from('vendas').select('vendedor_id, valor_venda, data_venda, status').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
+    db.from('vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
     db.from('visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),
     db.from('leads').select('responsavel_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
     db.from('propostas').select('lead_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
+    // Aparelho aceito em troca que ainda não chegou. Aparelho é dinheiro: se não
+    // entrou, a venda não subiu ninguém no ranking nem na meta. Quem cobra o
+    // cliente é o vendedor — sem isso o prejuízo da troca que não veio fica todo
+    // com o dono e o placar segue premiando a venda.
+    //
+    // `ativo` no filtro é a saída: excluir a unidade no estoque encerra a
+    // pendência (o caso do cliente que nunca vai trazer).
+    db.from('inventario_unidades').select('grupo_pdv')
+      .eq('empresa_id', empresaId).eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
   ])
+
+  const gruposRetidos = new Set(
+    ((trocasPendentes ?? []) as { grupo_pdv: string | null }[])
+      .map((u) => u.grupo_pdv).filter((g): g is string => !!g),
+  )
 
   // Propostas → responsável (via lead), inclusive de leads criados antes do período.
   const propLeadIds = [...new Set(((propostas ?? []) as { lead_id: number | null }[]).map((p) => p.lead_id).filter((x): x is number => x != null))]
@@ -49,13 +66,19 @@ export async function calcularRanking(db: Db, empresaId: number, periodo: string
   type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
   const linhas = new Map<string, LinhaRanking>()
   for (const m of (membrosRaw ?? []) as unknown as MembroRow[]) {
-    linhas.set(m.usuario_id, { usuario_id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—', vendas: 0, faturamento: 0, captacoes: 0, visitas: 0, propostas: 0, conversao: 0, score: 0 })
+    linhas.set(m.usuario_id, { usuario_id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—', vendas: 0, faturamento: 0, captacoes: 0, visitas: 0, propostas: 0, conversao: 0, score: 0, vendasRetidas: 0, faturamentoRetido: 0 })
   }
   const get = (id: string | null) => (id ? linhas.get(id) : undefined)
 
-  for (const v of (vendas ?? []) as { vendedor_id: string | null; valor_venda: number; status: string | null }[]) {
+  for (const v of (vendas ?? []) as { vendedor_id: string | null; valor_venda: number; status: string | null; grupo_pdv: string | null }[]) {
     if (v.status !== 'concluida') continue
     const l = get(v.vendedor_id); if (!l) continue
+    // Retida vai para o lado de fora do score e do faturamento — não some, mas
+    // também não pontua até o aparelho estar na loja.
+    if (v.grupo_pdv && gruposRetidos.has(v.grupo_pdv)) {
+      l.vendasRetidas += 1; l.faturamentoRetido += Number(v.valor_venda) || 0
+      continue
+    }
     l.vendas += 1; l.faturamento += Number(v.valor_venda) || 0
   }
   for (const v of (visitas ?? []) as { corretor_id: string | null }[]) {

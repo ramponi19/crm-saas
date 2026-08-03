@@ -102,7 +102,16 @@ export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { peri
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.visitas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.propostas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.conversao}%</td>
-                        <td className="px-3 py-2.5 text-right num text-ink">{formatCurrency(l.faturamento)}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span className="num text-ink">{formatCurrency(l.faturamento)}</span>
+                          {/* O que não pontuou tem de ficar visível para o vendedor
+                              saber que existe uma troca para ele ir cobrar. */}
+                          {l.faturamentoRetido > 0 && (
+                            <div className="text-[10.5px] text-warn">
+                              {formatCurrency(l.faturamentoRetido)} travado · aparelho não chegou
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -153,7 +162,14 @@ function PodioCard({ linha, pos, lider }: { linha: LinhaRanking; pos: number; li
       </div>
       <div className="mt-3 flex items-end justify-between border-t border-line-soft pt-2.5">
         <div><div className="num text-[22px] font-semibold text-ink">{linha.score}</div><div className="text-[10.5px] text-ink-3">score</div></div>
-        <div className="text-right text-[11px] text-ink-3">{linha.vendas} vendas · {linha.visitas} visitas<br />{formatCurrency(linha.faturamento)}</div>
+        <div className="text-right text-[11px] text-ink-3">
+          {linha.vendas} vendas · {linha.visitas} visitas<br />{formatCurrency(linha.faturamento)}
+          {linha.vendasRetidas > 0 && (
+            <><br /><span className="text-warn">
+              {linha.vendasRetidas} {linha.vendasRetidas === 1 ? 'venda travada' : 'vendas travadas'}
+            </span></>
+          )}
+        </div>
       </div>
     </div>
   )
