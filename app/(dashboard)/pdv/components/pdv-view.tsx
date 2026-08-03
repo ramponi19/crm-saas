@@ -178,6 +178,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
   const totais = useMemo(() => {
     const subtotal = carrinho.reduce((a, c) => a + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
+    // A venda VALE o preço cheio menos o desconto real. A troca NÃO abate daqui:
+    // ela é pagamento em espécie (dação em pagamento), não desconto — o cliente
+    // pagou o preço todo, só que parte dele em aparelho. É `valorVenda` que vai
+    // para `vendas.valor_venda`, e é dele que saem faturamento e lucro.
+    const valorVenda = Math.max(0, subtotal - descontoNum)
+    // `total` é outra coisa: o DINHEIRO que o cliente ainda tem de pagar. Aqui a
+    // troca abate, porque ela já foi paga em aparelho. É o valor do Pix, da
+    // maquininha e do "Total a pagar" na tela.
     const total = Math.max(0, subtotal - abatimento)
     const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0), 0)
     let totalComTaxa = total
@@ -190,8 +198,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       if (taxa?.percentual_taxa) totalComTaxa = total * (1 + Number(taxa.percentual_taxa) / 100)
     }
     const taxaPct = totalComTaxa > total ? ((totalComTaxa - total) / total * 100) : 0
-    return { subtotal, total, totalComTaxa, custo, lucro: total - custo, taxaPct }
-  }, [carrinho, abatimento, acessoriosTotal, formaPagamento, parcelas, bandeira, taxas])
+    // Lucro sai de `valorVenda`, não de `total`: senão a troca viraria prejuízo.
+    return { subtotal, valorVenda, total, totalComTaxa, custo, lucro: valorVenda - custo, taxaPct }
+  }, [carrinho, abatimento, descontoNum, acessoriosTotal, formaPagamento, parcelas, bandeira, taxas])
 
   const parcelasOpts = useMemo(() => {
     const fp = formaPagamento === 'credito' ? 'maquininha' : 'link'
@@ -242,11 +251,19 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       let primeiraVendaId: number | null = null
       let trocaNotaPendente = trocaNota.length > 0
 
-      // Uma venda por unidade do carrinho (abatimento = desconto + troca, rateado).
+      // Uma venda por unidade do carrinho. Desconto e troca são rateados
+      // separadamente porque têm naturezas diferentes: o desconto reduz o valor da
+      // venda, a troca só troca a FORMA de pagamento de uma parte dela.
       for (const c of carrinho) {
         const precoCheio = c.item.preco_venda ?? 0
-        const descontoItem = subtotalBruto > 0 ? abatimento * (precoCheio / subtotalBruto) : 0
+        const fatia = subtotalBruto > 0 ? precoCheio / subtotalBruto : 0
+        const descontoItem = descontoNum * fatia
+        const trocaItem = trocaNum * fatia
         const valorItem = precoCheio - descontoItem
+        // O que o cliente paga em dinheiro por este item. A validação de
+        // `abatimento > subtotalBruto` acima garante trocaItem <= valorItem; o
+        // Math.max é só contra resto de ponto flutuante.
+        const caixaItem = Math.max(0, valorItem - trocaItem)
 
         // Item de reserva só é vendável enquanto AINDA está reservado (a reserva
         // trava a peça); item comum exige 'disponivel' — protege contra corrida.
@@ -261,7 +278,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         if (!unidadeClaim) throw new Error(c.reserva ? `A reserva de "${c.item.produto_nome}" não está mais ativa` : `"${c.item.produto_nome}" não está mais disponível`)
         claimed.push({ id: c.item.id, statusAnterior: statusEsperado })
 
-        const valorItemComTaxa = valorItem * taxaMultiplier
+        // A taxa da maquininha incide só sobre o que passa no cartão — a parte
+        // paga em aparelho não tem taxa.
+        const caixaItemComTaxa = caixaItem * taxaMultiplier
 
         const vendaRow = {
           empresa_id: empresaId,
@@ -301,22 +320,38 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           const { error: eUid } = await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
           if (eUid) throw new Error('Falha ao vincular a unidade à venda pendente')
         }
-        await supabase.from('vendas_pagamentos').insert({
-          empresa_id: empresaId,
-          venda_id: venda.id, forma_pagamento: formaPagamento,
-          valor_pago: valorItem,
-          bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
-          parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
-          valor_com_juros: totais.totalComTaxa !== totais.total ? valorItemComTaxa : null,
-        })
+        // Pagamento em DUAS linhas quando houve troca: o dinheiro e o aparelho.
+        // Somadas, fecham exatamente o `valor_venda` — é isso que faz a conta
+        // bater sem transformar a troca em prejuízo.
+        if (caixaItem > 0.005) {
+          await supabase.from('vendas_pagamentos').insert({
+            empresa_id: empresaId,
+            venda_id: venda.id, forma_pagamento: formaPagamento,
+            valor_pago: caixaItem,
+            bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
+            parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
+            valor_com_juros: totais.totalComTaxa !== totais.total ? caixaItemComTaxa : null,
+          })
+        }
+        if (trocaItem > 0.005) {
+          await supabase.from('vendas_pagamentos').insert({
+            empresa_id: empresaId,
+            venda_id: venda.id, forma_pagamento: 'troca',
+            valor_pago: trocaItem,
+            bandeira_cartao: null, parcelas: null, valor_com_juros: null,
+          })
+        }
       }
 
       // #3 Acessórios ofertados (kit proteção, fonte…) → venda extra por item.
       for (const ac of acessorios) {
         const preco = Number(ac.valor) || 0
         if (preco <= 0 || !ac.descricao.trim()) continue
-        const descAc = subtotalBruto > 0 ? abatimento * (preco / subtotalBruto) : 0
+        const fatiaAc = subtotalBruto > 0 ? preco / subtotalBruto : 0
+        const descAc = descontoNum * fatiaAc
+        const trocaAc = trocaNum * fatiaAc
         const valorAc = preco - descAc
+        const caixaAc = Math.max(0, valorAc - trocaAc)
         const { data: vAc } = await supabase.from('vendas').insert({
           empresa_id: empresaId, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
@@ -324,10 +359,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
         if (vAc?.id) vendaIds.push(vAc.id)
-        if (vAc?.id) await supabase.from('vendas_pagamentos').insert({
-          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: formaPagamento, valor_pago: valorAc,
+        if (vAc?.id && caixaAc > 0.005) await supabase.from('vendas_pagamentos').insert({
+          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: formaPagamento, valor_pago: caixaAc,
           bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
+        } as never)
+        if (vAc?.id && trocaAc > 0.005) await supabase.from('vendas_pagamentos').insert({
+          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: 'troca', valor_pago: trocaAc,
+          bandeira_cartao: null, parcelas: null,
         } as never)
       }
 
@@ -388,6 +427,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           ...acessorios.filter((a) => a.descricao.trim() && a.valor > 0)
             .map((a) => ({ descricao: `Acessório: ${a.descricao.trim()}`, imei: null, valor: a.valor })),
         ],
+        // ATENÇÃO: aqui é o DINHEIRO (`total`), de propósito — diferente do
+        // `valor_venda` gravado na venda. O contrato é assinado pelo cliente: pôr
+        // o preço cheio sem que o documento diga que parte foi paga em aparelho
+        // criaria um contrato afirmando que ele pagou algo que não pagou em
+        // dinheiro. Para o contrato declarar o preço cheio primeiro precisa existir
+        // um marcador de troca no modelo — e o texto da cláusula é do lojista,
+        // não do CRM.
         total: totais.total,
         desconto: abatimento,
         forma_pagamento: formaPagamento,
@@ -806,7 +852,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               {trocaNum > 0 && (
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[13px] text-ink-2">
-                    Troca (abatimento)
+                    Pago em aparelho (troca)
                     {trocasValidas.length > 1 && <span className="text-ink-3"> · {trocasValidas.length} aparelhos</span>}
                   </span>
                   <span className="num text-[13px] font-semibold text-ink-2">− {fmt(trocaNum)}</span>
@@ -816,6 +862,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 <span className="text-[14px] font-semibold text-ink">Total a pagar</span>
                 <span className="num text-[28px] font-bold leading-none tracking-[-0.035em] text-ink">{fmt(totais.total)}</span>
               </div>
+              {/* Com troca, o que o cliente paga e o que a venda vale são números
+                  diferentes. Mostrar os dois evita a leitura de que a loja "perdeu"
+                  a diferença. */}
+              {trocaNum > 0 && (
+                <div className="mt-1.5 text-[11.5px] text-ink-3">
+                  Em dinheiro. A venda é registrada por <span className="num font-semibold text-ink-2">{fmt(totais.valorVenda)}</span> — a troca entra como forma de pagamento.
+                </div>
+              )}
             </div>
 
             {/* #3 Ofertar acessórios */}
