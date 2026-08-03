@@ -37,6 +37,8 @@ interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; l
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
 interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean }
+/** Aparelho entregue na troca. `valor` fica string porque vem de <input>. */
+interface TrocaItem { aparelho: string; imei: string; valor: string }
 /**
  * Contexto da venda fechada, guardado para emitir o documento escolhido.
  * Inclui `empresaId` porque ele é resolvido dentro do fechamento.
@@ -73,11 +75,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [finalizando, setFinalizando] = useState(false)
   // #3 upsell de acessórios (ofertas editáveis)
   const [acessorios, setAcessorios] = useState<{ descricao: string; valor: number }[]>([])
-  // #1 aparelho na troca (abate no total + entra no estoque)
+  // #1 aparelhos na troca (abatem no total + entram no estoque).
+  // É lista porque o cliente com frequência entrega mais de um aparelho na
+  // mesma compra — cada um vira uma unidade própria no estoque, com seu IMEI e
+  // seu valor, e a soma abate do total.
   const [trocaAtiva, setTrocaAtiva] = useState(false)
-  const [trocaAparelho, setTrocaAparelho] = useState('')
-  const [trocaImei, setTrocaImei] = useState('')
-  const [trocaValor, setTrocaValor] = useState('')
+  const [trocas, setTrocas] = useState<TrocaItem[]>([{ aparelho: '', imei: '', valor: '' }])
   // #2 entrega pendente (semi-novo que não sai na hora)
   const [entregaPendente, setEntregaPendente] = useState(false)
   const [pixCobranca, setPixCobranca] = useState<CobrancaPix | null>(null)
@@ -164,7 +167,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
   const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
   const acessoriosTotal = acessorios.reduce((a, x) => a + (Number(x.valor) || 0), 0)
-  const trocaNum = trocaAtiva ? (parseFloat(String(trocaValor).replace(',', '.')) || 0) : 0
+  /** Trocas realmente preenchidas (valor > 0), com o valor já numérico. */
+  const trocasValidas = trocaAtiva
+    ? trocas
+        .map((t) => ({ ...t, num: parseFloat(String(t.valor).replace(',', '.')) || 0 }))
+        .filter((t) => t.num > 0)
+    : []
+  const trocaNum = trocasValidas.reduce((s, t) => s + t.num, 0)
   const abatimento = descontoNum + trocaNum
 
   const totais = useMemo(() => {
@@ -227,7 +236,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
       const unitStatus = entregaPendente ? 'reservado' : 'vendido'
       const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
-      const trocaNota = trocaAtiva && trocaNum > 0 ? ` Troca: ${trocaAparelho || 'aparelho'} (R$ ${trocaNum}).` : ''
+      const trocaNota = trocasValidas.length
+        ? ` Troca: ${trocasValidas.map((t) => `${t.aparelho.trim() || 'aparelho'} (${fmt(t.num)})`).join(', ')}.`
+        : ''
       let primeiraVendaId: number | null = null
       let trocaNotaPendente = trocaNota.length > 0
 
@@ -320,12 +331,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         } as never)
       }
 
-      // #1 Aparelho recebido na troca entra no estoque (disponível).
-      if (trocaAtiva && trocaNum > 0) {
+      // #1 Cada aparelho recebido na troca entra no estoque como UMA unidade
+      // própria — com o IMEI e o custo dele. Somar tudo numa unidade só perderia
+      // o rastro de qual aparelho é qual na hora de revender.
+      for (const t of trocasValidas) {
         await supabase.from('inventario_unidades').insert({
           empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'disponivel',
-          preco_custo: trocaNum, imei: trocaImei.trim() || null,
-          observacoes: `${trocaAparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
+          preco_custo: t.num, imei: t.imei.trim() || null,
+          observacoes: `${t.aparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
           ativo: true,
         } as never)
       }
@@ -386,7 +399,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
       setCarrinho([]); setDesconto(''); setParcelas(1)
-      setAcessorios([]); setTrocaAtiva(false); setTrocaAparelho(''); setTrocaImei(''); setTrocaValor(''); setEntregaPendente(false)
+      setAcessorios([]); setTrocaAtiva(false); setTrocas([{ aparelho: '', imei: '', valor: '' }]); setEntregaPendente(false)
       if (formaPagamento !== 'pix') setClienteSelecionado(null)
       setComanda('')
       router.refresh()
@@ -791,7 +804,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 <div className="mt-2 flex items-center justify-between"><span className="text-[13px] text-ink-2">Acessórios</span><span className="num text-[13px] font-semibold text-ok">+ {fmt(acessoriosTotal)}</span></div>
               )}
               {trocaNum > 0 && (
-                <div className="mt-2 flex items-center justify-between"><span className="text-[13px] text-ink-2">Troca (abatimento)</span><span className="num text-[13px] font-semibold text-ink-2">− {fmt(trocaNum)}</span></div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-[13px] text-ink-2">
+                    Troca (abatimento)
+                    {trocasValidas.length > 1 && <span className="text-ink-3"> · {trocasValidas.length} aparelhos</span>}
+                  </span>
+                  <span className="num text-[13px] font-semibold text-ink-2">− {fmt(trocaNum)}</span>
+                </div>
               )}
               <div className="mt-4 flex items-baseline justify-between border-t border-line-soft pt-3">
                 <span className="text-[14px] font-semibold text-ink">Total a pagar</span>
@@ -823,19 +842,48 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             {/* #1 Aparelho na troca */}
             <div className="mb-4 rounded-card border border-line p-3">
               <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2">
-                <input type="checkbox" checked={trocaAtiva} onChange={(e) => setTrocaAtiva(e.target.checked)} className="size-4 accent-accent" /> Aparelho na troca (abate no total)
+                <input type="checkbox" checked={trocaAtiva} onChange={(e) => setTrocaAtiva(e.target.checked)} className="size-4 accent-accent" /> Aparelho(s) na troca (abatem no total)
               </label>
               {trocaAtiva && (
-                <div className="mt-2.5 space-y-2">
-                  <input value={trocaAparelho} onChange={(e) => setTrocaAparelho(e.target.value)} placeholder="Aparelho recebido (ex.: iPhone 12 64GB Preto)"
-                    className="h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input value={trocaImei} onChange={(e) => setTrocaImei(e.target.value)} placeholder="IMEI (opcional)"
-                      className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
-                    <input type="number" value={trocaValor} onChange={(e) => setTrocaValor(e.target.value)} placeholder="Valor R$"
-                      className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
-                  </div>
-                  <p className="text-[11px] text-ink-3">O aparelho entra no estoque (disponível) e o valor abate no total.</p>
+                <div className="mt-2.5 space-y-2.5">
+                  {trocas.map((t, i) => (
+                    <div key={i} className="space-y-2 rounded-control border border-line-soft bg-raised p-2">
+                      <div className="flex items-center gap-2">
+                        <input value={t.aparelho}
+                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, aparelho: e.target.value } : x)))}
+                          placeholder={`Aparelho ${i + 1} (ex.: iPhone 12 64GB Preto)`}
+                          className="h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
+                        {trocas.length > 1 && (
+                          <button type="button" aria-label={`Remover aparelho ${i + 1}`}
+                            onClick={() => setTrocas((ts) => ts.filter((_, j) => j !== i))}
+                            className="grid h-9 w-9 flex-none place-items-center rounded-control text-ink-3 hover:bg-bad/10 hover:text-bad">
+                            <Minus size={15} strokeWidth={2} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={t.imei}
+                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, imei: e.target.value } : x)))}
+                          placeholder="IMEI (opcional)"
+                          className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
+                        <input type="number" value={t.valor}
+                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)))}
+                          placeholder="Valor R$"
+                          className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
+                      </div>
+                    </div>
+                  ))}
+
+                  <button type="button"
+                    onClick={() => setTrocas((ts) => [...ts, { aparelho: '', imei: '', valor: '' }])}
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-control border border-dashed border-line text-[12.5px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
+                    <Plus size={14} strokeWidth={1.9} /> Outro aparelho na troca
+                  </button>
+
+                  <p className="text-[11px] text-ink-3">
+                    Cada aparelho entra no estoque como uma unidade (disponível), com o IMEI e o custo dele.
+                    A soma abate no total.
+                  </p>
                 </div>
               )}
             </div>
