@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Modal, Input, Select, Textarea, Button, ConfirmDialog, notify } from '@/components/ui'
+import { Modal, Input, Select, Textarea, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 interface Unidade {
@@ -20,6 +20,8 @@ interface Unidade {
   preco_venda: number | null
   fornecedor_id: number | null
   observacoes: string | null
+  /** URLs separadas por vírgula — mesmo formato que /avaliacoes já usa. */
+  fotos_urls: string | null
   status: string | null
   tipo: string | null
   estado: string | null
@@ -41,7 +43,7 @@ interface Props {
 const EMPTY: Unidade = {
   produto_id: null, imei: null, imei2: null, numero_serie: null, bateria: null,
   condicao: 'novo', cor: null, armazenamento: null, preco_custo: null, preco_venda: null,
-  fornecedor_id: null, observacoes: null, status: 'disponivel', tipo: 'compra',
+  fornecedor_id: null, observacoes: null, fotos_urls: null, status: 'disponivel', tipo: 'compra',
   estado: 'lacrado', custo_reparo: null,
   placa: null, chassi: null, renavam: null, km: null, ano: null,
 }
@@ -95,7 +97,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
       imei: form.imei, imei2: form.imei2, numero_serie: form.numero_serie, bateria: form.bateria,
       condicao: form.condicao, cor: form.cor, armazenamento: form.armazenamento,
       preco_custo: num(form.preco_custo), preco_venda: num(form.preco_venda), custo_reparo: num(form.custo_reparo),
-      fornecedor_id: form.fornecedor_id, observacoes: form.observacoes, status: form.status, tipo: form.tipo, estado: form.estado,
+      fornecedor_id: form.fornecedor_id, observacoes: form.observacoes, fotos_urls: form.fotos_urls, status: form.status, tipo: form.tipo, estado: form.estado,
       placa: form.placa, chassi: form.chassi, renavam: form.renavam, km: num(form.km), ano: num(form.ano),
     }
 
@@ -281,6 +283,19 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
             onChange={e => set('observacoes', e.target.value || null)}
             placeholder="Defeitos, histórico, detalhes…"
           />
+
+          {/* Fotos DESTA unidade (não do modelo): estado real do aparelho —
+              riscos, marcas de uso, tela. É a prova do que foi vendido. */}
+          <div className="col-span-2">
+            <UploadFotos
+              label="Fotos desta unidade"
+              value={(form.fotos_urls ?? '').split(',').map(u => u.trim()).filter(Boolean)}
+              onChange={urls => set('fotos_urls', urls.join(',') || null)}
+              empresaId={empresaId}
+              max={8}
+              ajuda="O aparelho de verdade — riscos, marcas de uso, tela ligada. Serve de prova do estado na venda e na garantia."
+            />
+          </div>
           </fieldset>
         </form>
       </Modal>

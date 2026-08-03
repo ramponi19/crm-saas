@@ -20,7 +20,14 @@ interface ItemEstoque {
   estado: string | null; preco_custo: number | null; preco_venda: number | null; status: string
   /** Garantia do modelo; null cai no padrão da loja. */
   produto_garantia_dias?: number | null
+  /** Fotos desta unidade (URLs separadas por vírgula) e foto do modelo. */
+  fotos_urls?: string | null
+  produto_foto?: string | null
 }
+
+/** Foto da unidade tem prioridade: é o aparelho real, não o do catálogo. */
+const fotoDoItem = (i: { fotos_urls?: string | null; produto_foto?: string | null }) =>
+  (i.fotos_urls ?? '').split(',').map((u) => u.trim()).find(Boolean) ?? i.produto_foto ?? null
 interface ClienteSimples { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
 interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
@@ -615,8 +622,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                         noCarrinho ? 'cursor-default border-line opacity-60' : 'border-line hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]',
                       )}
                     >
-                      <div className="mb-3 grid h-11 w-11 place-items-center rounded-control bg-ink/[0.04] text-ink-3">
-                        <Package size={20} strokeWidth={1.7} />
+                      {/* Foto da unidade quando existe; senão a do modelo; senão o ícone. */}
+                      <div className="mb-3 grid h-11 w-11 place-items-center overflow-hidden rounded-control bg-ink/[0.04] text-ink-3">
+                        {fotoDoItem(item)
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={fotoDoItem(item)!} alt="" className="h-full w-full object-cover" />
+                          : <Package size={20} strokeWidth={1.7} />}
                       </div>
                       <div className="min-h-[36px] text-[13px] font-semibold leading-[1.3] text-ink">
                         {item.produto_nome}

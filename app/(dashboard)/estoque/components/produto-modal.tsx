@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { Modal, Input, Select, Button, ConfirmDialog, notify } from '@/components/ui'
+import { Modal, Input, Select, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
 import { X, Plus } from 'lucide-react'
 import { APPLE_MODELOS } from '@/lib/apple-modelos'
 
@@ -65,6 +65,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
     categoria_id: produto?.categoria_id ? String(produto.categoria_id) : '',
     garantia_dias: '',
   })
+  const [foto, setFoto] = useState<string[]>([])
   const [cores, setCores] = useState<string[]>([])
   const [armazenamentos, setArmazenamentos] = useState<string[]>([])
   const [modeloApple, setModeloApple] = useState('')
@@ -74,10 +75,11 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   // Ao editar, carrega cores/armazenamentos/garantia salvos.
   useEffect(() => {
     if (!produto?.id) return
-    supabase.from('produtos').select('cores, armazenamentos, garantia_dias').eq('id', produto.id).maybeSingle().then(({ data }) => {
+    supabase.from('produtos').select('cores, armazenamentos, garantia_dias, foto_url').eq('id', produto.id).maybeSingle().then(({ data }) => {
       if (data?.cores) setCores(data.cores)
       if (data?.armazenamentos) setArmazenamentos(data.armazenamentos)
       if (data?.garantia_dias != null) setForm((f) => ({ ...f, garantia_dias: String(data.garantia_dias) }))
+      if (data?.foto_url) setFoto([data.foto_url])
     })
   }, [produto?.id, supabase])
 
@@ -103,6 +105,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
       armazenamentos: armazenamentos.length ? armazenamentos : null,
       // Vazio = usa o padrão da loja (/admin/configuracoes → Contrato).
       garantia_dias: form.garantia_dias.trim() ? Number(form.garantia_dias) : null,
+      foto_url: foto[0] ?? null,
       ativo: true,
     }
     if (isNew) {
@@ -194,6 +197,8 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
             onChange={e => setForm(f => ({ ...f, garantia_dias: e.target.value }))}
             placeholder="Em branco = padrão da loja"
           />
+          <UploadFotos label="Foto do modelo" value={foto} onChange={setFoto} empresaId={empresa?.id ?? 0} max={1}
+            disabled={!empresa?.id} ajuda="Aparece no PDV e no catálogo. JPG, PNG ou WEBP até 8 MB." />
           <ChipsField label="Cores do modelo" values={cores} onChange={setCores} placeholder="Ex.: Titânio Preto (Enter p/ adicionar)" />
           <ChipsField label="Armazenamentos" values={armazenamentos} onChange={setArmazenamentos} placeholder="Ex.: 256GB (Enter p/ adicionar)" />
           <p className="-mt-1 text-[11px] text-ink-3">No estoque, ao escolher este modelo, Cor e Armazenamento viram listas com estas opções.</p>

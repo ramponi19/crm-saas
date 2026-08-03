@@ -34,6 +34,8 @@ export interface Unidade {
   fornecedor_id: number | null
   custo_reparo: number | null
   observacoes: string | null
+  /** Fotos desta unidade — URLs separadas por vírgula. */
+  fotos_urls: string | null
   created_at: string | null
   // Veículos (segmento concessionaria)
   placa: string | null
