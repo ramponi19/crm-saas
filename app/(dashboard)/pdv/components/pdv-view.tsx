@@ -945,9 +945,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                     <Plus size={14} strokeWidth={1.9} /> Outro aparelho na troca
                   </button>
 
+                  {/* O vendedor precisa saber, ANTES de fechar, que a comissão
+                      depende dele trazer o aparelho — senão descobre depois, no
+                      ranking, sem entender por quê. */}
                   <p className="text-[11px] text-ink-3">
-                    Cada aparelho entra no estoque como uma unidade (disponível), com o IMEI e o custo dele.
-                    A soma abate no total.
+                    Cada aparelho entra no estoque como uma unidade <strong className="font-semibold text-warn">pendente</strong>, no seu nome,
+                    com o IMEI e o custo dele. A soma abate no total.
+                    Comissão e ranking só contam esta venda quando alguém confirmar a chegada no Estoque.
                   </p>
                 </div>
               )}

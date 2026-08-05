@@ -84,9 +84,10 @@ const STATUS_BADGE: Record<string, { label: string; tone: Tone; dot?: boolean }>
   reservado:   { label: 'Reservado',  tone: 'warn' },
   vendido:     { label: 'Vendido',    tone: 'neutro' },
   assistencia: { label: 'Em reparo',  tone: 'acc' },
-  // `pendente` já era gravável no cadastro manual mas não tinha rótulo aqui: o
-  // fallback do render mostrava a unidade como "Disponível", justamente o oposto.
-  pendente:    { label: 'A receber',  tone: 'warn' },
+  // "Pendente", a mesma palavra do cadastro manual e do PDV. Eu havia escrito
+  // "A receber" aqui: dois nomes para o mesmo status deixam o vendedor sem saber
+  // se são coisas diferentes.
+  pendente:    { label: 'Pendente',   tone: 'warn' },
 }
 
 const CONDICAO_BADGE: Record<string, { label: string; tone: Tone }> = {
@@ -107,7 +108,7 @@ const TIPO_BADGE: Record<string, { label: string; tone: Tone }> = {
 const STATUS_FILTER = [
   { value: 'todos', label: 'Todos' },
   { value: 'disponivel', label: 'Disponível' },
-  { value: 'pendente', label: 'A receber' },
+  { value: 'pendente', label: 'Pendente' },
   { value: 'reservado', label: 'Reservado' },
   { value: 'assistencia', label: 'Em reparo' },
   { value: 'vendido', label: 'Vendido' },
@@ -316,9 +317,13 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           {/* ── DASHBOARD ── */}
           {tab === 'dashboard' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+              <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-5 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
                 <StatCard bare label="Unidades ativas" value={stats.total} />
                 <StatCard bare label="Disponíveis" value={stats.disponiveis} deltaTone="ok" />
+                {/* Aparelho de troca que ainda não chegou. Estava sendo contado e
+                    não aparecia em lugar nenhum — é justamente o que alguém tem
+                    de olhar todo dia para ir cobrar o cliente. */}
+                <StatCard bare label="Pendentes" value={stats.pendentes} />
                 <StatCard bare label="Reservadas" value={stats.reservados} />
                 <StatCard bare label="Em reparo" value={stats.reparo} />
               </div>
@@ -327,6 +332,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                 <div className="space-y-4">
                   {[
                     { label: 'Disponíveis', count: stats.disponiveis, bar: 'bg-ok' },
+                    { label: 'Pendentes (troca a receber)', count: stats.pendentes, bar: 'bg-warn' },
                     { label: 'Reservadas', count: stats.reservados, bar: 'bg-warn' },
                     { label: 'Em reparo', count: stats.reparo, bar: 'bg-accent' },
                     { label: 'Vendidas (total)', count: stats.vendidos, bar: 'bg-ink-3' },

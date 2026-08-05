@@ -175,6 +175,11 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
 
           <Select label="Status" value={form.status ?? ''} onChange={e => set('status', e.target.value || null)}>
             <option value="disponivel">Disponível</option>
+            {/* Faltava aqui: abrir uma unidade pendente deixava o campo em branco,
+                porque o valor não existia na lista. Para liberar de verdade use
+                "Confirmar chegada" na lista — é ela que grava quem recebeu e
+                quando, e libera comissão e ranking. */}
+            <option value="pendente">Pendente (aguardando chegar)</option>
             <option value="reservado">Reservado</option>
             <option value="vendido">Vendido</option>
             <option value="assistencia">Assistência</option>
