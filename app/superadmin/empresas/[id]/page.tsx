@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { rastrDb } from '@/lib/rastreamento/db'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import { ControleEmpresa } from '@/components/superadmin/controle-empresa'
+import { AddonsEmpresa } from '@/components/superadmin/addons-empresa'
 import { ZonaPerigo } from '@/components/superadmin/zona-perigo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -69,6 +71,11 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
     .single()
 
   if (!empresa) notFound()
+
+  // Complementos pagos (Nexus Tracker / ZapIntel): estado na tabela autocontida
+  // tracker_addons, lida via client do complemento (fora dos tipos do CRM).
+  const { data: addon } = await rastrDb()
+    .from('tracker_addons').select('tracker_ativo, zapintel_ativo').eq('empresa_id', empresaId).maybeSingle()
 
   // Usuários membros
   const { data: membrosRaw } = await svc
@@ -232,6 +239,15 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
             .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
           limiteUsuariosInit={empresa.limite_usuarios ?? 0}
           limiteLeadsInit={empresa.limite_leads ?? 0}
+        />
+      </div>
+
+      {/* Complementos pagos (add-ons) — toggle por empresa */}
+      <div className="mb-5">
+        <AddonsEmpresa
+          empresaId={empresaId}
+          trackerInit={!!(addon as { tracker_ativo?: boolean } | null)?.tracker_ativo}
+          zapintelInit={!!(addon as { zapintel_ativo?: boolean } | null)?.zapintel_ativo}
         />
       </div>
 

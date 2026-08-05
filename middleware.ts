@@ -64,6 +64,9 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/api/orcamento/') ||
                         request.nextUrl.pathname.startsWith('/offline') ||
                         request.nextUrl.pathname === '/sw.js' ||
+                        request.nextUrl.pathname === '/track.js' ||
+                        request.nextUrl.pathname.startsWith('/i/') ||
+                        request.nextUrl.pathname.startsWith('/api/rastreamento/') ||
                         request.nextUrl.pathname === '/manifest.webmanifest'
 
   if (!user && !isAuthRoute && !isPublicRoute) {

@@ -5,6 +5,7 @@ import { EmpresaProvider } from '@/lib/empresa-context'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { AdminShell } from '@/components/admin/admin-shell'
+import { rastrDb } from '@/lib/rastreamento/db'
 
 /**
  * Área de Administração do DONO (owner/admin), escopada ao tenant.
@@ -15,9 +16,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { userId, empresaId, role } = await requireEmpresaRole(['owner', 'admin'])
 
   const supabase = await createClient()
-  const [{ data: usuario }, { data: empresa }] = await Promise.all([
+  const [{ data: usuario }, { data: empresa }, { data: addon }] = await Promise.all([
     supabase.from('usuarios').select('nome, email').eq('id', userId).single(),
     supabase.from('empresas').select('nome').eq('id', empresaId).single(),
+    // Atalhos dos complementos (Nexus Tracker / ZapIntel): só aparecem quando o
+    // add-on está ativo. Status vem da tabela própria do complemento, não do CRM.
+    rastrDb().from('tracker_addons').select('tracker_ativo, zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
   ])
   const impersonation = await getImpersonation()
 
@@ -28,6 +32,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         empresaNome={empresa?.nome ?? 'Minha empresa'}
         role={role}
         impersonationNome={impersonation?.nome ?? null}
+        trackerAtivo={!!(addon as { tracker_ativo?: boolean })?.tracker_ativo}
+        zapintelAtivo={!!(addon as { zapintel_ativo?: boolean })?.zapintel_ativo}
       >
         {children}
       </AdminShell>

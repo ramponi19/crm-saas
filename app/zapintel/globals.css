@@ -1,0 +1,39 @@
+/* ZapIntel — tema CLARO (padrão Nexus), escopado em .zi-root para não afetar o
+   resto do crm-saas. As telas usam estas variáveis, então mudar aqui reveste todas. */
+.zi-root {
+  --bg: #f6f7f9;         /* fundo da página */
+  --panel: #ffffff;      /* sidebar / barras */
+  --card: #ffffff;
+  --card2: #f4f6f8;
+  --brd: #e6e8ec;
+  --brd2: #dde1e6;
+  --txt: #15181c;        /* texto principal (ink) */
+  --dim: #5c6470;        /* texto secundário */
+  --muted: #9199a3;      /* metadados */
+  --purple: #7c5cfc;     /* accent ZapIntel (fills) */
+  --purple-l: #6d28d9;   /* accent legível sobre claro (textos/links) */
+  --green: #16a34a;
+  --yellow: #ca8a04;
+  --orange: #ea580c;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --teal: #0d9488;
+
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font-geist), "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.zi-root *, .zi-root *::before, .zi-root *::after { box-sizing: border-box; }
+.zi-root :where(h1, h2, h3, h4, p, ul, ol, figure) { margin: 0; }
+
+.zi-root .card { background: var(--card); border: 1px solid var(--brd); border-radius: 14px; box-shadow: 0 1px 2px rgba(21,24,28,.04); }
+.zi-root .card2 { background: var(--card2); border: 1px solid var(--brd2); border-radius: 10px; }
+
+.zi-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.zi-root ::-webkit-scrollbar-track { background: transparent; }
+.zi-root ::-webkit-scrollbar-thumb { background: #cfd4da; border-radius: 4px; }
+.zi-root ::-webkit-scrollbar-thumb:hover { background: #b6bcc4; }
+
+@keyframes zi-spin { to { transform: rotate(360deg); } }

@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
-  SlidersHorizontal, Link2, FileSignature,
+  SlidersHorizontal, Link2, FileSignature, Radar,
 } from 'lucide-react'
 
 /**
@@ -53,8 +53,8 @@ const navGroups = [
   },
 ]
 
-export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha empresa', role = 'owner', impersonationNome = null, children }: {
-  userName?: string; empresaNome?: string; role?: string; impersonationNome?: string | null; children: React.ReactNode
+export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha empresa', role = 'owner', impersonationNome = null, trackerAtivo = false, zapintelAtivo = false, children }: {
+  userName?: string; empresaNome?: string; role?: string; impersonationNome?: string | null; trackerAtivo?: boolean; zapintelAtivo?: boolean; children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -78,6 +78,31 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
       {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
           sai da tela em vez de o menu ganhar rolagem. */}
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+        {/* Complementos pagos (Nexus Tracker / ZapIntel) — só aparecem quando o
+            super admin ativou o add-on para esta empresa. São áreas próprias
+            (/tracker, /zapintel), por isso Link direto com a cor de cada marca. */}
+        {(trackerAtivo || zapintelAtivo) && (
+          <div className="mb-1.5">
+            {trackerAtivo && (
+              <Link href="/tracker" onClick={onNavigate}
+                className="mb-px flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
+                style={{ background: 'rgba(0,168,132,0.10)', color: '#007e5f' }}>
+                <Radar size={16} strokeWidth={1.7} className="shrink-0" />
+                <span className="flex-1 truncate">Nexus Tracker</span>
+                <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
+              </Link>
+            )}
+            {zapintelAtivo && (
+              <Link href="/zapintel" onClick={onNavigate}
+                className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
+                style={{ background: 'rgba(124,92,252,0.10)', color: '#6d28d9' }}>
+                <MessageSquareText size={16} strokeWidth={1.7} className="shrink-0" />
+                <span className="flex-1 truncate">ZapIntel</span>
+                <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
+              </Link>
+            )}
+          </div>
+        )}
         {navGroups.map((group) => (
           <div key={group.label}>
             <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">{group.label}</p>
