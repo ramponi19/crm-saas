@@ -14,9 +14,12 @@ export default async function EstoquePage() {
   const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
-      // `usuarios!usuario_id` é o responsável pela unidade — em entrada por troca,
-      // quem aceitou o aparelho e responde por ele até chegar na loja.
-      .select(`*, produtos!produto_id(nome, foto_url, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia), usuarios!usuario_id(nome)`)
+      // NÃO dá para embutir o responsável aqui: `inventario_unidades.usuario_id`
+      // tem FK para `auth.users`, não para `public.usuarios`. Pedir
+      // `usuarios!usuario_id(nome)` derruba a consulta INTEIRA no PostgREST e a
+      // página recebe `null` — o estoque aparecia vazio. O nome vem numa consulta
+      // separada, logo abaixo.
+      .select(`*, produtos!produto_id(nome, foto_url, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia)`)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('created_at', { ascending: false }),
@@ -29,10 +32,23 @@ export default async function EstoquePage() {
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
+  // Nome de quem respondeu pela unidade (entrada por troca). Consulta à parte
+  // porque o embed não é possível — ver o comentário no select acima.
+  const responsaveisIds = [...new Set(
+    ((unidades ?? []) as { usuario_id: string | null }[])
+      .map((u) => u.usuario_id).filter((id): id is string => !!id),
+  )]
+  const nomePorUsuario = new Map<string, string>()
+  if (responsaveisIds.length) {
+    const { data: resps } = await supabase.from('usuarios').select('id, nome').in('id', responsaveisIds)
+    for (const r of (resps ?? []) as { id: string; nome: string | null }[]) {
+      if (r.nome) nomePorUsuario.set(r.id, r.nome)
+    }
+  }
+
   type UnidadeRow = Tables<'inventario_unidades'> & {
     produtos: Embed<{ nome: string | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
     fornecedores: Embed<{ nome_fantasia: string | null }>
-    usuarios: Embed<{ nome: string | null }>
   }
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
@@ -43,7 +59,7 @@ export default async function EstoquePage() {
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       fornecedor_nome: one(u.fornecedores)?.nome_fantasia ?? null,
-      responsavel_nome: one(u.usuarios)?.nome ?? null,
+      responsavel_nome: u.usuario_id ? nomePorUsuario.get(u.usuario_id) ?? null : null,
     }
   })
 

@@ -6,6 +6,7 @@ import {
   Package, Banknote, Zap, CreditCard, Link2, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
@@ -235,12 +236,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id')
-        .eq('usuario_id', user.id).eq('ativo', true).single()
-
-      if (!vinculo) throw new Error('Empresa não encontrada')
-      const empresaId = vinculo.empresa_id
+      // Mesma resolução do servidor e da RLS. Consultar `empresa_usuarios` aqui
+      // quebrava para o super admin em impersonação — ele não tem vínculo, e a
+      // venda morria em "Empresa não encontrada" no último clique.
+      const empresaId = await empresaAtualId(supabase)
+      if (!empresaId) throw new Error('Empresa não encontrada')
 
       // Um fechamento gera VÁRIAS vendas (uma por item do carrinho). O grupo as
       // amarra: é por ele que um aparelho de troca ainda não recebido segura a
