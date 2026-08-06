@@ -378,7 +378,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     {marcasUnicas.map(m => <option key={m} value={m}>{m}</option>)}
                   </Select>
                 )}
-                <Button className="w-full sm:w-auto" icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => { setUnidadeSel(null); setModalOpen(true) }}>
+                {/* Vai para a aba Entrada, igual ao de semi-novo. Antes este
+                    botão abria um MODAL com o mesmo formulário: dois caminhos
+                    para a mesma coisa, na mesma tela, cada um com campos um
+                    pouco diferentes. O modal ficou só para ver/editar unidade
+                    que já existe (clique na linha da lista). */}
+                <Button className="w-full sm:w-auto" icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada(null)}>
                   {isVeiculo ? 'Adicionar veículo' : 'Entrada de estoque'}
                 </Button>
                 {!isVeiculo && (
