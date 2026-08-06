@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Tag, Package, Pencil, Trash2 } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { Search, Plus, Tag, Package, Pencil, Trash2, Download, Upload } from 'lucide-react'
+import { cn, formatCurrency } from '@/lib/utils'
+import { exportarCSV, lerCSV, type LinhaImportada, type ErroImport } from '@/lib/tabela-precos-csv'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { TIPOS_FORMULARIO } from '@/lib/estoque-campos'
@@ -129,6 +130,82 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const router = useRouter()
   const { empresa } = useEmpresa()
   const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
+
+  // ── Tabela de preços: exportar / importar em massa ──
+  const inputCSV = useRef<HTMLInputElement>(null)
+  const [previa, setPrevia] = useState<{ linhas: LinhaImportada[]; erros: ErroImport[]; novos: number; atualiza: number } | null>(null)
+  const [importando, setImportando] = useState(false)
+
+  function exportarTabela() {
+    const csv = exportarCSV(tabela.map((t) => ({
+      id: t.id, modelo: t.modelo, armazenamento: t.armazenamento,
+      condicao: t.condicao, preco_sugerido: t.preco_sugerido, observacoes: t.observacoes,
+    })))
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `tabela-precos_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  /**
+   * Lê o arquivo e mostra a PRÉVIA antes de gravar. Import direto num preço de
+   * venda é o tipo de coisa que, errada, só aparece depois de a loja vender
+   * barato o dia inteiro.
+   */
+  async function lerArquivo(file: File) {
+    const texto = await file.text()
+    const { linhas, erros } = lerCSV(texto)
+    const idsExistentes = new Set(tabela.map((t) => t.id))
+    const atualiza = linhas.filter((l) => l.dados.id != null && idsExistentes.has(l.dados.id)).length
+    const novos = linhas.length - atualiza
+    setPrevia({ linhas, erros, novos, atualiza })
+  }
+
+  async function confirmarImport() {
+    if (!previa) return
+    setImportando(true)
+    try {
+      const supabase = createClient()
+      const empresaId = await empresaAtualId(supabase)
+      if (!empresaId) { notify.bad('Empresa não encontrada'); return }
+      const idsExistentes = new Set(tabela.map((t) => t.id))
+
+      const paraAtualizar = previa.linhas.filter((l) => l.dados.id != null && idsExistentes.has(l.dados.id))
+      const paraCriar = previa.linhas.filter((l) => !(l.dados.id != null && idsExistentes.has(l.dados.id)))
+
+      // Update um a um: o id manda, e um erro numa linha não derruba as outras.
+      let falhas = 0
+      for (const l of paraAtualizar) {
+        const { error } = await supabase.from('tabela_precos').update({
+          modelo: l.dados.modelo, armazenamento: l.dados.armazenamento,
+          condicao: l.dados.condicao, preco_sugerido: l.dados.preco_sugerido,
+          observacoes: l.dados.observacoes,
+        }).eq('id', l.dados.id!).eq('empresa_id', empresaId)
+        if (error) falhas++
+      }
+      if (paraCriar.length) {
+        const { error } = await supabase.from('tabela_precos').insert(
+          paraCriar.map((l) => ({
+            empresa_id: empresaId, modelo: l.dados.modelo, armazenamento: l.dados.armazenamento,
+            condicao: l.dados.condicao, preco_sugerido: l.dados.preco_sugerido,
+            observacoes: l.dados.observacoes, ativo: true,
+          })),
+        )
+        if (error) { notify.bad('Erro ao criar os preços novos', error.message); return }
+      }
+
+      notify.ok(
+        `${paraAtualizar.length - falhas} atualizados, ${paraCriar.length} criados`,
+        falhas > 0 ? `${falhas} linhas falharam ao atualizar` : undefined,
+      )
+      setPrevia(null)
+      router.refresh()
+    } finally {
+      setImportando(false)
+    }
+  }
 
   // Categoria: criar/editar. É ela que decide os campos da entrada de estoque,
   // e até agora não havia tela nenhuma para mexer nisso.
@@ -396,9 +473,22 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {/* ── TABELA DE PREÇOS ── */}
           {tab === 'tabela' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[12.5px] text-ink-3">Preços de venda por modelo/condição — referência rápida para o balcão e o PDV.</p>
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovoPreco}>Novo preço</Button>
+                <div className="flex flex-wrap gap-2">
+                  {/* Alteração em massa: exporta, edita no Excel, importa de volta.
+                      A coluna `id` no arquivo é o que faz o import ATUALIZAR em vez
+                      de duplicar. */}
+                  <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={exportarTabela} disabled={tabela.length === 0}>
+                    Exportar CSV
+                  </Button>
+                  <Button variant="outline" icon={<Upload size={15} strokeWidth={1.7} />} onClick={() => inputCSV.current?.click()}>
+                    Importar CSV
+                  </Button>
+                  <input ref={inputCSV} type="file" accept=".csv,text/csv" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) lerArquivo(f); e.target.value = '' }} />
+                  <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovoPreco}>Novo preço</Button>
+                </div>
               </div>
 
               <Card flush>
@@ -477,6 +567,100 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           onDeleted={() => { setEditProd(null); router.refresh() }}
         />
       )}
+
+      {/* Prévia do import: mostra o que vai acontecer ANTES de gravar. Preço de
+          venda errado só aparece depois de a loja vender barato o dia inteiro. */}
+      <Modal
+        open={previa !== null}
+        onClose={() => setPrevia(null)}
+        size="lg"
+        title="Conferir importação"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPrevia(null)} disabled={importando}>Cancelar</Button>
+            <Button onClick={confirmarImport} loading={importando} disabled={!previa?.linhas.length}>
+              Aplicar {previa?.linhas.length ?? 0} {previa?.linhas.length === 1 ? 'linha' : 'linhas'}
+            </Button>
+          </>
+        }
+      >
+        {previa && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-control border border-line-soft p-3">
+                <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3">Atualiza</div>
+                <div className="num text-[20px] font-bold text-ink">{previa.atualiza}</div>
+              </div>
+              <div className="rounded-control border border-line-soft p-3">
+                <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3">Cria</div>
+                <div className="num text-[20px] font-bold text-ok">{previa.novos}</div>
+              </div>
+              <div className="rounded-control border border-line-soft p-3">
+                <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3">Com erro</div>
+                <div className={cn('num text-[20px] font-bold', previa.erros.length ? 'text-bad' : 'text-ink-3')}>{previa.erros.length}</div>
+              </div>
+            </div>
+
+            <p className="text-[12px] text-ink-2">
+              Preço que está na tabela e <strong>não</strong> veio no arquivo continua como está — o import nunca apaga.
+            </p>
+
+            {previa.erros.length > 0 && (
+              <div className="rounded-control border border-bad/30 bg-bad-soft p-3">
+                <div className="mb-1.5 text-[12.5px] font-semibold text-bad">Linhas ignoradas</div>
+                <ul className="space-y-0.5 text-[11.5px] text-ink-2">
+                  {previa.erros.slice(0, 12).map((e, i) => <li key={i}>Linha {e.linha}: {e.motivo}</li>)}
+                  {previa.erros.length > 12 && <li className="text-ink-3">…e mais {previa.erros.length - 12}</li>}
+                </ul>
+              </div>
+            )}
+
+            {previa.linhas.length > 0 && (
+              <div className="max-h-[240px] overflow-y-auto rounded-control border border-line-soft scrollbar-thin">
+                <table className="w-full text-[12px]">
+                  <thead className="sticky top-0 bg-raised text-ink-3">
+                    <tr>
+                      <th className="px-2.5 py-1.5 text-left font-semibold">Modelo</th>
+                      <th className="px-2.5 py-1.5 text-left font-semibold">Variante</th>
+                      <th className="px-2.5 py-1.5 text-left font-semibold">Condição</th>
+                      <th className="px-2.5 py-1.5 text-right font-semibold">Preço</th>
+                      <th className="px-2.5 py-1.5 text-right font-semibold">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previa.linhas.slice(0, 60).map((l, i) => {
+                      const existe = l.dados.id != null && tabela.some((t) => t.id === l.dados.id)
+                      const atual = existe ? tabela.find((t) => t.id === l.dados.id) : null
+                      const mudouPreco = atual && Number(atual.preco_sugerido) !== l.dados.preco_sugerido
+                      return (
+                        <tr key={i} className="border-t border-line-soft">
+                          <td className="px-2.5 py-1.5 text-ink">{l.dados.modelo}</td>
+                          <td className="px-2.5 py-1.5 text-ink-2">{l.dados.armazenamento ?? '—'}</td>
+                          <td className="px-2.5 py-1.5 text-ink-2">{l.dados.condicao}</td>
+                          <td className="num px-2.5 py-1.5 text-right">
+                            {/* Mostrar o preço ANTIGO ao lado é o que faz um erro de
+                                digitação saltar aos olhos aqui, e não no balcão. */}
+                            {mudouPreco && <span className="mr-1.5 text-ink-3 line-through">{formatCurrency(Number(atual!.preco_sugerido))}</span>}
+                            <span className={cn('font-semibold', mudouPreco ? 'text-accent' : 'text-ink')}>{formatCurrency(l.dados.preco_sugerido)}</span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right">
+                            <Badge tone={existe ? 'neutro' : 'ok'}>{existe ? 'atualiza' : 'novo'}</Badge>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {previa.linhas.length > 60 && (
+                  <div className="border-t border-line-soft px-2.5 py-1.5 text-[11.5px] text-ink-3">
+                    Mostrando 60 de {previa.linhas.length} — todas serão aplicadas.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={editCateg !== null}
