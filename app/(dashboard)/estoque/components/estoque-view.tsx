@@ -499,6 +499,71 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
   const [saving, setSaving] = useState(false)
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
 
+  /**
+   * Consulta pelo número de série / IMEI.
+   *
+   * A fonte é o histórico da PRÓPRIA loja — não existe consulta externa de IMEI
+   * no sistema, e inventar uma seria prometer dado que não temos. O que isso
+   * resolve de verdade:
+   *
+   * - DUPLICADO: já existe unidade ativa com esse IMEI. Hoje nada impede cadastrar
+   *   o mesmo aparelho duas vezes (os índices de imei/série não são únicos), e o
+   *   estoque passa a mentir na contagem.
+   * - CONHECIDO: aparelho que já passou pela loja (vendido, ou que voltou em
+   *   troca/garantia). Traz modelo, cor e capacidade preenchidos — é o caso comum
+   *   de recompra e de aparelho que volta.
+   *
+   * Preço NÃO é copiado de propósito: custo e venda são desta negociação, não da
+   * anterior. Repetir o valor antigo seria o tipo de "ajuda" que passa batida.
+   */
+  type Achado =
+    | { tipo: 'duplicado'; rotulo: string; status: string }
+    | { tipo: 'conhecido'; rotulo: string; quando: string | null }
+  const [serieBuscando, setSerieBuscando] = useState(false)
+  const [serieAchado, setSerieAchado] = useState<Achado | null>(null)
+
+  useEffect(() => {
+    const serie = form.imei.trim()
+    if (isVeiculo || serie.length < 6) { setSerieAchado(null); return }
+    let cancelado = false
+    setSerieBuscando(true)
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from('inventario_unidades')
+        .select('id, status, ativo, cor, armazenamento, condicao, bateria, produto_id, created_at, produtos!produto_id(nome)')
+        .eq('empresa_id', empresaId)
+        .or(`imei.eq.${serie},numero_serie.eq.${serie}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (cancelado) return
+      setSerieBuscando(false)
+
+      const u = (data ?? [])[0] as (Record<string, unknown> & { produtos?: { nome?: string } | { nome?: string }[] | null }) | undefined
+      if (!u) { setSerieAchado(null); return }
+
+      const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
+      const rotulo = prod?.nome ?? 'Aparelho sem cadastro de produto'
+
+      // Ativo e não vendido = está no estoque agora. É duplicata, não histórico.
+      if (u.ativo && u.status !== 'vendido') {
+        setSerieAchado({ tipo: 'duplicado', rotulo, status: String(u.status ?? '') })
+        return
+      }
+
+      setSerieAchado({ tipo: 'conhecido', rotulo, quando: (u.created_at as string) ?? null })
+      // Preenche só o que identifica o aparelho, e sem sobrescrever o que a
+      // pessoa já digitou.
+      setForm(f => ({
+        ...f,
+        produto_id: f.produto_id || (u.produto_id ? String(u.produto_id) : ''),
+        cor: f.cor || String(u.cor ?? ''),
+        armazenamento: f.armazenamento || String(u.armazenamento ?? ''),
+        bateria: f.bateria || String(u.bateria ?? ''),
+      }))
+    }, 450)
+    return () => { cancelado = true; clearTimeout(t) }
+  }, [form.imei, isVeiculo, empresaId, supabase])
+
   const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
   const margem = form.preco_venda && form.preco_custo
     ? (((Number(form.preco_venda) - custoTotal) / Number(form.preco_venda)) * 100).toFixed(1) : null
@@ -525,6 +590,13 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
 
   async function salvar() {
     if (!form.produto_id) { notify.warn('Selecione um produto'); return }
+    // Barra a duplicata de verdade. Só o aviso na tela não segura: quem está
+    // dando entrada em lote passa direto e o estoque fica com o mesmo aparelho
+    // contado duas vezes.
+    if (serieAchado?.tipo === 'duplicado') {
+      notify.bad('Este número de série já está no estoque', 'Localize a unidade existente em vez de cadastrar outra.')
+      return
+    }
     if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
     if (!form.preco_venda) { notify.warn('Informe o preço de venda'); return }
     setSaving(true)
@@ -574,6 +646,38 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
 
   return (
     <div className="space-y-5">
+      {/* Série primeiro: é o que a pessoa tem em mãos, e o que identifica ESTE
+          aparelho. Sem série, o fluxo por catálogo continua logo abaixo. */}
+      {!isVeiculo && (
+        <div className="flex flex-col gap-1.5">
+          <Input
+            label="Número de série / IMEI"
+            value={form.imei}
+            onChange={e => set('imei', e.target.value.replace(/\s/g, ''))}
+            placeholder="Bipe ou digite — o resto vem preenchido se a loja já conhecer o aparelho"
+            className="num"
+            autoFocus
+          />
+          {serieBuscando && <span className="text-[11.5px] text-ink-3">Procurando no histórico da loja…</span>}
+          {!serieBuscando && serieAchado?.tipo === 'duplicado' && (
+            <span className="text-[11.5px] font-medium text-bad">
+              Este número já está no estoque ({serieAchado.rotulo} · {STATUS_BADGE[serieAchado.status]?.label ?? serieAchado.status}).
+              Confira antes de cadastrar de novo — dois cadastros do mesmo aparelho fazem a contagem mentir.
+            </span>
+          )}
+          {!serieBuscando && serieAchado?.tipo === 'conhecido' && (
+            <span className="text-[11.5px] text-ok">
+              Aparelho já conhecido: {serieAchado.rotulo}
+              {serieAchado.quando ? ` (entrada em ${fmtDate(serieAchado.quando)})` : ''}.
+              Modelo e variante preenchidos — confira os preços, que são desta negociação.
+            </span>
+          )}
+          {!serieBuscando && !serieAchado && form.imei.trim().length >= 6 && (
+            <span className="text-[11.5px] text-ink-3">Aparelho novo para a loja — selecione o produto abaixo.</span>
+          )}
+        </div>
+      )}
+
       <Select
         label={isVeiculo ? 'Modelo (catálogo)' : 'Produto (catálogo)'}
         required
@@ -624,10 +728,9 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
             <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
             <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
           </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Input label="IMEI / Número de série" value={form.imei} onChange={e => set('imei', e.target.value)} placeholder="354 88•••• ••••" className="num" />
-            <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
-          </div>
+          {/* O IMEI subiu para o topo do formulário — é por ele que a entrada
+              começa agora. Aqui fica só a bateria. */}
+          <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
         </>
       )}
 
