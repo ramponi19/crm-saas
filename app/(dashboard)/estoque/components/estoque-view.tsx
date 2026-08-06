@@ -7,6 +7,7 @@ import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
+import { buscarModeloApple } from '@/lib/apple-modelos'
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog,
   type Column,
@@ -492,7 +493,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
   const supabase = createClient()
   const [form, setForm] = useState({
     produto_id: '', tipo: preset?.tipo ?? 'compra', condicao: preset?.condicao ?? (isVeiculo ? 'usado' : 'novo'), estado: isVeiculo ? 'bom' : (preset?.seminovo ? 'bom' : 'lacrado'),
-    status: 'disponivel', cor: '', armazenamento: '', imei: '', bateria: '',
+    status: 'disponivel', cor: '', armazenamento: '', imei: '', modelo_num: '', bateria: '',
     placa: '', chassi: '', renavam: '', km: '', ano: '',
     preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor', cliente_id: '',
   })
@@ -563,6 +564,39 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
     }, 450)
     return () => { cancelado = true; clearTimeout(t) }
   }, [form.imei, isVeiculo, empresaId, supabase])
+
+  /**
+   * Número de MODELO da Apple (o "A" atrás do aparelho e em Ajustes > Geral >
+   * Sobre). Diz QUAL É o aparelho: modelo, capacidades e cores possíveis.
+   *
+   * Não confundir com IMEI. O número de modelo é do MODELO, não da peça: todo
+   * iPhone 15 Pro Max vendido aqui é A3106. Ele não identifica a unidade e não
+   * serve para detectar duplicata — quem faz isso é o IMEI, no campo acima.
+   */
+  const modeloApple = useMemo(
+    () => (isVeiculo ? null : buscarModeloApple(form.modelo_num)),
+    [form.modelo_num, isVeiculo],
+  )
+
+  /** Produto do catálogo com o mesmo nome do modelo reconhecido. */
+  const produtoDoModelo = useMemo(() => {
+    if (!modeloApple) return null
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+    const alvo = norm(modeloApple.modelo)
+    return produtos.find(p => norm(p.nome) === alvo) ?? null
+  }, [modeloApple, produtos])
+
+  // Reconheceu o modelo → seleciona o produto e limpa variante que não existe
+  // nele (trocar de A#### depois de escolher deixaria cor/capacidade do anterior).
+  useEffect(() => {
+    if (!modeloApple) return
+    setForm(f => ({
+      ...f,
+      produto_id: produtoDoModelo ? String(produtoDoModelo.id) : f.produto_id,
+      armazenamento: modeloApple.capacidades.includes(f.armazenamento) ? f.armazenamento : '',
+      cor: modeloApple.cores.includes(f.cor) ? f.cor : '',
+    }))
+  }, [modeloApple, produtoDoModelo])
 
   const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
   const margem = form.preco_venda && form.preco_custo
@@ -646,17 +680,41 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
 
   return (
     <div className="space-y-5">
-      {/* Série primeiro: é o que a pessoa tem em mãos, e o que identifica ESTE
-          aparelho. Sem série, o fluxo por catálogo continua logo abaixo. */}
+      {/* Começa pelo aparelho em mãos, não pelo catálogo. Dois dados, com papéis
+          diferentes: o número de MODELO diz o que é; o IMEI diz qual é. */}
       {!isVeiculo && (
         <div className="flex flex-col gap-1.5">
           <Input
-            label="Número de série / IMEI"
-            value={form.imei}
-            onChange={e => set('imei', e.target.value.replace(/\s/g, ''))}
-            placeholder="Bipe ou digite — o resto vem preenchido se a loja já conhecer o aparelho"
+            label="Número de modelo (atrás do aparelho ou em Ajustes › Geral › Sobre)"
+            value={form.modelo_num}
+            onChange={e => set('modelo_num', e.target.value.toUpperCase())}
+            placeholder="A3106 — traz modelo, capacidades e cores"
             className="num"
             autoFocus
+          />
+          {modeloApple ? (
+            <span className="text-[11.5px] text-ok">
+              {modeloApple.codigo} = <strong className="font-semibold">{modeloApple.modelo}</strong>
+              {produtoDoModelo
+                ? ' — produto selecionado no catálogo.'
+                : ' — não há esse produto no catálogo ainda; escolha abaixo ou cadastre em Produtos.'}
+            </span>
+          ) : form.modelo_num.trim().length >= 4 ? (
+            <span className="text-[11.5px] text-ink-3">
+              Número de modelo não reconhecido. Siga pelo catálogo abaixo.
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {!isVeiculo && (
+        <div className="flex flex-col gap-1.5">
+          <Input
+            label="IMEI (identifica este aparelho)"
+            value={form.imei}
+            onChange={e => set('imei', e.target.value.replace(/\s/g, ''))}
+            placeholder="Bipe ou digite — avisa se este aparelho já está no estoque"
+            className="num"
           />
           {serieBuscando && <span className="text-[11.5px] text-ink-3">Procurando no histórico da loja…</span>}
           {!serieBuscando && serieAchado?.tipo === 'duplicado' && (
@@ -724,9 +782,26 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
         </>
       ) : (
         <>
+          {/* Com o modelo reconhecido, cor e capacidade viram lista fechada: são
+              as que a Apple fez para aquele aparelho. Digitar livre aqui é como
+              nascem "256 gb", "256GB" e "256 GB" como três variantes diferentes. */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
-            <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
+            {modeloApple && modeloApple.cores.length > 0 ? (
+              <Select label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)}>
+                <option value="">Selecione…</option>
+                {modeloApple.cores.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
+            )}
+            {modeloApple && modeloApple.capacidades.length > 0 ? (
+              <Select label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)}>
+                <option value="">Selecione…</option>
+                {modeloApple.capacidades.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
+            )}
           </div>
           {/* O IMEI subiu para o topo do formulário — é por ele que a entrada
               começa agora. Aqui fica só a bateria. */}
