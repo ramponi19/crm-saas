@@ -26,6 +26,8 @@ interface Venda {
   numero_serie: string | null
   desconto_valor: number | null
   observacoes: string | null
+  /** Peças vendidas nesta linha. 1 em item serializado. */
+  quantidade: number | null
 }
 
 interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; empresaId: number; documentos?: DocumentoDisponivel[] }
@@ -62,10 +64,10 @@ const csvCell = (v: string | number) => {
 }
 
 function exportCSV(rows: Venda[]) {
-  const header = 'Data,Cliente,Produto,Vendedor,Canal,Pagamento,Valor,Lucro,Status'
+  const header = 'Data,Cliente,Produto,Qtd,Vendedor,Canal,Pagamento,Valor,Lucro,Status'
   const lines = rows.map((v) => [
     v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
-    v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
+    v.cliente_nome ?? '', v.produto_nome ?? '', v.quantidade ?? 1, v.vendedor_nome ?? '',
     CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
     v.forma_pagamento ?? '', v.valor_venda, v.lucro ?? 0, v.status ?? '',
   ].map(csvCell).join(','))
@@ -179,7 +181,17 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     // Acessório é venda sem produto_id: a descrição vive em `observacoes`.
     // O fallback anterior era `forma_pagamento`, que imprimia "credito" na
     // coluna Produto.
-    { key: 'produto', header: 'Produto', hideOnMobile: true, render: (v) => <span className="text-ink-2">{v.produto_nome ?? v.observacoes ?? '—'}</span> },
+    {
+      key: 'produto', header: 'Produto', hideOnMobile: true,
+      render: (v) => (
+        <span className="text-ink-2">
+          {/* "3×" antes do nome: sem isso a venda de 3 películas parece de uma só,
+              e o valor na linha fica sem explicação. */}
+          {(v.quantidade ?? 1) > 1 && <span className="font-semibold text-ink">{v.quantidade}× </span>}
+          {v.produto_nome ?? v.observacoes ?? '—'}
+        </span>
+      ),
+    },
     {
       key: 'vendedor', header: 'Vendedor', hideOnMobile: true,
       render: (v) => (

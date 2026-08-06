@@ -26,7 +26,7 @@ export default async function HistoricoPage() {
       .from('vendas')
       .select(`
         id, data_venda, valor_venda, lucro, forma_pagamento,
-        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes,
+        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade,
         clientes!cliente_id(nome),
         produtos!produto_id(nome),
         usuarios!vendedor_id(nome)
@@ -41,6 +41,7 @@ export default async function HistoricoPage() {
     id: number; data_venda: string | null; valor_venda: number; lucro: number | null
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
     cliente_id: number | null; produto_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
+    quantidade: number | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
@@ -57,6 +58,7 @@ export default async function HistoricoPage() {
     cliente_id:    v.cliente_id,
     produto_id:    v.produto_id,
     observacoes:   v.observacoes,
+    quantidade:    v.quantidade ?? 1,
     numero_serie:  v.numero_serie,
     desconto_valor: v.desconto_valor != null ? Number(v.desconto_valor) : null,
     cliente_nome:  one(v.clientes)?.nome  ?? null,

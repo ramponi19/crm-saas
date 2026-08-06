@@ -36,7 +36,9 @@ export default async function PDVPage() {
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome))')
+      // `quantidade` = saldo do lote (item sem série). `tipo_formulario` da
+      // categoria diz se o item é vendido por peça ou por quantidade.
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(tipo_formulario))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
@@ -66,7 +68,11 @@ export default async function PDVPage() {
   const isAdmin = !!((usuarioRes?.data as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
-    produtos: Embed<{ nome: string | null; garantia_dias: number | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
+    produtos: Embed<{
+      nome: string | null; garantia_dias: number | null; foto_url: string | null
+      marcas_produtos: Embed<{ nome: string | null }>
+      categorias_produtos: Embed<{ tipo_formulario: string | null }>
+    }>
   }
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
@@ -78,6 +84,8 @@ export default async function PDVPage() {
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
+      quantidade: u.quantidade ?? 1,
+      tipo_formulario: one(prod?.categorias_produtos ?? null)?.tipo_formulario ?? null,
     }
   })
 

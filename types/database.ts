@@ -2196,6 +2196,7 @@ export type Database = {
           imei2: string | null
           km: number | null
           numero_serie: string | null
+          quantidade: number
           recebido_em: string | null
           recebido_por: string | null
           observacoes: string | null
@@ -2239,6 +2240,7 @@ export type Database = {
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          quantidade?: number
           recebido_em?: string | null
           recebido_por?: string | null
           renavam?: string | null
@@ -2277,6 +2279,7 @@ export type Database = {
           preco_custo?: number | null
           preco_venda?: number | null
           produto_id?: number | null
+          quantidade?: number
           recebido_em?: string | null
           recebido_por?: string | null
           renavam?: string | null
@@ -3381,6 +3384,7 @@ export type Database = {
           parcelas: number | null
           produto_id: number | null
           pedido_compra_id: number | null
+          quantidade: number
           unidade_id: number | null
           status: string | null
           usuario_id: string | null
@@ -3408,6 +3412,7 @@ export type Database = {
           parcelas?: number | null
           produto_id?: number | null
           pedido_compra_id?: number | null
+          quantidade?: number
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
@@ -3435,6 +3440,7 @@ export type Database = {
           parcelas?: number | null
           produto_id?: number | null
           pedido_compra_id?: number | null
+          quantidade?: number
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null

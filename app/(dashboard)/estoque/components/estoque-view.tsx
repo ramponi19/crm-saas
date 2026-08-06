@@ -42,6 +42,8 @@ export interface Unidade {
   fotos_urls: string | null
   /** Foto do modelo; usada quando a unidade não tem foto própria. */
   produto_foto?: string | null
+  /** Saldo do lote. 1 em item serializado. */
+  quantidade?: number
   /** Em entrada por troca: quem aceitou o aparelho e responde por ele até chegar. */
   responsavel_nome?: string | null
   /** Fechamento do PDV que trouxe a unidade — agrupa as trocas da mesma venda. */
@@ -181,15 +183,20 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   function abrirEntrada(p: Preset) { setPreset(p); setTab('entrada') }
 
   // Stats
+  // Conta PEÇAS, não linhas: um lote de 50 capinhas é uma linha só. Contar linhas
+  // diria "1 disponível" com 50 no estoque.
   const stats = useMemo(() => {
-    const disponiveis = itens.filter(i => i.status === 'disponivel').length
-    const reservados = itens.filter(i => i.status === 'reservado').length
-    const reparo = itens.filter(i => i.status === 'assistencia').length
-    const vendidos = itens.filter(i => i.status === 'vendido').length
-    const pendentes = itens.filter(i => i.status === 'pendente').length
-    const total = itens.length
+    const qtd = (i: Unidade) => Math.max(0, i.quantidade ?? 1)
+    const somaPor = (st: string) => itens.filter(i => i.status === st).reduce((a, i) => a + qtd(i), 0)
+    const disponiveis = somaPor('disponivel')
+    const reservados = somaPor('reservado')
+    const reparo = somaPor('assistencia')
+    const vendidos = somaPor('vendido')
+    const pendentes = somaPor('pendente')
+    const total = itens.reduce((a, i) => a + qtd(i), 0)
     // Só o que está na loja soma no valor do estoque — pendente ainda não chegou.
-    const valorEstoque = itens.filter(i => i.status === 'disponivel').reduce((acc, i) => acc + (i.preco_venda ?? 0), 0)
+    const valorEstoque = itens.filter(i => i.status === 'disponivel')
+      .reduce((acc, i) => acc + (i.preco_venda ?? 0) * qtd(i), 0)
     return { total, disponiveis, reservados, reparo, vendidos, pendentes, valorEstoque }
   }, [itens])
 
@@ -271,6 +278,13 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
       },
     },
     idCol,
+    {
+      // Só mostra número quando é lote — "1" em cada celular seria ruído.
+      key: 'qtd', header: 'Qtd', align: 'right', className: 'num',
+      render: (u) => (u.quantidade ?? 1) > 1
+        ? <span className="font-semibold text-ink">{u.quantidade}</span>
+        : <span className="text-ink-3">—</span>,
+    },
     {
       key: 'condicao', header: 'Condição', hideOnMobile: true,
       render: (u) => { const c = CONDICAO_BADGE[u.condicao ?? 'novo'] ?? CONDICAO_BADGE.novo; return <Badge tone={c.tone}>{c.label}</Badge> },
@@ -516,7 +530,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     modelo_num: '', bateria: '',
     placa: '', chassi: '', renavam: '', km: '', ano: '',
     preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor', cliente_id: '',
-    fornecedor_id: '', fotos_urls: '',
+    fornecedor_id: '', fotos_urls: '', quantidade: '1',
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -696,6 +710,9 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       ano: campos.veiculo && form.ano ? Number(form.ano) : null,
       fornecedor_id: form.fornecedor_id ? Number(form.fornecedor_id) : null,
       fotos_urls: form.fotos_urls || null,
+      // Só item sem série entra em lote. Serializado é sempre 1 — mandar outro
+      // valor ali criaria um "celular com saldo 3", que não existe.
+      quantidade: campos.semSerie ? Math.max(1, Number(form.quantidade) || 1) : 1,
       preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
       custo_reparo: Number(form.custo_reparo) || null,
       cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
@@ -864,11 +881,29 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
             </div>
           )}
 
+          {/* Item sem identidade por peça entra em LOTE: uma linha com saldo. Dar
+              entrada de 50 capinhas eram 50 cadastros à mão. */}
           {campos.semSerie && (
-            <p className="text-[11.5px] text-ink-3">
-              Item sem identidade por peça. Por enquanto cada entrada cadastra uma unidade —
-              entrada por quantidade é a próxima etapa.
-            </p>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <Input
+                label="Quantidade *"
+                type="number"
+                min={1}
+                value={form.quantidade}
+                onChange={e => set('quantidade', e.target.value)}
+                placeholder="1"
+                className="num"
+              />
+              {Number(form.quantidade) > 1 && Number(form.preco_custo) > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-medium text-ink-2">Custo do lote</label>
+                  <div className="num rounded-control border border-line bg-raised px-3 py-2 text-[13px] text-ink-2">
+                    {formatCurrency(Number(form.preco_custo) * Number(form.quantidade))}
+                    <span className="ml-1 text-[11px] text-ink-3">· o custo acima é por unidade</span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

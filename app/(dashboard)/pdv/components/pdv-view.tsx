@@ -13,6 +13,7 @@ import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
+import { camposDaCategoria } from '@/lib/estoque-campos'
 
 interface ItemEstoque {
   id: number; produto_id: number | null; produto_nome: string; marca_nome: string
@@ -25,7 +26,14 @@ interface ItemEstoque {
   fotos_urls?: string | null
   produto_foto?: string | null
   observacoes?: string | null
+  /** Saldo do lote. 1 em item serializado. */
+  quantidade?: number
+  /** Tipo da categoria — decide se o item é vendido por peça ou por quantidade. */
+  tipo_formulario?: string | null
 }
+
+/** Item vendido por quantidade (capinha, película) e não por peça identificada. */
+const porQuantidade = (i: ItemEstoque) => camposDaCategoria(i.tipo_formulario).semSerie
 
 /** Foto da unidade tem prioridade: é o aparelho real, não o do catálogo. */
 const fotoDoItem = (i: { fotos_urls?: string | null; produto_foto?: string | null }) =>
@@ -37,7 +45,7 @@ interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; l
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
 interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[] }
-interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean }
+interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /** Aparelho entregue na troca. `valor` fica string porque vem de <input>. */
 interface TrocaItem { aparelho: string; imei: string; valor: string }
 /**
@@ -132,10 +140,28 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   }, [clientes, buscaCliente])
 
   function adicionarItem(item: ItemEstoque, reserva = false) {
-    if (carrinho.some((c) => c.item.id === item.id)) { notify.warn('Item já está no carrinho'); return }
-    setCarrinho((prev) => [...prev, { item, desconto: 0, reserva }])
+    const jaTem = carrinho.find((c) => c.item.id === item.id)
+    if (jaTem) {
+      // Item por quantidade: clicar de novo soma mais um, até o saldo do lote.
+      // Peça identificada não repete — só existe uma.
+      if (!porQuantidade(item)) { notify.warn('Item já está no carrinho'); return }
+      alterarQtd(item.id, jaTem.qtd + 1)
+      return
+    }
+    setCarrinho((prev) => [...prev, { item, desconto: 0, reserva, qtd: 1 }])
   }
   function removerItem(id: number) { setCarrinho((prev) => prev.filter((c) => c.item.id !== id)) }
+
+  /** Muda a quantidade da linha, presa ao saldo disponível do lote. */
+  function alterarQtd(id: number, novaQtd: number) {
+    setCarrinho((prev) => prev.map((c) => {
+      if (c.item.id !== id) return c
+      const max = Math.max(1, c.item.quantidade ?? 1)
+      const q = Math.min(max, Math.max(1, novaQtd))
+      if (novaQtd > max) notify.warn(`Só há ${max} em estoque de "${c.item.produto_nome}"`)
+      return { ...c, qtd: q }
+    }))
+  }
 
   // Aba do catálogo: estoque disponível ou reservas de lead.
   const [abaCat, setAbaCat] = useState<'estoque' | 'reservas'>('estoque')
@@ -178,7 +204,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const abatimento = descontoNum + trocaNum
 
   const totais = useMemo(() => {
-    const subtotal = carrinho.reduce((a, c) => a + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
+    const subtotal = carrinho.reduce((a, c) => a + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
     // A venda VALE o preço cheio menos o desconto real. A troca NÃO abate daqui:
     // ela é pagamento em espécie (dação em pagamento), não desconto — o cliente
     // pagou o preço todo, só que parte dele em aparelho. É `valorVenda` que vai
@@ -188,7 +214,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     // troca abate, porque ela já foi paga em aparelho. É o valor do Pix, da
     // maquininha e do "Total a pagar" na tela.
     const total = Math.max(0, subtotal - abatimento)
-    const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0), 0)
+    const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0) * c.qtd, 0)
     let totalComTaxa = total
     if (formaPagamento === 'credito' || formaPagamento === 'link') {
       const fpBanco = formaPagamento === 'credito' ? 'maquininha' : 'link'
@@ -222,7 +248,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
   async function finalizarVenda(jaConfirmado = false) {
     if (carrinho.length === 0) { notify.warn('Carrinho vazio'); return }
-    const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0), 0) + acessoriosTotal
+    const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
     if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
     if (!jaConfirmado && semPreco.length > 0) { setConfirmarSemPreco(true); return }
@@ -230,7 +256,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
     // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
     // Guarda o status anterior: item de reserva volta a 'reservado', não 'disponivel'.
-    const claimed: { id: number; statusAnterior: string }[] = []
+    // `saldoAnterior` só existe em lote: desfazer ali é devolver o saldo, não só
+    // o status. Sem isso, uma falha no meio da venda sumiria com estoque.
+    const claimed: { id: number; statusAnterior: string; qtdBaixada?: number; saldoAnterior?: number }[] = []
     const vendaIds: number[] = []
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -259,7 +287,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // separadamente porque têm naturezas diferentes: o desconto reduz o valor da
       // venda, a troca só troca a FORMA de pagamento de uma parte dela.
       for (const c of carrinho) {
-        const precoCheio = c.item.preco_venda ?? 0
+        const precoCheio = (c.item.preco_venda ?? 0) * c.qtd
         const fatia = subtotalBruto > 0 ? precoCheio / subtotalBruto : 0
         const descontoItem = descontoNum * fatia
         const trocaItem = trocaNum * fatia
@@ -272,15 +300,39 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         // Item de reserva só é vendável enquanto AINDA está reservado (a reserva
         // trava a peça); item comum exige 'disponivel' — protege contra corrida.
         const statusEsperado = c.reserva ? 'reservado' : 'disponivel'
-        const { data: unidadeClaim } = await supabase
-          .from('inventario_unidades')
-          .update({ status: unitStatus, cliente_id: clienteSelecionado?.id ?? null })
-          .eq('id', c.item.id)
-          .eq('status', statusEsperado)
-          .select('id')
-          .single()
-        if (!unidadeClaim) throw new Error(c.reserva ? `A reserva de "${c.item.produto_nome}" não está mais ativa` : `"${c.item.produto_nome}" não está mais disponível`)
-        claimed.push({ id: c.item.id, statusAnterior: statusEsperado })
+
+        if (porQuantidade(c.item)) {
+          // Lote: baixa o saldo em vez de mudar o status. O filtro `gte` no
+          // próprio UPDATE é a trava contra corrida — dois caixas vendendo a
+          // última capinha ao mesmo tempo, só um consegue. Sem ele o saldo iria a
+          // negativo (o CHECK no banco recusaria, mas depois de meia venda feita).
+          const saldoAtual = c.item.quantidade ?? 1
+          const restante = saldoAtual - c.qtd
+          const { data: baixa } = await supabase
+            .from('inventario_unidades')
+            .update({
+              quantidade: restante,
+              // Lote zerado sai do estoque; com saldo, continua disponível.
+              status: restante <= 0 ? unitStatus : statusEsperado,
+            } as never)
+            .eq('id', c.item.id)
+            .eq('status', statusEsperado)
+            .gte('quantidade', c.qtd)
+            .select('id')
+            .maybeSingle()
+          if (!baixa) throw new Error(`Estoque insuficiente de "${c.item.produto_nome}" — alguém vendeu enquanto você fechava`)
+          claimed.push({ id: c.item.id, statusAnterior: statusEsperado, qtdBaixada: c.qtd, saldoAnterior: saldoAtual })
+        } else {
+          const { data: unidadeClaim } = await supabase
+            .from('inventario_unidades')
+            .update({ status: unitStatus, cliente_id: clienteSelecionado?.id ?? null })
+            .eq('id', c.item.id)
+            .eq('status', statusEsperado)
+            .select('id')
+            .single()
+          if (!unidadeClaim) throw new Error(c.reserva ? `A reserva de "${c.item.produto_nome}" não está mais ativa` : `"${c.item.produto_nome}" não está mais disponível`)
+          claimed.push({ id: c.item.id, statusAnterior: statusEsperado })
+        }
 
         // A taxa da maquininha incide só sobre o que passa no cartão — a parte
         // paga em aparelho não tem taxa.
@@ -293,7 +345,10 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           vendedor_id: user.id,
           usuario_id: user.id,
           valor_venda: valorItem,
-          valor_custo: c.item.preco_custo ?? 0,
+          valor_custo: (c.item.preco_custo ?? 0) * c.qtd,
+          // Quantas peças saíram nesta linha. Sem isto, vender 3 películas viraria
+          // 3 vendas e o ranking contaria 3.
+          quantidade: c.qtd,
           // `lucro` NAO entra: e coluna gerada (valor_venda - valor_custo). Mandar
           // valor faz o Postgres recusar o INSERT inteiro com 428C9.
           forma_pagamento: formaPagamento,
@@ -468,7 +523,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           await supabase.from('vendas').delete().in('id', vendaIds)
         }
         for (const cl of claimed) {
-          await supabase.from('inventario_unidades').update({ status: cl.statusAnterior, cliente_id: null } as never).eq('id', cl.id)
+          await supabase.from('inventario_unidades').update({
+            status: cl.statusAnterior,
+            cliente_id: null,
+            // Lote: devolve o saldo que foi baixado nesta tentativa.
+            ...(cl.saldoAnterior != null ? { quantidade: cl.saldoAnterior } : {}),
+          } as never).eq('id', cl.id)
         }
       } catch { /* rollback best-effort */ }
       notify.bad('Erro ao finalizar', e instanceof Error ? e.message : String(e))
@@ -710,16 +770,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3">
                 {itensFiltrados.map((item) => {
+                  // Lote continua clicável mesmo já no carrinho: clicar soma mais
+                  // um. Peça identificada trava, porque só existe uma.
                   const noCarrinho = carrinho.some((c) => c.item.id === item.id)
+                  const lote = porQuantidade(item)
+                  const travado = noCarrinho && !lote
                   return (
                     <button
                       key={item.id}
                       type="button"
-                      disabled={noCarrinho}
-                      onClick={() => !noCarrinho && adicionarItem(item)}
+                      disabled={travado}
+                      onClick={() => !travado && adicionarItem(item)}
                       className={cn(
                         'rounded-card border bg-card p-4 text-left transition-all',
-                        noCarrinho ? 'cursor-default border-line opacity-60' : 'border-line hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]',
+                        travado ? 'cursor-default border-line opacity-60' : 'border-line hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]',
                       )}
                     >
                       {/* Foto da unidade quando existe; senão a do modelo; senão o ícone. */}
@@ -735,6 +799,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                       </div>
                       <div className="mt-0.5 text-[11px] text-ink-3">
                         {item.cor ?? item.marca_nome}{item.bateria ? ` · bateria ${item.bateria}%` : ''}
+                        {lote && <span className="font-medium text-ink-2"> · {item.quantidade ?? 1} em estoque</span>}
                       </div>
                       <div className="mt-3 flex items-center justify-between">
                         <span className="num text-[16px] font-bold text-ink">{fmt(item.preco_venda ?? 0)}</span>
@@ -817,24 +882,41 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             <div className="mb-4 flex min-h-[48px] flex-col gap-3">
               {carrinho.length === 0 ? (
                 <div className="py-4 text-center text-[13px] text-ink-3">Carrinho vazio — toque num produto para adicionar.</div>
-              ) : carrinho.map(({ item }) => (
+              ) : carrinho.map(({ item, qtd }) => (
                 <div key={item.id} className="flex items-center gap-3">
                   <div className="grid h-9 w-9 flex-none place-items-center rounded-control bg-ink/[0.04] text-ink-3">
                     <Package size={17} strokeWidth={1.7} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-semibold text-ink">{item.produto_nome}</div>
+                    {/* Peça identificada não tem quantidade: só existe uma. Lote
+                        soma e subtrai até o saldo. */}
                     <div className="mt-1 flex items-center gap-2">
-                      <button type="button" onClick={() => removerItem(item.id)} className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] sm:h-[22px] sm:w-[22px]">
+                      <button type="button"
+                        onClick={() => (porQuantidade(item) && qtd > 1 ? alterarQtd(item.id, qtd - 1) : removerItem(item.id))}
+                        aria-label={porQuantidade(item) && qtd > 1 ? 'Diminuir' : 'Remover do carrinho'}
+                        className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] sm:h-[22px] sm:w-[22px]">
                         <Minus size={13} strokeWidth={1.7} />
                       </button>
-                      <span className="num text-[12.5px] font-bold text-ink">1</span>
-                      <span className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink-3 opacity-40 sm:h-[22px] sm:w-[22px]">
-                        <Plus size={13} strokeWidth={1.7} />
-                      </span>
+                      <span className="num text-[12.5px] font-bold text-ink">{qtd}</span>
+                      {porQuantidade(item) ? (
+                        <button type="button" onClick={() => alterarQtd(item.id, qtd + 1)}
+                          disabled={qtd >= (item.quantidade ?? 1)}
+                          aria-label="Aumentar"
+                          className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] disabled:opacity-40 sm:h-[22px] sm:w-[22px]">
+                          <Plus size={13} strokeWidth={1.7} />
+                        </button>
+                      ) : (
+                        <span className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink-3 opacity-40 sm:h-[22px] sm:w-[22px]">
+                          <Plus size={13} strokeWidth={1.7} />
+                        </span>
+                      )}
+                      {porQuantidade(item) && (
+                        <span className="text-[11px] text-ink-3">de {item.quantidade ?? 1} em estoque</span>
+                      )}
                     </div>
                   </div>
-                  <div className="num text-[13px] font-bold text-ink">{fmt(item.preco_venda ?? 0)}</div>
+                  <div className="num text-[13px] font-bold text-ink">{fmt((item.preco_venda ?? 0) * qtd)}</div>
                 </div>
               ))}
             </div>
