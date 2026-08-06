@@ -42,6 +42,8 @@ export interface Unidade {
   produto_foto?: string | null
   /** Em entrada por troca: quem aceitou o aparelho e responde por ele até chegar. */
   responsavel_nome?: string | null
+  /** Fechamento do PDV que trouxe a unidade — agrupa as trocas da mesma venda. */
+  grupo_pdv?: string | null
   created_at: string | null
   // Veículos (segmento concessionaria)
   placa: string | null
@@ -177,6 +179,13 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     const valorEstoque = itens.filter(i => i.status === 'disponivel').reduce((acc, i) => acc + (i.preco_venda ?? 0), 0)
     return { total, disponiveis, reservados, reparo, vendidos, pendentes, valorEstoque }
   }, [itens])
+
+  // Quantas trocas do MESMO fechamento ainda faltam chegar (incluindo a que está
+  // sendo confirmada). É o que decide se este clique libera a comissão ou não.
+  const pendentesDoMesmoFechamento = useMemo(() => {
+    if (!confirmar?.grupo_pdv) return 1
+    return itens.filter(i => i.grupo_pdv === confirmar.grupo_pdv && i.status === 'pendente').length
+  }, [itens, confirmar])
 
   const marcasUnicas = useMemo(() => [...new Set(itens.map(i => i.marca_nome))].filter(Boolean), [itens])
 
@@ -453,8 +462,15 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         loading={confirmando != null}
         title="Confirmar que o aparelho chegou?"
         description={
-          `"${confirmar?.produto_nome ?? 'Aparelho'}"${confirmar?.imei ? ` (IMEI ${confirmar.imei})` : ''} passa a disponível para venda`
-          + `${confirmar?.responsavel_nome ? ` e a comissão de ${confirmar.responsavel_nome} pela venda que trouxe este aparelho é liberada` : ' e a comissão da venda que trouxe este aparelho é liberada'}.`
+          `"${confirmar?.produto_nome ?? 'Aparelho'}"${confirmar?.imei ? ` (IMEI ${confirmar.imei})` : ''} passa a disponível para venda.`
+          // Quando a venda trouxe MAIS DE UM aparelho, confirmar só este não
+          // libera nada — o outro segue segurando o fechamento. O texto antigo
+          // prometia a liberação sempre, e no teste com duas trocas prometeu
+          // errado: confirmei um e a comissão continuou (corretamente) retida.
+          + (pendentesDoMesmoFechamento > 1
+            ? ` Ainda ${pendentesDoMesmoFechamento - 1 === 1 ? 'falta 1 aparelho' : `faltam ${pendentesDoMesmoFechamento - 1} aparelhos`} desta mesma venda`
+              + `${confirmar?.responsavel_nome ? ` — a comissão de ${confirmar.responsavel_nome}` : ' — a comissão'} só é liberada quando todos chegarem.`
+            : `${confirmar?.responsavel_nome ? ` A comissão de ${confirmar.responsavel_nome}` : ' A comissão'} pela venda que trouxe este aparelho é liberada.`)
           + ' Confirme apenas com o aparelho em mãos.'
         }
         confirmLabel="Chegou, confirmar"
