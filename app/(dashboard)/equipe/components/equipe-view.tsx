@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
+import { janelaDoPeriodo } from '@/lib/ranking'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
@@ -316,8 +317,11 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
   const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 
   const load = useCallback(async () => {
-    const inicio = `${mes}-01`
-    const fim = new Date(new Date(inicio).getFullYear(), new Date(inicio).getMonth() + 1, 1).toISOString()
+    // Janela pela função única. O cálculo que estava aqui produzia 3 HORAS em vez
+    // de um mês (ver janelaDoPeriodo), então a aba Comissões mostrava faturamento
+    // zero para todo mundo — e ninguém desconfiava, porque zero é um número
+    // plausível.
+    const { ini: inicio, fim } = janelaDoPeriodo(mes)
     const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
       supabase.from('vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),

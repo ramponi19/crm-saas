@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { janelaDoPeriodo } from '@/lib/ranking'
 import EquipeView from '@/app/(dashboard)/equipe/components/equipe-view'
 import type { Tables } from '@/types/database'
 
@@ -12,8 +13,8 @@ export default async function AdminEquipePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const mesAtual = new Date().toISOString().slice(0, 7)
-  const inicioMes = `${mesAtual}-01`
-  const fimMes = new Date(new Date(inicioMes).getFullYear(), new Date(inicioMes).getMonth() + 1, 1).toISOString()
+  // Janela pela função única — ver janelaDoPeriodo: o cálculo anterior dava 3h.
+  const { ini: inicioMes, fim: fimMes } = janelaDoPeriodo(mesAtual)
 
   const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }] = await Promise.all([
     supabase

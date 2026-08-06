@@ -25,6 +25,15 @@ export interface LinhaRanking {
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
+/**
+ * Janela [início, fim) de um mês "AAAA-MM", em horário local.
+ *
+ * Use SEMPRE esta função. O cálculo ingênuo — `new Date(\`${mes}-01\`)` e depois
+ * `getMonth() + 1` — está errado: a string só com data é lida como meia-noite
+ * UTC, mas `getMonth()` responde em hora local. A oeste de Greenwich isso cai no
+ * mês ANTERIOR, e o "fim" acaba poucas horas depois do início em vez de um mês.
+ * Medido em America/Sao_Paulo: janela de 3 horas.
+ */
 export function janelaDoPeriodo(periodo: string): { ini: string; fim: string } {
   const [ano, mes] = periodo.split('-').map(Number)
   return { ini: new Date(ano, mes - 1, 1).toISOString(), fim: new Date(ano, mes, 1).toISOString() }
