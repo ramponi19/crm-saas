@@ -8,8 +8,9 @@ import { Topbar } from '@/components/layout/topbar'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
 import { buscarModeloApple } from '@/lib/apple-modelos'
+import { camposDaCategoria } from '@/lib/estoque-campos'
 import {
-  Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog,
+  Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   type Column,
 } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
@@ -69,11 +70,22 @@ interface Props {
   movimentacoes: Movimentacao[]
   marcas: { id: number; nome: string }[]
   categorias: { id: number; nome: string }[]
-  produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+  produtos: ProdutoOpt[]
   clientes: { id: number; nome: string }[]
   tabelaPrecos: TabelaPrecoRef[]
+  fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
   segmento: Segmento
+}
+
+/** Produto do catálogo + o que a entrada precisa saber dele. */
+export interface ProdutoOpt {
+  id: number; nome: string; marca_id: number | null; categoria_id: number | null
+  marca_nome: string; categoria_nome: string | null; ativo: boolean
+  /** Decide os campos de identificação da entrada — ver lib/estoque-campos. */
+  tipo_formulario: string | null
+  cores: string[]
+  armazenamentos: string[]
 }
 
 export type TabelaPrecoRef = { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }
@@ -132,7 +144,7 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, empresaId, segmento }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, segmento }: Props) {
   const isVeiculo = segmento === 'concessionaria'
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
@@ -424,6 +436,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   produtos={produtos}
                   clientes={clientes}
                   tabelaPrecos={tabelaPrecos}
+                  fornecedores={fornecedores}
                   empresaId={empresaId}
                   isVeiculo={isVeiculo}
                   preset={preset}
@@ -486,10 +499,11 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeiculo, preset, onSaved }: {
-  produtos: { id: number; nome: string; marca_id: number | null; categoria_id: number | null; marca_nome: string; categoria_nome: string | null; ativo: boolean }[]
+function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, preset, onSaved }: {
+  produtos: ProdutoOpt[]
   clientes: { id: number; nome: string }[]
   tabelaPrecos: TabelaPrecoRef[]
+  fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
   isVeiculo: boolean
   preset: Preset
@@ -498,9 +512,11 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
   const supabase = createClient()
   const [form, setForm] = useState({
     produto_id: '', tipo: preset?.tipo ?? 'compra', condicao: preset?.condicao ?? (isVeiculo ? 'usado' : 'novo'), estado: isVeiculo ? 'bom' : (preset?.seminovo ? 'bom' : 'lacrado'),
-    status: 'disponivel', cor: '', armazenamento: '', imei: '', modelo_num: '', bateria: '',
+    status: 'disponivel', cor: '', armazenamento: '', imei: '', imei2: '', numero_serie: '',
+    modelo_num: '', bateria: '',
     placa: '', chassi: '', renavam: '', km: '', ano: '',
     preco_custo: '', custo_reparo: '', preco_venda: '', observacoes: '', origem: 'fornecedor', cliente_id: '',
+    fornecedor_id: '', fotos_urls: '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -583,6 +599,27 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
     [form.modelo_num, isVeiculo],
   )
 
+  /**
+   * Campos de identificação do item, decididos pela CATEGORIA do produto. Sem
+   * produto escolhido ainda, mostra o genérico — assim a tela nunca fica muda.
+   * Veículo vem do segmento porque ali a categoria é o próprio negócio.
+   */
+  const produtoSel = produtos.find(p => p.id === Number(form.produto_id)) ?? null
+  const campos = useMemo(
+    () => camposDaCategoria(isVeiculo ? 'veiculo' : produtoSel?.tipo_formulario),
+    [isVeiculo, produtoSel],
+  )
+
+  /**
+   * Listas de variante. O produto manda: são as cores/capacidades que a loja
+   * cadastrou para aquele modelo. O número de modelo Apple entra só como reforço
+   * quando o produto não tem lista própria.
+   */
+  const coresDisponiveis = produtoSel?.cores?.length ? produtoSel.cores : (modeloApple?.cores ?? [])
+  const armazenamentosDisponiveis = produtoSel?.armazenamentos?.length
+    ? produtoSel.armazenamentos
+    : (modeloApple?.capacidades ?? [])
+
   /** Produto do catálogo com o mesmo nome do modelo reconhecido. */
   const produtoDoModelo = useMemo(() => {
     if (!modeloApple) return null
@@ -644,15 +681,21 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
       produto_id: Number(form.produto_id),
       tipo: form.tipo, condicao: form.condicao, estado: form.estado,
       status: form.status,
-      cor: form.cor || null,
-      armazenamento: isVeiculo ? null : (form.armazenamento || null),
-      imei: isVeiculo ? null : (form.imei || null),
-      bateria: isVeiculo ? null : (form.bateria || null),
-      placa: isVeiculo ? (form.placa || null) : null,
-      chassi: isVeiculo ? (form.chassi || null) : null,
-      renavam: isVeiculo ? (form.renavam || null) : null,
-      km: isVeiculo && form.km ? Number(form.km) : null,
-      ano: isVeiculo && form.ano ? Number(form.ano) : null,
+      // Grava só o que o bloco da categoria mostrou. Sem isso, trocar de produto
+      // no meio do cadastro deixaria para trás o IMEI digitado no anterior.
+      cor: campos.cor ? (form.cor || null) : null,
+      armazenamento: campos.armazenamento ? (form.armazenamento || null) : null,
+      imei: campos.imei ? (form.imei || null) : null,
+      imei2: campos.imei2 ? (form.imei2 || null) : null,
+      numero_serie: campos.numeroSerie ? (form.numero_serie || null) : null,
+      bateria: campos.bateria ? (form.bateria || null) : null,
+      placa: campos.veiculo ? (form.placa || null) : null,
+      chassi: campos.veiculo ? (form.chassi || null) : null,
+      renavam: campos.veiculo ? (form.renavam || null) : null,
+      km: campos.veiculo && form.km ? Number(form.km) : null,
+      ano: campos.veiculo && form.ano ? Number(form.ano) : null,
+      fornecedor_id: form.fornecedor_id ? Number(form.fornecedor_id) : null,
+      fotos_urls: form.fotos_urls || null,
       preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
       custo_reparo: Number(form.custo_reparo) || null,
       cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
@@ -685,9 +728,10 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
 
   return (
     <div className="space-y-5">
-      {/* Começa pelo aparelho em mãos, não pelo catálogo. Dois dados, com papéis
-          diferentes: o número de MODELO diz o que é; o IMEI diz qual é. */}
-      {!isVeiculo && (
+      {/* Atalho de entrada: o número de modelo escolhe o produto sozinho. Some
+          quando a categoria escolhida não é de aparelho — numa loja de perfume
+          esse campo seria só ruído. */}
+      {!isVeiculo && (!produtoSel || campos.numeroModeloApple) && (
         <div className="flex flex-col gap-1.5">
           <Input
             label="Número de modelo (atrás do aparelho ou em Ajustes › Geral › Sobre)"
@@ -709,35 +753,6 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
               Número de modelo não reconhecido. Siga pelo catálogo abaixo.
             </span>
           ) : null}
-        </div>
-      )}
-
-      {!isVeiculo && (
-        <div className="flex flex-col gap-1.5">
-          <Input
-            label="IMEI (identifica este aparelho)"
-            value={form.imei}
-            onChange={e => set('imei', e.target.value.replace(/\s/g, ''))}
-            placeholder="Bipe ou digite — avisa se este aparelho já está no estoque"
-            className="num"
-          />
-          {serieBuscando && <span className="text-[11.5px] text-ink-3">Procurando no histórico da loja…</span>}
-          {!serieBuscando && serieAchado?.tipo === 'duplicado' && (
-            <span className="text-[11.5px] font-medium text-bad">
-              Este número já está no estoque ({serieAchado.rotulo} · {STATUS_BADGE[serieAchado.status]?.label ?? serieAchado.status}).
-              Confira antes de cadastrar de novo — dois cadastros do mesmo aparelho fazem a contagem mentir.
-            </span>
-          )}
-          {!serieBuscando && serieAchado?.tipo === 'conhecido' && (
-            <span className="text-[11.5px] text-ok">
-              Aparelho já conhecido: {serieAchado.rotulo}
-              {serieAchado.quando ? ` (entrada em ${fmtDate(serieAchado.quando)})` : ''}.
-              Modelo e variante preenchidos — confira os preços, que são desta negociação.
-            </span>
-          )}
-          {!serieBuscando && !serieAchado && form.imei.trim().length >= 6 && (
-            <span className="text-[11.5px] text-ink-3">Aparelho novo para a loja — selecione o produto abaixo.</span>
-          )}
         </div>
       )}
 
@@ -770,49 +785,93 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
         {field('Status inicial *', btnGroup('status', [{ v: 'disponivel', label: 'Disponível' }, { v: 'pendente', label: 'Pendente' }, { v: 'assistencia', label: 'Em reparo' }]))}
       </div>
 
-      {isVeiculo ? (
-        <>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Input label="Placa" value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC1D23" className="num" />
-            <Input label="Ano/modelo" type="number" value={form.ano} onChange={e => set('ano', e.target.value)} placeholder="2022" className="num" />
-          </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Input label="Chassi" value={form.chassi} onChange={e => set('chassi', e.target.value.toUpperCase())} placeholder="9BW…" className="num" />
-            <Input label="Km" type="number" value={form.km} onChange={e => set('km', e.target.value)} placeholder="45000" className="num" />
-          </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Prata" />
-            <Input label="Renavam" value={form.renavam} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" className="num" />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Com o modelo reconhecido, cor e capacidade viram lista fechada: são
-              as que a Apple fez para aquele aparelho. Digitar livre aqui é como
-              nascem "256 gb", "256GB" e "256 GB" como três variantes diferentes. */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {modeloApple && modeloApple.cores.length > 0 ? (
-              <Select label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)}>
-                <option value="">Selecione…</option>
-                {modeloApple.cores.map(c => <option key={c} value={c}>{c}</option>)}
-              </Select>
-            ) : (
-              <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Titânio Natural" />
-            )}
-            {modeloApple && modeloApple.capacidades.length > 0 ? (
-              <Select label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)}>
-                <option value="">Selecione…</option>
-                {modeloApple.capacidades.map(c => <option key={c} value={c}>{c}</option>)}
-              </Select>
-            ) : (
-              <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
-            )}
-          </div>
-          {/* O IMEI subiu para o topo do formulário — é por ele que a entrada
-              começa agora. Aqui fica só a bateria. */}
-          <Input label="Saúde da bateria" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
-        </>
-      )}
+      {/* ── Identificação: o bloco muda conforme a categoria do produto ──
+          Cor e capacidade saem de listas quando existem (do produto ou do modelo
+          Apple). Digitar livre é como nascem "256 gb", "256GB" e "256 GB" como
+          três variantes da mesma coisa. */}
+      <div className="rounded-card border border-line-soft p-4">
+        <div className="mb-3 flex items-baseline justify-between">
+          <span className="text-[13px] font-semibold text-ink">{campos.titulo}</span>
+          {produtoSel?.categoria_nome && (
+            <span className="text-[11px] text-ink-3">categoria: {produtoSel.categoria_nome}</span>
+          )}
+        </div>
+        <div className="space-y-5">
+          {campos.veiculo && (
+            <>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Input label="Placa" value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC1D23" className="num" />
+                <Input label="Ano/modelo" type="number" value={form.ano} onChange={e => set('ano', e.target.value)} placeholder="2022" className="num" />
+              </div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Input label="Chassi" value={form.chassi} onChange={e => set('chassi', e.target.value.toUpperCase())} placeholder="9BW…" className="num" />
+                <Input label="Km" type="number" value={form.km} onChange={e => set('km', e.target.value)} placeholder="45000" className="num" />
+              </div>
+              <Input label="Renavam" value={form.renavam} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" className="num" />
+            </>
+          )}
+
+          {(campos.imei || campos.numeroSerie) && (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {campos.imei && (
+                <div className="flex flex-col gap-1.5">
+                  <Input label="IMEI 1" value={form.imei} onChange={e => set('imei', e.target.value.replace(/\s/g, ''))} placeholder="Bipe ou digite" className="num" />
+                  {serieBuscando && <span className="text-[11.5px] text-ink-3">Procurando no histórico da loja…</span>}
+                  {!serieBuscando && serieAchado?.tipo === 'duplicado' && (
+                    <span className="text-[11.5px] font-medium text-bad">
+                      Já está no estoque ({serieAchado.rotulo} · {STATUS_BADGE[serieAchado.status]?.label ?? serieAchado.status}) — dois cadastros do mesmo aparelho fazem a contagem mentir.
+                    </span>
+                  )}
+                  {!serieBuscando && serieAchado?.tipo === 'conhecido' && (
+                    <span className="text-[11.5px] text-ok">
+                      Já passou pela loja{serieAchado.quando ? ` em ${fmtDate(serieAchado.quando)}` : ''} — dados preenchidos; confira os preços.
+                    </span>
+                  )}
+                </div>
+              )}
+              {campos.imei2 && (
+                <Input label="IMEI 2 (dual SIM)" value={form.imei2} onChange={e => set('imei2', e.target.value.replace(/\s/g, ''))} placeholder="Se houver" className="num" />
+              )}
+              {campos.numeroSerie && (
+                <Input label={campos.rotuloSerie} value={form.numero_serie} onChange={e => set('numero_serie', e.target.value)} placeholder={campos.semSerie ? '7891234567890' : 'XXXXX'} className="num" />
+              )}
+            </div>
+          )}
+
+          {(campos.cor || campos.armazenamento || campos.bateria) && (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {campos.cor && (coresDisponiveis.length > 0 ? (
+                <Select label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)}>
+                  <option value="">Selecione…</option>
+                  {coresDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+                  {form.cor && !coresDisponiveis.includes(form.cor) && <option value={form.cor}>{form.cor}</option>}
+                </Select>
+              ) : (
+                <Input label="Cor" value={form.cor} onChange={e => set('cor', e.target.value)} placeholder="Preto" />
+              ))}
+              {campos.armazenamento && (armazenamentosDisponiveis.length > 0 ? (
+                <Select label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)}>
+                  <option value="">Selecione…</option>
+                  {armazenamentosDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+                  {form.armazenamento && !armazenamentosDisponiveis.includes(form.armazenamento) && <option value={form.armazenamento}>{form.armazenamento}</option>}
+                </Select>
+              ) : (
+                <Input label="Armazenamento" value={form.armazenamento} onChange={e => set('armazenamento', e.target.value)} placeholder="256GB" />
+              ))}
+              {campos.bateria && (
+                <Input label="Saúde da bateria (%)" value={form.bateria} onChange={e => set('bateria', e.target.value)} placeholder="100" className="num" />
+              )}
+            </div>
+          )}
+
+          {campos.semSerie && (
+            <p className="text-[11.5px] text-ink-3">
+              Item sem identidade por peça. Por enquanto cada entrada cadastra uma unidade —
+              entrada por quantidade é a próxima etapa.
+            </p>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />
@@ -836,6 +895,23 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, empresaId, isVeic
           <span className="font-semibold text-accent">Aplicar</span>
         </button>
       )}
+
+      {/* Fornecedor e fotos existiam só no modal — vieram junto para este
+          formulário ser o completo, não a versão reduzida. */}
+      <Select label="Fornecedor" value={form.fornecedor_id} onChange={e => set('fornecedor_id', e.target.value)}>
+        <option value="">— Nenhum —</option>
+        {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
+      </Select>
+
+      {/* A coluna guarda URLs separadas por vírgula (mesmo formato de
+          /avaliacoes); o componente trabalha com array. */}
+      <UploadFotos
+        label="Fotos da unidade"
+        empresaId={empresaId}
+        value={form.fotos_urls ? form.fotos_urls.split(',').filter(Boolean) : []}
+        onChange={(urls) => set('fotos_urls', urls.join(','))}
+        max={8}
+      />
 
       <Textarea
         label="Observações"
