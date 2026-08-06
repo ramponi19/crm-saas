@@ -140,27 +140,38 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   }, [clientes, buscaCliente])
 
   function adicionarItem(item: ItemEstoque, reserva = false) {
-    const jaTem = carrinho.find((c) => c.item.id === item.id)
-    if (jaTem) {
-      // Item por quantidade: clicar de novo soma mais um, até o saldo do lote.
-      // Peça identificada não repete — só existe uma.
-      if (!porQuantidade(item)) { notify.warn('Item já está no carrinho'); return }
-      alterarQtd(item.id, jaTem.qtd + 1)
-      return
+    const lote = porQuantidade(item)
+    if (!lote && carrinho.some((c) => c.item.id === item.id)) {
+      notify.warn('Item já está no carrinho'); return
     }
-    setCarrinho((prev) => [...prev, { item, desconto: 0, reserva, qtd: 1 }])
+    // Tudo decidido DENTRO do updater: dois cliques rápidos caem no mesmo ciclo
+    // de render, e ler `carrinho` de fora faria os dois calcularem a mesma
+    // quantidade — clicar 3× somava 2.
+    setCarrinho((prev) => {
+      const i = prev.findIndex((c) => c.item.id === item.id)
+      if (i < 0) return [...prev, { item, desconto: 0, reserva, qtd: 1 }]
+      if (!lote) return prev
+      const max = Math.max(1, item.quantidade ?? 1)
+      if (prev[i].qtd >= max) { avisarSemSaldo(item, max); return prev }
+      return prev.map((c, j) => (j === i ? { ...c, qtd: c.qtd + 1 } : c))
+    })
   }
   function removerItem(id: number) { setCarrinho((prev) => prev.filter((c) => c.item.id !== id)) }
 
-  /** Muda a quantidade da linha, presa ao saldo disponível do lote. */
-  function alterarQtd(id: number, novaQtd: number) {
+  /** Soma/subtrai na linha (delta, nunca valor absoluto), presa ao saldo do lote. */
+  function alterarQtd(id: number, delta: number) {
     setCarrinho((prev) => prev.map((c) => {
       if (c.item.id !== id) return c
       const max = Math.max(1, c.item.quantidade ?? 1)
-      const q = Math.min(max, Math.max(1, novaQtd))
-      if (novaQtd > max) notify.warn(`Só há ${max} em estoque de "${c.item.produto_nome}"`)
-      return { ...c, qtd: q }
+      const alvo = c.qtd + delta
+      if (alvo > max) { avisarSemSaldo(c.item, max); return c }
+      return { ...c, qtd: Math.max(1, alvo) }
     }))
+  }
+
+  /** Aviso fora do updater: setState pode rodar duas vezes em modo estrito. */
+  function avisarSemSaldo(item: ItemEstoque, max: number) {
+    setTimeout(() => notify.warn(`Só há ${max} em estoque de "${item.produto_nome}"`), 0)
   }
 
   // Aba do catálogo: estoque disponível ou reservas de lead.
@@ -893,14 +904,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                         soma e subtrai até o saldo. */}
                     <div className="mt-1 flex items-center gap-2">
                       <button type="button"
-                        onClick={() => (porQuantidade(item) && qtd > 1 ? alterarQtd(item.id, qtd - 1) : removerItem(item.id))}
+                        onClick={() => (porQuantidade(item) && qtd > 1 ? alterarQtd(item.id, -1) : removerItem(item.id))}
                         aria-label={porQuantidade(item) && qtd > 1 ? 'Diminuir' : 'Remover do carrinho'}
                         className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] sm:h-[22px] sm:w-[22px]">
                         <Minus size={13} strokeWidth={1.7} />
                       </button>
                       <span className="num text-[12.5px] font-bold text-ink">{qtd}</span>
                       {porQuantidade(item) ? (
-                        <button type="button" onClick={() => alterarQtd(item.id, qtd + 1)}
+                        <button type="button" onClick={() => alterarQtd(item.id, 1)}
                           disabled={qtd >= (item.quantidade ?? 1)}
                           aria-label="Aumentar"
                           className="grid h-8 w-8 place-items-center rounded-[6px] border border-line text-ink transition-colors hover:bg-ink/[0.04] disabled:opacity-40 sm:h-[22px] sm:w-[22px]">
