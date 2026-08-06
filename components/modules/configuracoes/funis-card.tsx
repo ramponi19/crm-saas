@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, Star, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
 
 interface Funil { id: number; nome: string; padrao: boolean }
@@ -24,13 +25,10 @@ export function FunisCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!vinculo) return
-      setEmpresaId(vinculo.empresa_id)
-      await carregar(vinculo.empresa_id)
+      const id = await empresaAtualId(supabase)
+      if (!id) return
+      setEmpresaId(id)
+      await carregar(id)
     })()
   }, [supabase, carregar])
 

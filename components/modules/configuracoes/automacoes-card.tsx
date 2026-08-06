@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
 import type { Json } from '@/types/database'
 
@@ -57,18 +58,15 @@ export function AutomacoesCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!vinculo) return
-      setEmpresaId(vinculo.empresa_id)
-      const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', vinculo.empresa_id).maybeSingle()
+      const id = await empresaAtualId(supabase)
+      if (!id) return
+      setEmpresaId(id)
+      const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', id).maybeSingle()
       setSegmento(emp?.segmento ?? null)
       const { data: et } = await supabase
-        .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', vinculo.empresa_id).eq('ativo', true).order('ordem')
+        .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', id).eq('ativo', true).order('ordem')
       setEtapas(((et ?? []) as Etapa[]))
-      await carregar(vinculo.empresa_id)
+      await carregar(id)
     })()
   }, [supabase, carregar])
 

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 
 export type Plano = 'free' | 'starter' | 'pro'
 
@@ -43,19 +44,18 @@ export function EmpresaProvider({ children }: { children: ReactNode }) {
   async function fetchEmpresa() {
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
+      // Pelo RPC, não por `empresa_usuarios`: super admin operando uma empresa em
+      // impersonação não tem vínculo, e a consulta antiga voltava vazia — o
+      // contexto ficava nulo e tudo que depende dele (banner de limite, cor do
+      // white-label) simplesmente não carregava, sem erro nenhum.
+      const id = await empresaAtualId(supabase)
+      if (!id) { setLoading(false); return }
 
-      const { data } = await supabase
-        .from('empresa_usuarios')
-        .select('empresa:empresas(*)')
-        .eq('usuario_id', user.id)
-        .eq('ativo', true)
-        .single()
+      const { data: emp } = await supabase
+        .from('empresas').select('*').eq('id', id).maybeSingle()
 
-      if (data?.empresa) {
-        const emp = data.empresa as unknown as Empresa
-        setEmpresa(emp)
+      if (emp) {
+        setEmpresa(emp as unknown as Empresa)
         if (emp.wl_cor) {
           document.documentElement.style.setProperty('--color-primary', emp.wl_cor)
         }

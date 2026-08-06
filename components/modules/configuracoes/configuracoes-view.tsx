@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
@@ -98,11 +99,8 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
   const [empresaId, setEmpresaId] = useState<number | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-        .then(({ data }) => { if (data) setEmpresaId(data.empresa_id) })
-    })
+    empresaAtualId(supabase).then((id) => { if (id) setEmpresaId(id) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Taxas — estado controlado (visa_master / outros / link)

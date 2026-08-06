@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Lead, Usuario, type KanbanColumn } from './types'
 import { Modal, Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { ProdutoAutocomplete } from './produto-autocomplete'
@@ -54,16 +55,14 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { notify.bad('Não autenticado'); setLoading(false); return }
 
-    const { data: vinculo } = await supabase
-      .from('empresa_usuarios').select('empresa_id')
-      .eq('usuario_id', user.id).eq('ativo', true).single()
-    if (!vinculo) { notify.bad('Empresa não encontrada'); setLoading(false); return }
+    const empresaId = await empresaAtualId(supabase)
+    if (!empresaId) { notify.bad('Empresa não encontrada'); setLoading(false); return }
 
     const { data: empresa } = await supabase
-      .from('empresas').select('limite_leads').eq('id', vinculo.empresa_id).single()
+      .from('empresas').select('limite_leads').eq('id', empresaId).single()
     const { count: totalLeads } = await supabase
       .from('leads').select('*', { count: 'exact', head: true })
-      .eq('empresa_id', vinculo.empresa_id).eq('ativo', true)
+      .eq('empresa_id', empresaId).eq('ativo', true)
     const limiteLeads = empresa?.limite_leads ?? 0
     if (limiteLeads > 0 && (totalLeads ?? 0) >= limiteLeads) {
       notify.bad('Limite de leads atingido', `${totalLeads}/${limiteLeads}. Faça upgrade para continuar.`)
@@ -71,7 +70,7 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
     }
 
     const { data, error } = await supabase.from('leads').insert({
-      empresa_id: vinculo.empresa_id,
+      empresa_id: empresaId,
       nome: form.nome.trim(),
       telefone: form.telefone.trim() || null,
       instagram: form.instagram.trim() || null,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Save, Plus, Trash2, GripVertical } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -17,14 +18,11 @@ export function MotivosPerdaCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!vinculo) return
-      setEmpresaId(vinculo.empresa_id)
+      const id = await empresaAtualId(supabase)
+      if (!id) return
+      setEmpresaId(id)
       const { data } = await supabase
-        .from('motivos_perda').select('id, label, ativo').eq('empresa_id', vinculo.empresa_id).order('ordem')
+        .from('motivos_perda').select('id, label, ativo').eq('empresa_id', id).order('ordem')
       setRows(((data ?? []) as { id: number; label: string; ativo: boolean }[]).map(m => ({ id: m.id, label: m.label, ativo: m.ativo })))
     })()
   }, [supabase])

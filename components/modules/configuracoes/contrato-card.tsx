@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Save, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, notify } from '@/components/ui'
 import { GARANTIA_PADRAO_DIAS } from '@/lib/contrato-emitir'
 
@@ -22,15 +23,12 @@ export function ContratoCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setCarregando(false); return }
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!vinculo) { setCarregando(false); return }
-      setEmpresaId(vinculo.empresa_id)
+      const id = await empresaAtualId(supabase)
+      if (!id) { setCarregando(false); return }
+      setEmpresaId(id)
       const { data } = await supabase
         .from('configuracoes_sistema').select('valor')
-        .eq('empresa_id', vinculo.empresa_id).eq('chave', 'contrato').maybeSingle()
+        .eq('empresa_id', id).eq('chave', 'contrato').maybeSingle()
       const n = Number((data?.valor as { garantia_dias?: unknown } | null)?.garantia_dias)
       if (Number.isFinite(n) && n > 0) setDias(String(Math.round(n)))
       setCarregando(false)

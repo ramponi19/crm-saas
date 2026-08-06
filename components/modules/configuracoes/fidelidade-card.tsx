@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Gift, Plus, Trash2 } from 'lucide-react'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
 
@@ -30,11 +31,9 @@ export function FidelidadeCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: v } = await supabase.from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!v) return
-      setEmpresaId(v.empresa_id); await carregar(v.empresa_id)
+      const id = await empresaAtualId(supabase)
+      if (!id) return
+      setEmpresaId(id); await carregar(id)
     })()
   }, [supabase, carregar])
 

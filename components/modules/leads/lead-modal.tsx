@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
@@ -473,15 +474,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { notify.bad('Não autenticado'); setSaving(false); return }
 
-    const { data: vinculo } = await supabase
-      .from('empresa_usuarios').select('empresa_id')
-      .eq('usuario_id', user.id).eq('ativo', true).single()
-    if (!vinculo) { notify.bad('Empresa não encontrada'); setSaving(false); return }
+    const empresaId = await empresaAtualId(supabase)
+    if (!empresaId) { notify.bad('Empresa não encontrada'); setSaving(false); return }
 
     const { data: cliente, error } = await supabase
       .from('clientes')
       .insert({
-        empresa_id: vinculo.empresa_id,
+        empresa_id: empresaId,
         nome: form.nome.trim(),
         telefone: form.tel.trim() || null,
         instagram: form.ig.trim() || null,

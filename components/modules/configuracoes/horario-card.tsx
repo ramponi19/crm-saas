@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Input, Button, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database'
@@ -29,14 +30,11 @@ export function HorarioCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id').eq('usuario_id', user.id).eq('ativo', true).single()
-      if (!vinculo) return
-      setEmpresaId(vinculo.empresa_id)
+      const id = await empresaAtualId(supabase)
+      if (!id) return
+      setEmpresaId(id)
       const { data } = await supabase
-        .from('configuracoes_sistema').select('valor').eq('empresa_id', vinculo.empresa_id).eq('chave', 'horario_comercial').maybeSingle()
+        .from('configuracoes_sistema').select('valor').eq('empresa_id', id).eq('chave', 'horario_comercial').maybeSingle()
       if (data?.valor && typeof data.valor === 'object') {
         const v = data.valor as Partial<Horario>
         setForm({

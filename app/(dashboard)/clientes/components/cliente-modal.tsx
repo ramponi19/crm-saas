@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, ConfirmDialog, notify } from '@/components/ui'
@@ -89,14 +90,11 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
     const { total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
     const data = { ...payload, ativo: true }
     if (isNew) {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { notify.bad('Não autenticado'); setSaving(false); return }
-      const { data: vinculo } = await supabase
-        .from('empresa_usuarios').select('empresa_id, empresas(limite_leads)')
-        .eq('usuario_id', user.id).eq('ativo', true).maybeSingle()
-      if (!vinculo) { notify.bad('Empresa não encontrada'); setSaving(false); return }
-      const empId = (vinculo as { empresa_id: number }).empresa_id
-      const limite = (vinculo?.empresas as unknown as { limite_leads: number } | null)?.limite_leads ?? 0
+      const empId = await empresaAtualId(supabase)
+      if (!empId) { notify.bad('Empresa não encontrada'); setSaving(false); return }
+      const { data: emp } = await supabase
+        .from('empresas').select('limite_leads').eq('id', empId).maybeSingle()
+      const limite = emp?.limite_leads ?? 0
       if (limite > 0) {
         const { count } = await supabase.from('clientes')
           .select('*', { count: 'exact', head: true })
