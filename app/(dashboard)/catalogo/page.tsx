@@ -51,7 +51,8 @@ export default async function CatalogoPage() {
       preco_custo, custo_reparo, preco_venda, status, created_at,
       produtos!produto_id(nome)
     `).eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }),
-    supabase.from('categorias_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    // `tipo_formulario` decide os campos da entrada de estoque (lib/estoque-campos).
+    supabase.from('categorias_produtos').select('id, nome, tipo_formulario').eq('empresa_id', empresaId).order('nome'),
     supabase.from('subcategorias_produtos').select('id, nome, categoria_id').eq('empresa_id', empresaId).order('nome'),
     supabase.from('marcas_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
     supabase.from('tabela_precos').select('id, modelo, armazenamento, condicao, preco_sugerido, observacoes').eq('empresa_id', empresaId).eq('ativo', true).order('modelo'),
@@ -125,6 +126,7 @@ export default async function CatalogoPage() {
   const categorias = categsList.map(c => ({
     id: c.id,
     nome: c.nome,
+    tipo_formulario: (c as { tipo_formulario?: string | null }).tipo_formulario ?? null,
     total_produtos: prodPorCat[c.id] ?? 0,
     subcategorias: subsByCat[c.id] ?? [],
   }))

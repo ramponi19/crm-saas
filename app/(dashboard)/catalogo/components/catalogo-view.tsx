@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Tag, Package, Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
+import { TIPOS_FORMULARIO } from '@/lib/estoque-campos'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Topbar } from '@/components/layout/topbar'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
@@ -52,6 +54,8 @@ interface Unidade {
 interface Categoria {
   id: number
   nome: string
+  /** Decide os campos da entrada de estoque — ver lib/estoque-campos. */
+  tipo_formulario: string | null
   total_produtos: number
   subcategorias: string[]
 }
@@ -125,6 +129,42 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const router = useRouter()
   const { empresa } = useEmpresa()
   const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
+
+  // Categoria: criar/editar. É ela que decide os campos da entrada de estoque,
+  // e até agora não havia tela nenhuma para mexer nisso.
+  const [editCateg, setEditCateg] = useState<Categoria | 'new' | null>(null)
+  const [categForm, setCategForm] = useState({ nome: '', tipo_formulario: '' })
+  const [salvandoCateg, setSalvandoCateg] = useState(false)
+
+  useEffect(() => {
+    if (editCateg === 'new') setCategForm({ nome: '', tipo_formulario: '' })
+    else if (editCateg) setCategForm({ nome: editCateg.nome, tipo_formulario: editCateg.tipo_formulario ?? '' })
+  }, [editCateg])
+
+  async function salvarCategoria() {
+    const nome = categForm.nome.trim()
+    if (!nome) { notify.warn('Informe o nome da categoria'); return }
+    setSalvandoCateg(true)
+    try {
+      const supabase = createClient()
+      const dados = { nome, tipo_formulario: categForm.tipo_formulario || null }
+      if (editCateg === 'new') {
+        const empresaId = await empresaAtualId(supabase)
+        if (!empresaId) { notify.bad('Empresa não encontrada'); return }
+        const { error } = await supabase.from('categorias_produtos').insert({ ...dados, empresa_id: empresaId, ativo: true })
+        if (error) { notify.bad('Erro ao criar categoria', error.message); return }
+        notify.ok('Categoria criada')
+      } else if (editCateg) {
+        const { error } = await supabase.from('categorias_produtos').update(dados).eq('id', editCateg.id)
+        if (error) { notify.bad('Erro ao salvar', error.message); return }
+        notify.ok('Categoria atualizada')
+      }
+      setEditCateg(null)
+      router.refresh()
+    } finally {
+      setSalvandoCateg(false)
+    }
+  }
 
   function abrirNovoPreco() { setEditPreco(null); setPrecoForm({ modelo: '', armazenamento: '', condicao: 'novo', preco_sugerido: '', observacoes: '' }); setModalPreco(true) }
   function abrirEditPreco(t: TabelaPreco) {
@@ -291,25 +331,38 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           {tab === 'categorias' && (
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => window.location.href = '/admin/configuracoes'}>Nova categoria</Button>
+                {/* Antes isto mandava para /admin/configuracoes, onde não existe
+                    gestão de categoria — não dava para criar nem editar por
+                    lugar nenhum. E é a categoria que decide os campos da entrada
+                    de estoque, então sem ela um tenant novo cai sempre no
+                    formulário genérico. */}
+                <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => setEditCateg('new')}>Nova categoria</Button>
               </div>
               {categorias.length === 0 ? (
-                <Card><EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhuma categoria cadastrada" /></Card>
+                <Card><EmptyState icon={<Tag size={22} strokeWidth={1.7} />} title="Nenhuma categoria cadastrada" description="A categoria define quais campos aparecem ao dar entrada no estoque." /></Card>
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {categorias.map((c) => (
-                    <div key={c.id} className="rounded-card border border-line bg-card p-5 transition-colors hover:bg-raised">
+                    <button key={c.id} type="button" onClick={() => setEditCateg(c)}
+                      className="rounded-card border border-line bg-card p-5 text-left transition-colors hover:bg-raised">
                       <div className="mb-4 grid h-10 w-10 place-items-center rounded-control bg-ink/[0.04] text-ink-2">
                         <Package size={18} strokeWidth={1.7} />
                       </div>
                       <div className="text-[15px] font-semibold text-ink">{c.nome}</div>
                       <div className="mt-1 text-[12px] text-ink-3">{c.total_produtos} produtos</div>
+                      <div className="mt-2">
+                        {c.tipo_formulario ? (
+                          <Badge tone="neutro">{TIPOS_FORMULARIO.find(t => t.valor === c.tipo_formulario)?.label ?? c.tipo_formulario}</Badge>
+                        ) : (
+                          <Badge tone="warn">Sem tipo — entrada genérica</Badge>
+                        )}
+                      </div>
                       {c.subcategorias.length > 0 && (
                         <div className="mt-2 truncate text-[11.5px] text-ink-3">
                           Subcategorias: {c.subcategorias.join(' · ')}
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -424,6 +477,42 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           onDeleted={() => { setEditProd(null); router.refresh() }}
         />
       )}
+
+      <Modal
+        open={editCateg !== null}
+        onClose={() => setEditCateg(null)}
+        size="sm"
+        title={editCateg === 'new' ? 'Nova categoria' : 'Editar categoria'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditCateg(null)} disabled={salvandoCateg}>Cancelar</Button>
+            <Button onClick={salvarCategoria} loading={salvandoCateg}>Salvar</Button>
+          </>
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); salvarCategoria() }} className="grid gap-3">
+          <Input
+            label="Nome da categoria"
+            required
+            value={categForm.nome}
+            onChange={(e) => setCategForm((f) => ({ ...f, nome: e.target.value }))}
+            placeholder="Ex.: Celular, Acessórios, Perfumes"
+          />
+          <Select
+            label="Tipo de item"
+            value={categForm.tipo_formulario}
+            onChange={(e) => setCategForm((f) => ({ ...f, tipo_formulario: e.target.value }))}
+          >
+            <option value="">Genérico (número de série + cor)</option>
+            {TIPOS_FORMULARIO.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+          </Select>
+          <p className="text-[11.5px] text-ink-3">
+            O tipo define quais campos aparecem ao dar entrada no estoque: celular pede IMEI e bateria,
+            acessório pede só código de barras, veículo pede placa e chassi. Sem tipo, o formulário
+            mostra o genérico — nenhum campo obrigatório se perde, mas o operador vê campos a mais ou a menos.
+          </p>
+        </form>
+      </Modal>
     </div>
   )
 }
