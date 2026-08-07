@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { documentosDisponiveis } from '@/lib/contrato-emitir'
+import { TOLERANCIA_PADRAO } from '@/lib/troca-referencia'
 import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
 import type { Tables } from '@/types/database'
@@ -33,6 +34,8 @@ export default async function PDVPage() {
     { data: fornecedores },
     vinculoRes,
     usuarioRes,
+    { data: tabelaPrecos },
+    { data: cfgTroca },
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
@@ -60,6 +63,11 @@ export default async function PDVPage() {
     supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
     user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    // Referência de preço do aparelho recebido em troca + a tolerância da loja.
+    supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
+      .eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('configuracoes_sistema').select('valor')
+      .eq('empresa_id', empresaId).eq('chave', 'troca').maybeSingle(),
   ])
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
@@ -135,6 +143,8 @@ export default async function PDVPage() {
           segmento={empresa?.segmento ?? null}
           fornecedores={fornecedores ?? []}
           isAdmin={isAdmin}
+          tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
+          toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
         documentos={documentos} />
       </div>
     </>

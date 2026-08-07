@@ -14,6 +14,10 @@ import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 import { camposDaCategoria } from '@/lib/estoque-campos'
+import {
+  referenciaDaTroca, avaliarTroca, textoDoAceite, TOLERANCIA_PADRAO,
+  type PrecoRef, type AvaliacaoTroca,
+} from '@/lib/troca-referencia'
 
 interface ItemEstoque {
   id: number; produto_id: number | null; produto_nome: string; marca_nome: string
@@ -44,7 +48,7 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[] }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /** Aparelho entregue na troca. `valor` fica string porque vem de <input>. */
 interface TrocaItem { aparelho: string; imei: string; valor: string }
@@ -65,7 +69,7 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [] }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO }: Props) {
   const isFood = segmento === 'food'
   const [comanda, setComanda] = useState('')
   const [encomendaOpen, setEncomendaOpen] = useState(false)
@@ -212,6 +216,25 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         .filter((t) => t.num > 0)
     : []
   const trocaNum = trocasValidas.reduce((s, t) => s + t.num, 0)
+
+  /**
+   * Cada troca comparada com o preço de referência do modelo. A loja pagar MAIS
+   * do que o aparelho vale é o risco que some: abate do que o cliente paga, a
+   * venda continua com preço cheio, e o prejuízo só aparece na revenda.
+   */
+  const avaliacoesTroca = useMemo(
+    () => trocas.map((t) => {
+      const num = parseFloat(String(t.valor).replace(',', '.')) || 0
+      const ref = referenciaDaTroca(t.aparelho, tabelaPrecos)
+      return { aparelho: t.aparelho, referencia: ref, avaliacao: avaliarTroca(num, ref, toleranciaTroca) }
+    }),
+    [trocas, tabelaPrecos, toleranciaTroca],
+  )
+  /** Trocas que passaram da tolerância — exigem aceite antes de fechar. */
+  const trocasAcima = trocaAtiva
+    ? avaliacoesTroca.filter((a): a is typeof a & { avaliacao: AvaliacaoTroca } => !!a.avaliacao?.exigeAceite)
+    : []
+  const [confirmarTroca, setConfirmarTroca] = useState(false)
   const abatimento = descontoNum + trocaNum
 
   const totais = useMemo(() => {
@@ -257,12 +280,15 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
    */
   const semPreco = carrinho.filter((c) => !c.item.preco_venda)
 
-  async function finalizarVenda(jaConfirmado = false) {
+  async function finalizarVenda(jaConfirmado = false, trocaAceita = false) {
     if (carrinho.length === 0) { notify.warn('Carrinho vazio'); return }
     const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
     if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
     if (!jaConfirmado && semPreco.length > 0) { setConfirmarSemPreco(true); return }
+    // Troca acima da referência: o vendedor precisa aceitar, e o aceite é gravado
+    // logo abaixo. Sem passar por aqui a venda não fecha.
+    if (!trocaAceita && trocasAcima.length > 0) { setConfirmarTroca(true); return }
     setFinalizando(true)
     // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
     // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
@@ -458,6 +484,25 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           ativo: true,
         } as never)
       }
+
+      // Log do aceite: uma linha por troca acima da referência, ligada à primeira
+      // venda do fechamento. Fica em tabela própria (sem UPDATE nem DELETE por
+      // policy) porque a finalidade é comprovar — texto solto em `observacoes`
+      // seria editável e sem autor.
+      if (primeiraVendaId !== null && trocasAcima.length > 0) {
+        await supabase.from('vendas_alertas').insert(
+          trocasAcima.map((t) => ({
+            empresa_id: empresaId,
+            venda_id: primeiraVendaId!,
+            tipo: 'troca_acima_referencia',
+            mensagem: textoDoAceite(t.aparelho, t.avaliacao),
+            valor_referencia: t.avaliacao.referencia,
+            valor_informado: t.avaliacao.valor,
+            aceito_por: user.id,
+          })) as never,
+        )
+      }
+
       if (formaPagamento === 'pix' && totais.total > 0) {
         try {
           const res = await fetch('/api/payments/charge', {
@@ -676,6 +721,26 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           + `Total a pagar: ${fmt(totais.total)}. Se for brinde ou troca em garantia, siga; senão, cancele e defina o preço no estoque.`
         }
         confirmLabel="Finalizar assim mesmo"
+        tone="danger"
+      />
+
+      {/* Troca acima da referência: confirmar aqui grava um aceite com nome e
+          hora na venda. O texto diz isso — o vendedor precisa saber que está
+          assinando, senão o log não significa consentimento. */}
+      <ConfirmDialog
+        open={confirmarTroca}
+        onClose={() => setConfirmarTroca(false)}
+        onConfirm={() => { setConfirmarTroca(false); finalizarVenda(true, true) }}
+        title={trocasAcima.length === 1 ? 'Troca acima do preço de referência' : 'Trocas acima do preço de referência'}
+        description={
+          trocasAcima.map((t) =>
+            `"${t.aparelho.trim() || 'Aparelho'}": avaliado em ${fmt(t.avaliacao.valor)}, referência ${fmt(t.avaliacao.referencia)}`
+            + ` — ${fmt(t.avaliacao.excedente)} a mais (${t.avaliacao.percentual.toFixed(0)}%).`,
+          ).join(' ')
+          + ' A loja está pagando mais do que o aparelho vale, e isso só aparece no resultado quando ele for revendido.'
+          + ' Ao confirmar, fica registrado na venda que você aceitou, com seu nome e a hora.'
+        }
+        confirmLabel="Estou ciente, finalizar"
         tone="danger"
       />
 
@@ -1029,6 +1094,28 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                           placeholder="Valor R$"
                           className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
                       </div>
+
+                      {/* Referência do modelo e o quanto o valor passou dela. O
+                          vendedor vê ANTES de fechar, não depois. */}
+                      {(() => {
+                        const a = avaliacoesTroca[i]
+                        if (!a?.referencia) {
+                          return t.aparelho.trim() ? (
+                            <p className="mt-1.5 text-[11px] text-ink-3">Sem preço de referência para este modelo na tabela.</p>
+                          ) : null
+                        }
+                        const av = a.avaliacao
+                        return (
+                          <p className={cn('mt-1.5 text-[11px]', av?.exigeAceite ? 'font-medium text-bad' : 'text-ink-3')}>
+                            Referência {fmt(a.referencia)}
+                            {av && av.excedente > 0 && (
+                              <> · {fmt(av.excedente)} acima ({av.percentual.toFixed(0)}%)
+                                {av.exigeAceite ? ' — vai pedir confirmação' : ''}</>
+                            )}
+                            {av && av.excedente < 0 && <> · {fmt(-av.excedente)} abaixo — margem para a loja</>}
+                          </p>
+                        )
+                      })()}
                     </div>
                   ))}
 

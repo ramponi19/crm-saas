@@ -3500,6 +3500,12 @@ export type Database = {
           },
         ]
       }
+      vendas_alertas: {
+        Row: { id: number; empresa_id: number; venda_id: number; tipo: string; mensagem: string; valor_referencia: number | null; valor_informado: number | null; aceito_por: string | null; aceito_em: string }
+        Insert: { id?: never; empresa_id: number; venda_id: number; tipo: string; mensagem: string; valor_referencia?: number | null; valor_informado?: number | null; aceito_por?: string | null; aceito_em?: string }
+        Update: { id?: never; empresa_id?: number; venda_id?: number; tipo?: string; mensagem?: string; valor_referencia?: number | null; valor_informado?: number | null; aceito_por?: string | null; aceito_em?: string }
+        Relationships: []
+      }
       vendas_pagamentos: {
         Row: {
           bandeira_cartao: string | null

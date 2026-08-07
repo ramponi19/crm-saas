@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText } from 'lucide-react'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText, ArrowLeftRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
@@ -20,6 +20,7 @@ import { AgendamentoCard } from './agendamento-card'
 import { VeiculosPortalCard } from './veiculos-portal-card'
 import { FidelidadeCard } from './fidelidade-card'
 import { ContratoCard } from './contrato-card'
+import { TrocaCard } from './troca-card'
 import type { OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
 
@@ -48,6 +49,7 @@ const TABS = [
   { id: 'automacoes',  label: 'Automações',       Icon: Zap     },
   { id: 'fidelidade',  label: 'Fidelidade',       Icon: Gift    },
   { id: 'contrato',    label: 'Contrato',         Icon: FileText },
+  { id: 'troca',       label: 'Troca',            Icon: ArrowLeftRight },
   { id: 'horario',     label: 'Horário',          Icon: Clock   },
   { id: 'modelos',     label: 'Modelos WhatsApp', Icon: MessageSquareText },
   { id: 'notificacoes', label: 'Notificações',    Icon: Bell    },
@@ -427,6 +429,7 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
         {aba === 'veiculos-portais' && <VeiculosPortalCard slug={slug ?? null} />}
         {aba === 'fidelidade' && <FidelidadeCard />}
         {aba === 'contrato' && <ContratoCard />}
+        {aba === 'troca' && <TrocaCard />}
 
       </div>
 
