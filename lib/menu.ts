@@ -139,7 +139,8 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/historico', label: 'Histórico', icon: 'ReceiptText' },
       { href: '/simular-parcela', label: 'Simular parcela', icon: 'Calculator' },
       { href: '/estoque', label: 'Estoque', icon: 'Boxes' },
-      { href: '/check-imei', label: 'Check IMEI', icon: 'ScanSearch' },
+      // Só faz sentido onde se vende aparelho — opcional, como a FIPE em veículos.
+      { href: '/check-imei', label: 'Check IMEI', icon: 'ScanSearch', opcional: true },
       { href: '/catalogo', label: 'Produtos', icon: 'Smartphone' },
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
