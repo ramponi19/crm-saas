@@ -23,15 +23,23 @@ export function AvisoModuloIndisponivel() {
     jaAvisou.current = href
 
     const item = CATALOGO.flatMap((g) => g.items).find((i) => i.href === href)
-    notify.warn(
-      `${item?.label ?? 'Módulo'} não está habilitado nesta empresa`,
-      'Se você precisa desta tela, peça ao responsável pelo CRM para habilitar o módulo.',
-    )
+
+    // O <Toaster> do layout raiz vem DEPOIS de {children}, então monta depois
+    // deste componente. Avisar direto aqui emite o toast antes de existir quem
+    // escute, e ele some sem aparecer — foi o que aconteceu na primeira versão.
+    const t = setTimeout(() => {
+      notify.warn(
+        `${item?.label ?? 'Módulo'} não está habilitado nesta empresa`,
+        'Se você precisa desta tela, peça ao responsável pelo CRM para habilitar o módulo.',
+      )
+    }, 100)
 
     // Tira o parâmetro da URL para o aviso não voltar se a pessoa recarregar.
     const url = new URL(window.location.href)
     url.searchParams.delete('indisponivel')
     window.history.replaceState(null, '', url.pathname + url.search)
+
+    return () => clearTimeout(t)
   }, [href])
 
   return null
