@@ -18,6 +18,10 @@ import {
   referenciaDaTroca, avaliarTroca, textoDoAceite, TOLERANCIA_PADRAO,
   type PrecoRef, type AvaliacaoTroca,
 } from '@/lib/troca-referencia'
+import {
+  resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
+  FORMAS_PARCELAVEIS, type LinhaPagamento,
+} from '@/lib/pdv-pagamentos'
 
 interface ItemEstoque {
   id: number; produto_id: number | null; produto_nome: string; marca_nome: string
@@ -81,9 +85,17 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSimples | null>(null)
   const [buscaCliente, setBuscaCliente] = useState('')
   const [showClientes, setShowClientes] = useState(false)
-  const [formaPagamento, setFormaPagamento] = useState('dinheiro')
-  const [parcelas, setParcelas] = useState(1)
-  const [bandeira, setBandeira] = useState<'visa_master' | 'outros'>('visa_master')
+  /**
+   * Formas de pagamento da venda. Lista, não valor único: o caixa real combina
+   * cartão + dinheiro, dois cartões + Pix. `vendas_pagamentos` sempre foi 1:N —
+   * era só a tela que obrigava a escolher uma e mentir no resto.
+   */
+  const [pagamentos, setPagamentos] = useState<LinhaPagamento[]>([
+    { id: 'p1', forma: 'dinheiro', valor: 0, parcelas: 1, bandeira: 'visa_master' },
+  ])
+  /** Forma única, derivada — o resto do fluxo (Pix, contrato) pergunta por ela. */
+  const formaPagamento = formaResumida(pagamentos)
+  const parcelas = parcelasResumidas(pagamentos) ?? 1
   const [desconto, setDesconto] = useState('')
   const [finalizando, setFinalizando] = useState(false)
   // #3 upsell de acessórios (ofertas editáveis)
@@ -253,28 +265,41 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     // maquininha e do "Total a pagar" na tela.
     const total = Math.max(0, subtotal - abatimento)
     const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0) * c.qtd, 0)
-    let totalComTaxa = total
-    if (formaPagamento === 'credito' || formaPagamento === 'link') {
-      const fpBanco = formaPagamento === 'credito' ? 'maquininha' : 'link'
-      const taxa = taxas.find((t) =>
-        t.forma_pagamento === fpBanco && t.parcelas === parcelas &&
-        (fpBanco === 'link' || t.bandeira === bandeira),
-      )
-      if (taxa?.percentual_taxa) totalComTaxa = total * (1 + Number(taxa.percentual_taxa) / 100)
-    }
-    const taxaPct = totalComTaxa > total ? ((totalComTaxa - total) / total * 100) : 0
+    // Juros agora saem das LINHAS de pagamento (cada cartão tem a sua taxa), não
+    // de uma forma única — ver `resumoPag` logo abaixo.
     // Lucro sai de `valorVenda`, não de `total`: senão a troca viraria prejuízo.
-    return { subtotal, valorVenda, total, totalComTaxa, custo, lucro: valorVenda - custo, taxaPct }
-  }, [carrinho, abatimento, descontoNum, acessoriosTotal, formaPagamento, parcelas, bandeira, taxas])
+    return { subtotal, valorVenda, total, custo, lucro: valorVenda - custo }
+  }, [carrinho, abatimento, descontoNum, acessoriosTotal])
 
-  const parcelasOpts = useMemo(() => {
-    const fp = formaPagamento === 'credito' ? 'maquininha' : 'link'
-    return taxas
-      .filter((t) => t.forma_pagamento === fp && (fp === 'link' || t.bandeira === bandeira))
-      .sort((a, b) => (a.parcelas ?? 0) - (b.parcelas ?? 0))
-      .map((t) => t.parcelas!)
-      .filter(Boolean)
-  }, [taxas, formaPagamento, bandeira])
+  const resumoPag = useMemo(
+    () => resumirPagamentos(pagamentos, totais.total, taxas),
+    [pagamentos, totais.total, taxas],
+  )
+
+  /**
+   * Uma linha só acompanha o total automaticamente — é o caso comum e evita
+   * digitar o valor toda venda. Com duas ou mais, o operador é quem divide, e
+   * mexer nos valores dele seria pior que não ajudar.
+   */
+  useEffect(() => {
+    if (pagamentos.length !== 1) return
+    setPagamentos((ps) => (ps.length === 1 && ps[0].valor !== totais.total ? [{ ...ps[0], valor: totais.total }] : ps))
+  }, [totais.total, pagamentos.length])
+
+  function mudarPagamento(id: string, patch: Partial<LinhaPagamento>) {
+    setPagamentos((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+  }
+  function removerPagamento(id: string) {
+    setPagamentos((ps) => (ps.length <= 1 ? ps : ps.filter((p) => p.id !== id)))
+  }
+  /** Nova linha já vem com o que falta — é o valor que o operador ia digitar. */
+  function adicionarPagamento() {
+    setPagamentos((ps) => {
+      const coberto = ps.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+      const resta = Math.max(0, totais.total - coberto)
+      return [...ps, { id: `p${Date.now()}`, forma: 'dinheiro', valor: resta, parcelas: 1, bandeira: 'visa_master' }]
+    })
+  }
 
   /**
    * Itens do carrinho sem preço de venda. Acontece de verdade com aparelho que
@@ -317,7 +342,6 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       const grupoPdv = crypto.randomUUID()
       const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
       const unitStatus = entregaPendente ? 'reservado' : 'vendido'
-      const taxaMultiplier = totais.total > 0 ? totais.totalComTaxa / totais.total : 1
       const trocaNota = trocasValidas.length
         ? ` Troca: ${trocasValidas.map((t) => `${t.aparelho.trim() || 'aparelho'} (${fmt(t.num)})`).join(', ')}.`
         : ''
@@ -331,12 +355,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         const precoCheio = (c.item.preco_venda ?? 0) * c.qtd
         const fatia = subtotalBruto > 0 ? precoCheio / subtotalBruto : 0
         const descontoItem = descontoNum * fatia
-        const trocaItem = trocaNum * fatia
         const valorItem = precoCheio - descontoItem
-        // O que o cliente paga em dinheiro por este item. A validação de
-        // `abatimento > subtotalBruto` acima garante trocaItem <= valorItem; o
-        // Math.max é só contra resto de ponto flutuante.
-        const caixaItem = Math.max(0, valorItem - trocaItem)
+        // A parte paga em dinheiro não é mais calculada por item: os pagamentos
+        // do fechamento vão juntos na primeira venda do grupo.
 
         // Item de reserva só é vendável enquanto AINDA está reservado (a reserva
         // trava a peça); item comum exige 'disponivel' — protege contra corrida.
@@ -374,10 +395,6 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           if (!unidadeClaim) throw new Error(c.reserva ? `A reserva de "${c.item.produto_nome}" não está mais ativa` : `"${c.item.produto_nome}" não está mais disponível`)
           claimed.push({ id: c.item.id, statusAnterior: statusEsperado })
         }
-
-        // A taxa da maquininha incide só sobre o que passa no cartão — a parte
-        // paga em aparelho não tem taxa.
-        const caixaItemComTaxa = caixaItem * taxaMultiplier
 
         const vendaRow = {
           empresa_id: empresaId,
@@ -421,27 +438,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           const { error: eUid } = await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
           if (eUid) throw new Error('Falha ao vincular a unidade à venda pendente')
         }
-        // Pagamento em DUAS linhas quando houve troca: o dinheiro e o aparelho.
-        // Somadas, fecham exatamente o `valor_venda` — é isso que faz a conta
-        // bater sem transformar a troca em prejuízo.
-        if (caixaItem > 0.005) {
-          await supabase.from('vendas_pagamentos').insert({
-            empresa_id: empresaId,
-            venda_id: venda.id, forma_pagamento: formaPagamento,
-            valor_pago: caixaItem,
-            bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
-            parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
-            valor_com_juros: totais.totalComTaxa !== totais.total ? caixaItemComTaxa : null,
-          })
-        }
-        if (trocaItem > 0.005) {
-          await supabase.from('vendas_pagamentos').insert({
-            empresa_id: empresaId,
-            venda_id: venda.id, forma_pagamento: 'troca',
-            valor_pago: trocaItem,
-            bandeira_cartao: null, parcelas: null, valor_com_juros: null,
-          })
-        }
+        // Os pagamentos NÃO são gravados por item: com várias formas, ratear
+        // "crédito 3x" entre três linhas do carrinho inventaria uma divisão que
+        // não existe na maquininha. Ficam todos na primeira venda do fechamento,
+        // logo abaixo do laço — o invariante passa a ser por GRUPO:
+        // soma dos pagamentos do grupo = soma dos valor_venda do grupo.
       }
 
       // #3 Acessórios ofertados (kit proteção, fonte…) → venda extra por item.
@@ -450,9 +451,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         if (preco <= 0 || !ac.descricao.trim()) continue
         const fatiaAc = subtotalBruto > 0 ? preco / subtotalBruto : 0
         const descAc = descontoNum * fatiaAc
-        const trocaAc = trocaNum * fatiaAc
         const valorAc = preco - descAc
-        const caixaAc = Math.max(0, valorAc - trocaAc)
         const { data: vAc } = await supabase.from('vendas').insert({
           empresa_id: empresaId, grupo_pdv: grupoPdv, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
@@ -460,15 +459,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
         if (vAc?.id) vendaIds.push(vAc.id)
-        if (vAc?.id && caixaAc > 0.005) await supabase.from('vendas_pagamentos').insert({
-          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: formaPagamento, valor_pago: caixaAc,
-          bandeira_cartao: formaPagamento === 'credito' ? bandeira : null,
-          parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
-        } as never)
-        if (vAc?.id && trocaAc > 0.005) await supabase.from('vendas_pagamentos').insert({
-          empresa_id: empresaId, venda_id: vAc.id, forma_pagamento: 'troca', valor_pago: trocaAc,
-          bandeira_cartao: null, parcelas: null,
-        } as never)
+        // Acessório também não grava pagamento por linha — tudo vai junto na
+        // primeira venda do fechamento (ver o bloco de pagamentos abaixo).
       }
 
       // #1 Cada aparelho recebido na troca entra no estoque como UMA unidade
@@ -487,6 +479,36 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           observacoes: `${t.aparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
           ativo: true,
         } as never)
+      }
+
+      // Pagamentos do fechamento, na primeira venda do grupo: as formas que o
+      // cliente usou (cada cartão com sua bandeira, parcelas e juros) mais o
+      // aparelho dado em troca, que é pagamento em espécie.
+      if (primeiraVendaId !== null) {
+        const linhas = [
+          ...pagamentos
+            .filter((p) => (Number(p.valor) || 0) > 0.005)
+            .map((p) => {
+              const comJuros = valorComJuros(p, taxas)
+              return {
+                empresa_id: empresaId,
+                venda_id: primeiraVendaId!,
+                forma_pagamento: p.forma,
+                valor_pago: p.valor,
+                bandeira_cartao: p.forma === 'credito' ? (p.bandeira ?? 'visa_master') : null,
+                parcelas: FORMAS_PARCELAVEIS.includes(p.forma) ? (p.parcelas ?? 1) : null,
+                valor_com_juros: comJuros > p.valor ? comJuros : null,
+              }
+            }),
+          ...(trocaNum > 0.005 ? [{
+            empresa_id: empresaId,
+            venda_id: primeiraVendaId!,
+            forma_pagamento: 'troca',
+            valor_pago: trocaNum,
+            bandeira_cartao: null, parcelas: null, valor_com_juros: null,
+          }] : []),
+        ]
+        if (linhas.length) await supabase.from('vendas_pagamentos').insert(linhas as never)
       }
 
       // Termo de garantia: marca a PRIMEIRA venda do fechamento. O termo é um
@@ -516,14 +538,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         )
       }
 
-      if (formaPagamento === 'pix' && totais.total > 0) {
+      // Cobrança Pix pelo valor da LINHA de Pix, não pelo total: numa venda de
+      // R$ 5.000 com R$ 1.500 no Pix e o resto no cartão, gerar QR de 5.000
+      // cobraria o cliente duas vezes.
+      const valorPix = pagamentos
+        .filter((p) => p.forma === 'pix')
+        .reduce((s, p) => s + (Number(p.valor) || 0), 0)
+      if (valorPix > 0.005) {
         try {
           const res = await fetch('/api/payments/charge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tipo: 'pix',
-              valor: totais.total,
+              valor: valorPix,
               vendaId: primeiraVendaId,
               descricao: `Venda PDV`,
               pagador: clienteSelecionado ? { nome: clienteSelecionado.nome, telefone: clienteSelecionado.telefone ?? undefined } : undefined,
@@ -546,7 +574,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // escolher — a emissão deixou de ser automática. Uma venda = N linhas em
       // `vendas`, mas UM documento por emissão: `vendaIds` amarra as duas
       // coisas, e é por ele que o Histórico acha a 2ª via.
-      setUltimoTotal(totais.total)
+      // Guarda o que o cliente paga de fato (com juros), que é o valor do Pix e
+      // o que aparece no modal de sucesso.
+      setUltimoTotal(resumoPag.cobrado || totais.total)
       setContexto({
         empresaId,
         vendaIds,
@@ -576,12 +606,14 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         criadoPor: user.id,
       })
       setEmitidos([])
-      if (formaPagamento !== 'pix') setSucessoOpen(true)
+      // Com Pix na jogada, o modal do QR toma a frente; sem, mostra o sucesso.
+      if (valorPix <= 0.005) setSucessoOpen(true)
 
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
-      setCarrinho([]); setDesconto(''); setParcelas(1)
+      setCarrinho([]); setDesconto('')
+      setPagamentos([{ id: 'p1', forma: 'dinheiro', valor: 0, parcelas: 1, bandeira: 'visa_master' }])
       setAcessorios([]); setTrocaAtiva(false); setTrocas([{ aparelho: '', imei: '', valor: '' }]); setEntregaPendente(false); setTermoGarantia(false)
-      if (formaPagamento !== 'pix') setClienteSelecionado(null)
+      if (valorPix <= 0.005) setClienteSelecionado(null)
       setComanda('')
       router.refresh()
     } catch (e) {
@@ -685,7 +717,6 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     </div>
   )
 
-  const isCartaoOuLink = formaPagamento === 'credito' || formaPagamento === 'link'
 
   return (
     <>
@@ -1164,75 +1195,102 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               </span>
             </label>
 
-            {/* Forma de pagamento */}
-            <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Forma de pagamento</div>
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              {FORMAS_PAG.map((pg) => {
-                const ativo = formaPagamento === pg.key
-                const Icon = pg.icon
+            {/* ── Formas de pagamento (várias na mesma venda) ── */}
+            <div className="mb-2.5 flex items-baseline justify-between">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                {pagamentos.length > 1 ? 'Formas de pagamento' : 'Forma de pagamento'}
+              </span>
+              {resumoPag.juros > 0 && (
+                <span className="text-[11px] text-ink-3">juros {fmt(resumoPag.juros)}</span>
+              )}
+            </div>
+
+            <div className="mb-3 space-y-2">
+              {pagamentos.map((p) => {
+                const opcoesParcela = parcelasDisponiveis(p, taxas)
+                const comJuros = valorComJuros(p, taxas)
                 return (
-                  <button
-                    key={pg.key}
-                    type="button"
-                    onClick={() => { setFormaPagamento(pg.key); setParcelas(1) }}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-control border px-3 py-2.5 transition-all',
-                      ativo ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]',
+                  <div key={p.id} className="rounded-control border border-line p-2.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {FORMAS_PAG.map((pg) => {
+                        const Icon = pg.icon
+                        return (
+                          <button key={pg.key} type="button"
+                            onClick={() => mudarPagamento(p.id, { forma: pg.key, parcelas: 1 })}
+                            className={cn('flex items-center gap-2 rounded-control border px-2.5 py-2 transition-all',
+                              p.forma === pg.key ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]')}>
+                            <Icon size={15} strokeWidth={1.7} />
+                            <span className="text-[12.5px] font-semibold">{pg.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[12px] text-ink-3">R$</span>
+                      <input type="number" value={p.valor || ''}
+                        onChange={(e) => mudarPagamento(p.id, { valor: Number(e.target.value) || 0 })}
+                        placeholder="0,00"
+                        className="num h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 text-right text-[13px] font-semibold text-ink outline-none focus:border-accent" />
+                      {pagamentos.length > 1 && (
+                        <button type="button" aria-label="Remover forma de pagamento"
+                          onClick={() => removerPagamento(p.id)}
+                          className="grid h-9 w-9 flex-none place-items-center rounded-control text-ink-3 hover:bg-bad/10 hover:text-bad">
+                          <Minus size={15} strokeWidth={2} />
+                        </button>
+                      )}
+                    </div>
+
+                    {p.forma === 'credito' && (
+                      <div className="mt-2 flex gap-1.5">
+                        {(['visa_master', 'outros'] as const).map((b) => (
+                          <button key={b} type="button"
+                            onClick={() => mudarPagamento(p.id, { bandeira: b })}
+                            className={cn('flex-1 rounded-control border py-1 text-[11px] font-medium transition-all',
+                              (p.bandeira ?? 'visa_master') === b ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]')}>
+                            {b === 'visa_master' ? 'Visa / Master' : 'Outros'}
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  >
-                    <Icon size={17} strokeWidth={1.7} />
-                    <span className="text-[13px] font-semibold">{pg.label}</span>
-                  </button>
+
+                    {FORMAS_PARCELAVEIS.includes(p.forma) && (
+                      <>
+                        <div className="mt-2 grid grid-cols-6 gap-1">
+                          {(opcoesParcela.length ? opcoesParcela : [1, 2, 3, 4, 5, 6]).map((n) => (
+                            <button key={n} type="button"
+                              onClick={() => mudarPagamento(p.id, { parcelas: n })}
+                              className={cn('num rounded-control border py-1.5 text-center text-[12px] font-bold transition-all',
+                                (p.parcelas ?? 1) === n ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]')}>
+                              {n}x
+                            </button>
+                          ))}
+                        </div>
+                        {p.valor > 0 && comJuros > p.valor && (
+                          <div className="mt-1.5 text-[11px] text-ink-3">
+                            {p.parcelas ?? 1}× de <span className="num font-semibold text-ink-2">{fmt(comJuros / (p.parcelas ?? 1))}</span>
+                            {' '}· cobra {fmt(comJuros)} com juros
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )
               })}
             </div>
 
-            {/* Parcelas */}
-            {isCartaoOuLink && (
-              <div className="mb-4">
-                {formaPagamento === 'credito' && (
-                  <div className="mb-3 flex gap-2">
-                    {(['visa_master', 'outros'] as const).map((b) => (
-                      <button
-                        key={b}
-                        type="button"
-                        onClick={() => setBandeira(b)}
-                        className={cn('flex-1 rounded-control border py-1.5 text-[11px] font-medium transition-all',
-                          bandeira === b ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]')}
-                      >
-                        {b === 'visa_master' ? 'Visa / Master' : 'Outros'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Parcelas</div>
-                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
-                  {(parcelasOpts.length > 0 ? parcelasOpts : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setParcelas(p)}
-                      className={cn('num rounded-control border py-2 text-center text-[13px] font-bold transition-all',
-                        parcelas === p ? 'border-ink/30 bg-ink/[0.05] text-ink' : 'border-line text-ink-2 hover:bg-ink/[0.03]')}
-                    >
-                      {p}x
-                    </button>
-                  ))}
-                </div>
-                {totais.total > 0 && (
-                  <div className="mt-3 flex items-center justify-between rounded-control border border-line bg-raised p-3">
-                    <div>
-                      <div className="text-[11px] text-ink-3">{parcelas}x de</div>
-                      <div className="num text-[16px] font-bold text-ink">{fmt(totais.totalComTaxa / parcelas)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[11px] text-ink-3">com juros · {totais.taxaPct.toFixed(2)}%</div>
-                      <div className="num text-[16px] font-bold text-ink">{fmt(totais.totalComTaxa)}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Quanto falta é a informação que o caixa olha ao dividir. */}
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button type="button" onClick={adicionarPagamento}
+                className="flex items-center gap-1.5 rounded-control border border-dashed border-line px-3 py-2 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
+                <Plus size={14} strokeWidth={1.9} /> Outra forma
+              </button>
+              {totais.total > 0 && !resumoPag.fechado && (
+                <span className={cn('text-[12px] font-semibold', resumoPag.falta > 0 ? 'text-bad' : 'text-warn')}>
+                  {resumoPag.falta > 0 ? `Falta ${fmt(resumoPag.falta)}` : `Passou ${fmt(-resumoPag.falta)}`}
+                </span>
+              )}
+            </div>
 
             <Button
               size="lg"
@@ -1242,7 +1300,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               onClick={() => finalizarVenda()}
               icon={!finalizando ? <CheckCircle2 size={19} strokeWidth={1.7} /> : undefined}
             >
-              {finalizando ? 'Finalizando…' : `Finalizar venda · ${fmt(totais.totalComTaxa || totais.total)}`}
+              {finalizando ? 'Finalizando…' : `Finalizar venda · ${fmt(resumoPag.cobrado || totais.total)}`}
             </Button>
           </div>
         </div>
