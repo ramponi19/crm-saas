@@ -8,6 +8,7 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
+import { AssinaturaCard } from './assinatura-card'
 import { HorarioCard } from './horario-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
@@ -416,7 +417,12 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
         {aba === 'horario' && <HorarioCard />}
 
         {/* ── MODELOS DE MENSAGEM ── */}
-        {aba === 'modelos' && <TemplatesCard />}
+        {aba === 'modelos' && (
+          <div className="space-y-4">
+            <AssinaturaCard />
+            <TemplatesCard />
+          </div>
+        )}
 
         {/* ── NOTIFICAÇÕES (por usuário) ── */}
         {aba === 'notificacoes' && <NotificacoesCard />}

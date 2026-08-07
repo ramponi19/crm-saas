@@ -160,20 +160,59 @@ async function marcarErroNoCanal(canalId: number, erro: string, status = "erro")
 // ── Autenticação do envio ───────────────────────────────────────────────────
 // Antes: qualquer um com a anon key (pública, vai no bundle do front) enviava.
 // Agora: exige JWT de usuário e confere vínculo com a empresa dona do lead.
-async function usuarioAutorizado(req: Request, empresaId: number): Promise<boolean> {
+// Devolve QUEM está enviando, não só se pode. O nome é o que assina a mensagem
+// no aparelho do cliente — a API do WhatsApp manda tudo pelo número da loja, sem
+// identidade por atendente, então o prefixo no texto é o único jeito de o
+// cliente saber com quem está falando.
+async function usuarioDoEnvio(req: Request, empresaId: number): Promise<{ id: string; nome: string } | null> {
   try {
     const auth = req.headers.get("authorization") ?? "";
     const jwt = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-    if (!jwt || jwt === ANON_KEY || !ANON_KEY) return false;
+    if (!jwt || jwt === ANON_KEY || !ANON_KEY) return null;
     const cliente = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data, error } = await cliente.auth.getUser();
-    if (error || !data.user) return false;
+    if (error || !data.user) return null;
     const { data: vinculo } = await db.from("empresa_usuarios")
       .select("id").eq("empresa_id", empresaId).eq("usuario_id", data.user.id).eq("ativo", true).maybeSingle();
-    return !!vinculo;
-  } catch (e) { console.error("usuarioAutorizado:", e); return false; }
+    if (!vinculo) return null;
+    const { data: u } = await db.from("usuarios").select("nome").eq("id", data.user.id).maybeSingle();
+    return { id: data.user.id, nome: ((u?.nome as string | null) ?? "").trim() };
+  } catch (e) { console.error("usuarioDoEnvio:", e); return null; }
+}
+
+/**
+ * Prefixo de assinatura: "Thomas - JM STORE:" na frente do que o CRM envia.
+ *
+ * Configurável por empresa em `configuracoes_sistema`, chave
+ * `assinatura_atendente`: { ativo, incluir_empresa }. Sem linha configurada,
+ * assina — é o comportamento pedido, e uma loja que não queira desliga na tela.
+ *
+ * `markdown` só no WhatsApp: Instagram e Messenger não interpretam `*_..._*` e
+ * mostrariam os asteriscos crus para o cliente.
+ */
+async function assinaturaDe(empresaId: number, nomeUsuario: string, markdown: boolean): Promise<string> {
+  try {
+    const primeiro = nomeUsuario.split(/\s+/)[0];
+    if (!primeiro) return "";
+    const { data: cfg } = await db.from("configuracoes_sistema")
+      .select("valor").eq("empresa_id", empresaId).eq("chave", "assinatura_atendente").maybeSingle();
+    const v = (cfg?.valor ?? {}) as { ativo?: boolean; incluir_empresa?: boolean };
+    if (v.ativo === false) return "";
+
+    let quem = primeiro;
+    if (v.incluir_empresa !== false) {
+      const { data: emp } = await db.from("empresas").select("nome").eq("id", empresaId).maybeSingle();
+      const nomeEmp = (emp?.nome as string | null) ?? "";
+      if (nomeEmp) quem = `${primeiro} - ${nomeEmp.toUpperCase()}`;
+    }
+    return markdown ? `*_${quem}:_*\n` : `${quem}:\n`;
+  } catch (e) {
+    // Assinatura é enfeite: falhar aqui não pode impedir a resposta ao cliente.
+    console.error("assinaturaDe:", e);
+    return "";
+  }
 }
 
 // ── Mídia ───────────────────────────────────────────────────────────────────
@@ -461,7 +500,7 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
 }
 
 // ── Envio ───────────────────────────────────────────────────────────────────
-async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
+async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assinatura = "") {
   const number = body.number as string;
   const text = body.text as string | undefined;
   const leadId = body.leadId as string | undefined;
@@ -470,7 +509,10 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
 
   const comMidia = !!(midiaUrl && tipoMidia);
   const tipoDb = comMidia ? TIPO_DB[tipoMidia!] : "texto";
+  // Gravado SEM a assinatura: no CRM a autoria já aparece na própria bolha, e
+  // repetir "Fulano - LOJA:" em toda linha só sujaria a conversa.
   const conteudo = text || (comMidia ? `[${tipoDb}]` : "");
+  const textoEnviado = text ? assinatura + text : text;
   const num = number.replace(/\D/g, "");
   const destino = num.startsWith("55") ? num : "55" + num;
 
@@ -480,9 +522,9 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>) {
           messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: tipoMidia,
           [tipoMidia!]: tipoMidia === "audio"
             ? { link: midiaUrl }
-            : (text ? { link: midiaUrl, caption: text } : { link: midiaUrl }),
+            : (text ? { link: midiaUrl, caption: textoEnviado } : { link: midiaUrl }),
         }
-      : { messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: "text", text: { body: text } };
+      : { messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: "text", text: { body: textoEnviado } };
     const r = await fetch(`https://graph.facebook.com/${GRAPH}/${canal.external_id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${canal.token}` },
@@ -583,7 +625,7 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>) {
   return json({ success: true, modelo: nome });
 }
 
-async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>) {
+async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>, assinatura = "") {
   const leadId = body.leadId as string;
   const texto = body.texto as string | undefined;
   const nomeCanal = body.canal as string;
@@ -596,7 +638,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
   // A Send API não aceita texto + anexo na mesma mensagem.
   const message = comMidia
     ? { attachment: { type: tipoMidia, payload: { url: midiaUrl, is_reusable: true } } }
-    : { text: texto };
+    : { text: texto ? assinatura + texto : texto };
 
   // O envio é sempre pela PÁGINA — inclusive no Instagram. Como o canal do IG
   // guarda o id da CONTA do Instagram, busca-se a Página da mesma empresa.
@@ -659,9 +701,8 @@ serve(async (req: Request) => {
         .select("id, empresa_id, origem_id").eq("id", leadId).maybeSingle();
       if (!lead) return json({ error: "lead não encontrado" }, 404);
 
-      if (!(await usuarioAutorizado(req, lead.empresa_id as number))) {
-        return json({ error: "não autorizado" }, 401);
-      }
+      const usuario = await usuarioDoEnvio(req, lead.empresa_id as number);
+      if (!usuario) return json({ error: "não autorizado" }, 401);
 
       if (action === "send_template") {
         const canal = await canalPorEmpresa(lead.empresa_id as number, "whatsapp");
@@ -677,7 +718,7 @@ serve(async (req: Request) => {
           id: 0, empresa_id: lead.empresa_id as number, tipo: "whatsapp",
           external_id: "", waba_id: null, token: null, coexistencia: false,
         };
-        return await enviarWhatsApp(canal, body);
+        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true));
       }
 
       const nomeCanal = body.canal as string | undefined;
@@ -688,7 +729,9 @@ serve(async (req: Request) => {
       if (!lead.origem_id) return json({ error: "lead sem origem_id" }, 400);
       const canal = await canalPorEmpresa(lead.empresa_id as number, nomeCanal);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
-      return await enviarMeta(canal, String(lead.origem_id), body);
+      // Sem markdown: IG e Messenger mostrariam os asteriscos crus.
+      return await enviarMeta(canal, String(lead.origem_id), body,
+        await assinaturaDe(lead.empresa_id as number, usuario.nome, false));
     } catch (e) {
       console.error("envio:", e);
       return json({ error: (e as Error).message }, 500);
