@@ -44,7 +44,11 @@ export interface ValidacaoImei {
 export function validarImei(bruto: string): ValidacaoImei {
   const d = soDigitos(bruto)
   if (!d) return { digitos: d, valido: false, motivo: 'Informe o IMEI' }
-  if (d.length < 15) return { digitos: d, valido: false, motivo: `Faltam ${15 - d.length} dígitos (o IMEI tem 15)` }
+  if (d.length < 15) {
+    const faltam = 15 - d.length
+    const motivo = faltam === 1 ? 'Falta 1 dígito (o IMEI tem 15)' : `Faltam ${faltam} dígitos (o IMEI tem 15)`
+    return { digitos: d, valido: false, motivo }
+  }
   if (d.length > 15) return { digitos: d, valido: false, motivo: `${d.length} dígitos — o IMEI tem 15` }
 
   // Luhn: dobra os dígitos de posição par (a partir da direita, base 0 ímpar),
