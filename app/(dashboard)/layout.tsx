@@ -166,13 +166,13 @@ export default async function DashboardLayout({
             configDono={menuConfig}
             segOverride={segOverride}
           />
+          <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <LimiteBanner />
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
         </div>
       </div>
-      <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
       <SessionGuard />
       <AssistenteWidget />

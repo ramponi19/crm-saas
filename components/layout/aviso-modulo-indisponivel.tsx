@@ -1,49 +1,49 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { AlertTriangle, X } from 'lucide-react'
 import { CATALOGO } from '@/lib/menu'
-import { notify } from '@/components/ui'
 
 /**
- * Aviso de quem caiu aqui por bater numa rota de módulo que a empresa não tem.
+ * Aviso de quem caiu no dashboard por bater numa rota de módulo que a empresa
+ * não tem (a trava vive no middleware, que só sabe redirecionar).
  *
- * A trava vive no middleware, que só sabe redirecionar. Sem este aviso o
- * funcionário clica no favorito antigo, aparece o dashboard, e ele conclui que o
- * sistema travou — e liga para o dono. Dizer o que aconteceu e de quem depende
- * resolver evita esse telefonema.
+ * Sem isto o funcionário clica no favorito antigo, aparece o dashboard, e ele
+ * conclui que o sistema travou — e liga para o dono. Dizer o que aconteceu e de
+ * quem depende resolver evita esse telefonema.
+ *
+ * É BANNER, não toast, e isso foi aprendido no ar: a primeira versão avisava por
+ * toast e nada aparecia. O <Toaster> do layout raiz vem depois de {children} e
+ * só monta depois deste componente, então o toast era emitido sem ninguém
+ * escutando e sumia. Adiar por alguns milissegundos "resolvia" apostando numa
+ * corrida — banner é JSX, aparece porque foi renderizado.
  */
 export function AvisoModuloIndisponivel() {
   const params = useSearchParams()
   const href = params.get('indisponivel')
-  const jaAvisou = useRef<string | null>(null)
+  const [fechado, setFechado] = useState(false)
 
-  useEffect(() => {
-    if (!href || jaAvisou.current === href) return
-    jaAvisou.current = href
+  if (!href || fechado) return null
 
-    const item = CATALOGO.flatMap((g) => g.items).find((i) => i.href === href)
+  const item = CATALOGO.flatMap((g) => g.items).find((i) => i.href === href)
 
-    // Duas armadilhas de ordem aqui, ambas descobertas no ar:
-    //
-    // 1. O <Toaster> do layout raiz vem DEPOIS de {children}, então monta depois
-    //    deste componente. Avisar de imediato emite o toast antes de existir
-    //    quem escute, e ele some sem aparecer. Daí o atraso.
-    // 2. Limpar a URL fora do timeout matava o aviso: o useSearchParams reage na
-    //    hora, `href` vira null, as dependências mudam e o cleanup cancelava o
-    //    timeout antes de ele disparar. Por isso a limpeza vem DEPOIS do notify.
-    const t = setTimeout(() => {
-      notify.warn(
-        `${item?.label ?? 'Módulo'} não está habilitado nesta empresa`,
-        'Se você precisa desta tela, peça ao responsável pelo CRM para habilitar o módulo.',
-      )
-      const url = new URL(window.location.href)
-      url.searchParams.delete('indisponivel')
-      window.history.replaceState(null, '', url.pathname + url.search)
-    }, 150)
-
-    return () => clearTimeout(t)
-  }, [href])
-
-  return null
+  return (
+    <div className="flex shrink-0 items-center gap-3 border-b border-warn/25 bg-warn-soft px-5 py-2.5">
+      <AlertTriangle size={14} strokeWidth={1.9} className="shrink-0 text-warn" />
+      <span className="flex-1 text-[12px] text-ink-2">
+        <strong className="font-semibold text-ink">
+          {item?.label ?? 'Este módulo'} não está habilitado nesta empresa.
+        </strong>{' '}
+        Se você precisa desta tela, peça ao responsável pelo CRM para habilitar o módulo.
+      </span>
+      <button
+        onClick={() => setFechado(true)}
+        aria-label="Fechar aviso"
+        className="shrink-0 text-ink-3 transition-colors hover:text-ink-2"
+      >
+        <X size={14} strokeWidth={1.9} />
+      </button>
+    </div>
+  )
 }
