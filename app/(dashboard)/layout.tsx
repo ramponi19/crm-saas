@@ -14,7 +14,9 @@ import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
 import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 export default async function DashboardLayout({
   children,
@@ -170,6 +172,7 @@ export default async function DashboardLayout({
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
         </div>
       </div>
+      <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
       <SessionGuard />
       <AssistenteWidget />

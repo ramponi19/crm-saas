@@ -95,6 +95,20 @@ export function hrefsBase(): string[] {
 }
 
 /**
+ * Módulo do catálogo a que uma rota pertence — ou null se a rota não é módulo.
+ *
+ * Usado pela trava do middleware. Devolver null para o que não conhecemos é
+ * proposital: a trava só age sobre rota que está no catálogo, então rota nova,
+ * /admin, /api e afins passam direto em vez de dependerem de eu lembrar de
+ * incluí-las numa lista de exceções.
+ */
+export function moduloDaRota(pathname: string): string | null {
+  const raiz = '/' + (pathname.split('/')[1] ?? '')
+  if (NUCLEO.has(raiz)) return null // núcleo nunca é bloqueado
+  return CATALOGO.flatMap((g) => g.items).some((i) => i.href === raiz) ? raiz : null
+}
+
+/**
  * Deriva os módulos habilitados a partir da config ESTÁTICA (fallback quando o
  * banco ainda não tem `modulos_habilitados`): base menos ocultos + extras.
  */

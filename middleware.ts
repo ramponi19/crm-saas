@@ -1,7 +1,19 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { moduloDaRota } from '@/lib/menu'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
+
+/**
+ * Cache dos módulos habilitados por empresa (trava de rota por segmento).
+ *
+ * `segmentos_config` muda uma vez a cada muito tempo, e sem cache isso viraria
+ * duas consultas a cada navegação. TTL curto porque o superadmin ligar um módulo
+ * e o menu demorar 1 minuto para valer é aceitável; o contrário (consulta a cada
+ * clique) não é.
+ */
+const TTL_MODULOS_MS = 60_000
+const cacheModulos = new Map<number, { habilitados: Set<string>; expira: number }>()
 
 /**
  * Telas de parametrização que saíram do CRM e passaram a viver em /admin
@@ -114,7 +126,54 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Trava de rota por SEGMENTO. Até aqui o opt-in de módulo era só de menu: o
+  // link sumia, mas quem tinha a tela nos favoritos continuava usando — o dono
+  // desligava o módulo e ele seguia funcionando. Papel e plano já travam nas
+  // próprias páginas (requireEmpresaRole / exigirPlano); esta trava cuida só da
+  // camada que não tinha nenhuma.
+  const modulo = user ? moduloDaRota(request.nextUrl.pathname) : null
+  if (modulo) {
+    const habilitados = await modulosHabilitados(supabase)
+    // habilitados === null => não deu para saber. Passa direto: derrubar o CRM
+    // inteiro por uma consulta que falhou é muito pior do que uma tela a mais.
+    if (habilitados && !habilitados.has(modulo)) {
+      const url = new URL('/dashboard', request.url)
+      url.searchParams.set('indisponivel', modulo)
+      return NextResponse.redirect(url)
+    }
+  }
+
   return supabaseResponse
+}
+
+/** Módulos habilitados da empresa ativa (respeita impersonação via RPC). */
+async function modulosHabilitados(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+): Promise<Set<string> | null> {
+  try {
+    const { data: empresaId } = await supabase.rpc('get_empresa_id')
+    if (!empresaId) return null
+
+    const cached = cacheModulos.get(empresaId as number)
+    if (cached && cached.expira > Date.now()) return cached.habilitados
+
+    const { data: empresa } = await supabase
+      .from('empresas').select('segmento').eq('id', empresaId).single()
+    const { data: seg } = await supabase
+      .from('segmentos_config').select('modulos_habilitados')
+      .eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
+
+    // Segmento sem lista configurada não é motivo para bloquear nada.
+    const lista = seg?.modulos_habilitados as string[] | null | undefined
+    if (!Array.isArray(lista) || lista.length === 0) return null
+
+    const habilitados = new Set(lista)
+    cacheModulos.set(empresaId as number, { habilitados, expira: Date.now() + TTL_MODULOS_MS })
+    return habilitados
+  } catch {
+    return null
+  }
 }
 
 export const config = {
