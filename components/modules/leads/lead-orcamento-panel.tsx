@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Receipt, Plus, Copy, Loader2 } from 'lucide-react'
 import { Button, Badge, notify } from '@/components/ui'
+import {
+  OrcamentoEditorModal, orcamentoVazio, type EditorOrcamento,
+} from '@/components/modules/orcamentos/orcamento-editor-modal'
 
 interface Orc { id: number; tipo: string; status: string; total: number; token: string }
 const TIPO_LABEL: Record<string, string> = { assistencia: 'Conserto', melhoria: 'Upgrade', downgrade: 'Downgrade', venda: 'Venda' }
@@ -13,11 +15,17 @@ const STATUS: Record<string, { l: string; t: 'neutro' | 'acc' | 'ok' | 'bad' }> 
 }
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone }: { leadId: number; leadNome?: string | null; leadTelefone?: string | null }) {
+export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: {
+  leadId: number
+  leadNome?: string | null
+  leadTelefone?: string | null
+  /** Avisa o chat que um orçamento foi salvo — é o gancho que move a etapa. */
+  onSalvo?: () => void
+}) {
   const supabase = createClient()
-  const router = useRouter()
   const [itens, setItens] = useState<Orc[]>([])
   const [carregou, setCarregou] = useState(false)
+  const [editor, setEditor] = useState<EditorOrcamento | null>(null)
 
   const carregar = useCallback(async () => {
     const { data } = await supabase.from('orcamentos').select('id, tipo, status, total, token').eq('lead_id', leadId).order('created_at', { ascending: false })
@@ -25,9 +33,18 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone }: { leadId:
   }, [leadId, supabase])
   useEffect(() => { carregar() }, [carregar])
 
+  /**
+   * Abre o editor POR CIMA da conversa. Antes isto era
+   * router.push('/orcamentos?...'): o atendente saía do chat no meio do
+   * atendimento e não tinha caminho de volta para a conversa.
+   */
   function novo(tipo: string) {
-    const q = new URLSearchParams({ nome: leadNome ?? '', tel: leadTelefone ?? '', lead: String(leadId), tipo })
-    router.push(`/orcamentos?${q.toString()}`)
+    setEditor({
+      ...orcamentoVazio(tipo),
+      cliente_nome: leadNome ?? '',
+      cliente_telefone: leadTelefone ?? '',
+      lead_id: leadId,
+    })
   }
 
   function copiar(o: Orc) {
@@ -69,6 +86,14 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone }: { leadId:
         <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('downgrade')}>Downgrade</Button>
         <Button variant="outline" size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={() => novo('assistencia')}>Conserto</Button>
       </div>
+
+      {editor && (
+        <OrcamentoEditorModal
+          inicial={editor}
+          onClose={() => setEditor(null)}
+          onSaved={() => { carregar(); onSalvo?.() }}
+        />
+      )}
     </div>
   )
 }

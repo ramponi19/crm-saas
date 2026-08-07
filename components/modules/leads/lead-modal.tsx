@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { Lead, Usuario, type KanbanColumn, ganhoColId } from './types'
+import { Lead, Usuario, type KanbanColumn, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { LeadMatchPanel } from './lead-match-panel'
 import { LeadInteressePanel } from './lead-interesse-panel'
 import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
@@ -427,6 +427,40 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     }
   }
 
+  /**
+   * Orçamento salvo dentro da conversa → o lead anda para a etapa de orçamento
+   * sozinho, sem fechar o chat.
+   *
+   * Procura a etapa pelo slug 'orcamento'; se o funil da empresa não tiver uma,
+   * cai na etapa de NEGOCIAÇÃO, que é o que um orçamento enviado significa. Sem
+   * nenhuma das duas, não inventa movimento — só não move.
+   */
+  async function moverParaOrcamento() {
+    const alvo = columns.find((c) => c.id === 'orcamento') ?? columns.find((c) => c.tipo === 'negociacao')
+    if (!alvo || (lead.kanban_status ?? 'novo') === alvo.id) return
+
+    // Mesma trava de qualificação do quadro: mover automático não pode furar
+    // uma regra que o arrastar respeita.
+    const faltando = (alvo.camposObrigatorios ?? []).filter((campo) => {
+      const v = (lead as unknown as Record<string, unknown>)[campo]
+      return v == null || v === '' || (campo === 'valor_estimado' && !Number(v))
+    })
+    if (faltando.length > 0) {
+      const nomes = faltando.map((c) => CAMPOS_QUALIFICACAO.find((x) => x.key === c)?.label ?? c)
+      notify.warn(`Orçamento salvo, mas o lead não foi para "${alvo.label}"`, `Preencha: ${nomes.join(', ')}.`)
+      return
+    }
+
+    const r = await fetch('/api/leads/mover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: lead.id, kanban_status: alvo.id }),
+    })
+    if (!r.ok) { notify.warn('Orçamento salvo, mas não consegui mover a etapa'); return }
+    setForm((f) => ({ ...f, status: alvo.id }))
+    onUpdate({ ...lead, kanban_status: alvo.id })
+    notify.ok(`Lead movido para ${alvo.label}`)
+  }
+
   async function handleSave() {
     const statusKey = form.status || lead.kanban_status || 'novo'
     const respId = form.responsavel || null // Select agora guarda o ID; '' = sem responsável
@@ -606,7 +640,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             {segmento === 'concessionaria' && <LeadFinanciamentoPanel leadId={lead.id} />}
             <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
             <LeadChamadasPanel leadId={lead.id} />
-            <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} />
+            <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />
             <LeadCadenciaPanel leadId={lead.id} />
             {/* Continua existindo para quem já rolou até aqui, mas agora reflete o
                 estado: sem alteração pendente não há o que salvar. */}
