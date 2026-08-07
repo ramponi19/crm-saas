@@ -385,7 +385,13 @@ async function registrarEcho(
       // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
       status_entrega: "enviada", status_em: new Date().toISOString(),
     }]);
-    if (error) console.log("echo duplicado ignorado:", mid);
+    if (error) { console.log("echo duplicado ignorado:", mid); return; }
+
+    // A lista de leads é ordenada por `ultima_mensagem_at`. O recebimento já
+    // atualizava; o echo não — então responder pelo CRM subia a conversa e
+    // responder PELO CELULAR não, e ela afundava na lista mesmo tendo acabado
+    // de ser atendida. Só depois de gravar: echo repetido não mexe na ordem.
+    await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", lead.id);
   } catch (e) { console.error("registrarEcho:", e); }
 }
 

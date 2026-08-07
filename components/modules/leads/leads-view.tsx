@@ -33,6 +33,19 @@ interface LeadsViewProps {
   meuId?: string
 }
 
+/**
+ * Mais recente no topo — a mesma ordem que o servidor manda na carga inicial
+ * (`ultima_mensagem_at desc`).
+ *
+ * Precisa ser reaplicada a cada mudança em tempo real: o realtime alterava a
+ * data do lead NO LUGAR, então quem acabava de escrever continuava no fim da
+ * coluna. Lead sem mensagem nenhuma cai para o fim, ordenado pela criação.
+ */
+function porMensagemRecente(leads: Lead[]): Lead[] {
+  const quando = (l: Lead) => new Date(l.ultima_mensagem_at ?? l.created_at ?? 0).getTime()
+  return [...leads].sort((a, b) => quando(b) - quando(a))
+}
+
 export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
@@ -93,37 +106,46 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
         (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; created_at: string }>) => {
           const m = payload.new as { direcao: string; lead_id: number; created_at: string }
           if (m.direcao !== 'recebida') return
-          setLeads(prev => prev.map(l =>
+          // REORDENA. A lista chega do servidor por ultima_mensagem_at desc, mas
+          // atualizar a data no lugar deixava o card parado onde estava: quem
+          // acabou de escrever continuava no fim da coluna, que é justamente
+          // onde ninguém olha. Ordenar aqui devolve o card para o topo na hora.
+          setLeads(prev => porMensagemRecente(prev.map(l =>
             l.id === m.lead_id
               ? { ...l, msgs_nao_lidas: (l.msgs_nao_lidas ?? 0) + 1, ultima_mensagem_at: m.created_at }
               : l
-          ))
+          )))
         })
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'leads' },
         (payload: RealtimePostgresChangesPayload<Lead>) => {
           const novo = payload.new as Lead
           if (novo.ativo === false) return
-          if (restringe && novo.responsavel_id !== meuId) return // sem permissão de ver leads de outros
+          // Lead SEM dono é da esteira e aparece para todos. Sem o `!= null` o
+          // vendedor não via chegar lead novo nenhum: todo lead nasce sem
+          // responsável, e ele só apareceria depois de recarregar a página.
+          if (restringe && novo.responsavel_id != null && novo.responsavel_id !== meuId) return
           setLeads(prev =>
             prev.some(l => l.id === novo.id)
               ? prev
-              : [{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev])
+              : porMensagemRecente([{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev]))
         })
       // Lead atualizado: reflete na hora; se foi desativado (excluído), some da lista
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'leads' },
         (payload: RealtimePostgresChangesPayload<Lead>) => {
           const l = payload.new as Lead
-          // Sem permissão de ver leads de outros: se foi reatribuído p/ outra pessoa, some da lista.
-          if (restringe && l.responsavel_id !== meuId) {
+          // Some só quando foi para OUTRA pessoa. Voltar para a esteira
+          // (responsável nulo) deixa o lead livre — e livre é de todos, então
+          // ele continua na tela para quem quiser pegar.
+          if (restringe && l.responsavel_id != null && l.responsavel_id !== meuId) {
             setLeads(prev => prev.filter(x => x.id !== l.id))
             return
           }
           setLeads(prev =>
             l.ativo === false
               ? prev.filter(x => x.id !== l.id)
-              : prev.map(x => x.id === l.id ? { ...x, ...l } : x))
+              : porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x)))
         })
       // Lead removido do banco: some da lista na hora
       .on('postgres_changes',
