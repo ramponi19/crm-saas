@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
   if (!empresaId) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
 
   const form = await req.formData()
-  const vendaId = Number(form.get('vendaId'))
+  const termoId = Number(form.get('termoId'))
   const arquivo = form.get('arquivo')
 
-  if (!Number.isFinite(vendaId) || vendaId <= 0) return NextResponse.json({ error: 'Venda inválida' }, { status: 400 })
+  if (!Number.isFinite(termoId) || termoId <= 0) return NextResponse.json({ error: 'Termo inválido' }, { status: 400 })
   if (!(arquivo instanceof File)) return NextResponse.json({ error: 'Arquivo ausente' }, { status: 400 })
   if (!TIPOS_OK.includes(arquivo.type)) {
     return NextResponse.json({ error: 'Envie um PDF ou uma imagem (JPG/PNG).' }, { status: 400 })
@@ -34,37 +34,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Arquivo acima de 10 MB. Reduza a qualidade da digitalização.' }, { status: 400 })
   }
 
-  // A venda tem de ser desta empresa E estar esperando termo. Sem isto, um id
-  // adivinhado anexaria arquivo em venda de outra loja.
-  const { data: venda } = await supabase
-    .from('vendas').select('id, termo_garantia, termo_garantia_url')
-    .eq('id', vendaId).eq('empresa_id', empresaId).maybeSingle()
-  if (!venda) return NextResponse.json({ error: 'Venda não encontrada' }, { status: 404 })
-  if (!venda.termo_garantia) return NextResponse.json({ error: 'Esta venda não pede termo de garantia.' }, { status: 400 })
+  // O termo tem de ser desta empresa. Sem isto, um id adivinhado anexaria
+  // arquivo em venda de outra loja.
+  const { data: termo } = await supabase
+    .from('vendas_termos').select('id, venda_id, tipo, arquivo_url')
+    .eq('id', termoId).eq('empresa_id', empresaId).maybeSingle()
+  if (!termo) return NextResponse.json({ error: 'Termo não encontrado' }, { status: 404 })
 
   const ext = arquivo.type === 'application/pdf' ? 'pdf' : arquivo.type === 'image/png' ? 'png' : 'jpg'
-  const caminho = `${empresaId}/termos/${vendaId}-${Date.now()}.${ext}`
+  const caminho = `${empresaId}/termos/${termo.venda_id}-${termo.tipo}-${Date.now()}.${ext}`
 
   const { error: eUp } = await supabase.storage.from('documentos')
     .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false })
   if (eUp) return NextResponse.json({ error: `Falha ao enviar: ${eUp.message}` }, { status: 400 })
 
-  const { error: eVenda } = await supabase.from('vendas').update({
-    termo_garantia: 'assinado',
-    termo_garantia_url: caminho,
-    termo_garantia_em: new Date().toISOString(),
-    termo_garantia_por: user.id,
-  } as never).eq('id', vendaId).eq('empresa_id', empresaId)
+  const { error: eTermo } = await supabase.from('vendas_termos').update({
+    status: 'assinado',
+    arquivo_url: caminho,
+    assinado_em: new Date().toISOString(),
+    assinado_por: user.id,
+  } as never).eq('id', termoId).eq('empresa_id', empresaId)
 
-  if (eVenda) {
-    // Não deixa arquivo órfão ocupando espaço se a venda não pôde ser marcada.
+  if (eTermo) {
+    // Não deixa arquivo órfão ocupando espaço se o termo não pôde ser marcado.
     await supabase.storage.from('documentos').remove([caminho])
-    return NextResponse.json({ error: eVenda.message }, { status: 400 })
+    return NextResponse.json({ error: eTermo.message }, { status: 400 })
   }
 
   // Substituição: remove o anterior só depois de o novo estar gravado.
-  if (venda.termo_garantia_url && venda.termo_garantia_url !== caminho) {
-    await supabase.storage.from('documentos').remove([venda.termo_garantia_url])
+  if (termo.arquivo_url && termo.arquivo_url !== caminho) {
+    await supabase.storage.from('documentos').remove([termo.arquivo_url])
   }
 
   return NextResponse.json({ ok: true, caminho })
@@ -77,17 +76,17 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const empresaId = await getEmpresaId()
-  const vendaId = Number(req.nextUrl.searchParams.get('vendaId'))
-  if (!empresaId || !Number.isFinite(vendaId)) return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
+  const termoId = Number(req.nextUrl.searchParams.get('termoId'))
+  if (!empresaId || !Number.isFinite(termoId)) return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
 
-  const { data: venda } = await supabase
-    .from('vendas').select('termo_garantia_url')
-    .eq('id', vendaId).eq('empresa_id', empresaId).maybeSingle()
-  if (!venda?.termo_garantia_url) return NextResponse.json({ error: 'Sem termo anexado' }, { status: 404 })
+  const { data: termo } = await supabase
+    .from('vendas_termos').select('arquivo_url')
+    .eq('id', termoId).eq('empresa_id', empresaId).maybeSingle()
+  if (!termo?.arquivo_url) return NextResponse.json({ error: 'Sem termo anexado' }, { status: 404 })
 
   // 10 minutos: tempo de abrir e mandar, sem virar link permanente circulando.
   const { data, error } = await supabase.storage.from('documentos')
-    .createSignedUrl(venda.termo_garantia_url, 600)
+    .createSignedUrl(termo.arquivo_url, 600)
   if (error || !data) return NextResponse.json({ error: 'Não foi possível gerar o link' }, { status: 400 })
 
   return NextResponse.json({ url: data.signedUrl })

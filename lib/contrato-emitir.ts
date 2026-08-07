@@ -69,6 +69,8 @@ export interface EmitirContratoInput {
   /** Todas as linhas de `vendas` desta venda — é o que amarra o contrato a ela. */
   vendaIds: number[]
   itens: ContratoItem[]
+  /** Aparelhos recebidos em troca — alimentam os marcadores {{trocas}}. */
+  trocas?: { aparelho: string; imei?: string | null; valor: number }[]
   total: number
   desconto?: number
   forma_pagamento: string | null
@@ -129,6 +131,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     garantia_dias: garantiaLoja,
     vendedor: input.vendedor,
     data: input.data,
+    trocas: input.trocas,
   }
 
   const html = renderizarModelo(modelo, dados)

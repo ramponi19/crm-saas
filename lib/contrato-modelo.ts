@@ -58,6 +58,13 @@ export interface ModeloContrato {
   paginas: PaginaModelo[]
 }
 
+/** Aparelho entregue pelo cliente na troca. */
+export interface ContratoTroca {
+  aparelho: string
+  imei?: string | null
+  valor: number
+}
+
 export interface DadosMescla {
   loja: ContratoLoja
   comprador: ContratoComprador
@@ -69,6 +76,8 @@ export interface DadosMescla {
   garantia_dias: number
   vendedor?: string | null
   data?: string
+  /** Aparelhos recebidos em troca — para o termo de entrega do usado. */
+  trocas?: ContratoTroca[]
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -149,7 +158,42 @@ export function marcadores(d: DadosMescla): Record<string, string> {
     'garantia_dias': String(d.garantia_dias),
     'vendedor': esc(d.vendedor ?? ''),
     'data_extenso': dataExtenso(d.data),
+    // Aparelhos entregues pelo cliente na troca — base do termo de entrega do
+    // usado. Sem troca, todos saem vazios (ou zerados), e o modelo que os usa
+    // simplesmente não mostra nada.
+    'trocas': tabelaTrocas(d.trocas ?? []),
+    'trocas.descricao': esc((d.trocas ?? []).map(descreverTroca).join('; ')),
+    'trocas.total': brl(somaTrocas(d.trocas)),
+    'trocas.total_extenso': valorPorExtenso(somaTrocas(d.trocas)),
+    'trocas.quantidade': String((d.trocas ?? []).length),
   }
+}
+
+const somaTrocas = (t?: ContratoTroca[]) => (t ?? []).reduce((s, x) => s + (Number(x.valor) || 0), 0)
+
+/** "iPhone 12 64GB (IMEI 3548…), avaliado em R$ 1.200,00" */
+function descreverTroca(t: ContratoTroca): string {
+  const partes = [t.aparelho?.trim() || 'aparelho']
+  if (t.imei?.trim()) partes.push(`IMEI ${t.imei.trim()}`)
+  return `${partes.join(', ')}, avaliado em ${brl(t.valor)}`
+}
+
+function tabelaTrocas(trocas: ContratoTroca[]): string {
+  const validas = trocas.filter((t) => t.aparelho?.trim() || t.valor > 0)
+  if (!validas.length) return ''
+  const linhas = validas.map((t) => `<tr>
+      <td>${esc(t.aparelho?.trim() || 'Aparelho')}</td>
+      <td style="text-align:right">${t.imei?.trim() ? esc(t.imei.trim()) : '—'}</td>
+      <td style="text-align:right">${brl(t.valor)}</td>
+    </tr>`).join('')
+  return `<table style="width:100%;border-collapse:collapse;margin:6px 0">
+    <thead><tr>
+      <th style="text-align:left;border-bottom:1px solid currentColor;padding:4px 6px">Aparelho entregue</th>
+      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">IMEI / Nº série</th>
+      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">Valor avaliado</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>`
 }
 
 /** Lista para a tela do /admin mostrar o que existe para inserir. */
@@ -172,6 +216,12 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'garantia_dias', rotulo: 'Garantia (dias)' },
   { chave: 'vendedor', rotulo: 'Vendedor' },
   { chave: 'data_extenso', rotulo: 'Data por extenso' },
+  // Troca — para o termo de responsabilidade e entrega do aparelho usado.
+  { chave: 'trocas', rotulo: 'Tabela dos aparelhos entregues na troca' },
+  { chave: 'trocas.descricao', rotulo: 'Aparelhos da troca em texto corrido' },
+  { chave: 'trocas.total', rotulo: 'Valor total dado na troca (R$)' },
+  { chave: 'trocas.total_extenso', rotulo: 'Valor da troca por extenso' },
+  { chave: 'trocas.quantidade', rotulo: 'Quantos aparelhos na troca' },
   { chave: 'loja.nome', rotulo: 'Nome da loja' },
   { chave: 'loja.cnpj', rotulo: 'CNPJ da loja' },
 ]

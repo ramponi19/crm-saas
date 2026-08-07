@@ -9,8 +9,15 @@ import { Card, Table, Button, Badge, EmptyState, Modal, notify, type Column } fr
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 
+export interface TrocaDoTermo { aparelho: string; imei: string | null; valor: number }
+
 export interface VendaTermo {
+  /** id do TERMO (vendas_termos), não da venda. */
   id: number
+  venda_id: number
+  tipo: string
+  /** Aparelhos recebidos em troca — preenchem o termo de entrega do usado. */
+  trocas: TrocaDoTermo[]
   data_venda: string | null
   valor_venda: number
   cliente_id: number | null
@@ -23,9 +30,14 @@ export interface VendaTermo {
   parcelas: number | null
   desconto_valor: number | null
   quantidade: number | null
-  termo_garantia: string | null
-  termo_garantia_em: string | null
+  status: string
+  assinado_em: string | null
   anexado_por: string | null
+}
+
+const ROTULO_TIPO: Record<string, string> = {
+  garantia: 'Garantia',
+  troca: 'Entrega do usado',
 }
 
 interface Props {
@@ -51,8 +63,8 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
   const [alvoUpload, setAlvoUpload] = useState<number | null>(null)
   const inputArquivo = useRef<HTMLInputElement>(null)
 
-  const pendentes = vendas.filter((v) => v.termo_garantia === 'pendente')
-  const assinados = vendas.filter((v) => v.termo_garantia === 'assinado')
+  const pendentes = vendas.filter((v) => v.status === 'pendente')
+  const assinados = vendas.filter((v) => v.status === 'assinado')
 
   /** Emite o documento escolhido com os dados da venda e abre para impressão. */
   async function imprimir(v: VendaTermo, doc: DocumentoDisponivel) {
@@ -62,11 +74,14 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
     try {
       const r = await emitirContrato(supabase, {
         empresaId, documentoId: doc.id, nomeDocumento: doc.nome,
-        clienteId: v.cliente_id, vendaIds: [v.id],
+        clienteId: v.cliente_id, vendaIds: [v.venda_id],
         itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda, garantia_dias: null }],
         total: v.valor_venda, desconto: v.desconto_valor ?? 0,
         forma_pagamento: v.forma_pagamento, parcelas: v.parcelas,
         vendedor: v.vendedor_nome, data: v.data_venda ?? undefined,
+        // Os aparelhos da troca alimentam {{trocas}} e companhia — é o que faz o
+        // termo de entrega do usado ter conteúdo em vez de espaço em branco.
+        trocas: v.trocas,
       })
       if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`, 'Monte o documento em Administração → Documentos'); return }
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
@@ -81,7 +96,7 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
   async function enviarArquivo(file: File) {
     if (!alvoUpload) return
     const dados = new FormData()
-    dados.append('vendaId', String(alvoUpload))
+    dados.append('termoId', String(alvoUpload))
     dados.append('arquivo', file)
     setEnviando(alvoUpload)
     try {
@@ -97,8 +112,8 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
   }
 
   /** Link temporário do arquivo — o bucket é privado. */
-  async function abrirArquivo(vendaId: number, paraWhatsApp?: string | null) {
-    const r = await fetch(`/api/garantia/termo?vendaId=${vendaId}`)
+  async function abrirArquivo(termoId: number, paraWhatsApp?: string | null) {
+    const r = await fetch(`/api/garantia/termo?termoId=${termoId}`)
     const j = await r.json().catch(() => ({}))
     if (!r.ok || !j.url) { notify.bad('Não foi possível abrir', j.error); return }
     if (paraWhatsApp) {
@@ -115,13 +130,20 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
       render: (v) => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span>,
     },
     {
+      // O tipo precisa estar visível: a mesma venda pode ter dois termos, e sem
+      // isso viram duas linhas idênticas na fila.
+      key: 'tipo', header: 'Termo', className: 'w-[130px]',
+      render: (v) => <Badge tone={v.tipo === 'troca' ? 'acc' : 'neutro'}>{ROTULO_TIPO[v.tipo] ?? v.tipo}</Badge>,
+    },
+    {
       key: 'cliente', header: 'Cliente / Produto',
       render: (v) => (
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{v.cliente_nome ?? '— sem cliente —'}</div>
           <div className="truncate text-[11px] text-ink-3">
-            {(v.quantidade ?? 1) > 1 ? `${v.quantidade}× ` : ''}{v.produto_nome ?? '—'}
-            {v.numero_serie ? ` · ··${v.numero_serie.slice(-4)}` : ''}
+            {v.tipo === 'troca' && v.trocas.length
+              ? `Recebido: ${v.trocas.map((t) => t.aparelho || 'aparelho').join(', ')}`
+              : <>{(v.quantidade ?? 1) > 1 ? `${v.quantidade}× ` : ''}{v.produto_nome ?? '—'}{v.numero_serie ? ` · ··${v.numero_serie.slice(-4)}` : ''}</>}
           </div>
         </div>
       ),
@@ -132,9 +154,9 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
       render: (v) => assinado
         ? <div className="flex flex-col items-end gap-0.5">
             <Badge tone="ok">Assinado</Badge>
-            {v.termo_garantia_em && (
+            {v.assinado_em && (
               <span className="text-[10.5px] text-ink-3">
-                {new Date(v.termo_garantia_em).toLocaleDateString('pt-BR')}{v.anexado_por ? ` · ${v.anexado_por}` : ''}
+                {new Date(v.assinado_em).toLocaleDateString('pt-BR')}{v.anexado_por ? ` · ${v.anexado_por}` : ''}
               </span>
             )}
           </div>

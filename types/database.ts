@@ -3385,10 +3385,6 @@ export type Database = {
           produto_id: number | null
           pedido_compra_id: number | null
           quantidade: number
-          termo_garantia: string | null
-          termo_garantia_em: string | null
-          termo_garantia_por: string | null
-          termo_garantia_url: string | null
           unidade_id: number | null
           status: string | null
           usuario_id: string | null
@@ -3417,10 +3413,6 @@ export type Database = {
           produto_id?: number | null
           pedido_compra_id?: number | null
           quantidade?: number
-          termo_garantia?: string | null
-          termo_garantia_em?: string | null
-          termo_garantia_por?: string | null
-          termo_garantia_url?: string | null
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
@@ -3449,10 +3441,6 @@ export type Database = {
           produto_id?: number | null
           pedido_compra_id?: number | null
           quantidade?: number
-          termo_garantia?: string | null
-          termo_garantia_em?: string | null
-          termo_garantia_por?: string | null
-          termo_garantia_url?: string | null
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
@@ -3511,6 +3499,12 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vendas_termos: {
+        Row: { id: number; empresa_id: number; venda_id: number; tipo: string; status: string; arquivo_url: string | null; assinado_em: string | null; assinado_por: string | null; criado_em: string }
+        Insert: { id?: never; empresa_id: number; venda_id: number; tipo: string; status?: string; arquivo_url?: string | null; assinado_em?: string | null; assinado_por?: string | null; criado_em?: string }
+        Update: { id?: never; empresa_id?: number; venda_id?: number; tipo?: string; status?: string; arquivo_url?: string | null; assinado_em?: string | null; assinado_por?: string | null; criado_em?: string }
+        Relationships: []
       }
       vendas_alertas: {
         Row: { id: number; empresa_id: number; venda_id: number; tipo: string; mensagem: string; valor_referencia: number | null; valor_informado: number | null; aceito_por: string | null; aceito_em: string }

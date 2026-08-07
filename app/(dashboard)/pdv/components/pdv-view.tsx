@@ -511,13 +511,19 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         if (linhas.length) await supabase.from('vendas_pagamentos').insert(linhas as never)
       }
 
-      // Termo de garantia: marca a PRIMEIRA venda do fechamento. O termo é um
-      // documento só para a compra inteira — marcar cada linha do carrinho faria
-      // a mesma compra aparecer três vezes na fila de Garantia.
-      if (termoGarantia && primeiraVendaId !== null) {
-        await supabase.from('vendas')
-          .update({ termo_garantia: 'pendente' } as never)
-          .eq('id', primeiraVendaId)
+      // Termos a assinar, na PRIMEIRA venda do fechamento: são documentos da
+      // compra inteira, e marcar cada linha do carrinho faria a mesma compra
+      // aparecer três vezes na fila.
+      //
+      // O de TROCA entra sozinho sempre que há aparelho recebido — é o termo de
+      // responsabilidade e entrega do usado, e depender de o vendedor lembrar de
+      // marcar seria depender justamente de quem tem pressa de fechar.
+      if (primeiraVendaId !== null) {
+        const termos = [
+          ...(termoGarantia ? [{ tipo: 'garantia' }] : []),
+          ...(trocasValidas.length ? [{ tipo: 'troca' }] : []),
+        ].map((t) => ({ empresa_id: empresaId, venda_id: primeiraVendaId!, tipo: t.tipo, status: 'pendente' }))
+        if (termos.length) await supabase.from('vendas_termos').insert(termos as never)
       }
 
       // Log do aceite: uma linha por troca acima da referência, ligada à primeira
@@ -581,6 +587,9 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         empresaId,
         vendaIds,
         clienteId: clienteSelecionado?.id ?? null,
+        // Aparelhos da troca para os marcadores {{trocas}} — permite emitir o
+        // termo de entrega do usado já na tela de sucesso da venda.
+        trocas: trocasValidas.map((t) => ({ aparelho: t.aparelho.trim(), imei: t.imei.trim() || null, valor: t.num })),
         itens: [
           ...carrinho.map((c) => ({
             descricao: c.item.produto_nome,

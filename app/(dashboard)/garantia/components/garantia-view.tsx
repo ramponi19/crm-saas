@@ -67,7 +67,7 @@ export default function GarantiaView({ garantias, termos = [], documentos = [], 
   // com defeito; o TERMO é o papel que sai junto com a venda. Abas separadas
   // para a fila de assinatura não se perder no meio dos reparos.
   const [aba, setAba] = useState<'protocolos' | 'termos'>('protocolos')
-  const termosPendentes = termos.filter((t) => t.termo_garantia === 'pendente').length
+  const termosPendentes = termos.filter((t) => t.status === 'pendente').length
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
   const [selecionada, setSelecionada] = useState<Garantia | null>(null)
