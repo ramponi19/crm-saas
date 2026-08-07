@@ -9,11 +9,15 @@ type Svc = ReturnType<typeof createServiceClient>
  * responsável, ou null se não houver corretores ativos.
  */
 export async function proximoResponsavel(svc: Svc, empresaId: number): Promise<string | null> {
+  // `ausente` fora da roleta: quem está no almoço acabou de LIBERAR os leads
+  // dele. Entregar um novo no mesmo instante desfaria o pedido e deixaria o
+  // cliente esperando exatamente quem não está.
   const { data: membros } = await svc
     .from('empresa_usuarios')
     .select('usuario_id')
     .eq('empresa_id', empresaId)
     .eq('ativo', true)
+    .eq('ausente', false)
     .order('usuario_id', { ascending: true })
 
   const ids = (membros ?? []).map(m => m.usuario_id).filter(Boolean) as string[]

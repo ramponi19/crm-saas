@@ -4,6 +4,8 @@ import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/lea
 import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
+import { devolverLeadsSemResposta } from '@/lib/esteira'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const metadata = {
   title: 'Leads — CRM SaaS',
@@ -77,6 +79,17 @@ export default async function LeadsPage() {
   // Visibilidade de leads por permissão: só restringe quando o papel é CONHECIDO
   // e explicitamente sem "ver leads de outros". Papel desconhecido (ex.: superadmin
   // impersonando, que não está em empresa_usuarios) ou owner/admin → vê tudo.
+  // Devolve à esteira quem passou do prazo sem responder. Roda aqui, na abertura
+  // do funil, e não num cron: é exatamente quando alguém vai olhar a lista, e
+  // não depende do plano da Vercel permitir cron de minuto em minuto. Tem
+  // trava de 60s por empresa, então várias abas abrindo juntas não varrem em
+  // duplicado. Falhar não pode derrubar a tela.
+  try {
+    await devolverLeadsSemResposta(supabase as unknown as SupabaseClient, empresaId)
+  } catch (e) {
+    console.error('[leads] devolução à esteira falhou:', e)
+  }
+
   const meuRole = usuariosMapped.find((u) => u.id === user?.id)?.role ?? ''
   const restringe = !!meuRole && !permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
   // A ESTEIRA (lead sem responsável) é de todos. O filtro guardava só o que já

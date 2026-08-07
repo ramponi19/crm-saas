@@ -63,7 +63,19 @@ export async function distribuirExistente(
   if (lead.responsavel_id) return lead.responsavel_id
   const escolhido = await escolherResponsavel(svc, empresaId, lead)
   if (!escolhido) return null
-  await svc.from('leads').update({ responsavel_id: escolhido }).eq('id', lead.id)
+
+  // Regra com destinatários fixos pode apontar para quem está em almoço; a
+  // roleta já filtra, esta é a rede de proteção do outro caminho.
+  const { data: vinculo } = await svc.from('empresa_usuarios')
+    .select('ausente').eq('empresa_id', empresaId).eq('usuario_id', escolhido).maybeSingle()
+  if (vinculo?.ausente) return null
+
+  // `responsavel_desde` é o marco do prazo de devolução. Sem gravá-lo, um lead
+  // ANTIGO distribuído agora seria medido pela data de criação e nasceria com o
+  // prazo já estourado — devolvido no primeiro ciclo, sem ninguém ter falhado.
+  await svc.from('leads')
+    .update({ responsavel_id: escolhido, responsavel_desde: new Date().toISOString() })
+    .eq('id', lead.id)
   await svc.from('lead_atribuicoes').insert({
     empresa_id: empresaId, lead_id: lead.id, de_responsavel: null, para_responsavel: escolhido, por_usuario: null, acao: 'distribuir',
   })

@@ -1532,6 +1532,8 @@ export type Database = {
       empresa_usuarios: {
         Row: {
           ativo: boolean | null
+          ausente: boolean
+          ausente_em: string | null
           created_at: string | null
           empresa_id: number
           id: number
@@ -1540,6 +1542,8 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          ausente?: boolean
+          ausente_em?: string | null
           created_at?: string | null
           empresa_id: number
           id?: number
@@ -1548,6 +1552,8 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          ausente?: boolean
+          ausente_em?: string | null
           created_at?: string | null
           empresa_id?: number
           id?: number
@@ -2477,6 +2483,9 @@ export type Database = {
           convertido_em: number | null
           created_at: string | null
           data_transferencia_funil: string | null
+          devolucoes: number
+          devolvido_em: string | null
+          responsavel_desde: string | null
           empresa_id: number
           id: number
           instagram: string | null
@@ -2505,6 +2514,9 @@ export type Database = {
           convertido_em?: number | null
           created_at?: string | null
           data_transferencia_funil?: string | null
+          devolucoes?: number
+          devolvido_em?: string | null
+          responsavel_desde?: string | null
           empresa_id: number
           id?: never
           instagram?: string | null
@@ -2533,6 +2545,9 @@ export type Database = {
           convertido_em?: number | null
           created_at?: string | null
           data_transferencia_funil?: string | null
+          devolucoes?: number
+          devolvido_em?: string | null
+          responsavel_desde?: string | null
           empresa_id?: number
           id?: never
           instagram?: string | null

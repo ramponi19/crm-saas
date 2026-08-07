@@ -117,6 +117,22 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   })
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
 
+  /**
+   * Lead livre abre já com o nome de quem abriu no campo Responsável — mas SÓ
+   * na tela. A posse só é gravada quando a pessoa responde (`assumirSeLivre`).
+   * Assim quem espiou e fechou no X deixa o lead livre para o próximo, e quem
+   * atendeu não precisa lembrar de se atribuir.
+   */
+  useEffect(() => {
+    if (lead.responsavel_id) return
+    let cancel = false
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancel || !data.user) return
+      setForm((f) => (f.responsavel ? f : { ...f, responsavel: data.user!.id }))
+    })
+    return () => { cancel = true }
+  }, [lead.responsavel_id, supabase])
+
   // Valores como estão no banco. Comparar contra eles (e não contra um "sujo"
   // qualquer) é o que faz o botão DESAPARECER quando o funcionário desfaz a
   // edição — apagar o que digitou volta ao estado original e nada fica pendente.
@@ -333,9 +349,45 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         if (error) throw new Error(error.message)
       }
       await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
+      await assumirSeLivre()
     } catch (e) {
       rollback()
       notify.bad('Erro ao enviar', e instanceof Error ? e.message : 'Tente novamente.')
+    }
+  }
+
+  /**
+   * Assume o lead ao RESPONDER, não ao abrir.
+   *
+   * Abrir a conversa só preenche o campo na tela (ver `form.responsavel`): quem
+   * espiou e fechou no X não pode levar o lead embora da esteira. Só quando o
+   * cliente é respondido a posse é gravada.
+   *
+   * O `.is('responsavel_id', null)` resolve dois vendedores abrindo o mesmo lead
+   * livre: quem responder primeiro fica com ele, e o segundo é avisado em vez de
+   * roubar a conversa sem ninguém perceber.
+   */
+  async function assumirSeLivre() {
+    if (lead.responsavel_id) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('leads')
+      .update({ responsavel_id: user.id, responsavel_desde: new Date().toISOString() })
+      .eq('id', lead.id).is('responsavel_id', null)
+      .select('id')
+    if (data?.length) {
+      setForm((f) => ({ ...f, responsavel: user.id }))
+      onUpdate({ ...lead, responsavel_id: user.id })
+      notify.ok('Lead é seu', 'Você assumiu o atendimento ao responder.')
+      return
+    }
+    // Perdeu a corrida: alguém respondeu primeiro.
+    const { data: atual } = await supabase.from('leads')
+      .select('responsavel_id').eq('id', lead.id).maybeSingle()
+    const dono = usuarios.find((u) => u.id === atual?.responsavel_id)?.nome
+    if (atual?.responsavel_id) {
+      notify.warn('Este lead já tem dono', dono ? `${dono} assumiu o atendimento primeiro.` : 'Outro vendedor assumiu primeiro.')
+      onUpdate({ ...lead, responsavel_id: atual.responsavel_id as string })
     }
   }
 
@@ -481,6 +533,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       instagram: form.ig.trim() || null,
       produto_interessado: form.produto.trim() || null,
       responsavel_id: respId,
+      // Só remarca o início da responsabilidade quando o dono MUDA — salvar
+      // outro campo não pode zerar o relógio do prazo de resposta.
+      ...(respId !== (lead.responsavel_id ?? null)
+        ? { responsavel_desde: respId ? new Date().toISOString() : null }
+        : {}),
       observacoes: form.obs.trim() || null,
     }).eq('id', lead.id)
     if (error) { setSaving(false); notify.bad('Erro ao salvar'); return }

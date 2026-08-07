@@ -9,6 +9,7 @@ import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
 import { AssinaturaCard } from './assinatura-card'
+import { DevolucaoCard } from './devolucao-card'
 import { HorarioCard } from './horario-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
@@ -374,6 +375,7 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
 
         {/* ── SLA ── */}
         {aba === 'sla' && (
+          <div className="space-y-4">
           <Card
             title="SLA de atendimento"
             actions={
@@ -402,6 +404,8 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
               ))}
             </div>
           </Card>
+          <DevolucaoCard />
+          </div>
         )}
 
         {/* ── FUNIS ── */}

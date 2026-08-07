@@ -9,6 +9,7 @@ import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock } from 'lucide-rea
 import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
+import { AusenciaPopover } from './ausencia-popover'
 import { resolveTheme, themeVars, type SidebarTheme } from '@/lib/wl-menu'
 
 const PLANO_LABEL: Record<string, string> = { free: 'Plano Free', starter: 'Plano Starter', pro: 'Plano Pro' }
@@ -147,10 +148,7 @@ export function Sidebar({
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-white">
             {userName.slice(0, 2).toUpperCase()}
           </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className={cn('truncate text-[12px] font-semibold', strong)}>{userName}</div>
-            <div className={cn('text-[10px]', faint)}>{userRole}</div>
-          </div>
+          <AusenciaPopover userName={userName} userRole={userRole} nomeClasse={strong} papelClasse={faint} />
           {isEmpresaAdmin && (
             <Link href="/admin" aria-label="Administração" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)}>
               <Settings size={15} strokeWidth={1.7} />

@@ -43,7 +43,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
   }
 
-  const { error } = await supabase.from('leads').update({ responsavel_id: novo }).eq('id', body.leadId)
+  // Marca quando a responsabilidade começou — é a base do prazo de devolução à
+  // esteira. Sem isto, assumir um lead antigo herdaria a data de criação e ele
+  // seria devolvido no primeiro ciclo, sem ninguém ter falhado. Soltar (novo =
+  // null) limpa o marco.
+  const { error } = await supabase.from('leads')
+    .update({ responsavel_id: novo, responsavel_desde: novo ? new Date().toISOString() : null })
+    .eq('id', body.leadId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await supabase.from('lead_atribuicoes').insert({
