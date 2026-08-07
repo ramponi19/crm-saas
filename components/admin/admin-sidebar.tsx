@@ -16,11 +16,15 @@ import {
   Plug,
   Wallet,
   BarChart3,
+  Trophy,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/admin',               label: 'Visão geral',   icon: LayoutDashboard, exact: true },
   { href: '/admin/relatorios',    label: 'Relatórios',    icon: BarChart3 },
+  // Ranking saiu do menu do CRM: compara o resultado de todos, e com o
+  // isolamento por vendedor não é mais tela de quem vende — é de quem gere.
+  { href: '/ranking',             label: 'Ranking',       icon: Trophy },
   { href: '/admin/financeiro',    label: 'Financeiro',    icon: Wallet },
   { href: '/admin/equipe',        label: 'Equipe',        icon: UserCog },
   { href: '/admin/empresa',       label: 'Minha empresa', icon: Building2 },

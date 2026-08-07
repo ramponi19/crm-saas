@@ -25,6 +25,12 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   ])
   const isAdmin = !!(usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin')
 
+  // O ranking compara o resultado de TODO MUNDO — é tela de gestão, e saiu do
+  // menu do CRM a pedido do dono. Tirar do menu não bastaria: sem esta trava o
+  // vendedor continuaria vendo o faturamento dos colegas digitando a URL,
+  // justamente o que o isolamento por vendedor existe para impedir.
+  if (!isAdmin) redirect('/dashboard')
+
   const [linhas, { data: metasRaw }, { data: membrosRaw }] = await Promise.all([
     calcularRanking(supabase, empresaId, periodo),
     supabase.from('metas').select('id, escopo, usuario_id, tipo, alvo, periodo').eq('empresa_id', empresaId).eq('periodo', periodo).order('id', { ascending: true }),

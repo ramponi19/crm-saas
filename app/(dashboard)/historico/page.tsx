@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { Topbar } from '@/components/layout/topbar'
 import { HistoricoView } from '@/components/modules/historico/historico-view'
+import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 
 export const metadata = { title: 'Histórico de Vendas' }
 
@@ -12,28 +13,37 @@ export default async function HistoricoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: vinculo }, { data: usuario }, { data: membrosRaw }] = await Promise.all([
+  const [{ data: vinculo }, { data: usuario }, { data: membrosRaw }, { data: empresaPerm }] = await Promise.all([
     user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
   ])
   const isAdmin = !!((usuario as { is_super_admin?: boolean } | null)?.is_super_admin || (vinculo as { role?: string } | null)?.role === 'owner' || (vinculo as { role?: string } | null)?.role === 'admin')
   type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
   const vendedores = ((membrosRaw ?? []) as unknown as MembroRow[]).map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))
 
+  // Cada vendedor vê as próprias vendas. Papel desconhecido (super admin
+  // impersonando, que não tem vínculo) vê tudo — mesma regra do funil.
+  const papel = (vinculo as { role?: string } | null)?.role ?? ''
+  const soMinhas = !isAdmin && !!papel && !!user
+    && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
+
+  const baseVendas = supabase
+    .from('vendas')
+    .select(`
+      id, data_venda, valor_venda, lucro, forma_pagamento,
+      canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
+      clientes!cliente_id(nome),
+      produtos!produto_id(nome),
+      usuarios!vendedor_id(nome)
+    `)
+    .eq('empresa_id', empresaId)
+    .order('data_venda', { ascending: false })
+    .limit(500)
+
   const [{ data: vendasRaw }, { data: empresa }] = await Promise.all([
-    supabase
-      .from('vendas')
-      .select(`
-        id, data_venda, valor_venda, lucro, forma_pagamento,
-        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
-        clientes!cliente_id(nome),
-        produtos!produto_id(nome),
-        usuarios!vendedor_id(nome)
-      `)
-      .eq('empresa_id', empresaId)
-      .order('data_venda', { ascending: false })
-      .limit(500),
+    soMinhas ? baseVendas.eq('vendedor_id', user!.id) : baseVendas,
     supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', empresaId).maybeSingle(),
   ])
 

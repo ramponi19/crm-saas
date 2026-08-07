@@ -9,6 +9,15 @@ export interface PermissoesPapel {
   verFinanceiro: boolean
   verRelatorios: boolean
   verLeadsOutros: boolean
+  /**
+   * Ver venda, histórico, orçamento e números de OUTRAS pessoas.
+   *
+   * Separada de `verLeadsOutros` porque são perguntas diferentes: quem atende a
+   * esteira precisa ver lead livre, e nem por isso precisa ver quanto o colega
+   * vendeu. Sem ela, o dashboard de um vendedor mostrava o faturamento da loja
+   * inteira.
+   */
+  verVendasOutros: boolean
   excluir: boolean
   exportar: boolean
   descontoMax: number // % máximo de desconto no PDV
@@ -23,15 +32,18 @@ export const PERM_LABELS: { key: keyof Omit<PermissoesPapel, 'descontoMax'>; lab
   { key: 'verFinanceiro', label: 'Ver Financeiro' },
   { key: 'verRelatorios', label: 'Ver Relatórios' },
   { key: 'verLeadsOutros', label: 'Ver leads de outros' },
+  { key: 'verVendasOutros', label: 'Ver vendas e resultados de outros' },
   { key: 'excluir', label: 'Excluir registros' },
   { key: 'exportar', label: 'Exportar dados' },
 ]
 
 export const PERM_DEFAULT: Record<Papel, PermissoesPapel> = {
-  owner: { verFinanceiro: true, verRelatorios: true, verLeadsOutros: true, excluir: true, exportar: true, descontoMax: 100 },
-  admin: { verFinanceiro: true, verRelatorios: true, verLeadsOutros: true, excluir: true, exportar: true, descontoMax: 100 },
-  vendedor: { verFinanceiro: false, verRelatorios: false, verLeadsOutros: false, excluir: false, exportar: false, descontoMax: 10 },
-  tecnico: { verFinanceiro: false, verRelatorios: false, verLeadsOutros: true, excluir: false, exportar: false, descontoMax: 0 },
+  owner: { verFinanceiro: true, verRelatorios: true, verLeadsOutros: true, verVendasOutros: true, excluir: true, exportar: true, descontoMax: 100 },
+  admin: { verFinanceiro: true, verRelatorios: true, verLeadsOutros: true, verVendasOutros: true, excluir: true, exportar: true, descontoMax: 100 },
+  vendedor: { verFinanceiro: false, verRelatorios: false, verLeadsOutros: false, verVendasOutros: false, excluir: false, exportar: false, descontoMax: 10 },
+  // Técnico mexe em ordem de serviço, não em venda: número de faturamento não é
+  // assunto dele, mas lead ele precisa enxergar para atender o balcão.
+  tecnico: { verFinanceiro: false, verRelatorios: false, verLeadsOutros: true, verVendasOutros: false, excluir: false, exportar: false, descontoMax: 0 },
 }
 
 /** Permissões efetivas de um papel (default + o que o dono salvou; owner = total). */

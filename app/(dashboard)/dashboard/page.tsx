@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import DashboardImob from './dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
@@ -11,6 +12,27 @@ async function getDashboardData() {
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
+
+  /**
+   * O dashboard mostrava o faturamento, o lucro e o ticket da EMPRESA INTEIRA
+   * para qualquer um que entrasse — inclusive o vendedor. Agora, sem a
+   * permissão "ver vendas e resultados de outros", cada um vê o próprio número.
+   *
+   * ESTOQUE e ASSISTÊNCIAS continuam da loja: é operação compartilhada, não
+   * resultado individual. Cliente também — cliente é da loja.
+   */
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: vinculo }, { data: usuarioRow }, { data: empresaPerm }] = await Promise.all([
+    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
+    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
+  ])
+  const papel = (vinculo as { role?: string } | null)?.role ?? ''
+  const ehGestor = !!usuarioRow?.is_super_admin || papel === 'owner' || papel === 'admin'
+  const soMeu = !ehGestor && !!papel && !!user
+    && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
+  const meu = <T extends { eq: (c: string, v: string) => T }>(q: T, coluna: string): T =>
+    soMeu ? q.eq(coluna, user!.id) : q
 
   const [
     { data: vendasMesRaw },
@@ -23,20 +45,20 @@ async function getDashboardData() {
     { data: topProdutosRaw },
     { data: leadsFunilRaw },
   ] = await Promise.all([
-    supabase.from('vendas').select('*').eq('empresa_id', empresaId).gte('data_venda', startOfMonth.toISOString()).eq('status', 'concluida'),
+    meu(supabase.from('vendas').select('*').eq('empresa_id', empresaId).gte('data_venda', startOfMonth.toISOString()).eq('status', 'concluida'), 'vendedor_id'),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
+    meu(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true), 'responsavel_id'),
+    meu(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), 'responsavel_id'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
     supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
-    supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, produtos!produto_id(nome)').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
-    supabase.from('vendas')
+    meu(supabase.from('vendas').select('id, valor_venda, forma_pagamento, canal_venda, data_venda, status, produtos!produto_id(nome)').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5), 'vendedor_id'),
+    meu(supabase.from('vendas')
       .select('produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .gte('data_venda', startOfMonth.toISOString())
       .eq('status', 'concluida')
-      .limit(100),
-    supabase.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true),
+      .limit(100), 'vendedor_id'),
+    meu(supabase.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true), 'responsavel_id'),
   ])
 
   const vendasMes = (vendasMesRaw ?? []) as Array<{ valor_venda: number; lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; data_venda: string | null }>

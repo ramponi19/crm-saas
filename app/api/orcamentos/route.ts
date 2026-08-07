@@ -97,7 +97,12 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, id: b.id, token: data?.token })
   }
-  const { data, error } = await supabase.from('orcamentos').insert({ ...dados, status: statusEnviado ?? 'rascunho' }).select('id, token').single()
+  // `usuario_id` só na CRIAÇÃO: é o dono do orçamento, e o escopo por vendedor
+  // depende dele. Na edição o dono não muda — senão o admin que corrigisse uma
+  // vírgula viraria dono do orçamento do vendedor e sumiria com ele da lista dele.
+  const { data, error } = await supabase.from('orcamentos')
+    .insert({ ...dados, status: statusEnviado ?? 'rascunho', usuario_id: user.id })
+    .select('id, token').single()
   if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
   return NextResponse.json({ ok: true, id: data.id, token: data.token })
 }
