@@ -79,7 +79,14 @@ export default async function LeadsPage() {
   // impersonando, que não está em empresa_usuarios) ou owner/admin → vê tudo.
   const meuRole = usuariosMapped.find((u) => u.id === user?.id)?.role ?? ''
   const restringe = !!meuRole && !permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
-  const leadsVisiveis = restringe ? leadsComContagem.filter((l) => l.responsavel_id === user?.id) : leadsComContagem
+  // A ESTEIRA (lead sem responsável) é de todos. O filtro guardava só o que já
+  // tinha dono igual ao usuário, então lead novo — que nasce sem responsável —
+  // ficava invisível justamente para quem deveria pegá-lo: o vendedor abria o
+  // CRM e via o funil vazio. "Não ver lead de outros" é sobre lead DE OUTRO, e
+  // lead sem dono não é de ninguém.
+  const leadsVisiveis = restringe
+    ? leadsComContagem.filter((l) => l.responsavel_id === user?.id || l.responsavel_id == null)
+    : leadsComContagem
 
   const { data: scoringRow } = await supabase
     .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle()
