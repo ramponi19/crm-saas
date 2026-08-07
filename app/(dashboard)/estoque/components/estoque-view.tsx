@@ -558,6 +558,29 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
   const [serieBuscando, setSerieBuscando] = useState(false)
   const [serieAchado, setSerieAchado] = useState<Achado | null>(null)
 
+  /**
+   * Última consulta de bloqueio deste IMEI. Reprovado = aparelho impedido, e a
+   * entrada é barrada: cadastrar aparelho de origem duvidosa no estoque é o
+   * problema que o CRM tem de ajudar a evitar, não registrar bonitinho.
+   */
+  const [consultaImei, setConsultaImei] = useState<{ resultado: string; motivo: string | null; quando: string } | null>(null)
+  useEffect(() => {
+    const d = form.imei.replace(/\D/g, '')
+    if (isVeiculo || d.length !== 15) { setConsultaImei(null); return }
+    let cancelado = false
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from('imei_consultas')
+        .select('resultado, motivo, consultado_em')
+        .eq('empresa_id', empresaId).eq('imei', d)
+        .order('consultado_em', { ascending: false }).limit(1)
+      if (cancelado) return
+      const c = (data ?? [])[0] as { resultado: string; motivo: string | null; consultado_em: string } | undefined
+      setConsultaImei(c ? { resultado: c.resultado, motivo: c.motivo, quando: c.consultado_em } : null)
+    }, 450)
+    return () => { cancelado = true; clearTimeout(t) }
+  }, [form.imei, isVeiculo, empresaId, supabase])
+
   useEffect(() => {
     const serie = form.imei.trim()
     if (isVeiculo || serie.length < 6) { setSerieAchado(null); return }
@@ -685,6 +708,15 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     // contado duas vezes.
     if (serieAchado?.tipo === 'duplicado') {
       notify.bad('Este número de série já está no estoque', 'Localize a unidade existente em vez de cadastrar outra.')
+      return
+    }
+    // Aparelho impedido não entra. O aviso na tela não basta: quem está dando
+    // entrada em lote passa direto, e o prejuízo aqui não é de contagem.
+    if (consultaImei?.resultado === 'reprovado') {
+      notify.bad(
+        'IMEI reprovado na consulta de aparelhos impedidos',
+        consultaImei.motivo ? `Motivo: ${consultaImei.motivo}. Não cadastre este aparelho.` : 'Não cadastre este aparelho.',
+      )
       return
     }
     if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
@@ -844,6 +876,33 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
                       Já passou pela loja{serieAchado.quando ? ` em ${fmtDate(serieAchado.quando)}` : ''} — dados preenchidos; confira os preços.
                     </span>
                   )}
+
+                  {/* Bloqueio: o resultado da consulta de aparelho impedido. */}
+                  {(() => {
+                    const d = form.imei.replace(/\D/g, '')
+                    if (d.length !== 15) return null
+                    if (!consultaImei) {
+                      return (
+                        <span className="text-[11.5px] text-warn">
+                          IMEI não consultado na base de aparelhos impedidos.{' '}
+                          <a href="/check-imei" target="_blank" rel="noopener" className="font-medium underline">Consultar agora</a>
+                        </span>
+                      )
+                    }
+                    const quando = fmtDate(consultaImei.quando)
+                    if (consultaImei.resultado === 'reprovado') {
+                      return (
+                        <span className="text-[11.5px] font-semibold text-bad">
+                          REPROVADO na consulta de {quando}
+                          {consultaImei.motivo ? ` — ${consultaImei.motivo}` : ''}. Aparelho impedido não deve entrar no estoque.
+                        </span>
+                      )
+                    }
+                    if (consultaImei.resultado === 'aprovado') {
+                      return <span className="text-[11.5px] text-ok">Aprovado na consulta de {quando} — sem impedimento.</span>
+                    }
+                    return <span className="text-[11.5px] text-warn">Consulta de {quando} ficou inconclusiva.</span>
+                  })()}
                 </div>
               )}
               {campos.imei2 && (

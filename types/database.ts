@@ -3500,6 +3500,12 @@ export type Database = {
           },
         ]
       }
+      imei_consultas: {
+        Row: { id: number; empresa_id: number; imei: string; resultado: string; motivo: string | null; fonte: string; observacoes: string | null; consultado_por: string | null; consultado_em: string }
+        Insert: { id?: never; empresa_id: number; imei: string; resultado: string; motivo?: string | null; fonte?: string; observacoes?: string | null; consultado_por?: string | null; consultado_em?: string }
+        Update: { id?: never; empresa_id?: number; imei?: string; resultado?: string; motivo?: string | null; fonte?: string; observacoes?: string | null; consultado_por?: string | null; consultado_em?: string }
+        Relationships: []
+      }
       vendas_termos: {
         Row: { id: number; empresa_id: number; venda_id: number; tipo: string; status: string; arquivo_url: string | null; assinado_em: string | null; assinado_por: string | null; criado_em: string }
         Insert: { id?: never; empresa_id: number; venda_id: number; tipo: string; status?: string; arquivo_url?: string | null; assinado_em?: string | null; assinado_por?: string | null; criado_em?: string }
