@@ -96,6 +96,10 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [trocas, setTrocas] = useState<TrocaItem[]>([{ aparelho: '', imei: '', valor: '' }])
   // #2 entrega pendente (semi-novo que não sai na hora)
   const [entregaPendente, setEntregaPendente] = useState(false)
+  // Termo de garantia a assinar. Marcado aqui, a venda entra na fila de Garantia
+  // até alguém anexar o termo assinado — sem mexer no status da venda, que é o
+  // que faz ela contar no faturamento.
+  const [termoGarantia, setTermoGarantia] = useState(false)
   const [pixCobranca, setPixCobranca] = useState<CobrancaPix | null>(null)
   const [pixCopiado, setPixCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
@@ -485,6 +489,15 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         } as never)
       }
 
+      // Termo de garantia: marca a PRIMEIRA venda do fechamento. O termo é um
+      // documento só para a compra inteira — marcar cada linha do carrinho faria
+      // a mesma compra aparecer três vezes na fila de Garantia.
+      if (termoGarantia && primeiraVendaId !== null) {
+        await supabase.from('vendas')
+          .update({ termo_garantia: 'pendente' } as never)
+          .eq('id', primeiraVendaId)
+      }
+
       // Log do aceite: uma linha por troca acima da referência, ligada à primeira
       // venda do fechamento. Fica em tabela própria (sem UPDATE nem DELETE por
       // policy) porque a finalidade é comprovar — texto solto em `observacoes`
@@ -567,7 +580,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
       setCarrinho([]); setDesconto(''); setParcelas(1)
-      setAcessorios([]); setTrocaAtiva(false); setTrocas([{ aparelho: '', imei: '', valor: '' }]); setEntregaPendente(false)
+      setAcessorios([]); setTrocaAtiva(false); setTrocas([{ aparelho: '', imei: '', valor: '' }]); setEntregaPendente(false); setTermoGarantia(false)
       if (formaPagamento !== 'pix') setClienteSelecionado(null)
       setComanda('')
       router.refresh()
@@ -1138,9 +1151,17 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             </div>
 
             {/* #2 Entrega pendente */}
-            <label className="mb-4 flex items-center gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">
+            <label className="mb-2 flex items-center gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">
               <input type="checkbox" checked={entregaPendente} onChange={(e) => setEntregaPendente(e.target.checked)} className="size-4 accent-accent" />
               Entrega pendente — baixar depois no Histórico
+            </label>
+
+            <label className="mb-4 flex items-start gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">
+              <input type="checkbox" checked={termoGarantia} onChange={(e) => setTermoGarantia(e.target.checked)} className="mt-0.5 size-4 accent-accent" />
+              <span>
+                Termo de garantia a assinar
+                <span className="block text-[11px] text-ink-3">Fica pendente em Garantia até o termo assinado ser anexado. Não afeta o faturamento.</span>
+              </span>
             </label>
 
             {/* Forma de pagamento */}

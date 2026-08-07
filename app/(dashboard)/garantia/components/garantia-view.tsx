@@ -5,6 +5,8 @@ import { Plus, ShieldCheck } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Table, Button, Badge, StatCard, Tabs, EmptyState, type Column } from '@/components/ui'
 import GarantiaModal from './garantia-modal'
+import { TermosView, type VendaTermo } from './termos-view'
+import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
 
 interface Garantia {
   id: number
@@ -29,7 +31,13 @@ interface Garantia {
   produtos: { nome: string } | null
 }
 
-interface Props { garantias: Garantia[] }
+interface Props {
+  garantias: Garantia[]
+  /** Vendas com termo de garantia pendente ou já assinado. */
+  termos?: VendaTermo[]
+  documentos?: DocumentoDisponivel[]
+  empresaId: number
+}
 
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
@@ -54,7 +62,12 @@ function fmtPrazo(dias: number | null) {
   return `${dias} dias`
 }
 
-export default function GarantiaView({ garantias }: Props) {
+export default function GarantiaView({ garantias, termos = [], documentos = [], empresaId }: Props) {
+  // Duas coisas diferentes sob o mesmo menu: o PROTOCOLO é o aparelho voltando
+  // com defeito; o TERMO é o papel que sai junto com a venda. Abas separadas
+  // para a fila de assinatura não se perder no meio dos reparos.
+  const [aba, setAba] = useState<'protocolos' | 'termos'>('protocolos')
+  const termosPendentes = termos.filter((t) => t.termo_garantia === 'pendente').length
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
   const [selecionada, setSelecionada] = useState<Garantia | null>(null)
@@ -120,29 +133,48 @@ export default function GarantiaView({ garantias }: Props) {
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Garantia" />
 
-      <div className="grid shrink-0 grid-cols-2 gap-3 px-6 py-4 md:grid-cols-4">
-        <StatCard label="Em análise" value={stats.emAnalise} />
-        <StatCard label="Em reparo" value={stats.emReparo} />
-        <StatCard label="Dentro da garantia" value={stats.dentroGarantia} />
-        <StatCard label="Concluídas no mês" value={stats.concluidasMes} />
+      <div className="shrink-0 px-6 pt-4">
+        <Tabs
+          items={[
+            { value: 'protocolos', label: 'Protocolos' },
+            { value: 'termos', label: `Termos de garantia${termosPendentes ? ` (${termosPendentes})` : ''}` },
+          ]}
+          value={aba}
+          onValueChange={(v) => setAba(v as 'protocolos' | 'termos')}
+        />
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-6 pb-4">
-        <Tabs items={FILTROS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
-        <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo protocolo</Button>
-      </div>
+      {aba === 'protocolos' ? (
+        <>
+          <div className="grid shrink-0 grid-cols-2 gap-3 px-6 py-4 md:grid-cols-4">
+            <StatCard label="Em análise" value={stats.emAnalise} />
+            <StatCard label="Em reparo" value={stats.emReparo} />
+            <StatCard label="Dentro da garantia" value={stats.dentroGarantia} />
+            <StatCard label="Concluídas no mês" value={stats.concluidasMes} />
+          </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-        <Card flush>
-          <Table
-            columns={cols}
-            rows={filtrados}
-            rowKey={(g) => g.id}
-            onRowClick={openGarantia}
-            empty={<EmptyState icon={<ShieldCheck size={22} strokeWidth={1.7} />} title="Nenhuma garantia encontrada" description="Registre um novo protocolo de garantia." action={<Button size="sm" onClick={openNovo}>Novo protocolo</Button>} />}
-          />
-        </Card>
-      </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-6 pb-4">
+            <Tabs items={FILTROS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
+            <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={openNovo}>Novo protocolo</Button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+            <Card flush>
+              <Table
+                columns={cols}
+                rows={filtrados}
+                rowKey={(g) => g.id}
+                onRowClick={openGarantia}
+                empty={<EmptyState icon={<ShieldCheck size={22} strokeWidth={1.7} />} title="Nenhuma garantia encontrada" description="Registre um novo protocolo de garantia." action={<Button size="sm" onClick={openNovo}>Novo protocolo</Button>} />}
+              />
+            </Card>
+          </div>
+        </>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <TermosView vendas={termos} documentos={documentos} empresaId={empresaId} />
+        </div>
+      )}
 
       {modalOpen && (
         <GarantiaModal garantia={isNew ? null : selecionada} isNew={isNew} onClose={() => setModalOpen(false)} />

@@ -3385,6 +3385,10 @@ export type Database = {
           produto_id: number | null
           pedido_compra_id: number | null
           quantidade: number
+          termo_garantia: string | null
+          termo_garantia_em: string | null
+          termo_garantia_por: string | null
+          termo_garantia_url: string | null
           unidade_id: number | null
           status: string | null
           usuario_id: string | null
@@ -3413,6 +3417,10 @@ export type Database = {
           produto_id?: number | null
           pedido_compra_id?: number | null
           quantidade?: number
+          termo_garantia?: string | null
+          termo_garantia_em?: string | null
+          termo_garantia_por?: string | null
+          termo_garantia_url?: string | null
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
@@ -3441,6 +3449,10 @@ export type Database = {
           produto_id?: number | null
           pedido_compra_id?: number | null
           quantidade?: number
+          termo_garantia?: string | null
+          termo_garantia_em?: string | null
+          termo_garantia_por?: string | null
+          termo_garantia_url?: string | null
           unidade_id?: number | null
           status?: string | null
           usuario_id?: string | null
