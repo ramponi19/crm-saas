@@ -19,6 +19,7 @@ interface Venda {
   desconto_valor: number | null
   lucro: number | null
   forma_pagamento: string | null
+  observacoes: string | null
   status: string | null
   /** Aparelho aceito em troca nesta venda ainda não chegou na loja. */
   troca_pendente?: boolean
@@ -223,7 +224,13 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const vendaCols: Column<Venda>[] = [
     { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
     { key: 'cliente', header: 'Cliente', render: v => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
-    { key: 'produto', header: 'Produto', hideOnMobile: true, render: v => <span className="text-ink-2">{v.produto_nome ?? v.forma_pagamento ?? '—'}</span> },
+    {
+      // Venda sem cadastro de produto (acessório, aparelho de troca) guarda a
+      // descrição na observação. O fallback antigo era `forma_pagamento`, que
+      // imprimia "credito" — e agora imprimiria "multiplo" — na coluna Produto.
+      key: 'produto', header: 'Produto', hideOnMobile: true,
+      render: v => <span className="text-ink-2">{v.produto_nome ?? v.observacoes ?? '—'}</span>,
+    },
     { key: 'vendedor', header: 'Vendedor', hideOnMobile: true, render: v => <span className="text-ink-2">{v.vendedor_nome ?? '—'}</span> },
     { key: 'canal', header: 'Canal', hideOnMobile: true, render: v => <Badge tone="neutro">{CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '—'}</Badge> },
     {

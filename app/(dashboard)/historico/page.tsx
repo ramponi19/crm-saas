@@ -26,7 +26,7 @@ export default async function HistoricoPage() {
       .from('vendas')
       .select(`
         id, data_venda, valor_venda, lucro, forma_pagamento,
-        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade,
+        canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
         clientes!cliente_id(nome),
         produtos!produto_id(nome),
         usuarios!vendedor_id(nome)
@@ -41,12 +41,35 @@ export default async function HistoricoPage() {
     id: number; data_venda: string | null; valor_venda: number; lucro: number | null
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
     cliente_id: number | null; produto_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
-    quantidade: number | null
+    quantidade: number | null; grupo_pdv: string | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
   }
-  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(v => ({
+  const linhasVenda = (vendasRaw ?? []) as unknown as VendaRow[]
+
+  // As formas de pagamento reais. Ficam gravadas na PRIMEIRA venda do fechamento
+  // (o PDV cria uma venda por item), então a busca é por id e o resultado é
+  // compartilhado com as outras vendas do mesmo `grupo_pdv` — senão a segunda
+  // linha da mesma compra apareceria sem pagamento nenhum.
+  const idsVenda = linhasVenda.map((v) => v.id)
+  const { data: pagosRaw } = idsVenda.length
+    ? await supabase.from('vendas_pagamentos')
+        .select('venda_id, forma_pagamento, valor_pago, parcelas')
+        .in('venda_id', idsVenda).order('id')
+    : { data: [] }
+
+  type PagoRow = { venda_id: number | null; forma_pagamento: string; valor_pago: number; parcelas: number | null }
+  const grupoDaVenda = new Map(linhasVenda.map((v) => [v.id, v.grupo_pdv ?? `v:${v.id}`]))
+  const pagosPorGrupo = new Map<string, PagoRow[]>()
+  for (const p of (pagosRaw ?? []) as PagoRow[]) {
+    const chave = p.venda_id != null ? grupoDaVenda.get(p.venda_id) : null
+    if (!chave) continue
+    if (!pagosPorGrupo.has(chave)) pagosPorGrupo.set(chave, [])
+    pagosPorGrupo.get(chave)!.push(p)
+  }
+
+  const vendas = linhasVenda.map(v => ({
     id:            v.id,
     data_venda:    v.data_venda,
     valor_venda:   Number(v.valor_venda),
@@ -64,6 +87,8 @@ export default async function HistoricoPage() {
     cliente_nome:  one(v.clientes)?.nome  ?? null,
     produto_nome:  one(v.produtos)?.nome  ?? null,
     vendedor_nome: one(v.usuarios)?.nome  ?? null,
+    pagamentos: (pagosPorGrupo.get(v.grupo_pdv ?? `v:${v.id}`) ?? [])
+      .map((p) => ({ forma_pagamento: p.forma_pagamento, valor_pago: Number(p.valor_pago), parcelas: p.parcelas })),
   }))
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)

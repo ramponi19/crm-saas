@@ -100,6 +100,48 @@ export function parcelasResumidas(linhas: LinhaPagamento[]): number | null {
   return FORMAS_PARCELAVEIS.includes(l.forma) ? (l.parcelas ?? 1) : null
 }
 
+export const ROTULO_FORMA: Record<string, string> = {
+  dinheiro: 'Dinheiro',
+  pix: 'PIX',
+  debito: 'Débito',
+  credito: 'Crédito',
+  link: 'Link',
+  troca: 'Troca',
+  multiplo: 'Múltiplo',
+}
+
+export interface PagamentoGravado {
+  forma_pagamento: string
+  valor_pago: number
+  parcelas: number | null
+}
+
+/**
+ * Como o pagamento aparece nas telas de leitura (Histórico, Relatórios).
+ *
+ * Com várias formas, `vendas.forma_pagamento` guarda só 'multiplo' — palavra que
+ * não diz nada a quem está conferindo o caixa. Aqui as linhas reais viram texto:
+ * "Crédito 3x + Dinheiro".
+ */
+export function descreverPagamentos(
+  linhas: PagamentoGravado[] | undefined,
+  formaUnica: string | null,
+  parcelasUnica: number | null,
+): string {
+  if (!linhas?.length) {
+    // Venda antiga (antes das várias formas) ou linha do grupo que não guarda os
+    // pagamentos: cai no que a própria venda registrou.
+    const base = ROTULO_FORMA[formaUnica ?? ''] ?? formaUnica ?? ''
+    return [base, parcelasUnica && parcelasUnica > 1 ? `${parcelasUnica}x` : ''].filter(Boolean).join(' ') || '—'
+  }
+  return linhas
+    .map((l) => {
+      const nome = ROTULO_FORMA[l.forma_pagamento] ?? l.forma_pagamento
+      return l.parcelas && l.parcelas > 1 ? `${nome} ${l.parcelas}x` : nome
+    })
+    .join(' + ')
+}
+
 /** Opções de parcela configuradas para a forma/bandeira da linha. */
 export function parcelasDisponiveis(l: LinhaPagamento, taxas: Taxa[]): number[] {
   if (!FORMAS_PARCELAVEIS.includes(l.forma)) return []

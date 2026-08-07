@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { contratosDaVenda, emitirContrato, type DocumentoDisponivel, type ContratoArquivado } from '@/lib/contrato-emitir'
+import { descreverPagamentos, type PagamentoGravado } from '@/lib/pdv-pagamentos'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
@@ -28,6 +29,8 @@ interface Venda {
   observacoes: string | null
   /** Peças vendidas nesta linha. 1 em item serializado. */
   quantidade: number | null
+  /** Formas usadas no fechamento. Vazio em venda anterior ao multi-pagamento. */
+  pagamentos?: PagamentoGravado[]
 }
 
 interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; empresaId: number; documentos?: DocumentoDisponivel[] }
@@ -69,7 +72,7 @@ function exportCSV(rows: Venda[]) {
     v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
     v.cliente_nome ?? '', v.produto_nome ?? '', v.quantidade ?? 1, v.vendedor_nome ?? '',
     CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
-    v.forma_pagamento ?? '', v.valor_venda, v.lucro ?? 0, v.status ?? '',
+    descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas), v.valor_venda, v.lucro ?? 0, v.status ?? '',
   ].map(csvCell).join(','))
   // BOM (﻿) p/ o Excel abrir os acentos corretamente.
   const blob = new Blob(['﻿' + [header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -205,7 +208,9 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     },
     {
       key: 'pgto', header: 'Pagamento', hideOnMobile: true,
-      render: (v) => <span className="text-ink-2">{[v.forma_pagamento ?? '', v.parcelas && v.parcelas > 1 ? `${v.parcelas}x` : ''].filter(Boolean).join(' · ') || '—'}</span>,
+      // "multiplo" não diz nada a quem confere o caixa: aqui saem as formas de
+      // verdade ("Crédito 3x + Dinheiro"), lidas de vendas_pagamentos.
+      render: (v) => <span className="text-ink-2">{descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas)}</span>,
     },
     {
       key: 'valor', header: 'Valor / Lucro', align: 'right', className: 'num',
