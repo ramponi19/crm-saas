@@ -35,10 +35,24 @@ interface Cliente {
   ultima_compra?: string | null
 }
 
+/**
+ * Cliente recém-criado, devolvido a quem abriu o modal de dentro de uma venda.
+ * Traz `cpf_cnpj` porque o PDV o repassa ao contrato e ao termo de garantia —
+ * sem ele o documento sairia com lacuna logo depois do cadastro.
+ */
+export interface ClienteCriado { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }
+
 interface Props {
   cliente: Cliente | null
   isNew: boolean
   onClose: () => void
+  /**
+   * Avisa quem abriu que o cliente foi criado — é o que permite cadastrar no
+   * meio do PDV ou da encomenda e a venda seguir já com ele selecionado.
+   */
+  onCreated?: (c: ClienteCriado) => void
+  /** Pré-preenche o nome (o que a pessoa já tinha digitado na busca). */
+  nomeInicial?: string
 }
 
 const EMPTY: Cliente = {
@@ -73,10 +87,12 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
   )
 }
 
-export default function ClienteModal({ cliente, isNew, onClose }: Props) {
+export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeInicial }: Props) {
   const supabase = createClient()
   const router = useRouter()
-  const [form, setForm] = useState<Cliente>(isNew ? EMPTY : { ...EMPTY, ...cliente })
+  const [form, setForm] = useState<Cliente>(
+    isNew ? { ...EMPTY, nome: nomeInicial ?? '' } : { ...EMPTY, ...cliente },
+  )
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
 
@@ -104,9 +120,14 @@ export default function ClienteModal({ cliente, isNew, onClose }: Props) {
           setSaving(false); return
         }
       }
-      const { error } = await supabase.from('clientes').insert({ ...data, empresa_id: empId } as TablesInsert<'clientes'>)
-      if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
+      const { data: novo, error } = await supabase
+        .from('clientes')
+        .insert({ ...data, empresa_id: empId } as TablesInsert<'clientes'>)
+        .select('id, nome, telefone, cpf_cnpj')
+        .single()
+      if (error || !novo) { notify.bad('Erro ao cadastrar', error?.message); setSaving(false); return }
       notify.ok('Cliente cadastrado')
+      onCreated?.(novo as ClienteCriado)
     } else {
       // Não reenvia `ativo` na edição — senão reativa silenciosamente um cliente desativado.
       const { ativo: _ativo, ...semAtivo } = data

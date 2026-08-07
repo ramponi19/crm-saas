@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
 import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
+import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 import { camposDaCategoria } from '@/lib/estoque-campos'
@@ -85,6 +86,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSimples | null>(null)
   const [buscaCliente, setBuscaCliente] = useState('')
   const [showClientes, setShowClientes] = useState(false)
+  const [cadastroCliente, setCadastroCliente] = useState(false)
+  /**
+   * Clientes criados aqui dentro. A lista `clientes` vem do servidor e só é
+   * renovada no refresh; sem isto o cliente recém-cadastrado sumiria da busca
+   * se o vendedor reabrisse o seletor antes de a página recarregar.
+   */
+  const [clientesNovos, setClientesNovos] = useState<ClienteSimples[]>([])
   /**
    * Formas de pagamento da venda. Lista, não valor único: o caixa real combina
    * cartão + dinheiro, dois cartões + Pix. `vendas_pagamentos` sempre foi 1:N —
@@ -153,11 +161,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   }, [itensDisponiveis, busca])
 
   const clientesFiltrados = useMemo(() => {
+    const todos = [...clientesNovos, ...clientes.filter((c) => !clientesNovos.some((n) => n.id === c.id))]
     const base = buscaCliente
-      ? clientes.filter((c) => c.nome.toLowerCase().includes(buscaCliente.toLowerCase()) || (c.telefone ?? '').includes(buscaCliente))
-      : clientes
+      ? todos.filter((c) => c.nome.toLowerCase().includes(buscaCliente.toLowerCase()) || (c.telefone ?? '').includes(buscaCliente))
+      : todos
     return base.slice(0, 8)
-  }, [clientes, buscaCliente])
+  }, [clientes, clientesNovos, buscaCliente])
 
   function adicionarItem(item: ItemEstoque, reserva = false) {
     const lote = porQuantidade(item)
@@ -981,12 +990,17 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                   </div>
                   <button
                     type="button"
-                    onClick={() => { notify.info('Cadastro rápido em breve'); setShowClientes(false) }}
+                    onClick={() => { setCadastroCliente(true); setShowClientes(false) }}
                     className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-ink transition-colors hover:bg-ink/[0.04]"
                   >
                     <UserPlus size={17} strokeWidth={1.7} />
                     <span className="text-[12.5px] font-semibold">Cadastrar novo cliente</span>
                   </button>
+                  {clientesFiltrados.length === 0 && buscaCliente.trim() && (
+                    <p className="px-2.5 pb-1.5 text-[11.5px] text-ink-3">
+                      Nenhum cliente com “{buscaCliente.trim()}”.
+                    </p>
+                  )}
                   {clientesFiltrados.map((c) => (
                     <button
                       key={c.id}
@@ -1006,6 +1020,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 </div>
               )}
             </div>
+
+            {cadastroCliente && (
+              <ClienteModal
+                cliente={null}
+                isNew
+                nomeInicial={buscaCliente.trim()}
+                onCreated={(c) => {
+                  setClientesNovos((prev) => [c, ...prev])
+                  setClienteSelecionado(c)
+                  setBuscaCliente('')
+                }}
+                onClose={() => setCadastroCliente(false)}
+              />
+            )}
 
             {/* Itens */}
             <div className="mb-4 flex min-h-[48px] flex-col gap-3">

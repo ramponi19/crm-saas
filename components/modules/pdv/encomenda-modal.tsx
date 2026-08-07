@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
+import { UserPlus } from 'lucide-react'
 import { Modal, Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
+import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 
 interface Cli { id: number; nome: string }
 interface Forn { id: number; nome_fantasia: string }
@@ -23,7 +25,10 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
   const router = useRouter()
   const { empresa } = useEmpresa()
   const [clienteId, setClienteId] = useState('')
-  const [clienteNome, setClienteNome] = useState('')
+  const [cadastroAberto, setCadastroAberto] = useState(false)
+  /** Clientes criados aqui: a prop vem do servidor e só muda no refresh. */
+  const [clientesNovos, setClientesNovos] = useState<Cli[]>([])
+  const listaClientes = [...clientesNovos, ...clientes.filter((c) => !clientesNovos.some((n) => n.id === c.id))]
   const [produto, setProduto] = useState('')
   const [produtoId, setProdutoId] = useState<number | null>(null)
   const [coresDisp, setCoresDisp] = useState<string[]>([])
@@ -45,11 +50,15 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
   const especif = [capacidade, cor].filter(Boolean).join(' ')
 
   async function salvar() {
+    // Cliente é obrigatório na encomenda: o produto vai ser comprado por causa
+    // dele e alguém precisa avisá-lo quando chegar. Encomenda sem contato é
+    // encomenda que fica encalhada na prateleira.
+    if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
     if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
     setSalvando(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const cliNome = clienteId ? (clientes.find((c) => String(c.id) === clienteId)?.nome ?? '') : clienteNome.trim()
+    const cliNome = listaClientes.find((c) => String(c.id) === clienteId)?.nome ?? ''
 
     const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
       empresa_id: empresa.id,
@@ -69,13 +78,13 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
       empresa_id: empresa.id,
       valor_venda: Number(valorVenda) || 0,
       status: 'encomenda',
-      cliente_id: clienteId ? Number(clienteId) : null,
+      cliente_id: Number(clienteId),
       vendedor_id: user?.id ?? null,
       canal_venda: 'encomenda',
       data_venda: new Date().toISOString(),
       produto_id: produtoId,
       pedido_compra_id: (pedido as { id?: number } | null)?.id ?? null,
-      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${obs.trim() ? ' ' + obs.trim() : ''}${cliNome && !clienteId ? ` Cliente: ${cliNome}.` : ''}`,
+      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${obs.trim() ? ' ' + obs.trim() : ''}`,
     } as never)
 
     setSalvando(false)
@@ -88,8 +97,13 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     onClose(); router.refresh()
   }
 
+  // Os dois modais escutam Esc no document, então uma tecla fecharia o de fora
+  // junto — e a encomenda já digitada iria embora. Enquanto o cadastro está
+  // aberto, fechar o de trás não faz nada.
+  const fechar = () => { if (!cadastroAberto) onClose() }
+
   return (
-    <Modal open onClose={onClose} title="Venda por encomenda" footer={<>
+    <Modal open onClose={fechar} title="Venda por encomenda" footer={<>
       <Button variant="ghost" onClick={onClose}>Cancelar</Button>
       <Button onClick={salvar} loading={salvando}>Lançar encomenda</Button>
     </>}>
@@ -98,11 +112,20 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
           Produto que não tem em estoque. Ao lançar, o <strong className="text-ink">pedido de compra</strong> é criado automaticamente e a venda fica <strong className="text-ink">pendente</strong> até você finalizar quando o produto chegar.
         </p>
 
-        <Select label="Cliente (opcional)" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-          <option value="">— Cliente novo / avulso —</option>
-          {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-        </Select>
-        {!clienteId && <Input label="Nome do cliente" value={clienteNome} onChange={(e) => setClienteNome(e.target.value)} placeholder="Se não estiver cadastrado" />}
+        <div>
+          <Select label="Cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+            <option value="">— Selecione o cliente —</option>
+            {listaClientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </Select>
+          <button
+            type="button"
+            onClick={() => setCadastroAberto(true)}
+            className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-accent transition-opacity hover:opacity-80"
+          >
+            <UserPlus size={14} strokeWidth={1.9} />
+            Cadastrar cliente novo
+          </button>
+        </div>
 
         <ProdutoAutocomplete label="Produto a encomendar" value={produto}
           onChange={(v) => { setProduto(v); setProdutoId(null); setCoresDisp([]); setArmazDisp([]); setCor(''); setCapacidade('') }}
@@ -139,6 +162,15 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
 
         <Textarea label="Observações" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Cor, prazo prometido, sinal pago…" />
       </div>
+
+      {cadastroAberto && (
+        <ClienteModal
+          cliente={null}
+          isNew
+          onCreated={(c) => { setClientesNovos((prev) => [c, ...prev]); setClienteId(String(c.id)) }}
+          onClose={() => setCadastroAberto(false)}
+        />
+      )}
     </Modal>
   )
 }
