@@ -755,7 +755,23 @@ serve(async (req: Request) => {
 
   // Daqui para baixo é Meta: assinatura obrigatória.
   if (!(await assinaturaValida(req, corpoCru))) {
-    console.error("assinatura invalida ou ausente — evento recusado");
+    // IDENTIFICA quem foi recusado. Antes o log dizia só "assinatura inválida",
+    // e o resultado era ~2.000 recusas por dia sem nome: impossível saber se era
+    // ataque, app Meta a mais apontando para esta URL, ou segredo trocado. Com o
+    // `object` e o id da conta dá para achar a origem no painel da Meta.
+    //
+    // Só metadado de roteamento — nada do conteúdo da mensagem vai para o log.
+    const entrada = (body.entry as Record<string, unknown>[] | undefined)?.[0];
+    const contas = (body.entry as Record<string, unknown>[] | undefined)
+      ?.map((e) => e?.id).filter(Boolean).slice(0, 5);
+    console.error(
+      "assinatura invalida — recusado |",
+      `object=${objeto}`,
+      `contas=${JSON.stringify(contas ?? [])}`,
+      `campos=${JSON.stringify(((entrada?.changes as Record<string, unknown>[] | undefined) ?? []).map((c) => c?.field))}`,
+      `temAssinatura=${!!req.headers.get("x-hub-signature-256")}`,
+      `segredoConfigurado=${!!APP_SECRET}`,
+    );
     return new Response("assinatura invalida", { status: 403, headers: cors });
   }
 
