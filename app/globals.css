@@ -139,3 +139,27 @@
   caret-color: #16212E;
   transition: background-color 9999s ease 0s;
 }
+
+/* ── Fundo do chat (padrão do WhatsApp) ───────────────────────────────────────
+   O desenho vai num ::before, não direto no elemento: assim a opacidade do
+   padrão é independente do conteúdo. Aplicar opacidade no elemento apagaria
+   junto as bolhas e o texto.
+
+   `background-attachment: local` prende o padrão ao conteúdo rolável — sem
+   isso ele fica fixo e as bolhas parecem deslizar por cima de um papel parado. */
+.chat-fundo {
+  position: relative;
+  background-color: #efeae2;                 /* mesma base clara do WhatsApp */
+  isolation: isolate;
+}
+.chat-fundo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/chat-fundo.webp');
+  background-repeat: repeat;
+  background-size: 380px auto;               /* azulejo menor = emenda mais discreta */
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: -1;
+}

@@ -17,6 +17,7 @@ import { LeadOrcamentoPanel } from './lead-orcamento-panel'
 import { LeadReservaPanel } from './lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
 import { formatarTextoChat } from '@/lib/texto-whatsapp'
+import { EmojiPicker } from './emoji-picker'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
@@ -717,7 +718,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
             <div className="border-b border-line-soft px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
               Histórico de mensagens
             </div>
-            <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-5 scrollbar-thin">
+            {/* Fundo do chat: padrão repetido sobre a cor de base, como o
+                WhatsApp faz. O desenho vai no ::before com opacidade própria
+                para o texto das bolhas não brigar com ele — e para o tema
+                escuro poder baixar a opacidade sem trocar de imagem. */}
+            <div className="chat-fundo flex flex-1 flex-col gap-2.5 overflow-y-auto p-5 scrollbar-thin">
               {loadingChat ? (
                 <div className="flex h-full items-center justify-center text-[13px] text-ink-3">Carregando mensagens…</div>
               ) : chat.length === 0 ? (
@@ -729,8 +734,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               ) : chat.map((m, i) => {
                 const isLoja = m.from === 'loja'
                 return (
-                  <div key={i} className={`flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[72%] rounded-[12px] px-3.5 py-2.5 text-[13px] ${isLoja ? 'rounded-br-[3px] bg-ink text-white' : 'rounded-bl-[3px] bg-card text-ink border border-line'}`}>
+                  <div key={i} className={`relative flex ${isLoja ? 'justify-end' : 'justify-start'}`}>
+                    {/* Cores do WhatsApp: verde para o que a loja manda, branco
+                        para o que o cliente manda. A sombra leve é o que separa
+                        a bolha do padrão do fundo. */}
+                    <div className={`max-w-[72%] rounded-[12px] px-3.5 py-2.5 text-[13px] shadow-[0_1px_1px_rgba(11,20,26,0.13)] ${isLoja ? 'rounded-br-[3px] bg-[#d9fdd3] text-[#111b21]' : 'rounded-bl-[3px] bg-white text-[#111b21]'}`}>
                       {m.midiaUrl && m.tipo === 'imagem' && (
                         <a href={m.midiaUrl} target="_blank" rel="noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -744,7 +752,8 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         <audio src={m.midiaUrl} controls preload="metadata" className="mb-1 w-[220px] max-w-full" />
                       )}
                       {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && formatarTextoChat(m.text)}
-                      <div className={`mt-1 flex items-center gap-1 text-[9.5px] ${isLoja ? 'text-white/60' : 'text-ink-3'}`}>
+                      {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}
+                      <div className="mt-1 flex items-center justify-end gap-1 text-[9.5px] text-[#667781]">
                         <span>{m.time}</span>
                         {/* Confirmação da Meta: um tique saiu, dois chegou, dois
                             claros foi lido. Falha aparece com o motivo no title. */}
@@ -752,9 +761,8 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                           m.status === 'falhou'
                             ? <span className="text-[10px] text-bad" title={m.erro ?? 'Falha no envio'}>não enviada</span>
                             : <span
-                                // Lida ganha azul claro (o padrão que todo mundo já
-                                // entende); sobre a bolha escura, azul claro é o que
-                                // tem contraste.
+                                // Lida ganha o azul do WhatsApp, que todo mundo já
+                                // entende sem legenda.
                                 className={m.status === 'lida' ? 'font-semibold text-[#53BDEB]' : ''}
                                 title={ROTULO_ENTREGA[m.status]}
                               >
@@ -861,6 +869,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               >
                 {gravando ? <Square size={15} strokeWidth={1.7} className="animate-pulse" /> : <Mic size={16} strokeWidth={1.7} />}
               </IconButton>
+              <EmojiPicker disabled={gravando} onEscolher={(e) => setDraft((d) => d + e)} />
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
