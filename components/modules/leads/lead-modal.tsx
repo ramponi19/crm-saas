@@ -749,7 +749,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         <video src={m.midiaUrl} controls preload="metadata" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
                       )}
                       {m.midiaUrl && m.tipo === 'audio' && (
-                        <audio src={m.midiaUrl} controls preload="metadata" className="mb-1 w-[220px] max-w-full" />
+                        <audio src={m.midiaUrl} controls preload="metadata" className="audio-chat -mx-1 mb-0.5 w-[230px]" />
                       )}
                       {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}

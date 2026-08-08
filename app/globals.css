@@ -160,3 +160,20 @@
   background-size: auto, 380px auto;
   background-attachment: local, local;
 }
+
+/* ── Player de áudio dentro da bolha do chat ──────────────────────────────────
+   O player nativo do Chromium desenha uma "pílula" cinza própria. Dentro de uma
+   bolha verde ou branca isso vira caixa dentro de caixa e engorda o balão.
+   Deixando o painel transparente, o player passa a assumir a cor da bolha.
+
+   Só o fundo é neutralizado: os controles continuam sendo os do navegador, que
+   já trazem teclado, acessibilidade e velocidade de reprodução de graça. */
+.audio-chat {
+  height: 36px;
+  max-width: 100%;
+}
+.audio-chat::-webkit-media-controls-enclosure,
+.audio-chat::-webkit-media-controls-panel {
+  background: transparent;
+  box-shadow: none;
+}
