@@ -16,6 +16,12 @@ import { GRUPOS_EMOJI } from '@/lib/emojis'
  * fonte do sistema. Biblioteca de emoji passa de 1 MB porque traz as figuras.
  */
 
+/** Ícone de cada aba — o nome escrito não cabia em 300px com 10 categorias. */
+const ICONE: Record<string, string> = {
+  Recentes: '🕐', Rostos: '😀', Pessoas: '🖐️', Natureza: '🐻', Comida: '🍔',
+  Lugares: '✈️', Atividades: '⚽', Objetos: '💡', 'Símbolos': '🔣', Bandeiras: '🏳️',
+}
+
 const RECENTES_CHAVE = 'nexus:emojis-recentes'
 const MAX_RECENTES = 24
 
@@ -81,20 +87,25 @@ export function EmojiPicker({ onEscolher, disabled }: { onEscolher: (emoji: stri
 
       {aberto && (
         <div className="absolute bottom-full left-0 z-50 mb-2 w-[300px] rounded-card border border-line bg-card shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]">
-          {/* Abas por categoria — a faixa rola, que é o caso que a gente já
-              corrigiu no componente de abas do resto do app. */}
-          <div className="flex gap-0.5 overflow-x-auto border-b border-line-soft p-1.5 scrollbar-none">
+          {/* Abas por ÍCONE, não por nome escrito. Com os nomes, dez categorias
+              não cabiam nos 300px e as últimas — Objetos, Símbolos, Bandeiras —
+              ficavam fora do alcance do mouse, porque a faixa rola sem barra e
+              sem seta. Ícone cabe, e é o que todo seletor de emoji usa.
+              O nome continua no `title`, para quem passar o mouse. */}
+          <div className="flex items-center justify-between gap-0.5 border-b border-line-soft px-1.5 py-1">
             {abas.map((g, i) => (
               <button
                 key={g.nome}
                 type="button"
+                title={g.nome}
+                aria-label={g.nome}
                 onClick={() => setAba(i)}
                 className={cn(
-                  'shrink-0 rounded-control px-2 py-1 text-[11px] font-medium transition-colors',
-                  i === Math.min(aba, abas.length - 1) ? 'bg-ink/[0.07] text-ink' : 'text-ink-3 hover:text-ink',
+                  'grid h-7 w-7 flex-1 place-items-center rounded-control text-[15px] leading-none transition-colors',
+                  i === Math.min(aba, abas.length - 1) ? 'bg-ink/[0.08]' : 'opacity-45 hover:opacity-100',
                 )}
               >
-                {g.nome}
+                {ICONE[g.nome] ?? '•'}
               </button>
             ))}
           </div>
