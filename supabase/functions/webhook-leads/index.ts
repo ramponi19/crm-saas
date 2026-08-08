@@ -508,7 +508,7 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
 }
 
 // ── Envio ───────────────────────────────────────────────────────────────────
-async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assinatura = "") {
+async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assinatura = "", usuarioId: string | null = null) {
   const number = body.number as string;
   const text = body.text as string | undefined;
   const leadId = body.leadId as string | undefined;
@@ -561,6 +561,7 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
         empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo,
         origem: "whatsapp", lida: true, tipo: tipoDb, midia_url: midiaUrl ?? null,
         external_id: (data?.messages?.[0]?.id as string) ?? null,
+        usuario_id: usuarioId,
         // Primeiro estado; o webhook depois promove para entregue/lida.
         status_entrega: "enviada", status_em: new Date().toISOString(),
       }]);
@@ -579,7 +580,7 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
 // Envio por MODELO APROVADO. É o único caminho aceito pela Meta quando passaram
 // 24h sem o cliente escrever. O texto que fica gravado na conversa é o corpo do
 // modelo já com as variáveis trocadas — senão o histórico mostraria "{{1}}".
-async function enviarModelo(canal: Canal, body: Record<string, unknown>) {
+async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuarioId: string | null = null) {
   const number = String(body.number ?? '')
   const leadId = body.leadId as string | undefined
   const nome = String(body.modelo ?? '')
@@ -627,13 +628,14 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>) {
       empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
       conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
       tipo: "texto", external_id: (data?.messages?.[0]?.id as string) ?? null,
+      usuario_id: usuarioId,
       status_entrega: "enviada", status_em: new Date().toISOString(),
     }]);
   }
   return json({ success: true, modelo: nome });
 }
 
-async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>, assinatura = "") {
+async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>, assinatura = "", usuarioId: string | null = null) {
   const leadId = body.leadId as string;
   const texto = body.texto as string | undefined;
   const nomeCanal = body.canal as string;
@@ -671,6 +673,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
     empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
     conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, lida: true,
     tipo: tipoDb, midia_url: midiaUrl ?? null, external_id: (data?.message_id as string) ?? null,
+    usuario_id: usuarioId,
     status_entrega: "enviada", status_em: new Date().toISOString(),
   }]);
   return json({ success: true });
@@ -715,7 +718,7 @@ serve(async (req: Request) => {
       if (action === "send_template") {
         const canal = await canalPorEmpresa(lead.empresa_id as number, "whatsapp");
         if (!canal) return json({ error: "WhatsApp não conectado nesta empresa" }, 502);
-        return await enviarModelo(canal, body);
+        return await enviarModelo(canal, body, usuario.id);
       }
 
       if (action === "send") {
@@ -726,7 +729,7 @@ serve(async (req: Request) => {
           id: 0, empresa_id: lead.empresa_id as number, tipo: "whatsapp",
           external_id: "", waba_id: null, token: null, coexistencia: false,
         };
-        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true));
+        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true), usuario.id);
       }
 
       const nomeCanal = body.canal as string | undefined;
@@ -738,7 +741,7 @@ serve(async (req: Request) => {
       const canal = await canalPorEmpresa(lead.empresa_id as number, nomeCanal);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
       return await enviarMeta(canal, String(lead.origem_id), body,
-        await assinaturaDe(lead.empresa_id as number, usuario.nome, true));
+        await assinaturaDe(lead.empresa_id as number, usuario.nome, true), usuario.id);
     } catch (e) {
       console.error("envio:", e);
       return json({ error: (e as Error).message }, 500);

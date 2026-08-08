@@ -77,6 +77,13 @@ interface ChatMsg {
   erro?: string | null
   /** id da Meta — é por ele que a confirmação de entrega encontra a bolha. */
   externalId?: string | null
+  /**
+   * Quem atendeu, nas mensagens que saíram do CRM. Null = enviada pelo celular,
+   * fora do CRM. Existe porque a assinatura vai só no texto que o CLIENTE
+   * recebe: sem isto, um lead que volta ao funil semanas depois não diz ao
+   * próximo atendente com quem o cliente já falou.
+   */
+  autor?: string | null
 }
 
 const ROTULO_ENTREGA: Record<string, string> = {
@@ -238,7 +245,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id')
+        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
@@ -246,6 +253,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         direcao: string | null; conteudo: string | null; created_at: string
         tipo: string | null; midia_url: string | null
         status_entrega: string | null; erro_envio: string | null; external_id: string | null
+        usuario_id: string | null
       }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
@@ -257,6 +265,8 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         erro: m.erro_envio,
         externalId: m.external_id,
         iso: m.created_at,
+        // Quem atendeu. Nulo = saiu do celular, fora do CRM.
+        autor: m.usuario_id ? (usuarios.find((u) => u.id === m.usuario_id)?.nome ?? 'Atendente') : null,
       }))
       setChat(msgs)
       setLoadingChat(false)
@@ -344,9 +354,12 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         await entregarViaEdge(supabase, 'send', { number: lead.telefone, text: t, leadId: lead.id })
       } else {
         if (!empresa?.id) throw new Error('Empresa não encontrada')
+        // Canal sem integração (anotação de atendimento presencial): grava
+        // direto, e com o autor, igual aos canais que passam pela Edge.
+        const { data: { user: autor } } = await supabase.auth.getUser()
         const { error } = await supabase.from('lead_mensagens').insert({
           empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
-          conteudo: t, origem: canal, lida: true,
+          conteudo: t, origem: canal, lida: true, usuario_id: autor?.id ?? null,
         })
         if (error) throw new Error(error.message)
       }
@@ -739,6 +752,16 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         para o que o cliente manda. A sombra leve é o que separa
                         a bolha do padrão do fundo. */}
                     <div className={`max-w-[72%] rounded-[12px] px-3.5 py-2.5 text-[13px] shadow-[0_1px_1px_rgba(11,20,26,0.13)] ${isLoja ? 'rounded-br-[3px] bg-[#d9fdd3] text-[#111b21]' : 'rounded-bl-[3px] bg-white text-[#111b21]'}`}>
+                      {/* Quem respondeu. No WhatsApp de grupo o nome vem assim,
+                          acima da mensagem — e é o que permite ao próximo
+                          atendente saber com quem o cliente já falou. */}
+                      {/* Só quando SABEMOS quem foi. Mensagem anterior a esta
+                          coluna também tem autor nulo — chamá-la de "enviada
+                          pelo aparelho" seria inventar história sobre o
+                          histórico que já existe. */}
+                      {isLoja && m.autor && (
+                        <div className="mb-0.5 text-[10.5px] font-semibold text-[#06825f]">{m.autor}</div>
+                      )}
                       {m.midiaUrl && m.tipo === 'imagem' && (
                         <a href={m.midiaUrl} target="_blank" rel="noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}

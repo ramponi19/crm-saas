@@ -2420,6 +2420,7 @@ export type Database = {
           status_entrega: string | null
           erro_envio: string | null
           status_em: string | null
+          usuario_id: string | null
         }
         Insert: {
           conteudo: string
@@ -2436,6 +2437,7 @@ export type Database = {
           status_entrega?: string | null
           erro_envio?: string | null
           status_em?: string | null
+          usuario_id?: string | null
         }
         Update: {
           conteudo?: string
@@ -2452,6 +2454,7 @@ export type Database = {
           status_entrega?: string | null
           erro_envio?: string | null
           status_em?: string | null
+          usuario_id?: string | null
         }
         Relationships: [
           {
