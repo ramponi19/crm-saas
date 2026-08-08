@@ -33,6 +33,19 @@ interface LeadModalProps {
   onUpdate: (lead: Lead) => void
 }
 
+/**
+ * Reproduz a assinatura que sai nas mensagens — "Thomas - JM STORE:".
+ *
+ * Tem de seguir a MESMA regra da Edge Function (`assinaturaDe`, em
+ * supabase/functions/webhook-leads): primeiro nome, loja em maiúsculas, dois
+ * pontos no fim. As duas mudam juntas; se divergirem, o atendente lê uma coisa
+ * na tela e o cliente recebe outra — que é o problema que isto veio resolver.
+ */
+function assinaturaDoChat(autor: string, empresaNome?: string | null): string {
+  const primeiro = autor.trim().split(/\s+/)[0] || autor
+  return empresaNome ? `${primeiro} - ${empresaNome.toUpperCase()}:` : `${primeiro}:`
+}
+
 const CANAL_NOME: Record<string, string> = {
   whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', site: 'Site', manual: 'Loja',
 }
@@ -108,6 +121,26 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
+
+  /**
+   * Config da assinatura do atendente. A bolha do CRM mostra a MESMA linha que
+   * o cliente recebe, então precisa obedecer ao mesmo interruptor: se o dono
+   * desligar "incluir o nome da loja", a tela mudaria junto — senão o atendente
+   * leria uma coisa aqui e o cliente outra no aparelho.
+   */
+  const [incluirEmpresa, setIncluirEmpresa] = useState(true)
+  useEffect(() => {
+    if (!empresa?.id) return
+    let cancel = false
+    supabase.from('configuracoes_sistema').select('valor')
+      .eq('empresa_id', empresa.id).eq('chave', 'assinatura_atendente').maybeSingle()
+      .then(({ data }) => {
+        if (cancel) return
+        const v = (data?.valor ?? {}) as { incluir_empresa?: boolean }
+        setIncluirEmpresa(v.incluir_empresa !== false)
+      })
+    return () => { cancel = true }
+  }, [empresa?.id, supabase])
 
   useLockScroll(true)
   useEscape(true, onClose)
@@ -755,12 +788,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                       {/* Quem respondeu. No WhatsApp de grupo o nome vem assim,
                           acima da mensagem — e é o que permite ao próximo
                           atendente saber com quem o cliente já falou. */}
-                      {/* Só quando SABEMOS quem foi. Mensagem anterior a esta
-                          coluna também tem autor nulo — chamá-la de "enviada
-                          pelo aparelho" seria inventar história sobre o
-                          histórico que já existe. */}
+                      {/* A MESMA linha que o cliente recebe — primeiro nome,
+                          loja em maiúsculas, negrito-itálico — para o atendente
+                          não ler uma coisa na tela e o cliente outra no
+                          aparelho. Em preto: cor por pessoa foi descartada pelo
+                          dono.
+
+                          Só quando SABEMOS quem foi: mensagem anterior à coluna
+                          de autoria tem autor nulo, e rotulá-la seria inventar
+                          história sobre conversa que já aconteceu. */}
                       {isLoja && m.autor && (
-                        <div className="mb-0.5 text-[10.5px] font-semibold text-[#06825f]">{m.autor}</div>
+                        <div className="mb-0.5 text-[12.5px] font-semibold italic leading-tight text-[#111b21]">
+                          {assinaturaDoChat(m.autor, incluirEmpresa ? empresa?.nome : null)}
+                        </div>
                       )}
                       {m.midiaUrl && m.tipo === 'imagem' && (
                         <a href={m.midiaUrl} target="_blank" rel="noreferrer">
