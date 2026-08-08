@@ -16,6 +16,7 @@ import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadOrcamentoPanel } from './lead-orcamento-panel'
 import { LeadReservaPanel } from './lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
+import { formatarTextoChat } from '@/lib/texto-whatsapp'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
 import { useRouter } from 'next/navigation'
@@ -742,7 +743,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                       {m.midiaUrl && m.tipo === 'audio' && (
                         <audio src={m.midiaUrl} controls preload="metadata" className="mb-1 w-[220px] max-w-full" />
                       )}
-                      {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && m.text}
+                      {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && formatarTextoChat(m.text)}
                       <div className={`mt-1 flex items-center gap-1 text-[9.5px] ${isLoja ? 'text-white/60' : 'text-ink-3'}`}>
                         <span>{m.time}</span>
                         {/* Confirmação da Meta: um tique saiu, dois chegou, dois

@@ -189,8 +189,10 @@ async function usuarioDoEnvio(req: Request, empresaId: number): Promise<{ id: st
  * `assinatura_atendente`: { ativo, incluir_empresa }. Sem linha configurada,
  * assina — é o comportamento pedido, e uma loja que não queira desliga na tela.
  *
- * `markdown` só no WhatsApp: Instagram e Messenger não interpretam `*_..._*` e
- * mostrariam os asteriscos crus para o cliente.
+ * A marcação `*_..._*` (negrito + itálico) vale nos TRÊS canais. Eu tinha
+ * deixado Instagram e Messenger em texto puro achando que mostrariam os
+ * asteriscos crus; teste do dono no app do Instagram mostrou que renderiza
+ * igual ao WhatsApp.
  */
 async function assinaturaDe(empresaId: number, nomeUsuario: string, markdown: boolean): Promise<string> {
   try {
@@ -735,9 +737,8 @@ serve(async (req: Request) => {
       if (!lead.origem_id) return json({ error: "lead sem origem_id" }, 400);
       const canal = await canalPorEmpresa(lead.empresa_id as number, nomeCanal);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
-      // Sem markdown: IG e Messenger mostrariam os asteriscos crus.
       return await enviarMeta(canal, String(lead.origem_id), body,
-        await assinaturaDe(lead.empresa_id as number, usuario.nome, false));
+        await assinaturaDe(lead.empresa_id as number, usuario.nome, true));
     } catch (e) {
       console.error("envio:", e);
       return json({ error: (e as Error).message }, 500);
