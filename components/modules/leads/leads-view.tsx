@@ -142,10 +142,18 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
             setLeads(prev => prev.filter(x => x.id !== l.id))
             return
           }
-          setLeads(prev =>
-            l.ativo === false
-              ? prev.filter(x => x.id !== l.id)
-              : porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x)))
+          setLeads(prev => {
+            if (l.ativo === false) return prev.filter(x => x.id !== l.id)
+            // ENTRA na lista se ainda não estava. O tratador só sabia ALTERAR o
+            // que já estava na tela: um lead que era de outro vendedor — e por
+            // isso nem tinha sido carregado — voltava para a esteira e não
+            // aparecia para ninguém até alguém recarregar a página. Justamente
+            // o caso em que a pressa importa, porque o lead está sem dono.
+            if (!prev.some(x => x.id === l.id)) {
+              return porMensagemRecente([{ ...l, msgs_nao_lidas: l.msgs_nao_lidas ?? 0 }, ...prev])
+            }
+            return porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x))
+          })
         })
       // Lead removido do banco: some da lista na hora
       .on('postgres_changes',

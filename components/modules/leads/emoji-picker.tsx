@@ -1,43 +1,38 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Smile } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GRUPOS_EMOJI } from '@/lib/emojis'
 
 /**
  * Seletor de emoji do chat.
  *
- * Emoji sempre funcionou no envio e no recebimento — é texto Unicode comum, e
+ * Emoji sempre funcionou no envio e no recebimento — é texto Unicode, e
  * WhatsApp, Instagram e Messenger trafegam UTF-8. O que faltava era um jeito de
- * PÔR o emoji sem sair do teclado do computador (no Windows é Win+. , que quase
- * ninguém no balcão conhece).
+ * PÔR o emoji sem depender do Win+. do Windows, que ninguém no balcão conhece.
  *
- * Lista curada em vez de biblioteca: um pacote de emoji completo passa de 1 MB
- * e traz busca, categorias e sprites que ninguém vai usar para mandar 👍 ao
- * cliente. Estes são os que aparecem em conversa de loja.
+ * 821 emojis, sem biblioteca: são só os caracteres (~3 KB), e quem desenha é a
+ * fonte do sistema. Biblioteca de emoji passa de 1 MB porque traz as figuras.
  */
-const GRUPOS: { nome: string; emojis: string[] }[] = [
-  {
-    nome: 'Frequentes',
-    emojis: ['😀', '😁', '😂', '🤣', '😊', '😉', '😍', '😘', '🥰', '😎', '🤩', '🥳', '😅', '🙃', '😇', '🤗'],
-  },
-  {
-    nome: 'Gestos',
-    emojis: ['👍', '👎', '👌', '🙏', '👏', '🤝', '✌️', '🤙', '💪', '🫰', '👋', '🤞'],
-  },
-  {
-    nome: 'Loja',
-    emojis: ['📱', '💻', '⌚', '🎧', '🔋', '📦', '🛒', '💰', '💳', '🧾', '🚚', '🏪', '🔧', '✅', '❌', '⚠️'],
-  },
-  {
-    nome: 'Sentimentos',
-    emojis: ['❤️', '🧡', '💚', '💙', '💜', '🔥', '⭐', '✨', '🎉', '🎁', '😢', '😭', '😡', '🤔', '😴', '🙈'],
-  },
-]
+
+const RECENTES_CHAVE = 'nexus:emojis-recentes'
+const MAX_RECENTES = 24
+
+function lerRecentes(): string[] {
+  try {
+    const cru = localStorage.getItem(RECENTES_CHAVE)
+    return cru ? (JSON.parse(cru) as string[]).slice(0, MAX_RECENTES) : []
+  } catch { return [] }
+}
 
 export function EmojiPicker({ onEscolher, disabled }: { onEscolher: (emoji: string) => void; disabled?: boolean }) {
   const [aberto, setAberto] = useState(false)
+  const [aba, setAba] = useState(0)
+  const [recentes, setRecentes] = useState<string[]>([])
   const caixa = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { if (aberto) setRecentes(lerRecentes()) }, [aberto])
 
   useEffect(() => {
     if (!aberto) return
@@ -52,6 +47,22 @@ export function EmojiPicker({ onEscolher, disabled }: { onEscolher: (emoji: stri
       document.removeEventListener('keydown', esc)
     }
   }, [aberto])
+
+  /** Usados recentemente primeiro: no balcão são sempre os mesmos cinco. */
+  const abas = useMemo(
+    () => (recentes.length ? [{ nome: 'Recentes', emojis: recentes }, ...GRUPOS_EMOJI] : GRUPOS_EMOJI),
+    [recentes],
+  )
+  const atual = abas[Math.min(aba, abas.length - 1)]
+
+  function escolher(e: string) {
+    onEscolher(e)
+    try {
+      const novos = [e, ...lerRecentes().filter((x) => x !== e)].slice(0, MAX_RECENTES)
+      localStorage.setItem(RECENTES_CHAVE, JSON.stringify(novos))
+      setRecentes(novos)
+    } catch { /* sem localStorage o seletor continua funcionando, só sem histórico */ }
+  }
 
   return (
     <div className="relative shrink-0" ref={caixa}>
@@ -69,25 +80,40 @@ export function EmojiPicker({ onEscolher, disabled }: { onEscolher: (emoji: stri
       </button>
 
       {aberto && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[260px] w-[268px] overflow-y-auto rounded-card border border-line bg-card p-2.5 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)] scrollbar-thin">
-          {GRUPOS.map((g) => (
-            <div key={g.nome} className="mb-2 last:mb-0">
-              <div className="mb-1 px-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-3">{g.nome}</div>
-              <div className="grid grid-cols-8 gap-0.5">
-                {g.emojis.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    // Não fecha ao escolher: quem manda 🎉 costuma mandar 🔥 junto.
-                    onClick={() => onEscolher(e)}
-                    className="grid h-8 w-8 place-items-center rounded-control text-[18px] leading-none transition-colors hover:bg-ink/[0.06]"
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-[300px] rounded-card border border-line bg-card shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]">
+          {/* Abas por categoria — a faixa rola, que é o caso que a gente já
+              corrigiu no componente de abas do resto do app. */}
+          <div className="flex gap-0.5 overflow-x-auto border-b border-line-soft p-1.5 scrollbar-none">
+            {abas.map((g, i) => (
+              <button
+                key={g.nome}
+                type="button"
+                onClick={() => setAba(i)}
+                className={cn(
+                  'shrink-0 rounded-control px-2 py-1 text-[11px] font-medium transition-colors',
+                  i === Math.min(aba, abas.length - 1) ? 'bg-ink/[0.07] text-ink' : 'text-ink-3 hover:text-ink',
+                )}
+              >
+                {g.nome}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-h-[220px] overflow-y-auto p-2 scrollbar-thin">
+            <div className="grid grid-cols-8 gap-0.5">
+              {atual.emojis.map((e, i) => (
+                <button
+                  key={`${e}-${i}`}
+                  type="button"
+                  // Não fecha ao escolher: quem manda 🎉 costuma mandar 🔥 junto.
+                  onClick={() => escolher(e)}
+                  className="grid h-8 w-8 place-items-center rounded-control text-[19px] leading-none transition-colors hover:bg-ink/[0.06]"
+                >
+                  {e}
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>
