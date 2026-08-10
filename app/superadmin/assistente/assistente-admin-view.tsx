@@ -21,6 +21,26 @@ export function AssistenteAdminView({ config, empresas, keyConfigurada }: Props)
   const [dias, setDias] = useState('30')
   const [uso, setUso] = useState<Uso | null>(null)
   const [loading, setLoading] = useState(true)
+  const [modelos, setModelos] = useState<{ nome: string; rotulo: string }[]>([])
+  const [detectando, setDetectando] = useState(false)
+
+  /** Pergunta ao provedor quais modelos a chave aceita HOJE. */
+  async function detectarModelos() {
+    setDetectando(true)
+    try {
+      const r = await fetch('/api/superadmin/assistente/modelos')
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { notify.bad('Não consegui listar os modelos', j.error); return }
+      const lista = (j.modelos ?? []) as { nome: string; rotulo: string }[]
+      setModelos(lista)
+      const recomendado = lista[0]?.nome
+      if (recomendado && recomendado !== form.modelo) {
+        notify.ok(`${lista.length} modelos disponíveis`, `Recomendado: ${recomendado}. Selecione e salve.`)
+      } else {
+        notify.ok(`${lista.length} modelos disponíveis`, 'O modelo atual é o recomendado.')
+      }
+    } finally { setDetectando(false) }
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -71,7 +91,30 @@ export function AssistenteAdminView({ config, empresas, keyConfigurada }: Props)
           </label>
           <Input label="Limite de perguntas por minuto (por empresa)" type="number" min={1} value={String(form.limite_por_min)}
             onChange={(e) => setForm((f) => ({ ...f, limite_por_min: Number(e.target.value) || 0 }))} />
-          <Input label="Modelo Gemini" value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))} placeholder="gemini-2.5-flash" />
+          {/* Modelo: texto livre até aparecer a lista real da chave. Digitado à
+              mão, aceitava modelo aposentado e o assistente só quebrava quando
+              um lojista tentava usar. "Detectar" pergunta ao provedor o que a
+              chave aceita hoje, já ordenado por recomendação. */}
+          <div>
+            {modelos.length > 0 ? (
+              <Select label="Modelo de IA" value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))}>
+                {!modelos.some((m) => m.nome === form.modelo) && form.modelo && (
+                  <option value={form.modelo}>{form.modelo} (atual — fora da lista)</option>
+                )}
+                {modelos.map((m, i) => (
+                  <option key={m.nome} value={m.nome}>
+                    {m.nome}{i === 0 ? ' — recomendado' : ''}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input label="Modelo de IA" value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))} placeholder="gemini-2.5-flash" />
+            )}
+            <button type="button" onClick={detectarModelos} disabled={detectando}
+              className="mt-1.5 text-[11.5px] font-semibold text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent disabled:opacity-60">
+              {detectando ? 'Consultando o provedor…' : 'Detectar modelos disponíveis'}
+            </button>
+          </div>
           <Input label="Instrução extra ao assistente (opcional)" value={form.system_extra} onChange={(e) => setForm((f) => ({ ...f, system_extra: e.target.value }))} placeholder="Ex.: tom mais formal, citar o nome da loja…" />
         </div>
         <div className="mt-4 flex justify-end">

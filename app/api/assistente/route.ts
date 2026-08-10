@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
+import { melhorModelo } from '@/lib/assistente-modelos'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
@@ -94,6 +95,32 @@ export async function POST(req: Request) {
       const cru = (j?.error?.message as string) ?? `HTTP ${upstream.status}`
       // Cru no log (é onde serve para diagnosticar), traduzido na tela.
       console.error('[assistente] provedor recusou:', upstream.status, modelo, cru)
+
+      /**
+       * CONSERTO AUTOMÁTICO do modelo aposentado.
+       *
+       * O Google retira modelo sem avisar (foi o caso do gemini-2.0-flash). Sem
+       * isto, o assistente fica morto até alguém notar, abrir o superadmin e
+       * digitar o nome novo — com o lojista vendo erro nesse meio-tempo.
+       *
+       * Só para modelo INEXISTENTE ou não suportado. Cota estourada NÃO entra
+       * aqui: trocar de modelo por causa de cota é escolher gastar em outro
+       * lugar sem ninguém decidir, e o limite provavelmente é da conta inteira.
+       */
+      const modeloMorto = upstream.status === 404
+        || /not found|is not supported|not supported for/i.test(cru)
+      if (modeloMorto) {
+        const novo = await melhorModelo(apiKey)
+        if (novo && novo !== modelo) {
+          await svc.from('assistente_config').update({ modelo: novo } as never).eq('id', 1)
+          console.error(`[assistente] modelo ${modelo} indisponível — trocado por ${novo}`)
+          return NextResponse.json(
+            { error: `O modelo de IA foi atualizado para ${novo}. Envie a pergunta de novo.` },
+            { status: 503 },
+          )
+        }
+      }
+
       return NextResponse.json(
         { error: mensagemDoProvedor(upstream.status, cru) },
         { status: 502 },
