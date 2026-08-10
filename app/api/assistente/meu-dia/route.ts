@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 
 // "Iniciar o dia": roteiro priorizado a partir das demandas do usuário logado.
 // Free-safe: envia ao Gemini só CONTAGENS (sem nomes/dados de cliente).
@@ -13,7 +14,7 @@ export async function POST() {
   const svc = createServiceClient()
   const { data: cfg } = await svc.from('assistente_config').select('ativo, modelo').eq('id', 1).maybeSingle()
   if (cfg && cfg.ativo === false) return NextResponse.json({ error: 'O assistente está temporariamente desativado.' }, { status: 503 })
-  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
 
   const now = new Date()
   const inicioHoje = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString()
@@ -63,7 +64,12 @@ Regras: comece pelo mais urgente (leads aguardando e fila do dia costumam vir pr
       signal: AbortSignal.timeout(20000),
     })
     const j = await r.json()
-    if (!r.ok) return NextResponse.json({ error: j?.error?.message ?? 'Erro no assistente' }, { status: 502 })
+    if (!r.ok) {
+      // Mesmo tratamento do chat: cru no log, traduzido na tela.
+      const cru = (j?.error?.message as string) ?? `HTTP ${r.status}`
+      console.error('[assistente/meu-dia] provedor recusou:', r.status, modelo, cru)
+      return NextResponse.json({ error: mensagemDoProvedor(r.status, cru) }, { status: 502 })
+    }
     const roteiro = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
     const um = j?.usageMetadata
     await svc.from('assistente_uso').insert({ empresa_id: empresaId, tokens_in: um?.promptTokenCount ?? null, tokens_out: um?.candidatesTokenCount ?? null } as never)

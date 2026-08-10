@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   const { data: cfg } = await svc.from('assistente_config').select('ativo, limite_por_min, modelo, system_extra').eq('id', 1).maybeSingle()
   const ativo = cfg?.ativo ?? true
   const limite = cfg?.limite_por_min ?? 20
-  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
   if (!ativo) return NextResponse.json({ error: 'O assistente está temporariamente desativado.' }, { status: 503 })
 
   // Rate-limit por empresa (service client — bypassa RLS da tabela de uso).
@@ -90,7 +91,13 @@ export async function POST(req: Request) {
     )
     if (!upstream.ok || !upstream.body) {
       const j = await upstream.json().catch(() => ({}))
-      return NextResponse.json({ error: j?.error?.message ?? 'Erro no assistente' }, { status: 502 })
+      const cru = (j?.error?.message as string) ?? `HTTP ${upstream.status}`
+      // Cru no log (é onde serve para diagnosticar), traduzido na tela.
+      console.error('[assistente] provedor recusou:', upstream.status, modelo, cru)
+      return NextResponse.json(
+        { error: mensagemDoProvedor(upstream.status, cru) },
+        { status: 502 },
+      )
     }
 
     const reader = upstream.body.getReader()

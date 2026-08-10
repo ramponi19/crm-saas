@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdminApi } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
+import { MODELO_PADRAO } from '@/lib/assistente-erros'
 
 // Uso do assistente (agregado, filtrável por empresa/período) — só superadmin.
 export async function GET(req: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     id: 1,
     ativo: !!b.ativo,
     limite_por_min: Math.min(1000, Math.max(1, Number(b.limite_por_min) || 20)),
-    modelo: (b.modelo || 'gemini-2.0-flash').trim().slice(0, 60),
+    modelo: (b.modelo || MODELO_PADRAO).trim().slice(0, 60),
     system_extra: b.system_extra?.trim() ? b.system_extra.trim().slice(0, 2000) : null,
     updated_at: new Date().toISOString(),
   }

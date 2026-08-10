@@ -71,7 +71,7 @@ export function AssistenteAdminView({ config, empresas, keyConfigurada }: Props)
           </label>
           <Input label="Limite de perguntas por minuto (por empresa)" type="number" min={1} value={String(form.limite_por_min)}
             onChange={(e) => setForm((f) => ({ ...f, limite_por_min: Number(e.target.value) || 0 }))} />
-          <Input label="Modelo Gemini" value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))} placeholder="gemini-2.0-flash" />
+          <Input label="Modelo Gemini" value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))} placeholder="gemini-2.5-flash" />
           <Input label="Instrução extra ao assistente (opcional)" value={form.system_extra} onChange={(e) => setForm((f) => ({ ...f, system_extra: e.target.value }))} placeholder="Ex.: tom mais formal, citar o nome da loja…" />
         </div>
         <div className="mt-4 flex justify-end">
