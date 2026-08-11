@@ -36,7 +36,24 @@ export function SessionGuard() {
 
     // Sessão válida (o cookie do middleware já garante o acesso) → renova o carimbo.
     markSessionActive()
-    const id = setInterval(markSessionActive, 5 * 60 * 1000) // renova enquanto usa
+
+    /**
+     * Pulso do registro de uso (tabela `acessos`), pendurado no ciclo que já
+     * existia aqui — evita um segundo temporizador fazendo a mesma coisa.
+     *
+     * `abrir` reaproveita a sessão quando o sinal é recente, então recarregar a
+     * página ou abrir outra aba NÃO cria registro novo. Falha é ignorada: medir
+     * o uso não pode atrapalhar quem está usando.
+     */
+    const bater = (acao: 'abrir' | 'sinal') => {
+      fetch('/api/acesso', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao }),
+      }).catch(() => {})
+    }
+    bater('abrir')
+
+    const id = setInterval(() => { markSessionActive(); bater('sinal') }, 5 * 60 * 1000)
     return () => clearInterval(id)
   }, [router])
 

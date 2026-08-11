@@ -47,6 +47,9 @@ export function MobileTopbar({
   const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
 
   async function handleLogout() {
+    // Fecha o registro de uso ANTES do signOut: depois dele não há mais sessão
+    // para a rota autenticar, e a saída ficaria sem hora.
+    await fetch('/api/acesso', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar' }) }).catch(() => {})
     await supabase.auth.signOut()
     router.push('/login')
   }

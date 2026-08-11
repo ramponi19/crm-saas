@@ -11,6 +11,7 @@ import {
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
   SlidersHorizontal, Link2, FileSignature, Radar,
+  Clock,
 } from 'lucide-react'
 
 /**
@@ -25,6 +26,7 @@ const navGroups = [
       { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
       { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
       { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
+      { href: '/admin/acessos', label: 'Uso da equipe', icon: Clock },
     ],
   },
   {

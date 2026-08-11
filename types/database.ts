@@ -2480,6 +2480,12 @@ export type Database = {
           },
         ]
       }
+      acessos: {
+        Row: { id: number; empresa_id: number; usuario_id: string; entrada: string; ultimo_sinal: string; saida: string | null; fim_por: string | null; created_at: string | null }
+        Insert: { id?: never; empresa_id: number; usuario_id: string; entrada?: string; ultimo_sinal?: string; saida?: string | null; fim_por?: string | null; created_at?: string | null }
+        Update: { id?: never; empresa_id?: number; usuario_id?: string; entrada?: string; ultimo_sinal?: string; saida?: string | null; fim_por?: string | null; created_at?: string | null }
+        Relationships: []
+      }
       leads: {
         Row: {
           ativo: boolean | null
