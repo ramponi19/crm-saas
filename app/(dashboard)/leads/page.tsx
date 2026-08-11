@@ -35,8 +35,12 @@ export default async function LeadsPage() {
     // Contagem real de não-lidas — apenas leads desta empresa
     supabase
       .from('lead_mensagens')
-      .select('lead_id, leads!inner(empresa_id)')
+      .select('lead_id, leads!inner(empresa_id, ativo)')
       .eq('leads.empresa_id', empresaId)
+      // Lead arquivado não entra: a contagem era cruzada com a lista (que já
+      // filtra ativo), então o resultado saía certo, mas trazia milhares de
+      // linhas de conversa arquivada a cada abertura do funil para descartar.
+      .eq('leads.ativo', true)
       .eq('lida', false)
       .eq('direcao', 'recebida'),
     supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),

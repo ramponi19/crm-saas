@@ -31,20 +31,26 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
   useEffect(() => {
     const supabase = createClient()
 
-    // Atualiza título da aba: (nº de LEADS distintos aguardando resposta) empresa — CRM.
+    /**
+     * Título da aba: (nº de LEADS ativos aguardando resposta) empresa — CRM.
+     *
+     * Contava varrendo `lead_mensagens` por `lida = false`, SEM olhar se o lead
+     * ainda está ativo. Ao arquivar a base antiga, a aba passou a anunciar 184
+     * conversas pendentes que não existem mais para ninguém — e número que não
+     * corresponde a nada é pior que número nenhum: ensina o vendedor a ignorar o
+     * aviso.
+     *
+     * Agora lê o contador do próprio lead: uma consulta em `leads` em vez de
+     * trazer milhares de mensagens para contar no navegador.
+     */
     async function updateTitle() {
-      const { data } = await supabase
-        .from('lead_mensagens')
-        .select('lead_id')
-        .eq('lida', false)
-        .eq('direcao', 'recebida')
-      // Conta leads distintos, não mensagens (um lead com 3 msgs = 1).
-      const leads = new Set<number>()
-      for (const m of (data ?? []) as Array<{ lead_id: number | null }>) {
-        if (m.lead_id != null) leads.add(m.lead_id)
-      }
-      const count = leads.size
-      document.title = count > 0 ? `(${count}) ${nomeAba}` : nomeAba
+      const { count } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('ativo', true)
+        .gt('msgs_nao_lidas', 0)
+      const n = count ?? 0
+      document.title = n > 0 ? `(${n}) ${nomeAba}` : nomeAba
     }
     updateTitle()
 

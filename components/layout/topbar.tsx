@@ -48,8 +48,15 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
+      // `leads!inner` + ativo FILTRA NA CONSULTA, não depois. Antes trazia as
+      // 500 primeiras não lidas e só então descartava as de lead arquivado: com
+      // a base antiga arquivada (1.900+ não lidas invisíveis), a janela de 500
+      // podia ser inteira de lixo e o sino ficaria vazio justamente quando um
+      // cliente real escrevesse.
       const { data: msgs } = await supabase
-        .from('lead_mensagens').select('lead_id').eq('lida', false).eq('direcao', 'recebida').limit(500)
+        .from('lead_mensagens').select('lead_id, leads!inner(ativo)')
+        .eq('leads.ativo', true)
+        .eq('lida', false).eq('direcao', 'recebida').limit(500)
       if (!msgs) return
       const contagem: Record<number, number> = {}
       for (const m of msgs as Array<{ lead_id: number | null }>) {
