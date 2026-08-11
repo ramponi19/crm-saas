@@ -83,8 +83,18 @@ export interface ResolverMenuInput {
   segOverride?: SegOverride
 }
 
-// Nunca podem ser ocultados pela config do dono (camada 4).
-const PROTEGIDOS = new Set(['/dashboard'])
+/**
+ * Itens que a config do dono NÃO pode ocultar (camada 4).
+ *
+ * Estava com `/dashboard` dentro: aparecia como "fixo" na tela de Menu do CRM e
+ * o dono não conseguia tirar, mesmo em loja onde a tela inicial não serve para
+ * nada (quem só atende no balcão vive no PDV e no funil).
+ *
+ * Hoje vazio de propósito, e é seguro: ocultar é só de MENU — a rota continua
+ * acessível, e o dono desfaz em /admin/meu-menu, que fica fora do menu do CRM e
+ * portanto não pode ser escondido junto. Não existe como se trancar para fora.
+ */
+const PROTEGIDOS = new Set<string>()
 
 // Núcleo: sempre habilitado, independente do opt-in do segmento.
 const NUCLEO = new Set(['/dashboard', '/leads', '/clientes'])

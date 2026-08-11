@@ -9,7 +9,18 @@ import { LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MenuGroup } from '@/lib/menu'
 
-const PROTEGIDOS = new Set(['/dashboard'])
+/**
+ * Nada mais é "fixo": o dono pode ocultar qualquer item, inclusive o Dashboard.
+ *
+ * A lista tinha `/dashboard` e a linha aparecia com cadeado. Ocultar é só de
+ * MENU — a rota segue acessível — e esta tela vive em /admin, fora do menu do
+ * CRM, então não há como o dono se trancar para fora do próprio ajuste.
+ *
+ * A mesma lista existe em lib/menu.ts (o resolvedor precisa filtrar igual).
+ * Se voltar a proteger algo, tem de ser nos DOIS lugares, senão a tela oferece
+ * um botão que o resolvedor ignora.
+ */
+const PROTEGIDOS = new Set<string>()
 
 export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   grupos: MenuGroup[]
