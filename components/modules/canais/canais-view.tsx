@@ -326,7 +326,15 @@ export function CanaisView({ appId }: { appId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const por = (t: Canal['tipo']) => canais.find((c) => c.tipo === t)
+  // Um cartão por canal, mas a empresa pode ter MAIS DE UMA linha do mesmo tipo
+  // (reconexão gera phone_number_id novo, número de teste antigo, cliente com
+  // dois números). Preferir o ATIVO, e entre os ativos o mais recente — senão a
+  // tela anuncia "Reconectar" mostrando um canal expirado enquanto o bom
+  // funciona. A rota já devolve o mais recente primeiro.
+  const por = (t: Canal['tipo']) => {
+    const dele = canais.filter((c) => c.tipo === t)
+    return dele.find((c) => c.status === 'ativo') ?? dele[0]
+  }
 
   // ── WhatsApp: Embedded Signup com coexistência ────────────────────────────
   async function gravarMeta(code: string, pageId?: string) {

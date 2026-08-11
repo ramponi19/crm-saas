@@ -19,7 +19,15 @@ export async function GET() {
           'conectado_em, ultima_msg_em, sync_contatos_em, sync_historico_em, sync_historico_pct',
       )
       .eq('empresa_id', empresaId)
+      // Ordem IMPORTA: a tela mostra um cartão por canal e pegava o primeiro da
+      // lista. Com mais de um número no mesmo canal — reconexão que gerou id
+      // novo, número de teste antigo, cliente com duas linhas — ela podia
+      // escolher justamente o expirado e anunciar "Reconectar" com um número
+      // que ninguém usa, enquanto o canal certo estava ativo. Aconteceu em
+      // 11/08/2026 com a JM Store. Agora o mais recente vem primeiro, e a tela
+      // ainda prefere o ativo entre eles.
       .order('tipo')
+      .order('conectado_em', { ascending: false })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
