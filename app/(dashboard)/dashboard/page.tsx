@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
 import { normalizarSegmento } from '@/lib/segmentos'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { escopoDoUsuario, aplicarEscopo } from '@/lib/escopo'
 import DashboardImob from './dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
@@ -21,18 +21,10 @@ async function getDashboardData() {
    * ESTOQUE e ASSISTÊNCIAS continuam da loja: é operação compartilhada, não
    * resultado individual. Cliente também — cliente é da loja.
    */
-  const { data: { user } } = await supabase.auth.getUser()
-  const [{ data: vinculo }, { data: usuarioRow }, { data: empresaPerm }] = await Promise.all([
-    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
-    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
-  ])
-  const papel = (vinculo as { role?: string } | null)?.role ?? ''
-  const ehGestor = !!usuarioRow?.is_super_admin || papel === 'owner' || papel === 'admin'
-  const soMeu = !ehGestor && !!papel && !!user
-    && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
+  const escopo = await escopoDoUsuario(supabase, empresaId)
+  console.error('[dashboard/escopo]', JSON.stringify(escopo))
   const meu = <T extends { eq: (c: string, v: string) => T }>(q: T, coluna: string): T =>
-    soMeu ? q.eq(coluna, user!.id) : q
+    aplicarEscopo(q, escopo, coluna)
 
   const [
     { data: vendasMesRaw },
