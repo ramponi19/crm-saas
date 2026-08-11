@@ -113,13 +113,26 @@ export function CanaisView({ appId }: { appId: string }) {
     // mais confiável que existe: sem ela a rota teria de adivinhar qual número
     // conectar, e adivinhar erra quando o portfólio tem vários.
     const ouvir = (e: MessageEvent) => {
-      if (!e.origin.endsWith('facebook.com')) return
+      // Comparar o HOSTNAME, não o fim da string: "evilfacebook.com" também
+      // termina com "facebook.com" e passaria pelo filtro antigo.
+      let host = ''
+      try { host = new URL(e.origin).hostname } catch { return }
+      if (host !== 'facebook.com' && !host.endsWith('.facebook.com')) return
       try {
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
         if (d?.type !== 'WA_EMBEDDED_SIGNUP') return
         if (d.data?.phone_number_id) sessao.current.phoneNumberId = String(d.data.phone_number_id)
         if (d.data?.waba_id) sessao.current.wabaId = String(d.data.waba_id)
-        registrar('es_evento', { evento: d.event ?? null, etapa: d.data?.current_step ?? null })
+        // error_id e session_id entram no log de propósito: no CANCEL de
+        // 11/08/2026 foi o `current_step: QR_CODE` deste registro que provou a
+        // sessão dessincronizada — sem esses campos, cada falha do Embedded
+        // Signup vira adivinhação de novo.
+        registrar('es_evento', {
+          evento: d.event ?? null,
+          etapa: d.data?.current_step ?? null,
+          erroId: d.data?.error_id ?? null,
+          sessaoEs: d.data?.session_id ?? null,
+        })
       } catch { /* postMessage de outro remetente */ }
     }
     window.addEventListener('message', ouvir)
