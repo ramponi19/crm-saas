@@ -22,7 +22,6 @@ async function getDashboardData() {
    * resultado individual. Cliente também — cliente é da loja.
    */
   const escopo = await escopoDoUsuario(supabase, empresaId)
-  console.error('[dashboard/escopo]', JSON.stringify(escopo))
   const meu = <T extends { eq: (c: string, v: string) => T }>(q: T, coluna: string): T =>
     aplicarEscopo(q, escopo, coluna)
 

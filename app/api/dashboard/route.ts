@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { escopoDoUsuario, aplicarEscopo } from '@/lib/escopo'
 
 function getPeriodStarts(): Record<string, Date> {
   const now = new Date()
@@ -20,18 +21,32 @@ export async function GET() {
   // aplica o escopo, mas mantemos o filtro consistente com o resto do app).
   const empresaId = await getEmpresaId()
 
+  /**
+   * ESCOPO POR USUÁRIO. Esta rota é a que a tela realmente usa: o dashboard
+   * renderiza os números do servidor e, no navegador, chama /api/dashboard e
+   * SOBRESCREVE tudo. Enquanto só a página estava escopada, o vendedor via o
+   * faturamento da loja inteira — a correção estava no lugar que não aparece.
+   *
+   * Mesma lição do resto do app: dado calculado em dois lugares precisa da
+   * mesma regra nos dois, ou o que vale é sempre o que você esqueceu.
+   */
+  const escopo = await escopoDoUsuario(supabase, empresaId)
+
   const starts = getPeriodStarts()
   const inicio12m = new Date()
   inicio12m.setMonth(inicio12m.getMonth() - 12)
   inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
 
   // Vendas do ano com cliente e produto via inventario_unidades
-  const { data: vendasRaw } = await supabase
-    .from('vendas')
-    .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
-    .eq('empresa_id', empresaId)
-    .not('status', 'in', '("encomenda","pendente_entrega")')
-    .gte('data_venda', inicio12m.toISOString())
+  const { data: vendasRaw } = await aplicarEscopo(
+    supabase
+      .from('vendas')
+      .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
+      .eq('empresa_id', empresaId)
+      .not('status', 'in', '("encomenda","pendente_entrega")')
+      .gte('data_venda', inicio12m.toISOString()),
+    escopo, 'vendedor_id',
+  )
 
   type VendaRow = {
     id: number; valor_venda: number; lucro: number | null; data_venda: string | null
@@ -71,8 +86,8 @@ export async function GET() {
       ? supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).in('id', clienteIds)
       : Promise.resolve({ data: [] }),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'),
+    aplicarEscopo(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
+    aplicarEscopo(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
     supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
     supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(id, nome)').eq('empresa_id', empresaId).eq('ativo', true),
@@ -132,8 +147,17 @@ export async function GET() {
   const vendasMes = concluidas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
   const vendedorStats: Record<string, { nome: string; total: number; qtd: number; meta: number | null }> = {}
 
-  // Incluir todos os usuários mesmo sem venda
-  ;vendedores.forEach((u: { id: string; nome: string }) => {
+  /**
+   * Quem não pode ver resultado de outros aparece SOZINHO neste bloco.
+   *
+   * Filtrar só as vendas não bastaria: a lista era montada a partir de todos os
+   * usuários da empresa, então o vendedor continuaria vendo o nome e a meta dos
+   * colegas (com total zerado, o que é pior — parece que ninguém vendeu).
+   */
+  const paraRanking = escopo.soMeu && escopo.userId
+    ? vendedores.filter((u) => u.id === escopo.userId)
+    : vendedores
+  ;paraRanking.forEach((u: { id: string; nome: string }) => {
     vendedorStats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaMap[u.id] ?? null }
   })
   vendasMes.forEach(v => {
