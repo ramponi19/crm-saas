@@ -133,6 +133,13 @@ export async function middleware(request: NextRequest) {
   // camada que não tinha nenhuma.
   const modulo = user ? moduloDaRota(request.nextUrl.pathname) : null
   if (modulo) {
+    // SUPERADMIN PASSA. Ele constrói módulo novo antes de existir liberação, e a
+    // trava olha o segmento da empresa (inclusive a de preview, quando ele está
+    // impersonando): sem esta saída, o laboratório barraria justamente quem está
+    // fazendo a página.
+    const { data: eu } = await supabase.from('usuarios').select('is_super_admin').eq('id', user!.id).maybeSingle()
+    if (eu?.is_super_admin) return supabaseResponse
+
     const habilitados = await modulosHabilitados(supabase)
     // habilitados === null => não deu para saber. Passa direto: derrubar o CRM
     // inteiro por uma consulta que falhou é muito pior do que uma tela a mais.

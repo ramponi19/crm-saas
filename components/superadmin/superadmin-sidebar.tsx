@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   CreditCard,
   Layers,
+  FlaskConical,
   Megaphone,
   Car,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/superadmin',          label: 'Visão geral',     icon: LayoutDashboard, exact: true },
   { href: '/superadmin/empresas', label: 'Empresas',        icon: Building2 },
   { href: '/superadmin/segmentos', label: 'Segmentos',      icon: Layers },
+  { href: '/superadmin/laboratorio', label: 'Laboratório',   icon: FlaskConical },
   { href: '/superadmin/fipe',     label: 'Tabela FIPE',     icon: Car },
   { href: '/superadmin/metricas', label: 'Métricas',        icon: LineChart },
   { href: '/superadmin/planos',   label: 'Planos',          icon: CreditCard },

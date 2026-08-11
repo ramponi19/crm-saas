@@ -120,6 +120,15 @@ export function Sidebar({
                   >
                     <Icon size={15} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
                     <span className="flex-1 truncate">{item.label}</span>
+                    {/* Selo de maturidade: "beta" avisa o lojista que a tela
+                        ainda muda, e "obra" só o superadmin vê — é o módulo que
+                        ele está construindo, invisível para os tenants. */}
+                    {item.status === 'beta' && (
+                      <span className="shrink-0 rounded-full bg-warn/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-warn">beta</span>
+                    )}
+                    {item.status === 'construcao' && (
+                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-accent">obra</span>
+                    )}
                     {item.locked ? (
                       <Lock size={12} strokeWidth={1.7} className="shrink-0 opacity-60" />
                     ) : badge > 0 ? (

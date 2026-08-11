@@ -18,6 +18,19 @@ import { SEGMENTOS, type Segmento } from './segmentos'
 
 export type BadgeKey = 'leads' | 'garantia'
 
+/**
+ * Maturidade do módulo — é o que permite liberar o CRM por partes.
+ *
+ * `construcao` não depende de configuração nenhuma: nenhum lojista vê, mesmo que
+ * alguém ligue o módulo no segmento por engano. Sem isso, "liberar por partes"
+ * dependeria de alguém lembrar de desligar algo, e uma tela pela metade fica a
+ * um clique de um cliente real.
+ *
+ * `beta` segue as regras normais de liberação, mas com selo na sidebar: o
+ * lojista precisa saber que aquela tela ainda está mudando.
+ */
+export type StatusModulo = 'construcao' | 'beta' | 'producao'
+
 export interface MenuItemBase {
   href: string
   label: string
@@ -28,6 +41,8 @@ export interface MenuItemBase {
   badge?: BadgeKey
   /** Módulo OPCIONAL (nasce desligado; habilitado por segmento via opt-in). */
   opcional?: boolean
+  /** Ausente = producao (o normal). */
+  status?: StatusModulo
 }
 
 export interface MenuGroupBase {
@@ -40,6 +55,14 @@ export interface MenuItem extends MenuItemBase {
   label: string
   /** Bloqueado por plano — renderiza cadeado e leva a /planos. */
   locked: boolean
+}
+
+/** Status efetivo: item sem status declarado está em produção. */
+export const statusDo = (i: MenuItemBase): StatusModulo => i.status ?? 'producao'
+
+/** Todos os itens do catálogo, achatados — usado pelo laboratório do superadmin. */
+export function todosOsItens(): MenuItemBase[] {
+  return CATALOGO.flatMap((g) => g.items)
 }
 
 export interface MenuGroup {
@@ -234,6 +257,11 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   for (const g of CATALOGO) {
     const items: MenuItem[] = []
     for (const item of g.items) {
+      // Camada 0 — MATURIDADE, antes de qualquer configuração: módulo em
+      // construção é só do superadmin. Fica ANTES do opt-in de propósito: se
+      // alguém ligar o módulo no segmento por engano, o lojista continua sem
+      // ver. É o que sustenta liberar o CRM por partes sem depender de memória.
+      if (statusDo(item) === 'construcao' && !isSuperAdmin) continue
       if (!habilitados.has(item.href)) continue        // Camada 1: opt-in do segmento
       if (hidden.has(item.href)) continue              // Camada 3/4: dono/superadmin ocultou
       if (item.adminOnly && !isAdmin) continue         // Camada 5: papel
