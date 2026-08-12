@@ -418,6 +418,18 @@ async function sincronizarContatos(canal: Canal, lista: Record<string, unknown>[
   }
 }
 
+// Cofre do dado de tiro único: o payload cru entra em historico_bruto ANTES de
+// qualquer processamento. Falha aqui não pode derrubar o recebimento — mas é
+// logada alto, porque perder o bruto é perder a rede de segurança.
+async function guardarBruto(canal: Canal, tipo: string, value: unknown) {
+  try {
+    const { error } = await db.from("historico_bruto").insert({
+      empresa_id: canal.empresa_id, canal_id: canal.id, tipo, payload: value ?? {},
+    });
+    if (error) console.error("ALERTA historico_bruto NAO GRAVADO:", error.message);
+  } catch (e) { console.error("ALERTA historico_bruto NAO GRAVADO:", (e as Error).message); }
+}
+
 // ── Coexistência: histórico de 6 meses ──────────────────────────────────────
 // LIÇÃO DE 12/08/2026, quando o tiro único de 473 conversas rendeu ZERO:
 //   1. O upsert assumia um índice único em external_id que NUNCA EXISTIU — o
@@ -961,6 +973,7 @@ serve(async (req: Request) => {
 
           // COEXISTÊNCIA: contatos da agenda do celular
           if (campo === "smb_app_state_sync") {
+            await guardarBruto(canal, "smb_app_state_sync", value);
             await sincronizarContatos(canal, (value?.state_sync as Record<string, unknown>[]) ?? []);
             await db.from("canais_conectados")
               .update({ sync_contatos_em: new Date().toISOString() }).eq("id", canal.id);
@@ -968,6 +981,10 @@ serve(async (req: Request) => {
 
           // COEXISTÊNCIA: histórico de 6 meses (pode vir aos milhares por evento)
           if (campo === "history") {
+            // BRUTO ANTES DE PROCESSAR — sempre. O sync é de tiro único: em
+            // 12/08/2026 um bug no processamento queimou 473 conversas porque o
+            // corpo do webhook não existia em lugar nenhum para reprocessar.
+            await guardarBruto(canal, "history", value);
             const h = value?.history as Record<string, unknown>[] | undefined;
             if (h) await importarHistorico(canal, h);
             // Mesmo campo "history", outra forma: aviso só com as mídias.
