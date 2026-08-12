@@ -419,11 +419,17 @@ async function sincronizarContatos(canal: Canal, lista: Record<string, unknown>[
 }
 
 // ── Coexistência: histórico de 6 meses ──────────────────────────────────────
-// DECISÃO DE PRODUTO: importa mensagem apenas para conversa que JÁ tem lead.
-// Criar lead para cada thread de 6 meses jogaria centenas de contatos antigos no
-// funil de uma vez. O que sobra é contado no log para decidirmos depois.
+// LIÇÃO DE 12/08/2026, quando o tiro único de 473 conversas rendeu ZERO:
+//   1. O upsert assumia um índice único em external_id que NUNCA EXISTIU — o
+//      Postgres recusava o lote inteiro ("no unique or exclusion constraint").
+//      O índice agora existe (migração add_lead_mensagens_external_id_unique).
+//   2. Conversa sem lead ativo era DESCARTADA ("para decidirmos depois") — mas o
+//      histórico é de tiro único: descartar aqui é perder para sempre. Agora
+//      TODA conversa vira lead: reativa o inativo se houver, cria se não houver.
+//      O lead criado recebe ultima_mensagem_at da última mensagem REAL, então
+//      conversa antiga afunda na lista e não atropela o atendimento do dia.
 async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]) {
-  let importadas = 0, semLead = 0;
+  let importadas = 0, criados = 0, reativados = 0, falhas = 0;
   let progresso: number | null = null;
 
   for (const bloco of blocos) {
@@ -442,11 +448,12 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
     for (const thread of (bloco.threads as Record<string, unknown>[] ?? [])) {
       const fone = String(thread.id ?? "").replace(/\D/g, "");
       if (!fone) continue;
-      const { data: lead } = await db.from("leads").select("id")
-        .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", true).maybeSingle();
-      if (!lead?.id) { semLead++; continue; }
 
+      // Monta as linhas primeiro: a primeira/última mensagem também alimentam o
+      // lead (primeira_msg, ultima_mensagem_at).
       const linhas: Record<string, unknown>[] = [];
+      let ultimaEm: string | null = null;
+      let primeiraTexto = "";
       for (const m of (thread.messages as Record<string, unknown>[] ?? [])) {
         const tipoMsg = String(m.type ?? "text");
         const doNegocio = !!m.to; // "to" presente = mensagem que o negócio enviou
@@ -454,28 +461,89 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
           ? ((m.text as Record<string, string> | undefined)?.body ?? "")
           : tipoMsg === "media_placeholder" ? "[midia]" : `[${TIPO_DB[tipoMsg] ?? tipoMsg}]`;
         const linha: Record<string, unknown> = {
-          empresa_id: canal.empresa_id, lead_id: lead.id,
+          empresa_id: canal.empresa_id,
           direcao: doNegocio ? "enviada" : "recebida", conteudo, origem: "whatsapp",
           lida: true, external_id: m.id ?? null,
           tipo: TIPO_DB[tipoMsg] ?? "texto", midia_url: null,
         };
-        if (m.timestamp) linha.created_at = new Date(Number(m.timestamp) * 1000).toISOString();
+        if (m.timestamp) {
+          const iso = new Date(Number(m.timestamp) * 1000).toISOString();
+          linha.created_at = iso;
+          if (!ultimaEm || iso > ultimaEm) ultimaEm = iso;
+        }
+        if (!primeiraTexto && !doNegocio && conteudo) primeiraTexto = conteudo;
         linhas.push(linha);
       }
       if (!linhas.length) continue;
-      // O índice único em external_id descarta o que já existe; ignoreDuplicates
-      // evita que uma repetida derrube o lote inteiro.
+
+      // 1º lead ativo pelo origem_id; 2º lead criado à mão (origem_id nulo, casa
+      // pelos últimos 8 dígitos — mesma regra do recebimento normal); 3º lead
+      // INATIVO pelo origem_id, que é REATIVADO (o zerar do funil não pode
+      // significar perder o histórico de quem volta); 4º cria.
+      let leadId: number | null = null;
+      const { data: ativo } = await db.from("leads").select("id")
+        .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", true).maybeSingle();
+      leadId = (ativo?.id as number | undefined) ?? null;
+
+      if (!leadId) {
+        const last8 = fone.slice(-8);
+        if (last8.length >= 8) {
+          const { data: cands } = await db.from("leads").select("id, telefone")
+            .eq("empresa_id", canal.empresa_id).eq("ativo", true)
+            .is("origem_id", null).ilike("telefone", `%${last8}%`).limit(20);
+          const match = (cands ?? []).find((l) => {
+            const d = (l.telefone || "").replace(/\D/g, "");
+            return d === fone || d.slice(-8) === last8;
+          });
+          if (match) {
+            leadId = match.id as number;
+            await db.from("leads").update({ origem_id: fone }).eq("id", leadId);
+          }
+        }
+      }
+
+      if (!leadId) {
+        const { data: inativo } = await db.from("leads").select("id")
+          .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", false)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (inativo?.id) {
+          leadId = inativo.id as number;
+          await db.from("leads").update({ ativo: true }).eq("id", leadId);
+          reativados++;
+        }
+      }
+
+      if (!leadId) {
+        const { data: novo, error } = await db.from("leads").insert([{
+          empresa_id: canal.empresa_id, nome: fone, telefone: fone,
+          origem: "whatsapp", origem_id: fone,
+          primeira_msg: primeiraTexto || null,
+          kanban_status: "novo", ativo: true,
+          ...(ultimaEm ? { ultima_mensagem_at: ultimaEm } : {}),
+        }]).select("id").single();
+        if (error) { console.error("histórico criar lead:", fone, error.message); falhas++; continue; }
+        leadId = novo.id as number;
+        criados++;
+      }
+
+      for (const l of linhas) l.lead_id = leadId;
       const { error } = await db.from("lead_mensagens")
         .upsert(linhas, { onConflict: "external_id", ignoreDuplicates: true });
-      if (error) console.error("histórico lote:", error.message);
-      else importadas += linhas.length;
+      if (error) { console.error("histórico lote:", error.message); falhas++; continue; }
+      importadas += linhas.length;
+      // ultima_mensagem_at REAL da conversa: histórico velho não pode passar na
+      // frente do atendimento de hoje na ordenação da lista.
+      if (ultimaEm) {
+        await db.from("leads").update({ ultima_mensagem_at: ultimaEm }).eq("id", leadId)
+          .or(`ultima_mensagem_at.is.null,ultima_mensagem_at.lt.${ultimaEm}`);
+      }
     }
   }
 
   const patch: Record<string, unknown> = { sync_historico_em: new Date().toISOString() };
   if (progresso != null) patch.sync_historico_pct = progresso;
   await db.from("canais_conectados").update(patch).eq("id", canal.id);
-  console.log(`histórico: ${importadas} mensagens, ${semLead} conversas sem lead (ignoradas), progresso ${progresso ?? "?"}%`);
+  console.log(`histórico: ${importadas} mensagens, ${criados} leads criados, ${reativados} reativados, ${falhas} falhas, progresso ${progresso ?? "?"}%`);
 }
 
 // A mídia do histórico chega DEPOIS, num aviso separado que usa a chave "messages"
