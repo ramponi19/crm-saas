@@ -11,7 +11,7 @@ export interface SessaoAcesso {
   fim: string
   minutos: number
   aberta: boolean
-  comoTerminou: 'aberta' | 'saiu' | 'fechou a aba'
+  comoTerminou: 'aberta' | 'saiu' | 'fechou a aba' | 'parou de usar'
 }
 
 export interface ResumoUsuario {
@@ -124,11 +124,11 @@ export function AcessosView({ sessoes, resumo, dias }: {
         </Card>
 
         <p className="text-[11.5px] leading-relaxed text-ink-3">
-          <strong className="text-ink-2">Como o tempo é medido.</strong> O CRM manda um sinal a cada 5 minutos
-          enquanto está aberto. Quem clica em <strong className="text-ink-2">Sair</strong> tem a hora exata; quem
-          fecha a aba tem como saída o último sinal — por isso a coluna “Encerrou”. Recarregar a página ou abrir
-          outra aba não cria acesso novo: sinal recente é entendido como a mesma sessão, senão um dia normal
-          viraria dezenas de registros de dois minutos.
+          <strong className="text-ink-2">Como o tempo é medido.</strong> O CRM manda um sinal a cada 5 minutos —
+          só enquanto a aba está à frente e há alguém mexendo, para que aba esquecida aberta não vire hora
+          trabalhada. Quem clica em <strong className="text-ink-2">Sair</strong> tem a hora exata; quem fecha a aba
+          ou para de usar tem como saída o último sinal — por isso a coluna “Encerrou”. Recarregar a página ou
+          abrir outra aba não cria acesso novo: sinal recente é entendido como a mesma sessão.
         </p>
       </div>
     </main>

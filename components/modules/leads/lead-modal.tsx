@@ -114,6 +114,46 @@ type LinhaMsg = {
 const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia)\]$/.test(t)
 const TIPO_DB: Record<'image' | 'video' | 'audio', string> = { image: 'imagem', video: 'video', audio: 'audio' }
 
+/**
+ * Áudio da conversa.
+ *
+ * O WhatsApp entrega OGG/Opus, e o player nativo FALHA CALADO quando o navegador
+ * não dá conta do formato: a bolha aparece, o play não faz nada, e o vendedor só
+ * sabe dizer "não consigo ouvir". Aqui a falha vira texto — com o motivo — e um
+ * link para abrir o arquivo fora do CRM, que é a saída que sempre funciona.
+ */
+const MOTIVO_MEDIA: Record<number, string> = {
+  1: 'a reprodução foi interrompida',
+  2: 'a rede falhou no meio do download',
+  3: 'este navegador não conseguiu decodificar o áudio',
+  4: 'este navegador não suporta o formato do áudio (OGG/Opus)',
+}
+
+function AudioChat({ url }: { url: string }) {
+  const [erro, setErro] = useState<string | null>(null)
+
+  return (
+    <div className="mb-0.5">
+      <audio
+        src={url}
+        controls
+        preload="metadata"
+        className="audio-chat -mx-1 w-[230px]"
+        onPlay={() => setErro(null)}
+        onError={(e) => setErro(MOTIVO_MEDIA[e.currentTarget.error?.code ?? 0] ?? 'não foi possível tocar o áudio')}
+      />
+      {erro && (
+        <p className="mt-0.5 text-[10.5px] leading-snug text-[#8a6d00]">
+          {erro}.{' '}
+          <a href={url} target="_blank" rel="noreferrer" className="font-semibold underline">
+            abrir o áudio
+          </a>
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate }: LeadModalProps) {
   const supabase = createClient()
   const { empresa } = useEmpresa()
@@ -812,7 +852,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                         <video src={m.midiaUrl} controls preload="metadata" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
                       )}
                       {m.midiaUrl && m.tipo === 'audio' && (
-                        <audio src={m.midiaUrl} controls preload="metadata" className="audio-chat -mx-1 mb-0.5 w-[230px]" />
+                        <AudioChat url={m.midiaUrl} />
                       )}
                       {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}

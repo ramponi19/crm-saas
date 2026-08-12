@@ -53,8 +53,32 @@ export function SessionGuard() {
     }
     bater('abrir')
 
-    const id = setInterval(() => { markSessionActive(); bater('sinal') }, 5 * 60 * 1000)
-    return () => clearInterval(id)
+    /**
+     * O PULSO SÓ CONTA COM ALGUÉM NA FRENTE. Aba esquecida aberta pulsava a noite
+     * inteira e o primeiro dia real de uso registrou 23 HORAS de "trabalho" — o
+     * relatório existe para dizer se a pessoa usou a ferramenta, então tempo de
+     * aba aberta sozinha é mentira. Exige aba visível E interação recente; sem
+     * isso a sessão termina no último sinal de verdade.
+     */
+    let ultimaInteracao = Date.now()
+    const tocou = () => { ultimaInteracao = Date.now() }
+    const eventos = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+    eventos.forEach((e) => window.addEventListener(e, tocou, { passive: true }))
+    document.addEventListener('visibilitychange', tocou)
+
+    const OCIOSO_MS = 15 * 60 * 1000
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - ultimaInteracao > OCIOSO_MS) return
+      markSessionActive()
+      bater('sinal')
+    }, 5 * 60 * 1000)
+
+    return () => {
+      clearInterval(id)
+      eventos.forEach((e) => window.removeEventListener(e, tocou))
+      document.removeEventListener('visibilitychange', tocou)
+    }
   }, [router])
 
   return null

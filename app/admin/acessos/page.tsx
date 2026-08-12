@@ -44,7 +44,10 @@ export default async function AcessosPage({ searchParams }: { searchParams: Prom
       fim,
       minutos: Math.max(1, Math.round((new Date(fim).getTime() - new Date(l.entrada).getTime()) / 60000)),
       aberta,
-      comoTerminou: aberta ? 'aberta' : (l.fim_por === 'logout' ? 'saiu' : 'fechou a aba'),
+      comoTerminou: aberta ? 'aberta'
+        : l.fim_por === 'logout' ? 'saiu'
+        : l.fim_por === 'inatividade' ? 'parou de usar'
+        : 'fechou a aba',
     }
   })
 
