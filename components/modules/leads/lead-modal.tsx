@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { useEmpresa } from '@/lib/empresa-context'
@@ -111,7 +111,7 @@ type LinhaMsg = {
 }
 
 // Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
-const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia)\]$/.test(t)
+const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia|documento)\]$/.test(t)
 const TIPO_DB: Record<'image' | 'video' | 'audio', string> = { image: 'imagem', video: 'video', audio: 'audio' }
 
 /**
@@ -131,7 +131,8 @@ const MOTIVO_MEDIA: Record<number, string> = {
 
 /** Mídia que existiu na conversa mas cujo arquivo não temos. */
 const NOME_MIDIA: Record<string, string> = {
-  '[audio]': 'Áudio', '[imagem]': 'Imagem', '[video]': 'Vídeo', '[midia]': 'Anexo',
+  '[audio]': 'Áudio', '[imagem]': 'Imagem', '[video]': 'Vídeo',
+  '[documento]': 'Documento', '[midia]': 'Anexo',
 }
 
 function MidiaAusente({ placeholder }: { placeholder: string }) {
@@ -867,7 +868,22 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                       {m.midiaUrl && m.tipo === 'audio' && (
                         <AudioChat url={m.midiaUrl} />
                       )}
-                      {ehPlaceholderMidia(m.text)
+                      {/* Documento (PDF de comprovante, nota, boleto): o valor está
+                          no NOME e no download, não em prévia. */}
+                      {m.midiaUrl && m.tipo === 'documento' && (
+                        <a
+                          href={m.midiaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mb-1 flex items-center gap-2 rounded-[8px] bg-black/[0.06] px-2 py-1.5 text-[12.5px] font-medium text-[#111b21] transition-colors hover:bg-black/10"
+                        >
+                          <FileText size={16} strokeWidth={1.8} className="shrink-0 text-[#54656f]" />
+                          <span className="max-w-[190px] truncate">
+                            {ehPlaceholderMidia(m.text) ? 'Documento' : m.text}
+                          </span>
+                        </a>
+                      )}
+                      {m.midiaUrl && m.tipo === 'documento' ? null : ehPlaceholderMidia(m.text)
                         // Placeholder SEM arquivo: até 12/08/2026 o eco do celular
                         // não baixava a mídia, e a bolha exibia o texto cru
                         // "[audio]" — que não diz nada a quem lê a conversa.

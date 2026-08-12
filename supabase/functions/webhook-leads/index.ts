@@ -219,6 +219,82 @@ async function assinaturaDe(empresaId: number, nomeUsuario: string, markdown: bo
 
 // ── Mídia ───────────────────────────────────────────────────────────────────
 const TIPO_DB: Record<string, string> = { image: "imagem", video: "video", audio: "audio" };
+
+/**
+ * Tipos do WhatsApp cujo arquivo pode ser resgatado com o token do canal.
+ *
+ * Figurinha é imagem (webp) e documento ganhou tipo próprio, porque o chat
+ * mostra nome e link em vez de tentar tocar/exibir. Antes desta lista só os três
+ * primeiros eram baixados: comprovante em PDF, figurinha e localização entravam
+ * no chat como o texto cru "[midia]" — o vendedor via um código, não a mensagem.
+ */
+const BAIXAVEIS: Record<string, string> = {
+  image: "imagem", video: "video", audio: "audio", sticker: "imagem", document: "documento",
+};
+
+/**
+ * O que escrever quando a mensagem NÃO tem arquivo para baixar.
+ *
+ * Localização, contato e reação existem na conversa e precisam ser legíveis; o
+ * nome técnico do tipo ("[errors]", "[edit]") é lixo interno vazando na tela de
+ * quem atende.
+ */
+function descreverSemArquivo(t: string, m: Record<string, unknown>): string {
+  const bloco = m[t] as Record<string, unknown> | undefined;
+  switch (t) {
+    case "location": {
+      const partes = [bloco?.name, bloco?.address].filter(Boolean).map(String);
+      return `📍 Localização${partes.length ? `: ${partes.join(" — ")}` : ""}`;
+    }
+    case "contacts": {
+      const c = (m.contacts as Record<string, unknown>[] | undefined)?.[0];
+      const nome = (c?.name as Record<string, unknown> | undefined)?.formatted_name;
+      return `👤 Contato${nome ? `: ${String(nome)}` : ""}`;
+    }
+    case "reaction": return `reagiu ${String(bloco?.emoji ?? "")}`.trim();
+    case "button": case "interactive":
+      return String(bloco?.text ?? bloco?.title ?? "resposta de botão");
+    case "edit":
+      return String((bloco?.text as Record<string, unknown> | undefined)?.body
+        ?? (m.text as Record<string, unknown> | undefined)?.body ?? "mensagem editada");
+    // O histórico do WhatsApp marca assim o que ele não exporta para fora do app.
+    case "errors": case "unsupported": return "mensagem não disponível fora do WhatsApp";
+    case "media_placeholder": return "[midia]";
+    default: return "[midia]";
+  }
+}
+
+/**
+ * Traduz UMA mensagem do WhatsApp — recebida do cliente ou eco do celular — em
+ * {tipo, conteudo, midiaUrl}. Existe para os dois caminhos usarem o MESMO
+ * tradutor: foi justamente a lógica duplicada que deixou o eco sem baixar mídia
+ * durante todo o primeiro dia de uso.
+ */
+async function traduzirWhatsApp(
+  canal: Canal, m: Record<string, unknown>,
+): Promise<{ tipo: string; conteudo: string; midiaUrl: string | null }> {
+  const t = String(m.type ?? "text");
+
+  if (t === "text") {
+    return { tipo: "texto", conteudo: String((m.text as Record<string, unknown> | undefined)?.body ?? ""), midiaUrl: null };
+  }
+
+  const tipoDb = BAIXAVEIS[t];
+  if (!tipoDb) return { tipo: "texto", conteudo: descreverSemArquivo(t, m), midiaUrl: null };
+
+  const bloco = m[t] as Record<string, unknown> | undefined;
+  const legenda = bloco?.caption ? String(bloco.caption) : "";
+  const nome = bloco?.filename ? String(bloco.filename) : "";
+  const url = await salvarMidiaWhatsApp(canal, bloco?.id as string | undefined);
+
+  if (!url) {
+    // O ID da mídia vive 30 dias na Meta: com o bruto guardado o anexo ainda pode
+    // ser resgatado depois. Sem o cofre ele se perde para sempre.
+    await guardarBruto(canal, "midia_sem_arquivo", m);
+    return { tipo: "texto", conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: null };
+  }
+  return { tipo: tipoDb, conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: url };
+}
 const MIDIA_MAX = 20 * 1024 * 1024;
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
@@ -469,9 +545,12 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       for (const m of (thread.messages as Record<string, unknown>[] ?? [])) {
         const tipoMsg = String(m.type ?? "text");
         const doNegocio = !!m.to; // "to" presente = mensagem que o negócio enviou
+        // O histórico não traz arquivo (vem depois, por outro evento), mas o rótulo
+        // precisa ser legível: `[${tipo}]` cru virava "[errors]" e "[edit]" no chat
+        // — nome interno do payload da Meta na cara de quem atende.
         const conteudo = tipoMsg === "text"
           ? ((m.text as Record<string, string> | undefined)?.body ?? "")
-          : tipoMsg === "media_placeholder" ? "[midia]" : `[${TIPO_DB[tipoMsg] ?? tipoMsg}]`;
+          : TIPO_DB[tipoMsg] ? `[${TIPO_DB[tipoMsg]}]` : descreverSemArquivo(tipoMsg, m);
         const linha: Record<string, unknown> = {
           empresa_id: canal.empresa_id,
           direcao: doNegocio ? "enviada" : "recebida", conteudo, origem: "whatsapp",
@@ -901,15 +980,7 @@ serve(async (req: Request) => {
                 }
                 continue;
               }
-              let texto = ((m.text as Record<string, unknown> | undefined)?.body as string)
-                || ((m.image as Record<string, unknown> | undefined)?.caption as string) || "[midia]";
-              let tipo = "texto";
-              let midiaUrl: string | null = null;
-              if (t === "image" || t === "video" || t === "audio") {
-                const mid = m[t] as Record<string, unknown> | undefined;
-                const salvo = await salvarMidiaWhatsApp(canal, mid?.id as string | undefined);
-                if (salvo) { tipo = TIPO_DB[t]; midiaUrl = salvo; texto = (mid?.caption as string) || `[${tipo}]`; }
-              }
+              const { tipo, conteudo: texto, midiaUrl } = await traduzirWhatsApp(canal, m);
               await upsertLead(canal, {
                 nome: ((contatos?.[0]?.profile as Record<string, unknown> | undefined)?.name as string) ?? null,
                 telefone: fone, instagramUser: null, origem: "whatsapp", origemId: fone,
@@ -961,40 +1032,19 @@ serve(async (req: Request) => {
           // COEXISTÊNCIA: o vendedor respondeu pelo app do celular
           if (campo === "smb_message_echoes") {
             for (const e of (value?.message_echoes as Record<string, unknown>[] ?? [])) {
-              const t = e.type as string | undefined;
-              let conteudo = t === "text"
-                ? (((e.text as Record<string, unknown> | undefined)?.body as string) ?? "")
-                : `[${TIPO_DB[t ?? ""] ?? "midia"}]`;
-
               /**
-               * BAIXAR A MÍDIA DO ECHO — era o lado que faltava.
+               * O ECO PASSA PELO MESMO TRADUTOR DO RECEBIMENTO — era o que faltava.
                *
-               * O recebimento já fazia isto; o echo não, então áudio e foto que o
-               * vendedor mandava PELO CELULAR entravam no chat como o texto
-               * "[audio]" e nada mais: bolha sem player, sem arquivo, sem aviso.
-               * No Instagram funcionava porque lá o echo traz a URL direta no
-               * attachment; no WhatsApp vem um ID que precisa ser resgatado com o
-               * token do canal, exatamente como nas mensagens recebidas.
-               *
-               * Se o download falhar, segue com o placeholder — a mensagem no chat
-               * vale mais que o anexo.
+               * Antes o eco só montava "[audio]" e nunca resgatava o arquivo, então
+               * áudio e foto que o vendedor mandava PELO CELULAR entravam no chat
+               * como texto cru: bolha sem player, sem anexo, sem aviso. No Instagram
+               * não aparecia porque lá o eco traz a URL direta no attachment; no
+               * WhatsApp vem um ID que precisa ser trocado pelo arquivo com o token.
                */
-              let midiaUrl: string | null = null;
-              if (t && TIPO_DB[t]) {
-                const mid = e[t] as Record<string, unknown> | undefined;
-                midiaUrl = await salvarMidiaWhatsApp(canal, mid?.id as string | undefined);
-                const legenda = mid?.caption as string | undefined;
-                if (legenda) conteudo = legenda;
-                // Falhou o download: guarda o bruto. O ID da mídia vive 30 dias na
-                // Meta, então com o payload em mãos dá para tentar de novo. Sem o
-                // cofre, o anexo se perde para sempre — foi o que aconteceu com as
-                // mídias de 12/08/2026, que não estavam em log nenhum.
-                if (!midiaUrl) await guardarBruto(canal, "echo_midia_sem_arquivo", e);
-              }
-
+              const { tipo, conteudo, midiaUrl } = await traduzirWhatsApp(canal, e);
               // No echo o cliente é o "to" — o "from" é o número do negócio.
               await registrarEcho(canal, String(e.to ?? "").replace(/\D/g, ""), e.id as string,
-                conteudo, "whatsapp", TIPO_DB[t ?? ""] ?? "texto", midiaUrl);
+                conteudo, "whatsapp", tipo, midiaUrl);
             }
           }
 
