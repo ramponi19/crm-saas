@@ -174,6 +174,17 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState('')
+  const draftRef = useRef<HTMLTextAreaElement>(null)
+
+  // O campo cresce com o texto e volta ao tamanho de uma linha ao esvaziar. Sem
+  // isto, ou ele fica alto de propósito comendo a conversa, ou some com o que
+  // não caber em uma linha — e a pessoa digita sem ver o que escreveu.
+  useEffect(() => {
+    const el = draftRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`
+  }, [draft])
   const [confirmDel, setConfirmDel] = useState(false)
 
   /**
@@ -838,7 +849,12 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                     {/* Cores do WhatsApp: verde para o que a loja manda, branco
                         para o que o cliente manda. A sombra leve é o que separa
                         a bolha do padrão do fundo. */}
-                    <div className={`max-w-[72%] rounded-[12px] px-3.5 py-2.5 text-[13px] shadow-[0_1px_1px_rgba(11,20,26,0.13)] ${isLoja ? 'rounded-br-[3px] bg-[#d9fdd3] text-[#111b21]' : 'rounded-bl-[3px] bg-white text-[#111b21]'}`}>
+                    {/* `whitespace-pre-wrap`: a mensagem chega com as quebras que
+                        a pessoa digitou, e sem isto uma tabela de preços de
+                        quatro linhas era exibida achatada numa só — inclusive as
+                        que já estavam no histórico. `break-words` porque link
+                        longo sem espaço estourava a bolha. */}
+                    <div className={`max-w-[72%] whitespace-pre-wrap break-words rounded-[12px] px-3.5 py-2.5 text-[13px] shadow-[0_1px_1px_rgba(11,20,26,0.13)] ${isLoja ? 'rounded-br-[3px] bg-[#d9fdd3] text-[#111b21]' : 'rounded-bl-[3px] bg-white text-[#111b21]'}`}>
                       {/* Quem respondeu. No WhatsApp de grupo o nome vem assim,
                           acima da mensagem — e é o que permite ao próximo
                           atendente saber com quem o cliente já falou. */}
@@ -987,7 +1003,9 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               )}
             </Modal>
 
-            <div className="flex items-center gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
+            {/* `items-end`: o campo cresce com as linhas, e os botões precisam
+                ficar rentes à base — centralizados, eles subiriam junto. */}
+            <div className="flex items-end gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
               <input
                 ref={fileRef}
                 type="file"
@@ -1007,13 +1025,25 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                 {gravando ? <Square size={15} strokeWidth={1.7} className="animate-pulse" /> : <Mic size={16} strokeWidth={1.7} />}
               </IconButton>
               <EmojiPicker disabled={gravando} onEscolher={(e) => setDraft((d) => d + e)} />
-              <input
+              {/* Enter envia, SHIFT+ENTER quebra linha — igual ao WhatsApp Web.
+                  Era um <input> de uma linha: para mandar preço em lista o
+                  vendedor tinha que emendar tudo com " - " numa linha só. */}
+              <textarea
+                ref={draftRef}
+                rows={1}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMsg()}
-                placeholder={gravando ? 'Gravando áudio…' : 'Digite uma mensagem…'}
+                onKeyDown={(e) => {
+                  // isComposing: no Mac o acento é composto com dead key, e enviar
+                  // no meio da composição corta a palavra.
+                  if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+                  if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return
+                  e.preventDefault()
+                  sendMsg()
+                }}
+                placeholder={gravando ? 'Gravando áudio…' : 'Digite uma mensagem…  (Shift+Enter pula linha)'}
                 disabled={gravando}
-                className="h-10 min-w-0 flex-1 rounded-control border border-line bg-card px-3 text-base text-ink placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 disabled:opacity-60 sm:h-9 sm:text-[13px]"
+                className="max-h-[132px] min-h-[40px] min-w-0 flex-1 resize-none overflow-y-auto rounded-control border border-line bg-card px-3 py-[9px] text-base leading-snug text-ink scrollbar-thin placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 disabled:opacity-60 sm:min-h-[36px] sm:py-[8px] sm:text-[13px]"
               />
               <IconButton aria-label="Enviar mensagem" variant="primary" onClick={sendMsg}>
                 <Send size={16} strokeWidth={1.7} />
