@@ -312,7 +312,11 @@ const EXT: Record<string, string> = {
 };
 
 // Pasta POR EMPRESA (a v26 jogava tudo em "1/"). Falha degrada para placeholder.
-async function salvarMidia(empresaId: number, url: string, bearer?: string): Promise<string | null> {
+// Devolve o MIME junto porque no Instagram o tipo do anexo não diz o que é: um
+// "share" pode ser foto, vídeo ou reel, e quem sabe de verdade é o arquivo.
+async function baixarParaStorage(
+  empresaId: number, url: string, bearer?: string,
+): Promise<{ url: string; mime: string } | null> {
   try {
     const res = await fetch(url, bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : undefined);
     if (!res.ok) { console.error("midia download:", res.status); return null; }
@@ -322,9 +326,40 @@ async function salvarMidia(empresaId: number, url: string, bearer?: string): Pro
     const path = `${empresaId}/${crypto.randomUUID()}.${EXT[ct] ?? "bin"}`;
     const { error } = await db.storage.from("chat-midia").upload(path, buf, { contentType: ct });
     if (error) { console.error("midia upload:", error.message); return null; }
-    return db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl;
-  } catch (e) { console.error("salvarMidia:", e); return null; }
+    return { url: db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl, mime: ct };
+  } catch (e) { console.error("baixarParaStorage:", e); return null; }
 }
+
+/** Só a URL — para quem já sabe o tipo (WhatsApp diz no payload). */
+async function salvarMidia(empresaId: number, url: string, bearer?: string): Promise<string | null> {
+  return (await baixarParaStorage(empresaId, url, bearer))?.url ?? null;
+}
+
+/** Quem manda é o arquivo: "share" do Instagram pode ser foto, vídeo ou reel. */
+function tipoPorMime(mime: string): string {
+  if (mime.startsWith("image/")) return "imagem";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return "documento";
+}
+
+/**
+ * Anexos do Instagram/Messenger que não são foto/vídeo/áudio simples.
+ *
+ * Cliente que compartilha uma publicação, responde um story ou manda um reel
+ * caía tudo em "[midia]" — 263 mensagens assim desde junho, na conversa de quem
+ * atende. Agora o arquivo é baixado quando há URL, e o rótulo diz o que é.
+ */
+const ROTULO_ANEXO: Record<string, string> = {
+  share: "publicação compartilhada",
+  story_mention: "menção em story",
+  ig_reel: "reel",
+  reel: "reel",
+  file: "arquivo",
+  template: "mensagem com botões",
+  fallback: "anexo",
+  location: "📍 localização",
+};
 
 async function salvarMidiaWhatsApp(canal: Canal, mediaId: string | undefined): Promise<string | null> {
   try {
@@ -341,17 +376,27 @@ async function salvarMidiaWhatsApp(canal: Canal, mediaId: string | undefined): P
 async function extrairMidiaMeta(
   canal: Canal, message: Record<string, unknown> | undefined,
 ): Promise<{ tipo: string; midiaUrl: string | null; texto: string }> {
-  const base = (message?.text as string) || "[midia]";
+  const texto = (message?.text as string) || "";
+  let rotulo = "";
   try {
     const a = (message?.attachments as Record<string, unknown>[] | undefined)?.[0];
-    const aType = a?.type as string | undefined;
+    const aType = (a?.type as string | undefined) ?? "";
     const aUrl = (a?.payload as Record<string, unknown> | undefined)?.url as string | undefined;
-    if (a && aType && TIPO_DB[aType] && aUrl) {
-      const salvo = await salvarMidia(canal.empresa_id, aUrl);
-      if (salvo) return { tipo: TIPO_DB[aType], midiaUrl: salvo, texto: (message?.text as string) || `[${TIPO_DB[aType]}]` };
+    rotulo = ROTULO_ANEXO[aType] ?? "";
+
+    // BAIXA QUALQUER ANEXO COM URL — antes só image/video/audio passavam, e todo
+    // o resto (share, story, reel) virava "[midia]" sem arquivo nenhum.
+    if (aUrl) {
+      const salvo = await baixarParaStorage(canal.empresa_id, aUrl);
+      if (salvo) {
+        const tipo = TIPO_DB[aType] ?? tipoPorMime(salvo.mime);
+        return { tipo, midiaUrl: salvo.url, texto: texto || rotulo || `[${tipo}]` };
+      }
+      // URL da Meta é de CDN e expira: registrar ajuda a entender a falha depois.
+      await guardarBruto(canal, "anexo_meta_sem_arquivo", message ?? {});
     }
   } catch (e) { console.error("extrairMidiaMeta:", e); }
-  return { tipo: "texto", midiaUrl: null, texto: base };
+  return { tipo: "texto", midiaUrl: null, texto: texto || rotulo || "[midia]" };
 }
 
 // ── Persistência ────────────────────────────────────────────────────────────
