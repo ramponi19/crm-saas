@@ -61,15 +61,34 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
   // Grava a mudança de etapa (+ extras, ex.: motivo de perda) via route server,
   // que também dispara as automações de "entrou_na_etapa". Reverte no erro.
   async function persistirMove(lead: Lead, extra?: { motivo_perda_id?: number; perdido_em?: string; observacoes?: string }) {
+    /**
+     * AVISA O PAI ANTES DE GRAVAR. O card pulava de volta para a coluna de
+     * origem no instante em que era solto e só ia para o destino quando o
+     * servidor respondia.
+     *
+     * O motivo: `setActiveId(null)` dispara o efeito que ressincroniza a lista
+     * local com a do pai — e a do pai ainda tinha a etapa antiga. Nenhum
+     * servidor rápido resolveria isso; era ida e volta de UI.
+     */
+    const anterior = leads.find(l => l.id === lead.id)?.kanban_status ?? null
+    const otimista = { ...lead, ...(extra ?? {}) }
+    onLeadUpdate(otimista)
+
+    const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
+    notify.ok('Lead movido', destino)
+
     const res = await fetch('/api/leads/mover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ leadId: lead.id, kanban_status: lead.kanban_status, ...(extra ?? {}) }),
     })
-    if (!res.ok) { notify.bad('Erro ao mover o lead'); setLocalLeads(leads); return false }
-    onLeadUpdate({ ...lead, ...(extra ?? {}) })
-    const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
-    notify.ok('Lead movido', destino)
+    if (!res.ok) {
+      // Desfaz nos dois lugares: no pai (que é a fonte) e na lista local.
+      onLeadUpdate({ ...lead, kanban_status: anterior })
+      setLocalLeads(prev => prev.map(l => l.id === lead.id ? { ...l, kanban_status: anterior } : l))
+      notify.bad('Erro ao mover o lead', 'O card voltou para a etapa anterior.')
+      return false
+    }
     return true
   }
 

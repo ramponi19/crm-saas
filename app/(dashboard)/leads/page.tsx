@@ -5,6 +5,7 @@ import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
 import { devolverLeadsSemResposta } from '@/lib/esteira'
+import { after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const metadata = {
@@ -88,11 +89,18 @@ export default async function LeadsPage() {
   // não depende do plano da Vercel permitir cron de minuto em minuto. Tem
   // trava de 60s por empresa, então várias abas abrindo juntas não varrem em
   // duplicado. Falhar não pode derrubar a tela.
-  try {
-    await devolverLeadsSemResposta(supabase as unknown as SupabaseClient, empresaId)
-  } catch (e) {
-    console.error('[leads] devolução à esteira falhou:', e)
-  }
+  //
+  // `after()`: roda DEPOIS de a página ir para a tela. A varredura lê até 500
+  // leads e 4.000 mensagens, e estava no caminho crítico — todo mundo esperava
+  // por ela para ver o funil. O que ela muda (lead voltou para a esteira) chega
+  // pelo realtime, que a lista já escuta, então nada se perde por não esperar.
+  after(async () => {
+    try {
+      await devolverLeadsSemResposta(supabase as unknown as SupabaseClient, empresaId)
+    } catch (e) {
+      console.error('[leads] devolução à esteira falhou:', e)
+    }
+  })
 
   const meuRole = usuariosMapped.find((u) => u.id === user?.id)?.role ?? ''
   const restringe = !!meuRole && !permsDoPapel(meuRole, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
