@@ -962,12 +962,39 @@ serve(async (req: Request) => {
           if (campo === "smb_message_echoes") {
             for (const e of (value?.message_echoes as Record<string, unknown>[] ?? [])) {
               const t = e.type as string | undefined;
-              const conteudo = t === "text"
+              let conteudo = t === "text"
                 ? (((e.text as Record<string, unknown> | undefined)?.body as string) ?? "")
                 : `[${TIPO_DB[t ?? ""] ?? "midia"}]`;
+
+              /**
+               * BAIXAR A MÍDIA DO ECHO — era o lado que faltava.
+               *
+               * O recebimento já fazia isto; o echo não, então áudio e foto que o
+               * vendedor mandava PELO CELULAR entravam no chat como o texto
+               * "[audio]" e nada mais: bolha sem player, sem arquivo, sem aviso.
+               * No Instagram funcionava porque lá o echo traz a URL direta no
+               * attachment; no WhatsApp vem um ID que precisa ser resgatado com o
+               * token do canal, exatamente como nas mensagens recebidas.
+               *
+               * Se o download falhar, segue com o placeholder — a mensagem no chat
+               * vale mais que o anexo.
+               */
+              let midiaUrl: string | null = null;
+              if (t && TIPO_DB[t]) {
+                const mid = e[t] as Record<string, unknown> | undefined;
+                midiaUrl = await salvarMidiaWhatsApp(canal, mid?.id as string | undefined);
+                const legenda = mid?.caption as string | undefined;
+                if (legenda) conteudo = legenda;
+                // Falhou o download: guarda o bruto. O ID da mídia vive 30 dias na
+                // Meta, então com o payload em mãos dá para tentar de novo. Sem o
+                // cofre, o anexo se perde para sempre — foi o que aconteceu com as
+                // mídias de 12/08/2026, que não estavam em log nenhum.
+                if (!midiaUrl) await guardarBruto(canal, "echo_midia_sem_arquivo", e);
+              }
+
               // No echo o cliente é o "to" — o "from" é o número do negócio.
               await registrarEcho(canal, String(e.to ?? "").replace(/\D/g, ""), e.id as string,
-                conteudo, "whatsapp", TIPO_DB[t ?? ""] ?? "texto");
+                conteudo, "whatsapp", TIPO_DB[t ?? ""] ?? "texto", midiaUrl);
             }
           }
 

@@ -129,6 +129,19 @@ const MOTIVO_MEDIA: Record<number, string> = {
   4: 'este navegador não suporta o formato do áudio (OGG/Opus)',
 }
 
+/** Mídia que existiu na conversa mas cujo arquivo não temos. */
+const NOME_MIDIA: Record<string, string> = {
+  '[audio]': 'Áudio', '[imagem]': 'Imagem', '[video]': 'Vídeo', '[midia]': 'Anexo',
+}
+
+function MidiaAusente({ placeholder }: { placeholder: string }) {
+  return (
+    <span className="text-[13px] italic text-[#667781]">
+      {NOME_MIDIA[placeholder] ?? 'Anexo'} — arquivo não disponível no CRM
+    </span>
+  )
+}
+
 function AudioChat({ url }: { url: string }) {
   const [erro, setErro] = useState<string | null>(null)
 
@@ -854,7 +867,12 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                       {m.midiaUrl && m.tipo === 'audio' && (
                         <AudioChat url={m.midiaUrl} />
                       )}
-                      {!(m.midiaUrl && ehPlaceholderMidia(m.text)) && formatarTextoChat(m.text)}
+                      {ehPlaceholderMidia(m.text)
+                        // Placeholder SEM arquivo: até 12/08/2026 o eco do celular
+                        // não baixava a mídia, e a bolha exibia o texto cru
+                        // "[audio]" — que não diz nada a quem lê a conversa.
+                        ? (!m.midiaUrl && <MidiaAusente placeholder={m.text} />)
+                        : formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[9.5px] text-[#667781]">
                         <span>{m.time}</span>
