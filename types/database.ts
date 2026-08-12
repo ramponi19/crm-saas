@@ -2512,6 +2512,7 @@ export type Database = {
           telefone: string | null
           ultima_mensagem_at: string | null
           ultima_recebida_at: string | null
+          anuncio: Json | null
           ultima_enviada_at: string | null
           ultima_tratativa: string | null
           valor_estimado: number | null
@@ -2545,6 +2546,7 @@ export type Database = {
           telefone?: string | null
           ultima_mensagem_at?: string | null
           ultima_recebida_at?: string | null
+          anuncio?: Json | null
           ultima_enviada_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null
@@ -2578,6 +2580,7 @@ export type Database = {
           telefone?: string | null
           ultima_mensagem_at?: string | null
           ultima_recebida_at?: string | null
+          anuncio?: Json | null
           ultima_enviada_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null

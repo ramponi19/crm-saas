@@ -429,10 +429,45 @@ async function fetchProfile(id: string, token: string, fields: string) {
   } catch (e) { console.error("fetchProfile:", e); return null; }
 }
 
+/**
+ * O anúncio que trouxe o cliente, normalizado.
+ *
+ * Quem clica num anúncio do Facebook/Instagram e cai no WhatsApp chega com um
+ * bloco `referral`; no Instagram e no Messenger o mesmo dado vem com OUTRO nome
+ * (`ads_context_data`, `ad_id`). O CRM jogava tudo fora: o vendedor recebia
+ * "Quero saber quais iPhones novos lacrados tem disponível" e não sabia de qual
+ * campanha veio nem o que a pessoa tinha acabado de ler no anúncio.
+ */
+export interface AnuncioOrigem {
+  titulo: string | null; corpo: string | null; url: string | null;
+  midia: string | null; anuncio_id: string | null; plataforma: string | null;
+  em: string;
+}
+
+function extrairAnuncio(m: Record<string, unknown>): AnuncioOrigem | null {
+  const r = (m.referral ?? (m.message as Record<string, unknown> | undefined)?.referral) as Record<string, unknown> | undefined;
+  if (!r) return null;
+  const ctx = r.ads_context_data as Record<string, unknown> | undefined;
+
+  const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const anuncio: AnuncioOrigem = {
+    titulo: texto(r.headline) ?? texto(ctx?.ad_title),
+    corpo: texto(r.body),
+    url: texto(r.source_url),
+    midia: texto(r.image_url) ?? texto(r.thumbnail_url) ?? texto(ctx?.photo_url) ?? texto(ctx?.video_url),
+    anuncio_id: texto(r.source_id) ?? texto(r.ad_id) ?? texto(ctx?.post_id),
+    plataforma: texto(r.source_type) ?? texto(r.source) ?? null,
+    em: new Date().toISOString(),
+  };
+  // Sem nenhuma informação útil não vale poluir a conversa com um card vazio.
+  return (anuncio.titulo || anuncio.corpo || anuncio.url || anuncio.anuncio_id) ? anuncio : null;
+}
+
 async function upsertLead(canal: Canal, p: {
   nome: string | null; telefone: string | null; instagramUser: string | null;
   origem: string; origemId: string; texto: string; externalId: string | null;
   tipo?: string; midiaUrl?: string | null; fotoUrl?: string | null;
+  anuncio?: AnuncioOrigem | null;
 }) {
   const empresaId = canal.empresa_id;
   const tipo = p.tipo ?? "texto";
@@ -470,6 +505,7 @@ async function upsertLead(canal: Canal, p: {
       empresa_id: empresaId, nome: p.nome, telefone: p.telefone, instagram: p.instagramUser,
       origem: p.origem, origem_id: p.origemId, primeira_msg: p.texto,
       kanban_status: "novo", ativo: true, foto_url: p.fotoUrl ?? null,
+      anuncio: p.anuncio ?? null,
     }]).select("id").single();
     if (error) {
       const { data: again } = await db.from("leads").select("id")
@@ -484,7 +520,24 @@ async function upsertLead(canal: Canal, p: {
     // A foto SEMPRE atualiza quando vem: a pessoa pode ter trocado o avatar, e o
     // arquivo é sobrescrito no mesmo caminho (não acumula lixo no Storage).
     if (p.fotoUrl) patch.foto_url = p.fotoUrl;
+    // Cliente que volta por OUTRA campanha: vale o anúncio mais recente, que é o
+    // que explica esta conversa. O histórico de cada entrada fica no chat.
+    if (p.anuncio) patch.anuncio = p.anuncio;
     if (Object.keys(patch).length) await db.from("leads").update(patch).eq("id", leadId);
+  }
+
+  // O ANÚNCIO ENTRA NA CONVERSA, antes da mensagem — como o cliente vê no
+  // aparelho dele. Assim o vendedor lê o que a pessoa acabou de ver, e o
+  // histórico guarda CADA entrada por campanha (o campo no lead só tem a última).
+  // `external_id` derivado do id da mensagem: se a Meta reenviar o webhook, o
+  // índice único impede um segundo card.
+  if (p.anuncio) {
+    await db.from("lead_mensagens").insert([{
+      empresa_id: empresaId, lead_id: leadId, direcao: "recebida",
+      conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
+      external_id: p.externalId ? `anuncio:${p.externalId}` : null,
+      tipo: "anuncio", midia_url: p.anuncio.midia,
+    }]);
   }
 
   const { error: msgErr } = await db.from("lead_mensagens").insert([{
@@ -1044,6 +1097,7 @@ serve(async (req: Request) => {
                 nome: ((contatos?.[0]?.profile as Record<string, unknown> | undefined)?.name as string) ?? null,
                 telefone: fone, instagramUser: null, origem: "whatsapp", origemId: fone,
                 texto, externalId: (m.id as string) ?? null, tipo, midiaUrl,
+                anuncio: extrairAnuncio(m),
               });
             }
           }
@@ -1207,6 +1261,9 @@ serve(async (req: Request) => {
             nome, telefone: null, instagramUser: tipo === "instagram" ? username : null,
             origem: tipo, origemId: remetente, texto: midia.texto, externalId: mid ?? null,
             tipo: midia.tipo, midiaUrl: midia.midiaUrl, fotoUrl,
+            // No IG/Messenger o anúncio vem no evento (m.referral) ou dentro da
+            // própria mensagem — extrairAnuncio cobre os dois formatos.
+            anuncio: extrairAnuncio(m),
           });
         }
       }
