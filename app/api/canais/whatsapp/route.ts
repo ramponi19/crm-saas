@@ -194,13 +194,19 @@ export async function POST(req: Request) {
       sync_contatos_em: requestIds.contatos ? new Date().toISOString() : null,
     }).eq('id', canal.id)
 
+    // A instrução de "deixe o WhatsApp aberto" só faz sentido se alguma
+    // sincronização foi de fato ACEITA pela Meta. Mostrá-la depois de dois
+    // erros de sync prometia um histórico que não estava vindo — aconteceu em
+    // 11/08/2026, com as três mensagens empilhadas na mesma tela.
+    const algumaSync = !!(requestIds.contatos || requestIds.historico)
     return NextResponse.json({
       success: true,
       coexistencia,
       nome,
       avisos,
-      // O cliente precisa saber disso na hora, senão acha que travou:
-      instrucao: 'Deixe o WhatsApp aberto no celular por alguns minutos — é assim que os contatos e as conversas dos últimos 6 meses são copiados para o CRM.',
+      ...(algumaSync
+        ? { instrucao: 'Deixe o WhatsApp aberto no celular por alguns minutos — é assim que os contatos e as conversas dos últimos 6 meses são copiados para o CRM.' }
+        : {}),
     })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message || 'Erro interno' }, { status: 500 })
