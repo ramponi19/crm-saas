@@ -2511,6 +2511,8 @@ export type Database = {
           responsavel_id: string | null
           telefone: string | null
           ultima_mensagem_at: string | null
+          ultima_recebida_at: string | null
+          ultima_enviada_at: string | null
           ultima_tratativa: string | null
           valor_estimado: number | null
           motivo_perda_id: number | null
@@ -2542,6 +2544,8 @@ export type Database = {
           responsavel_id?: string | null
           telefone?: string | null
           ultima_mensagem_at?: string | null
+          ultima_recebida_at?: string | null
+          ultima_enviada_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null
           motivo_perda_id?: number | null
@@ -2573,6 +2577,8 @@ export type Database = {
           responsavel_id?: string | null
           telefone?: string | null
           ultima_mensagem_at?: string | null
+          ultima_recebida_at?: string | null
+          ultima_enviada_at?: string | null
           ultima_tratativa?: string | null
           valor_estimado?: number | null
           motivo_perda_id?: number | null

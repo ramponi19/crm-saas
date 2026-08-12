@@ -16,6 +16,13 @@ export interface Lead {
   msgs_nao_lidas: number | null
   ultima_tratativa: string | null
   ultima_mensagem_at: string | null
+  /**
+   * Última mensagem de cada lado, mantidas por trigger no banco. É com elas que
+   * o card sabe se o cliente está esperando: relógio só corre quando ele falou
+   * por último.
+   */
+  ultima_recebida_at?: string | null
+  ultima_enviada_at?: string | null
   produto_interessado: string | null
   valor_estimado?: number | null
   convertido_em: number | null

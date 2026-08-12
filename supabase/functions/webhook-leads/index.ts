@@ -254,11 +254,19 @@ function descreverSemArquivo(t: string, m: Record<string, unknown>): string {
     case "reaction": return `reagiu ${String(bloco?.emoji ?? "")}`.trim();
     case "button": case "interactive":
       return String(bloco?.text ?? bloco?.title ?? "resposta de botão");
+    // O texto novo vem em edit.message.text.body — NÃO em edit.text.body. Eu
+    // errei o caminho e o chat mostrava "mensagem editada" tendo o texto em mãos.
     case "edit":
-      return String((bloco?.text as Record<string, unknown> | undefined)?.body
-        ?? (m.text as Record<string, unknown> | undefined)?.body ?? "mensagem editada");
-    // O histórico do WhatsApp marca assim o que ele não exporta para fora do app.
-    case "errors": case "unsupported": return "mensagem não disponível fora do WhatsApp";
+      return String(
+        ((bloco?.message as Record<string, unknown> | undefined)?.text as Record<string, unknown> | undefined)?.body
+        ?? (bloco?.text as Record<string, unknown> | undefined)?.body
+        ?? (m.text as Record<string, unknown> | undefined)?.body
+        ?? "mensagem editada",
+      );
+    // Código 131051 ("Message type unknown"): a Meta não manda o conteúdo, só o
+    // erro. Não há texto para recuperar — o melhor possível é dizer o que houve.
+    case "errors": case "unsupported":
+      return "mensagem que o WhatsApp não envia ao CRM (enquete, chamada ou visualização única)";
     case "media_placeholder": return "[midia]";
     default: return "[midia]";
   }
@@ -962,7 +970,11 @@ serve(async (req: Request) => {
               // conhecidos e REGISTRA quando não reconhece — assim o tráfego
               // real nos ensina o formato em vez de falhar calado.
               if (t === "edit" || t === "revoke") {
-                const alvo = (m.edit as Record<string, unknown> | undefined)?.message_id
+                // `original_message_id` é o nome que o tráfego real usa (visto no
+                // histórico da JM); `message_id` fica como alternativa.
+                const alvo = (m.edit as Record<string, unknown> | undefined)?.original_message_id
+                  ?? (m.edit as Record<string, unknown> | undefined)?.message_id
+                  ?? (m.revoke as Record<string, unknown> | undefined)?.original_message_id
                   ?? (m.revoke as Record<string, unknown> | undefined)?.message_id
                   ?? (m.context as Record<string, unknown> | undefined)?.id;
                 if (!alvo) { console.log(`${t} sem id da mensagem original — payload:`, JSON.stringify(m).slice(0, 300)); continue; }
@@ -971,7 +983,9 @@ serve(async (req: Request) => {
                     .update({ conteudo: "[mensagem apagada]", tipo: "texto", midia_url: null })
                     .eq("empresa_id", canal.empresa_id).eq("external_id", String(alvo));
                 } else {
-                  const novo = ((m.edit as Record<string, unknown> | undefined)?.text as Record<string, unknown> | undefined)?.body
+                  const bloco = m.edit as Record<string, unknown> | undefined;
+                  const novo = ((bloco?.message as Record<string, unknown> | undefined)?.text as Record<string, unknown> | undefined)?.body
+                    ?? (bloco?.text as Record<string, unknown> | undefined)?.body
                     ?? (m.text as Record<string, unknown> | undefined)?.body;
                   if (novo) {
                     await db.from("lead_mensagens").update({ conteudo: String(novo) })

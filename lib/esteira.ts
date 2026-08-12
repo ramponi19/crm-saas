@@ -104,6 +104,23 @@ export async function devolverLeadsSemResposta(
 }
 
 /**
+ * O cliente está esperando resposta AGORA? — versão que só olha o lead.
+ *
+ * Mesma regra do `marcoDeCobranca`, lendo as colunas que o trigger do banco
+ * mantém (`ultima_recebida_at` / `ultima_enviada_at`). Existe para que o card do
+ * kanban e a ausência decidam igual à esteira, sem varrer mensagens e sem
+ * inventar um segundo conceito de "pendente".
+ */
+export function aguardandoResposta(lead: {
+  ultima_recebida_at?: string | null; ultima_enviada_at?: string | null
+}): boolean {
+  const recebida = lead.ultima_recebida_at
+  if (!recebida) return false
+  const enviada = lead.ultima_enviada_at
+  return !enviada || new Date(enviada) < new Date(recebida)
+}
+
+/**
  * A partir de quando o vendedor está devendo resposta.
  *
  * - cliente escreveu depois da última resposta → conta da mensagem do cliente.

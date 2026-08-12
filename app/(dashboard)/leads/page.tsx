@@ -22,7 +22,7 @@ export default async function LeadsPage() {
         responsavel_id, observacoes, created_at, ativo,
         primeira_msg, msgs_nao_lidas, ultima_tratativa,
         ultima_mensagem_at, produto_interessado, convertido_em, funil_id, valor_estimado,
-        foto_url
+        foto_url, ultima_recebida_at, ultima_enviada_at
       `)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)

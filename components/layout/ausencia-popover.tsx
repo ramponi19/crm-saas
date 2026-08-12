@@ -11,8 +11,8 @@ import { cn } from '@/lib/utils'
 /**
  * Almoço / ausência, aberto ao clicar no próprio nome na sidebar.
  *
- * Ligar libera os leads do atendente na hora, para os colegas atenderem
- * enquanto ele está fora — um lead esperando alguém que saiu para almoçar é
+ * Ligar libera os leads em que o CLIENTE ESTÁ ESPERANDO RESPOSTA, para os colegas
+ * atenderem enquanto ele está fora — um cliente esperando alguém que saiu é
  * cliente esperando sem saber. Desligar só volta a receber distribuição: nada é
  * puxado de volta, senão dois vendedores achariam que o lead é seu.
  */
@@ -74,7 +74,7 @@ export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }:
         <div className={cn('truncate text-[12px] font-semibold', nomeClasse)}>{userName}</div>
         <div className={cn('flex items-center gap-1 text-[10px]', papelClasse)}>
           {ausente && <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />}
-          <span className="truncate">{ausente ? 'Ausente — leads liberados' : userRole}</span>
+          <span className="truncate">{ausente ? 'Ausente — pendências liberadas' : userRole}</span>
         </div>
       </button>
 
@@ -86,8 +86,8 @@ export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }:
           </div>
           <p className="mb-3 text-[11.5px] leading-relaxed text-ink-2">
             {ausente
-              ? 'Seus leads estão liberados para a equipe. Ao voltar, você recebe novos — os que foram liberados seguem com quem pegar.'
-              : 'Ao ativar, seus leads voltam para a esteira e ficam livres para qualquer vendedor atender.'}
+              ? 'As conversas com cliente esperando foram para a esteira. Ao voltar, você recebe novos leads — as liberadas seguem com quem pegou.'
+              : 'Ao ativar, só as conversas com cliente esperando resposta vão para a esteira. As que você já respondeu continuam suas.'}
           </p>
           <button type="button" onClick={alternar} disabled={salvando}
             className="flex w-full items-center justify-between rounded-control border border-line p-2.5 transition-colors hover:bg-bg disabled:opacity-60">

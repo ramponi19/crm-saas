@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Lead, Usuario } from './types'
 import { formatCurrency } from '@/lib/utils'
 import { calcularScore } from '@/lib/lead-score'
+import { aguardandoResposta } from '@/lib/esteira'
 import { useScoreConfig } from './score-config-context'
 
 const TIER_CHIP: Record<string, { label: string; cls: string }> = {
@@ -71,6 +72,18 @@ const SLA_CLASS: Record<SlaTone, string> = {
   ok: 'text-ok', warn: 'text-warn', bad: 'text-bad', neutro: 'text-ink-3',
 }
 
+/**
+ * Desde quando ESTE lead está esperando resposta — null quando não está.
+ *
+ * O relógio contava desde a última mensagem qualquer, inclusive a resposta do
+ * próprio vendedor: ele respondia e o cartão continuava cobrando. Aqui vale a
+ * mesma regra da esteira (`marcoDeCobranca`): só o cliente falando por último
+ * gera dívida. Respondeu, o relógio zera e sai da tela.
+ */
+function aguardandoDesde(lead: { ultima_recebida_at?: string | null; ultima_enviada_at?: string | null }): string | null {
+  return aguardandoResposta(lead) ? lead.ultima_recebida_at ?? null : null
+}
+
 function humanElapsed(date: string | null): string {
   if (!date) return ''
   const min = Math.floor((Date.now() - new Date(date).getTime()) / 60_000)
@@ -99,8 +112,8 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
 
   const responsavel = usuarios.find((u) => u.id === lead.responsavel_id)
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
-  const lastAt = lead.ultima_mensagem_at ?? lead.ultima_tratativa
-  const slaTone = getSlaTone(lastAt, sla)
+  const esperandoDesde = aguardandoDesde(lead)
+  const slaTone = getSlaTone(esperandoDesde, sla)
   const scoreCfg = useScoreConfig()
   const { score, tier } = calcularScore(lead, scoreCfg)
   const chip = TIER_CHIP[tier]
@@ -145,8 +158,13 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
                 {(lead.msgs_nao_lidas ?? 0) > 99 ? '99+' : lead.msgs_nao_lidas}
               </span>
             )}
-            {lastAt && (
-              <span className={`whitespace-nowrap text-[10px] font-semibold ${SLA_CLASS[slaTone]}`}>{humanElapsed(lastAt)}</span>
+            {esperandoDesde && (
+              <span
+                title="Cliente esperando resposta"
+                className={`whitespace-nowrap text-[10px] font-semibold ${SLA_CLASS[slaTone]}`}
+              >
+                {humanElapsed(esperandoDesde)}
+              </span>
             )}
           </div>
         </div>
