@@ -1,5 +1,4 @@
 {
-  "//": "gru1 = São Paulo. O banco (Supabase) está em sa-east-1, e a Vercel roda o servidor em iad1 (Virgínia) por padrão: cada consulta feita no servidor levava 219 ms de média contra 47 ms medidos de São Paulo — 4,6x, pagos várias vezes por tela, porque uma página faz várias consultas. Não era o código: era a distância. Manter esta região junto do banco.",
   "regions": ["gru1"],
   "crons": [
     {
