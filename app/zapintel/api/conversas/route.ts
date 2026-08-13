@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { trackerEmpresa } from '@/lib/tracker/ctx'
+import { zapintelEmpresa } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { mapCrmSegmento } from '@/lib/zapintel/segments/segments'
 
@@ -38,7 +38,7 @@ type L = { id: number; nome: string | null; telefone: string | null; origem_id: 
 type Msg = { lead_id: number; direcao: string; conteudo: string | null; tipo: string | null; created_at: string }
 
 export async function GET() {
-  const { empresaId } = await trackerEmpresa()
+  const { empresaId } = await zapintelEmpresa()
   const db = rastrDb()
 
   const { data: empresa } = await db.from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle()

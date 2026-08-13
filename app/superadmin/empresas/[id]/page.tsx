@@ -72,10 +72,10 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
   if (!empresa) notFound()
 
-  // Complementos pagos (Nexus Tracker / ZapIntel): estado na tabela autocontida
-  // tracker_addons, lida via client do complemento (fora dos tipos do CRM).
+  // Complemento pago (ZapIntel): estado na tabela autocontida
+  // complementos_empresa, lida via client do complemento (fora dos tipos do CRM).
   const { data: addon } = await rastrDb()
-    .from('tracker_addons').select('tracker_ativo, zapintel_ativo').eq('empresa_id', empresaId).maybeSingle()
+    .from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle()
 
   // Usuários membros
   const { data: membrosRaw } = await svc
@@ -242,11 +242,10 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
         />
       </div>
 
-      {/* Complementos pagos (add-ons) — toggle por empresa */}
+      {/* Complemento pago (add-on) — toggle por empresa */}
       <div className="mb-5">
         <AddonsEmpresa
           empresaId={empresaId}
-          trackerInit={!!(addon as { tracker_ativo?: boolean } | null)?.tracker_ativo}
           zapintelInit={!!(addon as { zapintel_ativo?: boolean } | null)?.zapintel_ativo}
         />
       </div>

@@ -1,28 +1,29 @@
-import { requireEmpresaRole } from '@/lib/owner'
-import { createClient } from '@/lib/supabase/server'
-import { AcessosView, type SessaoAcesso, type ResumoUsuario } from './acessos-view'
-
-export const metadata = { title: 'Uso da equipe' }
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SessaoAcesso, ResumoUsuario } from '@/components/admin/uso-equipe'
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
-export default async function AcessosPage({ searchParams }: { searchParams: Promise<{ dias?: string }> }) {
-  // Registro de ponto é assunto de quem administra: vendedor não vê horário do
-  // colega. A RLS da tabela também exige admin — esta é a segunda camada.
-  const { empresaId } = await requireEmpresaRole(['owner', 'admin'])
-  const supabase = await createClient()
-
-  const sp = await searchParams
-  const dias = Math.min(90, Math.max(1, Number(sp.dias) || 14))
+/**
+ * Monta o "uso da equipe": sessões do período e resumo por pessoa.
+ *
+ * ATENÇÃO AO EMBED: o vínculo tem que ser nomeado pela constraint
+ * (`usuarios!acessos_usuario_id_fkey`). Quando `acessos.usuario_id` apontava
+ * para auth.users, o PostgREST não conseguia montar a junção e devolvia a
+ * consulta INTEIRA vazia — a tela mostrava zero acesso com a tabela cheia, sem
+ * erro nenhum na cara de quem olhava.
+ */
+export async function carregarUsoDaEquipe(
+  db: SupabaseClient, empresaId: number, dias: number,
+): Promise<{ sessoes: SessaoAcesso[]; resumo: ResumoUsuario[] }> {
   const desde = new Date(Date.now() - dias * 86400000).toISOString()
 
   const [{ data: linhas }, { data: membros }] = await Promise.all([
-    supabase.from('acessos')
-      .select('id, usuario_id, entrada, ultimo_sinal, saida, fim_por, usuarios!usuario_id(nome)')
+    db.from('acessos')
+      .select('id, usuario_id, entrada, ultimo_sinal, saida, fim_por, usuarios!acessos_usuario_id_fkey(nome)')
       .eq('empresa_id', empresaId).gte('entrada', desde)
       .order('entrada', { ascending: false }).limit(500),
-    supabase.from('empresa_usuarios')
+    db.from('empresa_usuarios')
       .select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(nome, ultimo_acesso)')
       .eq('empresa_id', empresaId).eq('ativo', true),
   ])
@@ -64,5 +65,5 @@ export default async function AcessosPage({ searchParams }: { searchParams: Prom
     }
   }).sort((a, b) => b.minutos - a.minutos)
 
-  return <AcessosView sessoes={sessoes} resumo={resumo} dias={dias} />
+  return { sessoes, resumo }
 }

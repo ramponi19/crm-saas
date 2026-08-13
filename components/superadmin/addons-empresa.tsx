@@ -2,32 +2,32 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Radar, MessageSquareText, ExternalLink } from 'lucide-react'
+import { MessageSquareText, ExternalLink } from 'lucide-react'
 import { Card, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
 const PLATFORM = '#6D28D9'
 
-type Campo = 'tracker_ativo' | 'zapintel_ativo'
-type Modulo = 'tracker' | 'zapintel'
+type Campo = 'zapintel_ativo'
+type Modulo = 'zapintel'
 
 /**
- * Toggle dos complementos pagos por empresa (Nexus Tracker, ZapIntel).
- * Persiste em `tracker_addons` via /api/superadmin/empresas/[id]/addons — não
+ * Toggle dos complementos pagos por empresa (hoje só o ZapIntel — o Nexus
+ * Tracker foi removido do produto em 13/08/2026).
+ * Persiste em `complementos_empresa` via /api/superadmin/empresas/[id]/addons — não
  * altera o schema do CRM. Quando ativo, o atalho aparece no menu do /admin da empresa.
  */
-export function AddonsEmpresa({ empresaId, trackerInit, zapintelInit }: {
-  empresaId: number; trackerInit: boolean; zapintelInit: boolean
+export function AddonsEmpresa({ empresaId, zapintelInit }: {
+  empresaId: number; zapintelInit: boolean
 }) {
   const router = useRouter()
-  const [tracker, setTracker] = useState(trackerInit)
   const [zapintel, setZapintel] = useState(zapintelInit)
   const [saving, setSaving] = useState<Campo | null>(null)
 
   async function salvar(campo: Campo, valor: boolean) {
     setSaving(campo)
     // otimista — reverte no catch se a API recusar
-    if (campo === 'tracker_ativo') setTracker(valor); else setZapintel(valor)
+    setZapintel(valor)
     try {
       const res = await fetch(`/api/superadmin/empresas/${empresaId}/addons`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -37,15 +37,14 @@ export function AddonsEmpresa({ empresaId, trackerInit, zapintelInit }: {
       notify.ok(valor ? 'Complemento ativado' : 'Complemento desativado')
       router.refresh()
     } catch (e) {
-      if (campo === 'tracker_ativo') setTracker(!valor); else setZapintel(!valor)
+      setZapintel(!valor)
       notify.bad('Não foi possível salvar', e instanceof Error ? e.message : undefined)
     } finally {
       setSaving(null)
     }
   }
 
-  const rows: { key: Campo; modulo: Modulo; label: string; desc: string; icon: typeof Radar; on: boolean; cor: string }[] = [
-    { key: 'tracker_ativo', modulo: 'tracker', label: 'Nexus Tracker', desc: 'Rastreamento de anúncios ponta a ponta — área /tracker', icon: Radar, on: tracker, cor: '#00a884' },
+  const rows: { key: Campo; modulo: Modulo; label: string; desc: string; icon: typeof MessageSquareText; on: boolean; cor: string }[] = [
     { key: 'zapintel_ativo', modulo: 'zapintel', label: 'ZapIntel', desc: 'Inteligência de conversas por IA — área /zapintel', icon: MessageSquareText, on: zapintel, cor: '#7c5cfc' },
   ]
 
@@ -66,7 +65,7 @@ export function AddonsEmpresa({ empresaId, trackerInit, zapintelInit }: {
               {/* Preview: super admin inspeciona esta empresa mesmo com o add-on
                   desligado (não impersona o CRM inteiro). */}
               <a
-                href={`/api/tracker/preview?empresa=${empresaId}&to=${r.modulo}`}
+                href={`/api/zapintel/preview?empresa=${empresaId}`}
                 className="flex flex-none items-center gap-1 rounded-control border border-line px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:border-[#6D28D9] hover:text-[#6D28D9]"
               >
                 <ExternalLink size={13} strokeWidth={1.8} /> Prever

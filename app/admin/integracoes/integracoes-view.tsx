@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle, Instagram, Facebook, ArrowUpRight } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, Badge, notify } from '@/components/ui'
+import { CanaisView } from '@/components/modules/canais/canais-view'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
   return (
@@ -31,8 +32,10 @@ function UrlLinha({ label, url, onCopy }: { label: string; url: string; onCopy: 
   )
 }
 
-export default function IntegracoesView({ slug, segmento, token, feedUrlInicial, ultimaImportacao }: {
+export default function IntegracoesView({ slug, segmento, token, feedUrlInicial, ultimaImportacao, appId }: {
   slug: string; segmento: string; token: string; feedUrlInicial: string; ultimaImportacao: string | null
+  /** App ID da Meta — público, roda no navegador dentro do conector oficial. */
+  appId: string
 }) {
   const [origin, setOrigin] = useState('')
   useEffect(() => { setOrigin(window.location.origin) }, [])
@@ -98,16 +101,13 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
           </p>
 
           <div className="space-y-4">
-            {/* Canais de atendimento — todos os segmentos */}
-            <IntegracaoCard icon={MessageCircle} titulo="Canais de atendimento" desc="WhatsApp, Instagram e Facebook — receba e responda mensagens dentro do CRM.">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="ok"><MessageCircle size={14} strokeWidth={1.7} /> WhatsApp</Badge>
-                <Badge tone="neutro"><Instagram size={14} strokeWidth={1.7} /> Instagram</Badge>
-                <Badge tone="acc"><Facebook size={14} strokeWidth={1.7} /> Facebook</Badge>
-                <Link href="/admin/configuracoes" className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-control bg-ink px-4 text-[12.5px] font-medium text-white transition-colors hover:bg-ink/90">
-                  Configurar canais <ArrowUpRight size={14} strokeWidth={1.7} />
-                </Link>
-              </div>
+            {/* CONECTAR ACONTECE AQUI, não noutra tela.
+                Havia dois menus para a mesma coisa — "Canais" e "Integrações" — e
+                o card daqui só empurrava para um terceiro lugar
+                (/admin/configuracoes). Quem quer ligar o WhatsApp abria os três
+                até achar o botão. Agora o conector de verdade mora aqui. */}
+            <IntegracaoCard icon={MessageCircle} titulo="Canais de atendimento" desc="WhatsApp, Instagram e Facebook — receba e responda mensagens dentro do CRM. No WhatsApp, o número continua funcionando no seu celular.">
+              <CanaisView appId={appId} />
             </IntegracaoCard>
 
             {isImob && (<>

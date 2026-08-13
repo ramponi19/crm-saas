@@ -10,8 +10,7 @@ import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
-  SlidersHorizontal, Link2, FileSignature, Radar,
-  Clock,
+  SlidersHorizontal, Link2, FileSignature,
 } from 'lucide-react'
 
 /**
@@ -26,7 +25,6 @@ const navGroups = [
       { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
       { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
       { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
-      { href: '/admin/acessos', label: 'Uso da equipe', icon: Clock },
     ],
   },
   {
@@ -43,7 +41,8 @@ const navGroups = [
     label: 'Sistema',
     items: [
       { href: '/admin/contrato', label: 'Contrato', icon: FileSignature },
-      { href: '/admin/canais', label: 'Canais', icon: Plug },
+      // "Canais" saiu: era o mesmo assunto de Integrações, e o conector do
+      // WhatsApp/Instagram agora mora lá dentro. A rota /admin/canais redireciona.
       { href: '/admin/integracoes', label: 'Integrações', icon: Link2 },
       { href: '/admin/permissoes', label: 'Permissões', icon: Shield },
       { href: '/admin/meu-menu', label: 'Menu do CRM', icon: SlidersHorizontal },
@@ -55,8 +54,8 @@ const navGroups = [
   },
 ]
 
-export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha empresa', role = 'owner', impersonationNome = null, trackerAtivo = false, zapintelAtivo = false, children }: {
-  userName?: string; empresaNome?: string; role?: string; impersonationNome?: string | null; trackerAtivo?: boolean; zapintelAtivo?: boolean; children: React.ReactNode
+export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha empresa', role = 'owner', impersonationNome = null, zapintelAtivo = false, children }: {
+  userName?: string; empresaNome?: string; role?: string; impersonationNome?: string | null; zapintelAtivo?: boolean; children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -80,29 +79,18 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
       {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
           sai da tela em vez de o menu ganhar rolagem. */}
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
-        {/* Complementos pagos (Nexus Tracker / ZapIntel) — só aparecem quando o
-            super admin ativou o add-on para esta empresa. São áreas próprias
-            (/tracker, /zapintel), por isso Link direto com a cor de cada marca. */}
-        {(trackerAtivo || zapintelAtivo) && (
+        {/* Complemento pago ZapIntel — só aparece quando o super admin ativou o
+            add-on para esta empresa. É área própria (/zapintel), por isso Link
+            direto com a cor da marca. */}
+        {zapintelAtivo && (
           <div className="mb-1.5">
-            {trackerAtivo && (
-              <Link href="/tracker" onClick={onNavigate}
-                className="mb-px flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
-                style={{ background: 'rgba(0,168,132,0.10)', color: '#007e5f' }}>
-                <Radar size={16} strokeWidth={1.7} className="shrink-0" />
-                <span className="flex-1 truncate">Nexus Tracker</span>
-                <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
-              </Link>
-            )}
-            {zapintelAtivo && (
-              <Link href="/zapintel" onClick={onNavigate}
-                className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
-                style={{ background: 'rgba(124,92,252,0.10)', color: '#6d28d9' }}>
-                <MessageSquareText size={16} strokeWidth={1.7} className="shrink-0" />
-                <span className="flex-1 truncate">ZapIntel</span>
-                <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
-              </Link>
-            )}
+            <Link href="/zapintel" onClick={onNavigate}
+              className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
+              style={{ background: 'rgba(124,92,252,0.10)', color: '#6d28d9' }}>
+              <MessageSquareText size={16} strokeWidth={1.7} className="shrink-0" />
+              <span className="flex-1 truncate">ZapIntel</span>
+              <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
+            </Link>
           </div>
         )}
         {navGroups.map((group) => (

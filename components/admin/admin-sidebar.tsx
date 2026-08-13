@@ -28,7 +28,6 @@ const navItems = [
   { href: '/ranking',             label: 'Ranking',       icon: Trophy },
   { href: '/admin/financeiro',    label: 'Financeiro',    icon: Wallet },
   { href: '/admin/equipe',        label: 'Equipe',        icon: UserCog },
-  { href: '/admin/acessos',      label: 'Uso da equipe', icon: Clock },
   { href: '/admin/empresa',       label: 'Minha empresa', icon: Building2 },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
   { href: '/admin/integracoes',   label: 'Integrações',   icon: Plug },

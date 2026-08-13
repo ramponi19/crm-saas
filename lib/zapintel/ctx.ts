@@ -3,10 +3,14 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * Contexto do complemento Tracker: resolve a empresa ativa do usuário logado,
- * reusando o login do crm-saas. Redireciona se não houver sessão/empresa.
+ * Contexto do complemento ZapIntel: resolve a empresa ativa do usuário logado,
+ * reusando o login do CRM. Redireciona se não houver sessão/empresa.
+ *
+ * Veio de lib/tracker/ctx.ts quando o Tracker foi removido: o ZapIntel dependia
+ * dele, e mover é mais honesto que manter uma pasta morta só por causa de um
+ * import.
  */
-export async function trackerEmpresa(): Promise<{ userId: string; empresaId: number }> {
+export async function zapintelEmpresa(): Promise<{ userId: string; empresaId: number }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

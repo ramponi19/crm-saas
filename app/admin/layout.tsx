@@ -19,9 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const [{ data: usuario }, { data: empresa }, { data: addon }] = await Promise.all([
     supabase.from('usuarios').select('nome, email').eq('id', userId).single(),
     supabase.from('empresas').select('nome').eq('id', empresaId).single(),
-    // Atalhos dos complementos (Nexus Tracker / ZapIntel): só aparecem quando o
+    // Atalho do complemento ZapIntel: só aparece quando o
     // add-on está ativo. Status vem da tabela própria do complemento, não do CRM.
-    rastrDb().from('tracker_addons').select('tracker_ativo, zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
+    rastrDb().from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
   ])
   const impersonation = await getImpersonation()
 
@@ -31,8 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         userName={usuario?.nome ?? usuario?.email ?? 'Administrador'}
         empresaNome={empresa?.nome ?? 'Minha empresa'}
         role={role}
-        impersonationNome={impersonation?.nome ?? null}
-        trackerAtivo={!!(addon as { tracker_ativo?: boolean })?.tracker_ativo}
+        impersonationNome={impersonation?.nome ?? null}
         zapintelAtivo={!!(addon as { zapintel_ativo?: boolean })?.zapintel_ativo}
       >
         {children}

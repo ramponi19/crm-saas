@@ -42,13 +42,16 @@ function desdeQuando(iso: string | null): string {
 }
 
 /**
- * Uso da equipe: quem entrou, quando, e por quanto tempo ficou.
+ * Uso da equipe — aba dentro de Equipe.
  *
- * A pergunta que essa tela responde é "meus funcionários estão usando o CRM?",
- * então o RESUMO vem primeiro — a lista de sessões é para conferir um caso
+ * Mora aqui, e não num item próprio do menu, porque a pergunta ("meu time está
+ * usando o CRM?") é sobre as MESMAS pessoas listadas ao lado: é uma outra visão
+ * da equipe, não outro assunto.
+ *
+ * O RESUMO vem primeiro; a lista de sessões serve para conferir um caso
  * específico, não para ler todo dia.
  */
-export function AcessosView({ sessoes, resumo, dias }: {
+export function UsoEquipe({ sessoes, resumo, dias }: {
   sessoes: SessaoAcesso[]; resumo: ResumoUsuario[]; dias: number
 }) {
   const router = useRouter()
@@ -92,45 +95,42 @@ export function AcessosView({ sessoes, resumo, dias }: {
   ]
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
-      <div className="mx-auto w-full max-w-[900px] space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-[18px] font-semibold text-ink">
-              <Clock size={18} strokeWidth={1.8} className="text-accent" /> Uso da equipe
-            </h1>
-            <p className="mt-0.5 text-[13px] text-ink-3">Quem entrou no CRM, quando e por quanto tempo ficou.</p>
-          </div>
-          <Select wrapperClassName="w-[170px]" label="Período" value={String(dias)}
-            onChange={(e) => router.push(`/admin/acessos?dias=${e.target.value}`)}>
-            <option value="7">Últimos 7 dias</option>
-            <option value="14">Últimos 14 dias</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
-          </Select>
-        </div>
-
-        <Card flush title="Resumo por pessoa">
-          <Table columns={colsResumo} rows={resumo} rowKey={(u) => u.nome}
-            empty={<EmptyState icon={<LogIn size={22} strokeWidth={1.7} />} title="Nenhum usuário ativo" description="Cadastre a equipe em Equipe." />} />
-        </Card>
-
-        <Card flush title={`Acessos (${sessoes.length})`}>
-          <Table columns={cols} rows={sessoes} rowKey={(s) => s.id}
-            empty={<EmptyState
-              icon={<Clock size={22} strokeWidth={1.7} />}
-              title="Nenhum acesso registrado no período"
-              description="O registro começa a partir de agora: acesso anterior a esta tela não foi gravado." />} />
-        </Card>
-
-        <p className="text-[11.5px] leading-relaxed text-ink-3">
-          <strong className="text-ink-2">Como o tempo é medido.</strong> O CRM manda um sinal a cada 5 minutos —
-          só enquanto a aba está à frente e há alguém mexendo, para que aba esquecida aberta não vire hora
-          trabalhada. Quem clica em <strong className="text-ink-2">Sair</strong> tem a hora exata; quem fecha a aba
-          ou para de usar tem como saída o último sinal — por isso a coluna “Encerrou”. Recarregar a página ou
-          abrir outra aba não cria acesso novo: sinal recente é entendido como a mesma sessão.
-        </p>
+    <div className="space-y-5">
+      <div className="flex items-end justify-between gap-3">
+        <p className="text-[13px] text-ink-3">Quem entrou no CRM, quando e por quanto tempo ficou.</p>
+        <Select
+          wrapperClassName="w-[170px]"
+          label="Período"
+          value={String(dias)}
+          onChange={(e) => router.push(`/admin/equipe?tab=uso&dias=${e.target.value}`)}
+        >
+          <option value="7">Últimos 7 dias</option>
+          <option value="14">Últimos 14 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+        </Select>
       </div>
-    </main>
+
+      <Card flush title="Resumo por pessoa">
+        <Table columns={colsResumo} rows={resumo} rowKey={(u) => u.nome}
+          empty={<EmptyState icon={<LogIn size={22} strokeWidth={1.7} />} title="Nenhum usuário ativo" description="Cadastre a equipe na aba Usuários." />} />
+      </Card>
+
+      <Card flush title={`Acessos (${sessoes.length})`}>
+        <Table columns={cols} rows={sessoes} rowKey={(s) => s.id}
+          empty={<EmptyState
+            icon={<Clock size={22} strokeWidth={1.7} />}
+            title="Nenhum acesso registrado no período"
+            description="O registro começou em 12/08/2026: acesso anterior a essa data não foi gravado." />} />
+      </Card>
+
+      <p className="text-[11.5px] leading-relaxed text-ink-3">
+        <strong className="text-ink-2">Como o tempo é medido.</strong> O CRM manda um sinal a cada 5 minutos —
+        só enquanto a aba está à frente e há alguém mexendo, para que aba esquecida aberta não vire hora
+        trabalhada. Quem clica em <strong className="text-ink-2">Sair</strong> tem a hora exata; quem fecha a aba
+        ou para de usar tem como saída o último sinal — por isso a coluna “Encerrou”. Recarregar a página ou
+        abrir outra aba não cria acesso novo: sinal recente é entendido como a mesma sessão.
+      </p>
+    </div>
   )
 }

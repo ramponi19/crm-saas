@@ -456,7 +456,7 @@ export function isValidSegment(id: string | null | undefined): boolean {
 }
 
 // Mapeia o segmento do CRM (empresas.segmento) para o segmento do ZapIntel.
-// É só o PADRÃO — o usuário pode sobrescrever (guardado em tracker_addons).
+// É só o PADRÃO — o usuário pode sobrescrever (guardado em complementos_empresa).
 export const CRM_TO_ZAPINTEL: Record<string, string> = {
   varejo: "ecommerce",
   assistencia: "servicos",

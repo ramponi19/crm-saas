@@ -32,11 +32,17 @@ interface Props {
   vendasMes: VendaResumo[]
   comissoesPagas: ComissaoPaga[]
   mesAtual: string
+  /**
+   * Painel "Uso da equipe". Só o /admin passa esta prop — sem ela a aba nem
+   * existe, então o vendedor não vê horário de colega mesmo abrindo /equipe.
+   * Vem pronto de cima porque a consulta é do servidor e exige papel de admin.
+   */
+  uso?: React.ReactNode
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TABS = [
+const TABS_BASE = [
   { value: 'usuarios',  label: 'Usuários'  },
   { value: 'metas',     label: 'Metas'     },
   { value: 'comissoes', label: 'Comissões' },
@@ -503,9 +509,10 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios }: Props) {
+export default function EquipeView({ usuarios, uso }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState('usuarios')
+  const TABS = uso ? [...TABS_BASE, { value: 'uso', label: 'Uso da equipe' }] : TABS_BASE
   const [modal, setModal] = useState<{ open: boolean; usuario: Usuario | null }>({ open: false, usuario: null })
   const [remover, setRemover] = useState<Usuario | null>(null)
   const [removendo, setRemovendo] = useState(false)
@@ -608,6 +615,7 @@ export default function EquipeView({ usuarios }: Props) {
         )}
         {tab === 'metas' && <MetasTab usuarios={usuarios} />}
         {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} />}
+        {tab === 'uso' && uso}
       </div>
 
       {modal.open && (

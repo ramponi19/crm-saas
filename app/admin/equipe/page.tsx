@@ -1,6 +1,9 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import EquipeView from '@/app/(dashboard)/equipe/components/equipe-view'
+import { UsoEquipe } from '@/components/admin/uso-equipe'
+import { carregarUsoDaEquipe } from '@/lib/uso-equipe'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Equipe' }
@@ -9,8 +12,15 @@ type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 // Mesma carga de dados da tela /equipe, reaproveitada dentro do painel /admin.
-export default async function AdminEquipePage() {
+export default async function AdminEquipePage({ searchParams }: { searchParams: Promise<{ dias?: string }> }) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+
+  // Uso da equipe: aba deste painel, e só dele. Na tela /equipe do CRM o
+  // vendedor não recebe a prop, então não existe aba nenhuma para ele — horário
+  // de colega não é assunto de quem trabalha ao lado.
+  const sp = await searchParams
+  const dias = Math.min(90, Math.max(1, Number(sp.dias) || 14))
+  const uso = await carregarUsoDaEquipe(supabase as unknown as SupabaseClient, empresaId, dias)
 
   const mesAtual = new Date().toISOString().slice(0, 7)
   // Janela pela função única — ver janelaDoPeriodo: o cálculo anterior dava 3h.
@@ -53,6 +63,7 @@ export default async function AdminEquipePage() {
       vendasMes={vendasMes ?? []}
       comissoesPagas={comissoesMes ?? []}
       mesAtual={mesAtual}
+      uso={<UsoEquipe sessoes={uso.sessoes} resumo={uso.resumo} dias={dias} />}
     />
   )
 }

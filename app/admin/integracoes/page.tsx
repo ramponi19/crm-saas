@@ -24,6 +24,7 @@ export default async function IntegracoesPage() {
       token={token}
       feedUrlInicial={cfg?.feed_url ?? ''}
       ultimaImportacao={cfg?.ultima_importacao ?? null}
+      appId={process.env.NEXT_PUBLIC_META_APP_ID ?? ''}
     />
   )
 }
