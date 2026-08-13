@@ -67,7 +67,14 @@ export async function POST(req: Request) {
 
   // Alimenta `usuarios.ultimo_acesso`: a coluna já existia e a tela de Equipe já
   // mostrava "Último acesso" — só que ninguém escrevia nela, então vivia vazia.
-  await supabase.from('usuarios').update({ ultimo_acesso: agora } as never).eq('id', user.id)
+  //
+  // O ERRO É REGISTRADO. Esta escrita ficou falhando por dias com "permission
+  // denied" (faltava GRANT na coluna) e ninguém soube, porque o resultado era
+  // descartado: a tela dizia "nunca entrou" com 19 acessos gravados ao lado.
+  // Falha aqui não pode derrubar a resposta — mas também não pode ser invisível.
+  const { error: erroAcesso } = await supabase
+    .from('usuarios').update({ ultimo_acesso: agora } as never).eq('id', user.id)
+  if (erroAcesso) console.error('[api/acesso] ultimo_acesso não gravado:', erroAcesso.message)
 
   return NextResponse.json({ ok: true })
 }

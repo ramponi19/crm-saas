@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withSentryConfig } from '@sentry/nextjs'
 
 /**
  * REGIÃO DO SERVIDOR: `regions: ["gru1"]` em `vercel.json` (São Paulo).
@@ -17,4 +18,19 @@ const nextConfig: NextConfig = {
   // Type-check e ESLint reativados — build falha se houver erro de tipo
 }
 
-export default nextConfig
+/**
+ * SENTRY. Envolve a config para subir os source maps: sem eles, o erro chega como
+ * uma linha de código minificado e não serve para nada.
+ *
+ * `silent` no build local para não encher o terminal; o upload só acontece quando
+ * SENTRY_AUTH_TOKEN existe (produção), então `npm run build` aqui segue igual.
+ */
+export default withSentryConfig(nextConfig, {
+  org: 'ramponi19',
+  project: 'nexus-crm',
+  silent: !process.env.CI,
+  // O túnel evita que bloqueador de anúncio engula o relatório de erro — o
+  // navio afunda calado justamente em quem usa extensão de bloqueio.
+  tunnelRoute: '/monitoring',
+  widenClientFileUpload: true,
+})
