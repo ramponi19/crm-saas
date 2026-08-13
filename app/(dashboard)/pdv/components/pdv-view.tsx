@@ -360,11 +360,27 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // Uma venda por unidade do carrinho. Desconto e troca são rateados
       // separadamente porque têm naturezas diferentes: o desconto reduz o valor da
       // venda, a troca só troca a FORMA de pagamento de uma parte dela.
-      for (const c of carrinho) {
+      /**
+       * Sobra do rateio, em centavos, fica com a ÚLTIMA linha.
+       *
+       * Cada venda é gravada com duas casas. R$ 100 de desconto entre três itens
+       * de R$ 1.000 dá 33,3333… por item; arredondado, três linhas de 966,67
+       * somam R$ 2.900,01 — um centavo a mais de faturamento por venda, que
+       * ninguém confere e que nunca fecha com o caixa. Fechar a conta na última
+       * linha faz a soma bater exatamente com o valor cobrado do cliente.
+       */
+      const cent = (n: number) => Math.round(n * 100) / 100
+      let descontoRateado = 0
+
+      for (const [iCarrinho, c] of carrinho.entries()) {
         const precoCheio = (c.item.preco_venda ?? 0) * c.qtd
         const fatia = subtotalBruto > 0 ? precoCheio / subtotalBruto : 0
-        const descontoItem = descontoNum * fatia
-        const valorItem = precoCheio - descontoItem
+        const ultimaLinha = iCarrinho === carrinho.length - 1
+        const descontoItem = ultimaLinha
+          ? cent(descontoNum - descontoRateado)
+          : cent(descontoNum * fatia)
+        descontoRateado += descontoItem
+        const valorItem = cent(precoCheio - descontoItem)
         // A parte paga em dinheiro não é mais calculada por item: os pagamentos
         // do fechamento vão juntos na primeira venda do grupo.
 

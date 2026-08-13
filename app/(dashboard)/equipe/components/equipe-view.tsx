@@ -486,9 +486,28 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     },
   ]
 
+  /**
+   * ZERO AQUI É UM NÚMERO PLAUSÍVEL — e é isso que o torna perigoso.
+   *
+   * A comissão sai de `percentual_comissao_padrao`, que vem da meta do mês. Sem
+   * meta cadastrada o percentual é 0, então TODO MUNDO aparece com R$ 0 a pagar
+   * mesmo tendo vendido: a tela não erra, ela só cala. O dono pode fechar o mês
+   * achando que não há comissão devida.
+   */
+  const houveVenda = Object.values(vendasPorUser).some((v) => v.total > 0)
+  const semPercentual = vendedores.every((u) => !Number(metaMap[u.id]?.percentual_comissao_padrao))
+
   return (
     <div className="space-y-4">
       <MonthPicker mes={mes} setMes={setMes} />
+
+      {houveVenda && semPercentual && (
+        <div className="rounded-control border border-warn/40 bg-warn-soft px-3.5 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
+          <strong className="text-ink">Nenhum percentual de comissão cadastrado neste mês.</strong> Houve venda, mas
+          o cálculo dá R$ 0 para todos porque não há percentual definido — não é que ninguém tenha direito.
+          Defina em <strong className="text-ink">Metas</strong>, no mês correspondente.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="A pagar" value={formatCurrency(totalAPagar)} />
