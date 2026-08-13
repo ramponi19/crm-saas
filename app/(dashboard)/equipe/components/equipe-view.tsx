@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
@@ -511,8 +511,22 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 export default function EquipeView({ usuarios, uso }: Props) {
   const router = useRouter()
-  const [tab, setTab] = useState('usuarios')
   const TABS = uso ? [...TABS_BASE, { value: 'uso', label: 'Uso da equipe' }] : TABS_BASE
+
+  /**
+   * A ABA VEM DA URL. O seletor de período do "Uso da equipe" navega para
+   * `?tab=uso&dias=N` para o servidor recarregar os dados — e como a aba era só
+   * estado local, a página voltava para "Usuários": quem trocava o período era
+   * jogado para outra aba e nunca via o resultado do que pediu.
+   *
+   * Valor inválido cai em "usuarios" em vez de deixar a tela vazia, e `uso` só
+   * vale quando o painel existe (no CRM o vendedor não recebe a prop).
+   */
+  const searchParams = useSearchParams()
+  const abaDaUrl = searchParams.get('tab') ?? ''
+  const [tab, setTab] = useState(
+    TABS.some((t) => t.value === abaDaUrl) ? abaDaUrl : 'usuarios',
+  )
   const [modal, setModal] = useState<{ open: boolean; usuario: Usuario | null }>({ open: false, usuario: null })
   const [remover, setRemover] = useState<Usuario | null>(null)
   const [removendo, setRemovendo] = useState(false)
