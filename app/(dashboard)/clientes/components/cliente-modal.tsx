@@ -6,6 +6,7 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, ConfirmDialog, notify } from '@/components/ui'
+import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 interface Cliente {
@@ -101,7 +102,13 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { notify.warn('Nome é obrigatório'); return }
+    const faltando = camposFaltantesContrato(form)
+    if (faltando.length) {
+      // Lista TUDO que falta de uma vez: apontar um campo por tentativa faria o
+      // vendedor salvar seis vezes para descobrir o formulário inteiro.
+      notify.warn('Faltam dados que o contrato usa', faltando.join(', ') + '.')
+      return
+    }
     setSaving(true)
     const { total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
     const data = { ...payload, ativo: true }
@@ -190,31 +197,31 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
 
         <form onSubmit={(e) => { e.preventDefault(); salvar() }} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input wrapperClassName="col-span-2" label="Nome completo" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome completo" />
-          <Input label="Telefone / WhatsApp" value={form.telefone ?? ''} onChange={(e) => set('telefone', e.target.value)} placeholder="(11) 99999-9999" />
+          <Input label="Telefone / WhatsApp" required value={form.telefone ?? ''} onChange={(e) => set('telefone', e.target.value)} placeholder="(11) 99999-9999" />
           <Input label="E-mail" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} placeholder="email@exemplo.com" />
-          <Input label="CPF / CNPJ" value={form.cpf_cnpj ?? ''} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00" />
+          <Input label="CPF / CNPJ" required value={form.cpf_cnpj ?? ''} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00" />
           <Input label="Data de nascimento" type="date" value={form.data_nascimento ?? ''} onChange={(e) => set('data_nascimento', e.target.value)} />
           <Select label="Tipo de cliente" value={form.tipo_cliente ?? 'Novo'} onChange={(e) => set('tipo_cliente', e.target.value)}>
             {['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'].map((t) => <option key={t}>{t}</option>)}
           </Select>
-          <Select label="Estado civil" value={form.estado_civil ?? ''} onChange={(e) => set('estado_civil', e.target.value)}>
+          <Select label="Estado civil" required value={form.estado_civil ?? ''} onChange={(e) => set('estado_civil', e.target.value)}>
             <option value="">—</option>
             {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável'].map((t) => <option key={t}>{t}</option>)}
           </Select>
-          <Input label="Profissão" value={form.profissao ?? ''} onChange={(e) => set('profissao', e.target.value)} placeholder="Ex.: Comerciante" />
+          <Input label="Profissão" required value={form.profissao ?? ''} onChange={(e) => set('profissao', e.target.value)} placeholder="Ex.: Comerciante" />
           <Input label="Nacionalidade" value={form.nacionalidade ?? ''} onChange={(e) => set('nacionalidade', e.target.value)} placeholder="Brasileiro(a)" />
           <Input label="Instagram" value={form.instagram ?? ''} onChange={(e) => set('instagram', e.target.value)} placeholder="@usuario" />
           <Select label="Origem do cliente" value={form.origem_cliente ?? ''} onChange={(e) => set('origem_cliente', e.target.value)}>
             <option value="">—</option>
             {['Instagram', 'WhatsApp', 'Indicação', 'Loja física', 'Facebook', 'Google', 'Marketplace'].map((t) => <option key={t}>{t}</option>)}
           </Select>
-          <Input label="CEP" value={form.cep ?? ''} onChange={(e) => set('cep', e.target.value)} placeholder="00000-000" />
-          <Input label="Endereço (Rua / Av.)" value={form.endereco ?? ''} onChange={(e) => set('endereco', e.target.value)} />
-          <Input label="Nº" value={form.numero ?? ''} onChange={(e) => set('numero', e.target.value)} placeholder="123" />
+          <Input label="CEP" required value={form.cep ?? ''} onChange={(e) => set('cep', e.target.value)} placeholder="00000-000" />
+          <Input label="Endereço (Rua / Av.)" required value={form.endereco ?? ''} onChange={(e) => set('endereco', e.target.value)} />
+          <Input label="Nº" required value={form.numero ?? ''} onChange={(e) => set('numero', e.target.value)} placeholder="123" />
           <Input label="Complemento" value={form.complemento ?? ''} onChange={(e) => set('complemento', e.target.value)} placeholder="Apto, bloco…" />
-          <Input label="Bairro" value={form.bairro ?? ''} onChange={(e) => set('bairro', e.target.value)} />
-          <Input label="Cidade" value={form.cidade ?? ''} onChange={(e) => set('cidade', e.target.value)} />
-          <Input wrapperClassName="col-span-2" label="Estado (UF)" value={form.estado ?? ''} onChange={(e) => set('estado', e.target.value)} maxLength={2} />
+          <Input label="Bairro" required value={form.bairro ?? ''} onChange={(e) => set('bairro', e.target.value)} />
+          <Input label="Cidade" required value={form.cidade ?? ''} onChange={(e) => set('cidade', e.target.value)} />
+          <Input wrapperClassName="col-span-2" label="Estado (UF)" required value={form.estado ?? ''} onChange={(e) => set('estado', e.target.value)} maxLength={2} />
           <Textarea wrapperClassName="col-span-2" label="Observações" rows={3} value={form.observacoes ?? ''} onChange={(e) => set('observacoes', e.target.value)} placeholder="Anotações sobre o cliente…" />
         </form>
       </Modal>

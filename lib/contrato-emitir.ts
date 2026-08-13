@@ -9,6 +9,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ContratoItem, ContratoComprador } from './contrato-tipos'
 import { renderizarModelo, type ModeloContrato, type PaginaModelo, type DadosMescla } from './contrato-modelo'
+import { camposFaltantesContrato } from './cliente-contrato'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>
@@ -88,6 +89,11 @@ export interface ContratoEmitido {
   salvo: boolean
   /** O documento escolhido nao tem versao salva (nada a emitir). */
   semModelo: boolean
+  /**
+   * Campos do comprador que saíram EM BRANCO no documento (rótulos prontos para
+   * mostrar). Vazio = cadastro completo.
+   */
+  faltando?: string[]
 }
 
 /**
@@ -149,7 +155,14 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     criado_por: input.criadoPor ?? null,
   } as never)
 
-  return { html, salvo: !error, semModelo: false }
+  return {
+    html, salvo: !error, semModelo: false,
+    // O que o cadastro do comprador não tinha. O contrato imprime o espaço em
+    // branco sem reclamar, então quem emite precisa saber ANTES de entregar o
+    // papel — cliente antigo, cadastrado quando nada era obrigatório, continua
+    // incompleto e ninguém perceberia até alguém ler o contrato assinado.
+    faltando: camposFaltantesContrato(dados.comprador),
+  }
 }
 
 export interface ContratoArquivado { id: number; nome: string | null; html: string; created_at: string }

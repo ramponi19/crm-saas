@@ -39,14 +39,31 @@ export interface ContratoItem {
 }
 
 /**
+ * Regra que faz o navegador imprimir o fundo do papel timbrado.
+ *
+ * Por padrão ele descarta imagem e cor de fundo ao imprimir (economia de tinta),
+ * então o contrato saía em branco mesmo aparecendo certo na tela.
+ */
+const CSS_IMPRIMIR_FUNDO =
+  '<style>@media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}@page{size:A4;margin:0}</style>'
+
+/**
  * Imprime um documento JÁ EMITIDO (2ª via): abre exatamente o HTML arquivado no
  * fechamento da venda, sem remontar nada.
+ *
+ * A única coisa acrescentada é a regra de impressão do fundo. Os contratos
+ * emitidos ANTES desta correção têm o CSS antigo gravado dentro deles — e o
+ * arquivo não pode ser reescrito, porque é o documento que foi assinado. Então a
+ * regra entra na hora de imprimir, sem tocar no que está arquivado.
  */
 export function imprimirContratoHTML(html: string): boolean {
   const w = window.open('', '_blank', 'width=860,height=980')
   if (!w) return false
+  const pronto = html.includes('print-color-adjust')
+    ? html
+    : html.replace(/<\/head>/i, `${CSS_IMPRIMIR_FUNDO}</head>`)
   w.document.open()
-  w.document.write(html)
+  w.document.write(pronto)
   w.document.close()
   return true
 }

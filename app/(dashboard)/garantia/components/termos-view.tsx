@@ -85,6 +85,11 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
       })
       if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`, 'Monte o documento em Administração → Documentos'); return }
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
+      // Cadastro incompleto: o contrato imprime o espaço em branco calado, então
+      // avisa ANTES de o papel ir para a mão do cliente.
+      if (r.faltando?.length) {
+        notify.warn('Contrato saiu com campos em branco', 'Falta no cadastro do cliente: ' + r.faltando.join(', ') + '.')
+      }
       if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
     } catch (e) {
       notify.bad('Erro ao emitir', e instanceof Error ? e.message : undefined)

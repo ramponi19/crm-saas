@@ -696,6 +696,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
       setEmitidos((e) => [...e, doc.id])
       if (!r.salvo) notify.warn('Documento não foi arquivado', 'Dá para imprimir agora, mas não haverá 2ª via no Histórico')
+      // Cadastro incompleto: o contrato imprime o espaço em branco calado, então
+      // avisa ANTES de o papel ir para a mão do cliente.
+      if (r.faltando?.length) {
+        notify.warn('Contrato saiu com campos em branco', 'Falta no cadastro do cliente: ' + r.faltando.join(', ') + '.')
+      }
       if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
     } catch (e) {
       setEmitindo(null)

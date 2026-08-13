@@ -260,7 +260,17 @@ const CSS_PAGINA = `
   th,td{font-size:9.5pt}
   .aviso{position:absolute;top:8px;left:70px;right:70px;z-index:2;border:1px solid #f59e0b;
     background:#fffbeb;color:#92400e;border-radius:6px;padding:6px 9px;font-size:9pt}
-  @media print{body{background:none}.page{margin:0;width:210mm;height:297mm}}
+  /* SEM ISTO O FUNDO NÃO IMPRIME. O navegador descarta imagem e cor de fundo na
+     impressão por padrão (economia de tinta) — o papel timbrado do contrato
+     aparecia na tela e saía em branco no papel. print-color-adjust:exact é o
+     pedido explícito para respeitar o fundo; é o que faz a folha impressa ser
+     igual à da tela. O prefixo -webkit- cobre Safari e Chrome mais antigos. */
+  @media print{
+    body{background:none}
+    .page{margin:0;width:210mm;height:297mm}
+    *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  }
+  @page{size:A4;margin:0}
 `
 
 /**
