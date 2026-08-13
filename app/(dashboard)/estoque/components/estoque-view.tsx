@@ -11,8 +11,7 @@ import { buscarModeloApple } from '@/lib/apple-modelos'
 import { camposDaCategoria } from '@/lib/estoque-campos'
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
-  type Column,
-} from '@/components/ui'
+  type Column, BuscaSelect } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
 import type { Segmento } from '@/lib/segmentos'
 
@@ -73,7 +72,7 @@ interface Props {
   marcas: { id: number; nome: string }[]
   categorias: { id: number; nome: string }[]
   produtos: ProdutoOpt[]
-  clientes: { id: number; nome: string }[]
+  clientes: { id: number; nome: string; telefone?: string | null; cpf_cnpj?: string | null }[]
   tabelaPrecos: TabelaPrecoRef[]
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
@@ -515,7 +514,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 // ── Formulário inline de entrada ──
 function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, preset, onSaved }: {
   produtos: ProdutoOpt[]
-  clientes: { id: number; nome: string }[]
+  clientes: { id: number; nome: string; telefone?: string | null; cpf_cnpj?: string | null }[]
   tabelaPrecos: TabelaPrecoRef[]
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
@@ -821,10 +820,21 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       </div>
 
       {!isVeiculo && (preset?.seminovo || form.condicao !== 'novo') && (
-        <Select label="Cliente (quem vendeu o aparelho)" value={form.cliente_id} onChange={e => set('cliente_id', e.target.value)}>
-          <option value="">— Não vincular —</option>
-          {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-        </Select>
+        <BuscaSelect
+          label="Cliente (quem vendeu o aparelho)"
+          valor={form.cliente_id}
+          onChange={(v) => set('cliente_id', v)}
+          vazio="— Não vincular —"
+          placeholder="Nome, telefone ou CPF…"
+          opcoes={clientes.map((c) => ({
+            id: c.id,
+            nome: c.nome,
+            detalhe: [c.telefone, c.cpf_cnpj].filter(Boolean).join(' · ') || null,
+            // Também pelos dígitos: o cadastro guarda "123.456.789-00" e no balcão
+            // a pessoa digita tudo junto.
+            busca: [c.telefone, c.cpf_cnpj].filter(Boolean).join(' ').replace(/\D/g, ''),
+          }))}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -845,6 +855,21 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
             <span className="text-[11px] text-ink-3">categoria: {produtoSel.categoria_nome}</span>
           )}
         </div>
+
+        {/* SEM PRODUTO ESCOLHIDO, ESTE BLOCO MENTE.
+            Os campos daqui vêm da categoria do produto: celular pede IMEI, IMEI 2
+            e saúde da bateria; acessório pede código de barras. Antes de escolher,
+            a tela caía no conjunto genérico (série + cor) — e quem já usava o CRM
+            lia isso como "sumiram os campos do aparelho". Agora o formulário diz
+            que está esperando o produto, em vez de mostrar a versão pobre. */}
+        {!produtoSel && !isVeiculo && (
+          <p className="mb-3 rounded-control border border-line bg-raised px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
+            <strong className="text-ink">Escolha o produto acima</strong> para abrir os campos certos. Um celular
+            pede IMEI, IMEI 2 e saúde da bateria; um acessório pede código de barras. Enquanto isso, só aparece o
+            básico.
+          </p>
+        )}
+
         <div className="space-y-5">
           {campos.veiculo && (
             <>
@@ -992,10 +1017,14 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
 
       {/* Fornecedor e fotos existiam só no modal — vieram junto para este
           formulário ser o completo, não a versão reduzida. */}
-      <Select label="Fornecedor" value={form.fornecedor_id} onChange={e => set('fornecedor_id', e.target.value)}>
-        <option value="">— Nenhum —</option>
-        {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
-      </Select>
+      <BuscaSelect
+        label="Fornecedor"
+        valor={form.fornecedor_id}
+        onChange={(v) => set('fornecedor_id', v)}
+        vazio="— Nenhum —"
+        placeholder="Nome do fornecedor…"
+        opcoes={fornecedores.map((f) => ({ id: f.id, nome: f.nome_fantasia }))}
+      />
 
       {/* A coluna guarda URLs separadas por vírgula (mesmo formato de
           /avaliacoes); o componente trabalha com array. */}

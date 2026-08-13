@@ -31,7 +31,9 @@ export default async function EstoquePage() {
     supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
     supabase.from('empresas').select('segmento').eq('id', empresaId).single(),
-    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
+    // ninguem lembra o nome completo, mas tem o telefone na mao.
+    supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
     // Fornecedor faltava no formulário da aba — só o modal tinha.
     supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
@@ -109,7 +111,7 @@ export default async function EstoquePage() {
       marcas={marcas ?? []}
       categorias={categorias ?? []}
       produtos={produtos}
-      clientes={(clientesRaw ?? []) as { id: number; nome: string }[]}
+      clientes={(clientesRaw ?? []) as { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }[]}
       tabelaPrecos={(tabelaRaw ?? []) as unknown as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
       fornecedores={(fornecedoresRaw ?? []) as { id: number; nome_fantasia: string }[]}
       empresaId={empresaId!}
