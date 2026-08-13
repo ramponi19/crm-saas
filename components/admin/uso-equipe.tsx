@@ -121,7 +121,7 @@ export function UsoEquipe({ sessoes, resumo, dias }: {
           empty={<EmptyState
             icon={<Clock size={22} strokeWidth={1.7} />}
             title="Nenhum acesso registrado no período"
-            description="O registro começou em 12/08/2026: acesso anterior a essa data não foi gravado." />} />
+            description="O histórico começa em 13/08/2026 — ver a nota abaixo." />} />
       </Card>
 
       <p className="text-[11.5px] leading-relaxed text-ink-3">
@@ -130,6 +130,13 @@ export function UsoEquipe({ sessoes, resumo, dias }: {
         trabalhada. Quem clica em <strong className="text-ink-2">Sair</strong> tem a hora exata; quem fecha a aba
         ou para de usar tem como saída o último sinal — por isso a coluna “Encerrou”. Recarregar a página ou
         abrir outra aba não cria acesso novo: sinal recente é entendido como a mesma sessão.
+      </p>
+
+      <p className="text-[11.5px] leading-relaxed text-ink-3">
+        <strong className="text-ink-2">O histórico começa em 13/08/2026.</strong> Os dois primeiros dias de
+        registro (11 e 12/08) foram apagados de propósito: naquela versão o sinal continuava a ser enviado com a
+        aba aberta e sem ninguém na frente, então uma janela esquecida virava “25 horas trabalhadas”. Número que
+        engana é pior que número nenhum — e ninguém deve ser avaliado por ele.
       </p>
     </div>
   )
