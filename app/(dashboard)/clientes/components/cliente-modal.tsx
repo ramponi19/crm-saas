@@ -115,6 +115,26 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
     if (isNew) {
       const empId = await empresaAtualId(supabase)
       if (!empId) { notify.bad('Empresa não encontrada'); setSaving(false); return }
+
+      /**
+       * CPF JÁ CADASTRADO — avisa em vez de criar o segundo.
+       *
+       * Nada impedia dois cadastros da mesma pessoa, e a consequência não é uma
+       * linha a mais na lista: o histórico de compras racha em dois, a garantia
+       * fica no cadastro errado e o contrato sai apontando para o cadastro que o
+       * vendedor não abriu. Aqui é só aviso, não bloqueio: existe caso legítimo
+       * (mesmo CPF, cadastro reativado) e travar o balcão seria pior.
+       */
+      const digitos = (form.cpf_cnpj ?? '').replace(/\D/g, '')
+      if (digitos.length >= 11) {
+        const { data: iguais } = await supabase
+          .from('clientes').select('id, nome')
+          .eq('empresa_id', empId).eq('ativo', true)
+          .ilike('cpf_cnpj', `%${digitos.slice(-9)}%`).limit(1)
+        if (iguais?.length) {
+          notify.warn('Já existe cliente com este CPF/CNPJ', `${iguais[0].nome} — confira antes de duplicar o cadastro.`)
+        }
+      }
       const { data: emp } = await supabase
         .from('empresas').select('limite_leads').eq('id', empId).maybeSingle()
       const limite = emp?.limite_leads ?? 0

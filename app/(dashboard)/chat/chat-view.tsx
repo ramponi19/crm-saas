@@ -76,8 +76,12 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
       .select('id, autor_id, destinatario_id, conteudo, created_at')
       .eq('empresa_id', empresaId).eq('tipo', 'direto')
       .or(`and(autor_id.eq.${meuId},destinatario_id.eq.${peer}),and(autor_id.eq.${peer},destinatario_id.eq.${meuId})`)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => { if (!cancel) { setDireto((data ?? []) as Msg[]); scrollFim() } })
+      // Últimas 200, não a conversa inteira: sem teto, abrir um histórico de anos
+      // trava a tela — e ninguém rola até 2024 para ler o que foi dito hoje.
+      .order('created_at', { ascending: false }).limit(200)
+      .then(({ data }) => {
+        if (!cancel) { setDireto([...((data ?? []) as Msg[])].reverse()); scrollFim() }
+      })
     return () => { cancel = true }
   }, [peer, empresaId, meuId, supabase, scrollFim])
 

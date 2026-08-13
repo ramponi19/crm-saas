@@ -71,10 +71,20 @@ export default function ClientesView({ clientes }: Props) {
   const filtrados = useMemo(() => {
     if (!search) return clientes
     const q = search.toLowerCase()
+    /**
+     * Busca também por CPF/CNPJ, comparando só os DÍGITOS.
+     *
+     * Faltava o campo inteiro: quem digitava o CPF do cliente não achava ninguém
+     * e concluía que não estava cadastrado — e cadastrava de novo. E comparar o
+     * texto cru não resolveria: o cadastro guarda "123.456.789-00" e no balcão a
+     * pessoa digita "12345678900".
+     */
+    const digitos = q.replace(/\D/g, '')
     return clientes.filter((c) =>
       c.nome.toLowerCase().includes(q) ||
       (c.email ?? '').toLowerCase().includes(q) ||
-      (c.telefone ?? '').includes(q),
+      (digitos.length >= 3 && (c.telefone ?? '').replace(/\D/g, '').includes(digitos)) ||
+      (digitos.length >= 3 && (c.cpf_cnpj ?? '').replace(/\D/g, '').includes(digitos)),
     )
   }, [clientes, search])
 
