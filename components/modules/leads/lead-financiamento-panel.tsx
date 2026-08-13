@@ -25,7 +25,7 @@ const brl = (v: number | null) => (v == null ? '—' : v.toLocaleString('pt-BR',
 
 export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [carregou, setCarregou] = useState(false)
   const [criando, setCriando] = useState(false)
@@ -45,11 +45,12 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   useEffect(() => { carregar() }, [carregar])
 
   async function adicionar() {
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     if (!form.banco.trim()) { notify.warn('Informe o banco'); return }
     setCriando(true)
     const { error } = await supabase.from('fichas_financiamento').insert({
-      empresa_id: empresa.id, lead_id: leadId, banco: form.banco.trim(),
+      empresa_id: empresaId, lead_id: leadId, banco: form.banco.trim(),
       valor: num(form.valor), entrada: num(form.entrada), parcelas: num(form.parcelas), taxa: num(form.taxa),
       status: 'enviada',
     })

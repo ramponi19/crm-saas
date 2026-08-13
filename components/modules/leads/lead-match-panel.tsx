@@ -18,7 +18,7 @@ const vazio = {
 
 export function LeadMatchPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [form, setForm] = useState(vazio)
   const [salvando, setSalvando] = useState(false)
   const [buscando, setBuscando] = useState(false)
@@ -65,10 +65,11 @@ export function LeadMatchPanel({ leadId }: { leadId: number }) {
     setForm(f => ({ ...f, tipos: f.tipos.includes(t) ? f.tipos.filter(x => x !== t) : [...f.tipos, t] }))
 
   async function salvar() {
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)
     const { error } = await supabase.from('lead_perfil_busca').upsert({
-      empresa_id: empresa.id,
+      empresa_id: empresaId,
       lead_id: leadId,
       finalidade: form.finalidade,
       tipos: form.tipos,

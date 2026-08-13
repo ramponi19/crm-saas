@@ -23,7 +23,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [clienteId, setClienteId] = useState('')
   const [cadastroAberto, setCadastroAberto] = useState(false)
   /** Clientes criados aqui: a prop vem do servidor e só muda no refresh. */
@@ -55,13 +55,14 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     // encomenda que fica encalhada na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)
     const { data: { user } } = await supabase.auth.getUser()
     const cliNome = listaClientes.find((c) => String(c.id) === clienteId)?.nome ?? ''
 
     const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
-      empresa_id: empresa.id,
+      empresa_id: empresaId,
       fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
       descricao: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}${cliNome ? ` — ${cliNome}` : ''}`,
       valor_total: Number(custo) || 0,
@@ -75,7 +76,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     if (e1 || !pedido) { setSalvando(false); notify.bad('Erro ao criar o pedido de compra'); return }
 
     const { error: e2 } = await supabase.from('vendas').insert({
-      empresa_id: empresa.id,
+      empresa_id: empresaId,
       valor_venda: Number(valorVenda) || 0,
       status: 'encomenda',
       cliente_id: Number(clienteId),

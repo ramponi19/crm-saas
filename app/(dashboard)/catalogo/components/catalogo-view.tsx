@@ -128,7 +128,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const [saving, setSaving] = useState(false)
   const [removendoPreco, setRemovendoPreco] = useState<number | null>(null)
   const router = useRouter()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
 
   // ── Tabela de preços: exportar / importar em massa ──
@@ -266,10 +266,11 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   async function salvarPreco() {
     if (!precoForm.modelo || !precoForm.preco_sugerido) { notify.bad('Modelo e preço são obrigatórios'); return }
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSaving(true)
     const payload = {
-      empresa_id: empresa.id,
+      empresa_id: empresaId,
       modelo: precoForm.modelo.trim(),
       armazenamento: precoForm.armazenamento.trim() || null,
       condicao: precoForm.condicao,

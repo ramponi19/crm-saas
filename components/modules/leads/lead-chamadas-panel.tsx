@@ -19,7 +19,7 @@ const quando = (iso: string | null) => (iso ? new Date(iso).toLocaleString('pt-B
 
 export function LeadChamadasPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [itens, setItens] = useState<Chamada[]>([])
   const [carregou, setCarregou] = useState(false)
   const [direcao, setDirecao] = useState('saida')
@@ -34,11 +34,12 @@ export function LeadChamadasPanel({ leadId }: { leadId: number }) {
   useEffect(() => { carregar() }, [carregar])
 
   async function registrar() {
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('chamadas').insert({
-      empresa_id: empresa.id, lead_id: leadId, usuario_id: user?.id ?? null,
+      empresa_id: empresaId, lead_id: leadId, usuario_id: user?.id ?? null,
       direcao, resultado, observacao: obs.trim() || null,
     })
     if (!error) {

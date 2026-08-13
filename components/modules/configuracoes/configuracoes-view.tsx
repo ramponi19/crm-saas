@@ -107,6 +107,20 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * Id da empresa na hora de salvar.
+   *
+   * A busca acima roda UMA vez; se falhar (rede oscilando, token renovando), o
+   * estado fica nulo e todo botão de salvar passa a recusar com "Empresa não
+   * carregada" até alguém dar F5 — e quem usa não tem como adivinhar isso.
+   */
+  async function garantirEmpresaId(): Promise<number | null> {
+    if (empresaId) return empresaId
+    const id = await empresaAtualId(supabase)
+    if (id) setEmpresaId(id)
+    return id
+  }
+
   // Taxas — estado controlado (visa_master / outros / link)
   const [taxasVisa, setTaxasVisa] = useState<Record<number, string>>(() => {
     const m: Record<number, string> = {}
@@ -141,8 +155,9 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
   }, [empresaId])
 
   async function salvarTaxas() {
-    if (!empresaId) { notify.bad('Empresa não carregada'); return }
-    const empresa_id = empresaId
+    const empId = await garantirEmpresaId()
+    if (!empId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
+    const empresa_id = empId
     setSavingTaxas(true)
     try {
       const rows: Array<{ empresa_id: number; forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number; ativo: boolean }> = []
@@ -174,12 +189,13 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
   }
 
   async function salvarSLA() {
-    if (!empresaId) { notify.bad('Empresa não carregada'); return }
+    const empId = await garantirEmpresaId()
+    if (!empId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSavingSLA(true)
     try {
       const [verde, amarelo, vermelho] = slaValues
       const { error } = await supabase.from('configuracoes_sistema')
-        .upsert({ empresa_id: empresaId, chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'empresa_id,chave' })
+        .upsert({ empresa_id: empId, chave: 'sla_atendimento', valor: { verde, amarelo, vermelho } as unknown as Json }, { onConflict: 'empresa_id,chave' })
       if (error) { notify.bad('Erro ao salvar SLA'); return }
       notify.ok('Regras de SLA salvas!')
     } finally { setSavingSLA(false) }
@@ -235,11 +251,12 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
 
   async function saveModal() {
     if (!modalCanal) return
-    if (!empresaId) { notify.bad('Empresa não carregada'); return }
+    const empId = await garantirEmpresaId()
+    if (!empId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSaving(true)
     const upsert = (chave: string, valor: unknown) =>
       supabase.from('configuracoes_sistema')
-        .upsert({ empresa_id: empresaId, chave, valor: valor as Json }, { onConflict: 'empresa_id,chave' })
+        .upsert({ empresa_id: empId, chave, valor: valor as Json }, { onConflict: 'empresa_id,chave' })
     try {
       if (modalCanal.id === 'whatsapp') {
         const cfg: OfficialConfig = {

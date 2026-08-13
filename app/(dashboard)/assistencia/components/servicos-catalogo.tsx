@@ -22,7 +22,7 @@ const EMPTY = { nome: '', categoria: '', preco: '', tempo: '' }
 
 export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo[] }) {
   const router = useRouter()
-  const { empresa } = useEmpresa()
+  const { empresa, resolverEmpresaId } = useEmpresa()
   const [edit, setEdit] = useState<ServicoReparo | null>(null)
   const [novo, setNovo] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -37,10 +37,11 @@ export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo
 
   async function salvar() {
     if (!form.nome.trim()) { notify.warn('Informe o nome do serviço'); return }
-    if (!empresa?.id) { notify.bad('Empresa não carregada'); return }
+    const empresaId = await resolverEmpresaId()
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)
     const payload = {
-      empresa_id: empresa.id,
+      empresa_id: empresaId,
       nome: form.nome.trim(),
       categoria: form.categoria || null,
       preco: Number(String(form.preco).replace(',', '.')) || 0,
