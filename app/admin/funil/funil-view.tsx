@@ -58,7 +58,8 @@ export function FunilView({ initial, funilId, funis = [], leadsPorEtapa = {} }: 
     if (j < 0 || j >= e.length) return e
     const copy = [...e];[copy[i], copy[j]] = [copy[j], copy[i]]; return copy
   })
-  const add = () => setEtapas((e) => [...e, { label: 'Nova etapa', cor: '#9199A3', tipo: 'normal', ativo: true, probabilidade: 25 }])
+  // Sem probabilidade: o servidor deriva do tipo da etapa (ver /api/funil).
+  const add = () => setEtapas((e) => [...e, { label: 'Nova etapa', cor: '#9199A3', tipo: 'normal', ativo: true }])
 
   /**
    * Arrastar com o mouse — a ordem do funil é visual, e clicar em seta 6 vezes
@@ -131,7 +132,7 @@ export function FunilView({ initial, funilId, funis = [], leadsPorEtapa = {} }: 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           funilId,
-          etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo, probabilidade: e.probabilidade ?? 0, camposObrigatorios: e.camposObrigatorios ?? [] })),
+          etapas: etapas.map((e) => ({ id: e.id, label: e.label.trim(), cor: e.cor, tipo: e.tipo, ativo: e.ativo, camposObrigatorios: e.camposObrigatorios ?? [] })),
           // Exclusões vão no MESMO salvamento: reordenar e excluir em chamadas
           // separadas deixaria o funil num estado intermediário se a segunda
           // falhasse — com lead apontando para etapa que já não existe.
@@ -305,17 +306,6 @@ function LinhaEtapa({ id, etapa: e, indice: i, total, leads, set, move, onExclui
         <Select wrapperClassName="w-[140px]" value={e.tipo} onChange={(ev) => set(i, { tipo: ev.target.value })}>
           {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
         </Select>
-        <div className="flex w-[92px] flex-none items-center gap-1">
-          <Input
-            type="number" min={0} max={100}
-            value={e.probabilidade ?? 0}
-            onChange={(ev) => set(i, { probabilidade: Math.max(0, Math.min(100, Number(ev.target.value))) })}
-            className="num text-center"
-            aria-label="Probabilidade"
-          />
-          <span className="text-[12px] text-ink-3">%</span>
-        </div>
-
         {/* Quantos leads moram aqui: é o número que torna a exclusão uma decisão
             informada em vez de um susto depois. */}
         {leads > 0 && <Badge tone="neutro">{leads} lead{leads > 1 ? 's' : ''}</Badge>}

@@ -14,6 +14,22 @@ interface EtapaIn {
 
 const CAMPOS_VALIDOS = ['telefone', 'valor_estimado', 'responsavel_id', 'produto_interessado']
 
+/**
+ * Probabilidade de fechamento por tipo de etapa.
+ *
+ * A tela do funil não pede mais esse número: era uma coluna "%" que ninguém sabia
+ * o que significava e que só alimenta UMA coisa — o forecast em Metas (valor
+ * estimado do lead x probabilidade da etapa). Pedir ao dono um percentual de
+ * conversão por etapa é pedir uma estatística que ele não tem.
+ *
+ * Ganho é certeza (100), perdido é zero, negociação vale mais que contato inicial.
+ * Números redondos e honestos: servem de ponto de partida e o forecast deixa de
+ * depender de digitação.
+ */
+const PROB_POR_TIPO: Record<string, number> = {
+  ganho: 100, perdido: 0, negociacao: 60, normal: 25,
+}
+
 function slugify(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'etapa'
@@ -65,8 +81,16 @@ export async function POST(req: Request) {
     const campos = Array.isArray(e.camposObrigatorios) ? e.camposObrigatorios.filter(c => CAMPOS_VALIDOS.includes(c)) : []
     if (e.id) {
       // slug NÃO muda (leads.kanban_status depende dele)
+      //
+      // A probabilidade só é escrita se o corpo mandar. A tela não manda mais, e
+      // sobrescrever com 0 zeraria o forecast de quem já tinha ajustado o número
+      // quando a coluna "%" existia.
+      const patch = {
+        label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, campos_obrigatorios: campos,
+        ...(typeof e.probabilidade === 'number' ? { probabilidade: prob } : {}),
+      }
       const { error } = await service.from('funil_etapas')
-        .update({ label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, probabilidade: prob, campos_obrigatorios: campos })
+        .update(patch)
         .eq('id', e.id).eq('empresa_id', empresaId)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     } else {
@@ -75,7 +99,7 @@ export async function POST(req: Request) {
       while (slugs.has(slug)) slug = `${slugify(e.label)}_${n++}`
       slugs.add(slug)
       const { error } = await service.from('funil_etapas')
-        .insert({ empresa_id: empresaId, funil_id: funilId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, probabilidade: prob, campos_obrigatorios: campos })
+        .insert({ empresa_id: empresaId, funil_id: funilId, slug, label: e.label, cor: e.cor, tipo, ordem: i, ativo: e.ativo, probabilidade: typeof e.probabilidade === 'number' ? prob : (PROB_POR_TIPO[tipo] ?? 25), campos_obrigatorios: campos })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
