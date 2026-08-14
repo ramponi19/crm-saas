@@ -210,6 +210,79 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState('')
   const draftRef = useRef<HTMLTextAreaElement>(null)
+  const [meuId, setMeuId] = useState<string | null>(null)
+  const [rascunhoRestaurado, setRascunhoRestaurado] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMeuId(data.user?.id ?? null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
+   * RASCUNHO POR CONVERSA — como no celular.
+   *
+   * O vendedor escreve meia mensagem, o cliente do balcão chama, ele fecha o
+   * chat e perde tudo. Agora o texto fica guardado e volta quando ele reabre a
+   * conversa.
+   *
+   * FICA NO NAVEGADOR, não no banco: rascunho é intenção, não mensagem. Guardar
+   * no servidor faria texto não enviado sobre um cliente virar registro
+   * permanente da empresa, visível em backup e auditoria — e ninguém escreve
+   * rascunho contando com isso.
+   *
+   * A CHAVE INCLUI O USUÁRIO porque na loja dois vendedores usam o mesmo
+   * computador. Sem isso, um leria o texto que o outro deixou pela metade.
+   */
+  const chaveRascunho = meuId ? `crm_rascunho_${meuId}_lead_${lead.id}` : null
+
+  useEffect(() => {
+    if (!chaveRascunho) return
+    try {
+      const cru = window.localStorage.getItem(chaveRascunho)
+      if (!cru) return
+      const r = JSON.parse(cru) as { texto?: string; em?: number; dono?: string | null }
+
+      /**
+       * O LEAD MUDOU DE MÃO → o rascunho morre.
+       *
+       * Guardo quem era o responsável quando o texto foi escrito. Se o lead voltou
+       * para a esteira (devolução por falta de resposta) ou outro vendedor assumiu,
+       * o rascunho é apagado — foi o combinado: quem perde o lead não deixa
+       * mensagem pendurada nele. Lead que estava livre e continua livre mantém o
+       * texto, senão quem atende antes de assumir perderia o que digitou.
+       */
+      if ((r.dono ?? null) !== (lead.responsavel_id ?? null)) {
+        window.localStorage.removeItem(chaveRascunho)
+        return
+      }
+      // Higiene: rascunho de uma semana atrás não é mais intenção, é lixo.
+      if (r.em && Date.now() - r.em > 7 * 24 * 60 * 60 * 1000) {
+        window.localStorage.removeItem(chaveRascunho)
+        return
+      }
+      if (r.texto?.trim()) { setDraft(r.texto); setRascunhoRestaurado(true) }
+    } catch { /* localStorage cheio ou bloqueado: rascunho é conforto, não pode quebrar o chat */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveRascunho, lead.responsavel_id])
+
+  // Grava com folga entre teclas: escrever no localStorage a cada caractere é
+  // trabalho à toa num campo em que a pessoa digita rápido.
+  useEffect(() => {
+    if (!chaveRascunho) return
+    const id = setTimeout(() => {
+      try {
+        if (draft.trim()) {
+          window.localStorage.setItem(chaveRascunho, JSON.stringify({
+            texto: draft, em: Date.now(), dono: lead.responsavel_id ?? null,
+          }))
+        } else {
+          window.localStorage.removeItem(chaveRascunho)
+        }
+      } catch { /* sem espaço: segue sem rascunho */ }
+    }, 400)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, chaveRascunho, lead.responsavel_id])
 
   // O campo cresce com o texto e volta ao tamanho de uma linha ao esvaziar. Sem
   // isto, ou ele fica alto de propósito comendo a conversa, ou some com o que
@@ -492,6 +565,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     const t = draft.trim(); if (!t) return
     const canal = lead.origem ?? 'manual'
     setDraft('')
+    setRascunhoRestaurado(false)
+    // Enviou: deixou de ser rascunho. O `rollback` abaixo devolve o texto ao
+    // campo se o envio falhar, e o efeito de gravação salva de novo — então não
+    // há risco de perder a mensagem por limpar aqui.
+    if (chaveRascunho) { try { window.localStorage.removeItem(chaveRascunho) } catch {} }
     setChat((prev) => [...prev, { from: 'loja', text: t, time: 'agora' }])
 
     const rollback = () => {
@@ -698,21 +776,40 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     }
 
     setSaving(true)
-    // Campos editáveis (sem a etapa — a etapa vai pelo endpoint que dispara as automações).
+    // Campos editáveis (sem a etapa nem o responsável — cada um tem seu caminho).
     const { error } = await supabase.from('leads').update({
       nome: form.nome.trim() || null,
       telefone: form.tel.trim() || null,
       instagram: form.ig.trim() || null,
       produto_interessado: form.produto.trim() || null,
-      responsavel_id: respId,
-      // Só remarca o início da responsabilidade quando o dono MUDA — salvar
-      // outro campo não pode zerar o relógio do prazo de resposta.
-      ...(respId !== (lead.responsavel_id ?? null)
-        ? { responsavel_desde: respId ? new Date().toISOString() : null }
-        : {}),
       observacoes: form.obs.trim() || null,
     }).eq('id', lead.id)
     if (error) { setSaving(false); notify.bad('Erro ao salvar'); return }
+
+    /**
+     * TROCA DE DONO vai pela rota, nunca pelo client.
+     *
+     * A proteção de carteira e a regra de quem pode transferir vivem em
+     * /api/leads/atribuir. Gravar `responsavel_id` daqui contornava as duas em um
+     * clique — e ainda zerava `responsavel_desde`, reiniciando a carência.
+     */
+    const donoAtual = lead.responsavel_id ?? null
+    if (respId !== donoAtual) {
+      const acao = !respId ? 'devolver' : (!donoAtual && respId === meuId ? 'pegar' : 'atribuir')
+      const r = await fetch('/api/leads/atribuir', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, acao, paraResponsavel: respId }),
+      })
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}))
+        setSaving(false)
+        // O resto já foi salvo; devolve o select ao dono real para a tela não
+        // mostrar uma troca que o servidor recusou.
+        setForm((f) => ({ ...f, responsavel: donoAtual ?? '' }))
+        notify.bad('Responsável não alterado', j.error ?? 'Tente novamente.')
+        return
+      }
+    }
 
     // Mudança de etapa → /api/leads/mover (motivo de perda já barrado acima;
     // aqui dispara automações, cadência por etapa e orçamento de negociação).
@@ -1066,6 +1163,17 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
 
             {/* `items-end`: o campo cresce com as linhas, e os botões precisam
                 ficar rentes à base — centralizados, eles subiriam junto. */}
+            {/* Avisa que o texto no campo veio de antes. Sem isso, reabrir a
+                conversa e encontrar palavras já escritas assusta: o vendedor não
+                sabe se aquilo foi enviado ao cliente ou não. Sai no primeiro
+                toque de tecla. */}
+            {rascunhoRestaurado && (
+              <div className="flex items-center gap-1.5 border-t border-line-soft px-3 pt-2 text-[11.5px] text-ink-3 sm:px-5">
+                <Clock size={12} strokeWidth={1.8} className="shrink-0" />
+                Rascunho salvo — esta mensagem <strong className="font-semibold text-ink-2">não foi enviada</strong>.
+              </div>
+            )}
+
             <div className="flex items-end gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
               <input
                 ref={fileRef}
@@ -1093,7 +1201,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
                 ref={draftRef}
                 rows={1}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => { setDraft(e.target.value); setRascunhoRestaurado(false) }}
                 onKeyDown={(e) => {
                   // isComposing: no Mac o acento é composto com dead key, e enviar
                   // no meio da composição corta a palavra.
