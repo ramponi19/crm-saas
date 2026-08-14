@@ -3,7 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { Topbar } from '@/components/layout/topbar'
 import { Home, CircleAlert, ArrowUpRight, Users, CalendarDays } from 'lucide-react'
-import { Card, StatCard, Badge } from '@/components/ui'
+import { Card, Badge } from '@/components/ui'
 import type { ScoreConfig } from '@/lib/lead-score'
 import { TermometroLeads } from './termometro-leads'
 import { LeadsParados, type LeadParado } from './leads-parados'
@@ -155,15 +155,7 @@ export default async function DashboardImob() {
   const ultimosClientes = (ultimosClientesRaw ?? []) as ClienteRow[]
   const ultimosImoveis = (ultimosImoveisRaw ?? []) as ImovelRow[]
 
-  const escopo = isGestor ? 'da equipe' : 'suas'
   const primeiroNome = (usuario?.nome ?? '').split(' ')[0] || 'corretor'
-
-  const kpis = [
-    { label: `Leads ativos (${escopo})`, valor: leads.length },
-    { label: 'Leads novos', valor: porEtapa('novo') },
-    { label: 'Visitas agendadas', valor: porEtapa('visita_agendada') },
-    { label: 'Em proposta', valor: porEtapa('proposta') },
-  ]
   const recentes = leads.slice(0, 6)
 
   return (
@@ -179,14 +171,20 @@ export default async function DashboardImob() {
             <p className="mt-0.5 text-[13px] text-ink-2">Aqui está {isGestor ? 'a operação da equipe' : 'sua operação'} hoje.</p>
           </div>
 
-          {/* KPIs */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
-            {kpis.map(k => <StatCard key={k.label} bare label={k.label} value={k.valor} />)}
-          </div>
-
-          {/* Pipeline — uma caixa por etapa, na ordem em que o negócio anda */}
+          {/* Funil — uma caixa por etapa, na ordem em que o negócio anda.
+              Os indicadores que existiam aqui em cima (leads novos, visitas
+              agendadas, em proposta) eram as próprias etapas repetidas; do
+              conjunto antigo só o TOTAL não estava no funil, e ele virou o
+              subtítulo deste card. */}
           <Card
-            title={`Funil ${isGestor ? 'da equipe' : 'de vendas'}`}
+            title={
+              <span className="flex items-baseline gap-2">
+                <span>Funil {isGestor ? 'da equipe' : 'de vendas'}</span>
+                <span className="num text-[12px] font-normal text-ink-3">
+                  {leads.length} {leads.length === 1 ? 'lead ativo' : 'leads ativos'}
+                </span>
+              </span>
+            }
             actions={<Link href="/leads" className="text-[12px] font-semibold text-accent hover:underline">Abrir Leads →</Link>}
           >
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
