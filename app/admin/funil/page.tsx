@@ -33,6 +33,22 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
     .from('funil_etapas').select('id, slug, label, cor, tipo, ativo, ordem, probabilidade, campos_obrigatorios')
     .eq('empresa_id', empresaId).eq('funil_id', funilId ?? -1).order('ordem')
 
+  /**
+   * Quantos leads ativos moram em cada etapa.
+   *
+   * É o que permite excluir com responsabilidade: o lead guarda o SLUG da etapa
+   * em `kanban_status`, então apagar uma etapa que tem gente dentro deixaria
+   * esses leads apontando para algo que não existe — eles sairiam do kanban sem
+   * ninguém perceber, e é justamente o cliente que ainda não comprou.
+   */
+  const { data: leadsPorEtapa } = await supabase
+    .from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true)
+  const contagem: Record<string, number> = {}
+  for (const l of (leadsPorEtapa ?? []) as { kanban_status: string | null }[]) {
+    const k = l.kanban_status ?? ''
+    if (k) contagem[k] = (contagem[k] ?? 0) + 1
+  }
+
   const etapasEdit: EtapaEdit[] = ((etapas ?? []) as Array<Record<string, unknown>>).map((e) => ({
     id: e.id as number,
     slug: e.slug as string,
@@ -48,7 +64,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <Topbar title="Funil de vendas" />
-      <FunilView initial={etapasEdit} funilId={funilId} funis={funis} />
+      <FunilView initial={etapasEdit} funilId={funilId} funis={funis} leadsPorEtapa={contagem} />
     </>
   )
 }
