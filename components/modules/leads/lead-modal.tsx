@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { Lead, Usuario, type KanbanColumn, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
+import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
+import { MotivoPerdaModal } from './motivo-perda-modal'
 import { LeadMatchPanel } from './lead-match-panel'
 import { LeadInteressePanel } from './lead-interesse-panel'
 import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
@@ -29,6 +30,11 @@ interface LeadModalProps {
   usuarios: Usuario[]
   columns: KanbanColumn[]
   segmento?: string | null
+  /**
+   * Motivos de perda. Necessários AQUI porque agora dá para marcar Perdido pelo
+   * próprio modal — antes ele recusava e mandava arrastar o card no quadro.
+   */
+  motivos?: Motivo[]
   onClose: () => void
   onUpdate: (lead: Lead) => void
 }
@@ -203,7 +209,7 @@ function AudioChat({ url }: { url: string }) {
   )
 }
 
-export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate }: LeadModalProps) {
+export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onClose, onUpdate }: LeadModalProps) {
   const supabase = createClient()
   const { empresa } = useEmpresa()
   const router = useRouter()
@@ -262,7 +268,6 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       }
       if (r.texto?.trim()) { setDraft(r.texto); setRascunhoRestaurado(true) }
     } catch { /* localStorage cheio ou bloqueado: rascunho é conforto, não pode quebrar o chat */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveRascunho, lead.responsavel_id])
 
   // Grava com folga entre teclas: escrever no localStorage a cada caractere é
@@ -281,7 +286,6 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
       } catch { /* sem espaço: segue sem rascunho */ }
     }, 400)
     return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, chaveRascunho, lead.responsavel_id])
 
   // O campo cresce com o texto e volta ao tamanho de uma linha ao esvaziar. Sem
@@ -294,6 +298,10 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`
   }, [draft])
   const [confirmDel, setConfirmDel] = useState(false)
+  const [movendoEtapa, setMovendoEtapa] = useState(false)
+  /** Etapa de perda escolhida, esperando motivo + justificativa. */
+  const [perdaPendente, setPerdaPendente] = useState<string | null>(null)
+  const [salvandoPerda, setSalvandoPerda] = useState(false)
 
   /**
    * Config da assinatura do atendente. A bolha do CRM mostra a MESMA linha que
@@ -763,18 +771,98 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
     notify.ok(`Lead movido para ${alvo.label}`)
   }
 
+  /**
+   * Troca de etapa pelo modal, com efeito imediato.
+   *
+   * Antes o modal RECUSAVA marcar Perdido: mandava fechar e arrastar o card no
+   * quadro, porque a perda exige motivo e o motivo só existia no fluxo do
+   * arraste. Pedir para o vendedor repetir o gesto noutro lugar é empurrar
+   * trabalho para quem está no meio do atendimento — o modal agora pede o motivo
+   * ali mesmo.
+   *
+   * As etapas normais movem na hora (otimista, com reversão se o servidor
+   * recusar). A rota é a MESMA do quadro, então automação, cadência por etapa e
+   * orçamento de negociação continuam disparando igual.
+   */
+  async function mudarEtapa(novo: string) {
+    if (novo === (form.status || lead.kanban_status || 'novo')) return
+    const alvo = columns.find((c) => c.id === novo)
+
+    // Perdido: não move nada até saber o motivo. Se o vendedor cancelar, o
+    // select volta para a etapa real — nada de card em limbo.
+    if (alvo?.tipo === 'perdido') { setPerdaPendente(novo); return }
+
+    const anterior = form.status
+    setForm((f) => ({ ...f, status: novo }))
+    setMovendoEtapa(true)
+    try {
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, kanban_status: novo }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'Falha ao mover')
+      onUpdate({ ...lead, kanban_status: novo })
+      notify.ok('Etapa alterada', alvo?.label ?? novo)
+    } catch (e) {
+      setForm((f) => ({ ...f, status: anterior }))
+      notify.bad('Não foi possível mover', e instanceof Error ? e.message : undefined)
+    } finally {
+      setMovendoEtapa(false)
+    }
+  }
+
+  /**
+   * Perda confirmada no modal: grava ETAPA + MOTIVO + JUSTIFICATIVA de uma vez.
+   *
+   * A justificativa vai para `observacoes` (é onde ela sempre morou e onde o
+   * vendedor a lê depois), com rótulo e data — o mesmo lead pode ser perdido,
+   * voltar e ser perdido de novo, e sem carimbo ninguém sabe de qual vez é o
+   * texto.
+   */
+  async function confirmarPerda(motivoId: number, justificativa: string) {
+    if (!perdaPendente) return
+    setSalvandoPerda(true)
+    try {
+      const quando = new Date().toLocaleDateString('pt-BR')
+      const obsNova = justificativa
+        ? (form.obs ? form.obs + '\n' : '') + `Justificativa da perda (${quando}): ${justificativa}`
+        : form.obs
+
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          kanban_status: perdaPendente,
+          motivo_perda_id: motivoId,
+          perdido_em: new Date().toISOString(),
+          ...(justificativa ? { observacoes: obsNova } : {}),
+        }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'Falha ao registrar a perda')
+
+      setForm((f) => ({ ...f, status: perdaPendente, obs: obsNova }))
+      onUpdate({ ...lead, kanban_status: perdaPendente, motivo_perda_id: motivoId, observacoes: obsNova })
+      notify.ok('Lead marcado como perdido', motivos.find((m) => m.id === motivoId)?.label)
+      setPerdaPendente(null)
+    } catch (e) {
+      notify.bad('Não foi possível registrar a perda', e instanceof Error ? e.message : undefined)
+    } finally {
+      setSalvandoPerda(false)
+    }
+  }
+
   async function handleSave() {
     const statusKey = form.status || lead.kanban_status || 'novo'
     const respId = form.responsavel || null // Select agora guarda o ID; '' = sem responsável
-    const mudouEtapa = statusKey !== (lead.kanban_status ?? 'novo')
-    const alvo = columns.find((c) => c.id === statusKey)
 
-    // Marcar como "Perdido" exige motivo → só pelo quadro (kanban), não pelo modal.
-    if (mudouEtapa && alvo?.tipo === 'perdido') {
-      notify.warn('Para marcar como Perdido, arraste o lead no quadro (é preciso informar o motivo da perda).')
-      return
-    }
-
+    /**
+     * A ETAPA NÃO É SALVA AQUI. O próprio select já moveu o lead (ver
+     * `mudarEtapa`), inclusive no caminho da perda, que pede motivo antes.
+     *
+     * Antes este ponto recusava marcar Perdido e mandava o vendedor fechar o
+     * modal e arrastar o card no quadro — o gesto duas vezes, no meio do
+     * atendimento.
+     */
     setSaving(true)
     // Campos editáveis (sem a etapa nem o responsável — cada um tem seu caminho).
     const { error } = await supabase.from('leads').update({
@@ -809,16 +897,6 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
         notify.bad('Responsável não alterado', j.error ?? 'Tente novamente.')
         return
       }
-    }
-
-    // Mudança de etapa → /api/leads/mover (motivo de perda já barrado acima;
-    // aqui dispara automações, cadência por etapa e orçamento de negociação).
-    if (mudouEtapa) {
-      const r = await fetch('/api/leads/mover', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: lead.id, kanban_status: statusKey }),
-      })
-      if (!r.ok) { setSaving(false); notify.bad('Erro ao mover de etapa'); return }
     }
 
     setSaving(false)
@@ -942,10 +1020,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
               <ProdutoAutocomplete label="Produto interessado" value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
             )}
             {salvarAqui('produto')}
-            <Select label="Status no funil" value={form.status} onChange={(e) => set('status', e.target.value)}>
+            {/* Escolher a etapa MOVE o card na hora — não espera "Salvar".
+                Trocar o status é uma ação, não a edição de um texto: quem escolhe
+                "Negociando" quer que o quadro mostre isso agora. */}
+            <Select label="Status no funil" value={form.status} onChange={(e) => mudarEtapa(e.target.value)} disabled={movendoEtapa}>
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
-            {salvarAqui('status')}
+            {movendoEtapa && <p className="text-[11.5px] text-ink-3">movendo…</p>}
             <Select label="Responsável" value={form.responsavel} onChange={(e) => set('responsavel', e.target.value)}>
               <option value="">Sem responsável</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -1221,6 +1302,18 @@ export function LeadModal({ lead, usuarios, columns, segmento, onClose, onUpdate
           </div>
         </div>
       </div>
+
+      {/* Perda pedida pelo select: motivo + justificativa antes de mover.
+          Cancelar devolve o select à etapa real — o lead não fica em limbo. */}
+      {perdaPendente && (
+        <MotivoPerdaModal
+          leadNome={form.nome || lead.nome || ''}
+          motivos={motivos}
+          loading={salvandoPerda}
+          onConfirm={confirmarPerda}
+          onCancel={() => setPerdaPendente(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmDel}
