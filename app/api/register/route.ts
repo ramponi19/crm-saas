@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { motivosDoSegmento } from '@/lib/motivos-perda'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 
 /**
@@ -123,7 +124,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Erro ao vincular usuário: ' + vinErr.message }, { status: 500 })
   }
 
-  // 5) e-mail de boas-vindas (não-bloqueante: nunca falha o cadastro).
+  /**
+   * 5) motivos de perda do segmento.
+   *
+   * Marcar lead como perdido EXIGE motivo, e a empresa nascia sem nenhum: o
+   * vendedor arrastava o card, o modal abria vazio mandando "configurar em
+   * Configurações" e a ação morria. Campo obrigatório sem opção é porta trancada.
+   *
+   * Não bloqueia o cadastro se falhar — a loja consegue cadastrar à mão depois, e
+   * derrubar um cadastro inteiro por causa de uma lista de apoio seria pior.
+   */
+  const { error: motErr } = await svc.from('motivos_perda').insert(
+    motivosDoSegmento(body.segmento).map((label, i) => ({
+      empresa_id: empresa.id, label, ordem: i, ativo: true,
+    })),
+  )
+  if (motErr) console.error('[register] motivos de perda não semeados:', motErr.message)
+
+  // 6) e-mail de boas-vindas (não-bloqueante: nunca falha o cadastro).
   const { subject, html } = emailBoasVindas(nomeUsuario, nomeEmpresa)
   enviarEmail({ to: email, subject, html }).catch(() => {/* stub/no-op sem provider */})
 

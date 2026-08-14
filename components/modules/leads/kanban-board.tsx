@@ -131,7 +131,13 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
       perdido_em: new Date().toISOString(),
     }
     if (observacao) {
-      extra.observacoes = (pendingPerda.observacoes ? pendingPerda.observacoes + '\n' : '') + `Motivo da perda: ${observacao}`
+      // Rótulo e DATA no texto: a justificativa entra no meio das observações do
+      // lead, e sem carimbo ninguém sabe, meses depois, se aquilo é de agora ou de
+      // uma perda anterior — o mesmo lead pode ser perdido, voltar e ser perdido
+      // de novo.
+      const quando = new Date().toLocaleDateString('pt-BR')
+      extra.observacoes = (pendingPerda.observacoes ? pendingPerda.observacoes + '\n' : '')
+        + `Justificativa da perda (${quando}): ${observacao}`
     }
     await persistirMove(pendingPerda, extra)
     setSalvandoPerda(false)
