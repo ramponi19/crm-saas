@@ -127,8 +127,19 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
         vendedor: v.vendedor_nome, data: v.data_venda ?? undefined,
       })
       setEmitindo(null)
+      // Recusado por falta de identificação da loja: diz o MOTIVO. O teste mostrou
+      // esta tela caindo no 'Não foi possível emitir' genérico — que não diz o que
+      // fazer, e é o mesmo que falhar calado.
+      if (r.bloqueado) { notify.bad('Contrato não emitido', r.bloqueado); return }
       if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`); return }
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
+      // O cadastro do comprador incompleto também precisa aparecer aqui.
+      if (r.faltando?.length) {
+        notify.warn('Contrato saiu com campos em branco', 'Falta no cadastro do cliente: ' + r.faltando.join(', ') + '.')
+      }
+      if (r.faltandoLoja?.length) {
+        notify.warn('Falta o cadastro da sua loja', 'O contrato pede: ' + r.faltandoLoja.join(', ') + '. Preencha em Administração → Minha empresa.')
+      }
       if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
       abrirDocumentos(v)
     } catch (e) {
