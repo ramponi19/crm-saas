@@ -246,6 +246,10 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           usuarios={usuarios}
           columns={columns}
           segmento={segmento}
+          // Sem esta lista o modal de perda abriria vazio ("nenhum motivo
+          // cadastrado") justamente onde agora se marca Perdido — e sem erro
+          // algum na tela, que é o pior jeito de faltar dado.
+          motivos={motivos}
           onClose={() => setSelectedLead(null)}
           onUpdate={handleLeadUpdate}
         />
