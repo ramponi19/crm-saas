@@ -151,7 +151,10 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
 
   useEffect(() => {
     if (!empresaId) return
-    supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'sla_atendimento').single()
+    // `maybeSingle`: empresa que nunca salvou o SLA não tem esta linha — ausência é
+    // o estado PADRÃO, não erro. Com `single()` a tela registrava um erro no console
+    // a cada abertura, e ruído constante é o que faz ninguém mais olhar o console.
+    supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'sla_atendimento').maybeSingle()
       .then(({ data }) => {
         if (data?.valor && typeof data.valor === 'object') {
           const v = data.valor as { verde?: number; amarelo?: number; vermelho?: number }

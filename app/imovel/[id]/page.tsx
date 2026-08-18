@@ -9,13 +9,19 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 async function getImovel(id: number) {
   const svc = createServiceClient()
-  const { data: imovel } = await svc.from('imoveis').select('*').eq('id', id).single()
+  // `maybeSingle`: link velho ou imóvel apagado é caso NORMAL numa página pública —
+  // o visitante clicou num anúncio antigo. Com `single()` isso levantava erro e
+  // derrubava a renderização, em vez de cair no `return null` da linha seguinte,
+  // que é o 404 que o código já queria dar.
+  const { data: imovel } = await svc.from('imoveis').select('*').eq('id', id).maybeSingle()
   if (!imovel) return null
   const { data: empresa } = await svc
     .from('empresas')
     .select('nome, wl_cor, wl_logo_url, wl_whatsapp, telefone')
     .eq('id', imovel.empresa_id)
-    .single()
+    // A empresa existe (é chave estrangeira), mas esta é página PÚBLICA: derrubar a
+    // vitrine do imóvel por causa da marca faltando é o pior dos dois resultados.
+    .maybeSingle()
   return { imovel, empresa }
 }
 
