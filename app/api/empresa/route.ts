@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
-import { temAcesso } from '@/lib/empresa-context'
+import { temAcesso, type Plano } from '@/lib/planos'
 
 /**
  * Dados da própria empresa — identificação e white-label.
@@ -45,7 +45,7 @@ export async function PATCH(req: Request) {
   // Plano decide o white-label; identificação não é recurso pago — é o que faz o
   // contrato ser válido.
   const { data: emp } = await supabase.from('empresas').select('plano').eq('id', empresaId).maybeSingle()
-  const podeWl = temAcesso(emp?.plano as 'free' | 'starter' | 'pro' | undefined, 'white_label')
+  const podeWl = temAcesso(emp?.plano as Plano | undefined, 'white_label')
 
   const permitidos: Campo[] = [...CAMPOS_IDENTIDADE, ...(podeWl ? CAMPOS_WHITE_LABEL : [])]
 
