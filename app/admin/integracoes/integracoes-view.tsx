@@ -6,6 +6,7 @@ import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle, In
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, Badge, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
   return (
@@ -89,7 +90,9 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
 });
 </script>`
 
-  const isImob = segmento === 'imobiliaria'
+  // Portais e site: capacidade. Concessionária também publica em portal, e um dia
+  // vai querer isto — sem editar esta tela.
+  const isImob = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.integraPortais
 
   return (
     <div className="flex h-full flex-col">

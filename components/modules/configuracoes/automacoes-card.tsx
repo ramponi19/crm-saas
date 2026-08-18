@@ -5,6 +5,7 @@ import { Plus, Trash2, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import type { Json } from '@/types/database'
 
 interface Automacao {
@@ -160,7 +161,7 @@ export function AutomacoesCard() {
 
   return (
     <div className="space-y-5">
-      {segmento === 'concessionaria' && (
+      {SEGMENTOS[normalizarSegmento(segmento)].capacidades.automacoesVeiculo && (
         <Card>
           <div className="flex flex-wrap items-center gap-3">
             <Zap size={18} strokeWidth={1.7} className="flex-none text-accent" />

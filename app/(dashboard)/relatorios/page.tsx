@@ -4,7 +4,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/relatorios/relatorios-imob-view'
 import { exigirPlano } from '@/lib/acesso'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Relatórios' }
@@ -19,7 +19,8 @@ export default async function RelatoriosPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
 
-  if (normalizarSegmento(empresa?.segmento) === 'imobiliaria') {
+  // Mesma capacidade do dashboard: a vertical traz as próprias telas de leitura.
+  if (SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.telasProprias) {
     return (
       <>
         <Topbar title="Relatórios" />
