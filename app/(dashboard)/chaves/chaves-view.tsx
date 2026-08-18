@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, KeyRound, ArrowRightLeft, Undo2 } from 'lucide-react'
 import { Card, Button, Input, Select, Modal, Badge, EmptyState, notify } from '@/components/ui'
+import { formatarData, paraData } from '@/lib/datas'
 
 export interface Chave {
   id: number
@@ -25,7 +26,11 @@ const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' }> = {
   na_imobiliaria: { label: 'Na imobiliária', tone: 'ok' },
   emprestada: { label: 'Emprestada', tone: 'warn' },
 }
-const fmtData = (s: string | null) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
+/**
+ * `devolucao_prevista` é coluna `date`, e `new Date('2026-08-18')` em JavaScript é
+ * meia-noite UTC — em Brasília isso volta para 17/08. Ver `lib/datas.ts`.
+ */
+const fmtData = (s: string | null) => formatarData(s, undefined, '—')
 const imovelLabel = (im: Imovel | Chave) => [('imovel_codigo' in im ? im.imovel_codigo : im.codigo), ('imovel_titulo' in im ? im.imovel_titulo : im.titulo)].filter(Boolean).join(' · ') || 'Imóvel'
 
 export function ChavesView({ initial, empresaId, imoveis }: { initial: Chave[]; empresaId: number; imoveis: Imovel[] }) {
@@ -83,7 +88,22 @@ export function ChavesView({ initial, empresaId, imoveis }: { initial: Chave[]; 
     router.refresh()
   }
 
-  const atrasada = (c: Chave) => c.status === 'emprestada' && c.devolucao_prevista && new Date(c.devolucao_prevista) < new Date(new Date().toDateString())
+  /**
+   * Atrasada é a que passou do dia — não a que VENCE hoje.
+   *
+   * A conta antiga comparava `new Date('2026-08-18')` (meia-noite UTC, que em
+   * Brasília é 17/08 às 21h) com a meia-noite LOCAL de hoje. Resultado: a chave
+   * aparecia como atrasada no próprio dia em que devia voltar, um dia antes da
+   * hora — e quem empresta chave cobra o corretor por isso. Com as duas pontas no
+   * fuso local, o dia do vencimento ainda está em tempo.
+   */
+  const atrasada = (c: Chave) => {
+    if (c.status !== 'emprestada') return false
+    const prevista = paraData(c.devolucao_prevista)
+    if (!prevista) return false
+    const agora = new Date()
+    return prevista < new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+  }
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
