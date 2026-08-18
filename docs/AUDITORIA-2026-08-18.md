@@ -158,3 +158,83 @@ As duas telas já eram de admin — a tela nunca é a tranca.
   lançamento manual — decisão de produto).
 - Derrubar as 5 colunas legadas de veículo em `inventario_unidades`, só quando a
   leitura migrar e uma concessionária real validar.
+
+---
+
+# Segunda passada — as rotas ABERTAS (mesmo dia)
+
+Depois do achado da aprovação por link, fui atrás das irmãs dela: toda rota que
+escreve **sem login**. São sete (`/api/register`, `/api/agendar/[slug]`,
+`/api/menu/[slug]/pedido`, `/api/os/[token]`, `/api/orcamento/[token]`,
+`/api/portais/[slug]/leads`, `/api/imob/[slug]/lead`) mais o feed
+`/api/veiculos/[slug]`. Cinco achados.
+
+## 9. Cadastro público sem teto — o pior da segunda passada
+
+`/api/register` cria o usuário com `email_confirm: true` **e** a empresa, e o
+docblock dele diz, textualmente, que passa por fora do rate limit do `signUp` do
+Supabase de propósito (para não depender de e-mail). Sem captcha e sem teto
+próprio: um script criava tenants confirmados sem parar — empresa, funil, etapas e
+motivos de perda a cada chamada.
+
+**Feito:** migração `rate_limit_para_rotas_publicas` (tabela + função
+`rate_limit_bump`, `EXECUTE` só para `service_role`) e `lib/rate-limit.ts`. O IP
+**não** é guardado: a chave é um HMAC-SHA256 do IP com segredo do servidor —
+serve para contar, não para identificar. Tetos por hora e por origem: 5 no
+cadastro, 20 no agendamento, 30 no pedido. Se o contador falhar, a chamada passa —
+um problema no banco não pode derrubar o cadastro. Conferido no banco: a 6ª
+chamada com teto 5 é bloqueada, as 5 primeiras passam.
+
+## 10. Feed público de veículos vazava nome de cliente
+
+`/api/veiculos/[slug]` é aberto e exportava `inventario_unidades.observacoes` —
+que é a nota **interna** da peça. E é exatamente ali que o CRM escreve
+"aparelho recebido em troca no PDV (cliente Maria)" e "Entrada por downgrade —
+orçamento #12, cliente João". Qualquer pessoa com a URL lia isso.
+
+Além do vazamento, o feed servia o estoque **inteiro com preços** de qualquer
+empresa, bastando saber o slug — que é público (aparece na landing, no cardápio,
+no link de agendamento). Inclusive de uma loja de celular, que não tem portal de
+veículo nenhum.
+
+**Feito:** `observacoes` saiu do feed e o feed passou a exigir a capacidade
+`usaPlaca` do contrato de segmento — quem não trabalha com veículo devolve o mesmo
+404 de slug inexistente (não confirma que a empresa existe). Descrição de anúncio,
+se for necessária, precisa de campo próprio, escrito para ser lido de fora.
+
+## 11. Aprovação da OS criava tarefa dupla
+
+`/api/os/[token]` conferia `aprovado_em`/`recusado_em` e **depois** dava o UPDATE.
+Dois cliques do cliente — ou o retry de um POST — passavam pelos dois e criavam
+duas tarefas de reparo para a mesma OS.
+
+**Feito:** a condição foi para dentro do UPDATE (mesmo claim atômico do achado 2).
+
+## 12. Agendamento e pedido aceitavam qualquer loja
+
+Nenhuma das duas rotas conferia se a empresa **usa** aquele canal. Um POST no slug
+de uma loja de celular criava lead + "consulta" nela: o lead entrava na roleta,
+consumia o limite do plano e a consulta ia para uma tela que não existe naquele
+segmento. As páginas públicas tinham o mesmo furo — o visitante preenchia o
+formulário e só tomava o erro no fim.
+
+**Feito:** rota e página agora exigem a capacidade do contrato
+(`agendaClinica`/`agendaVisitas` para agendar, `usaComanda` para o cardápio).
+Nenhum nome de segmento entrou no código — a trava do núcleo segue em zero.
+
+## Conferido nesta passada e sem defeito
+
+- Tokens de link público (`orcamentos`, `garantias_assistencias`, `propostas`) são
+  UUID v4 em hex, 32 caracteres — sem risco de enumeração.
+- `/api/portais/[slug]/leads` valida token por empresa antes de qualquer escrita.
+- `/api/menu/[slug]/pedido` recalcula todos os preços pelo banco: preço que vem do
+  cliente é ignorado.
+- Os webhooks Stripe e de pagamento verificam assinatura (o segundo passou a
+  recusar quando não há segredo — achado 7).
+
+## Fica reportado, não mexido
+
+- **`/api/imob/[slug]/lead`** tem o mesmo padrão de rota aberta que cria lead sem
+  teto. É área da construção do segmento imobiliária, em andamento por outra
+  frente — o limite (`excedeuLimite(svc, 'imob-lead', req, 20)`) é uma linha, mas
+  não vou tocar em código de outra demanda sem combinar.

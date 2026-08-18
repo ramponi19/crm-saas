@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { excedeuLimite } from '@/lib/rate-limit'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }) }
@@ -9,8 +11,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, segmento').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+
+  // Cardápio é de quem trabalha com comanda. Sem esta guarda, dava para mandar
+  // pedido para o slug de qualquer loja — e o pedido caía numa tela que ela não
+  // tem. Ver a nota equivalente em /api/agendar.
+  if (!SEGMENTOS[normalizarSegmento(empresa.segmento)].capacidades.usaComanda) {
+    return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+  }
+
+  // Ver a nota em /api/agendar: rota aberta que escreve precisa de teto. Aqui o
+  // custo do abuso é a cozinha recebendo pedido falso.
+  if (await excedeuLimite(svc, 'pedido', req, 30)) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429, headers: CORS })
+  }
 
   const b = (await req.json().catch(() => ({}))) as { mesa?: string; cliente_nome?: string; observacoes?: string; itens?: { produto_id: number; qtd: number }[] }
   const pedidos = (b.itens ?? []).filter((i) => i.produto_id && (i.qtd ?? 0) > 0)

@@ -4360,6 +4360,24 @@ export type Database = {
           },
         ]
       }
+      rate_limit: {
+        Row: {
+          chave: string
+          contador: number
+          janela: string
+        }
+        Insert: {
+          chave: string
+          contador?: number
+          janela: string
+        }
+        Update: {
+          chave?: string
+          contador?: number
+          janela?: string
+        }
+        Relationships: []
+      }
       segmentos_config: {
         Row: {
           ativo: boolean
@@ -5439,6 +5457,10 @@ export type Database = {
       }
       is_empresa_admin: { Args: { emp: number }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      rate_limit_bump: {
+        Args: { p_chave: string; p_janela: string }
+        Returns: number
+      }
       refresh_status_atrasados: { Args: never; Returns: undefined }
       set_impersonation: {
         Args: { p_empresa_id: number; p_ttl_seconds?: number }
