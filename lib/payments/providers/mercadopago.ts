@@ -142,7 +142,8 @@ export class MercadoPagoProvider implements PaymentProvider {
         throw new Error('Mercado Pago: assinatura inválida')
       }
     } else {
-      console.warn('[mercadopago] webhook_secret não configurado — validação de assinatura ignorada')
+      // Ver a nota no adapter do Asaas: webhook de dinheiro sem assinatura é recusado.
+      throw new Error('Mercado Pago: webhook_secret não configurado — webhook recusado')
     }
 
     // MP envia { type, data: { id } }. Consultamos o pagamento para obter status atual.

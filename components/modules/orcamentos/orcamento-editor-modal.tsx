@@ -19,13 +19,15 @@ import type { ItemOrc, Orcamento, UnidadeOpt, PrecoRef } from '@/app/(dashboard)
 
 export interface EditorOrcamento {
   id?: number; lead_id?: number | null; tipo: string; cliente_nome: string; cliente_telefone: string
+  /** Cadastro escolhido na busca. Null = lead ou nome novo. */
+  cliente_id: number | null
   aparelho: string; imei: string; defeito: string; prazo_dias: string; garantia_dias: string
   itens: ItemOrc[]; aparelho_novo: string; valor_novo: string; aparelho_usado: string; valor_entrada: string
   unidade_id: number | null; observacoes: string; acerto: string
 }
 
 export const orcamentoVazio = (tipo = 'assistencia'): EditorOrcamento => ({
-  tipo, lead_id: null, cliente_nome: '', cliente_telefone: '', aparelho: '', imei: '', defeito: '',
+  tipo, lead_id: null, cliente_nome: '', cliente_telefone: '', cliente_id: null, aparelho: '', imei: '', defeito: '',
   prazo_dias: '', garantia_dias: '', itens: [{ descricao: '', qtd: 1, valor: 0 }],
   aparelho_novo: '', valor_novo: '', aparelho_usado: '', valor_entrada: '', unidade_id: null,
   observacoes: '', acerto: 'dinheiro',
@@ -35,6 +37,7 @@ export const orcamentoVazio = (tipo = 'assistencia'): EditorOrcamento => ({
 export function editorDoOrcamento(o: Orcamento): EditorOrcamento {
   return {
     id: o.id, lead_id: o.lead_id, tipo: o.tipo, cliente_nome: o.cliente_nome, cliente_telefone: o.cliente_telefone ?? '',
+    cliente_id: o.cliente_id ?? null,
     aparelho: o.aparelho ?? '', imei: o.imei ?? '', defeito: o.defeito ?? '',
     prazo_dias: o.prazo_dias != null ? String(o.prazo_dias) : '',
     garantia_dias: o.garantia_dias != null ? String(o.garantia_dias) : '',
@@ -134,6 +137,7 @@ export function OrcamentoEditorModal({
       body: JSON.stringify({
         id: editor.id, lead_id: editor.lead_id ?? null, tipo: editor.tipo, status: enviar ? 'enviado' : undefined,
         cliente_nome: editor.cliente_nome, cliente_telefone: editor.cliente_telefone,
+        cliente_id: editor.cliente_id ?? null,
         aparelho: editor.aparelho, imei: editor.imei, defeito: editor.defeito,
         prazo_dias: editor.prazo_dias ? Number(editor.prazo_dias) : undefined,
         garantia_dias: editor.garantia_dias ? Number(editor.garantia_dias) : undefined,
@@ -173,8 +177,10 @@ export function OrcamentoEditorModal({
           </Select>
           <ClienteAutocomplete
             nome={editor.cliente_nome}
-            onNome={(v) => setEditor({ ...editor, cliente_nome: v })}
-            onSelect={(c) => setEditor({ ...editor, cliente_nome: c.nome, cliente_telefone: c.telefone })}
+            // Digitar por cima SOLTA o cadastro: o nome deixou de ser o daquele
+            // cliente, e manter o id ligaria a venda a quem nao foi atendido.
+            onNome={(v) => setEditor({ ...editor, cliente_nome: v, cliente_id: null })}
+            onSelect={(c) => setEditor({ ...editor, cliente_nome: c.nome, cliente_telefone: c.telefone, cliente_id: c.cliente_id })}
           />
           <Input label="WhatsApp/telefone" value={editor.cliente_telefone} onChange={(e) => setEditor({ ...editor, cliente_telefone: e.target.value })} />
         </div>

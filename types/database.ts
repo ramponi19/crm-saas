@@ -3367,6 +3367,7 @@ export type Database = {
           aparelho_novo: string | null
           aparelho_usado: string | null
           aprovado_em: string | null
+          cliente_id: number | null
           cliente_nome: string
           cliente_telefone: string | null
           created_at: string | null
@@ -3397,6 +3398,7 @@ export type Database = {
           aparelho_novo?: string | null
           aparelho_usado?: string | null
           aprovado_em?: string | null
+          cliente_id?: number | null
           cliente_nome: string
           cliente_telefone?: string | null
           created_at?: string | null
@@ -3427,6 +3429,7 @@ export type Database = {
           aparelho_novo?: string | null
           aparelho_usado?: string | null
           aprovado_em?: string | null
+          cliente_id?: number | null
           cliente_nome?: string
           cliente_telefone?: string | null
           created_at?: string | null
@@ -3452,6 +3455,13 @@ export type Database = {
           valor_novo?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orcamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orcamentos_empresa_id_fkey"
             columns: ["empresa_id"]

@@ -147,7 +147,8 @@ export class EfiBankProvider implements PaymentProvider {
         throw new Error('Efí Bank: assinatura inválida')
       }
     } else {
-      console.warn('[efibank] x-gw-signature ausente — validação de assinatura ignorada')
+      // Ver a nota no adapter do Asaas: webhook de dinheiro sem assinatura é recusado.
+      throw new Error('Efí Bank: x-gw-signature ausente — webhook recusado')
     }
 
     let body: { pix?: Array<{ txid?: string; horario?: string }> }

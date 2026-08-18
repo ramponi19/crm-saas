@@ -55,6 +55,22 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     // encomenda que fica encalhada na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
+
+    /**
+     * CUSTO ZERADO VIRA LUCRO DE 100% — e ninguém vai conferir depois.
+     *
+     * `valor_custo` alimenta o lucro da venda e o pedido de compra. Sem ele a
+     * encomenda entra como se o aparelho fosse de graça: o relatório mostra margem
+     * cheia num item que a loja ainda vai pagar. Foi o que aconteceu nas duas
+     * encomendas de teste, ambas com valor_total 0,00.
+     *
+     * AVISO, não bloqueio: às vezes o custo real só chega com a nota do fornecedor,
+     * e travar o balcão por um número que ainda não existe seria pior. Mas o
+     * vendedor precisa saber o que está deixando em branco.
+     */
+    if (!(Number(custo) > 0)) {
+      notify.warn('Encomenda sem custo de compra', 'O lucro vai aparecer como 100%. Preencha quando souber o valor do fornecedor.')
+    }
     const empresaId = await resolverEmpresaId()
     if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)

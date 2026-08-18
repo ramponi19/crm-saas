@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
+    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, cliente_id, observacoes, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
@@ -42,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       const { data: os } = await svc.from('garantias_assistencias').insert({
         empresa_id: orc.empresa_id,
         tipo: 'assistencia',
+        cliente_id: orc.cliente_id ?? null,
         defeito_relatado: orc.defeito ?? (orc.tipo === 'melhoria' ? 'Upgrade/melhoria do aparelho' : null),
         orcamento_valor: orc.total,
         imei_serial: orc.imei,
@@ -99,6 +100,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         valor_venda: valorVenda,
         data_venda: nowIso,
         vendedor_id: vendedorId,
+        usuario_id: vendedorId,
+        cliente_id: orc.cliente_id ?? null,
         canal_venda: 'downgrade',
         observacoes: `Downgrade — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${vale}). Cliente pagou: R$ ${orc.total}.${Number(orc.valor_devolver) > 0 ? ` Saldo a favor do cliente: R$ ${orc.valor_devolver} (${orc.acerto}).` : ''}`,
       } as never).select('id').single<{ id: number }>()
@@ -139,20 +142,56 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
     // Venda/semi-novo com unidade do estoque → baixa a unidade + registra a venda.
     if (orc.tipo === 'venda' && orc.unidade_id) {
-      await svc.from('inventario_unidades').update({ status: 'vendido' } as never).eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id)
-      let vendedorId: string | null = null
-      if (orc.lead_id) {
-        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
-        vendedorId = lead?.responsavel_id ?? null
+      // O CUSTO vem da unidade. Sem ele a venda entra com valor_custo no default 0
+      // e `lucro` (coluna gerada) devolve o preço inteiro como margem — 100% de
+      // lucro num aparelho comprado por dinheiro. O relatório mostrava isso como
+      // se fosse conta fechada.
+      const { data: uni } = await svc.from('inventario_unidades')
+        .select('id, status, preco_custo, produto_id, imei, numero_serie')
+        .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id).maybeSingle()
+
+      // Claim atômico: só sai do estoque o que ainda ESTÁ no estoque. Se o balcão
+      // vendeu a mesma peça antes do cliente clicar no link, a segunda venda não
+      // pode ser registrada — seriam dois faturamentos para um aparelho só.
+      const { data: baixada } = await svc.from('inventario_unidades')
+        .update({ status: 'vendido' } as never)
+        .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id)
+        .in('status', ['disponivel', 'reservado'])
+        .select('id').maybeSingle()
+
+      if (!baixada) {
+        // O orçamento fica aprovado (o cliente aprovou mesmo), mas a venda NÃO é
+        // criada. Registrado por escrito no próprio orçamento, porque quem abrir a
+        // tela precisa saber por que não há venda — silêncio aqui viraria "o
+        // sistema perdeu minha venda".
+        await svc.from('orcamentos').update({
+          observacoes: [orc.observacoes, `[${nowIso.slice(0, 10)}] Cliente aprovou pelo link, mas o item já não estava disponível no estoque (status: ${uni?.status ?? 'não encontrado'}). Nenhuma venda foi registrada — confira com o vendedor.`].filter(Boolean).join(' '),
+        } as never).eq('id', orc.id)
+      } else {
+        let vendedorId: string | null = null
+        if (orc.lead_id) {
+          const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
+          vendedorId = lead?.responsavel_id ?? null
+        }
+        await svc.from('vendas').insert({
+          empresa_id: orc.empresa_id,
+          // Amarra a venda à peça que saiu: sem isto o aparelho ficava 'vendido' no
+          // estoque sem nada apontando para qual venda o levou.
+          unidade_id: orc.unidade_id,
+          produto_id: uni?.produto_id ?? null,
+          numero_serie: uni?.imei ?? uni?.numero_serie ?? null,
+          valor_venda: orc.total ?? 0,
+          valor_custo: uni?.preco_custo ?? 0,
+          // `lucro` não entra: é coluna gerada (venda − custo). Enviar valor faz o
+          // Postgres recusar o INSERT inteiro com 428C9.
+          cliente_id: orc.cliente_id ?? null,
+          data_venda: nowIso,
+          vendedor_id: vendedorId,
+          usuario_id: vendedorId,
+          canal_venda: 'orcamento',
+          observacoes: `Venda por orçamento #${orc.id} — ${orc.cliente_nome}.`,
+        } as never)
       }
-      await svc.from('vendas').insert({
-        empresa_id: orc.empresa_id,
-        valor_venda: orc.total ?? 0,
-        data_venda: nowIso,
-        vendedor_id: vendedorId,
-        canal_venda: 'orcamento',
-        observacoes: `Venda por orçamento #${orc.id} — ${orc.cliente_nome}.`,
-      } as never)
     }
 
     if (osId && osId !== orc.os_id) await svc.from('orcamentos').update({ os_id: osId } as never).eq('id', orc.id)
