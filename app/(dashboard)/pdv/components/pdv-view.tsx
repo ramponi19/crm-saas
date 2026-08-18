@@ -135,6 +135,16 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   // Total da última venda — separado do contrato, porque a venda acontece mesmo
   // quando a loja não tem modelo configurado e nenhum contrato é emitido.
   const [ultimoTotal, setUltimoTotal] = useState(0)
+  /**
+   * Quanto a VENDA valeu, além de quanto entrou de dinheiro.
+   *
+   * O modal de sucesso mostrava o valor cobrado sob o rótulo "Total da venda" — e
+   * numa troca esses números são diferentes: o teste fechou uma venda de R$ 1.200
+   * com R$ 400 em aparelho, e a tela anunciou "Total da venda R$ 800,00" enquanto o
+   * relatório registrava R$ 1.200. O carrinho já explicava a diferença; a
+   * confirmação a desfazia. Guardar os dois deixa cada rótulo dizer a verdade.
+   */
+  const [ultimoValorVenda, setUltimoValorVenda] = useState(0)
   const [sucessoOpen, setSucessoOpen] = useState(false)
   const [confirmarSemPreco, setConfirmarSemPreco] = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
@@ -431,6 +441,17 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           vendedor_id: user.id,
           usuario_id: user.id,
           valor_venda: valorItem,
+          /**
+           * A PEÇA fica amarrada à venda SEMPRE, não só na entrega pendente.
+           *
+           * Antes o vínculo só era gravado quando a venda ficava pendente de
+           * entrega (ali ele é obrigatório, para baixar depois). Na venda normal a
+           * unidade virava 'vendido' e nada apontava para qual venda a levou: o
+           * teste registrou uma venda de R$ 1.200 com `unidade_id` nulo. Sobrava só
+           * o `numero_serie` como ligação — e item sem série (acessório em lote) não
+           * tem nem isso. Sem o vínculo, nenhuma conferência de estoque fecha.
+           */
+          unidade_id: c.item.id,
           valor_custo: (c.item.preco_custo ?? 0) * c.qtd,
           // Quantas peças saíram nesta linha. Sem isto, vender 3 películas viraria
           // 3 vendas e o ranking contaria 3.
@@ -461,11 +482,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         if (error) throw new Error(error.message)
         vendaIds.push(venda.id)
         if (primeiraVendaId === null) primeiraVendaId = venda.id
-        // Entrega pendente: guarda a unidade reservada p/ baixar ao "Entregar" no Histórico.
-        if (entregaPendente) {
-          const { error: eUid } = await supabase.from('vendas').update({ unidade_id: c.item.id } as never).eq('id', venda.id)
-          if (eUid) throw new Error('Falha ao vincular a unidade à venda pendente')
-        }
+        // O vínculo com a unidade já vai no INSERT acima (inclusive na entrega
+        // pendente, que é quem precisa dele para baixar o estoque no "Entregar").
         // Os pagamentos NÃO são gravados por item: com várias formas, ratear
         // "crédito 3x" entre três linhas do carrinho inventaria uma divisão que
         // não existe na maquininha. Ficam todos na primeira venda do fechamento,
@@ -611,6 +629,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // Guarda o que o cliente paga de fato (com juros), que é o valor do Pix e
       // o que aparece no modal de sucesso.
       setUltimoTotal(resumoPag.cobrado || totais.total)
+      setUltimoValorVenda(totais.valorVenda)
       setContexto({
         empresaId,
         vendaIds,
@@ -719,6 +738,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // avisa ANTES de o papel ir para a mão do cliente.
       if (r.faltando?.length) {
         notify.warn('Contrato saiu com campos em branco', 'Falta no cadastro do cliente: ' + r.faltando.join(', ') + '.')
+      }
+      // O mesmo para a LOJA: contrato que não identifica a vendedora não
+      // identifica as partes. Só avisa do que este modelo realmente usa.
+      if (r.faltandoLoja?.length) {
+        notify.warn('Falta o cadastro da sua loja', 'O contrato pede: ' + r.faltandoLoja.join(', ') + '. Preencha em Administração → Minha empresa.')
       }
       if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
     } catch (e) {
@@ -839,8 +863,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       >
         <div className="space-y-4">
           <div className="rounded-card border border-ok/20 bg-ok-soft p-4 text-center">
-            <p className="text-[11px] text-ink-3">Total da venda</p>
+            <p className="text-[11px] text-ink-3">Recebido do cliente</p>
             <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoTotal)}</p>
+            {ultimoValorVenda > ultimoTotal + 0.005 && (
+              <p className="mt-1 text-[11.5px] text-ink-3">
+                Venda registrada por <strong className="text-ink">{fmt(ultimoValorVenda)}</strong> — a diferença entrou em aparelho.
+              </p>
+            )}
           </div>
           <ListaDocumentos />
           <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setContexto(null); setClienteSelecionado(null) }}>

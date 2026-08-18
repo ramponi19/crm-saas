@@ -1538,9 +1538,16 @@ export type Database = {
       }
       empresas: {
         Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
           cnpj: string | null
+          complemento: string | null
           created_at: string | null
           demo: boolean | null
+          email: string | null
+          endereco: string | null
+          estado: string | null
           id: number
           limite_leads: number | null
           limite_usuarios: number | null
@@ -1548,8 +1555,11 @@ export type Database = {
           menu_override: Json | null
           modulos_override: Json | null
           nome: string
+          numero: string | null
           permissoes: Json | null
           plano: string
+          representante_cpf: string | null
+          representante_nome: string | null
           segmento: string
           slug: string
           status: string
@@ -1567,9 +1577,16 @@ export type Database = {
           wl_whatsapp: string | null
         }
         Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string | null
           demo?: boolean | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: number
           limite_leads?: number | null
           limite_usuarios?: number | null
@@ -1577,8 +1594,11 @@ export type Database = {
           menu_override?: Json | null
           modulos_override?: Json | null
           nome: string
+          numero?: string | null
           permissoes?: Json | null
           plano?: string
+          representante_cpf?: string | null
+          representante_nome?: string | null
           segmento?: string
           slug: string
           status?: string
@@ -1596,9 +1616,16 @@ export type Database = {
           wl_whatsapp?: string | null
         }
         Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string | null
           demo?: boolean | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: number
           limite_leads?: number | null
           limite_usuarios?: number | null
@@ -1606,8 +1633,11 @@ export type Database = {
           menu_override?: Json | null
           modulos_override?: Json | null
           nome?: string
+          numero?: string | null
           permissoes?: Json | null
           plano?: string
+          representante_cpf?: string | null
+          representante_nome?: string | null
           segmento?: string
           slug?: string
           status?: string

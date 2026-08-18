@@ -723,8 +723,20 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
     if (!form.preco_venda) { notify.warn('Informe o preço de venda'); return }
     setSaving(true)
+    /**
+     * Quem deu entrada FICA REGISTRADO.
+     *
+     * A lista de estoque tem coluna de responsável — ela lê
+     * `inventario_unidades.usuario_id` — e essa coluna nunca era preenchida por
+     * este formulário: aparecia vazia em toda unidade cadastrada à mão. Estoque sem
+     * autor é o tipo de dado que só faz falta no dia da divergência de contagem,
+     * quando já não há como saber quem registrou o quê.
+     */
+    const { data: { user: autor } } = await supabase.auth.getUser()
+
     const payload = {
       empresa_id: empresaId,
+      usuario_id: autor?.id ?? null,
       produto_id: Number(form.produto_id),
       tipo: form.tipo, condicao: form.condicao, estado: form.estado,
       status: form.status,

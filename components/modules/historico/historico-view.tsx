@@ -150,8 +150,29 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     setFinalizando(id)
     const supabase = createClient()
     // Se houver unidade reservada (veio da compra recebida), baixa do estoque.
-    const { data: v } = await supabase.from('vendas').select('unidade_id').eq('id', id).maybeSingle()
-    const { error } = await supabase.from('vendas').update({ status: 'concluida', data_venda: new Date().toISOString() }).eq('id', id)
+    const { data: v } = await supabase.from('vendas')
+      .select('unidade_id, numero_serie, inventario_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
+      .eq('id', id).maybeSingle()
+
+    /**
+     * A SÉRIE DO APARELHO ENTRA AQUI, na conclusão.
+     *
+     * Venda de encomenda nasce sem série — no ato do pedido o aparelho ainda não
+     * existe. Quem digita o IMEI é o estoque, na unidade, quando a caixa chega.
+     * Se ninguém copiar para a venda, a loja fica com uma venda concluída sem
+     * identificar o que saiu: consulta de garantia por IMEI não acha, e o termo
+     * de garantia sai sem número de série. Só preenche o que está vazio — série
+     * já registrada no PDV não é sobrescrita.
+     */
+    const uni = Array.isArray(v?.inventario_unidades) ? v?.inventario_unidades[0] : v?.inventario_unidades
+    const serieDaUnidade = uni?.imei || uni?.numero_serie || null
+    const patch: { status: string; data_venda: string; numero_serie?: string } = {
+      status: 'concluida',
+      data_venda: new Date().toISOString(),
+    }
+    if (!v?.numero_serie && serieDaUnidade) patch.numero_serie = serieDaUnidade
+
+    const { error } = await supabase.from('vendas').update(patch as never).eq('id', id)
     if (!error && v?.unidade_id) {
       await supabase.from('inventario_unidades').update({ status: 'vendido' }).eq('id', v.unidade_id)
     }

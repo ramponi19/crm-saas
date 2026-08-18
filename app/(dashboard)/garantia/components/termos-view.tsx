@@ -90,6 +90,11 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
       if (r.faltando?.length) {
         notify.warn('Contrato saiu com campos em branco', 'Falta no cadastro do cliente: ' + r.faltando.join(', ') + '.')
       }
+      // O mesmo para a LOJA: contrato que não identifica a vendedora não
+      // identifica as partes. Só avisa do que este modelo realmente usa.
+      if (r.faltandoLoja?.length) {
+        notify.warn('Falta o cadastro da sua loja', 'O contrato pede: ' + r.faltandoLoja.join(', ') + '. Preencha em Administração → Minha empresa.')
+      }
       if (!imprimirContratoHTML(r.html)) notify.warn('Permita pop-ups para imprimir')
     } catch (e) {
       notify.bad('Erro ao emitir', e instanceof Error ? e.message : undefined)

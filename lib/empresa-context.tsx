@@ -21,6 +21,23 @@ export interface Empresa {
    */
   cnpj: string | null
   telefone: string | null
+  /**
+   * Endereço e representante legal — o bloco "VENDEDORA" do contrato.
+   *
+   * Sem estes campos o modelo não tinha marcador para identificar a loja e trazia
+   * tudo como texto fixo. Ver [[lib/contrato-emitir.ts]]: a emissão agora avisa o
+   * que falta, mas só do que o modelo realmente usa.
+   */
+  email: string | null
+  cep: string | null
+  endereco: string | null
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string | null
+  estado: string | null
+  representante_nome: string | null
+  representante_cpf: string | null
   plano: Plano
   status: string
   wl_cor: string | null

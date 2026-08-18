@@ -10,6 +10,24 @@ export interface ContratoLoja {
   cnpj: string | null
   telefone: string | null
   logoUrl: string | null
+  /**
+   * Identificação da VENDEDORA no contrato.
+   *
+   * O bloco "VENDEDORA" do modelo pede razão social, CNPJ, e-mail, endereço
+   * completo e quem assina. Enquanto isso não existia no cadastro, o modelo trazia
+   * tudo como texto fixo ("SUA EMPRESA LTDA, CNPJ 11.111.111/1111-11, Rua xxx") e
+   * três contratos saíram sem dizer quem vendeu.
+   */
+  email: string | null
+  cep: string | null
+  endereco: string | null
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string | null
+  estado: string | null
+  representanteNome: string | null
+  representanteCpf: string | null
 }
 
 export interface ContratoComprador {

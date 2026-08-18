@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
 
   const { data: orc } = await svc.from('orcamentos')
-    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, cliente_id, observacoes, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
+    .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, cliente_id, usuario_id, observacoes, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
@@ -56,11 +56,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
     // Downgrade aprovado → dá entrada do usado no estoque + registra a venda.
     if (orc.tipo === 'downgrade') {
+      /**
+       * Quem leva a venda: o responsável pelo lead e, na falta dele, QUEM FEZ O
+       * ORÇAMENTO.
+       *
+       * Antes só o lead contava. Orçamento criado pela tela de Orçamentos não tem
+       * lead — e o teste mostrou o resultado: venda concluída de R$ 1.500 sem
+       * vendedor nenhum. Isso não é detalhe de cadastro: ranking e comissão saem de
+       * `vendedor_id`, então a venda simplesmente não era de ninguém.
+       */
       let vendedorId: string | null = null
       if (orc.lead_id) {
         const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
         vendedorId = lead?.responsavel_id ?? null
       }
+      vendedorId = vendedorId ?? orc.usuario_id ?? null
 
       // Amarra a unidade recebida à venda gerada aqui — mesmo mecanismo do PDV,
       // que é o que segura a comissão até a chegada ser confirmada.
@@ -173,6 +183,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
           vendedorId = lead?.responsavel_id ?? null
         }
+        // Ver a nota na ramificação do downgrade: sem lead, quem fez o orçamento leva.
+        vendedorId = vendedorId ?? orc.usuario_id ?? null
         await svc.from('vendas').insert({
           empresa_id: orc.empresa_id,
           // Amarra a venda à peça que saiu: sem isto o aparelho ficava 'vendido' no

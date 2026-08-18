@@ -42,6 +42,16 @@ export default function EmpresaConfigPage() {
     // contrato de compra e venda sai sem identificar a vendedora.
     cnpj: '',
     telefone: '',
+    email: '',
+    cep: '',
+    endereco: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    representante_nome: '',
+    representante_cpf: '',
     wl_slogan: '',
     wl_whatsapp: '',
     wl_cor: '#2E5CE6',
@@ -54,6 +64,16 @@ export default function EmpresaConfigPage() {
         nome:          empresa.nome         ?? '',
         cnpj:          empresa.cnpj         ?? '',
         telefone:      empresa.telefone     ?? '',
+        email:              empresa.email              ?? '',
+        cep:                empresa.cep                ?? '',
+        endereco:           empresa.endereco           ?? '',
+        numero:             empresa.numero             ?? '',
+        complemento:        empresa.complemento        ?? '',
+        bairro:             empresa.bairro             ?? '',
+        cidade:             empresa.cidade             ?? '',
+        estado:             empresa.estado             ?? '',
+        representante_nome: empresa.representante_nome ?? '',
+        representante_cpf:  empresa.representante_cpf  ?? '',
         wl_slogan:     empresa.wl_slogan    ?? '',
         wl_whatsapp:   empresa.wl_whatsapp  ?? '',
         wl_cor:        empresa.wl_cor       ?? '#2E5CE6',
@@ -113,6 +133,17 @@ export default function EmpresaConfigPage() {
         // recurso de plano pago — é o que faz o contrato ser válido.
         cnpj:        form.cnpj.trim()     || null,
         telefone:    form.telefone.trim() || null,
+        email:              form.email.trim()              || null,
+        cep:                form.cep.trim()                || null,
+        endereco:           form.endereco.trim()           || null,
+        numero:             form.numero.trim()             || null,
+        complemento:        form.complemento.trim()        || null,
+        bairro:             form.bairro.trim()             || null,
+        cidade:             form.cidade.trim()             || null,
+        // UF em maiúsculas: o contrato escreve "Campinas - SP", não "- sp".
+        estado:             form.estado.trim().toUpperCase() || null,
+        representante_nome: form.representante_nome.trim()  || null,
+        representante_cpf:  form.representante_cpf.trim()   || null,
         // White-label fields only saved for plans that include the module
         ...(temWL ? {
           wl_slogan:   form.wl_slogan   || null,
@@ -199,6 +230,28 @@ export default function EmpresaConfigPage() {
                   hint="Contato que aparece nos documentos."
                   className="num"
                 />
+                {/* Endereço e representante: o bloco "VENDEDORA" do contrato pede
+                    razão social, CNPJ, e-mail, endereço completo e quem assina. Sem
+                    estes campos o modelo só conseguia trazer tudo como texto fixo —
+                    era o que fazia o contrato da JM sair como "SUA EMPRESA LTDA". */}
+                <Input label="E-mail da loja" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="contato@sualoja.com.br" hint="Sai no contrato ({{loja.email}})." />
+                <div className="grid gap-3 sm:grid-cols-[1fr_130px]">
+                  <Input label="Endereço (rua/avenida)" value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Avenida Central" />
+                  <Input label="Número" value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} placeholder="250" className="num" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input label="Complemento" value={form.complemento} onChange={e => setForm(f => ({ ...f, complemento: e.target.value }))} placeholder="Loja 3" />
+                  <Input label="Bairro" value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[1fr_90px_150px]">
+                  <Input label="Cidade" value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Campinas" />
+                  <Input label="UF" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))} placeholder="SP" maxLength={2} />
+                  <Input label="CEP" value={form.cep} onChange={e => setForm(f => ({ ...f, cep: e.target.value }))} placeholder="13000-000" className="num" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input label="Quem assina pela loja" value={form.representante_nome} onChange={e => setForm(f => ({ ...f, representante_nome: e.target.value }))} placeholder="Nome do responsável legal" hint="Aparece no contrato como representante." />
+                  <Input label="CPF de quem assina" value={form.representante_cpf} onChange={e => setForm(f => ({ ...f, representante_cpf: e.target.value }))} placeholder="000.000.000-00" className="num" />
+                </div>
                 <Input label="Slogan" value={form.wl_slogan} onChange={e => setForm(f => ({ ...f, wl_slogan: e.target.value }))} placeholder="Ex: Importados com qualidade" />
                 <Input label="WhatsApp (com DDI)" value={form.wl_whatsapp} onChange={e => setForm(f => ({ ...f, wl_whatsapp: e.target.value }))} placeholder="5511999999999" />
               </div>

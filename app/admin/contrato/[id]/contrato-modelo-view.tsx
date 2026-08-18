@@ -33,7 +33,13 @@ const blocoVazio = (): BlocoTexto => ({ x: 9, y: 8, largura: 82, texto_html: '<p
 
 // Dados de exemplo da pré-visualização — nenhuma venda é tocada.
 const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
-  loja: { nome: 'Sua Loja', cnpj: '00.000.000/0001-00', telefone: '(00) 0000-0000', logoUrl: null },
+  loja: {
+    nome: 'Sua Loja', cnpj: '00.000.000/0001-00', telefone: '(00) 0000-0000', logoUrl: null,
+    email: 'contato@sualoja.com.br', cep: '13000-000',
+    endereco: 'Avenida Central', numero: '250', complemento: 'Loja 3', bairro: 'Centro',
+    cidade: 'Campinas', estado: 'SP',
+    representanteNome: 'Responsável Exemplo', representanteCpf: '000.000.000-00',
+  },
   comprador: {
     nome: 'Maria Souza Lima', cpf_cnpj: '000.000.000-00', nacionalidade: 'brasileira',
     estado_civil: 'solteira', profissao: 'designer', data_nascimento: null, telefone: '(11) 90000-0000', email: 'maria@exemplo.com',
