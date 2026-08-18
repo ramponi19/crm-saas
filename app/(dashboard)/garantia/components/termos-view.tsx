@@ -83,6 +83,8 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
         // termo de entrega do usado ter conteúdo em vez de espaço em branco.
         trocas: v.trocas,
       })
+      // Recusado: a loja não está identificada. Não há documento a imprimir.
+      if (r.bloqueado) { notify.bad('Contrato não emitido', r.bloqueado); return }
       if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`, 'Monte o documento em Administração → Documentos'); return }
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
       // Cadastro incompleto: o contrato imprime o espaço em branco calado, então
