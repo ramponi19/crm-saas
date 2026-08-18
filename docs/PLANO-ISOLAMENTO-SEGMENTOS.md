@@ -245,3 +245,38 @@ mas renomear coluna em produção por causa de nomenclatura é risco sem ganho.
 |---|---|---|
 | Comparações por segmento no núcleo | 21 | **0** |
 | Colunas de vertical em tabela de núcleo | 5 em 3 tabelas | 5 em 1 tabela (em transição) + 1 mantida por decisão |
+
+## Validação (18/08/2026) e uma regressão encontrada
+
+**No navegador, como JM Store (varejo):** 15 telas respondendo 200, e cada
+capacidade conferida pelo efeito, não pela intenção:
+
+- dashboard de varejo (não o de imóveis) → `telasProprias` off
+- estoque sem campo Placa → `usaPlaca` off
+- PDV sem campo Comanda → `usaComanda` off
+- Configurações sem abas Portais/Cardápio/Agendamento → lista extra vazia
+- Integrações sem feed de imóveis → `integraPortais` off
+
+**Um teste meu deu resultado enganoso e valeu a pena investigar:** procurei
+"Agendar visita" em `/agenda` e não achei. Não era falha da refatoração — `/agenda`
+**não está habilitada para o varejo** (confirmado em `segmentos_config`: ligada para
+imobiliária e saúde, desligada para varejo), então o middleware redireciona. O teste
+procurava texto numa tela que a JM não tem.
+
+**Banco:** `veiculo_dados` criada com RLS (1 política), ponte `v_inventario_veiculo`
+no ar, `tarefas.imovel_id` removida, 4 backups guardados no schema `backup`. Núcleo
+intacto: 508 leads ativos, 16 tarefas, 2 vendas.
+
+### A regressão: `set_impersonation` voltou a ser chamável sem login
+
+O linter de segurança acusou algo que **eu havia corrigido em 13/08**: a permissão
+de executar `set_impersonation` para quem não fez login. A migração de 14/08 que
+tornou o argumento opcional usou `CREATE OR REPLACE`, e o Postgres **restaurou o
+grant padrão de PUBLIC** — a proteção voltou atrás sem ninguém notar.
+
+Nada vazou: a função valida super admin por dentro e levanta exceção. Mas função
+que troca a empresa da sessão não deve ser nem alcançável por quem não entrou.
+
+**Lição, registrada na própria migração:** toda vez que uma função `SECURITY
+DEFINER` for recriada, o `revoke` precisa vir **na mesma migração**. Recriar função
+apaga permissão ajustada à mão.
