@@ -142,9 +142,11 @@ As duas telas já eram de admin — a tela nunca é a tranca.
 
 ## Pendente com o dono (não é código)
 
-- Preencher CNPJ e telefone em Administração → Minha empresa: o contrato sai com
-  `SUA EMPRESA LTDA` / CNPJ `11.111.111/1111-11`, e **dois contratos já foram
-  emitidos assim**.
+- **Contrato — ver o achado 13 na terceira passada.** Preencher CNPJ e telefone NÃO
+  era suficiente: o modelo não usava marcador nenhum da loja. Agora usa. O que falta
+  é preencher os dados da JM em Administração → Minha empresa (inclusive endereço e
+  quem assina) e digitar, uma vez, a qualificação pessoal de quem assina no modelo.
+  Três contratos já saíram sem identificar a vendedora.
 - Lançar o custo das vendas — enquanto for zero, todo lucro é o faturamento.
 - Tabela de preços vazia; metas de comissão zeradas; três clientes sem
   CPF/endereço.
@@ -243,3 +245,107 @@ Nenhum nome de segmento entrou no código — a trava do núcleo segue em zero.
   no NAVEGADOR do visitante (o site da imobiliária é outro domínio), então quem abre
   o código-fonte da página lê o token. O limite ficou ANTES da checagem do token,
   para também limitar quem tenta adivinhá-lo.
+
+---
+
+# Terceira passada — teste NA TELA, em produção (mesmo dia)
+
+Conta do dono, navegador real, dado de teste marcado ("TESTE AUDITORIA") e
+apagado no fim com cópia em `backup.teste_auditoria_20260818_*`. O banco voltou ao
+estado anterior: 2 vendas reais, 3 clientes, contratos 10 e 11, pedidos 2 e 3,
+estoque zerado.
+
+## O que passou
+
+- **Registrar chamada** (o bug do Luis Felipe, corrigido dias antes e nunca
+  conferido): gravou empresa, autor, direção, resultado e observação. Sem
+  "Empresa não carregada".
+- **Aprovação por link** (achado 2): a venda nasceu com `valor_custo` 1000,
+  `lucro` 500 — não os 1500 de margem fantasma —, com peça, IMEI, produto e
+  cliente, e a unidade foi para `vendido`. A cadeia `cliente_id` passou ponta a
+  ponta: busca com badge CLIENTE → editor → API → orçamento → venda.
+- **PDV com troca**: venda registrada por R$ 1.200 com custo 800 e lucro 400 — a
+  troca entrou como pagamento, não como desconto, então não virou prejuízo. O
+  aparelho recebido entrou como unidade `pendente`, `usado`/`troca`, custo 400, no
+  nome do vendedor.
+- **Encomenda**: pedido de compra criado, recebimento gerou unidade `reservado`
+  ligada à venda, conclusão baixou o estoque.
+- **Garantia pelo IMEI** (achado 3, depois do conserto): "Vendido em 18/08/2026 ·
+  garantia de 90 dias · **90 dia(s) restantes**", e a Origem da OS já veio como
+  Garantia.
+- **Emissão do contrato**: emitiu, arquivou e avisou — "Contrato saiu com campos
+  em branco: falta CPF/CNPJ, Estado civil, Profissão, CEP, Endereço…".
+
+## 13. O contrato não usava marcador nenhum da loja
+
+O mais importante da passada, e corrige o que eu havia dito antes. O modelo ativo
+da JM identificava a vendedora como **texto fixo**: "SUA EMPRESA LTDA, inscrita no
+CNPJ sob o nº 11.111.111/1111-11, com sede na Rua xxx…". Preencher CNPJ e telefone
+em Minha empresa **não mudaria nada**, porque o modelo não perguntava isso ao
+sistema. Medido no contrato emitido: continha "SUA EMPRESA LTDA", continha
+"11.111.111", e **não** continha "JM Store".
+
+E faltavam campos: `empresas` só tinha `cnpj` e `telefone`; o bloco pede e-mail,
+endereço completo e quem assina.
+
+**Feito:** migração `empresa_dados_para_o_contrato` (email, cep, endereco, numero,
+complemento, bairro, cidade, estado, representante_nome, representante_cpf), os
+marcadores correspondentes no catálogo, os campos na tela Minha empresa, e o bloco
+da VENDEDORA do modelo trocado por marcadores — backup em
+`backup.contrato_modelos_20260818`. **Nenhuma cláusula foi tocada.** Conferido: 12
+marcadores da loja, os 11 do cliente preservados, e o endereço **do representante**
+intacto (era texto idêntico ao da loja — um replace global trocaria o endereço de
+uma pessoa pelo da empresa).
+
+A emissão passou a avisar o que falta na LOJA, não só no cliente — e só do que
+aquele modelo usa. Continua texto fixo, de propósito, a qualificação pessoal de
+quem assina (nacionalidade, estado civil, profissão, endereço residencial): é dado
+de uma pessoa, estável, que o lojista digita uma vez no modelo. Criar oito colunas
+no cadastro da empresa para o estado civil do dono seria pior.
+
+## 14. Encomenda aceitava venda de R$ 0,00
+
+O modal exigia cliente e produto, mas não o preço de venda. O teste lançou uma
+encomenda com o campo vazio e ela entrou como venda de **R$ 0,00**: o cliente "não
+paga nada", o faturamento soma zero e o pedido de compra fica com o custo sozinho
+— prejuízo puro no relatório. Agora bloqueia. Diferente do custo (que é só aviso,
+porque às vezes só chega com a nota do fornecedor): o preço cobrado é o que a loja
+ACABOU de combinar com o cliente.
+
+## 15. Data de coluna `date` voltava um dia
+
+Um pedido criado às 17:41 de 18/08 aparecia na lista de Compras como **17/08**.
+Causa: `pedidos_compra.data_pedido` é coluna `date`, e `new Date('2026-08-18')` em
+JavaScript é meia-noite **UTC** — no fuso de Brasília volta para 17/08 21:00.
+
+**Feito:** `lib/datas.ts` monta data pura no fuso local e distingue de
+`timestamptz` (que não tem o problema — somar horas na mão quebraria o caso que já
+funciona). Aplicado em Compras, o caso medido. As seis tabelas com coluna `date`
+foram levantadas; o Financeiro já tinha a gambiarra `+ 'T00:00:00'` no lugar certo,
+e `chaves_imoveis.devolucao_prevista` fica reportado — é tela da imobiliária.
+
+## Achados 16-20 (os outros da passada)
+
+- **"Converter em cliente"** criava cliente sem CPF nem endereço e respondia
+  "convertido em cliente!". Era a origem dos clientes incompletos da JM — os dois
+  sem CPF vieram desse caminho, não do cadastro manual. Agora diz o que falta e
+  onde completar, sem bloquear.
+- **Página pública do orçamento de VENDA** não mostrava o que estava sendo
+  vendido: só nome e total. Aprovar cria a venda e baixa a peça do estoque.
+- **Venda por link sem lead ficava sem vendedor** — o código só olhava o lead, e
+  orçamento criado pela tela de Orçamentos não tem lead. Ranking e comissão saem
+  de `vendedor_id`: a venda de R$ 1.500 não era de ninguém.
+- **`vendas.unidade_id` só era gravado na entrega pendente**: venda de balcão
+  deixava a peça `vendido` sem nada apontando para a venda.
+- **O modal de sucesso do PDV** dizia "Total da venda R$ 800,00" numa venda de
+  1.200 com 400 em aparelho, contradizendo o próprio carrinho.
+- **Entrada de estoque não gravava quem deu entrada**, e a lista tem coluna de
+  responsável que por isso nunca preenchia.
+
+## Duas coisas que eu reportei errado e corrigi
+
+- `origem` gravar `'manual'` não é bug: é o valor por trás do rótulo "Loja física"
+  em `new-lead-modal.tsx`.
+- A observação que "não salvou" no cadastro de lead foi falha da automação do
+  teste (`fill` não dispara o `onChange` do React em textarea). Digitada de
+  verdade, salva.

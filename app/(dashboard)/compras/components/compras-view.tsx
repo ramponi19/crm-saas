@@ -5,6 +5,7 @@ import { Plus, ShoppingCart, Building2, PackageCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { notify } from '@/components/ui'
 import { useEmpresa } from '@/lib/empresa-context'
+import { formatarDiaMes } from '@/lib/datas'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Modal, Input, Select, Textarea, Button, Badge, EmptyState } from '@/components/ui'
@@ -41,10 +42,12 @@ const STATUS_PEDIDO: Record<string, { label: string; tone: 'acc' | 'ok' | 'warn'
 
 const fmtBRL = (v: number | null) => v ? formatCurrency(v) : '—'
 
-function fmtData(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-}
+/**
+ * `data_pedido` é coluna `date`, e `new Date('2026-08-18')` é meia-noite UTC —
+ * em Brasília isso volta para 17/08. Medido: pedido criado às 17:41 de 18/08
+ * aparecia como 17/08 na lista. `formatarDiaMes` monta data pura no fuso local.
+ */
+const fmtData = (d: string | null) => formatarDiaMes(d, '—')
 
 function getInitials(name: string) {
   return name.trim().split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
