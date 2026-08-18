@@ -23,8 +23,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   const agora = new Date().toISOString()
+  /**
+   * Claim atômico, não "conferi antes".
+   *
+   * A checagem acima lê e o UPDATE escreve depois: dois cliques do cliente (ou o
+   * duplo POST de um retry) passavam pelos dois e criavam DUAS tarefas de reparo
+   * para a mesma OS. A condição vai para dentro do UPDATE — só um vence.
+   */
+  const claim = await svc.from('garantias_assistencias')
+    .update({
+      status: b.acao === 'aprovar' ? 'aprovado' : 'reprovado',
+      ...(b.acao === 'aprovar' ? { aprovado_em: agora } : { recusado_em: agora }),
+    } as never)
+    .eq('id', os.id).is('aprovado_em', null).is('recusado_em', null)
+    .select('id').maybeSingle()
+  if (!claim.data) {
+    return NextResponse.json({ error: 'Este orçamento já foi respondido.' }, { status: 409 })
+  }
+
   if (b.acao === 'aprovar') {
-    await svc.from('garantias_assistencias').update({ status: 'aprovado', aprovado_em: agora }).eq('id', os.id)
     // Tarefa interna pro técnico (Meta-safe): não envia mensagem, só cria tarefa.
     const cliente = Array.isArray(os.clientes) ? os.clientes[0] : os.clientes
     await svc.from('tarefas').insert({
@@ -34,8 +51,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       tipo: 'ligacao',
       vencimento: agora,
     } as never)
-  } else {
-    await svc.from('garantias_assistencias').update({ status: 'reprovado', recusado_em: agora }).eq('id', os.id)
   }
 
   return NextResponse.json({ ok: true, acao: b.acao })

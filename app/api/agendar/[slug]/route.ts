@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { escolherResponsavel } from '@/lib/distribuicao'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { excedeuLimite } from '@/lib/rate-limit'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -11,8 +13,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, segmento').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+
+  /**
+   * A loja precisa USAR agenda para receber agendamento.
+   *
+   * A tela é liberada por segmento, a rota não era: um POST no slug de qualquer
+   * empresa criava lead + consulta numa loja que não tem agenda nenhuma. O lead
+   * entrava na roleta, consumia o limite do plano e ninguém ia ver a "consulta",
+   * porque a tela não existe ali. Mesmo 404: a rota não conta quem existe.
+   */
+  const cap = SEGMENTOS[normalizarSegmento(empresa.segmento)].capacidades
+  if (!cap.agendaClinica && !cap.agendaVisitas) {
+    return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+  }
+
+  // Cada agendamento cria um LEAD, que entra na roleta e consome o limite do
+  // plano da loja. Sem teto, dava para encher o funil de quem quisesse.
+  if (await excedeuLimite(svc, 'agendar', req, 20)) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429, headers: CORS })
+  }
 
   const b = (await req.json().catch(() => ({}))) as { nome?: string; telefone?: string; data_hora?: string; observacoes?: string }
   const nome = (b.nome || '').trim()

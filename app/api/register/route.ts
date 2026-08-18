@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { motivosDoSegmento } from '@/lib/motivos-perda'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
+import { excedeuLimite } from '@/lib/rate-limit'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -25,6 +26,22 @@ function slugify(text: string) {
 
 export async function POST(req: Request) {
   const svc = createServiceClient()
+
+  /**
+   * Teto por origem.
+   *
+   * Esta rota cria usuário com `email_confirm: true` e a empresa junto — e passa
+   * por fora do rate limit do signUp do Supabase de propósito (ver o docblock
+   * acima). Sem teto, um script criava tenants confirmados sem parar: empresa,
+   * funil, etapas e motivos de perda a cada chamada. Cinco por hora é folgado para
+   * quem está de fato se cadastrando e inviável para quem está automatizando.
+   */
+  if (await excedeuLimite(svc, 'register', req, 5)) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas de cadastro. Tente novamente em alguns minutos.' },
+      { status: 429 },
+    )
+  }
 
   let body: {
     email?: string; password?: string; nomeUsuario?: string
