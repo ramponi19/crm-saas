@@ -730,6 +730,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         ...contexto, documentoId: doc.id, nomeDocumento: doc.nome,
       })
       setEmitindo(null)
+      // Recusado: a loja não está identificada. Não há documento a imprimir.
+      if (r.bloqueado) { notify.bad('Contrato não emitido', r.bloqueado); return }
       if (r.semModelo) { notify.warn(`"${doc.nome}" não tem conteúdo`, 'Monte o documento em Administração → Documentos'); return }
       if (!r.html) { notify.bad('Não foi possível emitir'); return }
       setEmitidos((e) => [...e, doc.id])

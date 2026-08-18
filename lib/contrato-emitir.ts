@@ -99,6 +99,11 @@ export interface ContratoEmitido {
    * modelo realmente usa: cobrar dado que não vai a lugar nenhum é ruído.
    */
   faltandoLoja?: string[]
+  /**
+   * Preenchido quando a emissão foi RECUSADA. Contrato de compra e venda sem
+   * identificar quem vende não é contrato — é papel bonito. Ver `lojaIdentificada`.
+   */
+  bloqueado?: string
 }
 
 /**
@@ -123,6 +128,28 @@ const CAMPOS_LOJA: { marcador: string; label: string; ler: (l: ContratoLoja) => 
   { marcador: 'loja.representante',     label: 'Quem assina pela loja',  ler: (l) => l.representanteNome },
   { marcador: 'loja.representante_cpf', label: 'CPF de quem assina',     ler: (l) => l.representanteCpf },
 ]
+
+/**
+ * A loja está identificada o suficiente para assinar?
+ *
+ * Só barra o essencial — razão social e CNPJ — e só quando o modelo REALMENTE os
+ * usa. O resto (e-mail, bairro, CEP) sai como aviso: incomoda, não impede.
+ *
+ * POR QUE BARRAR: até 18/08 o modelo da JM trazia "SUA EMPRESA LTDA, CNPJ
+ * 11.111.111/1111-11" como texto fixo, e dois contratos saíram assim — com uma
+ * empresa que não existe no lugar da vendedora. Ao trocar por marcadores, o mesmo
+ * bloco passou a sair EM BRANCO enquanto o cadastro estivesse vazio. Os dois casos
+ * produzem um documento que não identifica as partes; a diferença é que este aqui
+ * a gente consegue impedir, e o conserto são 30 segundos numa tela.
+ */
+function lojaIdentificada(loja: ContratoLoja, modelo: ModeloContrato): string | null {
+  const texto = JSON.stringify(modelo.paginas).toLowerCase()
+  const falta: string[] = []
+  if (texto.includes('{{loja.nome}}') && !String(loja.nome ?? '').trim()) falta.push('a razão social')
+  if (texto.includes('{{loja.cnpj}}') && !String(loja.cnpj ?? '').trim()) falta.push('o CNPJ')
+  if (!falta.length) return null
+  return `O documento sairia sem ${falta.join(' e ')} da loja. Preencha em Administração → Minha empresa e emita de novo.`
+}
 
 function camposFaltantesLoja(loja: ContratoLoja, modelo: ModeloContrato): string[] {
   // O modelo é JSON com HTML dentro; procurar no texto todo cobre qualquer bloco.
@@ -190,6 +217,11 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     data: input.data,
     trocas: input.trocas,
   }
+
+  // Recusa ANTES de montar e arquivar: contrato em branco não deve nem existir no
+  // histórico, senão vira 2ª via de um documento inválido.
+  const impedimento = lojaIdentificada(dados.loja, modelo)
+  if (impedimento) return { html: null, salvo: false, semModelo: false, bloqueado: impedimento }
 
   const html = renderizarModelo(modelo, dados)
 
