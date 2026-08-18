@@ -9,9 +9,8 @@ import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
-import { LeadMatchPanel } from './lead-match-panel'
-import { LeadInteressePanel } from './lead-interesse-panel'
-import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
+import { PaineisDaVertical } from './paineis-vertical'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadOrcamentoPanel } from './lead-orcamento-panel'
@@ -210,6 +209,14 @@ function AudioChat({ url }: { url: string }) {
 }
 
 export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onClose, onUpdate }: LeadModalProps) {
+  /**
+   * O que ESTE segmento pede — em vez de o modal testar quem ele é.
+   *
+   * Antes havia cinco comparações aqui (rótulo do campo de interesse e três
+   * painéis de vertical). Acrescentar uma vertical exigia editar este arquivo, que
+   * é o mais disputado do projeto: em 13/08 duas frentes colidiram nele.
+   */
+  const cfgSegmento = SEGMENTOS[normalizarSegmento(segmento)]
   const supabase = createClient()
   const { empresa } = useEmpresa()
   const router = useRouter()
@@ -1014,10 +1021,14 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             {salvarAqui('tel')}
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
             {salvarAqui('ig')}
-            {segmento === 'concessionaria' || segmento === 'imobiliaria' ? (
-              <Input label={segmento === 'concessionaria' ? 'Veículo interessado' : 'Imóvel interessado'} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
+            {/* O rótulo e o TIPO de campo vêm do contrato, não de um `if` por
+                segmento. Vertical com catálogo no CRM (varejo, assistência) ganha
+                o autocomplete de produto; vertical cujo item vive em tabela
+                própria (imóvel, veículo) recebe texto livre. */}
+            {cfgSegmento.paineisDoLead.length > 0 ? (
+              <Input label={cfgSegmento.interesseLabel} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
             ) : (
-              <ProdutoAutocomplete label="Produto interessado" value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
+              <ProdutoAutocomplete label={cfgSegmento.interesseLabel} value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
             )}
             {salvarAqui('produto')}
             {/* Escolher a etapa MOVE o card na hora — não espera "Salvar".
@@ -1042,9 +1053,9 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
               responsavelInicial={lead.responsavel_id}
               onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
             />
-            {segmento === 'imobiliaria' && <LeadMatchPanel leadId={lead.id} />}
-            {segmento === 'concessionaria' && <LeadInteressePanel leadId={lead.id} />}
-            {segmento === 'concessionaria' && <LeadFinanciamentoPanel leadId={lead.id} />}
+            {/* Painéis da vertical, na ordem que o segmento declarou. Acrescentar
+                uma vertical não abre mais este arquivo. */}
+            <PaineisDaVertical nomes={cfgSegmento.paineisDoLead} leadId={lead.id} />
             <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
             <LeadChamadasPanel leadId={lead.id} />
             <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />

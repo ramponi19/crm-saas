@@ -76,10 +76,6 @@ const AREA_DE_VERTICAL = [
  * refatoração precisa resolver, para a lista ser um plano e não um esconderijo.
  */
 const DIVIDA = {
-  'components/modules/leads/lead-modal.tsx':
-    { max: 5, nota: 'Fase 1: painéis por registro (paineisDoLead) + interesseLabel no contrato' },
-  'components/modules/configuracoes/configuracoes-view.tsx':
-    { max: 4, nota: 'Fase 1: cascata de abas → abasPorSegmento no contrato' },
   'components/modules/leads/lead-acoes-panel.tsx':
     { max: 1, nota: 'Fase 2: isImob → capacidade no contrato' },
   'components/modules/configuracoes/automacoes-card.tsx':

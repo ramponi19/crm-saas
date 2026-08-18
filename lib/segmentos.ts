@@ -32,7 +32,42 @@ export interface SegmentoConfig {
   funil: string[]
   /** módulos EXCLUSIVOS do segmento (fase profunda). icon = nome do ícone lucide. */
   modulosExtra?: { href: string; label: string; icon: string }[]
+
+  /**
+   * Rótulo do campo "o que o cliente quer comprar", no modal do lead.
+   *
+   * O núcleo perguntava `segmento === 'concessionaria' ? 'Veículo' : 'Imóvel'` —
+   * ou seja, para acrescentar uma vertical era preciso EDITAR o modal do lead, o
+   * arquivo mais disputado do projeto. Agora cada segmento declara o seu.
+   */
+  interesseLabel: string
+
+  /**
+   * Painéis de vertical que aparecem no modal do lead, na ordem.
+   *
+   * Antes o modal listava `{segmento === 'imobiliaria' && <LeadMatchPanel/>}` uma
+   * linha por painel. Com a lista aqui, uma vertical nova só acrescenta o nome
+   * dela — o modal não muda. Os nomes válidos estão em PAINEIS_DO_LEAD
+   * (components/modules/leads/paineis-vertical.tsx), que é quem conhece os
+   * componentes.
+   */
+  paineisDoLead: PainelDoLead[]
+
+  /**
+   * Abas EXTRA em Configurações, além das que todo segmento tem.
+   *
+   * Substitui uma cascata de quatro `if` na tela. Vazio = só o padrão.
+   */
+  abasExtraConfiguracoes: { id: string; label: string }[]
 }
+
+/**
+ * Painéis de vertical disponíveis para o modal do lead.
+ *
+ * É um tipo, e não string livre, de propósito: errar o nome viraria painel que
+ * some sem erro nenhum — a pior falha, porque parece funcionar.
+ */
+export type PainelDoLead = 'match-imoveis' | 'interesse-veiculo' | 'financiamento'
 
 export const SEGMENTO_PADRAO: Segmento = 'varejo'
 
@@ -44,6 +79,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: [],
     labelOverrides: {},
     funil: ['Novo', 'Contato', 'Negociação', 'Fechamento', 'Pós-venda'],
+    interesseLabel: 'Produto interessado',
+    paineisDoLead: [],
+    abasExtraConfiguracoes: [],
   },
   assistencia: {
     label: 'Assistência técnica',
@@ -52,6 +90,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: [],
     labelOverrides: {},
     funil: ['Novo', 'Diagnóstico', 'Orçamento', 'Em reparo', 'Pronto', 'Entregue'],
+    interesseLabel: 'Aparelho / equipamento',
+    paineisDoLead: [],
+    abasExtraConfiguracoes: [],
   },
   servicos: {
     label: 'Serviços / Prestadores',
@@ -60,6 +101,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: ['/estoque', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
     labelOverrides: { '/produtos': 'Serviços', '/catalogo': 'Catálogo de serviços' },
     funil: ['Novo', 'Contato', 'Orçamento', 'Aprovado', 'Em execução', 'Concluído'],
+    interesseLabel: 'Serviço de interesse',
+    paineisDoLead: [],
+    abasExtraConfiguracoes: [],
   },
   imobiliaria: {
     label: 'Imobiliária',
@@ -76,6 +120,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
       { href: '/chaves', label: 'Chaves', icon: 'Key' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
     ],
+    interesseLabel: 'Imóvel interessado',
+    paineisDoLead: ['match-imoveis'],
+    abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
   },
   saude: {
     label: 'Saúde / Clínica',
@@ -84,6 +131,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
     labelOverrides: { '/clientes': 'Pacientes' },
     funil: ['Novo', 'Contato', 'Consulta agendada', 'Em atendimento', 'Retorno'],
+    interesseLabel: 'Procedimento / especialidade',
+    paineisDoLead: [],
+    abasExtraConfiguracoes: [{ id: 'agendamento', label: 'Agendamento' }],
   },
   food: {
     label: 'Food / Restaurante',
@@ -95,6 +145,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     modulosExtra: [
       { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed' },
     ],
+    interesseLabel: 'Item do cardápio',
+    paineisDoLead: [],
+    abasExtraConfiguracoes: [{ id: 'cardapio', label: 'Cardápio' }],
   },
   concessionaria: {
     label: 'Loja de veículos',
@@ -109,6 +162,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
       { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
     ],
+    interesseLabel: 'Veículo interessado',
+    paineisDoLead: ['interesse-veiculo', 'financiamento'],
+    abasExtraConfiguracoes: [{ id: 'veiculos-portais', label: 'Portais' }],
   },
 }
 

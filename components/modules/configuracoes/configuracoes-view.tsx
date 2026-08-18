@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText, ArrowLeftRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
@@ -88,14 +89,19 @@ const supabase = createClient()
 
 export function ConfiguracoesView({ official, instagram, messenger, taxas, segmento, slug }: Props) {
   const [aba, setAba]       = useState('integracoes')
-  const tabs = segmento === 'imobiliaria'
-    ? [...TABS, { id: 'portais', label: 'Portais', Icon: LinkIcon }]
-    : segmento === 'food'
-    ? [...TABS, { id: 'cardapio', label: 'Cardápio', Icon: LinkIcon }]
-    : segmento === 'saude'
-    ? [...TABS, { id: 'agendamento', label: 'Agendamento', Icon: LinkIcon }]
-    : segmento === 'concessionaria'
-    ? [...TABS, { id: 'veiculos-portais', label: 'Portais', Icon: LinkIcon }]
+  /**
+   * As abas extra vêm do contrato, não de uma cascata de `if`.
+   *
+   * Eram quatro comparações aqui (imobiliária, food, saúde, concessionária), e
+   * cada vertical nova acrescentava um degrau nessa escada — nesta tela, que todo
+   * segmento abre. Agora o segmento declara em `abasExtraConfiguracoes` o que quer.
+   *
+   * O ícone fica AQUI e não no contrato de propósito: `lib/segmentos.ts` é
+   * config, e importar componente de ícone ali o transformaria em código de tela.
+   */
+  const extras = SEGMENTOS[normalizarSegmento(segmento)].abasExtraConfiguracoes
+  const tabs = extras.length
+    ? [...TABS, ...extras.map((e) => ({ ...e, Icon: LinkIcon }))]
     : TABS
   const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
   const [modalValues, setModalValues] = useState<Record<string, string>>({})
