@@ -232,9 +232,14 @@ Nenhum nome de segmento entrou no código — a trava do núcleo segue em zero.
 - Os webhooks Stripe e de pagamento verificam assinatura (o segundo passou a
   recusar quando não há segredo — achado 7).
 
-## Fica reportado, não mexido
+## Aplicado depois, com autorização — e uma correção do que eu disse
 
-- **`/api/imob/[slug]/lead`** tem o mesmo padrão de rota aberta que cria lead sem
-  teto. É área da construção do segmento imobiliária, em andamento por outra
-  frente — o limite (`excedeuLimite(svc, 'imob-lead', req, 20)`) é uma linha, mas
-  não vou tocar em código de outra demanda sem combinar.
+- **`/api/imob/[slug]/lead`** recebeu o mesmo teto (20/hora por origem), a pedido
+  do dono em 18/08.
+
+  **Correção do que registrei antes:** eu descrevi esta rota como "aberta", e ela
+  não é — valida o token do portal (`getPortalToken`) antes de escrever. O teto
+  continua valendo, por outro motivo: o token viaja na URL de um formulário que roda
+  no NAVEGADOR do visitante (o site da imobiliária é outro domínio), então quem abre
+  o código-fonte da página lê o token. O limite ficou ANTES da checagem do token,
+  para também limitar quem tenta adivinhá-lo.
