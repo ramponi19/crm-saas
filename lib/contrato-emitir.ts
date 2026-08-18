@@ -7,7 +7,7 @@
 // por item em `vendas`, uma venda de 3 produtos virava 3 contratos de 1 item.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ContratoItem, ContratoComprador } from './contrato-tipos'
+import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
 import { renderizarModelo, type ModeloContrato, type PaginaModelo, type DadosMescla } from './contrato-modelo'
 import { camposFaltantesContrato } from './cliente-contrato'
 
@@ -94,6 +94,43 @@ export interface ContratoEmitido {
    * mostrar). Vazio = cadastro completo.
    */
   faltando?: string[]
+  /**
+   * Campos da LOJA que o modelo pede e o cadastro não tem. Só entra o que o
+   * modelo realmente usa: cobrar dado que não vai a lugar nenhum é ruído.
+   */
+  faltandoLoja?: string[]
+}
+
+/**
+ * O que a loja precisa preencher para ESTE modelo sair completo.
+ *
+ * Cada linha liga um marcador ao campo do cadastro. A verificação olha o modelo
+ * antes de reclamar: se o lojista não escreveu {{loja.cep}} no contrato dele, o CEP
+ * em branco não é problema nenhum.
+ */
+const CAMPOS_LOJA: { marcador: string; label: string; ler: (l: ContratoLoja) => string | null | undefined }[] = [
+  { marcador: 'loja.nome',              label: 'Nome / razão social',    ler: (l) => l.nome },
+  { marcador: 'loja.cnpj',              label: 'CNPJ',                   ler: (l) => l.cnpj },
+  { marcador: 'loja.telefone',          label: 'Telefone',               ler: (l) => l.telefone },
+  { marcador: 'loja.email',             label: 'E-mail',                 ler: (l) => l.email },
+  { marcador: 'loja.cep',               label: 'CEP',                    ler: (l) => l.cep },
+  { marcador: 'loja.endereco',          label: 'Endereço',               ler: (l) => l.endereco },
+  { marcador: 'loja.numero',            label: 'Número',                 ler: (l) => l.numero },
+  { marcador: 'loja.bairro',            label: 'Bairro',                 ler: (l) => l.bairro },
+  { marcador: 'loja.cidade',            label: 'Cidade',                 ler: (l) => l.cidade },
+  { marcador: 'loja.estado',            label: 'Estado (UF)',            ler: (l) => l.estado },
+  { marcador: 'loja.cidade_estado',     label: 'Cidade e estado',        ler: (l) => [l.cidade, l.estado].filter(Boolean).join('') },
+  { marcador: 'loja.representante',     label: 'Quem assina pela loja',  ler: (l) => l.representanteNome },
+  { marcador: 'loja.representante_cpf', label: 'CPF de quem assina',     ler: (l) => l.representanteCpf },
+]
+
+function camposFaltantesLoja(loja: ContratoLoja, modelo: ModeloContrato): string[] {
+  // O modelo é JSON com HTML dentro; procurar no texto todo cobre qualquer bloco.
+  // Minúsculas dos dois lados porque `mesclar` também ignora caixa.
+  const texto = JSON.stringify(modelo.paginas).toLowerCase()
+  return CAMPOS_LOJA
+    .filter(({ marcador, ler }) => texto.includes(`{{${marcador}}}`) && !String(ler(loja) ?? '').trim())
+    .map(({ label }) => label)
 }
 
 /**
@@ -110,7 +147,9 @@ export interface ContratoEmitido {
  */
 export async function emitirContrato(supabase: Client, input: EmitirContratoInput): Promise<ContratoEmitido> {
   const [empRes, cliRes, garantiaLoja, modelo] = await Promise.all([
-    supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', input.empresaId).maybeSingle(),
+    supabase.from('empresas')
+      .select('nome, cnpj, telefone, wl_logo_url, email, cep, endereco, numero, complemento, bairro, cidade, estado, representante_nome, representante_cpf')
+      .eq('id', input.empresaId).maybeSingle(),
     input.clienteId
       ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -121,11 +160,23 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
   // Sem modelo não há contrato. Sai antes de montar dado nenhum.
   if (!modelo) return { html: null, salvo: false, semModelo: true }
 
-  const e = empRes.data as { nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null } | null
+  const e = empRes.data as {
+    nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null
+    email?: string | null; cep?: string | null; endereco?: string | null; numero?: string | null
+    complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null
+    representante_nome?: string | null; representante_cpf?: string | null
+  } | null
   const c = cliRes.data as Partial<ContratoComprador> | null
 
   const dados: DadosMescla = {
-    loja: { nome: e?.nome ?? 'Loja', cnpj: e?.cnpj ?? null, telefone: e?.telefone ?? null, logoUrl: e?.wl_logo_url ?? null },
+    loja: {
+      nome: e?.nome ?? 'Loja', cnpj: e?.cnpj ?? null, telefone: e?.telefone ?? null,
+      logoUrl: e?.wl_logo_url ?? null,
+      email: e?.email ?? null, cep: e?.cep ?? null,
+      endereco: e?.endereco ?? null, numero: e?.numero ?? null, complemento: e?.complemento ?? null,
+      bairro: e?.bairro ?? null, cidade: e?.cidade ?? null, estado: e?.estado ?? null,
+      representanteNome: e?.representante_nome ?? null, representanteCpf: e?.representante_cpf ?? null,
+    },
     comprador: { ...COMPRADOR_VAZIO, ...(c ?? {}) },
     // Congela a garantia item a item: o produto pode mudar de política depois,
     // o contrato assinado não muda.
@@ -162,6 +213,15 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     // papel — cliente antigo, cadastrado quando nada era obrigatório, continua
     // incompleto e ninguém perceberia até alguém ler o contrato assinado.
     faltando: camposFaltantesContrato(dados.comprador),
+    /**
+     * O que falta na LOJA.
+     *
+     * Simétrico ao comprador, e pela mesma razão: contrato de compra e venda sem
+     * identificar a VENDEDORA não identifica as partes. Só entra na lista o que o
+     * modelo realmente usa — avisar sobre marcador que o lojista não escreveu seria
+     * cobrar dado que não vai a lugar nenhum.
+     */
+    faltandoLoja: camposFaltantesLoja(dados.loja, modelo),
   }
 }
 

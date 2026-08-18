@@ -91,6 +91,32 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
             </>
           )}
 
+          {/* Venda (novo/semi-novo) — o cliente precisa ver O QUE está aprovando.
+              Antes, tipo 'venda' não tinha bloco nenhum: a página mostrava o nome
+              do cliente e o total, e nada do aparelho. Aprovar esse link cria a
+              venda e BAIXA a peça do estoque — pedir "aprove R$ 1.500,00" sem dizer
+              de quê é pedir assinatura em papel em branco. */}
+          {dados.tipo === 'venda' && (
+            <>
+              {(dados.aparelho || dados.imei) && (
+                <div className="mb-3 space-y-1 rounded-control border border-line-soft bg-bg p-3 text-[13px]">
+                  {dados.aparelho && <div><span className="text-ink-3">Aparelho:</span> <span className="font-medium">{dados.aparelho}</span></div>}
+                  {dados.imei && <div><span className="text-ink-3">IMEI/Série:</span> <span className="num">{dados.imei}</span></div>}
+                </div>
+              )}
+              {dados.itens.filter((it) => it.descricao).length > 0 && (
+                <div className="overflow-hidden rounded-control border border-line-soft">
+                  {dados.itens.filter((it) => it.descricao).map((it, i) => (
+                    <div key={i} className="flex items-center justify-between border-b border-line-soft px-3 py-2 text-[13px] last:border-0">
+                      <span>{it.qtd > 1 ? `${it.qtd}× ` : ''}{it.descricao}</span>
+                      <span className="num font-medium">{brl(it.qtd * it.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           {/* Downgrade */}
           {dados.tipo === 'downgrade' && (
             <div className="space-y-2 text-[13.5px]">

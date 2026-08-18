@@ -110,7 +110,21 @@ export default function OSModal({ os, isNew, onClose }: Props) {
     const timer = setTimeout(async () => {
       setBuscandoVenda(true)
       try {
-        const { data: venda } = await supabase
+        /**
+         * Procura por DOIS caminhos, porque o IMEI não está sempre no mesmo lugar.
+         *
+         * `vendas.numero_serie` só é preenchido pelo PDV. Venda de ENCOMENDA nasce
+         * sem série nenhuma — no ato do pedido o aparelho ainda não existe — e
+         * quem digita o IMEI depois é o estoque, na unidade. Resultado que o teste
+         * mostrou: o cliente voltava com um aparelho que a loja vendeu e a tela
+         * dizia "nenhuma venda desta loja com este IMEI".
+         *
+         * Então: tenta pela série da venda e, se não achar, pela UNIDADE ligada à
+         * venda (`vendas.unidade_id`), que é onde o IMEI real acaba morando.
+         */
+        let venda: { data_venda: string | null; created_at: string | null } | null = null
+
+        const { data: porSerie } = await supabase
           .from('vendas')
           .select('data_venda, created_at')
           .eq('numero_serie', serie)
@@ -118,6 +132,28 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           .order('data_venda', { ascending: false })
           .limit(1)
           .maybeSingle()
+        venda = porSerie ?? null
+
+        if (!venda) {
+          const { data: unidades } = await supabase
+            .from('inventario_unidades')
+            .select('id')
+            .or(`imei.eq.${serie},imei2.eq.${serie},numero_serie.eq.${serie}`)
+            .limit(5)
+          const ids = (unidades ?? []).map(u => u.id)
+          if (ids.length) {
+            const { data: porUnidade } = await supabase
+              .from('vendas')
+              .select('data_venda, created_at')
+              .in('unidade_id', ids)
+              .eq('status', 'concluida')
+              .order('data_venda', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            venda = porUnidade ?? null
+          }
+        }
+
         if (cancelado || !venda) { setGarantiaDaVenda(null); return }
 
         // Garantia da loja (configuracoes_sistema → contrato). O mesmo número que

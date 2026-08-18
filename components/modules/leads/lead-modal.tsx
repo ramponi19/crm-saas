@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
+import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
@@ -940,7 +941,29 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       .eq('id', lead.id)
 
     setSaving(false)
-    notify.ok('Lead convertido em cliente!')
+    /**
+     * Diz o que FALTOU, em vez de comemorar um cadastro pela metade.
+     *
+     * A conversão grava nome, telefone e Instagram — é o que o lead tem. Só que o
+     * cliente nasce sem CPF, endereço, estado civil: os campos que o CONTRATO usa.
+     * O cadastro manual pede tudo isso com asterisco; este caminho não pedia nada e
+     * ainda respondia "convertido em cliente!", como se estivesse completo. Foi
+     * assim que a JM ficou com clientes sem CPF — e o contrato saiu em branco.
+     *
+     * Não bloqueia: o vendedor está com o cliente na frente e pode não ter o CPF
+     * ainda. Mas sai daqui sabendo o que buscar, e onde.
+     */
+    const faltando = camposFaltantesContrato({
+      nome: form.nome, telefone: form.tel,
+    })
+    if (faltando.length) {
+      notify.warn(
+        'Cliente criado com cadastro incompleto',
+        `Falta para o contrato: ${faltando.join(', ')}. Complete em Clientes.`,
+      )
+    } else {
+      notify.ok('Lead convertido em cliente!')
+    }
     onUpdate({ ...lead, kanban_status: ganhoColId(columns), convertido_em: cliente.id })
     onClose()
   }
