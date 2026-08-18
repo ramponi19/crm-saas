@@ -16,7 +16,12 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' }: {
   nome: string
   onNome: (v: string) => void
-  onSelect: (c: { nome: string; telefone: string }) => void
+  /**
+   * `cliente_id` vem preenchido SÓ quando o escolhido é um cliente cadastrado.
+   * Lead e nome digitado à mão devolvem null: quem grava não pode inventar um
+   * vínculo que não existe.
+   */
+  onSelect: (c: { nome: string; telefone: string; cliente_id: number | null }) => void
   label?: string
 }) {
   const supabase = createClient()
@@ -63,7 +68,11 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
 
   function escolher(c: Sug) {
     skip.current = true
-    onSelect({ nome: c.nome, telefone: c.telefone ?? '' })
+    onSelect({
+      nome: c.nome,
+      telefone: c.telefone ?? '',
+      cliente_id: c.origem === 'cliente' ? Number(c.id.slice(1)) : null,
+    })
     setOpen(false); setRes([])
   }
 

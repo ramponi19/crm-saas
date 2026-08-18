@@ -10,6 +10,7 @@ export interface ItemOrc { descricao: string; qtd: number; valor: number }
 
 export interface Orcamento {
   id: number; lead_id: number | null; tipo: string; status: string; cliente_nome: string; cliente_telefone: string | null
+  cliente_id: number | null
   aparelho: string | null; imei: string | null; defeito: string | null; prazo_dias: number | null; garantia_dias: number | null
   itens: ItemOrc[]; aparelho_novo: string | null; valor_novo: number | null; aparelho_usado: string | null; valor_entrada: number | null
   unidade_id: number | null; total: number; valor_devolver: number | null; acerto: string | null

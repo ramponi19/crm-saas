@@ -18,6 +18,12 @@ interface Venda {
   valor_venda: number
   desconto_valor: number | null
   lucro: number | null
+  /**
+   * Custo da venda. Entra aqui para a tela detectar quando o "Lucro total" é
+   * FICTÍCIO: `lucro` é coluna gerada (venda − custo), então custo zerado devolve o
+   * faturamento inteiro como se fosse margem.
+   */
+  valor_custo?: number | null
   forma_pagamento: string | null
   observacoes: string | null
   status: string | null
@@ -193,9 +199,22 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     const qtd      = conc.length
     const ticket   = qtd > 0 ? receita / qtd : 0
     const descontos = conc.reduce((s, v) => s + (v.desconto_valor ?? 0), 0)
+    /**
+     * Vendas concluídas SEM custo lançado.
+     *
+     * Cada uma soma o preço cheio no "Lucro total", porque `lucro` é venda − custo.
+     * Hoje isso vale para 100% das vendas da JM: o relatório mostra margem total
+     * onde não há informação de margem nenhuma — e número que parece calculado é
+     * pior que número ausente, porque ninguém desconfia dele.
+     */
+    const semCusto = conc.filter(v => !(Number(v.valor_custo) > 0)).length
     return [
       { label: 'Total vendas', value: formatCurrency(receita) },
-      { label: 'Lucro total',  value: formatCurrency(lucro) },
+      {
+        label: 'Lucro total',
+        value: formatCurrency(lucro),
+        aviso: semCusto > 0 ? `${semCusto} de ${qtd} sem custo lançado` : undefined,
+      },
       { label: 'Ticket médio', value: formatCurrency(ticket) },
       { label: 'Descontos',    value: formatCurrency(descontos) },
       { label: 'Qtd. vendas',  value: String(qtd) },
@@ -294,7 +313,16 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-5 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
             {kpis.map(k => (
-              <StatCard key={k.label} bare label={k.label} value={k.value} />
+              <StatCard
+                key={k.label}
+                bare
+                label={k.label}
+                value={k.value}
+                // O aviso vive DENTRO do card, colado ao número que ele qualifica —
+                // uma nota no fim da página não alcança quem lê só o indicador.
+                delta={'aviso' in k ? k.aviso : undefined}
+                deltaTone={'aviso' in k && k.aviso ? 'warn' : undefined}
+              />
             ))}
           </div>
 

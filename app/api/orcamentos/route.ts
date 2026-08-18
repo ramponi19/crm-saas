@@ -8,6 +8,7 @@ interface Body {
   status?: string
   cliente_nome?: string
   cliente_telefone?: string
+  cliente_id?: number | null
   lead_id?: number | null
   aparelho?: string
   imei?: string
@@ -41,6 +42,20 @@ export async function POST(req: Request) {
   const nome = (b.cliente_nome || '').trim()
   if (!nome) return NextResponse.json({ error: 'Informe o nome do cliente' }, { status: 400 })
 
+  /**
+   * O cadastro vem do cliente, então precisa ser CONFERIDO aqui: um id de outra
+   * empresa gravaria o orçamento apontando para o cliente de outro tenant, e a
+   * venda gerada na aprovação (que roda com service role, sem RLS) apareceria no
+   * histórico de quem não comprou nada. Não é da empresa → grava nulo, o nome
+   * digitado continua valendo.
+   */
+  let clienteId: number | null = null
+  if (b.cliente_id != null) {
+    const { data: cli } = await supabase.from('clientes')
+      .select('id').eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
+    clienteId = cli?.id ?? null
+  }
+
   const itens = (b.itens ?? [])
     .map((i) => ({ descricao: (i.descricao || '').trim(), qtd: Math.max(1, Number(i.qtd) || 1), valor: Math.max(0, Number(i.valor) || 0) }))
     .filter((i) => i.descricao)
@@ -73,6 +88,7 @@ export async function POST(req: Request) {
     lead_id: b.lead_id ?? null,
     cliente_nome: nome,
     cliente_telefone: b.cliente_telefone?.trim() || null,
+    cliente_id: clienteId,
     tipo,
     aparelho: b.aparelho?.trim() || null,
     imei: b.imei?.trim() || null,

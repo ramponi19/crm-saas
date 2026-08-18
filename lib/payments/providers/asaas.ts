@@ -139,7 +139,12 @@ export class AsaasProvider implements PaymentProvider {
         throw new Error('Asaas: assinatura inválida')
       }
     } else {
-      console.warn('[asaas] webhook_token não configurado — validação de assinatura ignorada')
+      // Sem token não há como saber se o aviso veio do Asaas. Aceitar o payload
+      // deixaria QUALQUER POST marcar uma cobrança como paga (e lançar receita no
+      // Financeiro) sabendo só o provider_ref. Recusar é o único lado seguro:
+      // pagamento não confirmado se resolve conferindo no painel; pagamento
+      // confirmado por engano é prejuízo com o cliente já a caminho da porta.
+      throw new Error('Asaas: webhook_token não configurado — webhook recusado')
     }
 
     let body: { event?: string; payment?: { id?: string; status?: string; paymentDate?: string } }

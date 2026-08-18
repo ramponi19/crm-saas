@@ -128,7 +128,8 @@ export class PagSeguroProvider implements PaymentProvider {
         throw new Error('PagSeguro: assinatura inválida')
       }
     } else {
-      console.warn('[pagseguro] webhook_secret não configurado — validação de assinatura ignorada')
+      // Ver a nota no adapter do Asaas: webhook de dinheiro sem assinatura é recusado.
+      throw new Error('PagSeguro: webhook_secret não configurado — webhook recusado')
     }
 
     let body: { id?: string; charges?: Array<{ status?: string; paid_at?: string }> }

@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { requireEmpresaRoleApi } from '@/lib/owner'
 import { encryptCredenciais } from '@/lib/payments/crypto'
 import { buildProvider, type ProviderId } from '@/lib/payments'
 
 const PROVIDERS_VALIDOS: ProviderId[] = ['manual', 'mercadopago', 'asaas', 'efibank', 'pagseguro']
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
-  const empresaId = await getEmpresaId()
+  /**
+   * Dono ou admin, não "qualquer logado".
+   *
+   * Esta rota grava a credencial de RECEBIMENTO da loja. Com só a checagem de
+   * sessão, um vendedor podia apontar a conta de pagamentos para a chave Pix dele
+   * — o link de cobrança continuaria funcionando e o dinheiro entraria em outro
+   * lugar. A tela é de admin, mas a tela não é a tranca.
+   */
+  const auth = await requireEmpresaRoleApi(['owner', 'admin'])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
   const { provider, credenciais, modo, ativo, testar } = await req.json() as {
     provider: ProviderId
     credenciais: Record<string, string>
@@ -56,11 +62,9 @@ export async function POST(req: NextRequest) {
 
 // Retorna a config atual SEM as credenciais (apenas metadados)
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
-  const empresaId = await getEmpresaId()
+  const auth = await requireEmpresaRoleApi(['owner', 'admin'])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
   const { data } = await supabase
     .from('tenant_payment_config')
     .select('provider, ativo, modo, atualizado_em, credenciais_cipher')

@@ -83,6 +83,69 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const empresaId = empresa?.id
   const [form, setForm] = useState<OS>(isNew ? EMPTY : { ...EMPTY, ...os })
   const [saving, setSaving] = useState(false)
+  /** O que a venda daquele IMEI diz sobre a garantia — null = não procurado ainda. */
+  const [garantiaDaVenda, setGarantiaDaVenda] = useState<
+    { vendaEm: string; diasTotal: number; restantes: number } | null
+  >(null)
+  const [buscandoVenda, setBuscandoVenda] = useState(false)
+
+  /**
+   * A GARANTIA VEM DA VENDA, não da memória de quem atende.
+   *
+   * `dias_garantia_restantes` era um campo digitado: o atendente olhava a nota,
+   * fazia a conta de cabeça e escrevia um número. Isso é decidir a obrigação da
+   * loja por estimativa — e a estimativa erra para os dois lados: recusa reparo de
+   * quem tinha direito, ou concede o que já venceu.
+   *
+   * O CRM tem os dois dados: a venda com o IMEI e a garantia congelada no contrato
+   * daquela venda. Aqui eles são cruzados e o número aparece calculado; o campo
+   * continua editável, porque caso excepcional existe (cortesia, acordo) — mas o
+   * padrão passa a ser o fato, não o palpite.
+   */
+  useEffect(() => {
+    const serie = (form.imei_serial ?? '').trim()
+    if (serie.length < 6) { setGarantiaDaVenda(null); return }
+
+    let cancelado = false
+    const timer = setTimeout(async () => {
+      setBuscandoVenda(true)
+      try {
+        const { data: venda } = await supabase
+          .from('vendas')
+          .select('data_venda, created_at')
+          .eq('numero_serie', serie)
+          .eq('status', 'concluida')
+          .order('data_venda', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (cancelado || !venda) { setGarantiaDaVenda(null); return }
+
+        // Garantia da loja (configuracoes_sistema → contrato). O mesmo número que
+        // saiu impresso no contrato daquela venda.
+        const { data: cfg } = await supabase
+          .from('configuracoes_sistema')
+          .select('valor').eq('chave', 'contrato').maybeSingle()
+        const diasTotal = Number((cfg?.valor as { garantia_dias?: unknown } | null)?.garantia_dias) || 90
+
+        const base = new Date(venda.data_venda ?? venda.created_at ?? Date.now())
+        const passados = Math.floor((Date.now() - base.getTime()) / 86_400_000)
+        const restantes = diasTotal - passados
+
+        if (!cancelado) {
+          setGarantiaDaVenda({ vendaEm: base.toLocaleDateString('pt-BR'), diasTotal, restantes })
+          // Só preenche o que o atendente ainda não tocou: sobrescrever um número
+          // que ele acabou de digitar seria pior que não sugerir nada.
+          setForm((f) => f.dias_garantia_restantes == null
+            ? { ...f, dias_garantia_restantes: restantes, dentro_garantia: restantes >= 0 }
+            : f)
+        }
+      } finally {
+        if (!cancelado) setBuscandoVenda(false)
+      }
+    }, 500)
+
+    return () => { cancelado = true; clearTimeout(timer) }
+  }, [form.imei_serial])
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
   const [servicos, setServicos] = useState<{ id: number; nome: string; preco: number }[]>([])
@@ -282,7 +345,26 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <option value="">Selecionar...</option>
           {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </Select>
-        <Input label="IMEI / Nº série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+        <div>
+          <Input label="IMEI / Nº série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+          {/* O que a VENDA diz — para o atendente não decidir a garantia de cabeça. */}
+          {buscandoVenda && <p className="mt-1 text-[11.5px] text-ink-3">procurando a venda deste aparelho…</p>}
+          {!buscandoVenda && garantiaDaVenda && (
+            <p className={`mt-1 text-[11.5px] leading-snug ${garantiaDaVenda.restantes >= 0 ? 'text-ok' : 'text-bad'}`}>
+              Vendido em {garantiaDaVenda.vendaEm} · garantia de {garantiaDaVenda.diasTotal} dias ·{' '}
+              <strong>
+                {garantiaDaVenda.restantes >= 0
+                  ? `${garantiaDaVenda.restantes} dia(s) restantes`
+                  : `vencida há ${Math.abs(garantiaDaVenda.restantes)} dia(s)`}
+              </strong>
+            </p>
+          )}
+          {!buscandoVenda && !garantiaDaVenda && (form.imei_serial ?? '').trim().length >= 6 && (
+            <p className="mt-1 text-[11.5px] text-ink-3">
+              Nenhuma venda desta loja com este IMEI — trate como reparo externo, salvo comprovação.
+            </p>
+          )}
+        </div>
         <Input label="Data de entrada" type="date" value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} />
         <Select label="Origem" value={form.dentro_garantia ? 'garantia' : 'externo'} onChange={e => set('dentro_garantia', e.target.value === 'garantia')}>
           <option value="externo">Reparo externo</option>

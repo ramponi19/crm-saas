@@ -43,7 +43,20 @@ interface Cobranca {
   cliente_id: number | null
   clientes?: { nome: string } | { nome: string }[] | null
 }
-interface Props { lancamentos: Lancamento[]; categorias: Categoria[]; cobrancas: Cobranca[]; empresaId: number }
+interface Props {
+  lancamentos: Lancamento[]
+  categorias: Categoria[]
+  cobrancas: Cobranca[]
+  empresaId: number
+  /**
+   * Faturamento das vendas do mês, que NÃO entra no cálculo desta tela.
+   *
+   * Serve para o aviso: sem ele o "Resultado líquido" aparece negativo enquanto o
+   * Dashboard mostra faturamento, e nada na tela explica a contradição.
+   */
+  faturamentoVendas?: number
+  qtdVendas?: number
+}
 
 const TABS = [
   { key: 'fluxo',      label: 'Fluxo de Caixa'  },
@@ -76,7 +89,7 @@ const fmtBRL = (v: number | null) => v != null ? formatCurrency(v) : '—'
 const emAberto = (s: string | null) => s === 'pendente' || s === 'atrasado'
 const naoCancelado = (s: string | null) => s !== 'cancelado'
 
-export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId }: Props) {
+export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId, faturamentoVendas = 0, qtdVendas = 0 }: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState('fluxo')
   const [lancamentos, setLancamentos] = useState(initial)
@@ -279,6 +292,20 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
+
+          {/* AS VENDAS NÃO ESTÃO NESTA CONTA — e o silêncio sobre isso é o problema.
+              O "Resultado líquido" soma apenas lançamentos; venda concluída não gera
+              lançamento. Quem registra o aluguel e não lança as vendas vê prejuízo
+              permanente, enquanto o Dashboard mostra faturamento no mesmo dia. */}
+          {faturamentoVendas > 0 && (
+            <div className="rounded-control border border-warn/40 bg-warn-soft px-3.5 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
+              <strong className="text-ink">As vendas não entram nestes números.</strong>{' '}
+              Houve <strong className="text-ink">{fmtBRL(faturamentoVendas)}</strong> em {qtdVendas} venda
+              {qtdVendas === 1 ? '' : 's'} concluída{qtdVendas === 1 ? '' : 's'} no mês, e este painel soma só os
+              lançamentos abaixo. Para o resultado refletir o caixa, lance a receita da venda aqui — ou peça para
+              o CRM gerar automaticamente.
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">

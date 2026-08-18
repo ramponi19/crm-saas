@@ -11,18 +11,27 @@ interface ProviderDef {
   id: ProviderId
   nome: string
   desc: string
-  campos: { key: string; label: string; placeholder?: string }[]
+  campos: { key: string; label: string; placeholder?: string; dica?: string }[]
 }
 
 const PROVIDERS: ProviderDef[] = [
   { id: 'manual', nome: 'Manual', desc: 'Registro manual de pagamentos, sem integração.', campos: [] },
   {
     id: 'mercadopago', nome: 'Mercado Pago', desc: 'Pix, boleto e link de pagamento.',
-    campos: [{ key: 'access_token', label: 'Access Token', placeholder: 'APP_USR-...' }],
+    campos: [
+      { key: 'access_token', label: 'Access Token', placeholder: 'APP_USR-...' },
+      // Sem o segredo do webhook o CRM não tem como provar que o aviso de
+      // "pago" veio mesmo do provedor, e recusa o aviso. Faltava no formulário:
+      // dava para ligar o meio de pagamento sem ele e a confirmação nunca chegaria.
+      { key: 'webhook_secret', label: 'Chave secreta do webhook', placeholder: 'do painel do Mercado Pago', dica: 'Sem ela o pagamento não confirma sozinho.' },
+    ],
   },
   {
     id: 'asaas', nome: 'Asaas', desc: 'Pix, boleto e cartão.',
-    campos: [{ key: 'api_key', label: 'API Key', placeholder: '$aact_...' }],
+    campos: [
+      { key: 'api_key', label: 'API Key', placeholder: '$aact_...' },
+      { key: 'webhook_token', label: 'Token do webhook', placeholder: 'o que você definiu no Asaas', dica: 'Sem ele o pagamento não confirma sozinho.' },
+    ],
   },
   {
     id: 'efibank', nome: 'Efí Bank', desc: 'Pix com QR Code nativo.',
@@ -34,7 +43,10 @@ const PROVIDERS: ProviderDef[] = [
   },
   {
     id: 'pagseguro', nome: 'PagSeguro', desc: 'Link de pagamento e Pix.',
-    campos: [{ key: 'token', label: 'Token', placeholder: 'seu-token-pagseguro' }],
+    campos: [
+      { key: 'token', label: 'Token', placeholder: 'seu-token-pagseguro' },
+      { key: 'webhook_secret', label: 'Chave secreta do webhook', placeholder: 'do painel do PagSeguro', dica: 'Sem ela o pagamento não confirma sozinho.' },
+    ],
   },
 ]
 
@@ -136,6 +148,7 @@ export function MeiosPagamentoCard() {
               placeholder={c.placeholder}
               value={credenciais[c.key] ?? ''}
               onChange={e => setCredenciais(v => ({ ...v, [c.key]: e.target.value }))}
+              hint={c.dica}
             />
           ))}
 

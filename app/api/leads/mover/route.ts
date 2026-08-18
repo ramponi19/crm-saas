@@ -60,24 +60,26 @@ export async function POST(req: Request) {
       // Cadência nunca quebra o move.
       console.error('[leads/mover] cadências falharam:', e)
     }
-    // Entrou em etapa de NEGOCIAÇÃO → cria um orçamento em rascunho vinculado
-    // ao lead (opção A), se ainda não houver um em aberto. Não quebra o move.
-    try {
-      const { data: etapas } = await supabase.from('funil_etapas').select('tipo').eq('empresa_id', empresaId).eq('slug', body.kanban_status).limit(1)
-      if (etapas?.[0]?.tipo === 'negociacao') {
-        const { data: aberto } = await supabase.from('orcamentos').select('id').eq('lead_id', body.leadId).in('status', ['rascunho', 'enviado']).limit(1)
-        if (!aberto?.length) {
-          await supabase.from('orcamentos').insert({
-            empresa_id: empresaId, lead_id: body.leadId,
-            cliente_nome: leadAtual.nome || 'Lead',
-            cliente_telefone: leadAtual.telefone ?? null,
-            tipo: 'venda', status: 'rascunho', total: 0,
-          } as never)
-        }
-      }
-    } catch (e) {
-      console.error('[leads/mover] orçamento de negociação falhou:', e)
-    }
+    /**
+     * REMOVIDO: criação automática de orçamento ao entrar em Negociação.
+     *
+     * A ideia era adiantar trabalho — o lead chega em Negociação e já encontra um
+     * orçamento pronto para preencher. O resultado foi outro: 31 de 31 orçamentos
+     * da JM eram rascunhos de R$ 0,00, SEM UM ÚNICO ITEM, e nenhum orçamento real
+     * chegou a ser criado no período.
+     *
+     * O que isso produzia:
+     *  - a tela de Orçamentos virou uma lista de nada, e lista cheia de vazio é o
+     *    que ensina a equipe a não abrir a tela;
+     *  - "orçamentos em aberto" deixou de significar negociação em andamento:
+     *    virava 1 por lead movido, inflando qualquer contagem;
+     *  - o vendedor que de fato quisesse orçar encontrava um rascunho fantasma no
+     *    caminho, sem saber se era dele ou de um colega.
+     *
+     * O caminho certo já existe e é explícito: o painel de Orçamento dentro do lead
+     * cria quando alguém DECIDE orçar — e ao salvar move o lead para a etapa de
+     * orçamento. Intenção do vendedor, não efeito colateral de arrastar um card.
+     */
   }
 
   return NextResponse.json({ ok: true })

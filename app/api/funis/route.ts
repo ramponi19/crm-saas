@@ -1,9 +1,22 @@
-import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireEmpresaRoleApi } from '@/lib/owner'
+
+/**
+ * Funis são configuração da LOJA, não ferramenta de atendimento.
+ *
+ * Esta rota não checava papel nenhum — só a RLS, que libera a tabela inteira para
+ * qualquer usuário do tenant. Um vendedor podia criar funil, renomear, excluir e,
+ * pior, marcar outro como `padrao`: todo lead novo da loja passaria a cair no
+ * funil dele. A tela de funil já é de admin, e /api/funil (as etapas) já exigia
+ * owner/admin — aqui a tranca faltava.
+ */
+const ADMIN = ['owner', 'admin'] as const
 
 // Criar funil (duplicando as etapas de um funil de origem — por padrão o funil padrão).
 export async function POST(req: Request) {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const auth = await requireEmpresaRoleApi([...ADMIN])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
   const body = await req.json().catch(() => ({})) as { nome?: string; origemFunilId?: number }
   const nome = (body.nome ?? '').trim()
   if (!nome) return NextResponse.json({ error: 'Informe o nome do funil' }, { status: 400 })
@@ -35,7 +48,9 @@ export async function POST(req: Request) {
 
 // Renomear ou definir como padrão.
 export async function PATCH(req: Request) {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const auth = await requireEmpresaRoleApi([...ADMIN])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
   const body = await req.json().catch(() => ({})) as { id?: number; nome?: string; padrao?: boolean }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
@@ -58,7 +73,9 @@ export async function PATCH(req: Request) {
 
 // Excluir funil (com guardas: não é o padrão e não tem leads).
 export async function DELETE(req: Request) {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const auth = await requireEmpresaRoleApi([...ADMIN])
+  if (auth.error) return auth.error
+  const { supabase, empresaId } = auth
   const body = await req.json().catch(() => ({})) as { id?: number }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
