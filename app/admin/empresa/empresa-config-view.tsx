@@ -123,11 +123,20 @@ export default function EmpresaConfigPage() {
     const temWL = planoTemAcesso(empresa.plano, 'white_label')
     setLoading(true)
     setSucesso(false)
-    const supabase = createClient()
 
-    const { error } = await supabase
-      .from('empresas')
-      .update({
+    /**
+     * Salva pelo SERVIDOR, não direto pelo cliente.
+     *
+     * `empresas` tem grant de UPDATE por coluna para `authenticated` — só nome e
+     * white-label. Gravando daqui, CNPJ e telefone davam "permission denied for
+     * column": a tela existia e não funcionava, e foi por isso que a JM ficou com os
+     * dois vazios e o contrato saiu sem identificar a vendedora. Ver
+     * app/api/empresa/route.ts, que confere owner/admin antes de gravar.
+     */
+    const resposta = await fetch('/api/empresa', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         nome:        form.nome,
         // Fora do bloco de white-label de propósito: identificação da empresa não é
         // recurso de plano pago — é o que faz o contrato ser válido.
@@ -151,10 +160,11 @@ export default function EmpresaConfigPage() {
           wl_cor:      form.wl_cor,
           wl_logo_url: form.wl_logo_url || null,
         } : {}),
-      })
-      .eq('id', empresa.id)
+      }),
+    })
 
-    if (error) { setLoading(false); notify.bad('Erro ao salvar', error.message); return }
+    const corpo = await resposta.json().catch(() => ({}))
+    if (!resposta.ok) { setLoading(false); notify.bad('Erro ao salvar', corpo?.error); return }
 
     document.documentElement.style.setProperty('--color-primary', form.wl_cor)
 
