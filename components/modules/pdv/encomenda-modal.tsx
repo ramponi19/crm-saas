@@ -55,6 +55,21 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
     // encomenda que fica encalhada na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
+    /**
+     * O PREÇO DE VENDA É OBRIGATÓRIO — e aqui é bloqueio, não aviso.
+     *
+     * O teste lançou uma encomenda com o campo vazio e ela entrou como venda de
+     * R$ 0,00: o cliente "não paga nada", o faturamento soma zero e o pedido de
+     * compra fica com o custo sozinho — prejuízo puro no relatório.
+     *
+     * Diferente do custo, que às vezes só aparece com a nota do fornecedor: o preço
+     * cobrado do cliente é o que a loja ACABOU DE COMBINAR com ele. Se ninguém sabe
+     * quanto vai cobrar, não há encomenda para lançar.
+     */
+    if (!(Number(valorVenda) > 0)) {
+      notify.warn('Informe quanto o cliente vai pagar', 'Sem isso a encomenda entra como venda de R$ 0,00.')
+      return
+    }
 
     /**
      * CUSTO ZERADO VIRA LUCRO DE 100% — e ninguém vai conferir depois.
