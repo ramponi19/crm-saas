@@ -104,13 +104,41 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
       placa: form.placa, chassi: form.chassi, renavam: form.renavam, km: num(form.km), ano: num(form.ano),
     }
 
+    /**
+     * Os campos de veículo vão para `veiculo_dados` ALÉM das colunas antigas.
+     *
+     * Escrita dupla temporária (Fase 3 do isolamento por segmento): a leitura ainda
+     * usa as colunas de `inventario_unidades`, então elas continuam recebendo; a
+     * tabela nova recebe em paralelo para o dado de hoje já estar no lugar certo
+     * quando a leitura migrar. Sem isso, o dia da troca traria placa vazia em tudo
+     * que foi cadastrado antes.
+     *
+     * `upsert` e não `insert`: aqui o mesmo formulário cria E edita.
+     */
+    async function gravarVeiculo(unidadeId: number) {
+      if (!isVeiculo) return
+      const { error } = await supabase.from('veiculo_dados').upsert({
+        unidade_id: unidadeId,
+        empresa_id: empresaId,
+        placa: form.placa, chassi: form.chassi, renavam: form.renavam,
+        km: num(form.km), ano: num(form.ano),
+      } as never, { onConflict: 'unidade_id' })
+      // Não desfaz o cadastro: a unidade existe e as colunas antigas têm o dado.
+      if (error) console.error('[estoque] veiculo_dados não gravado:', error.message)
+    }
+
     if (isNew) {
-      const { error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>)
+      const { data, error } = await supabase
+        .from('inventario_unidades')
+        .insert(payload as TablesInsert<'inventario_unidades'>)
+        .select('id').single()
       if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
+      await gravarVeiculo(data.id)
       notify.ok('Unidade adicionada ao estoque')
     } else {
       const { error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!)
       if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
+      await gravarVeiculo(unidade!.id!)
       notify.ok('Unidade atualizada')
     }
     router.refresh()

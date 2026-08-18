@@ -752,8 +752,36 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       observacoes: form.observacoes || null, ativo: true,
     }
     const { data, error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>).select().single()
+    if (error) { setSaving(false); notify.bad('Erro ao cadastrar', error.message); return }
+
+    /**
+     * ESCRITA DUPLA, de propósito e por tempo limitado.
+     *
+     * Os campos de veículo saíram de `inventario_unidades` para `veiculo_dados`
+     * (Fase 3 do isolamento por segmento). As colunas antigas continuam recebendo
+     * porque a listagem e a busca ainda leem delas em vários pontos; a tabela nova
+     * passa a receber também, para que o dado de hoje já esteja no lugar certo
+     * quando a leitura migrar.
+     *
+     * Sem isto, o dia em que a leitura mudasse o estoque apareceria vazio de placa
+     * para tudo que foi cadastrado antes. Falha aqui NÃO desfaz o cadastro: a
+     * unidade existe e as colunas antigas têm o dado — reparar depois é possível,
+     * perder a entrada do balcão não.
+     */
+    if (campos.veiculo && (form.placa || form.chassi || form.renavam || form.km || form.ano)) {
+      const { error: erroVeic } = await supabase.from('veiculo_dados').insert({
+        unidade_id: data.id,
+        empresa_id: empresaId,
+        placa: form.placa || null,
+        chassi: form.chassi || null,
+        renavam: form.renavam || null,
+        km: form.km ? Number(form.km) : null,
+        ano: form.ano ? Number(form.ano) : null,
+      } as never)
+      if (erroVeic) console.error('[estoque] veiculo_dados não gravado:', erroVeic.message)
+    }
+
     setSaving(false)
-    if (error) { notify.bad('Erro ao cadastrar', error.message); return }
     const prod = produtos.find(p => p.id === Number(form.produto_id))
     onSaved({ ...data, produto_id: data.produto_id!, produto_nome: prod?.nome ?? '', marca_nome: prod?.marca_nome ?? '', fornecedor_nome: null })
   }
