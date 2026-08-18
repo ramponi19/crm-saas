@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard } from '@/components/ui'
@@ -62,7 +62,8 @@ export default async function AdminOverviewPage() {
   const { data: reguaCfg } = await supabase
     .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'regua_followup').maybeSingle()
   const reguaAtiva = (reguaCfg?.valor as { ativo?: boolean } | null)?.ativo !== false
-  const isImob = normalizarSegmento(empresa?.segmento) === 'imobiliaria'
+  // O que muda aqui são os atalhos de portais/site — capacidade, não identidade.
+  const isImob = !!SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.integraPortais
 
   const stats = [
     { label: 'Faturamento no mês', value: brl(faturamentoMes), icon: TrendingUp, sub: `${qtdVendas} venda${qtdVendas === 1 ? '' : 's'} concluída${qtdVendas === 1 ? '' : 's'}` },

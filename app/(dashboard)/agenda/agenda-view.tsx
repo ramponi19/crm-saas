@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { Topbar } from '@/components/layout/topbar'
 import { Plus, Clock, MapPin, Phone, CalendarDays } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
@@ -34,7 +35,9 @@ export default function AgendaView({ inicial, leads, imoveis, usuarios, empresaI
   inicial: Visita[]; leads: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]; empresaId: number; meuId: string; isGestor: boolean; segmento?: string | null
 }) {
   const supabase = createClient()
-  const isSaude = segmento === 'saude'
+  // Os rótulos da agenda (consulta/paciente/profissional) são o comportamento;
+  // saúde é só quem o usa hoje.
+  const isSaude = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.agendaClinica
   const L = {
     agendar: isSaude ? 'Agendar consulta' : 'Agendar visita',
     item: isSaude ? 'Consulta' : 'Visita',

@@ -59,6 +59,40 @@ export interface SegmentoConfig {
    * Substitui uma cascata de quatro `if` na tela. Vazio = só o padrão.
    */
   abasExtraConfiguracoes: { id: string; label: string }[]
+
+  /**
+   * CAPACIDADES — o que o segmento FAZ, não quem ele é.
+   *
+   * Aqui estava a maior parte da dívida: `isVeiculo`, `isFood`, `isSaude`,
+   * `isImob` espalhados por PDV, estoque, agenda, dashboard e relatórios. O nome
+   * do flag revelava o problema — "é concessionária?" é uma pergunta sobre
+   * identidade; "usa placa?" é sobre comportamento, e comportamento é o que a
+   * tela precisa saber.
+   *
+   * Consequência prática: um segmento novo que também venda veículo (locadora,
+   * por exemplo) liga `usaPlaca` e funciona. Com `isVeiculo` seria preciso achar
+   * e editar cada um dos arquivos.
+   */
+  capacidades: {
+    /** Estoque pede placa, chassi, renavam, km e ano. */
+    usaPlaca?: boolean
+    /** PDV pede número de comanda (mesa/balcão). */
+    usaComanda?: boolean
+    /** Agenda fala de consulta/paciente/profissional em vez de visita/corretor. */
+    agendaClinica?: boolean
+    /** Painel de visitas e agendamento de visita no lead. */
+    agendaVisitas?: boolean
+    /** Dashboard e Relatórios próprios da vertical. */
+    telasProprias?: boolean
+    /** Integrações mostram portais e site além dos canais. */
+    integraPortais?: boolean
+    /** Automações oferecem o bloco de veículos. */
+    automacoesVeiculo?: boolean
+    /** Match de interesse: por veículo em vez de imóvel. */
+    matchVeiculo?: boolean
+    /** Rota inicial depois do login, quando não é o dashboard. */
+    telaInicial?: string
+  }
 }
 
 /**
@@ -82,6 +116,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Produto interessado',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
+    capacidades: {},
   },
   assistencia: {
     label: 'Assistência técnica',
@@ -93,6 +128,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Aparelho / equipamento',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
+    capacidades: {},
   },
   servicos: {
     label: 'Serviços / Prestadores',
@@ -104,6 +140,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Serviço de interesse',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
+    capacidades: {},
   },
   imobiliaria: {
     label: 'Imobiliária',
@@ -123,6 +160,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Imóvel interessado',
     paineisDoLead: ['match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
+    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true },
   },
   saude: {
     label: 'Saúde / Clínica',
@@ -134,6 +172,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Procedimento / especialidade',
     paineisDoLead: [],
     abasExtraConfiguracoes: [{ id: 'agendamento', label: 'Agendamento' }],
+    capacidades: { agendaClinica: true, telaInicial: '/agenda' },
   },
   food: {
     label: 'Food / Restaurante',
@@ -148,6 +187,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Item do cardápio',
     paineisDoLead: [],
     abasExtraConfiguracoes: [{ id: 'cardapio', label: 'Cardápio' }],
+    capacidades: { usaComanda: true },
   },
   concessionaria: {
     label: 'Loja de veículos',
@@ -165,6 +205,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Veículo interessado',
     paineisDoLead: ['interesse-veiculo', 'financiamento'],
     abasExtraConfiguracoes: [{ id: 'veiculos-portais', label: 'Portais' }],
+    capacidades: { usaPlaca: true, automacoesVeiculo: true, matchVeiculo: true },
   },
 }
 

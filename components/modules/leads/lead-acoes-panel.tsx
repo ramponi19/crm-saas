@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { CheckSquare, Square, Plus, CalendarPlus, Loader2, Clock } from 'lucide-react'
 import { Input, Button, IconButton, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
@@ -22,7 +23,9 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
   leadId: number; empresaId: number; segmento?: string | null
 }) {
   const supabase = createClient()
-  const isImob = segmento === 'imobiliaria'
+  // Painel de visitas: capacidade, não identidade. Qualquer vertical que agende
+  // visita liga `agendaVisitas` e ganha isto sem editar este arquivo.
+  const isImob = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.agendaVisitas
 
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [visitas, setVisitas] = useState<Visita[]>([])

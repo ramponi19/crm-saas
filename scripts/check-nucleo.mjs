@@ -23,13 +23,17 @@
  * orçamento. Uma regra que buscasse o nome solto daria 14 falsos positivos no
  * primeiro dia, e regra que grita errado é regra que a equipe desliga.
  *
- * ══ A LISTA DE EXCEÇÕES SÓ PODE DIMINUIR ═══════════════════════════════════
+ * ══ HISTÓRIA ═══════════════════════════════════════════════════════════════
  *
- * Os arquivos abaixo já tinham a comparação quando a trava nasceu. Parar as
- * entregas do varejo para refatorar 17 arquivos seria pior que a dívida — então a
- * trava congela o tamanho do problema e as fases seguintes reduzem.
+ * A trava nasceu (14/08/2026) com 21 comparações em 17 arquivos: refatorar tudo de
+ * uma vez, com a loja em produção, seria pior que a dívida — então ela congelou o
+ * tamanho do problema e as fases seguintes reduziram.
  *
- * REGRA: para acrescentar um arquivo aqui, tire outro. Sem exceção.
+ * Em 18/08/2026 a lista chegou a ZERO. Nenhum arquivo de núcleo pergunta mais "é
+ * imobiliária?".
+ *
+ * REGRA: a lista fica vazia. Acrescentar arquivo é reabrir a porta que o plano
+ * fechou — a saída quase sempre é uma capacidade nova no contrato.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -76,30 +80,13 @@ const AREA_DE_VERTICAL = [
  * refatoração precisa resolver, para a lista ser um plano e não um esconderijo.
  */
 const DIVIDA = {
-  'components/modules/leads/lead-acoes-panel.tsx':
-    { max: 1, nota: 'Fase 2: isImob → capacidade no contrato' },
-  'components/modules/configuracoes/automacoes-card.tsx':
-    { max: 1, nota: 'Fase 2: bloco de concessionária → capacidade no contrato' },
-  'app/(dashboard)/estoque/components/estoque-view.tsx':
-    { max: 1, nota: 'Fase 2: isVeiculo → capacidade usaPlaca' },
-  'app/(dashboard)/pdv/components/pdv-view.tsx':
-    { max: 1, nota: 'Fase 2: isFood → capacidade usaComanda' },
-  'app/(dashboard)/agenda/agenda-view.tsx':
-    { max: 1, nota: 'Fase 2: isSaude → capacidade própria' },
-  'app/(dashboard)/dashboard/page.tsx':
-    { max: 1, nota: 'Fase 2: escolha do dashboard → capacidade dashboardProprio' },
-  'app/(dashboard)/relatorios/page.tsx':
-    { max: 1, nota: 'Fase 2: escolha do relatório → capacidade própria' },
-  'app/(dashboard)/orcamentos/orcamentos-view.tsx':
-    { max: 1, nota: 'Fase 2: ternário inútil (mesmo valor nos dois lados) — corrigir junto' },
-  'app/admin/page.tsx':
-    { max: 1, nota: 'Fase 2: isImob → capacidade no contrato' },
-  'app/admin/integracoes/integracoes-view.tsx':
-    { max: 1, nota: 'Fase 2: isImob → capacidade no contrato' },
-  'app/api/match/lead/[id]/route.ts':
-    { max: 1, nota: 'Fase 2: match de veículo vs imóvel → estratégia por vertical' },
-  'app/entrar/page.tsx':
-    { max: 1, nota: 'Fase 2: saúde entra em /agenda → capacidade telaInicial' },
+  // VAZIA — Fases 1 e 2 concluídas em 18/08/2026: as 21 comparações que existiam
+  // foram para o contrato (lib/segmentos.ts) como campos e capacidades.
+  //
+  // Manter assim. Acrescentar arquivo aqui é reabrir a porta que o plano fechou:
+  // o núcleo volta a saber o nome das verticais e mexer numa passa a poder quebrar
+  // as outras. Se parecer inevitável, o certo é quase sempre uma capacidade nova no
+  // contrato — ver docs/PLANO-ISOLAMENTO-SEGMENTOS.md.
 }
 
 function arquivos(dir) {

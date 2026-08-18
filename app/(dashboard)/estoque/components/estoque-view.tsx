@@ -13,7 +13,7 @@ import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   type Column, BuscaSelect } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
-import type { Segmento } from '@/lib/segmentos'
+import { SEGMENTOS, normalizarSegmento, type Segmento } from '@/lib/segmentos'
 
 export interface Unidade {
   id: number
@@ -146,7 +146,9 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
 ]
 
 export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, segmento }: Props) {
-  const isVeiculo = segmento === 'concessionaria'
+  // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
+  // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
+  const isVeiculo = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaPlaca
   const [tab, setTab] = useState<Tab>('lista')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')

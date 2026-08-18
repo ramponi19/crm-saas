@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolverMenu, type MenuConfigDono } from '@/lib/menu'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import type { ModuloPlano } from '@/lib/plano'
 
 // Rota neutra pós-login: decide o destino conforme o papel do usuário.
@@ -43,7 +43,10 @@ export default async function EntrarPage() {
     .from('empresas')
     .select('segmento, plano, permissoes, menu_config, menu_override, modulos_override')
     .eq('id', vinculo.empresa_id).maybeSingle()
-  if (emp?.segmento === 'saude') redirect('/agenda')
+  // Tela inicial do segmento (clínica abre a agenda, não o dashboard). Vem do
+  // contrato: um segmento novo declara a sua sem tocar nesta rota.
+  const inicial = SEGMENTOS[normalizarSegmento(emp?.segmento)].capacidades.telaInicial
+  if (inicial) redirect(inicial)
 
   /**
    * A tela inicial tem de ser uma que o funcionário VÊ.

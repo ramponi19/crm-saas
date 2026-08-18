@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { ranquear, type PerfilBusca, type ImovelMatchInput } from '@/lib/match-imoveis'
 import { ranquearVeiculos, type InteresseVeiculo, type VeiculoMatchInput } from '@/lib/match-veiculos'
@@ -21,7 +22,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId!).maybeSingle()
 
   // ── Loja de veículos ──
-  if (empresa?.segmento === 'concessionaria') {
+  // `matchVeiculo`: casa o interesse com unidade de veículo em vez de imóvel.
+  if (SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.matchVeiculo) {
     const { data: lead } = await supabase.from('leads').select('interesse').eq('id', leadId).maybeSingle()
     const interesse = (lead?.interesse ?? null) as InteresseVeiculo | null
     if (!interesse) return NextResponse.json({ matches: [] })

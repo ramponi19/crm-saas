@@ -14,6 +14,7 @@ import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { camposDaCategoria } from '@/lib/estoque-campos'
 import {
   referenciaDaTroca, avaliarTroca, textoDoAceite, TOLERANCIA_PADRAO,
@@ -75,7 +76,9 @@ const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0
 const fmt = (v: number) => formatCurrency(v)
 
 export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO }: Props) {
-  const isFood = segmento === 'food'
+  // Comanda é comportamento (mesa/balcão), não segmento: bar, cafeteria e
+  // qualquer atendimento por mesa usam o mesmo campo.
+  const isFood = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaComanda
   const [comanda, setComanda] = useState('')
   const [encomendaOpen, setEncomendaOpen] = useState(false)
   const supabase = createClient()

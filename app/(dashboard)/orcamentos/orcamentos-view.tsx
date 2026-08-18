@@ -28,7 +28,10 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const tipoPadrao = segmento === 'assistencia' ? 'assistencia' : 'assistencia'
+  // Era um ternário com o MESMO valor nos dois lados — comparava o segmento e
+  // devolvia 'assistencia' de qualquer forma. A intenção original se perdeu; fica
+  // a constante, que é o que o código sempre fez.
+  const tipoPadrao = 'assistencia'
   const [editor, setEditor] = useState<EditorOrcamento | null>(null)
   const [excluir, setExcluir] = useState<Orcamento | null>(null)
 
