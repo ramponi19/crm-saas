@@ -37,6 +37,11 @@ export default function EmpresaConfigPage() {
 
   const [form, setForm] = useState({
     nome: '',
+    // Dados JURÍDICOS da loja. Não eram editáveis em lugar nenhum: só entravam no
+    // cadastro inicial e, se a pessoa pulasse, ficavam vazios para sempre — e o
+    // contrato de compra e venda sai sem identificar a vendedora.
+    cnpj: '',
+    telefone: '',
     wl_slogan: '',
     wl_whatsapp: '',
     wl_cor: '#2E5CE6',
@@ -47,6 +52,8 @@ export default function EmpresaConfigPage() {
     if (empresa) {
       setForm({
         nome:          empresa.nome         ?? '',
+        cnpj:          empresa.cnpj         ?? '',
+        telefone:      empresa.telefone     ?? '',
         wl_slogan:     empresa.wl_slogan    ?? '',
         wl_whatsapp:   empresa.wl_whatsapp  ?? '',
         wl_cor:        empresa.wl_cor       ?? '#2E5CE6',
@@ -102,6 +109,10 @@ export default function EmpresaConfigPage() {
       .from('empresas')
       .update({
         nome:        form.nome,
+        // Fora do bloco de white-label de propósito: identificação da empresa não é
+        // recurso de plano pago — é o que faz o contrato ser válido.
+        cnpj:        form.cnpj.trim()     || null,
+        telefone:    form.telefone.trim() || null,
         // White-label fields only saved for plans that include the module
         ...(temWL ? {
           wl_slogan:   form.wl_slogan   || null,
@@ -168,6 +179,26 @@ export default function EmpresaConfigPage() {
             <Card title="Dados da loja">
               <div className="space-y-3">
                 <Input label="Nome da loja" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
+                {/* CNPJ e telefone saem no CONTRATO ({{loja.cnpj}}) e na nota. Não
+                    havia onde preencher: só o cadastro inicial pedia, e a JM está em
+                    produção com os dois vazios — o contrato de compra e venda não
+                    identifica a vendedora. */}
+                <Input
+                  label="CNPJ"
+                  value={form.cnpj}
+                  onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))}
+                  placeholder="00.000.000/0000-00"
+                  hint="Sai no contrato de compra e venda. Sem ele, o documento não identifica a loja."
+                  className="num"
+                />
+                <Input
+                  label="Telefone da loja"
+                  value={form.telefone}
+                  onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))}
+                  placeholder="(19) 3333-4444"
+                  hint="Contato que aparece nos documentos."
+                  className="num"
+                />
                 <Input label="Slogan" value={form.wl_slogan} onChange={e => setForm(f => ({ ...f, wl_slogan: e.target.value }))} placeholder="Ex: Importados com qualidade" />
                 <Input label="WhatsApp (com DDI)" value={form.wl_whatsapp} onChange={e => setForm(f => ({ ...f, wl_whatsapp: e.target.value }))} placeholder="5511999999999" />
               </div>

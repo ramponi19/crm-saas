@@ -10,6 +10,17 @@ export interface Empresa {
   id: number
   nome: string
   slug: string
+  /**
+   * Dados jurídicos da loja: saem no contrato de compra e venda ({{loja.cnpj}}) e
+   * nos documentos impressos.
+   *
+   * Faltavam neste tipo, então a tela "Minha empresa" não tinha como exibi-los para
+   * edição — só o cadastro inicial pedia, e quem pulasse ficava com os dois vazios
+   * para sempre. Foi o que aconteceu com a JM: contrato emitido sem identificar a
+   * vendedora.
+   */
+  cnpj: string | null
+  telefone: string | null
   plano: Plano
   status: string
   wl_cor: string | null
