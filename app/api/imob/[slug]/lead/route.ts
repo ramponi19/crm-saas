@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
+import { excedeuLimite } from '@/lib/rate-limit'
 
 /**
  * Captura de leads do SITE PRÓPRIO da imobiliária.
@@ -29,6 +30,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+
+  /**
+   * Teto por origem, ANTES de conferir o token.
+   *
+   * O token protege a rota, mas ele viaja na URL de um formulário que roda no
+   * navegador do visitante (o site da imobiliária é outro domínio) — quem abre o
+   * código-fonte da página lê o token. A partir daí é lead atrás de lead entrando
+   * na roleta e consumindo o limite do plano.
+   *
+   * Vem antes da checagem do token de propósito: assim também limita quem fica
+   * tentando adivinhar token. 20 por hora POR IP não atrapalha visitante nenhum —
+   * cada pessoa que preenche o formulário vem de um IP diferente.
+   */
+  if (await excedeuLimite(svc, 'imob-lead', req, 20)) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+      { status: 429, headers: CORS },
+    )
+  }
 
   const esperado = await getPortalToken(svc, empresa.id)
   if (!esperado || token !== esperado) {
