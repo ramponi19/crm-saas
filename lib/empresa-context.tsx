@@ -3,8 +3,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
+// A matriz de planos saiu daqui para lib/planos.ts: arquivo de UI nao pode ser
+// importado por rota de servidor (era um 500 de corpo vazio). Reexportado abaixo
+// para os imports existentes seguirem valendo.
+import { temAcesso, type Plano } from '@/lib/planos'
 
-export type Plano = 'free' | 'starter' | 'pro'
 
 export interface Empresa {
   id: number
@@ -152,12 +155,5 @@ export function useEmpresa() {
   return useContext(EmpresaContext)
 }
 
-export function temAcesso(plano: Plano | undefined, modulo: 'bi' | 'multi_usuario' | 'api' | 'white_label'): boolean {
-  const matriz: Record<typeof modulo, Plano[]> = {
-    bi:            ['starter', 'pro'],
-    multi_usuario: ['starter', 'pro'],
-    api:           ['pro'],
-    white_label:   ['pro'],
-  }
-  return plano ? matriz[modulo].includes(plano) : false
-}
+export { temAcesso }
+export type { Plano }
