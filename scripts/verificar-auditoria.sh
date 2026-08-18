@@ -67,6 +67,8 @@ if head -1 lib/planos.ts | grep -q "use client"; then printf "  FALHA planos.ts 
 v "contrato recusa loja sem CNPJ"     "lib/contrato-emitir.ts" "lojaIdentificada"
 v "tela trata a recusa (garantia)"    "app/(dashboard)/garantia/components/termos-view.tsx" "r.bloqueado"
 v "tela trata a recusa (PDV)"         "app/(dashboard)/pdv/components/pdv-view.tsx" "r.bloqueado"
+v "tela trata a recusa (Historico)"   "components/modules/historico/historico-view.tsx" "r.bloqueado"
+v "Historico avisa campos do cliente"  "components/modules/historico/historico-view.tsx" "r.faltando"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
