@@ -77,8 +77,10 @@ export async function DELETE() {
       .eq('id', user.id)
       .single()
 
-    // Encerra via a mesma RPC (p_empresa_id = null), com o client autenticado.
-    await supabase.rpc('set_impersonation', { p_empresa_id: null })
+    // Encerra via a mesma RPC, chamada SEM empresa — o argumento tem DEFAULT NULL
+    // no banco. Passar `null` explícito não passa no type-check porque o gerador de
+    // tipos do Supabase não representa valores padrão.
+    await supabase.rpc('set_impersonation')
 
     await logSuperAdminAction({
       adminUserId: user.id,

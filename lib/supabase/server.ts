@@ -52,7 +52,7 @@ export async function getEmpresaId(): Promise<number> {
     // TTL expirado: zera a impersonação no DB (RPC SECURITY DEFINER — o UPDATE
     // direto em usuarios é barrado pelo trigger/grant; ver rota impersonar).
     supabase
-      .rpc('set_impersonation', { p_empresa_id: null })
+      .rpc('set_impersonation') // sem empresa = encerra a impersonação
       .then(() => {/* fire-and-forget */})
   }
 

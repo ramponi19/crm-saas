@@ -187,3 +187,61 @@ cada vertical.
 - Não copiar `leads` para `leads_imobiliaria`.
 - Não refatorar tudo de uma vez com a JM em produção: fase por fase, com deploy e
   validação entre elas.
+
+---
+
+## Fase 3 — executada em 18/08/2026, com uma decisão revista
+
+Antes de mexer, medi o que havia nas cinco colunas: **zero linhas** com
+`placa`, `chassi`, `renavam`, `km`, `ano` ou `tarefas.imovel_id`. Sem dado, a fase
+deixou de exigir migração — só estrutura.
+
+### `veiculo_dados` (nova tabela) + ponte
+
+- Tabela 1:1 com a unidade (`unidade_id` é a chave), RLS por empresa, índice de
+  placa por empresa.
+- `empresa_id` repetido na tabela de propósito: a RLS precisa dele para isolar sem
+  junção a cada leitura.
+- **As colunas antigas continuam lá.** Uma view (`v_inventario_veiculo`) lê da
+  tabela nova com queda para as colunas antigas, então quem consulta não vê
+  diferença.
+
+**Por que não apagar as colunas agora:** o estoque lê e escreve esses campos em 25
+pontos (`estoque-view` e `unidade-modal`). Trocar tudo com a loja vendendo é o tipo
+de mudança que quebra no ponto que ninguém testou. Apagar coluna é irreversível;
+deixar conviver, não. As colunas saem quando o estoque já estiver escrevendo na
+tabela nova **e** houver uma concessionária real para validar.
+
+### `tarefas.imovel_id` — removida, não movida
+
+O caminho legítimo já existia: `visitas` (tabela exclusiva da imobiliária) tem
+`imovel_id`, `lead_id` e `corretor_id`. A coluna em `tarefas` era um **segundo
+caminho para o mesmo dado**, e dois caminhos para a mesma coisa é como nasce
+divergência. Zero linhas usavam, nenhuma linha de código lia.
+
+Cópia em `backup.tarefas_imovel_id_20260818` antes do `drop` — DDL de coluna não se
+desfaz depois do commit.
+
+### `vendas.comanda` — FICA, e a análise mudou de conclusão
+
+O plano original listava esta coluna junto das outras. Olhando de perto, ela é
+diferente:
+
+- `placa` só existe para veículo; `comanda` é **identificador de atendimento** —
+  mesa, ficha, senha, número de pedido. Restaurante usa, mas também bar, cafeteria,
+  balcão de assistência com senha, oficina com ordem numerada.
+- Está em `vendas`, onde faz sentido: é atributo *daquela venda*, não de uma
+  entidade separada. Movê-la para `venda_comanda` criaria uma tabela 1:1 para
+  guardar um texto curto — complexidade sem retorno.
+- O acoplamento que importava (`isFood` decidindo se o campo aparece) **já saiu** na
+  Fase 2: hoje é a capacidade `usaComanda`.
+
+Conclusão: manter. O nome poderia ser mais genérico (`identificador_atendimento`),
+mas renomear coluna em produção por causa de nomenclatura é risco sem ganho.
+
+### Estado final do isolamento
+
+| | antes | agora |
+|---|---|---|
+| Comparações por segmento no núcleo | 21 | **0** |
+| Colunas de vertical em tabela de núcleo | 5 em 3 tabelas | 5 em 1 tabela (em transição) + 1 mantida por decisão |
