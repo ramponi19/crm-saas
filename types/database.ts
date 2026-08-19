@@ -2234,6 +2234,8 @@ export type Database = {
           area_util: number | null
           bairro: string | null
           banheiros: number | null
+          captado_em: string | null
+          captado_por: string | null
           cep: string | null
           cidade: string | null
           codigo: string | null
@@ -2274,6 +2276,8 @@ export type Database = {
           area_util?: number | null
           bairro?: string | null
           banheiros?: number | null
+          captado_em?: string | null
+          captado_por?: string | null
           cep?: string | null
           cidade?: string | null
           codigo?: string | null
@@ -2314,6 +2318,8 @@ export type Database = {
           area_util?: number | null
           bairro?: string | null
           banheiros?: number | null
+          captado_em?: string | null
+          captado_por?: string | null
           cep?: string | null
           cidade?: string | null
           codigo?: string | null
@@ -2348,6 +2354,13 @@ export type Database = {
           valor_venda?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "imoveis_captado_por_fkey"
+            columns: ["captado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "imoveis_empresa_id_fkey"
             columns: ["empresa_id"]
@@ -3360,6 +3373,129 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negocios_imobiliarios: {
+        Row: {
+          assinado_em: string | null
+          captador_id: string | null
+          chaves_entregues_em: string | null
+          cliente_id: number | null
+          corretor_id: string | null
+          created_at: string
+          criado_por: string | null
+          empresa_id: number
+          id: number
+          imovel_id: number
+          lead_id: number | null
+          locacao_fim: string | null
+          locacao_inicio: string | null
+          observacoes: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          valor: number
+          vistoria_em: string | null
+        }
+        Insert: {
+          assinado_em?: string | null
+          captador_id?: string | null
+          chaves_entregues_em?: string | null
+          cliente_id?: number | null
+          corretor_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: number
+          id?: number
+          imovel_id: number
+          lead_id?: number | null
+          locacao_fim?: string | null
+          locacao_inicio?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          valor: number
+          vistoria_em?: string | null
+        }
+        Update: {
+          assinado_em?: string | null
+          captador_id?: string | null
+          chaves_entregues_em?: string | null
+          cliente_id?: number | null
+          corretor_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: number
+          id?: number
+          imovel_id?: number
+          lead_id?: number | null
+          locacao_fim?: string | null
+          locacao_inicio?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+          vistoria_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negocios_imobiliarios_captador_id_fkey"
+            columns: ["captador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]

@@ -2,6 +2,7 @@
 
 import type { PainelDoLead } from '@/lib/segmentos'
 import { LeadMatchPanel } from './lead-match-panel'
+import { LeadNegocioPanel } from './lead-negocio-panel'
 import { LeadInteressePanel } from './lead-interesse-panel'
 import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
 
@@ -26,6 +27,7 @@ import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
  */
 export const PAINEIS_DO_LEAD: Record<PainelDoLead, (props: { leadId: number }) => React.ReactNode> = {
   'match-imoveis': ({ leadId }) => <LeadMatchPanel leadId={leadId} />,
+  'negocio-imovel': ({ leadId }) => <LeadNegocioPanel leadId={leadId} />,
   'interesse-veiculo': ({ leadId }) => <LeadInteressePanel leadId={leadId} />,
   'financiamento': ({ leadId }) => <LeadFinanciamentoPanel leadId={leadId} />,
 }
