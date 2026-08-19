@@ -93,7 +93,12 @@ export async function POST(req: Request) {
     .select('valor').eq('empresa_id', empresaId).eq('chave', 'comissao_imob').maybeSingle()
   const taxas = mesclarTaxas((cfgRow?.valor ?? null) as Partial<TaxasComissao> | null)
   const cashback = Math.max(0, Number(b.cashback) || 0)
-  const com = calcularComissao(tipo as 'venda' | 'locacao', valor, taxas, cashback)
+  // Quem de fato assume cada papel — parte de papel vago fica com a casa.
+  const corretorId = b.corretor_id ?? userId
+  const captadorId = b.captador_id ?? imovel.captado_por ?? null
+  const com = calcularComissao(tipo as 'venda' | 'locacao', valor, taxas, cashback, {
+    captador: !!captadorId, vendedor: !!corretorId,
+  })
 
   const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
     empresa_id: empresaId,
@@ -103,9 +108,9 @@ export async function POST(req: Request) {
     tipo,
     valor,
     // Quem vendeu é quem está fechando, salvo indicação contrária.
-    corretor_id: b.corretor_id ?? userId,
+    corretor_id: corretorId,
     // Captador vem do imóvel; o formulário pode corrigir.
-    captador_id: b.captador_id ?? imovel.captado_por ?? null,
+    captador_id: captadorId,
     status: 'contrato',
     assinado_em: b.assinado_em ?? null,
     locacao_inicio: tipo === 'locacao' ? (b.locacao_inicio ?? null) : null,

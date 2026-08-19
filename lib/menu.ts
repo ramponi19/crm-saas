@@ -220,6 +220,9 @@ export const CATALOGO: MenuGroupBase[] = [
   {
     label: 'Gestão',
     items: [
+      // Painel do dono da vertical: opcional (fora de hrefsBase), então nenhum
+      // segmento herda por acidente — só quem tem '/executivo' na lista habilitada.
+      { href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true },
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true },
       { href: '/conversao', label: 'Conversão', icon: 'Filter', adminOnly: true },
       { href: '/metas', label: 'Metas', icon: 'Gauge', adminOnly: true },

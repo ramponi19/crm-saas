@@ -70,5 +70,16 @@ v "tela trata a recusa (PDV)"         "app/(dashboard)/pdv/components/pdv-view.t
 v "tela trata a recusa (Historico)"   "components/modules/historico/historico-view.tsx" "r.bloqueado"
 v "Historico avisa campos do cliente"  "components/modules/historico/historico-view.tsx" "r.faltando"
 
+echo "== painel executivo (19/08) =="
+# Padroes escolhidos para NAO casarem com comentario: sao trechos de codigo
+# executavel (chamada, chave de objeto, expressao), nunca prosa minha.
+v "executivo exige dono ou admin"     "app/(dashboard)/executivo/page.tsx" "await requireEmpresaRole(.'owner', 'admin'.)"
+v "executivo trava por capacidade"    "app/(dashboard)/executivo/page.tsx" "cfgSeg.capacidades.comissaoPorNegocio) redirect"
+v "executivo no menu e opcional"      "lib/menu.ts" "href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true"
+v "icone do executivo no mapa"        "components/layout/menu-icons.ts" "Landmark,"
+v "comissao respeita papel vago"      "lib/comissao-imob.ts" "temCaptador ? arredonda"
+v "rota informa os papeis"            "app/api/imob/negocios/route.ts" "captador: !!captadorId, vendedor: !!corretorId"
+v "eficiencia por origem e historica" "app/(dashboard)/executivo/page.tsx" "qFechados"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

@@ -86,11 +86,22 @@ export function calcularComissao(
   valor: number,
   taxas: TaxasComissao,
   cashback = 0,
+  /**
+   * Quem existe de fato neste negócio.
+   *
+   * Sem isto, um imóvel sem captador reservava a parte do captador mesmo assim — o
+   * teste de 19/08 fechou uma locação de imóvel sem captação e o sistema separou
+   * R$ 700 para ninguém: some do total da casa e não aparece para nenhuma pessoa.
+   * Parte de papel vago FICA COM A CASA, que é quem fez o trabalho que faltou.
+   */
+  papeis: { captador?: boolean; vendedor?: boolean } = {},
 ): ComissaoCalculada {
+  const temCaptador = papeis.captador ?? true
+  const temVendedor = papeis.vendedor ?? true
   const percentual = tipo === 'locacao' ? taxas.percentual_locacao : taxas.percentual_venda
   const total = arredonda((Number(valor) || 0) * (percentual / 100))
-  const captador = arredonda(total * (taxas.parte_captador / 100))
-  const vendedor = arredonda(total * (taxas.parte_vendedor / 100))
+  const captador = temCaptador ? arredonda(total * (taxas.parte_captador / 100)) : 0
+  const vendedor = temVendedor ? arredonda(total * (taxas.parte_vendedor / 100)) : 0
   const casaBruta = arredonda(total - captador - vendedor)
   const casa = arredonda(Math.max(0, casaBruta - Math.max(0, Number(cashback) || 0)))
   return { percentual, total, captador, vendedor, casa }
