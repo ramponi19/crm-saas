@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => ({})) as {
     chave?: string; novo?: boolean; label?: string; descricao?: string | null
     hidden_hrefs?: string[]; label_overrides?: Record<string, string>
-    funil_seed?: string[]; modulos_extra?: { href: string; label: string; icon: string }[]
+    modulos_extra?: { href: string; label: string; icon: string }[]
     modulos_habilitados?: string[]
     ordem?: number; ativo?: boolean
   }
@@ -27,7 +27,6 @@ export async function POST(req: Request) {
     descricao: b.descricao?.trim() || null,
     hidden_hrefs: (b.hidden_hrefs ?? []) as never,
     label_overrides: (b.label_overrides ?? {}) as never,
-    funil_seed: (b.funil_seed ?? []) as never,
     modulos_extra: (b.modulos_extra ?? []) as never,
     modulos_habilitados: (b.modulos_habilitados ?? []) as never,
     ordem: Number.isFinite(b.ordem) ? b.ordem! : 0,

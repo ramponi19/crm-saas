@@ -28,8 +28,15 @@ export interface SegmentoConfig {
   hiddenHrefs: string[]
   /** renomeia labels de itens do menu: href -> novo label */
   labelOverrides: Record<string, string>
-  /** etapas padrão do funil de leads (kanban) para o segmento */
-  funil: string[]
+  /**
+   * O FUNIL SAIU DAQUI (19/08/2026) — junto com `segmentos_config.funil_seed`.
+   *
+   * Eram duas listas de etapas que ninguém lia: sete segmentos declaravam o funil
+   * aqui, e nenhum ponto do sistema consultava. Quem define as colunas do kanban é
+   * `funil_etapas` da empresa e, na falta dela, KANBAN_POR_SEGMENTO em
+   * components/modules/leads/types.ts. Config que parece autoridade e não é foi o
+   * que fez o dono editar o funil no superadmin e nada acontecer.
+   */
   /** módulos EXCLUSIVOS do segmento (fase profunda). icon = nome do ícone lucide. */
   /**
    * Módulos exclusivos do segmento — telas que só ele mostra no menu.
@@ -148,7 +155,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🛍️',
     hiddenHrefs: [],
     labelOverrides: {},
-    funil: ['Novo', 'Contato', 'Negociação', 'Fechamento', 'Pós-venda'],
     interesseLabel: 'Produto interessado',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
@@ -160,7 +166,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🔧',
     hiddenHrefs: [],
     labelOverrides: {},
-    funil: ['Novo', 'Diagnóstico', 'Orçamento', 'Em reparo', 'Pronto', 'Entregue'],
     interesseLabel: 'Aparelho / equipamento',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
@@ -172,7 +177,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🧰',
     hiddenHrefs: ['/estoque', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
     labelOverrides: { '/produtos': 'Serviços', '/catalogo': 'Catálogo de serviços' },
-    funil: ['Novo', 'Contato', 'Orçamento', 'Aprovado', 'Em execução', 'Concluído'],
     interesseLabel: 'Serviço de interesse',
     paineisDoLead: [],
     abasExtraConfiguracoes: [],
@@ -201,7 +205,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
       '/metas': 'Meta da empresa',
       '/executivo': 'Dashboard Executivo',
     },
-    funil: ['Lead novo', 'Contato feito', 'Visita agendada', 'Visita realizada', 'Proposta', 'Análise de crédito', 'Contrato', 'Vistoria', 'Entrega de chaves', 'Fechamento'],
     // Agenda e Tarefas passaram ao núcleo (grupo "Hoje", todos os segmentos) — ver lib/menu.
     modulosExtra: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home' },
@@ -237,7 +240,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🩺',
     hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
     labelOverrides: { '/clientes': 'Pacientes' },
-    funil: ['Novo', 'Contato', 'Consulta agendada', 'Em atendimento', 'Retorno'],
     interesseLabel: 'Procedimento / especialidade',
     paineisDoLead: [],
     abasExtraConfiguracoes: [{ id: 'agendamento', label: 'Agendamento' }],
@@ -249,7 +251,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🍽️',
     hiddenHrefs: ['/garantia', '/assistencia', '/simular-parcela'],
     labelOverrides: {},
-    funil: ['Novo', 'Contato', 'Pedido', 'Entregue'],
     modulosExtra: [
       { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed' },
     ],
@@ -265,7 +266,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     // Venda vai por proposta + F&I (não PDV); a "compra" é a avaliação de usados (não o módulo de fornecedores).
     hiddenHrefs: ['/pdv', '/compras', '/simular-parcela'],
     labelOverrides: { '/produtos': 'Veículos', '/assistencia': 'Oficina' },
-    funil: ['Novo', 'Contato', 'Test-drive agendado', 'Test-drive feito', 'Avaliação do usado', 'Proposta + F&I', 'Fechamento'],
     modulosExtra: [
       { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck' },
       { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car' },

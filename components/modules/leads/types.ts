@@ -90,18 +90,30 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
  * O dono ajusta em Administração → Funil: pode renomear, reordenar e excluir o que
  * a operação dele não usa. Isto é o ponto de partida, não a regra.
  */
+/**
+ * Rótulos e ordem revistos em 19/08/2026 com o dono da imobiliária.
+ *
+ * O fluxo dele analisa e APROVA o cadastro antes de levar o cliente para visitar
+ * (na locação, é a análise cadastral que decide se vale ocupar a agenda do
+ * corretor). Por isso "Em Análise" e "Aprovados" vêm antes de "Em Visita", e não
+ * depois da proposta, como estava.
+ *
+ * Os IDS são os slugs antigos de propósito: `leads.kanban_status` guarda o slug, e
+ * vários pontos usam 'novo' como padrão. Trocar o rótulo não pode mexer na
+ * identidade da etapa nem no lead que está nela.
+ */
 const KANBAN_IMOBILIARIA: KanbanColumn[] = [
-  { id: 'novo',             label: 'Lead novo',          color: '#7FB0E8' },
-  { id: 'contato',          label: 'Contato feito',      color: '#C6A86A' },
-  { id: 'visita_agendada',  label: 'Visita agendada',    color: '#A78BFA' },
-  { id: 'visita_realizada', label: 'Visita realizada',   color: '#22D3EE' },
-  { id: 'proposta',         label: 'Proposta',           color: '#F4B740', tipo: 'negociacao' },
-  { id: 'credito',          label: 'Análise de crédito', color: '#FB923C' },
-  { id: 'contrato',         label: 'Contrato',           color: '#6366F1' },
-  { id: 'vistoria',         label: 'Vistoria',           color: '#2DD4BF' },
-  { id: 'entrega_chaves',   label: 'Entrega de chaves',  color: '#A3E635' },
-  { id: 'fechamento',       label: 'Fechamento',         color: '#34D399', tipo: 'ganho' },
-  { id: 'perdido',          label: 'Perdido',            color: '#DC2626', tipo: 'perdido' },
+  { id: 'novo',            label: 'Lead novo',         color: '#7FB0E8' },
+  { id: 'contato',         label: 'Atendimento',       color: '#C6A86A' },
+  { id: 'credito',         label: 'Em Análise',        color: '#FB923C' },
+  { id: 'aprovado',        label: 'Aprovados',         color: '#22D3EE' },
+  { id: 'visita_agendada', label: 'Em Visita',         color: '#A78BFA' },
+  { id: 'proposta',        label: 'Em Proposta',       color: '#F4B740', tipo: 'negociacao' },
+  { id: 'contrato',        label: 'Contratos',         color: '#6366F1' },
+  { id: 'vistoria',        label: 'Vistoria',          color: '#2DD4BF' },
+  { id: 'entrega_chaves',  label: 'Entrega de chaves', color: '#A3E635' },
+  { id: 'fechamento',      label: 'Finalizado',        color: '#34D399', tipo: 'ganho' },
+  { id: 'perdido',         label: 'Perdido',           color: '#DC2626', tipo: 'perdido' },
 ]
 
 const KANBAN_POR_SEGMENTO: Record<string, KanbanColumn[]> = {

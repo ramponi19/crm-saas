@@ -4571,7 +4571,6 @@ export type Database = {
           chave: string
           created_at: string
           descricao: string | null
-          funil_seed: Json
           hidden_hrefs: Json
           label: string
           label_overrides: Json
@@ -4584,7 +4583,6 @@ export type Database = {
           chave: string
           created_at?: string
           descricao?: string | null
-          funil_seed?: Json
           hidden_hrefs?: Json
           label: string
           label_overrides?: Json
@@ -4597,7 +4595,6 @@ export type Database = {
           chave?: string
           created_at?: string
           descricao?: string | null
-          funil_seed?: Json
           hidden_hrefs?: Json
           label?: string
           label_overrides?: Json
