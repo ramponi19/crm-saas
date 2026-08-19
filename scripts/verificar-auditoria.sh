@@ -103,5 +103,10 @@ v "compromisso tem tipo e fim"         "app/(dashboard)/agenda/agenda-view.tsx" 
 v "menu ordena por segmento"           "lib/menu.ts" "seg.menuLayout"
 v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
 
+echo "== pipeline (19/08) =="
+v "pipeline filtra por corretor"       "components/modules/leads/leads-view.tsx" "Filtrar por corretor"
+v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "!restringe && usuarios.length > 1"
+v "esteira e corretor sao exclusivos"  "components/modules/leads/leads-view.tsx" "if (corretorId) return leadsDoFunilBase.filter"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
