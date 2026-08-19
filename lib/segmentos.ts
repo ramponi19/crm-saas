@@ -86,6 +86,14 @@ export interface SegmentoConfig {
     telasProprias?: boolean
     /** Integrações mostram portais e site além dos canais. */
     integraPortais?: boolean
+    /**
+     * Financeiro ganha a aba de comissão POR NEGÓCIO.
+     *
+     * Aditivo, não substituto: a imobiliária também paga aluguel e salário, então o
+     * livro-caixa e o DRE continuam valendo. O que ela tem a mais é a comissão de
+     * cada negócio, dividida entre quem captou e quem vendeu.
+     */
+    comissaoPorNegocio?: boolean
     /** Automações oferecem o bloco de veículos. */
     automacoesVeiculo?: boolean
     /** Match de interesse: por veículo em vez de imóvel. */
@@ -160,7 +168,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Imóvel interessado',
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
-    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true },
+    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true },
   },
   saude: {
     label: 'Saúde / Clínica',

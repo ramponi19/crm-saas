@@ -3,6 +3,8 @@ import { useState, useMemo } from 'react'
 import { Plus, Copy, Check, ExternalLink, Trash2, Receipt } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { ComissoesImob, type NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
+import type { TaxasComissao } from '@/lib/comissao-imob'
 import type { TablesInsert } from '@/types/database'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Table, Tabs, Badge, Button, IconButton, Input, Select, Textarea, Modal, EmptyState, type Column } from '@/components/ui'
@@ -56,8 +58,19 @@ interface Props {
    */
   faturamentoVendas?: number
   qtdVendas?: number
+  /**
+   * Negócios com comissão — só chega preenchido no segmento que declara
+   * `comissaoPorNegocio`. Null = a aba não existe para esta loja.
+   */
+  comissoesNegocio?: NegocioComissao[] | null
+  taxasComissao?: TaxasComissao | null
+  podeQuitarComissao?: boolean
 }
 
+/**
+ * Abas base, comuns a todo segmento. A imobiliária ganha "Comissões" no fim quando
+ * declara a capacidade — ver `abas` no corpo do componente.
+ */
 const TABS = [
   { key: 'fluxo',      label: 'Fluxo de Caixa'  },
   { key: 'pagar',      label: 'Contas a Pagar'   },
@@ -89,9 +102,17 @@ const fmtBRL = (v: number | null) => v != null ? formatCurrency(v) : '—'
 const emAberto = (s: string | null) => s === 'pendente' || s === 'atrasado'
 const naoCancelado = (s: string | null) => s !== 'cancelado'
 
-export default function FinanceiroView({ lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId, faturamentoVendas = 0, qtdVendas = 0 }: Props) {
+export default function FinanceiroView({
+  lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId,
+  faturamentoVendas = 0, qtdVendas = 0,
+  comissoesNegocio = null, taxasComissao = null, podeQuitarComissao = false,
+}: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState('fluxo')
+  // A aba só existe quando o segmento a declara; nenhum outro paga por ela.
+  const abas = comissoesNegocio && taxasComissao
+    ? [...TABS, { key: 'comissoes', label: 'Comissões' }]
+    : TABS
   const [lancamentos, setLancamentos] = useState(initial)
   const [cobrancas, setCobrancas] = useState(initialCobrancas)
   const [copiado, setCopiado] = useState<number | null>(null)
@@ -316,7 +337,7 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
           </div>
 
           {/* Tabs */}
-          <Tabs items={TABS.map(t => ({ value: t.key, label: t.label }))} value={tab} onValueChange={setTab} />
+          <Tabs items={abas.map(t => ({ value: t.key, label: t.label }))} value={tab} onValueChange={setTab} />
 
           {/* Conteúdo da tab */}
           {tab === 'fluxo' && (
@@ -366,6 +387,15 @@ export default function FinanceiroView({ lancamentos: initial, categorias, cobra
                 />
               </Card>
             </div>
+          )}
+
+          {/* Comissões: existe só quando a página manda os dados (capacidade do segmento). */}
+          {tab === 'comissoes' && comissoesNegocio && taxasComissao && (
+            <ComissoesImob
+              negocios={comissoesNegocio}
+              taxas={taxasComissao}
+              podeQuitar={podeQuitarComissao}
+            />
           )}
 
           {tab === 'dre' && (

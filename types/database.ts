@@ -3381,8 +3381,14 @@ export type Database = {
         Row: {
           assinado_em: string | null
           captador_id: string | null
+          cashback: number
           chaves_entregues_em: string | null
           cliente_id: number | null
+          comissao_captador: number | null
+          comissao_paga_em: string | null
+          comissao_status: string
+          comissao_total: number | null
+          comissao_vendedor: number | null
           corretor_id: string | null
           created_at: string
           criado_por: string | null
@@ -3393,6 +3399,7 @@ export type Database = {
           locacao_fim: string | null
           locacao_inicio: string | null
           observacoes: string | null
+          percentual: number | null
           status: string
           tipo: string
           updated_at: string
@@ -3402,8 +3409,14 @@ export type Database = {
         Insert: {
           assinado_em?: string | null
           captador_id?: string | null
+          cashback?: number
           chaves_entregues_em?: string | null
           cliente_id?: number | null
+          comissao_captador?: number | null
+          comissao_paga_em?: string | null
+          comissao_status?: string
+          comissao_total?: number | null
+          comissao_vendedor?: number | null
           corretor_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -3414,6 +3427,7 @@ export type Database = {
           locacao_fim?: string | null
           locacao_inicio?: string | null
           observacoes?: string | null
+          percentual?: number | null
           status?: string
           tipo: string
           updated_at?: string
@@ -3423,8 +3437,14 @@ export type Database = {
         Update: {
           assinado_em?: string | null
           captador_id?: string | null
+          cashback?: number
           chaves_entregues_em?: string | null
           cliente_id?: number | null
+          comissao_captador?: number | null
+          comissao_paga_em?: string | null
+          comissao_status?: string
+          comissao_total?: number | null
+          comissao_vendedor?: number | null
           corretor_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -3435,6 +3455,7 @@ export type Database = {
           locacao_fim?: string | null
           locacao_inicio?: string | null
           observacoes?: string | null
+          percentual?: number | null
           status?: string
           tipo?: string
           updated_at?: string

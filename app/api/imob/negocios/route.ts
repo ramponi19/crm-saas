@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { calcularComissao, mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 
 /**
  * Negócio fechado da imobiliária — venda ou locação de um imóvel.
@@ -25,6 +26,7 @@ const STATUS_IMOVEL_POR_TIPO: Record<string, string> = { venda: 'vendido', locac
 
 interface CorpoNovo {
   imovel_id?: number
+  cashback?: number | string
   lead_id?: number | null
   cliente_id?: number | null
   tipo?: string
@@ -79,6 +81,20 @@ export async function POST(req: Request) {
     }, { status: 400 })
   }
 
+  /**
+   * A comissão é calculada e CONGELADA agora.
+   *
+   * As taxas vêm da configuração da loja; o que não estiver configurado usa o padrão
+   * de mercado. Congelar no fechamento significa que mudar a taxa em novembro não
+   * reescreve o que foi combinado em agosto — mesmo princípio da garantia congelada
+   * no contrato.
+   */
+  const { data: cfgRow } = await svc.from('configuracoes_sistema')
+    .select('valor').eq('empresa_id', empresaId).eq('chave', 'comissao_imob').maybeSingle()
+  const taxas = mesclarTaxas((cfgRow?.valor ?? null) as Partial<TaxasComissao> | null)
+  const cashback = Math.max(0, Number(b.cashback) || 0)
+  const com = calcularComissao(tipo as 'venda' | 'locacao', valor, taxas, cashback)
+
   const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
     empresa_id: empresaId,
     imovel_id: imovel.id,
@@ -96,6 +112,12 @@ export async function POST(req: Request) {
     locacao_fim: tipo === 'locacao' ? (b.locacao_fim ?? null) : null,
     observacoes: b.observacoes?.trim() || null,
     criado_por: userId,
+    percentual: com.percentual,
+    comissao_total: com.total,
+    comissao_captador: com.captador,
+    comissao_vendedor: com.vendedor,
+    cashback,
+    comissao_status: 'prevista',
   } as never).select('id').single<{ id: number }>()
 
   if (error) {
@@ -124,6 +146,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     id: negocio.id,
+    comissao: com,
     imovelBaixado: !!baixado,
     aviso: baixado ? null : 'O negócio foi registrado, mas o imóvel não saiu de disponível — confira a ficha dele.',
   })
@@ -132,6 +155,7 @@ export async function POST(req: Request) {
 interface CorpoPatch {
   id?: number
   status?: string
+  comissao_status?: string
   vistoria_em?: string | null
   chaves_entregues_em?: string | null
   assinado_em?: string | null
@@ -142,7 +166,7 @@ interface CorpoPatch {
 export async function PATCH(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor'])
   if (auth.error) return auth.error
-  const { empresaId } = auth
+  const { empresaId, role } = auth
 
   const b = (await req.json().catch(() => ({}))) as CorpoPatch
   if (!b.id) return NextResponse.json({ error: 'Negócio não informado' }, { status: 400 })
@@ -154,6 +178,32 @@ export async function PATCH(req: Request) {
 
   const patch: Record<string, string | null> = {}
   if (b.status && STATUS.includes(b.status as never)) patch.status = b.status
+  /**
+   * Quitar a comissão estampa a data por conta do servidor.
+   *
+   * Data de pagamento vinda do navegador é data que o relógio de quem clicou
+   * decide — e comissão paga é dinheiro que saiu, não palpite de fuso.
+   */
+  /**
+   * QUITAR COMISSÃO É ATO DE CAIXA — só dono e admin.
+   *
+   * Avançar vistoria e entrega de chaves é trabalho do corretor, e ele faz. Dizer
+   * que o próprio dinheiro já foi pago, não: seria o vendedor assinando o próprio
+   * recibo. A tela do corretor não mostra o botão, mas a tela nunca é a tranca.
+   */
+  if (b.comissao_status && !['owner', 'admin'].includes(role)) {
+    return NextResponse.json({
+      error: 'Só o dono ou um admin pode marcar comissão como paga.',
+    }, { status: 403 })
+  }
+  if (b.comissao_status === 'paga') {
+    patch.comissao_status = 'paga'
+    const hoje = new Date()
+    patch.comissao_paga_em = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+  } else if (b.comissao_status === 'prevista') {
+    patch.comissao_status = 'prevista'
+    patch.comissao_paga_em = null
+  }
   for (const campo of ['vistoria_em', 'chaves_entregues_em', 'assinado_em', 'observacoes'] as const) {
     if (campo in b) patch[campo] = (b[campo] || null) as string | null
   }
