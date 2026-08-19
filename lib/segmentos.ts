@@ -41,6 +41,20 @@ export interface SegmentoConfig {
   modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]
 
   /**
+   * Ordem do menu neste segmento: grupo -> hrefs na sequência desejada.
+   *
+   * Item listado é TRAZIDO para o grupo, na ordem dada, venha de onde vier; o que
+   * não está listado continua onde estava. Existe porque a sequência do menu é a
+   * primeira coisa que o dono compara com o sistema que ele já usa — e "Leads" no
+   * grupo Comercial, três blocos abaixo do Dashboard, não é a ordem em que ele
+   * trabalha.
+   *
+   * Não tem coluna no banco: é código, então não há override de `segmentos_config`
+   * para conferir aqui.
+   */
+  menuLayout?: Record<string, string[]>
+
+  /**
    * Rótulo do campo "o que o cliente quer comprar", no modal do lead.
    *
    * O núcleo perguntava `segmento === 'concessionaria' ? 'Veículo' : 'Imóvel'` —
@@ -205,6 +219,13 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
        */
       { href: '/ranking', label: 'Metas e Ranking', icon: 'Trophy', grupo: 'Gestão' },
     ],
+    /**
+     * Dashboard → Pipeline → Agenda: a sequência que o dono pediu (19/08/2026).
+     *
+     * É o caminho do dia dele: abre o painel, olha o funil, vê os compromissos.
+     * Tarefas e Chat seguem no mesmo grupo, depois.
+     */
+    menuLayout: { Hoje: ['/dashboard', '/leads', '/agenda', '/tarefas', '/chat'] },
     interesseLabel: 'Imóvel interessado',
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],

@@ -310,5 +310,25 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
     else out.push({ label: grupo, items: [item] })
   }
 
-  return out
+  /**
+   * Ordem declarada pelo segmento (`menuLayout`), aplicada por último.
+   *
+   * Roda depois de tudo — opt-in, ocultos, papel e plano — para reordenar apenas o
+   * que sobrou. Grupo que ficou vazio sai: "Comercial" sem itens é cabeçalho solto.
+   */
+  for (const [grupo, hrefs] of Object.entries(seg.menuLayout ?? {})) {
+    const trazidos: MenuItem[] = []
+    for (const href of hrefs) {
+      for (const g of out) {
+        const i = g.items.findIndex((it) => it.href === href)
+        if (i >= 0) { trazidos.push(g.items.splice(i, 1)[0]); break }
+      }
+    }
+    if (!trazidos.length) continue
+    const alvo = out.find((g) => g.label === grupo)
+    if (alvo) alvo.items = [...trazidos, ...alvo.items]
+    else out.push({ label: grupo, items: trazidos })
+  }
+
+  return out.filter((g) => g.items.length > 0)
 }
