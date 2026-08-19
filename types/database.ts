@@ -5492,42 +5492,67 @@ export type Database = {
       }
       visitas: {
         Row: {
+          cliente_id: number | null
           corretor_id: string | null
           created_at: string | null
           data_hora: string
           empresa_id: number
+          fim: string | null
           id: number
           imovel_id: number | null
           lead_id: number | null
+          local: string | null
           observacoes: string | null
+          participantes: string | null
           status: string
+          tipo: string
+          titulo: string | null
           updated_at: string | null
         }
         Insert: {
+          cliente_id?: number | null
           corretor_id?: string | null
           created_at?: string | null
           data_hora: string
           empresa_id: number
+          fim?: string | null
           id?: number
           imovel_id?: number | null
           lead_id?: number | null
+          local?: string | null
           observacoes?: string | null
+          participantes?: string | null
           status?: string
+          tipo?: string
+          titulo?: string | null
           updated_at?: string | null
         }
         Update: {
+          cliente_id?: number | null
           corretor_id?: string | null
           created_at?: string | null
           data_hora?: string
           empresa_id?: number
+          fim?: string | null
           id?: number
           imovel_id?: number | null
           lead_id?: number | null
+          local?: string | null
           observacoes?: string | null
+          participantes?: string | null
           status?: string
+          tipo?: string
+          titulo?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "visitas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "visitas_corretor_id_fkey"
             columns: ["corretor_id"]

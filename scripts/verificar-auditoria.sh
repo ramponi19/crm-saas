@@ -93,5 +93,15 @@ v "captacao de imovel e modulo proprio" "lib/captacao-imob.ts" "imoveisCaptadosP
 v "ranking soma imovel captado"       "lib/ranking.ts" "+ l.imoveisCaptados"
 v "conversao segue sendo por lead"    "lib/ranking.ts" "l.conversao = l.captacoes > 0"
 
+echo "== agenda em calendario (19/08) =="
+v "agenda trava por capacidade"        "app/(dashboard)/agenda/page.tsx" "cap.agendaVisitas"
+n "agenda nao olha nome de segmento"   "app/(dashboard)/agenda/page.tsx" "seg !== 'imobiliaria'"
+v "agenda usa dia LOCAL"               "app/(dashboard)/agenda/agenda-view.tsx" "const chaveLocal"
+v "agenda tem aba supervisao"          "app/(dashboard)/agenda/agenda-view.tsx" "aba === 'supervisao'"
+v "agenda avisa fim em outro dia"      "app/(dashboard)/agenda/agenda-view.tsx" "const faixa ="
+v "compromisso tem tipo e fim"         "app/(dashboard)/agenda/agenda-view.tsx" "participantes: form.participantes.trim"
+v "menu ordena por segmento"           "lib/menu.ts" "seg.menuLayout"
+v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
