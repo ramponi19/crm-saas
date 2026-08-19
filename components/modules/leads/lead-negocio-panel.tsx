@@ -31,6 +31,12 @@ type Negocio = {
   locacao_inicio: string | null
   locacao_fim: string | null
   observacoes: string | null
+  percentual: number | null
+  comissao_total: number | null
+  comissao_captador: number | null
+  comissao_vendedor: number | null
+  cashback: number | null
+  comissao_status: string | null
   imoveis: { codigo: string | null; titulo: string | null } | { codigo: string | null; titulo: string | null }[] | null
 }
 
@@ -64,11 +70,11 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [abrindo, setAbrindo] = useState(false)
-  const [form, setForm] = useState({ imovel_id: '', tipo: 'venda', valor: '', assinado_em: '', locacao_inicio: '', locacao_fim: '' })
+  const [form, setForm] = useState({ imovel_id: '', tipo: 'venda', valor: '', assinado_em: '', locacao_inicio: '', locacao_fim: '', cashback: '' })
 
   const carregar = useCallback(async () => {
     const { data } = await supabase.from('negocios_imobiliarios')
-      .select('id, tipo, valor, status, assinado_em, vistoria_em, chaves_entregues_em, locacao_inicio, locacao_fim, observacoes, imoveis!negocios_imobiliarios_imovel_id_fkey(codigo, titulo)')
+      .select('id, tipo, valor, status, assinado_em, vistoria_em, chaves_entregues_em, locacao_inicio, locacao_fim, observacoes, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, comissao_status, imoveis!negocios_imobiliarios_imovel_id_fkey(codigo, titulo)')
       .eq('lead_id', leadId)
       .not('status', 'eq', 'cancelado')
       .order('created_at', { ascending: false })
@@ -109,6 +115,9 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
         tipo: form.tipo,
         valor: Number(String(form.valor).replace(/\./g, '').replace(',', '.')),
         assinado_em: form.assinado_em || null,
+        // `\.` escapado: `/./g` casa QUALQUER caractere e apagaria o valor inteiro,
+        // fazendo todo cashback chegar zero sem ninguém perceber.
+        cashback: Number(String(form.cashback).replace(/\./g, '').replace(',', '.')) || 0,
         locacao_inicio: form.locacao_inicio || null,
         locacao_fim: form.locacao_fim || null,
       }),
@@ -120,7 +129,7 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
     if (j?.aviso) notify.warn('Negócio registrado', j.aviso)
     else notify.ok('Negócio registrado')
     setAbrindo(false)
-    setForm({ imovel_id: '', tipo: 'venda', valor: '', assinado_em: '', locacao_inicio: '', locacao_fim: '' })
+    setForm({ imovel_id: '', tipo: 'venda', valor: '', assinado_em: '', locacao_inicio: '', locacao_fim: '', cashback: '' })
     void carregar()
   }
 
@@ -192,6 +201,31 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
           )}
         </div>
 
+        {/* A comissão, com a origem do número à vista.
+            Dizer "prevista" e mostrar a taxa é o que separa número calculado de
+            número inventado — e as duas definições (base do cálculo e cashback)
+            ainda esperam confirmação do dono. */}
+        {negocio.comissao_total != null && (
+          <div className="mt-3 rounded-control border border-line-soft bg-bg p-2.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold text-ink">
+                Comissão {negocio.comissao_status === 'paga' ? 'paga' : 'prevista'}
+              </span>
+              <span className="num text-[13px] font-bold text-ink">{brl(negocio.comissao_total)}</span>
+            </div>
+            <div className="num mt-0.5 text-[11px] text-ink-3">
+              {negocio.percentual}% sobre {brl(negocio.valor)}
+            </div>
+            <div className="mt-1.5 space-y-0.5 text-[11.5px] text-ink-2">
+              <div className="flex justify-between gap-2"><span>Captador</span><span className="num">{brl(negocio.comissao_captador)}</span></div>
+              <div className="flex justify-between gap-2"><span>Vendedor</span><span className="num">{brl(negocio.comissao_vendedor)}</span></div>
+              {(negocio.cashback ?? 0) > 0 && (
+                <div className="flex justify-between gap-2 text-warn"><span>Cashback ao cliente</span><span className="num">−{brl(negocio.cashback)}</span></div>
+              )}
+            </div>
+          </div>
+        )}
+
         {(proximo || negocio.status === 'entregue') && (
           <div className="mt-3 flex flex-wrap gap-2">
             {proximo && (
@@ -260,8 +294,14 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
             hint="O que foi combinado, não o anunciado." />
         </div>
 
-        <Input label="Assinatura" type="date" value={form.assinado_em}
-          onChange={(e) => setForm({ ...form, assinado_em: e.target.value })} />
+        <div className="grid grid-cols-2 gap-2">
+          <Input label="Assinatura" type="date" value={form.assinado_em}
+            onChange={(e) => setForm({ ...form, assinado_em: e.target.value })} />
+          <Input label="Cashback ao cliente (R$)" className="num" value={form.cashback}
+            onChange={(e) => setForm({ ...form, cashback: e.target.value })}
+            placeholder="0,00"
+            hint="Sai da parte da imobiliária." />
+        </div>
 
         {ehLocacao && (
           <div className="grid grid-cols-2 gap-2">
