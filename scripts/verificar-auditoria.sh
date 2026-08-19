@@ -81,5 +81,17 @@ v "comissao respeita papel vago"      "lib/comissao-imob.ts" "temCaptador ? arre
 v "rota informa os papeis"            "app/api/imob/negocios/route.ts" "captador: !!captadorId, vendedor: !!corretorId"
 v "eficiencia por origem e historica" "app/(dashboard)/executivo/page.tsx" "qFechados"
 
+echo "== menu do segmento (19/08) =="
+v "resolverMenu injeta extras"        "lib/menu.ts" "if (noCatalogo.has(ex.href)) continue"
+v "extra escolhe o grupo"             "lib/menu.ts" "const grupo = ex.grupo ?? 'Operação'"
+v "ranking e extra da imobiliaria"    "lib/segmentos.ts" "href: '/ranking', label: 'Metas e Ranking'"
+v "ranking abre por segmento"         "app/(dashboard)/ranking/page.tsx" "if (!isAdmin && !abertoAoTime) redirect"
+v "trava do ranking le o banco"       "app/(dashboard)/ranking/page.tsx" "extrasBanco.some"
+v "captacao de imovel e modulo proprio" "lib/captacao-imob.ts" "imoveisCaptadosPorPessoa"
+# Sem '*' no padrao: no grep basico ele e quantificador, e a checagem passava a
+# exigir espacos onde o codigo tem "* 1" — o check falhava com o codigo certo.
+v "ranking soma imovel captado"       "lib/ranking.ts" "+ l.imoveisCaptados"
+v "conversao segue sendo por lead"    "lib/ranking.ts" "l.conversao = l.captacoes > 0"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

@@ -90,7 +90,7 @@ export interface MenuConfigDono {
 export interface SegOverride {
   hiddenHrefs?: string[]
   labelOverrides?: Record<string, string>
-  modulosExtra?: { href: string; label: string; icon: string }[]
+  modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]
   /** Opt-in: hrefs habilitados neste segmento (novo modelo). Se presente, tem precedência. */
   habilitados?: string[]
 }
@@ -153,7 +153,14 @@ function habilitadosDerivados(seg: { hiddenHrefs: string[]; modulosExtra?: { hre
 
 /**
  * Catálogo base do menu (camada 1, parte comum). Os módulos EXCLUSIVOS de cada
- * segmento (modulosExtra) são injetados em "Operação" por resolverMenu.
+ * segmento (modulosExtra) são injetados por resolverMenu no grupo que o segmento
+ * declarar (padrão "Operação").
+ *
+ * ATÉ 19/08/2026 ESTE COMENTÁRIO MENTIA: resolverMenu percorria só o CATALOGO e
+ * jamais injetava extra nenhum. Os extras da imobiliária apareciam por coincidência
+ * — /imoveis, /proprietarios e /chaves também estão aqui como opcionais. Quem
+ * descobriu foi o ranking, que precisa existir no menu de UM segmento sem voltar
+ * para o menu da JM, de onde saiu a pedido do dono.
  * Itens de Fase 4 (Propostas em Comercial, Metas em Gestão) entram depois — os
  * grupos já ficam prontos.
  */
@@ -277,5 +284,31 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
     }
     if (items.length > 0) out.push({ label: g.label, items })
   }
+
+  /**
+   * Extras do segmento que NÃO existem no catálogo comum.
+   *
+   * Passam pelo mesmo opt-in (`habilitados`) e pelo mesmo "ocultar" do dono; o que
+   * eles não têm é `adminOnly`, porque tela que o segmento declara como sua é tela
+   * do time dele. Quem depende de papel trava na própria página.
+   */
+  const noCatalogo = new Set(CATALOGO.flatMap((g) => g.items).map((i) => i.href))
+  const extras = segOverride?.modulosExtra ?? seg.modulosExtra ?? []
+  for (const ex of extras) {
+    if (noCatalogo.has(ex.href)) continue
+    if (!habilitados.has(ex.href)) continue
+    if (hidden.has(ex.href)) continue
+    const item: MenuItem = {
+      href: ex.href,
+      label: labels[ex.href] ?? ex.label,
+      icon: ex.icon,
+      locked: false,
+    }
+    const grupo = ex.grupo ?? 'Operação'
+    const alvo = out.find((g) => g.label === grupo)
+    if (alvo) alvo.items.push(item)
+    else out.push({ label: grupo, items: [item] })
+  }
+
   return out
 }

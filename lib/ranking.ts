@@ -13,6 +13,16 @@ export interface LinhaRanking {
   vendas: number
   faturamento: number
   captacoes: number
+  /**
+   * Imóveis que a pessoa captou no período.
+   *
+   * Métrica SEPARADA de `captacoes` de propósito. Captar lead é atender quem
+   * chegou; captar imóvel é trazer o produto para a loja vender — na imobiliária é
+   * metade do trabalho, e era o número que o CRM dela mostrava e o nosso não.
+   * Somar os dois no mesmo campo estragaria `conversao`, que é venda por lead.
+   * Zero em quem não capta ativo.
+   */
+  imoveisCaptados: number
   visitas: number
   propostas: number
   conversao: number
@@ -39,7 +49,19 @@ export function janelaDoPeriodo(periodo: string): { ini: string; fim: string } {
   return { ini: new Date(ano, mes - 1, 1).toISOString(), fim: new Date(ano, mes, 1).toISOString() }
 }
 
-export async function calcularRanking(db: Db, empresaId: number, periodo: string): Promise<LinhaRanking[]> {
+export async function calcularRanking(
+  db: Db,
+  empresaId: number,
+  periodo: string,
+  /**
+   * Captação de ativo INJETADA por quem conhece a vertical.
+   *
+   * Este módulo é núcleo e não consulta `imoveis`: quem sabe onde mora o ativo do
+   * segmento é a camada dele (`lib/captacao-imob.ts`). Sem a injeção, a coluna sai
+   * zerada — não erra, só não mostra.
+   */
+  opts: { imoveisCaptados?: Map<string, number> } = {},
+): Promise<LinhaRanking[]> {
   const { ini, fim } = janelaDoPeriodo(periodo)
 
   const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }, { data: trocasPendentes }] = await Promise.all([
@@ -75,7 +97,7 @@ export async function calcularRanking(db: Db, empresaId: number, periodo: string
   type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
   const linhas = new Map<string, LinhaRanking>()
   for (const m of (membrosRaw ?? []) as unknown as MembroRow[]) {
-    linhas.set(m.usuario_id, { usuario_id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—', vendas: 0, faturamento: 0, captacoes: 0, visitas: 0, propostas: 0, conversao: 0, score: 0, vendasRetidas: 0, faturamentoRetido: 0 })
+    linhas.set(m.usuario_id, { usuario_id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—', vendas: 0, faturamento: 0, captacoes: 0, imoveisCaptados: 0, visitas: 0, propostas: 0, conversao: 0, score: 0, vendasRetidas: 0, faturamentoRetido: 0 })
   }
   const get = (id: string | null) => (id ? linhas.get(id) : undefined)
 
@@ -100,9 +122,14 @@ export async function calcularRanking(db: Db, empresaId: number, periodo: string
     const l = get(p.lead_id != null ? respByLead.get(p.lead_id) ?? null : null); if (l) l.propostas += 1
   }
 
+  for (const [id, qtd] of opts.imoveisCaptados ?? []) {
+    const l = linhas.get(id); if (l) l.imoveisCaptados = qtd
+  }
+
   for (const l of linhas.values()) {
     l.conversao = l.captacoes > 0 ? Math.round((l.vendas / l.captacoes) * 100) : 0
-    l.score = l.captacoes * 1 + l.visitas * 2 + l.propostas * 3 + l.vendas * 5
+    // Captar imóvel pontua igual a captar lead: é trabalho que traz produto.
+    l.score = l.captacoes * 1 + l.imoveisCaptados * 1 + l.visitas * 2 + l.propostas * 3 + l.vendas * 5
   }
 
   return [...linhas.values()].sort((a, b) => b.score - a.score || b.faturamento - a.faturamento)
@@ -116,6 +143,7 @@ export function valorMetrica(linha: LinhaRanking | undefined, tipo: string): num
     case 'visitas': return linha.visitas
     case 'propostas': return linha.propostas
     case 'captacoes': return linha.captacoes
+    case 'imoveis_captados': return linha.imoveisCaptados
     case 'vendas': case 'fechamentos': default: return linha.vendas
   }
 }

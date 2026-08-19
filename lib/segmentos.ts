@@ -31,7 +31,14 @@ export interface SegmentoConfig {
   /** etapas padrão do funil de leads (kanban) para o segmento */
   funil: string[]
   /** módulos EXCLUSIVOS do segmento (fase profunda). icon = nome do ícone lucide. */
-  modulosExtra?: { href: string; label: string; icon: string }[]
+  /**
+   * Módulos exclusivos do segmento — telas que só ele mostra no menu.
+   *
+   * `grupo` escolhe onde o item entra (padrão "Operação"). Existe porque o ranking
+   * é tela de GESTÃO na imobiliária: cair em Operação, junto de Imóveis e Chaves,
+   * esconderia justamente o que o dono procura.
+   */
+  modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]
 
   /**
    * Rótulo do campo "o que o cliente quer comprar", no modal do lead.
@@ -94,6 +101,13 @@ export interface SegmentoConfig {
      * cada negócio, dividida entre quem captou e quem vendeu.
      */
     comissaoPorNegocio?: boolean
+    /**
+     * Ranking conta IMÓVEIS captados, além de leads.
+     *
+     * Onde o corretor traz o produto para a loja vender, captação é do ativo — era o
+     * número que o CRM da imobiliária mostrava e o nosso somava errado (contava lead).
+     */
+    captacaoDeImovel?: boolean
     /** Automações oferecem o bloco de veículos. */
     automacoesVeiculo?: boolean
     /** Match de interesse: por veículo em vez de imóvel. */
@@ -156,7 +170,23 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     emoji: '🏠',
     // esconde tudo de varejo/assistência; o módulo "Imóveis" chega na fase profunda
     hiddenHrefs: ['/pdv', '/estoque', '/catalogo', '/produtos', '/garantia', '/assistencia', '/simular-parcela', '/compras'],
-    labelOverrides: {},
+    /**
+     * O vocabulário do dono, não o nosso (decisão dele, 19/08/2026).
+     *
+     * Ele já opera um CRM em que essas telas se chamam assim; obrigá-lo a aprender
+     * outro nome para a mesma coisa é atrito sem ganho. Rótulo é por segmento, então
+     * a JM segue com "Leads" e "Conversão".
+     *
+     * "Meta da empresa" em /metas é desambiguação nossa: como /ranking passa a se
+     * chamar "Metas e Ranking", dois itens chamados "Metas" mandariam ele adivinhar
+     * qual é qual.
+     */
+    labelOverrides: {
+      '/leads': 'Pipeline',
+      '/conversao': 'Gestão de Leads',
+      '/metas': 'Meta da empresa',
+      '/executivo': 'Dashboard Executivo',
+    },
     funil: ['Lead novo', 'Contato feito', 'Visita agendada', 'Visita realizada', 'Proposta', 'Análise de crédito', 'Contrato', 'Vistoria', 'Entrega de chaves', 'Fechamento'],
     // Agenda e Tarefas passaram ao núcleo (grupo "Hoje", todos os segmentos) — ver lib/menu.
     modulosExtra: [
@@ -164,11 +194,21 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
       { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound' },
       { href: '/chaves', label: 'Chaves', icon: 'Key' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
+      /**
+       * RANKING NO MENU DO TIME — e só aqui.
+       *
+       * A tela existe desde a Sprint 3.1, mas saiu do menu do CRM a pedido do dono
+       * da JM: lá o vendedor não pode ver o faturamento do colega. Na imobiliária a
+       * decisão do dono é a oposta (19/08/2026) — placar aberto, porque ranking que o
+       * time não vê não gamifica nada. Declarar aqui, e não no catálogo comum, é o que
+       * sustenta as duas verdades ao mesmo tempo.
+       */
+      { href: '/ranking', label: 'Metas e Ranking', icon: 'Trophy', grupo: 'Gestão' },
     ],
     interesseLabel: 'Imóvel interessado',
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
-    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true },
+    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true },
   },
   saude: {
     label: 'Saúde / Clínica',
@@ -239,3 +279,16 @@ export function normalizarSegmento(v: string | null | undefined): Segmento {
  * Os CAMPOS seguem em uso: `lib/menu.ts` lê `hiddenHrefs` e `labelOverrides`
  * daqui como fallback, quando o banco não tem override.
  */
+
+/**
+ * Esta tela é módulo PRÓPRIO deste segmento?
+ *
+ * Serve para a página decidir quem entra usando a MESMA fonte do menu. O ranking é
+ * o caso: onde o segmento declara a tela como dele, o time inteiro vê; onde não
+ * declara, segue valendo a trava de dono/admin. Sem uma fonte só, esconder do menu
+ * e liberar na página (ou o contrário) viraria divergência silenciosa.
+ */
+export function moduloDoSegmento(segmento: string | null | undefined, href: string): boolean {
+  const seg = SEGMENTOS[normalizarSegmento(segmento)]
+  return (seg.modulosExtra ?? []).some((m) => m.href === href)
+}
