@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { Plus, Filter } from 'lucide-react'
+import { Button, Select } from '@/components/ui'
 import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo, type Funil } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -55,6 +55,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
   const [soEsteira, setSoEsteira] = useState(false)
+  /** '' = todos os corretores. Filtro de quem gerencia a equipe. */
+  const [corretorId, setCorretorId] = useState('')
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
@@ -66,10 +68,16 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
     [leads, funilId, funilPadrao],
   )
   const esteiraCount = useMemo(() => leadsDoFunilBase.filter(l => !l.responsavel_id && l.ativo !== false).length, [leadsDoFunilBase])
-  const leadsDoFunil = useMemo(
-    () => (soEsteira ? leadsDoFunilBase.filter(l => !l.responsavel_id) : leadsDoFunilBase),
-    [leadsDoFunilBase, soEsteira],
-  )
+  /**
+   * Esteira e corretor são EXCLUSIVOS: esteira é "sem dono", corretor é "dono é
+   * este". Ligar os dois devolveria quadro vazio sempre, e quadro vazio por
+   * combinação de filtro parece sistema sem lead. Os botões também se desligam.
+   */
+  const leadsDoFunil = useMemo(() => {
+    if (soEsteira) return leadsDoFunilBase.filter(l => !l.responsavel_id)
+    if (corretorId) return leadsDoFunilBase.filter(l => l.responsavel_id === corretorId)
+    return leadsDoFunilBase
+  }, [leadsDoFunilBase, soEsteira, corretorId])
 
   useEffect(() => {
     const supabase = createClient()
@@ -206,8 +214,27 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
               })}
             </div>
           )}
+          {/*
+            Filtro por corretor — só para quem pode ver o lead do colega.
+            Com `restringe`, o servidor já mandou apenas os leads dele: o filtro
+            não teria o que filtrar e sugeriria acesso que ele não tem.
+          */}
+          {!restringe && usuarios.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <Filter size={15} strokeWidth={1.8} className="shrink-0 text-ink-3" />
+              <Select
+                aria-label="Filtrar por corretor"
+                value={corretorId}
+                onChange={e => { setCorretorId(e.target.value); if (e.target.value) setSoEsteira(false) }}
+                className="min-w-[190px]"
+              >
+                <option value="">Todos os corretores</option>
+                {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome || 'Sem nome'}</option>)}
+              </Select>
+            </div>
+          )}
           <button
-            onClick={() => setSoEsteira(v => !v)}
+            onClick={() => { setSoEsteira(v => !v); setCorretorId('') }}
             className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${soEsteira ? 'border-warn bg-warn-soft text-warn' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
           >
             Esteira{esteiraCount > 0 ? ` (${esteiraCount})` : ''}
