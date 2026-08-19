@@ -108,5 +108,12 @@ v "pipeline filtra por corretor"       "components/modules/leads/leads-view.tsx"
 v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "!restringe && usuarios.length > 1"
 v "esteira e corretor sao exclusivos"  "components/modules/leads/leads-view.tsx" "if (corretorId) return leadsDoFunilBase.filter"
 
+echo "== funil: uma verdade so (19/08) =="
+n "superadmin nao edita funil morto"    "app/superadmin/segmentos/segmentos-view.tsx" "funil_seed"
+n "rota de segmentos nao grava seed"    "app/api/superadmin/segmentos/route.ts" "funil_seed"
+n "segmentos.ts nao declara funil"      "lib/segmentos.ts" "funil: ["
+v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
+v "padrao do codigo tem Aprovados"      "components/modules/leads/types.ts" "label: 'Aprovados'"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

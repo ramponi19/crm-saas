@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { getKanbanColumns, ganhoColId } from '@/components/modules/leads/types'
+import { getKanbanColumns, ganhoColId, type KanbanColumn } from '@/components/modules/leads/types'
 import { Home, Target, TrendingUp, Wallet, Award } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
@@ -36,13 +36,24 @@ export async function RelatoriosImobView() {
   const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1).toISOString()
   const nomeMes = agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
-  const [{ data: leads }, { data: imoveis }, { data: membros }, { data: leadsMes }, { data: visitasMes }, { data: propostasMes }] = await Promise.all([
+  const [{ data: leads }, { data: imoveis }, { data: membros }, { data: leadsMes }, { data: visitasMes }, { data: propostasMes }, { data: etapasRaw }] = await Promise.all([
     supabase.from('leads').select('kanban_status, origem, responsavel_id').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('imoveis').select('status, tipo, valor_venda').eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('leads').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
     supabase.from('visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes),
     supabase.from('propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
+    /**
+     * Etapas do funil PADRÃO, do banco.
+     *
+     * O relatório usava só a constante do segmento: quando o dono renomeou e
+     * reordenou o funil (19/08/2026), o kanban mostrava "Em Análise · Aprovados" e
+     * este relatório continuava dizendo "Contato feito · Visita realizada" — dois
+     * nomes para a mesma etapa, no mesmo CRM. A constante fica como reserva de
+     * empresa que ainda não tem funil próprio.
+     */
+    supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funis!inner(padrao)')
+      .eq('empresa_id', empresaId).eq('ativo', true).eq('funis.padrao', true).order('ordem'),
   ])
 
   // Responsável de cada lead citado nas propostas do mês (sem embed — resolve por lookup).
@@ -56,7 +67,14 @@ export async function RelatoriosImobView() {
 
   const L = leads ?? []
   const I = imoveis ?? []
-  const colunas = getKanbanColumns('imobiliaria')
+  type EtapaRow = { slug: string; label: string; cor: string | null; tipo: string | null }
+  const doBanco: KanbanColumn[] = ((etapasRaw ?? []) as unknown as EtapaRow[]).map((e) => ({
+    id: e.slug,
+    label: e.label,
+    color: e.cor ?? '#7FB0E8',
+    tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
+  }))
+  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns('imobiliaria')
   const fechamentoId = ganhoColId(colunas)
 
   const imoveisDisp = I.filter((i) => i.status === 'disponivel')
