@@ -218,12 +218,16 @@ export function normalizarSegmento(v: string | null | undefined): Segmento {
   return v && v in SEGMENTOS ? (v as Segmento) : SEGMENTO_PADRAO
 }
 
-/** Resolve o label final de um item de menu conforme o segmento. */
-export function labelDoItem(seg: Segmento, href: string, labelPadrao: string): string {
-  return SEGMENTOS[seg].labelOverrides[href] ?? labelPadrao
-}
-
-/** Diz se um módulo (href) está visível no segmento. */
-export function moduloVisivel(seg: Segmento, href: string): boolean {
-  return !SEGMENTOS[seg].hiddenHrefs.includes(href)
-}
+/**
+ * `labelDoItem` e `moduloVisivel` viviam aqui e foram removidos em 19/08/2026:
+ * zero chamadas no repositório inteiro.
+ *
+ * Quem responde essas duas perguntas hoje é `lib/menu.ts`, e por um bom motivo —
+ * lá a config do BANCO (`segmentos_config`) sobrepõe a estática, e é a lista
+ * `modulos_habilitados` do banco que o middleware usa para liberar rota. Duas
+ * funções respondendo a mesma pergunta com outra fonte é como se cria divergência
+ * silenciosa entre o menu e o que a rota realmente permite.
+ *
+ * Os CAMPOS seguem em uso: `lib/menu.ts` lê `hiddenHrefs` e `labelOverrides`
+ * daqui como fallback, quando o banco não tem override.
+ */
