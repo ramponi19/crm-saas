@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { Topbar } from '@/components/layout/topbar'
@@ -39,9 +40,20 @@ export default async function DashboardImob() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
 
+  /**
+   * Sessão e cadastro ausentes NÃO derrubam a tela.
+   *
+   * Havia `user!.id` e `.single()` aqui: o `!` estoura se o token expirar no meio
+   * do carregamento, e o `.single()` lança quando o usuário autenticado ainda não
+   * tem linha em `usuarios` — recém-convidado, por exemplo. Nos dois casos o
+   * dashboard inteiro virava erro em vez de degradar. Sem sessão, manda para o
+   * login; sem cadastro, segue como corretor comum.
+   */
+  if (!user) redirect('/login')
+
   const [{ data: usuario }, { data: vinculo }] = await Promise.all([
-    supabase.from('usuarios').select('nome, is_super_admin').eq('id', user!.id).single(),
-    supabase.from('empresa_usuarios').select('role').eq('usuario_id', user!.id).eq('empresa_id', empresaId).maybeSingle(),
+    supabase.from('usuarios').select('nome, is_super_admin').eq('id', user.id).maybeSingle(),
+    supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).maybeSingle(),
   ])
   /**
    * Quem responde pela operação vê a operação inteira: dono, admin e super admin.
@@ -63,7 +75,7 @@ export default async function DashboardImob() {
   let q = supabase.from('leads')
     .select('id, nome, kanban_status, origem, responsavel_id, ultima_mensagem_at, ultima_tratativa, created_at, telefone, instagram, valor_estimado, msgs_nao_lidas')
     .eq('empresa_id', empresaId).eq('ativo', true)
-  if (!isGestor && user) q = q.eq('responsavel_id', user.id)
+  if (!isGestor) q = q.eq('responsavel_id', user.id)
 
   // janela de "hoje" (local) e a dos próximos dias, para a agenda do cockpit
   const agora = new Date()
@@ -72,16 +84,30 @@ export default async function DashboardImob() {
 
   let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome), imoveis(codigo, titulo)')
     .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimJanela).order('data_hora').limit(8)
-  if (!isGestor && user) vq = vq.eq('corretor_id', user.id)
+  if (!isGestor) vq = vq.eq('corretor_id', user.id)
+
+  /**
+   * Quantos leads a carteira TEM, além de quantos esta tela carregou.
+   *
+   * O funil e o termômetro somam sobre o recorte de `TETO_LEADS`. Enquanto a
+   * carteira é menor que o teto, recorte e total são a mesma coisa e ninguém
+   * percebe; passando disso, os números encolhem sem avisar — e número que parece
+   * calculado é pior que número ausente, porque ninguém desconfia dele. Um
+   * `count` é barato (o banco nem devolve linha) e paga a honestidade.
+   */
+  let cq = supabase.from('leads').select('*', { count: 'exact', head: true })
+    .eq('empresa_id', empresaId).eq('ativo', true)
+  if (!isGestor) cq = cq.eq('responsavel_id', user.id)
 
   let tq = supabase.from('tarefas').select('id, titulo, vencimento, leads(nome)')
     .eq('empresa_id', empresaId).eq('concluida', false).order('vencimento', { nullsFirst: false }).limit(8)
-  if (!isGestor && user) tq = tq.eq('responsavel_id', user.id)
+  if (!isGestor) tq = tq.eq('responsavel_id', user.id)
 
   const [
     { data: leadsRaw }, { count: imoveisDisp }, { count: imoveisTotal }, { count: totalClientes },
     { data: visitasRaw }, { data: tarefasRaw }, { data: scoreCfgRow }, { data: membrosRaw },
     { data: etapasRaw }, { data: ultimosClientesRaw }, { data: ultimosImoveisRaw },
+    { count: totalLeadsCarteira },
   ] = await Promise.all([
     q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(TETO_LEADS),
     supabase.from('imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
@@ -99,6 +125,7 @@ export default async function DashboardImob() {
       .eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }).limit(5),
     supabase.from('imoveis').select('id, codigo, titulo, tipo, status, valor_venda, valor_locacao, finalidade, bairro')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
+    cq,
   ])
 
   const leads = (leadsRaw ?? []) as LeadRow[]
@@ -181,12 +208,20 @@ export default async function DashboardImob() {
               <span className="flex items-baseline gap-2">
                 <span>Funil {isGestor ? 'da equipe' : 'de vendas'}</span>
                 <span className="num text-[12px] font-normal text-ink-3">
-                  {leads.length} {leads.length === 1 ? 'lead ativo' : 'leads ativos'}
+                  {totalLeadsCarteira ?? leads.length} {(totalLeadsCarteira ?? leads.length) === 1 ? 'lead ativo' : 'leads ativos'}
                 </span>
               </span>
             }
             actions={<Link href="/leads" className="text-[12px] font-semibold text-accent hover:underline">Abrir Leads →</Link>}
           >
+            {/* O recorte cortou: diz na cara, em vez de deixar a soma encolher calada. */}
+            {(totalLeadsCarteira ?? 0) > leads.length && (
+              <p className="mb-3 rounded-control border border-warn/30 bg-warn-soft px-3 py-2 text-[12px] leading-snug text-ink-2">
+                Os números abaixo e o termômetro contam os <strong className="num">{leads.length}</strong> leads
+                de contato mais recente, de <strong className="num">{totalLeadsCarteira}</strong> ativos.
+                Abra <Link href="/leads" className="font-semibold text-accent hover:underline">Leads</Link> para a carteira inteira.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
               {colunas.map(c => (
                 <Link

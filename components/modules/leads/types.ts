@@ -78,7 +78,18 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
   { id: 'perdido',    label: 'Perdido',    color: '#DC2626', tipo: 'perdido' },
 ]
 
-// Funil imobiliário (segmento 'imobiliaria').
+/**
+ * Funil imobiliário (segmento 'imobiliaria').
+ *
+ * As três etapas depois do crédito — contrato, vistoria e entrega de chaves —
+ * existem porque o negócio imobiliário NÃO acaba na proposta aceita: o contrato é
+ * assinado, o imóvel é vistoriado e a chave é entregue, e cada uma dessas coisas
+ * pode travar por semanas. Sem elas, todo negócio fechado ficava empilhado em
+ * "Fechamento" e ninguém sabia se estava esperando assinatura ou chave.
+ *
+ * O dono ajusta em Administração → Funil: pode renomear, reordenar e excluir o que
+ * a operação dele não usa. Isto é o ponto de partida, não a regra.
+ */
 const KANBAN_IMOBILIARIA: KanbanColumn[] = [
   { id: 'novo',             label: 'Lead novo',          color: '#7FB0E8' },
   { id: 'contato',          label: 'Contato feito',      color: '#C6A86A' },
@@ -86,6 +97,9 @@ const KANBAN_IMOBILIARIA: KanbanColumn[] = [
   { id: 'visita_realizada', label: 'Visita realizada',   color: '#22D3EE' },
   { id: 'proposta',         label: 'Proposta',           color: '#F4B740', tipo: 'negociacao' },
   { id: 'credito',          label: 'Análise de crédito', color: '#FB923C' },
+  { id: 'contrato',         label: 'Contrato',           color: '#6366F1' },
+  { id: 'vistoria',         label: 'Vistoria',           color: '#2DD4BF' },
+  { id: 'entrega_chaves',   label: 'Entrega de chaves',  color: '#A3E635' },
   { id: 'fechamento',       label: 'Fechamento',         color: '#34D399', tipo: 'ganho' },
   { id: 'perdido',          label: 'Perdido',            color: '#DC2626', tipo: 'perdido' },
 ]
