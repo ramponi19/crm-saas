@@ -101,7 +101,7 @@ export interface SegmentoConfig {
  * É um tipo, e não string livre, de propósito: errar o nome viraria painel que
  * some sem erro nenhum — a pior falha, porque parece funcionar.
  */
-export type PainelDoLead = 'match-imoveis' | 'interesse-veiculo' | 'financiamento'
+export type PainelDoLead = 'match-imoveis' | 'negocio-imovel' | 'interesse-veiculo' | 'financiamento'
 
 export const SEGMENTO_PADRAO: Segmento = 'varejo'
 
@@ -158,7 +158,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
     ],
     interesseLabel: 'Imóvel interessado',
-    paineisDoLead: ['match-imoveis'],
+    paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
     capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true },
   },
