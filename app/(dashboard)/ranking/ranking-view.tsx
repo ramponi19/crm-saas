@@ -22,7 +22,7 @@ function shiftMes(p: string, d: number) {
 }
 const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '—'
 
-export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { periodo: string; linhas: LinhaRanking[]; metas: MetaUi[]; membros: MembroOpt[]; isAdmin: boolean }) {
+export function RankingView({ periodo, linhas, metas, membros, isAdmin, mostrarImoveis = false }: { periodo: string; linhas: LinhaRanking[]; metas: MetaUi[]; membros: MembroOpt[]; isAdmin: boolean; mostrarImoveis?: boolean }) {
   const router = useRouter()
   const [aba, setAba] = useState<'ranking' | 'metas'>('ranking')
   const [recalc, setRecalc] = useState(false)
@@ -85,6 +85,9 @@ export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { peri
                       <th className="px-3 py-2.5 text-right font-semibold">Score</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Vendas</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Captações</th>
+                      {/* Só onde a captação de imóvel existe — coluna zerada em toda
+                          linha é ruído que faz o dono duvidar do resto da tabela. */}
+                      {mostrarImoveis && <th className="px-3 py-2.5 text-right font-semibold">Imóveis</th>}
                       <th className="px-3 py-2.5 text-right font-semibold">Visitas</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Propostas</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Conversão</th>
@@ -99,6 +102,7 @@ export function RankingView({ periodo, linhas, metas, membros, isAdmin }: { peri
                         <td className="px-3 py-2.5 text-right"><span className="num font-semibold text-accent">{l.score}</span></td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.vendas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.captacoes}</td>
+                        {mostrarImoveis && <td className="px-3 py-2.5 text-right num text-ink-2">{l.imoveisCaptados}</td>}
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.visitas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.propostas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.conversao}%</td>
