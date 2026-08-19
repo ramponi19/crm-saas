@@ -38,3 +38,8 @@ next-env.d.ts
 
 # Cache do Supabase CLI — nao versionar
 supabase/.temp/
+
+# Screenshots do playwright/chrome-devtools na raiz — nao versionar
+/hb-*.png
+/janela-*.png
+/page-*.png

@@ -154,8 +154,39 @@ export async function GET(
           })
         }
 
-        // Regra 2 — visita realizada há +3 dias e lead ainda não avançou p/ proposta: cobrar retomada.
-        const jaAvancou = ['proposta', 'credito', 'fechamento', 'perdido']
+        /**
+         * Regra 2 — visita realizada há +3 dias e o lead não avançou: cobrar retomada.
+         *
+         * "Avançou" sai do FUNIL DE CADA EMPRESA, não de uma lista de slugs cravada.
+         * Antes era `['proposta','credito','fechamento','perdido']`: bastava a
+         * imobiliária ganhar as etapas de contrato, vistoria e entrega de chaves para
+         * o CRM começar a cobrar "enviar proposta" de negócio já assinado esperando a
+         * chave. E funil renomeado pelo dono nunca casava com a lista.
+         *
+         * A régua agora é a ordem: da primeira etapa de negociação para frente, o
+         * lead já passou do ponto de precisar de proposta. Empresa sem funil salvo
+         * cai na lista antiga como último recurso.
+         */
+        const LISTA_ANTIGA = ['proposta', 'credito', 'fechamento', 'perdido']
+        const { data: etapasCron } = await supabase
+          .from('funil_etapas').select('empresa_id, slug, tipo, ordem').eq('ativo', true)
+        const avancouPorEmpresa = new Map<number, Set<string>>()
+        {
+          const porEmpresa = new Map<number, Array<{ slug: string; tipo: string; ordem: number }>>()
+          for (const e of (etapasCron ?? []) as Array<{ empresa_id: number; slug: string; tipo: string; ordem: number }>) {
+            if (!porEmpresa.has(e.empresa_id)) porEmpresa.set(e.empresa_id, [])
+            porEmpresa.get(e.empresa_id)!.push(e)
+          }
+          for (const [emp, etapas] of porEmpresa) {
+            const marcos = etapas.filter((e) => ['negociacao', 'ganho', 'perdido'].includes(e.tipo))
+            if (!marcos.length) continue
+            const corte = Math.min(...marcos.map((e) => e.ordem))
+            avancouPorEmpresa.set(emp, new Set(etapas.filter((e) => e.ordem >= corte).map((e) => e.slug)))
+          }
+        }
+        const jaAvancouNaEmpresa = (empresaId: number, slug: string) =>
+          (avancouPorEmpresa.get(empresaId) ?? new Set(LISTA_ANTIGA)).has(slug)
+
         const { data: visitasRaw } = await supabase
           .from('visitas').select('id, empresa_id, lead_id, corretor_id, leads(nome, kanban_status, responsavel_id, ativo)')
           .eq('status', 'realizada').lt('data_hora', d3).gte('data_hora', d14).limit(500)
@@ -164,7 +195,7 @@ export async function GET(
           if (!v.lead_id || desativadas.has(v.empresa_id)) continue
           const lead = one(v.leads)
           if (!lead || lead.ativo === false) continue
-          if (jaAvancou.includes(lead.kanban_status ?? '')) continue
+          if (jaAvancouNaEmpresa(v.empresa_id, lead.kanban_status ?? '')) continue
           criadas += await gerar({
             empresaId: v.empresa_id, leadId: v.lead_id, responsavelId: lead.responsavel_id ?? v.corretor_id,
             regra: 'pos_visita', chave: `pos_visita:lead:${v.lead_id}`,
