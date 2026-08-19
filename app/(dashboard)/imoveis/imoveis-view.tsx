@@ -42,13 +42,14 @@ const vazio = {
   valor_venda: '', valor_locacao: '', valor_condominio: '', valor_iptu: '', iptu_periodicidade: 'anual',
   area_util: '', area_total: '', quartos: '', suites: '', banheiros: '', vagas: '',
   matricula: '', status_chaves: '',
+  captado_por: '', captado_em: '',
   cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '',
   descricao: '',
   ocultar_numero_publico: false, aceita_permuta: false, aceita_financiamento: false, publicar_portais: false,
 }
 type FormT = typeof vazio
 
-export default function ImoveisView({ inicial, proprietarios, empresaId, slug }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; empresaId: number; slug: string }) {
+export default function ImoveisView({ inicial, proprietarios, equipe, empresaId, slug }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; equipe: { id: string; nome: string }[]; empresaId: number; slug: string }) {
   const supabase = createClient()
   const [lista, setLista] = useState<Imovel[]>(inicial)
   const [busca, setBusca] = useState('')
@@ -104,6 +105,7 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
       area_util: im.area_util?.toString() ?? '', area_total: im.area_total?.toString() ?? '',
       quartos: im.quartos?.toString() ?? '', suites: im.suites?.toString() ?? '', banheiros: im.banheiros?.toString() ?? '', vagas: im.vagas?.toString() ?? '',
       matricula: im.matricula ?? '', status_chaves: im.status_chaves ?? '',
+      captado_por: im.captado_por ?? '', captado_em: im.captado_em ?? '',
       cep: im.cep ?? '', logradouro: im.logradouro ?? '', numero: im.numero ?? '', complemento: im.complemento ?? '', bairro: im.bairro ?? '', cidade: im.cidade ?? '', uf: im.uf ?? '',
       descricao: im.descricao ?? '',
       ocultar_numero_publico: !!im.ocultar_numero_publico, aceita_permuta: !!im.aceita_permuta, aceita_financiamento: !!im.aceita_financiamento, publicar_portais: !!im.publicar_portais,
@@ -124,6 +126,10 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
       area_util: n(form.area_util), area_total: n(form.area_total),
       quartos: i(form.quartos), suites: i(form.suites), banheiros: i(form.banheiros), vagas: i(form.vagas),
       matricula: form.matricula || null, status_chaves: form.status_chaves || null,
+      // Quem captou alimenta "Captações" no ranking e o rateio da comissão do
+      // negócio. Vazio é resposta válida: imóvel vindo de portal não tem captador.
+      captado_por: form.captado_por || null,
+      captado_em: form.captado_em || null,
       cep: form.cep || null, logradouro: form.logradouro || null, numero: form.numero || null, complemento: form.complemento || null,
       bairro: form.bairro || null, cidade: form.cidade || null, uf: form.uf || null,
       descricao: form.descricao || null,
@@ -275,6 +281,14 @@ export default function ImoveisView({ inicial, proprietarios, empresaId, slug }:
             <option value="">— nenhum —</option>
             {proprietarios.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
           </Select>
+          {/* Captação: é o que o ranking do corretor mede e o que o negócio usa
+              para saber com quem dividir a comissão. Sem este campo a coluna do
+              banco ficava sempre nula — campo sem caminho na tela não existe. */}
+          <Select label="Captado por" value={form.captado_por} onChange={e => set('captado_por', e.target.value)}>
+            <option value="">— não informado —</option>
+            {equipe.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+          </Select>
+          <Campo label="Captado em" tipo="date" value={form.captado_em} onChange={str('captado_em')} />
         </div>
 
         <Secao>Fotos</Secao>
