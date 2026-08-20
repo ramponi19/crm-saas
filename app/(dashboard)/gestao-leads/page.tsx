@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
-import { diasParado, DIAS_PARADO } from '@/lib/lead-parado'
+import { diasParado, DIAS_ATENCAO } from '@/lib/lead-parado'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { GestaoLeadsView, type LeadAtrasado, type EstadoReativacao } from './gestao-leads-view'
 
@@ -86,20 +86,40 @@ export default async function GestaoLeadsPage() {
     ultima_mensagem_at: string | null; ultima_tratativa: string | null; created_at: string | null
   }
   const agora = Date.now()
-  const atrasados: LeadAtrasado[] = ((leadsRaw ?? []) as LeadRow[])
+  const abertos = ((leadsRaw ?? []) as LeadRow[])
     // Etapa terminal fora: lead ganho ou perdido não está parado, está resolvido.
     .filter((l) => !terminais.has(l.kanban_status ?? 'novo'))
-    .map((l) => ({
-      id: l.id,
-      nome: l.nome || 'Lead sem nome',
-      telefone: l.telefone,
-      etapa: colunas.find((c) => c.id === (l.kanban_status ?? 'novo'))?.label ?? '—',
-      responsavel: l.responsavel_id ? (nomePorUsuario.get(l.responsavel_id) ?? '—') : 'sem dono',
-      valor: Number(l.valor_estimado) || 0,
-      dias: diasParado(l, agora),
-    }))
-    .filter((l) => l.dias >= DIAS_PARADO)
+    .map((l) => ({ lead: l, dias: diasParado(l, agora) }))
+    .filter((x) => x.dias >= DIAS_ATENCAO)
     .sort((a, b) => b.dias - a.dias)
+
+  /**
+   * "Região" do lead = onde ele PROCURA (perfil de busca), não onde ele mora.
+   *
+   * O lead não tem endereço no nosso modelo, e inventar um campo para preencher a
+   * coluna seria pior: o que o corretor precisa saber ao retomar contato é a região
+   * de interesse. Bairro tem precedência sobre cidade porque é mais específico.
+   */
+  const idsLista = abertos.map((x) => x.lead.id)
+  const { data: perfisRaw } = idsLista.length
+    ? await supabase.from('lead_perfil_busca').select('lead_id, cidades, bairros').eq('empresa_id', empresaId).in('lead_id', idsLista)
+    : { data: [] }
+  const regiaoPorLead = new Map<number, string>()
+  for (const p of ((perfisRaw ?? []) as { lead_id: number; cidades: string[] | null; bairros: string[] | null }[])) {
+    const partes = [...(p.bairros ?? []), ...(p.cidades ?? [])].filter(Boolean)
+    if (partes.length) regiaoPorLead.set(p.lead_id, partes.slice(0, 2).join(', '))
+  }
+
+  const atrasados: LeadAtrasado[] = abertos.map(({ lead: l, dias }) => ({
+    id: l.id,
+    nome: l.nome || 'Lead sem nome',
+    telefone: l.telefone,
+    etapa: colunas.find((c) => c.id === (l.kanban_status ?? 'novo'))?.label ?? '—',
+    responsavel: l.responsavel_id ? (nomePorUsuario.get(l.responsavel_id) ?? '—') : 'sem dono',
+    regiao: regiaoPorLead.get(l.id) ?? null,
+    valor: Number(l.valor_estimado) || 0,
+    dias,
+  }))
 
   const cfg = (reativRow?.valor ?? {}) as { ativo?: boolean; dias_frio?: number; incluir_perdidos?: boolean; cadencia_id?: number | null }
   const cadencias = (cadenciasRaw ?? []) as { id: number; nome: string }[]
@@ -127,7 +147,7 @@ export default async function GestaoLeadsPage() {
       templates={(tmplRow?.valor ?? {}) as Record<string, string>}
       reativacao={reativacao}
       podeExecutar={isAdmin}
-      limiteDias={DIAS_PARADO}
+      limiteDias={DIAS_ATENCAO}
       soMeus={restringe}
     />
   )

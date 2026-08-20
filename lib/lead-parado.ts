@@ -19,11 +19,34 @@ export const GRAVIDADES: { id: Gravidade; label: string; desde: number; tone: 'b
   { id: 'critico',  label: 'Crítico',  desde: 30, tone: 'bad' },
   { id: 'alto',     label: 'Alto',     desde: 15, tone: 'bad' },
   { id: 'moderado', label: 'Moderado', desde: 7,  tone: 'warn' },
-  { id: 'atencao',  label: 'Atenção',  desde: 0,  tone: 'neutro' },
+  /**
+   * "Atenção" começa em 3 dias, e não em zero.
+   *
+   * Em zero ela era inalcançável: a tela lista de `DIAS_ATENCAO` para cima, então o
+   * card ficava eternamente 0 — e a primeira versão desta tela resolveu isso
+   * ESCONDENDO o card, ou seja, entregando menos. Três dias é o ponto em que o lead
+   * ainda está quente e já passou tempo suficiente para alguém ter respondido.
+   */
+  { id: 'atencao',  label: 'Atenção',  desde: 3,  tone: 'neutro' },
 ]
 
-/** A partir de quantos dias o lead entra na lista de parados. */
+/**
+ * Dois limites, porque são dois usos.
+ *
+ * `DIAS_ATENCAO` é a porta da tela de Gestão de Leads: tudo que já merece um toque.
+ * `DIAS_PARADO` é o resumo do dashboard, que mostra só o que já dói — cockpit com
+ * lista de três dias de atraso vira ruído e o corretor para de olhar.
+ */
+export const DIAS_ATENCAO = GRAVIDADES[GRAVIDADES.length - 1].desde
 export const DIAS_PARADO = 7
+
+/** Prioridade do follow-up, no vocabulário de prioridade (não de gravidade). */
+export function prioridadeDoFollowUp(dias: number): { label: string; tone: 'bad' | 'warn' | 'neutro' } {
+  const g = gravidadeDoAtraso(dias).id
+  if (g === 'critico' || g === 'alto') return { label: 'Prioridade Alta', tone: 'bad' }
+  if (g === 'moderado') return { label: 'Prioridade Média', tone: 'warn' }
+  return { label: 'Prioridade Baixa', tone: 'neutro' }
+}
 
 export function gravidadeDoAtraso(dias: number): { id: Gravidade; label: string; tone: 'bad' | 'warn' | 'neutro' } {
   // GRAVIDADES está em ordem decrescente de `desde`: a primeira que couber vale.
