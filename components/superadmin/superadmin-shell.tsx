@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { NavRolavel } from '@/components/layout/nav-rolavel'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, LineChart, ScrollText, ShieldCheck, LogOut,
@@ -39,22 +40,22 @@ export function SuperAdminShell({ userName = 'Super Admin', children }: { userNa
 
   const Nav = ({ onNavigate }: { onNavigate?: () => void }) => (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3.5">
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-line-soft px-4 py-3.5">
         <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px]" style={{ background: ADMIN_COR }}><ShieldAlert size={15} strokeWidth={1.7} className="text-white" /></div>
         <div className="min-w-0 leading-tight">
           <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-ink">Super Admin</div>
           <div className="text-[10px] font-medium text-ink-3">Painel da plataforma</div>
         </div>
       </div>
-      {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
-          sai da tela em vez de o menu ganhar rolagem. */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      {/* Rolagem, aviso de corte e "ir até o item ativo" — ver NavRolavel. */}
+      <NavRolavel classeGradiente="from-raised" className="px-2 py-2.5">
         <div className="space-y-px">
           {navItems.map((item) => {
             const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
             const Icon = item.icon
             return (
               <Link key={item.href} href={item.href} onClick={onNavigate}
+                data-ativo={isActive || undefined}
                 style={isActive ? { color: ADMIN_COR } : undefined}
                 className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
                   isActive ? 'bg-[#6D28D9]/[0.10] font-semibold' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
@@ -64,8 +65,8 @@ export function SuperAdminShell({ userName = 'Super Admin', children }: { userNa
             )
           })}
         </div>
-      </nav>
-      <div className="border-t border-line-soft px-3 py-2.5">
+      </NavRolavel>
+      <div className="shrink-0 border-t border-line-soft px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: ADMIN_COR }}>{userName.slice(0, 2).toUpperCase()}</span>
           <div className="min-w-0 flex-1 leading-tight">

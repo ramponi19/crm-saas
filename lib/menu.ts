@@ -84,7 +84,24 @@ export interface MenuOverridesSuperadmin {
 export interface MenuConfigDono {
   hidden?: string[]
   labels?: Record<string, string>
+  /**
+   * Ordem escolhida pelo DONO, arrastando em /admin/meu-menu.
+   *
+   * Mesma forma do layout do segmento — grupo -> hrefs, mais `__grupos` com a
+   * ordem das caixas. É a última camada, então vence o segmento: quem usa a loja
+   * todo dia sabe melhor que o molde da vertical em que ordem trabalha.
+   */
+  ordem?: Record<string, string[]>
 }
+
+/**
+ * Chave especial dentro do layout: a ordem dos GRUPOS, não de itens.
+ *
+ * Vive no mesmo objeto porque salvar ordem de item e de grupo em dois campos
+ * separados abriria a porta para os dois discordarem. O prefixo com dois
+ * sublinhados evita colisão com um grupo que alguém chame de "grupos".
+ */
+export const CHAVE_GRUPOS = '__grupos'
 
 /** Config do segmento vinda do banco (segmentos_config) — sobrepõe o SEGMENTOS estático. */
 export interface SegOverride {
@@ -93,6 +110,8 @@ export interface SegOverride {
   modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]
   /** Opt-in: hrefs habilitados neste segmento (novo modelo). Se presente, tem precedência. */
   habilitados?: string[]
+  /** Ordem do menu definida pelo superadmin na tela de Segmentos (segmentos_config.menu_layout). */
+  menuLayout?: Record<string, string[]>
 }
 
 export interface ResolverMenuInput {
@@ -325,12 +344,29 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   }
 
   /**
-   * Ordem declarada pelo segmento (`menuLayout`), aplicada por último.
+   * ORDEM DO MENU, aplicada por último e EM CAMADAS.
    *
    * Roda depois de tudo — opt-in, ocultos, papel e plano — para reordenar apenas o
-   * que sobrou. Grupo que ficou vazio sai: "Comercial" sem itens é cabeçalho solto.
+   * que sobrou. As camadas, da mais genérica para a mais específica:
+   *   1. código      (`seg.menuLayout`, o molde da vertical)
+   *   2. superadmin  (`segOverride.menuLayout`, editável na tela de Segmentos)
+   *   3. dono        (`configDono.ordem`, arrastado em /admin/meu-menu)
+   *
+   * A mescla é RASA de propósito: quem declara "Hoje" manda em "Hoje" inteiro, e
+   * não em metade dele. Mescla profunda produziria uma ordem que ninguém escolheu
+   * — pedaço do dono intercalado com pedaço do molde.
+   *
+   * Grupo ausente do layout conserva a ordem do catálogo, e item que ninguém
+   * declarou fica no fim do grupo dele: módulo novo aparece em vez de sumir.
    */
-  for (const [grupo, hrefs] of Object.entries(seg.menuLayout ?? {})) {
+  const layout: Record<string, string[]> = {
+    ...(seg.menuLayout ?? {}),
+    ...(segOverride?.menuLayout ?? {}),
+    ...(configDono?.ordem ?? {}),
+  }
+  for (const [grupo, hrefs] of Object.entries(layout)) {
+    if (grupo === CHAVE_GRUPOS) continue
+    if (!Array.isArray(hrefs)) continue
     const trazidos: MenuItem[] = []
     for (const href of hrefs) {
       for (const g of out) {
@@ -342,6 +378,20 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
     const alvo = out.find((g) => g.label === grupo)
     if (alvo) alvo.items = [...trazidos, ...alvo.items]
     else out.push({ label: grupo, items: trazidos })
+  }
+
+  /**
+   * Ordem das CAIXAS. Grupo fora da lista vai para o fim, na ordem em que estava —
+   * assim um grupo novo (criado por um módulo extra) não desaparece do menu nem
+   * salta para o topo por acidente.
+   */
+  const ordemGrupos = layout[CHAVE_GRUPOS]
+  if (Array.isArray(ordemGrupos) && ordemGrupos.length > 0) {
+    const posicao = (label: string) => {
+      const i = ordemGrupos.indexOf(label)
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i
+    }
+    out.sort((a, b) => posicao(a.label) - posicao(b.label))
   }
 
   return out.filter((g) => g.items.length > 0)

@@ -204,5 +204,28 @@ v "caixa nao aparece na aba comissao"  "app/(dashboard)/financeiro/components/fi
 v "conta do lancamento aparece antes"  "components/modules/financeiro/comissoes-imob.tsx" "Fica com a casa"
 v "cashback maior que a casa avisa"    "components/modules/financeiro/comissoes-imob.tsx" "cashbackCabe(conta, cashbackNum)"
 v "executivo ignora imovel nulo"       "app/(dashboard)/executivo/page.tsx" "filter((id): id is number"
+echo "== menu configuravel e rolagem (20/08) =="
+# Salvar segmento zerava hidden_hrefs e modulos_extra: era ?? [] em campo que a
+# tela nem manda. Foi como a imobiliaria perdeu os extras do menu.
+v "salvar segmento nao zera campo"     "app/api/superadmin/segmentos/route.ts" "SALVAR É REMENDO"
+v "campo ausente conserva o banco"     "app/api/superadmin/segmentos/route.ts" "vindo !== undefined ? vindo"
+v "ordem do menu tem coluna"           "app/superadmin/segmentos/segmentos-view.tsx" "menu_layout: form.menu_layout"
+v "ordem em camadas no resolvedor"     "lib/menu.ts" "configDono?.ordem ?? {}"
+v "chave dos grupos e unica"           "lib/menu.ts" "CHAVE_GRUPOS = "
+v "dono salva a ordem"                 "app/api/menu-config/route.ts" "body.ordem ?? {}"
+v "arrastar entre grupos move"         "components/layout/menu-ordenavel.tsx" "alvo.slice(6)"
+# Alca, e nao a linha toda: senao clicar no campo de renomear arrastaria o item.
+v "arraste sai da alca"                "components/layout/menu-ordenavel.tsx" "aria-label={.Reordenar"
+v "grupo vazio aceita soltar"          "components/layout/menu-ordenavel.tsx" "useDroppable({ id: .grupo:"
+v "setas existem ao lado do arraste"   "components/layout/menu-ordenavel.tsx" "aria-label=\"Descer\""
+# O menu cortava sem aviso e nem rolava ate a pagina aberta (medido em /ranking).
+v "menu rola ate o item ativo"         "components/layout/nav-rolavel.tsx" "scrollIntoView({ block: .nearest. })"
+v "aviso de conteudo escondido"        "components/layout/nav-rolavel.tsx" "cortado.abaixo"
+v "item ativo marcado no CRM"          "components/layout/sidebar.tsx" "data-ativo={isActive || undefined}"
+v "rodape nao encolhe"                 "components/layout/sidebar.tsx" "shrink-0 px-3 py-2.5"
+v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "segmentos_config"
+# A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
+# salvava e nada acontecia.
+n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
