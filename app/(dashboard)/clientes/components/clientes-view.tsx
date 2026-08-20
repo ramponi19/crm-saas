@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, UserPlus, Users, SlidersHorizontal } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, UserPlus, Users, SlidersHorizontal, GitMerge } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
-import { Card, Table, Input, Button, Badge, EmptyState, Select, type Column } from '@/components/ui'
+import { Card, Table, Input, Button, Badge, EmptyState, Select, notify, type Column } from '@/components/ui'
 import ClienteModal from './cliente-modal'
 import ClienteModalImob from './cliente-modal-imob'
+import FundirLeadsModal from './fundir-leads-modal'
 import { TIPO_NEGOCIO, STATUS_APROVACAO, rotuloTipoNegocio, statusAprovacao } from './cliente-imob-tipos'
 
 interface Cliente {
@@ -89,7 +91,9 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
   const [modalOpen, setModalOpen] = useState(false)
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
   const [isNew, setIsNew] = useState(false)
+  const router = useRouter()
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
+  const [fundir, setFundir] = useState(false)
   const [fCorretor, setFCorretor] = useState('')
   const [fTipo, setFTipo] = useState('')
   const [fStatus, setFStatus] = useState('')
@@ -224,8 +228,16 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
             <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Clientes</h1>
             <p className="mt-0.5 text-[13px] text-ink-2">Gerencie seus clientes e leads</p>
           </div>
-          {/* "Fundir Leads" é a próxima fatia: o botão só aparece quando existir a
-              tela, para o menu não prometer o que ainda não abre. */}
+          {/* Fundir precisa de pelo menos dois cadastros para fazer sentido. */}
+          {clientes.length > 1 && (
+            <Button
+              variant="outline"
+              icon={<GitMerge size={15} strokeWidth={1.7} />}
+              onClick={() => setFundir(true)}
+            >
+              Fundir Leads
+            </Button>
+          )}
         </div>
       )}
 
@@ -277,6 +289,20 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
           />
         </Card>
       </div>
+
+      {fundir && (
+        <FundirLeadsModal
+          clientes={clientes.map((c) => ({ id: c.id, nome: c.nome, cpf_cnpj: c.cpf_cnpj, telefone: c.telefone, email: c.email }))}
+          onClose={() => setFundir(false)}
+          onFundido={(resumo) => {
+            setFundir(false)
+            notify.ok('Cadastros unificados', resumo)
+            // A lista vem do servidor: sem recarregar, o cliente removido continuaria
+            // na tela e alguém tentaria abrir um registro que já não existe.
+            router.refresh()
+          }}
+        />
+      )}
 
       {modalOpen && (imob ? (
         <ClienteModalImob
