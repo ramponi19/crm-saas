@@ -218,8 +218,14 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
             Filtro por corretor — só para quem pode ver o lead do colega.
             Com `restringe`, o servidor já mandou apenas os leads dele: o filtro
             não teria o que filtrar e sugeriria acesso que ele não tem.
+
+            NÃO condicionar a "ter mais de um corretor": a versão anterior escondia
+            o filtro em empresa de uma pessoa só, e foi assim que ele nasceu
+            invisível para o dono da imobiliária, que ainda não cadastrou a equipe.
+            Recurso que aparece sozinho quando o segundo usuário entra é recurso
+            que ninguém descobre — e, na avaliação do CRM, é recurso que não existe.
           */}
-          {!restringe && usuarios.length > 1 && (
+          {!restringe && (
             <div className="flex items-center gap-1.5">
               <Filter size={15} strokeWidth={1.8} className="shrink-0 text-ink-3" />
               <Select

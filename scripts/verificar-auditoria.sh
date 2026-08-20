@@ -105,7 +105,8 @@ v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
 
 echo "== pipeline (19/08) =="
 v "pipeline filtra por corretor"       "components/modules/leads/leads-view.tsx" "Filtrar por corretor"
-v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "!restringe && usuarios.length > 1"
+v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "{!restringe && ("
+n "filtro nao exige equipe montada"    "components/modules/leads/leads-view.tsx" "restringe && usuarios.length > 1"
 v "esteira e corretor sao exclusivos"  "components/modules/leads/leads-view.tsx" "if (corretorId) return leadsDoFunilBase.filter"
 
 echo "== funil: uma verdade so (19/08) =="
