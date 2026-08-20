@@ -55,7 +55,15 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
    * Editar meta continua sendo de dono/admin: a view recebe `isAdmin` e esconde
    * criar e excluir, e a rota /api/ranking/metas confere de novo.
    */
-  const abertoAoTime = Array.isArray(extrasBanco)
+  /**
+   * `modulos_extra = []` no banco é "não configurado", não "nenhum extra".
+   *
+   * Escrito `Array.isArray(extrasBanco) ? ... : ...`, o array vazio — o estado real
+   * da imobiliária em 20/08/2026 — respondia "o segmento não declarou /ranking" e
+   * mandava todo corretor para o /dashboard, na mesma tela que o dono abriu ao time.
+   * O menu tinha o gêmeo exato deste bug (ver `lib/menu.ts`).
+   */
+  const abertoAoTime = Array.isArray(extrasBanco) && extrasBanco.length > 0
     ? extrasBanco.some((m) => m?.href === '/ranking')
     : moduloDoSegmento(empresa?.segmento, '/ranking')
   if (!isAdmin && !abertoAoTime) redirect('/dashboard')
@@ -66,7 +74,8 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
    * A consulta é feita AQUI porque só esta página sabe o segmento; `calcularRanking`
    * recebe o número pronto e segue neutro. Quem não capta ativo nem paga a consulta.
    */
-  const captaImovel = !!SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.captacaoDeImovel
+  const seg = SEGMENTOS[normalizarSegmento(empresa?.segmento)]
+  const captaImovel = !!seg.capacidades.captacaoDeImovel
   const janela = janelaDoPeriodo(periodo)
   const captacoesImovel = captaImovel
     ? await imoveisCaptadosPorPessoa(supabase, empresaId, janela.ini, janela.fim)
@@ -75,7 +84,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const [linhas, { data: metasRaw }, { data: membrosRaw }] = await Promise.all([
     calcularRanking(supabase, empresaId, periodo, { imoveisCaptados: captacoesImovel }),
     supabase.from('metas').select('id, escopo, usuario_id, tipo, alvo, periodo').eq('empresa_id', empresaId).eq('periodo', periodo).order('id', { ascending: true }),
-    supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('empresa_usuarios').select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
   const linhaByUser = new Map(linhas.map((l) => [l.usuario_id, l]))
@@ -92,8 +101,31 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
     }
   })
 
-  type MembroRow = { usuario_id: string; usuarios: Embed<{ nome: string | null }> }
-  const membros: MembroOpt[] = ((membrosRaw ?? []) as unknown as MembroRow[]).map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))
+  type MembroRow = { usuario_id: string; role: string | null; usuarios: Embed<{ nome: string | null }> }
+  const membrosRows = (membrosRaw ?? []) as unknown as MembroRow[]
+  const membros: MembroOpt[] = membrosRows.map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))
 
-  return <RankingView periodo={periodo} linhas={linhas} metas={metas} membros={membros} isAdmin={isAdmin} mostrarImoveis={captaImovel} />
+  /**
+   * O PAPEL vai junto do nome, como no CRM que o dono usa.
+   *
+   * Uma linha de ranking sem papel obriga a decorar quem é corretor e quem é
+   * administração — e comparar o placar de um gerente com o de quem roda a rua é
+   * o mal-entendido clássico de placar de equipe. Vem desta consulta, que a página
+   * já fazia para o seletor de pessoa das metas; `lib/ranking` segue neutro.
+   */
+  const papeis: Record<string, string> = {}
+  for (const m of membrosRows) papeis[m.usuario_id] = m.role ?? 'member'
+
+  return (
+    <RankingView
+      periodo={periodo}
+      linhas={linhas}
+      metas={metas}
+      membros={membros}
+      papeis={papeis}
+      isAdmin={isAdmin}
+      mostrarImoveis={captaImovel}
+      equipeLabel={seg.equipeLabel ?? 'Vendedor'}
+    />
+  )
 }

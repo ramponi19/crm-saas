@@ -10,7 +10,7 @@ import { EmpresaProvider } from '@/lib/empresa-context'
 import { RotulosProvider } from '@/components/layout/rotulos-context'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { normalizarSegmento, SEGMENTOS } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
 import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
@@ -134,11 +134,16 @@ export default async function DashboardLayout({
       <div className="flex h-[100dvh] overflow-hidden bg-bg">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
+          /*
+            "Vendedor" vira o nome que o segmento usa — "Corretor" na imobiliária.
+            O ranking já chamava a mesma pessoa de corretor: sem isto, o rodapé do
+            menu e a tabela do placar discordavam sobre o cargo de quem está logado.
+          */
           userRole={
             role === 'owner' ? 'Proprietário'
               : role === 'admin' ? 'Administrador'
               : role === 'tecnico' ? 'Técnico'
-              : 'Vendedor'
+              : (SEGMENTOS[normalizarSegmento(empresa?.segmento)].equipeLabel ?? 'Vendedor')
           }
           userEmpresa={empresa?.nome}
           leadsCount={leadsCount ?? 0}

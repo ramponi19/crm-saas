@@ -295,7 +295,19 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
    * do time dele. Quem depende de papel trava na própria página.
    */
   const noCatalogo = new Set(CATALOGO.flatMap((g) => g.items).map((i) => i.href))
-  const extras = segOverride?.modulosExtra ?? seg.modulosExtra ?? []
+  /**
+   * LISTA VAZIA DO BANCO NÃO É "NENHUM EXTRA" — É "NÃO CONFIGURADO".
+   *
+   * Era `segOverride?.modulosExtra ?? seg.modulosExtra`: com `modulos_extra = []`
+   * em `segmentos_config` (o estado real da imobiliária em 20/08/2026), o array
+   * vazio NÃO é nulo, então vencia o código e derrubava todos os extras. Foi assim
+   * que "Metas e Ranking" sumiu do menu dela — e, junto, o acesso do corretor à
+   * tela, que se apoia na mesma declaração.
+   *
+   * Mesma regra que já vale para `modulos_habilitados`: lista vazia não bloqueia,
+   * ela só não diz nada. Para TIRAR um extra existe `hidden_hrefs`.
+   */
+  const extras = segOverride?.modulosExtra?.length ? segOverride.modulosExtra : (seg.modulosExtra ?? [])
   for (const ex of extras) {
     if (noCatalogo.has(ex.href)) continue
     if (!habilitados.has(ex.href)) continue

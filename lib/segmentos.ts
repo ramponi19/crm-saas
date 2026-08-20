@@ -69,6 +69,15 @@ export interface SegmentoConfig {
    * arquivo mais disputado do projeto. Agora cada segmento declara o seu.
    */
   interesseLabel: string
+  /**
+   * Como o segmento chama quem vende. Padrão "Vendedor".
+   *
+   * O ranking e as metas comparam pessoas, e na imobiliária essa pessoa é o
+   * CORRETOR — era uma coluna "Vendedor" numa tela que o dono lê como placar da
+   * corretagem. Fica aqui, e não numa capacidade booleana, porque é vocabulário:
+   * um segmento novo escreve o dele sem tocar em tela nenhuma.
+   */
+  equipeLabel?: string
 
   /**
    * Painéis de vertical que aparecem no modal do lead, na ordem.
@@ -220,6 +229,9 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
        */
       '/metas': 'Meta da empresa',
       '/executivo': 'Dashboard Executivo',
+      /* O menu diz "Metas e Ranking"; sem isto a barra do topo da MESMA tela dizia
+         "Ranking & Metas" — dois nomes para o mesmo lugar. */
+      '/ranking': 'Metas e Ranking',
     },
     // Agenda e Tarefas passaram ao núcleo (grupo "Hoje", todos os segmentos) — ver lib/menu.
     modulosExtra: [
@@ -246,6 +258,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
      */
     menuLayout: { Hoje: ['/dashboard', '/leads', '/agenda', '/tarefas', '/chat'] },
     interesseLabel: 'Imóvel interessado',
+    equipeLabel: 'Corretor',
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
     capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },
