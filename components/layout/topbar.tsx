@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from './command-palette'
+import { useRotuloDaRota } from './rotulos-context'
 
 interface TopbarProps {
   eyebrow?: string
@@ -34,6 +35,14 @@ const periods = [
 
 export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', onPeriodChange }: TopbarProps) {
   const router = useRouter()
+  /**
+   * O nome que o segmento deu à tela vence o título escrito aqui dentro.
+   *
+   * Sem isto, renomear no menu deixava as duas metades da mesma página discordando:
+   * "Pipeline" na lateral, "Leads" no topo.
+   */
+  const rotuloDoSegmento = useRotuloDaRota()
+  const titulo = rotuloDoSegmento ?? title
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotifLead[]>([])
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -121,7 +130,7 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
 
   return (
     <header suppressHydrationWarning className="z-10 flex h-[52px] shrink-0 items-center gap-3 border-b border-line-soft bg-card/90 px-5 backdrop-blur-md">
-      <span className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-ink">{title}</span>
+      <span className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-ink">{titulo}</span>
 
       <div className="flex-1" />
 

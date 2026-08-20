@@ -154,5 +154,10 @@ v "confirmacao exige digitar o nome"   "app/(dashboard)/clientes/components/fund
 v "os tres passos do modelo"           "app/(dashboard)/clientes/components/fundir-leads-modal.tsx" "SECUNDÁRIO (será removido)"
 v "lista recarrega apos fundir"        "app/(dashboard)/clientes/components/clientes-view.tsx" "router.refresh()"
 
+echo "== rotulo do topo (20/08) =="
+v "topo respeita rotulo do segmento"   "components/layout/topbar.tsx" "const titulo = rotuloDoSegmento ?? title"
+v "layout passa os rotulos"            "app/(dashboard)/layout.tsx" "RotulosProvider valor="
+v "rotulo resolve pela raiz da rota"   "components/layout/rotulos-context.tsx" "const raiz = ./. + (pathname.split"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

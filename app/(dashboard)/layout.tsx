@@ -7,6 +7,7 @@ import { LimiteBanner } from '@/components/layout/limite-banner'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
+import { RotulosProvider } from '@/components/layout/rotulos-context'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { normalizarSegmento } from '@/lib/segmentos'
@@ -170,7 +171,14 @@ export default async function DashboardLayout({
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <LimiteBanner />
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+          {/*
+            Os rótulos do segmento chegam à barra do topo de cada tela.
+            Mesma precedência do menu: segmento, depois superadmin, depois o dono —
+            senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
+          */}
+          <RotulosProvider valor={{ ...(segOverride?.labelOverrides ?? {}), ...(mo?.labels ?? {}), ...(menuConfig?.labels ?? {}) }}>
+            <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+          </RotulosProvider>
         </div>
       </div>
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
