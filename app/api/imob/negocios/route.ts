@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
-import { calcularComissao, mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
+import { calcularComissao, calcularComissaoPorPercentual, cashbackCabe, mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 
 /**
  * Negócio fechado da imobiliária — venda ou locação de um imóvel.
@@ -26,6 +26,19 @@ const STATUS_IMOVEL_POR_TIPO: Record<string, string> = { venda: 'vendido', locac
 
 interface CorpoNovo {
   imovel_id?: number
+  /**
+   * 'manual' = comissão lançada à mão, sem imóvel cadastrado nem lead no funil.
+   *
+   * É como o CRM do dono trabalha: a comissão é o registro, e o imóvel entra como
+   * código digitado. Serve para venda antiga, contrato importado e acerto por fora
+   * — dinheiro que existe e, sem isto, ficava fora do painel.
+   */
+  origem?: string
+  cliente_nome?: string | null
+  imovel_codigo?: string | null
+  /** % da comissão combinado NAQUELE negócio (só no lançamento manual). */
+  percentual?: number | string
+  cashback_percentual?: number | string
   cashback?: number | string
   lead_id?: number | null
   cliente_id?: number | null
@@ -49,8 +62,9 @@ export async function POST(req: Request) {
   const tipo = TIPOS.includes(b.tipo as never) ? (b.tipo as string) : null
   const valor = Number(b.valor)
 
-  if (!b.imovel_id) return NextResponse.json({ error: 'Escolha o imóvel do negócio' }, { status: 400 })
   if (!tipo) return NextResponse.json({ error: 'Diga se é venda ou locação' }, { status: 400 })
+  if (b.origem === 'manual') return lancarComissaoManual(b, tipo, valor, empresaId, userId, auth.role)
+  if (!b.imovel_id) return NextResponse.json({ error: 'Escolha o imóvel do negócio' }, { status: 400 })
   /**
    * Valor obrigatório e maior que zero.
    *
@@ -122,7 +136,8 @@ export async function POST(req: Request) {
     comissao_captador: com.captador,
     comissao_vendedor: com.vendedor,
     cashback,
-    comissao_status: 'prevista',
+    comissao_status: 'pendente',
+    origem: 'funil',
   } as never).select('id').single<{ id: number }>()
 
   if (error) {
@@ -154,6 +169,97 @@ export async function POST(req: Request) {
     comissao: com,
     imovelBaixado: !!baixado,
     aviso: baixado ? null : 'O negócio foi registrado, mas o imóvel não saiu de disponível — confira a ficha dele.',
+  })
+}
+
+/**
+ * Comissão lançada à mão — sem imóvel, sem lead, sem baixar estoque.
+ *
+ * SÓ DONO E ADMIN. Registrar comissão à mão é dizer que a casa deve dinheiro a
+ * alguém, sem nenhum negócio no funil para conferir; deixar isso na mão de quem
+ * recebe seria assinar o próprio recibo. Fechar negócio de verdade continua sendo
+ * trabalho do corretor (o POST normal aceita 'vendedor').
+ *
+ * O percentual vem DIGITADO: é o que foi combinado naquele acerto. O rateio entre
+ * captador, vendedor e casa segue a regra da loja — e sem captador informado, a
+ * parte dele fica com a casa, e não reservada para ninguém.
+ */
+async function lancarComissaoManual(
+  b: CorpoNovo, tipo: string, valor: number, empresaId: number, userId: string, role: string,
+) {
+  if (!['owner', 'admin'].includes(role)) {
+    return NextResponse.json({ error: 'Só o dono ou um admin pode lançar comissão à mão.' }, { status: 403 })
+  }
+  const cliente = (b.cliente_nome ?? '').trim()
+  if (!cliente) return NextResponse.json({ error: 'Informe o nome do cliente' }, { status: 400 })
+  if (!b.corretor_id) return NextResponse.json({ error: 'Escolha o corretor da comissão' }, { status: 400 })
+  const pct = Number(b.percentual)
+  /**
+   * Percentual obrigatório e maior que zero: comissão de 0% é registro que não
+   * paga ninguém — o mesmo furo do negócio de R$ 0,00, só mais difícil de ver
+   * porque o valor do negócio aparece cheio na tabela.
+   */
+  if (!(pct > 0)) return NextResponse.json({ error: 'Informe o % de comissão combinado' }, { status: 400 })
+  if (pct > 100) return NextResponse.json({ error: 'O % de comissão não pode passar de 100' }, { status: 400 })
+
+  const svc = createServiceClient()
+
+  // O corretor é DESTA empresa? Id vindo do navegador nunca decide sozinho.
+  const { data: vinculo } = await svc.from('empresa_usuarios')
+    .select('usuario_id').eq('empresa_id', empresaId).eq('usuario_id', b.corretor_id).eq('ativo', true).maybeSingle()
+  if (!vinculo) return NextResponse.json({ error: 'Corretor não encontrado nesta empresa' }, { status: 404 })
+
+  const { data: cfgRow } = await svc.from('configuracoes_sistema')
+    .select('valor').eq('empresa_id', empresaId).eq('chave', 'comissao_imob').maybeSingle()
+  const taxas = mesclarTaxas((cfgRow?.valor ?? null) as Partial<TaxasComissao> | null)
+
+  const pctCashback = Math.min(100, Math.max(0, Number(b.cashback_percentual) || 0))
+  const cashback = Math.round(valor * (pctCashback / 100) * 100) / 100
+  const captadorId = b.captador_id ?? null
+  const com = calcularComissaoPorPercentual(pct, valor, taxas, cashback, {
+    captador: !!captadorId, vendedor: true,
+  })
+
+  const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
+    empresa_id: empresaId,
+    origem: 'manual',
+    imovel_id: null,
+    imovel_codigo: (b.imovel_codigo ?? '').trim() || null,
+    cliente_nome: cliente,
+    lead_id: null,
+    cliente_id: null,
+    tipo,
+    valor,
+    corretor_id: b.corretor_id,
+    captador_id: captadorId,
+    // Comissão à mão não move funil de negócio: nasce e morre no financeiro.
+    status: 'finalizado',
+    assinado_em: b.assinado_em ?? null,
+    observacoes: b.observacoes?.trim() || null,
+    criado_por: userId,
+    percentual: com.percentual,
+    comissao_total: com.total,
+    comissao_captador: com.captador,
+    comissao_vendedor: com.vendedor,
+    cashback,
+    cashback_percentual: pctCashback || null,
+    comissao_status: 'pendente',
+  } as never).select('id').single<{ id: number }>()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({
+    ok: true,
+    id: negocio.id,
+    comissao: com,
+    /**
+     * Cashback maior que a parte da casa não é bloqueado — pode ter sido o
+     * combinado —, mas é DITO. Silenciar isso deixaria a casa em zero e o dono
+     * procurando o dinheiro que faltou.
+     */
+    aviso: cashbackCabe(com, cashback)
+      ? null
+      : 'O cashback informado é maior que a parte da casa neste negócio — a casa fica em zero.',
   })
 }
 
@@ -201,13 +307,36 @@ export async function PATCH(req: Request) {
       error: 'Só o dono ou um admin pode marcar comissão como paga.',
     }, { status: 403 })
   }
+  /**
+   * O ciclo da comissão: pendente → aprovada → paga, e cancelada a qualquer momento.
+   *
+   * "Aprovada" existe para separar duas decisões que o dono toma em dias
+   * diferentes: reconhecer que a comissão é devida, e pagá-la. Sem esse meio, o
+   * único jeito de dizer "conferi, está certo" era marcar como paga — e aí a
+   * tabela dizia que o dinheiro saiu quando ele não saiu.
+   *
+   * As datas são do SERVIDOR: data de pagamento vinda do navegador é o relógio de
+   * quem clicou, e comissão paga é dinheiro que saiu, não palpite de fuso.
+   */
+  const hojeIso = () => {
+    const h = new Date()
+    return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`
+  }
   if (b.comissao_status === 'paga') {
     patch.comissao_status = 'paga'
-    const hoje = new Date()
-    patch.comissao_paga_em = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
-  } else if (b.comissao_status === 'prevista') {
-    patch.comissao_status = 'prevista'
+    patch.comissao_paga_em = hojeIso()
+  } else if (b.comissao_status === 'aprovada') {
+    patch.comissao_status = 'aprovada'
+    patch.comissao_aprovada_em = hojeIso()
+    // Voltar de paga para aprovada apaga a data de pagamento: o dinheiro não saiu.
     patch.comissao_paga_em = null
+  } else if (b.comissao_status === 'cancelada') {
+    patch.comissao_status = 'cancelada'
+    patch.comissao_paga_em = null
+  } else if (b.comissao_status === 'pendente') {
+    patch.comissao_status = 'pendente'
+    patch.comissao_paga_em = null
+    patch.comissao_aprovada_em = null
   }
   for (const campo of ['vistoria_em', 'chaves_entregues_em', 'assinado_em', 'observacoes'] as const) {
     if (campo in b) patch[campo] = (b[campo] || null) as string | null
@@ -228,7 +357,12 @@ export async function PATCH(req: Request) {
    * índice único liberaria um negócio novo num imóvel que a tela mostra como
    * indisponível. Duas verdades sobre o mesmo imóvel.
    */
-  if (patch.status === 'cancelado') {
+  /**
+   * `atual.imovel_id` pode ser nulo desde a comissão lançada à mão (20/08/2026):
+   * sem esta guarda, cancelar uma comissão avulsa mandaria um update com
+   * `id = null` — que não acha nada, mas é consulta escrita por engano.
+   */
+  if (patch.status === 'cancelado' && atual.imovel_id) {
     await svc.from('imoveis')
       .update({ status: 'disponivel' } as never)
       .eq('id', atual.imovel_id).eq('empresa_id', empresaId)

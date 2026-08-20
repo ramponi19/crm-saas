@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Copy, Check, ExternalLink, Trash2, Receipt } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { ComissoesImob, type NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
+import { ComissoesImob, type NegocioComissao, type MembroEquipe } from '@/components/modules/financeiro/comissoes-imob'
 import type { TaxasComissao } from '@/lib/comissao-imob'
 import type { TablesInsert } from '@/types/database'
 import { Topbar } from '@/components/layout/topbar'
@@ -64,12 +64,18 @@ interface Props {
    */
   comissoesNegocio?: NegocioComissao[] | null
   taxasComissao?: TaxasComissao | null
+  /** Equipe para o filtro por corretor e para o lançamento manual. */
+  equipeComissao?: MembroEquipe[]
   podeQuitarComissao?: boolean
 }
 
 /**
- * Abas base, comuns a todo segmento. A imobiliária ganha "Comissões" no fim quando
- * declara a capacidade — ver `abas` no corpo do componente.
+ * Abas base, comuns a todo segmento.
+ *
+ * A imobiliária ganha "Comissões" — e ganha NA FRENTE, como aba de entrada: no CRM
+ * dela o Financeiro É o acompanhamento de comissão e cashback, e o livro-caixa é
+ * gestão da empresa (que vai para a área do dono). Ver `abas` no corpo do
+ * componente.
  */
 const TABS = [
   { key: 'fluxo',      label: 'Fluxo de Caixa'  },
@@ -105,13 +111,14 @@ const naoCancelado = (s: string | null) => s !== 'cancelado'
 export default function FinanceiroView({
   lancamentos: initial, categorias, cobrancas: initialCobrancas, empresaId,
   faturamentoVendas = 0, qtdVendas = 0,
-  comissoesNegocio = null, taxasComissao = null, podeQuitarComissao = false,
+  comissoesNegocio = null, taxasComissao = null, equipeComissao = [], podeQuitarComissao = false,
 }: Props) {
   const supabase = createClient()
-  const [tab, setTab] = useState('fluxo')
   // A aba só existe quando o segmento a declara; nenhum outro paga por ela.
-  const abas = comissoesNegocio && taxasComissao
-    ? [...TABS, { key: 'comissoes', label: 'Comissões' }]
+  const temComissoes = !!(comissoesNegocio && taxasComissao)
+  const [tab, setTab] = useState(temComissoes ? 'comissoes' : 'fluxo')
+  const abas = temComissoes
+    ? [{ key: 'comissoes', label: 'Comissões' }, ...TABS]
     : TABS
   const [lancamentos, setLancamentos] = useState(initial)
   const [cobrancas, setCobrancas] = useState(initialCobrancas)
@@ -310,6 +317,13 @@ export default function FinanceiroView({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Financeiro" />
+      {/*
+        O subtítulo diz de que financeiro esta tela fala. Sem ele, "Financeiro"
+        abrindo em comissões parecia a tela de caixa mostrando outra coisa.
+      */}
+      {temComissoes && tab === 'comissoes' && (
+        <p className="px-6 pt-4 text-[13px] text-ink-2">Gestão de comissões e cashback</p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
@@ -318,7 +332,7 @@ export default function FinanceiroView({
               O "Resultado líquido" soma apenas lançamentos; venda concluída não gera
               lançamento. Quem registra o aluguel e não lança as vendas vê prejuízo
               permanente, enquanto o Dashboard mostra faturamento no mesmo dia. */}
-          {faturamentoVendas > 0 && (
+          {faturamentoVendas > 0 && tab !== 'comissoes' && (
             <div className="rounded-control border border-warn/40 bg-warn-soft px-3.5 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
               <strong className="text-ink">As vendas não entram nestes números.</strong>{' '}
               Houve <strong className="text-ink">{fmtBRL(faturamentoVendas)}</strong> em {qtdVendas} venda
@@ -328,8 +342,13 @@ export default function FinanceiroView({
             </div>
           )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          {/*
+            Cartões do CAIXA — escondidos na aba de comissões.
+            Lá o dinheiro é outro (comissão prevista, paga, cashback), e dois blocos
+            de números diferentes empilhados na mesma tela fazem o dono somar o que
+            não se soma.
+          */}
+          <div className={`grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r ${tab === 'comissoes' ? 'hidden' : ''}`}>
             <StatCard bare label="À receber" value={fmtBRL(stats.aReceber)} delta={`${listaReceber.length} lançamentos`} deltaTone="ok" />
             <StatCard bare label="À pagar" value={fmtBRL(stats.aPagar)} delta={`${listaPagar.length} contas em aberto`} deltaTone="warn" />
             <StatCard bare label="Despesas (total)" value={fmtBRL(stats.despesas)} delta="custo operacional" deltaTone="neutral" />
@@ -392,6 +411,7 @@ export default function FinanceiroView({
           {/* Comissões: existe só quando a página manda os dados (capacidade do segmento). */}
           {tab === 'comissoes' && comissoesNegocio && taxasComissao && (
             <ComissoesImob
+              equipe={equipeComissao}
               negocios={comissoesNegocio}
               taxas={taxasComissao}
               podeQuitar={podeQuitarComissao}

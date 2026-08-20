@@ -185,5 +185,24 @@ v "equipe geral e a primeira opcao"    "app/(dashboard)/ranking/ranking-view.tsx
 # Tipo fora da lista da rota virava "vendas" em silencio: a meta media outra coisa.
 v "meta de imovel captado e aceita"    "app/api/ranking/metas/route.ts" "imoveis_captados"
 n "sem opcao duplicada de fechamento"  "app/(dashboard)/ranking/ranking-view.tsx" "v: .fechamentos., l:"
+echo "== financeiro: comissoes e cashback (20/08) =="
+# Lancar comissao a mao e dizer que a casa deve dinheiro sem negocio no funil.
+v "lancar a mao exige dono ou admin"   "app/api/imob/negocios/route.ts" "pode lançar comissão à mão"
+v "corretor conferido na empresa"      "app/api/imob/negocios/route.ts" "Corretor não encontrado nesta empresa"
+# 0% passaria batido: o valor do negocio aparece cheio e a comissao sai zero.
+v "percentual obrigatorio no manual"   "app/api/imob/negocios/route.ts" "% de comissão combinado"
+v "percentual digitado tem funcao own" "lib/comissao-imob.ts" "calcularComissaoPorPercentual"
+v "os quatro status do molde"          "components/modules/financeiro/comissoes-imob.tsx" "v: .aprovada., l: .Aprovado."
+v "aprovar e pagar sao datas do server" "app/api/imob/negocios/route.ts" "comissao_aprovada_em = hojeIso()"
+# Cancelar comissao avulsa nao pode mandar update com id nulo no imovel.
+v "cancelar respeita imovel nulo"      "app/api/imob/negocios/route.ts" "cancelado. && atual.imovel_id"
+v "filtro por corretor status e tipo"  "components/modules/financeiro/comissoes-imob.tsx" "Todos os corretores"
+# Cartao somando tudo com a tabela filtrada faz o dono cobrar o valor errado.
+v "totais seguem o recorte da tela"    "components/modules/financeiro/comissoes-imob.tsx" "}, .visiveis.)"
+v "comissao abre primeiro na imob"     "app/(dashboard)/financeiro/components/financeiro-view.tsx" "temComissoes ? .comissoes. : .fluxo."
+v "caixa nao aparece na aba comissao"  "app/(dashboard)/financeiro/components/financeiro-view.tsx" "tab === .comissoes. ? .hidden."
+v "conta do lancamento aparece antes"  "components/modules/financeiro/comissoes-imob.tsx" "Fica com a casa"
+v "cashback maior que a casa avisa"    "components/modules/financeiro/comissoes-imob.tsx" "cashbackCabe(conta, cashbackNum)"
+v "executivo ignora imovel nulo"       "app/(dashboard)/executivo/page.tsx" "filter((id): id is number"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

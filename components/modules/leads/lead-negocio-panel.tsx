@@ -209,7 +209,11 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
           <div className="mt-3 rounded-control border border-line-soft bg-bg p-2.5">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[12px] font-semibold text-ink">
-                Comissão {negocio.comissao_status === 'paga' ? 'paga' : 'prevista'}
+                {/* Os quatro estados vivem no Financeiro; aqui basta a palavra certa. */}
+                Comissão {negocio.comissao_status === 'paga' ? 'paga'
+                  : negocio.comissao_status === 'aprovada' ? 'aprovada'
+                  : negocio.comissao_status === 'cancelada' ? 'cancelada'
+                  : 'pendente'}
               </span>
               <span className="num text-[13px] font-bold text-ink">{brl(negocio.comissao_total)}</span>
             </div>

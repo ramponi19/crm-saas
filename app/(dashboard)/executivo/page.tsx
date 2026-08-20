@@ -92,15 +92,21 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   type NegRow = {
     id: number; tipo: string; valor: number; status: string
     comissao_total: number | null; comissao_captador: number | null; comissao_vendedor: number | null
-    corretor_id: string | null; captador_id: string | null; imovel_id: number; lead_id: number | null
+    corretor_id: string | null; captador_id: string | null; imovel_id: number | null; lead_id: number | null
   }
   const negocios = (negRaw ?? []) as NegRow[]
 
   // ── Nomes por consulta separada (embed duplo para `usuarios` erra fácil e
   //    esvazia a consulta inteira em silêncio — ver o log de acessos de 12/08).
   const idsUsuarios = [...new Set(((membrosRaw ?? []) as { usuario_id: string }[]).map((m) => m.usuario_id))]
+  /**
+   * Comissão lançada à mão não tem imóvel cadastrado (20/08/2026), então
+   * `imovel_id` pode ser nulo — e nulo dentro do `.in()` é consulta pedindo
+   * `id = null`. Filtra antes.
+   */
   const idsImoveis = [...new Set([...negocios.map((n) => n.imovel_id),
     ...((visitasRaw ?? []) as { imovel_id: number }[]).map((v) => v.imovel_id)])]
+    .filter((id): id is number => id != null)
   const [{ data: nomesU }, { data: imoveisN }] = await Promise.all([
     idsUsuarios.length ? supabase.from('usuarios').select('id, nome').in('id', idsUsuarios) : Promise.resolve({ data: [] }),
     idsImoveis.length ? supabase.from('imoveis').select('id, codigo, titulo, bairro, cidade').in('id', idsImoveis) : Promise.resolve({ data: [] }),

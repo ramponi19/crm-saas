@@ -86,6 +86,25 @@ export function calcularComissao(
   valor: number,
   taxas: TaxasComissao,
   cashback = 0,
+  papeis: { captador?: boolean; vendedor?: boolean } = {},
+): ComissaoCalculada {
+  const percentual = tipo === 'locacao' ? taxas.percentual_locacao : taxas.percentual_venda
+  return calcularComissaoPorPercentual(percentual, valor, taxas, cashback, papeis)
+}
+
+/**
+ * Mesma conta, com o percentual DITO em vez de derivado das taxas.
+ *
+ * Existe para a comissão lançada à mão: ali o percentual é o que foi combinado
+ * naquele negócio — venda antiga, contrato importado, acerto por fora —, e forçar a
+ * taxa vigente da loja reescreveria o combinado. O rateio entre captador, vendedor e
+ * casa continua sendo o da loja, porque isso é regra dela, não do negócio.
+ */
+export function calcularComissaoPorPercentual(
+  percentual: number,
+  valor: number,
+  taxas: TaxasComissao,
+  cashback = 0,
   /**
    * Quem existe de fato neste negócio.
    *
@@ -98,8 +117,7 @@ export function calcularComissao(
 ): ComissaoCalculada {
   const temCaptador = papeis.captador ?? true
   const temVendedor = papeis.vendedor ?? true
-  const percentual = tipo === 'locacao' ? taxas.percentual_locacao : taxas.percentual_venda
-  const total = arredonda((Number(valor) || 0) * (percentual / 100))
+  const total = arredonda((Number(valor) || 0) * ((Number(percentual) || 0) / 100))
   const captador = temCaptador ? arredonda(total * (taxas.parte_captador / 100)) : 0
   const vendedor = temVendedor ? arredonda(total * (taxas.parte_vendedor / 100)) : 0
   const casaBruta = arredonda(total - captador - vendedor)

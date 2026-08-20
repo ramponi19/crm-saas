@@ -3435,8 +3435,11 @@ export type Database = {
           assinado_em: string | null
           captador_id: string | null
           cashback: number
+          cashback_percentual: number | null
           chaves_entregues_em: string | null
           cliente_id: number | null
+          cliente_nome: string | null
+          comissao_aprovada_em: string | null
           comissao_captador: number | null
           comissao_paga_em: string | null
           comissao_status: string
@@ -3447,11 +3450,13 @@ export type Database = {
           criado_por: string | null
           empresa_id: number
           id: number
-          imovel_id: number
+          imovel_codigo: string | null
+          imovel_id: number | null
           lead_id: number | null
           locacao_fim: string | null
           locacao_inicio: string | null
           observacoes: string | null
+          origem: string
           percentual: number | null
           status: string
           tipo: string
@@ -3463,8 +3468,11 @@ export type Database = {
           assinado_em?: string | null
           captador_id?: string | null
           cashback?: number
+          cashback_percentual?: number | null
           chaves_entregues_em?: string | null
           cliente_id?: number | null
+          cliente_nome?: string | null
+          comissao_aprovada_em?: string | null
           comissao_captador?: number | null
           comissao_paga_em?: string | null
           comissao_status?: string
@@ -3475,11 +3483,13 @@ export type Database = {
           criado_por?: string | null
           empresa_id: number
           id?: number
-          imovel_id: number
+          imovel_codigo?: string | null
+          imovel_id?: number | null
           lead_id?: number | null
           locacao_fim?: string | null
           locacao_inicio?: string | null
           observacoes?: string | null
+          origem?: string
           percentual?: number | null
           status?: string
           tipo: string
@@ -3491,8 +3501,11 @@ export type Database = {
           assinado_em?: string | null
           captador_id?: string | null
           cashback?: number
+          cashback_percentual?: number | null
           chaves_entregues_em?: string | null
           cliente_id?: number | null
+          cliente_nome?: string | null
+          comissao_aprovada_em?: string | null
           comissao_captador?: number | null
           comissao_paga_em?: string | null
           comissao_status?: string
@@ -3503,11 +3516,13 @@ export type Database = {
           criado_por?: string | null
           empresa_id?: number
           id?: number
-          imovel_id?: number
+          imovel_codigo?: string | null
+          imovel_id?: number | null
           lead_id?: number | null
           locacao_fim?: string | null
           locacao_inicio?: string | null
           observacoes?: string | null
+          origem?: string
           percentual?: number | null
           status?: string
           tipo?: string
