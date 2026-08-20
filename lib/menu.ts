@@ -396,3 +396,56 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
 
   return out.filter((g) => g.items.length > 0)
 }
+
+/**
+ * Chave da ordem PLANA do menu: uma lista só de hrefs, sem grupo.
+ *
+ * O menu do CRM não mostra mais separadores ("Hoje", "Comercial", "Operação"…) —
+ * decisão do dono em 20/08/2026. Sem cabeçalho na tela, ordenar "por grupo" deixa
+ * de fazer sentido: quem arrasta quer o Financeiro logo abaixo do Dashboard, e o
+ * formato antigo (`{grupo: [hrefs]}`) não sabe representar isso, porque a
+ * renderização concatenava grupo por grupo.
+ *
+ * Os grupos seguem existindo DENTRO do catálogo: é o que dá uma sequência inicial
+ * razoável a quem nunca arrastou nada, e é como os módulos novos entram em algum
+ * lugar previsível. Eles só não aparecem mais.
+ */
+export const CHAVE_ORDEM = '__ordem'
+
+/**
+ * Achata os grupos numa lista única, aplicando a ordem escolhida.
+ *
+ * Href que está na ordem salva vem primeiro, na sequência pedida. O que ninguém
+ * posicionou segue depois, na ordem do catálogo — módulo novo aparece no fim em vez
+ * de sumir ou de saltar para o topo. Href salvo que não existe mais (plano trocado,
+ * módulo desligado) é simplesmente ignorado.
+ */
+export function achatarMenu(grupos: MenuGroup[], ordem?: string[]): MenuItem[] {
+  const todos = grupos.flatMap((g) => g.items)
+  if (!ordem?.length) return todos
+
+  const porHref = new Map(todos.map((i) => [i.href, i]))
+  const saida: MenuItem[] = []
+  const usados = new Set<string>()
+  for (const href of ordem) {
+    const item = porHref.get(href)
+    if (item && !usados.has(href)) { saida.push(item); usados.add(href) }
+  }
+  for (const item of todos) if (!usados.has(item.href)) saida.push(item)
+  return saida
+}
+
+/**
+ * O menu como o CRM desenha: uma lista, na ordem final.
+ *
+ * Existe para que sidebar, gaveta do celular e a folha "Mais" não repitam (e
+ * divirjam em) a mesma conta de camadas — foi o que aconteceu com os rótulos, que
+ * o menu aplicava e a barra do topo não.
+ */
+export function resolverMenuPlano(input: ResolverMenuInput): MenuItem[] {
+  const grupos = resolverMenu(input)
+  const ordem = input.configDono?.ordem?.[CHAVE_ORDEM]
+    ?? input.segOverride?.menuLayout?.[CHAVE_ORDEM]
+    ?? SEGMENTOS[input.segmento]?.menuLayout?.[CHAVE_ORDEM]
+  return achatarMenu(grupos, ordem)
+}

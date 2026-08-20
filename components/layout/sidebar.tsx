@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock } from 'lucide-react'
-import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
+import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
 import { NavRolavel } from './nav-rolavel'
@@ -57,7 +57,12 @@ export function Sidebar({
 
   const t = theme ?? resolveTheme(null)
   const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
-  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
+  /**
+   * UMA LISTA, sem separador. O dono tirou os cabeçalhos "Hoje / Comercial /
+   * Operação…" em 20/08/2026: com 19 itens eles ocupavam cinco linhas de altura
+   * para dizer o que o próprio nome do item já diz.
+   */
+  const itens = resolverMenuPlano({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
 
   async function handleLogout() {
     // Fecha o registro de uso ANTES do signOut: depois dele não há mais sessão
@@ -103,49 +108,44 @@ export function Sidebar({
       {/* Rolagem, aviso de corte e "ir até o item ativo" vivem no NavRolavel — as
           três barras (CRM, admin, plataforma) tinham o mesmo problema. */}
       <NavRolavel corFundo="var(--sb-bg)" className="px-2 py-2.5" style={{ color: 'var(--sb-text)' }}>
-        {grupos.map((group) => (
-          <div key={group.label}>
-            <p className="px-2.5 pb-1.5 pt-3.5 text-[10px] font-semibold uppercase tracking-[0.07em] opacity-60">{group.label}</p>
-            <div className="space-y-px">
-              {group.items.map((item) => {
-                const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
-                const isActive = !item.locked && (pathname === item.href || pathname.startsWith(item.href + '/'))
-                const href = item.locked ? `/admin/planos?upgrade=${item.modulo}` : item.href
-                const badge = item.locked ? 0 : badgeCount(item.badge)
+        <div className="space-y-px">
+          {itens.map((item) => {
+            const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
+            const isActive = !item.locked && (pathname === item.href || pathname.startsWith(item.href + '/'))
+            const href = item.locked ? `/admin/planos?upgrade=${item.modulo}` : item.href
+            const badge = item.locked ? 0 : badgeCount(item.badge)
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={href}
-                    data-ativo={isActive || undefined}
-                    style={isActive ? { background: 'var(--sb-active-bg)', color: 'var(--sb-active-text)' } : undefined}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-control px-2.5 py-[7px] text-[12.5px] font-medium transition-colors',
-                      item.locked ? 'opacity-50' : isActive ? 'font-semibold' : HOVER,
-                    )}
-                  >
-                    <Icon size={15} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {/* Selo de maturidade: "beta" avisa o lojista que a tela
-                        ainda muda, e "obra" só o superadmin vê — é o módulo que
-                        ele está construindo, invisível para os tenants. */}
-                    {item.status === 'beta' && (
-                      <span className="shrink-0 rounded-full bg-warn/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-warn">beta</span>
-                    )}
-                    {item.status === 'construcao' && (
-                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-accent">obra</span>
-                    )}
-                    {item.locked ? (
-                      <Lock size={12} strokeWidth={1.7} className="shrink-0 opacity-60" />
-                    ) : badge > 0 ? (
-                      <span className="num text-[10px] font-semibold" style={isActive ? undefined : { opacity: 0.7 }}>{badge}</span>
-                    ) : null}
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                data-ativo={isActive || undefined}
+                style={isActive ? { background: 'var(--sb-active-bg)', color: 'var(--sb-active-text)' } : undefined}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-control px-2.5 py-[7px] text-[12.5px] font-medium transition-colors',
+                  item.locked ? 'opacity-50' : isActive ? 'font-semibold' : HOVER,
+                )}
+              >
+                <Icon size={15} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {/* Selo de maturidade: "beta" avisa o lojista que a tela
+                    ainda muda, e "obra" só o superadmin vê — é o módulo que
+                    ele está construindo, invisível para os tenants. */}
+                {item.status === 'beta' && (
+                  <span className="shrink-0 rounded-full bg-warn/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-warn">beta</span>
+                )}
+                {item.status === 'construcao' && (
+                  <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-accent">obra</span>
+                )}
+                {item.locked ? (
+                  <Lock size={12} strokeWidth={1.7} className="shrink-0 opacity-60" />
+                ) : badge > 0 ? (
+                  <span className="num text-[10px] font-semibold" style={isActive ? undefined : { opacity: 0.7 }}>{badge}</span>
+                ) : null}
+              </Link>
+            )
+          })}
+        </div>
 
         {isSuperAdmin && (
           <div className="mt-4 pt-3" style={{ borderTop: '1px solid color-mix(in srgb, var(--sb-text) 12%, transparent)' }}>

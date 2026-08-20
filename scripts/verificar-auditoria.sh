@@ -213,10 +213,10 @@ v "ordem do menu tem coluna"           "app/superadmin/segmentos/segmentos-view.
 v "ordem em camadas no resolvedor"     "lib/menu.ts" "configDono?.ordem ?? {}"
 v "chave dos grupos e unica"           "lib/menu.ts" "CHAVE_GRUPOS = "
 v "dono salva a ordem"                 "app/api/menu-config/route.ts" "body.ordem ?? {}"
-v "arrastar entre grupos move"         "components/layout/menu-ordenavel.tsx" "alvo.slice(6)"
+v "editor de ordem e lista unica"     "components/layout/menu-ordenavel.tsx" "CHAVE_ORDEM.: novo.map"
 # Alca, e nao a linha toda: senao clicar no campo de renomear arrastaria o item.
 v "arraste sai da alca"                "components/layout/menu-ordenavel.tsx" "aria-label={.Reordenar"
-v "grupo vazio aceita soltar"          "components/layout/menu-ordenavel.tsx" "useDroppable({ id: .grupo:"
+v "menu sai plano do resolvedor"       "lib/menu.ts" "export function resolverMenuPlano"
 v "setas existem ao lado do arraste"   "components/layout/menu-ordenavel.tsx" "aria-label=\"Descer\""
 # O menu cortava sem aviso e nem rolava ate a pagina aberta (medido em /ranking).
 v "menu rola ate o item ativo"         "components/layout/nav-rolavel.tsx" "scrollIntoView({ block: .nearest. })"
@@ -227,5 +227,13 @@ v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "segmentos_
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"
+echo "== menu sem separadores (20/08) =="
+# O dono tirou os cabecalhos de grupo: o menu e uma lista corrida.
+n "sidebar nao desenha grupo"          "components/layout/sidebar.tsx" "grupos.map((group)"
+n "gaveta do celular tambem nao"       "components/layout/mobile-topbar.tsx" "grupos.map((g)"
+n "folha Mais tambem nao"              "components/layout/bottom-nav.tsx" "grupos.map((g)"
+v "sidebar usa a lista plana"          "components/layout/sidebar.tsx" "resolverMenuPlano({"
+# Href salvo que nao existe mais e ignorado; item novo entra no fim, nao desaparece.
+v "ordem plana tolera href sumido"     "lib/menu.ts" "if (!usados.has(item.href)) saida.push(item)"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

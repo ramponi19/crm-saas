@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Target, Users, Menu, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { resolverMenu, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
+import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
 import { Drawer } from '@/components/ui'
@@ -35,7 +35,8 @@ export function BottomNav({ segmento = 'varejo', plano, role = 'owner', isSuperA
   const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
   const [maisOpen, setMaisOpen] = useState(false)
-  const grupos = resolverMenu({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
+  // Uma lista, sem os cabeçalhos de grupo (decisão do dono, 20/08/2026).
+  const itens = resolverMenuPlano({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
   const fab = FAB[seg] ?? { label: 'Novo lead', href: '/leads' }
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
@@ -77,28 +78,21 @@ export function BottomNav({ segmento = 'varejo', plano, role = 'owner', isSuperA
       </nav>
 
       <Drawer open={maisOpen} onClose={() => setMaisOpen(false)} title="Menu">
-        <div className="space-y-4">
-          {grupos.map((g) => (
-            <div key={g.label}>
-              <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">{g.label}</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {g.items.map((it) => {
-                  const Icon = MENU_ICONS[it.icon] ?? Home
-                  return (
-                    <Link
-                      key={it.href}
-                      href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href}
-                      onClick={() => setMaisOpen(false)}
-                      className={cn('flex items-center gap-2.5 rounded-control border border-line px-3 py-2.5 text-[13px] font-medium', isActive(it.href) ? 'bg-accent-soft text-accent' : 'text-ink')}
-                    >
-                      <Icon size={16} strokeWidth={1.7} className="flex-none opacity-85" />
-                      <span className="truncate">{it.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-1.5">
+          {itens.map((it) => {
+            const Icon = MENU_ICONS[it.icon] ?? Home
+            return (
+              <Link
+                key={it.href}
+                href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href}
+                onClick={() => setMaisOpen(false)}
+                className={cn('flex items-center gap-2.5 rounded-control border border-line px-3 py-2.5 text-[13px] font-medium', isActive(it.href) ? 'bg-accent-soft text-accent' : 'text-ink')}
+              >
+                <Icon size={16} strokeWidth={1.7} className="flex-none opacity-85" />
+                <span className="truncate">{it.label}</span>
+              </Link>
+            )
+          })}
         </div>
       </Drawer>
     </>

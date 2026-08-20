@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { resolverMenu, type MenuOverridesSuperadmin, type MenuGroup, type SegOverride } from '@/lib/menu'
+import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuItem, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { MeuMenuView } from './meu-menu-view'
 
@@ -61,7 +61,7 @@ export default async function MeuMenuPage() {
    * ocultou: item escondido tem de aparecer nesta lista, senão não há como
    * reexibi-lo. Por isso `configDono` entra só com a ordem.
    */
-  const grupos: MenuGroup[] = resolverMenu({
+  const itens: MenuItem[] = resolverMenuPlano({
     segmento: normalizarSegmento(emp?.segmento), plano: emp?.plano ?? undefined,
     role, isSuperAdmin: false, overrides, segOverride,
     configDono: { ordem: cfg?.ordem },
@@ -70,7 +70,7 @@ export default async function MeuMenuPage() {
   return (
     <>
       <Topbar title="Meu menu" />
-      <MeuMenuView grupos={grupos} initialHidden={cfg?.hidden ?? []} initialLabels={cfg?.labels ?? {}} />
+      <MeuMenuView itens={itens} initialHidden={cfg?.hidden ?? []} initialLabels={cfg?.labels ?? {}} />
     </>
   )
 }
