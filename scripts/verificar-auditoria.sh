@@ -121,7 +121,14 @@ v "faixa de atraso tem fonte unica"    "lib/lead-parado.ts" "export function gra
 n "dashboard nao redefine a faixa"     "app/(dashboard)/dashboard/leads-parados.tsx" "function prioridade"
 v "dias parados usa o marco recente"   "lib/lead-parado.ts" "Math.max(...marcos)"
 v "tela corta etapa terminal"          "app/(dashboard)/gestao-leads/page.tsx" "terminais.has"
-v "so faixa que pode acontecer"        "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "g.desde >= limiteDias"
+# A primeira versao ESCONDIA o card "Atencao" porque ele nunca somava. O certo era
+# a faixa comecar em 3 dias e a lista abrir nela — os cinco cards do original existem.
+v "faixa atencao existe de verdade"    "lib/lead-parado.ts" "label: 'Atenção',  desde: 3"
+v "tela mostra as quatro faixas"       "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "GRAVIDADES.map"
+v "vocabulario do dono nas abas"       "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "'Leads Perdidos'"
+v "follow-up abre as sugestoes"        "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "Enviar via WhatsApp"
+v "regiao vem do perfil de busca"      "app/(dashboard)/gestao-leads/page.tsx" "lead_perfil_busca"
+n "faixa nao usa opacidade sobre soft" "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "bg-warn-soft/"
 v "rodar reativacao recarrega numero"  "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "router.refresh()"
 v "texto da mensagem e da loja"        "app/(dashboard)/gestao-leads/page.tsx" "mensagens_templates"
 n "menu nao renomeia mais conversao"   "lib/segmentos.ts" "'/conversao': 'Gest"

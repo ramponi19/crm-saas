@@ -4,18 +4,30 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { Card, Badge, Button, EmptyState, Select, notify } from '@/components/ui'
-import { GRAVIDADES, gravidadeDoAtraso, type Gravidade } from '@/lib/lead-parado'
+import { Card, Badge, Button, notify } from '@/components/ui'
+import { GRAVIDADES, gravidadeDoAtraso, prioridadeDoFollowUp, type Gravidade } from '@/lib/lead-parado'
 import { formatCurrency } from '@/lib/utils'
-import { CircleAlert, MessageCircle, Copy, RefreshCw, Repeat, ExternalLink } from 'lucide-react'
+import {
+  TriangleAlert, Send, RefreshCw, TrendingDown, ChevronDown, ChevronUp,
+  Copy, MessageCircle, ExternalLink, Repeat,
+} from 'lucide-react'
 
 /**
- * Gestão de Leads — quem parou, e o que a automação está fazendo.
+ * Gestão de Leads — a tela do CRM que o dono da imobiliária usa, reproduzida com
+ * autorização dele: mesmo título, mesmo subtítulo, botão Atualizar, abas
+ * "Leads Perdidos" e "Follow-up Automático", os CINCO cards (Total, Crítico, Alto,
+ * Moderado, Atenção) e os cartões de follow-up que abrem mostrando "N sugestões".
  *
- * Duas abas porque são duas perguntas: "quem eu preciso cobrar hoje" (parados) e
- * "o sistema está reciclando o que esfriou?" (reativação). A segunda é só leitura
- * mais o botão de rodar agora: a configuração vive em Administração → Cadências, e
- * ter dois lugares para configurar a mesma coisa é como se cria divergência.
+ * A primeira versão desta tela traduziu os nomes dele ("Leads parados",
+ * "Reativação automática") e escondeu o card "Atenção" porque ele nunca somava.
+ * Traduzir o vocabulário de quem vai usar é atrito de graça, e esconder card é
+ * entregar menos: o certo era baixar a porta da lista para a faixa existir.
+ *
+ * O que é NOSSO, e acrescenta sem tirar nada:
+ *  - o texto da sugestão vem dos modelos da LOJA, não fixo no código;
+ *  - o cartão lista TODAS as sugestões cadastradas (daí "N sugestões" variar);
+ *  - as faixas também FILTRAM a lista, em vez de só contar;
+ *  - a tira de automação diz se a reativação está ligada e deixa rodar na hora.
  */
 
 export interface LeadAtrasado {
@@ -24,6 +36,7 @@ export interface LeadAtrasado {
   telefone: string | null
   etapa: string
   responsavel: string
+  regiao: string | null
   valor: number
   dias: number
 }
@@ -44,6 +57,22 @@ function waLink(tel: string | null, msg: string) {
   return `https://wa.me/${d}${msg ? `?text=${encodeURIComponent(msg)}` : ''}`
 }
 
+/**
+ * Paleta das faixas: vermelho → laranja → âmbar → azul, como no original.
+ *
+ * Alfa EXPLÍCITO, e não o modificador `/50` sobre `bg-warn-soft`: os tokens `-soft`
+ * já são `rgba(...)`, e aplicar opacidade em cima fez o Tailwind descartar o alfa e
+ * pintar o marrom cheio — o card "Moderado" saía mais escuro que o "Alto" e a escada
+ * de gravidade lia ao contrário.
+ */
+const TOM_FAIXA: Record<Gravidade | 'total', { caixa: string; numero: string }> = {
+  total:    { caixa: 'border-ink bg-card',                     numero: 'text-ink' },
+  critico:  { caixa: 'border-bad/25 bg-[rgba(217,45,32,.10)]', numero: 'text-bad' },
+  alto:     { caixa: 'border-warn/30 bg-[rgba(180,83,9,.12)]', numero: 'text-warn' },
+  moderado: { caixa: 'border-warn/15 bg-[rgba(180,83,9,.05)]', numero: 'text-warn' },
+  atencao:  { caixa: 'border-accent/25 bg-accent-soft',        numero: 'text-accent' },
+}
+
 export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, limiteDias, soMeus }: {
   leads: LeadAtrasado[]
   templates: Record<string, string>
@@ -53,27 +82,17 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
   soMeus: boolean
 }) {
   const router = useRouter()
-  const [aba, setAba] = useState<'parados' | 'reativacao'>('parados')
+  const [aba, setAba] = useState<'perdidos' | 'followup'>('perdidos')
   const [faixa, setFaixa] = useState<Gravidade | 'todos'>('todos')
-  const chavesTemplate = Object.keys(templates)
-  const [chaveMsg, setChaveMsg] = useState(chavesTemplate[0] ?? '')
+  const [aberto, setAberto] = useState<number | null>(null)
+  const [atualizando, setAtualizando] = useState(false)
   const [rodando, setRodando] = useState(false)
   const [ultimoResultado, setUltimoResultado] = useState<string | null>(null)
 
-  /**
-   * Só as faixas que PODEM acontecer nesta tela.
-   *
-   * A lista começa em `limiteDias`, então "Atenção" (abaixo disso) seria um card
-   * estruturalmente zerado para sempre — e card sempre zero faz duvidar dos outros
-   * três. Derivado do limite, não escrito à mão: mudar o limite ajusta sozinho.
-   */
-  const faixasVisiveis = useMemo(() => {
-    const cabem = GRAVIDADES.filter((g) => g.desde >= limiteDias)
-    return cabem.map((g, i) => {
-      const acima = cabem[i - 1]
-      return { ...g, intervalo: acima ? `${g.desde} a ${acima.desde - 1} dias` : `${g.desde}+ dias` }
-    })
-  }, [limiteDias])
+  const sugestoes = useMemo(
+    () => Object.entries(templates).map(([nome, texto]) => ({ nome, texto })),
+    [templates],
+  )
 
   const contagem = useMemo(() => {
     const c: Record<Gravidade, number> = { critico: 0, alto: 0, moderado: 0, atencao: 0 }
@@ -86,19 +105,24 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
     [leads, faixa],
   )
 
-  /** Texto da loja com o nome do lead — a mesma variável que a Fila do dia usa. */
-  const mensagemPara = (nome: string) =>
-    (templates[chaveMsg] ?? '').replace(/\{\{nome\}\}/g, nome.split(' ')[0] || nome)
+  /** Texto da loja com o primeiro nome do lead — mesma variável da Fila do dia. */
+  const comNome = (texto: string, nome: string) =>
+    texto.replace(/\{\{nome\}\}/g, nome.trim().split(/\s+/)[0] || nome)
 
-  async function copiar(nome: string) {
-    const msg = mensagemPara(nome)
-    if (!msg) { notify.warn('Nenhum texto escolhido', 'Cadastre modelos em Administração → Modelos.'); return }
+  async function copiar(texto: string) {
     try {
-      await navigator.clipboard.writeText(msg)
+      await navigator.clipboard.writeText(texto)
       notify.ok('Mensagem copiada')
     } catch {
       notify.bad('O navegador não deixou copiar')
     }
+  }
+
+  function atualizar() {
+    setAtualizando(true)
+    router.refresh()
+    // O refresh não avisa quando termina; 800ms é só o giro do ícone parar.
+    setTimeout(() => setAtualizando(false), 800)
   }
 
   async function rodarReativacao() {
@@ -111,14 +135,11 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
     setRodando(false)
     if (!r.ok) { notify.bad('Não foi possível rodar', j?.error); return }
     const n = Number(j?.reativados) || 0
-    setUltimoResultado(n > 0 ? `${n} ${n === 1 ? 'lead entrou' : 'leads entraram'} na cadência agora` : 'Nenhum lead novo para reativar')
+    setUltimoResultado(n > 0 ? `${n} ${n === 1 ? 'lead entrou' : 'leads entraram'} na cadência agora` : 'nenhum lead novo para reativar')
     notify.ok('Reativação executada', n > 0 ? `${n} inscrito(s)` : 'Nada a reativar')
     /**
-     * Recarrega os números do servidor.
-     *
-     * Sem isto, rodar a reativação inscrevia o lead e o card "Na fila da automação"
-     * continuava dizendo 0 — o dono clica, vê a mensagem de sucesso e o contador
-     * contradizendo, e passa a não acreditar em nenhum dos dois.
+     * Recarrega os números do servidor: sem isto o contador continuava dizendo 0
+     * depois de inscrever o lead — sucesso e número se contradizendo na mesma tela.
      */
     if (n > 0) router.refresh()
   }
@@ -130,111 +151,106 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 sm:px-6 scrollbar-thin">
         <div className="mx-auto w-full max-w-[1100px]">
 
-          <div className="py-4">
-            <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Gestão de Leads</h1>
-            <p className="mt-0.5 text-[13px] text-ink-2">
-              Quem parou de andar e o que a automação está reciclando
-              {soMeus && ' · mostrando apenas os seus leads'}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3 py-4">
+            <div>
+              <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Gestão de Leads</h1>
+              <p className="mt-0.5 text-[13px] text-ink-2">
+                Detecção de leads perdidos e automação de follow-up
+                {soMeus && ' · seus leads'}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              icon={<RefreshCw size={14} strokeWidth={1.8} className={atualizando ? 'animate-spin' : ''} />}
+              onClick={atualizar}
+            >
+              Atualizar
+            </Button>
           </div>
 
-          <div className="mb-4 flex gap-1 rounded-control border border-line bg-card p-1">
-            {([['parados', 'Leads parados'], ['reativacao', 'Reativação automática']] as const).map(([id, label]) => (
+          {/* Abas sublinhadas, como no original. */}
+          <div className="mb-4 flex gap-6 border-b border-line">
+            {([
+              ['perdidos', 'Leads Perdidos', TriangleAlert],
+              ['followup', 'Follow-up Automático', Send],
+            ] as const).map(([id, label, Icone]) => (
               <button
                 key={id}
                 onClick={() => setAba(id)}
-                className={`rounded-[6px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                  aba === id ? 'bg-ink text-white' : 'text-ink-2 hover:bg-bg'
+                className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-0.5 pb-2.5 text-[13px] font-semibold transition-colors ${
+                  aba === id ? 'border-accent text-accent' : 'border-transparent text-ink-3 hover:text-ink-2'
                 }`}
               >
-                {label}
+                <Icone size={14} strokeWidth={1.8} />{label}
               </button>
             ))}
           </div>
 
-          {aba === 'parados' ? (
+          {aba === 'perdidos' ? (
             <>
-              {/* Faixas como FILTRO, não só placar: o número sem o "me mostre quais"
-                  obriga o gestor a procurar na lista o que ele acabou de contar. */}
-              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {/* Total + as quatro faixas. Clicar filtra: no original os cards só
+                  contam, e contar sem poder ver quem é rende pouco. */}
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 <Faixa
                   ativa={faixa === 'todos'}
                   onClick={() => setFaixa('todos')}
                   label="Total"
                   valor={leads.length}
-                  tone="neutro"
+                  tom={TOM_FAIXA.total}
                 />
-                {faixasVisiveis.map((g) => (
+                {GRAVIDADES.map((g) => (
                   <Faixa
                     key={g.id}
                     ativa={faixa === g.id}
                     onClick={() => setFaixa(faixa === g.id ? 'todos' : g.id)}
                     label={g.label}
                     valor={contagem[g.id]}
-                    tone={g.tone}
-                    rodape={g.intervalo}
+                    tom={TOM_FAIXA[g.id]}
                   />
                 ))}
               </div>
 
-              {chavesTemplate.length > 0 && (
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="text-[12px] text-ink-2">Mensagem:</span>
-                  <Select
-                    aria-label="Modelo de mensagem"
-                    value={chaveMsg}
-                    onChange={(e) => setChaveMsg(e.target.value)}
-                    className="min-w-[200px]"
-                  >
-                    {chavesTemplate.map((k) => <option key={k} value={k}>{k}</option>)}
-                  </Select>
-                  <Link href="/admin/modelos" className="text-[12px] font-semibold text-accent hover:underline">
-                    Editar modelos →
-                  </Link>
-                </div>
-              )}
-
               <Card flush>
                 {visiveis.length === 0 ? (
-                  <EmptyState
-                    icon={<CircleAlert size={20} strokeWidth={1.7} />}
-                    title={leads.length === 0 ? 'Nenhum lead parado' : 'Nenhum lead nesta faixa'}
-                    description={
-                      leads.length === 0
-                        ? `Ninguém sem tratativa há mais de ${limiteDias} dias. Carteira em dia.`
-                        : 'Troque a faixa acima para ver as outras.'
-                    }
-                  />
+                  <div className="flex flex-col items-center px-6 py-14 text-center">
+                    <TrendingDown size={26} strokeWidth={1.6} className="text-ink-3" />
+                    <p className="mt-3 text-[15px] font-semibold text-ink">
+                      {leads.length === 0 ? 'Nenhum lead perdido encontrado' : 'Nenhum lead nesta faixa'}
+                    </p>
+                    <p className="mt-1 text-[13px] text-ink-3">
+                      {leads.length === 0
+                        ? 'Seus leads estão sendo bem atendidos!'
+                        : 'Toque em outra faixa para ver os demais.'}
+                    </p>
+                  </div>
                 ) : (
                   <div className="divide-y divide-line-soft">
                     {visiveis.map((l) => {
                       const g = gravidadeDoAtraso(l.dias)
-                      const msg = mensagemPara(l.nome)
+                      const primeira = sugestoes[0]
                       return (
                         <div key={l.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-2">
-                              <span className="min-w-0 truncate text-[13px] font-semibold text-ink">{l.nome}</span>
+                              <span className="min-w-0 truncate text-[13.5px] font-semibold text-ink">{l.nome}</span>
                               <Badge tone={g.tone}>{g.label}</Badge>
                             </span>
                             <span className="mt-0.5 block truncate text-[11.5px] text-ink-3">
-                              {l.etapa} · {l.responsavel}
+                              {l.dias} {l.dias === 1 ? 'dia' : 'dias'} sem contato
+                              {' · '}Etapa: {l.etapa}
+                              {l.regiao && <> · Região: {l.regiao}</>}
+                              {' · '}Corretor: {l.responsavel}
                               {l.valor > 0 && <> · <span className="num">{formatCurrency(l.valor)}</span></>}
                             </span>
                           </span>
-                          <span className="num shrink-0 text-right text-[12px] text-ink-2">
-                            {l.dias} {l.dias === 1 ? 'dia' : 'dias'}
-                          </span>
                           <span className="flex shrink-0 items-center gap-1.5">
-                            {chavesTemplate.length > 0 && (
+                            {primeira && (
                               <>
-                                <Button size="sm" variant="ghost" icon={<Copy size={13} strokeWidth={1.8} />} onClick={() => copiar(l.nome)}>
+                                <Button size="sm" variant="ghost" icon={<Copy size={13} strokeWidth={1.8} />} onClick={() => copiar(comNome(primeira.texto, l.nome))}>
                                   Copiar
                                 </Button>
-                                {/* Link wa.me, não envio pela API: abrir conversa é
-                                    ação da pessoa, e não passa perto da política da Meta. */}
                                 <a
-                                  href={waLink(l.telefone, msg)}
+                                  href={waLink(l.telefone, comNome(primeira.texto, l.nome))}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className={`inline-flex items-center gap-1 rounded-control border border-line px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
@@ -260,49 +276,129 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
               </Card>
             </>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card title={<span className="inline-flex items-center gap-2"><Repeat size={15} strokeWidth={1.8} className="text-accent" />Reativação de leads frios</span>}>
-                {reativacao.ativo ? (
-                  <>
-                    <p className="text-[13px] leading-snug text-ink-2">
-                      Ligada. Lead sem tratativa há <strong className="num">{reativacao.diasFrio}</strong> dias entra
-                      {reativacao.cadenciaNome ? <> na cadência <strong>{reativacao.cadenciaNome}</strong></> : ' na cadência configurada'}
-                      {reativacao.incluirPerdidos ? ', e os perdidos também entram.' : '. Leads perdidos ficam de fora.'}
-                    </p>
-                    <p className="mt-2 text-[12px] text-ink-3">
-                      A inscrição só AGENDA a tarefa — quem fala com o cliente é o corretor, pela Fila do dia.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[13px] leading-snug text-ink-2">
-                    Desligada. Lead que esfria fica esfriado: ninguém volta a chamá-lo, a não ser que
-                    alguém lembre. Ligar leva um minuto em Administração → Cadências.
-                  </p>
-                )}
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="space-y-3">
+              {/* Tira da automação: o original não tem, e é o que responde "isso
+                  acontece sozinho ou eu preciso lembrar?". */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card px-4 py-3">
+                <span className="flex items-start gap-2">
+                  <Repeat size={15} strokeWidth={1.8} className={`mt-0.5 ${reativacao.ativo ? 'text-ok' : 'text-ink-3'}`} />
+                  <span className="text-[12.5px] leading-snug text-ink-2">
+                    {reativacao.ativo ? (
+                      <>
+                        Reativação <strong className="text-ok">ligada</strong>: lead sem tratativa há{' '}
+                        <strong className="num">{reativacao.diasFrio}</strong> dias entra
+                        {reativacao.cadenciaNome ? <> na cadência <strong>{reativacao.cadenciaNome}</strong></> : ' na cadência configurada'}
+                        {reativacao.incluirPerdidos ? ', perdidos incluídos.' : '.'}
+                        {' '}<span className="num">{reativacao.inscritosAtivos}</span> em cadência ativa.
+                      </>
+                    ) : (
+                      <>
+                        Reativação <strong>desligada</strong> — lead que esfria só volta se alguém lembrar.
+                        Ligar leva um minuto em Cadências.
+                      </>
+                    )}
+                    {ultimoResultado && <span className="ml-1 text-ink-3">· {ultimoResultado}</span>}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
                   <Link href="/admin/cadencias" className="text-[12.5px] font-semibold text-accent hover:underline">
-                    {reativacao.ativo ? 'Ajustar em Cadências →' : 'Configurar em Cadências →'}
+                    {reativacao.ativo ? 'Ajustar' : 'Configurar'} →
                   </Link>
                   {podeExecutar && reativacao.ativo && (
                     <Button size="sm" variant="outline" loading={rodando} icon={<RefreshCw size={13} strokeWidth={1.8} />} onClick={rodarReativacao}>
                       Rodar agora
                     </Button>
                   )}
-                </div>
-                {ultimoResultado && <p className="mt-2 text-[12px] text-ink-2">{ultimoResultado}</p>}
-              </Card>
+                </span>
+              </div>
 
-              <Card title="Na fila da automação">
-                <div className="num text-[26px] font-bold tracking-[-0.03em] text-ink">{reativacao.inscritosAtivos}</div>
-                <p className="mt-0.5 text-[12.5px] text-ink-2">
-                  {reativacao.inscritosAtivos === 1 ? 'lead com cadência ativa' : 'leads com cadência ativa'}
-                </p>
-                <p className="mt-2 text-[12px] leading-snug text-ink-3">
-                  Conta todas as cadências, não só a de reativação: é o total de gente que o sistema
-                  vai lembrar de cobrar. As tarefas do dia aparecem na <Link href="/fila" className="font-semibold text-accent hover:underline">Fila do dia</Link>.
-                </p>
-              </Card>
+              {leads.length === 0 ? (
+                <Card>
+                  <div className="flex flex-col items-center px-6 py-12 text-center">
+                    <Send size={24} strokeWidth={1.6} className="text-ink-3" />
+                    <p className="mt-3 text-[15px] font-semibold text-ink">Nenhum follow-up sugerido</p>
+                    <p className="mt-1 text-[13px] text-ink-3">
+                      Ninguém sem contato há mais de {limiteDias} dias. Nada a cobrar hoje.
+                    </p>
+                  </div>
+                </Card>
+              ) : (
+                leads.map((l) => {
+                  const p = prioridadeDoFollowUp(l.dias)
+                  const expandido = aberto === l.id
+                  return (
+                    <div key={l.id} className="overflow-hidden rounded-card border border-line bg-card">
+                      <button
+                        onClick={() => setAberto(expandido ? null : l.id)}
+                        aria-expanded={expandido}
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-bg"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-[14px] font-semibold text-ink">{l.nome}</span>
+                            <Badge tone={p.tone}>{p.label}</Badge>
+                          </span>
+                          <span className="mt-1 block truncate text-[12px] text-ink-2">
+                            {l.dias} {l.dias === 1 ? 'dia' : 'dias'} sem contato
+                            <span className="mx-2 text-ink-3">·</span>Etapa: {l.etapa}
+                            {l.regiao && <><span className="mx-2 text-ink-3">·</span>Região: {l.regiao}</>}
+                            <span className="mx-2 text-ink-3">·</span>Corretor: {l.responsavel}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1.5 text-[11.5px] text-ink-3">
+                          {sugestoes.length} {sugestoes.length === 1 ? 'sugestão' : 'sugestões'}
+                          {expandido ? <ChevronUp size={15} strokeWidth={1.8} /> : <ChevronDown size={15} strokeWidth={1.8} />}
+                        </span>
+                      </button>
+
+                      {expandido && (
+                        <div className="border-t border-line-soft bg-bg px-4 py-3">
+                          {sugestoes.length === 0 ? (
+                            <p className="text-[12.5px] text-ink-2">
+                              Nenhum texto cadastrado ainda. Escreva os seus em{' '}
+                              <Link href="/admin/modelos" className="font-semibold text-accent hover:underline">Modelos</Link>
+                              {' '}— o sistema não escreve a mensagem no seu lugar.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {sugestoes.map((s) => {
+                                const texto = comNome(s.texto, l.nome)
+                                return (
+                                  <div key={s.nome} className="rounded-control border border-line bg-card p-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <span className="flex items-center gap-2">
+                                        <Badge tone="ok">WhatsApp</Badge>
+                                        <span className="text-[11.5px] text-ink-3">{s.nome}</span>
+                                      </span>
+                                      <Button size="sm" variant="ghost" icon={<Copy size={13} strokeWidth={1.8} />} onClick={() => copiar(texto)}>
+                                        Copiar
+                                      </Button>
+                                    </div>
+                                    <p className="mt-2 text-[13px] leading-snug text-ink">{texto}</p>
+                                    <a
+                                      href={waLink(l.telefone, texto)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`mt-2.5 inline-flex items-center gap-1.5 rounded-control bg-ok px-3 py-1.5 text-[12.5px] font-semibold text-white transition-opacity ${
+                                        l.telefone ? 'hover:opacity-90' : 'pointer-events-none opacity-40'
+                                      }`}
+                                    >
+                                      <Send size={13} strokeWidth={1.9} />Enviar via WhatsApp
+                                    </a>
+                                    {!l.telefone && (
+                                      <span className="ml-2 text-[11.5px] text-ink-3">sem telefone cadastrado</span>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
             </div>
           )}
         </div>
@@ -311,21 +407,17 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
   )
 }
 
-function Faixa({ label, valor, tone, rodape, ativa, onClick }: {
-  label: string; valor: number; tone: 'bad' | 'warn' | 'neutro'; rodape?: string; ativa: boolean; onClick: () => void
+function Faixa({ label, valor, tom, ativa, onClick }: {
+  label: string; valor: number; tom: { caixa: string; numero: string }; ativa: boolean; onClick: () => void
 }) {
-  const cor = tone === 'bad' ? 'text-bad' : tone === 'warn' ? 'text-warn' : 'text-ink'
   return (
     <button
       onClick={onClick}
       aria-pressed={ativa}
-      className={`rounded-card border bg-card p-3 text-left transition-colors ${
-        ativa ? 'border-ink' : 'border-line hover:border-ink/30'
-      }`}
+      className={`rounded-card border py-3 text-center transition-shadow ${tom.caixa} ${ativa ? 'ring-2 ring-ink/15' : ''}`}
     >
-      <div className={`num text-[20px] font-bold tracking-[-0.02em] ${cor}`}>{valor}</div>
-      <div className="text-[11.5px] font-semibold text-ink-2">{label}</div>
-      {rodape && <div className="text-[10.5px] text-ink-3">{rodape}</div>}
+      <div className={`num text-[20px] font-bold tracking-[-0.02em] ${tom.numero}`}>{valor}</div>
+      <div className="text-[11.5px] font-medium text-ink-2">{label}</div>
     </button>
   )
 }
