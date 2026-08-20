@@ -133,5 +133,18 @@ v "rodar reativacao recarrega numero"  "app/(dashboard)/gestao-leads/gestao-lead
 v "texto da mensagem e da loja"        "app/(dashboard)/gestao-leads/page.tsx" "mensagens_templates"
 n "menu nao renomeia mais conversao"   "lib/segmentos.ts" "'/conversao': 'Gest"
 
+echo "== cliente imobiliario (20/08) =="
+v "ficha imob por capacidade"          "app/(dashboard)/clientes/page.tsx" "clienteComPipeline"
+v "varejo mantem a ficha antiga"       "app/(dashboard)/clientes/components/clientes-view.tsx" "imob ? ("
+v "etapa grava no LEAD"                "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "kanban_status: id"
+# Sem 'as never' no insert do lead: quem confere o payload contra as colunas reais
+# e o TypeScript, nao um grep — foi assim que o 'email' inexistente apareceu.
+v "insert do lead sem cast cego"       "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "}).select(.id.).single<{ id: number }>()"
+v "guarda de empresa no insert"        "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "typeof emp !== .number."
+v "cliente sem lead nao inventa score" "app/(dashboard)/clientes/components/clientes-view.tsx" "Sem lead vinculado"
+v "15 caracteristicas do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Ar Condicionado'"
+v "10 tipos de imovel do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Sala Comercial'"
+v "status de aprovacao existe"         "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "em_analise"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
