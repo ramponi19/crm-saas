@@ -5708,6 +5708,10 @@ export type Database = {
       }
     }
     Functions: {
+      fundir_clientes: {
+        Args: { p_empresa: number; p_principal: number; p_secundario: number }
+        Returns: Json
+      }
       get_empresa_id: { Args: never; Returns: number }
       hard_delete_empresa: {
         Args: { p_empresa_id: number }

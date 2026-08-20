@@ -146,5 +146,13 @@ v "15 caracteristicas do modelo"       "app/(dashboard)/clientes/components/clie
 v "10 tipos de imovel do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Sala Comercial'"
 v "status de aprovacao existe"         "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "em_analise"
 
+echo "== fusao de clientes (20/08) =="
+v "fusao roda numa funcao do banco"    "app/api/clientes/fundir/route.ts" "rpc('fundir_clientes'"
+v "fundir exige dono ou admin"         "app/api/clientes/fundir/route.ts" "await requireEmpresaRoleApi(.'owner', 'admin'.)"
+n "empresa nao vem do corpo"           "app/api/clientes/fundir/route.ts" "b.empresa"
+v "confirmacao exige digitar o nome"   "app/(dashboard)/clientes/components/fundir-leads-modal.tsx" "disabled={!podeConfirmar}"
+v "os tres passos do modelo"           "app/(dashboard)/clientes/components/fundir-leads-modal.tsx" "SECUNDÁRIO (será removido)"
+v "lista recarrega apos fundir"        "app/(dashboard)/clientes/components/clientes-view.tsx" "router.refresh()"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
