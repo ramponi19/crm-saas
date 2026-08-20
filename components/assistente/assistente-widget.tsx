@@ -143,6 +143,7 @@ export function AssistenteWidget() {
       <button
         onClick={() => setAberto((v) => !v)}
         aria-label="Assistente"
+        data-print-hide
         className="fixed bottom-5 right-5 z-40 grid place-items-center rounded-full bg-accent text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
         style={{ width: 52, height: 52 }}
       >

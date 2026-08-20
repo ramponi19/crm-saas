@@ -177,3 +177,38 @@
   background: transparent;
   box-shadow: none;
 }
+
+/*
+ * IMPRESSÃO — o botão "PDF" do relatório usa a impressão do navegador.
+ *
+ * Sem isto o PDF sai como foto da tela: menu lateral ocupando um terço da folha,
+ * barra do topo, widget do assistente flutuando em cima do número, e o conteúdo
+ * cortado porque a área de rolagem tem altura fixa. Relatório impresso é documento
+ * que alguém leva para reunião — tem de sair como documento.
+ */
+@media print {
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  /* Menu, barra do topo, banners e widgets não são parte do relatório. */
+  aside,
+  header,
+  [data-print-hide] {
+    display: none !important;
+  }
+  /* A área de rolagem vira fluxo normal, senão a folha 2 vem em branco. */
+  main,
+  main > div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+  /* Cartão não deve quebrar no meio de uma tabela. */
+  .rounded-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+}
