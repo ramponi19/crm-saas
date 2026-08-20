@@ -6,7 +6,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Button, Input, notify } from '@/components/ui'
 import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 import { cn } from '@/lib/utils'
-import type { MenuGroup } from '@/lib/menu'
+import { CHAVE_ORDEM, type MenuItem } from '@/lib/menu'
 
 /**
  * O menu do CRM na mão do dono: ordem, nome e visibilidade de cada item.
@@ -21,8 +21,8 @@ import type { MenuGroup } from '@/lib/menu'
  * salvo), então o que se vê aqui é a ordem real do menu — não uma lista paralela
  * que precisa ser comparada de cabeça com a barra lateral.
  */
-export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
-  grupos: MenuGroup[]
+export function MeuMenuView({ itens, initialHidden, initialLabels }: {
+  itens: MenuItem[]
   initialHidden: string[]
   initialLabels: Record<string, string>
 }) {
@@ -49,7 +49,7 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
           hidden: [...hidden],
           labels: cleanLabels,
           // Sem arrastar nada, manda o que já estava — não zera a ordem salva.
-          ordem: ordem ?? montarLayout(grupos),
+          ordem: ordem ?? { [CHAVE_ORDEM]: itens.map((i) => i.href) },
         }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
@@ -66,13 +66,13 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[760px] space-y-4">
         <p className="text-[13px] text-ink-2">
-          Arraste pela alça para mudar a ordem — inclusive de um grupo para outro. Renomeie itens
+          Arraste pela alça para mudar a ordem do menu. Renomeie itens
           (ex.: <b className="text-ink">Clientes → Pacientes</b>) e oculte o que sua empresa não usa.
           Ocultar tira do menu; a tela continua acessível por link.
         </p>
 
         <MenuOrdenavel
-          grupos={grupos.map((g) => ({ label: g.label, items: g.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })) }))}
+          itens={itens.map((i) => ({ href: i.href, label: i.label, icon: i.icon }))}
           onChange={setOrdem}
           renderExtra={(item) => {
             const oculto = hidden.has(item.href)
@@ -105,10 +105,3 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   )
 }
 
-/** A ordem que já está na tela, para salvar nome/visibilidade sem mexer na sequência. */
-function montarLayout(grupos: MenuGroup[]): LayoutMenu {
-  const layout: LayoutMenu = {}
-  for (const g of grupos) layout[g.label] = g.items.map((i) => i.href)
-  layout.__grupos = grupos.map((g) => g.label)
-  return layout
-}

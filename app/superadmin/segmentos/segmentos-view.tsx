@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Eye } from 'lucide-react'
 import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/components/ui'
-import { CATALOGO, resolverMenu } from '@/lib/menu'
+import { CATALOGO, resolverMenuPlano } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 
@@ -95,7 +95,7 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
    * e deixa o código valer, exatamente como a engine faz.
    */
   const menuDoSegmento = form
-    ? resolverMenu({
+    ? resolverMenuPlano({
         segmento: normalizarSegmento(form.chave),
         role: 'owner',
         isSuperAdmin: false,
@@ -222,9 +222,8 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
             <div>
               <div className="mb-1 text-[12.5px] font-semibold text-ink">Ordem do menu</div>
               <p className="mb-3 text-[11.5px] text-ink-3">
-                Arraste pela alça para mudar a sequência — inclusive de um grupo para outro. As setas
-                do cabeçalho movem o grupo inteiro. Vale para toda empresa deste segmento; cada dono
-                ainda pode reordenar o dele em Administração → Meu menu.
+                Arraste pela alça para mudar a sequência do menu. Vale para toda empresa deste
+                segmento; cada dono ainda pode reordenar o dele em Administração → Meu menu.
               </p>
               {/*
                 `key` pela lista de hrefs: ligar ou desligar um módulo acima remonta
@@ -232,8 +231,8 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
                 o estado interno do arrastável nasce da lista e não se atualizava.
               */}
               <MenuOrdenavel
-                key={menuDoSegmento.flatMap((g) => g.items.map((i) => i.href)).join('|')}
-                grupos={menuDoSegmento.map((g) => ({ label: g.label, items: g.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })) }))}
+                key={menuDoSegmento.map((i) => i.href).join('|')}
+                itens={menuDoSegmento.map((i) => ({ href: i.href, label: i.label, icon: i.icon }))}
                 onChange={(menu_layout) => setForm((f) => (f ? { ...f, menu_layout } : f))}
               />
             </div>
