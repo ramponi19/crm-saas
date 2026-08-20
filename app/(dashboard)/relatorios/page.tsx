@@ -14,9 +14,11 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 // Roteador único de relatórios por segmento (imobiliária → relatório imob;
 // demais → BI genérico, plan-gated). Substitui a rota órfã /relatorios-imob.
-export default async function RelatoriosPage() {
+export default async function RelatoriosPage({ searchParams }: {
+  searchParams: Promise<{ de?: string; ate?: string; corretor?: string }>
+}) {
   await requireEmpresaRole(['owner', 'admin'])
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
   const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
 
   // Mesma capacidade do dashboard: a vertical traz as próprias telas de leitura.
@@ -24,7 +26,7 @@ export default async function RelatoriosPage() {
     return (
       <>
         <Topbar title="Relatórios" />
-        <RelatoriosImobView />
+        <RelatoriosImobView de={sp.de ?? ''} ate={sp.ate ?? ''} corretor={sp.corretor ?? ''} />
       </>
     )
   }

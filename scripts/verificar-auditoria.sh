@@ -159,5 +159,16 @@ v "topo respeita rotulo do segmento"   "components/layout/topbar.tsx" "const tit
 v "layout passa os rotulos"            "app/(dashboard)/layout.tsx" "RotulosProvider valor="
 v "rotulo resolve pela raiz da rota"   "components/layout/rotulos-context.tsx" "const raiz = ./. + (pathname.split"
 
+echo "== relatorios: filtro e exportacao (20/08) =="
+v "relatorio recorta por periodo"      "components/modules/relatorios/relatorios-imob-view.tsx" "soData.test(de)"
+# O regex de data perdeu a barra do d num script meu e passou a NAO CASAR NUNCA: a
+# tela dizia "Recorte: julho" e mostrava agosto. Este check existe por causa disso.
+n "regex de data nao perdeu a barra"   "components/modules/relatorios/relatorios-imob-view.tsx" "/^d{4}"
+n "regex do export tambem esta certo"  "app/api/exportar/route.ts" "/^d{4}"
+v "export usa o mesmo recorte"         "app/api/exportar/route.ts" "cfg.corretor && corretor"
+v "seis conjuntos para exportar"       "app/api/exportar/route.ts" "imob_corretores"
+v "css de impressao existe"            "app/globals.css" "@media print"
+v "impressao esconde so os controles"  "components/modules/relatorios/relatorios-filtros.tsx" "gap-2 print:hidden"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

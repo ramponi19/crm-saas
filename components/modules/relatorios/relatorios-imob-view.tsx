@@ -3,6 +3,7 @@ import { getKanbanColumns, ganhoColId, type KanbanColumn } from '@/components/mo
 import { Home, Target, TrendingUp, Wallet, Award } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
+import { RelatoriosFiltros } from './relatorios-filtros'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -27,21 +28,57 @@ function Barra({ label, valor, max, cor }: { label: string; valor: number; max: 
 }
 
 /** Relatório imobiliário (server). Renderizado por /relatorios quando segmento=imobiliaria. */
-export async function RelatoriosImobView() {
+export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
+  de?: string; ate?: string; corretor?: string
+} = {}) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  // Janela do mês corrente (ranking mensal).
+  /**
+   * A janela do relatório.
+   *
+   * Sem filtro, vale o mês corrente — que era o comportamento antigo e é o que o
+   * dono olha no dia a dia. Com filtro, vale o que ele pediu.
+   *
+   * As datas vêm como `YYYY-MM-DD` e são convertidas em horário LOCAL: montar a
+   * borda com `new Date('2026-08-01')` daria meia-noite UTC, e no Brasil o dia 1º
+   * cairia dentro de julho — o relatório perderia (ou ganharia) um dia inteiro na
+   * virada do mês.
+   */
   const agora = new Date()
-  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString()
-  const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1).toISOString()
-  const nomeMes = agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  const soData = /^\d{4}-\d{2}-\d{2}$/
+  const localDe = (t: string) => { const [a, m, d] = t.split('-').map(Number); return new Date(a, m - 1, d) }
+  const inicioJanela = soData.test(de) ? localDe(de) : new Date(agora.getFullYear(), agora.getMonth(), 1)
+  // Fim EXCLUSIVO no dia seguinte: senão o próprio dia escolhido ficaria de fora.
+  const fimJanela = soData.test(ate)
+    ? new Date(localDe(ate).getTime() + 86400000)
+    : new Date(agora.getFullYear(), agora.getMonth() + 1, 1)
+  const inicioMes = inicioJanela.toISOString()
+  const fimMes = fimJanela.toISOString()
+  const fmtDia = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const nomeMes = (soData.test(de) || soData.test(ate))
+    ? `${fmtDia(inicioJanela)} a ${fmtDia(new Date(fimJanela.getTime() - 86400000))}`
+    : agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+
+  /**
+   * O filtro de corretor recorta lead e visita, não o acervo.
+   *
+   * Imóvel não é "do" corretor no nosso modelo (quem capta fica em `captado_por`),
+   * então filtrar o acervo por corretor mostraria carteira vazia e daria a impressão
+   * de que a imobiliária não tem imóvel — pior que não filtrar.
+   */
+  let qLeads = supabase.from('leads').select('kanban_status, origem, responsavel_id').eq('empresa_id', empresaId).eq('ativo', true)
+  if (corretor) qLeads = qLeads.eq('responsavel_id', corretor)
+  let qLeadsMes = supabase.from('leads').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes)
+  if (corretor) qLeadsMes = qLeadsMes.eq('responsavel_id', corretor)
+  let qVisitas = supabase.from('visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes)
+  if (corretor) qVisitas = qVisitas.eq('corretor_id', corretor)
 
   const [{ data: leads }, { data: imoveis }, { data: membros }, { data: leadsMes }, { data: visitasMes }, { data: propostasMes }, { data: etapasRaw }] = await Promise.all([
-    supabase.from('leads').select('kanban_status, origem, responsavel_id').eq('empresa_id', empresaId).eq('ativo', true),
+    qLeads,
     supabase.from('imoveis').select('status, tipo, valor_venda').eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
-    supabase.from('visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes),
+    qLeadsMes,
+    qVisitas,
     supabase.from('propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
     /**
      * Etapas do funil PADRÃO, do banco.
@@ -147,6 +184,12 @@ export async function RelatoriosImobView() {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1100px] space-y-4">
+        <RelatoriosFiltros
+          equipe={Object.entries(nomePorId).map(([id, nome]) => ({ id, nome }))}
+          de={de}
+          ate={ate}
+          corretor={corretor}
+        />
         <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
           {kpis.map((k) => <StatCard key={k.label} bare label={k.label} value={k.valor} delta={k.sub} deltaTone="neutral" />)}
         </div>
