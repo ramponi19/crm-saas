@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CircleAlert } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
+import { gravidadeDoAtraso } from '@/lib/lead-parado'
 
 /**
  * Leads sem tratativa há tempo demais.
@@ -17,14 +18,6 @@ export interface LeadParado {
   etapa: string
   responsavel: string
   dias: number
-}
-
-/** Faixas de urgência. Quem passou de 30 dias precisa de ligação, não de e-mail. */
-function prioridade(dias: number): { label: string; tone: 'bad' | 'warn' | 'neutro' } {
-  if (dias >= 30) return { label: 'Crítico', tone: 'bad' }
-  if (dias >= 15) return { label: 'Alto', tone: 'bad' }
-  if (dias >= 7) return { label: 'Moderado', tone: 'warn' }
-  return { label: 'Atenção', tone: 'neutro' }
 }
 
 export function LeadsParados({ leads, limiteDias }: { leads: LeadParado[]; limiteDias: number }) {
@@ -54,7 +47,7 @@ export function LeadsParados({ leads, limiteDias }: { leads: LeadParado[]; limit
     >
       <div className="divide-y divide-line-soft">
         {leads.map((l) => {
-          const p = prioridade(l.dias)
+          const p = gravidadeDoAtraso(l.dias)
           return (
             <Link key={l.id} href="/leads" className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-raised">
               <span className="min-w-0 flex-1">

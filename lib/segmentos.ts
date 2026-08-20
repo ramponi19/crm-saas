@@ -201,7 +201,14 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
      */
     labelOverrides: {
       '/leads': 'Pipeline',
-      '/conversao': 'Gestão de Leads',
+      /**
+       * `/conversao` VOLTOU a se chamar Conversão (20/08/2026).
+       *
+       * Ela recebeu o nome "Gestão de Leads" para falar a língua do dono, mas no
+       * sistema dele essa tela é leads parados + follow-up, e a nossa mostra taxa de
+       * conversão por etapa: o menu prometia uma coisa e abria outra. O nome passou
+       * para a tela que faz aquilo (`/gestao-leads`).
+       */
       '/metas': 'Meta da empresa',
       '/executivo': 'Dashboard Executivo',
     },
