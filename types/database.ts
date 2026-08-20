@@ -4642,6 +4642,7 @@ export type Database = {
           hidden_hrefs: Json
           label: string
           label_overrides: Json
+          menu_layout: Json
           modulos_extra: Json
           modulos_habilitados: Json | null
           ordem: number
@@ -4654,6 +4655,7 @@ export type Database = {
           hidden_hrefs?: Json
           label: string
           label_overrides?: Json
+          menu_layout?: Json
           modulos_extra?: Json
           modulos_habilitados?: Json | null
           ordem?: number
@@ -4666,6 +4668,7 @@ export type Database = {
           hidden_hrefs?: Json
           label?: string
           label_overrides?: Json
+          menu_layout?: Json
           modulos_extra?: Json
           modulos_habilitados?: Json | null
           ordem?: number

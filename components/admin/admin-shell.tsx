@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { NavRolavel } from '@/components/layout/nav-rolavel'
 import { createClient } from '@/lib/supabase/client'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import {
@@ -69,16 +70,16 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
 
   const Nav = ({ onNavigate }: { onNavigate?: () => void }) => (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3.5">
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-line-soft px-4 py-3.5">
         <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-ink text-white"><Crown size={15} strokeWidth={1.7} /></div>
         <div className="min-w-0 leading-tight">
           <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-ink">{empresaNome}</div>
           <div className="text-[10px] font-medium text-ink-3">Administração</div>
         </div>
       </div>
-      {/* `min-h-0`: sem ele o nav não encolhe (min-height:auto do flex) e o rodapé
-          sai da tela em vez de o menu ganhar rolagem. */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 scrollbar-thin">
+      {/* Rolagem, aviso de corte e "ir até o item ativo" — ver NavRolavel. O menu
+          de administração tem 19 itens e cortava sem avisar em tela de notebook. */}
+      <NavRolavel classeGradiente="from-raised" className="px-2 py-2.5">
         {/* Complemento pago ZapIntel — só aparece quando o super admin ativou o
             add-on para esta empresa. É área própria (/zapintel), por isso Link
             direto com a cor da marca. */}
@@ -103,6 +104,7 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
                 const Icon = item.icon
                 return (
                   <Link key={item.href} href={item.href} onClick={onNavigate}
+                    data-ativo={isActive || undefined}
                     className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
                       isActive ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
                     <Icon size={16} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
@@ -118,8 +120,8 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
             <ArrowUpRight size={16} strokeWidth={1.7} className="shrink-0" /><span className="flex-1 truncate">Acessar o CRM</span>
           </Link>
         </div>
-      </nav>
-      <div className="border-t border-line-soft px-3 py-2.5">
+      </NavRolavel>
+      <div className="shrink-0 border-t border-line-soft px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-white">{userName.slice(0, 2).toUpperCase()}</span>
           <div className="min-w-0 flex-1 leading-tight">

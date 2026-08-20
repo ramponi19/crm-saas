@@ -2,26 +2,25 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Lock } from 'lucide-react'
-import { Card, Button, Input, notify } from '@/components/ui'
-import { MENU_ICONS } from '@/components/layout/menu-icons'
-import { LayoutDashboard } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+import { Button, Input, notify } from '@/components/ui'
+import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 import { cn } from '@/lib/utils'
 import type { MenuGroup } from '@/lib/menu'
 
 /**
- * Nada mais é "fixo": o dono pode ocultar qualquer item, inclusive o Dashboard.
+ * O menu do CRM na mão do dono: ordem, nome e visibilidade de cada item.
  *
- * A lista tinha `/dashboard` e a linha aparecia com cadeado. Ocultar é só de
- * MENU — a rota segue acessível — e esta tela vive em /admin, fora do menu do
- * CRM, então não há como o dono se trancar para fora do próprio ajuste.
+ * Nada é fixo — nem o Dashboard. Ocultar é só de MENU (a rota segue acessível), e
+ * esta tela vive em /admin, fora do menu do CRM, então não há como o dono se
+ * trancar para fora do próprio ajuste. A rota `/api/menu-config` tinha uma lista de
+ * protegidos que a tela ignorava: o botão existia, o dono salvava e o item ficava
+ * no menu sem explicação. Os dois lados agora concordam (20/08/2026).
  *
- * A mesma lista existe em lib/menu.ts (o resolvedor precisa filtrar igual).
- * Se voltar a proteger algo, tem de ser nos DOIS lugares, senão a tela oferece
- * um botão que o resolvedor ignora.
+ * A ordem chega já resolvida do servidor (o `resolverMenu` aplica o que está
+ * salvo), então o que se vê aqui é a ordem real do menu — não uma lista paralela
+ * que precisa ser comparada de cabeça com a barra lateral.
  */
-const PROTEGIDOS = new Set<string>()
-
 export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   grupos: MenuGroup[]
   initialHidden: string[]
@@ -30,6 +29,7 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
   const router = useRouter()
   const [hidden, setHidden] = useState<Set<string>>(new Set(initialHidden))
   const [labels, setLabels] = useState<Record<string, string>>(initialLabels)
+  const [ordem, setOrdem] = useState<LayoutMenu | null>(null)
   const [saving, setSaving] = useState(false)
 
   const toggle = (href: string) => setHidden((s) => {
@@ -45,7 +45,12 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
       for (const [k, v] of Object.entries(labels)) if (v.trim()) cleanLabels[k] = v.trim()
       const res = await fetch('/api/menu-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hidden: [...hidden], labels: cleanLabels }),
+        body: JSON.stringify({
+          hidden: [...hidden],
+          labels: cleanLabels,
+          // Sem arrastar nada, manda o que já estava — não zera a ordem salva.
+          ordem: ordem ?? montarLayout(grupos),
+        }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
       notify.ok('Menu salvo', 'A barra lateral já reflete as mudanças.')
@@ -59,47 +64,51 @@ export function MeuMenuView({ grupos, initialHidden, initialLabels }: {
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
-      <div className="mx-auto max-w-[720px] space-y-4">
+      <div className="mx-auto max-w-[760px] space-y-4">
         <p className="text-[13px] text-ink-2">
-          Oculte módulos que sua empresa não usa e renomeie itens (ex.: <b className="text-ink">Clientes → Pacientes</b>).
-          Dashboard e Configurações não podem ser ocultados.
+          Arraste pela alça para mudar a ordem — inclusive de um grupo para outro. Renomeie itens
+          (ex.: <b className="text-ink">Clientes → Pacientes</b>) e oculte o que sua empresa não usa.
+          Ocultar tira do menu; a tela continua acessível por link.
         </p>
 
-        {grupos.map((g) => (
-          <Card key={g.label} title={g.label} flush>
-            <div className="divide-y divide-line-soft">
-              {g.items.map((item) => {
-                const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
-                const protegido = PROTEGIDOS.has(item.href)
-                const oculto = hidden.has(item.href)
-                return (
-                  <div key={item.href} className={cn('flex items-center gap-3 px-4 py-2.5', oculto && 'opacity-55')}>
-                    <Icon size={16} strokeWidth={1.7} className="flex-none text-ink-3" />
-                    <Input
-                      wrapperClassName="flex-1"
-                      value={labels[item.href] ?? ''}
-                      onChange={(e) => setLabels((l) => ({ ...l, [item.href]: e.target.value }))}
-                      placeholder={item.label}
-                    />
-                    {protegido ? (
-                      <span className="flex items-center gap-1 text-[11px] text-ink-3"><Lock size={13} strokeWidth={1.7} /> fixo</span>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => toggle(item.href)} icon={oculto ? <EyeOff size={14} strokeWidth={1.7} /> : <Eye size={14} strokeWidth={1.7} />}>
-                        {oculto ? 'Oculto' : 'Visível'}
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        ))}
+        <MenuOrdenavel
+          grupos={grupos.map((g) => ({ label: g.label, items: g.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })) }))}
+          onChange={setOrdem}
+          renderExtra={(item) => {
+            const oculto = hidden.has(item.href)
+            return (
+              <span className={cn('flex items-center gap-2', oculto && 'opacity-60')}>
+                <Input
+                  wrapperClassName="w-[190px]"
+                  value={labels[item.href] ?? ''}
+                  onChange={(e) => setLabels((l) => ({ ...l, [item.href]: e.target.value }))}
+                  placeholder={item.label}
+                  aria-label={`Novo nome para ${item.label}`}
+                />
+                <Button
+                  variant="ghost" size="sm" onClick={() => toggle(item.href)}
+                  icon={oculto ? <EyeOff size={14} strokeWidth={1.7} /> : <Eye size={14} strokeWidth={1.7} />}
+                >
+                  {oculto ? 'Oculto' : 'Visível'}
+                </Button>
+              </span>
+            )
+          }}
+        />
 
         <div className="flex items-center gap-2">
           <Button onClick={salvar} loading={saving}>Salvar menu</Button>
-          <span className="text-[11.5px] text-ink-3">O placeholder cinza é o nome padrão; escreva para renomear.</span>
+          <span className="text-[11.5px] text-ink-3">O texto cinza é o nome padrão; escreva ao lado para renomear.</span>
         </div>
       </div>
     </main>
   )
+}
+
+/** A ordem que já está na tela, para salvar nome/visibilidade sem mexer na sequência. */
+function montarLayout(grupos: MenuGroup[]): LayoutMenu {
+  const layout: LayoutMenu = {}
+  for (const g of grupos) layout[g.label] = g.items.map((i) => i.href)
+  layout.__grupos = grupos.map((g) => g.label)
+  return layout
 }

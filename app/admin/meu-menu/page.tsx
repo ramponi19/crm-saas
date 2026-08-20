@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { resolverMenu, type MenuOverridesSuperadmin, type MenuGroup } from '@/lib/menu'
+import { resolverMenu, type MenuOverridesSuperadmin, type MenuGroup, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { MeuMenuView } from './meu-menu-view'
 
@@ -30,12 +30,42 @@ export default async function MeuMenuPage() {
     hidden: mo?.hidden,
     labels: mo?.labels,
   }
-  // Menu que a empresa PODE ter (sem a camada 4 do dono) — é isso que ele gerencia.
+
+  /**
+   * A CONFIG DO SEGMENTO precisa entrar aqui também.
+   *
+   * Esta tela resolvia o menu sem consultar `segmentos_config`, então listava itens
+   * que o segmento desligou e — pior — não listava os que ele acrescenta. Na
+   * imobiliária isso significava que "Metas e Ranking" simplesmente não existia
+   * para o dono ocultar, renomear ou reordenar: a tela de ajuste do menu discordava
+   * do menu.
+   */
+  const { data: segCfg } = await supabase
+    .from('segmentos_config')
+    .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados, menu_layout')
+    .eq('chave', emp?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
+  const segOverride: SegOverride | undefined = segCfg ? {
+    hiddenHrefs: (segCfg.hidden_hrefs ?? []) as string[],
+    labelOverrides: (segCfg.label_overrides ?? {}) as Record<string, string>,
+    modulosExtra: (segCfg.modulos_extra ?? []) as { href: string; label: string; icon: string }[],
+    habilitados: (segCfg.modulos_habilitados ?? undefined) as string[] | undefined,
+    menuLayout: (segCfg.menu_layout ?? undefined) as Record<string, string[]> | undefined,
+  } : undefined
+
+  const cfg = (emp?.menu_config ?? null) as {
+    hidden?: string[]; labels?: Record<string, string>; ordem?: Record<string, string[]>
+  } | null
+
+  /**
+   * Menu que a empresa PODE ter — com a ORDEM do dono já aplicada, mas sem o que ele
+   * ocultou: item escondido tem de aparecer nesta lista, senão não há como
+   * reexibi-lo. Por isso `configDono` entra só com a ordem.
+   */
   const grupos: MenuGroup[] = resolverMenu({
     segmento: normalizarSegmento(emp?.segmento), plano: emp?.plano ?? undefined,
-    role, isSuperAdmin: false, overrides,
+    role, isSuperAdmin: false, overrides, segOverride,
+    configDono: { ordem: cfg?.ordem },
   })
-  const cfg = (emp?.menu_config ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
 
   return (
     <>

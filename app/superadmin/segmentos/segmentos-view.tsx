@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Eye } from 'lucide-react'
 import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/components/ui'
-import { CATALOGO } from '@/lib/menu'
+import { CATALOGO, resolverMenu } from '@/lib/menu'
+import { normalizarSegmento } from '@/lib/segmentos'
+import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 
 export interface SegmentoRow {
   chave: string
@@ -14,12 +16,14 @@ export interface SegmentoRow {
   label_overrides: unknown
   modulos_extra: unknown
   modulos_habilitados: unknown
+  menu_layout: unknown
   ordem: number
   ativo: boolean
 }
 
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : [])
 const obj = (v: unknown): Record<string, string> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : {})
+const layoutDe = (v: unknown): LayoutMenu => (v && typeof v === 'object' && !Array.isArray(v) ? (v as LayoutMenu) : {})
 
 // Núcleo: sempre ligado (não dá pra desmarcar). Espelha o NUCLEO de lib/menu.
 const TRAVADOS = new Set(['/dashboard', '/leads', '/clientes'])
@@ -28,15 +32,19 @@ interface FormState {
   novo: boolean; chave: string; label: string; descricao: string; ordem: string; ativo: boolean
   habilitados: string[]                 // hrefs ligados (opt-in)
   labels: Record<string, string>        // href -> novo nome
+  menu_layout: LayoutMenu               // ordem: grupo -> hrefs (+ __grupos)
+  extras: { href: string; label: string; icon: string }[]  // só para o preview da ordem
 }
 
 function fromRow(s: SegmentoRow): FormState {
   return {
     novo: false, chave: s.chave, label: s.label, descricao: s.descricao ?? '', ordem: String(s.ordem), ativo: s.ativo,
     habilitados: arr(s.modulos_habilitados), labels: obj(s.label_overrides),
+    menu_layout: layoutDe(s.menu_layout),
+    extras: Array.isArray(s.modulos_extra) ? (s.modulos_extra as FormState['extras']) : [],
   }
 }
-const EMPTY: FormState = { novo: true, chave: '', label: '', descricao: '', ordem: '99', ativo: true, habilitados: [], labels: {} }
+const EMPTY: FormState = { novo: true, chave: '', label: '', descricao: '', ordem: '99', ativo: true, habilitados: [], labels: {}, menu_layout: {}, extras: [] }
 
 export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   const router = useRouter()
@@ -76,6 +84,30 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
     })
   }
 
+  /**
+   * O MENU DESTE SEGMENTO, resolvido aqui na tela.
+   *
+   * Usa o MESMO `resolverMenu` que o CRM usa, alimentado com o formulário em
+   * edição — então a lista que se arrasta é o menu que o segmento vai gerar, e não
+   * uma cópia da lista de checkboxes que precisa ser conferida de cabeça.
+   *
+   * `modulosExtra` só entra quando existe: lista vazia significa "não configurado"
+   * e deixa o código valer, exatamente como a engine faz.
+   */
+  const menuDoSegmento = form
+    ? resolverMenu({
+        segmento: normalizarSegmento(form.chave),
+        role: 'owner',
+        isSuperAdmin: false,
+        segOverride: {
+          habilitados: Array.from(new Set([...TRAVADOS, ...form.habilitados])),
+          labelOverrides: form.labels,
+          modulosExtra: form.extras.length ? form.extras : undefined,
+          menuLayout: form.menu_layout,
+        },
+      })
+    : []
+
   async function salvar() {
     if (!form) return
     if (!form.label.trim()) { notify.warn('Informe o label'); return }
@@ -90,6 +122,7 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
           ordem: Number(form.ordem) || 0, ativo: form.ativo,
           label_overrides: form.labels,
           modulos_habilitados: habilitados,
+          menu_layout: form.menu_layout,
         }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao salvar') }
@@ -183,6 +216,26 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Ordem do menu — arrastando */}
+            <div>
+              <div className="mb-1 text-[12.5px] font-semibold text-ink">Ordem do menu</div>
+              <p className="mb-3 text-[11.5px] text-ink-3">
+                Arraste pela alça para mudar a sequência — inclusive de um grupo para outro. As setas
+                do cabeçalho movem o grupo inteiro. Vale para toda empresa deste segmento; cada dono
+                ainda pode reordenar o dele em Administração → Meu menu.
+              </p>
+              {/*
+                `key` pela lista de hrefs: ligar ou desligar um módulo acima remonta
+                esta parte. Sem isso, o item recém-ligado não aparecia para ordenar —
+                o estado interno do arrastável nasce da lista e não se atualizava.
+              */}
+              <MenuOrdenavel
+                key={menuDoSegmento.flatMap((g) => g.items.map((i) => i.href)).join('|')}
+                grupos={menuDoSegmento.map((g) => ({ label: g.label, items: g.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })) }))}
+                onChange={(menu_layout) => setForm((f) => (f ? { ...f, menu_layout } : f))}
+              />
             </div>
 
             {/*
