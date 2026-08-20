@@ -1,7 +1,13 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-const TIPOS = ['vendas', 'fechamentos', 'visitas', 'propostas', 'captacoes', 'faturamento']
+/**
+ * `imoveis_captados` entra aqui porque `valorMetrica` já sabe medir e a tela já
+ * oferece a opção onde o segmento capta ativo. Fora da lista, o tipo caía no
+ * silêncio pior possível: a rota trocava por "vendas" e a meta passava a medir
+ * outra coisa sem avisar ninguém.
+ */
+const TIPOS = ['vendas', 'fechamentos', 'visitas', 'propostas', 'captacoes', 'imoveis_captados', 'faturamento']
 
 async function exigirAdmin(supabase: Awaited<ReturnType<typeof createClient>>, empresaId: number, userId: string) {
   const [{ data: vinculo }, { data: usuario }] = await Promise.all([

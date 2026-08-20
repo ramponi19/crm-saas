@@ -170,5 +170,20 @@ v "seis conjuntos para exportar"       "app/api/exportar/route.ts" "imob_correto
 v "css de impressao existe"            "app/globals.css" "@media print"
 v "impressao esconde so os controles"  "components/modules/relatorios/relatorios-filtros.tsx" "gap-2 print:hidden"
 
+echo "== metas e ranking (20/08) =="
+# Lista vazia no banco nao pode vencer a declaracao do codigo: com
+# modulos_extra = [] o item sumia do menu e o corretor caia no dashboard.
+v "extra vazio do banco cai no codigo" "lib/menu.ts" "segOverride?.modulosExtra?.length ?"
+v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "extrasBanco.length > 0"
+v "segmento nomeia quem vende"         "lib/segmentos.ts" "equipeLabel: .Corretor."
+v "menu e ranking usam o mesmo nome"   "app/(dashboard)/layout.tsx" "equipeLabel ?? .Vendedor."
+v "coluna leva o nome do segmento"     "app/(dashboard)/ranking/ranking-view.tsx" "font-semibold\">{equipeLabel}"
+v "cabecalho da secao como no modelo"  "app/(dashboard)/ranking/ranking-view.tsx" "Ranking Completo"
+v "papel aparece ao lado do nome"      "app/(dashboard)/ranking/ranking-view.tsx" "papelDe(papeis.l.usuario_id., equipeLabel)"
+v "mes e ano em lista"                 "app/(dashboard)/ranking/ranking-view.tsx" "aria-label=\"Ano\""
+v "equipe geral e a primeira opcao"    "app/(dashboard)/ranking/ranking-view.tsx" "Equipe Geral"
+# Tipo fora da lista da rota virava "vendas" em silencio: a meta media outra coisa.
+v "meta de imovel captado e aceita"    "app/api/ranking/metas/route.ts" "imoveis_captados"
+n "sem opcao duplicada de fechamento"  "app/(dashboard)/ranking/ranking-view.tsx" "v: .fechamentos., l:"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
