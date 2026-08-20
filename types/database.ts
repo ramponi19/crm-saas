@@ -849,6 +849,7 @@ export type Database = {
           cidade: string | null
           cnpj_validado: boolean | null
           complemento: string | null
+          corretor_id: string | null
           cpf_cnpj: string | null
           cpf_validado: boolean | null
           created_at: string | null
@@ -860,15 +861,20 @@ export type Database = {
           estado_civil: string | null
           id: number
           instagram: string | null
+          lead_id: number | null
           nacionalidade: string | null
           nome: string
           numero: string | null
           observacoes: string | null
           origem_cliente: string | null
           profissao: string | null
+          regiao_interesse: string | null
+          status_aprovacao: string
           telefone: string | null
           tipo_cliente: string | null
+          tipo_negocio: string | null
           usuario_id: string | null
+          valor_pretendido: number | null
         }
         Insert: {
           ativo?: boolean | null
@@ -877,6 +883,7 @@ export type Database = {
           cidade?: string | null
           cnpj_validado?: boolean | null
           complemento?: string | null
+          corretor_id?: string | null
           cpf_cnpj?: string | null
           cpf_validado?: boolean | null
           created_at?: string | null
@@ -888,15 +895,20 @@ export type Database = {
           estado_civil?: string | null
           id?: never
           instagram?: string | null
+          lead_id?: number | null
           nacionalidade?: string | null
           nome: string
           numero?: string | null
           observacoes?: string | null
           origem_cliente?: string | null
           profissao?: string | null
+          regiao_interesse?: string | null
+          status_aprovacao?: string
           telefone?: string | null
           tipo_cliente?: string | null
+          tipo_negocio?: string | null
           usuario_id?: string | null
+          valor_pretendido?: number | null
         }
         Update: {
           ativo?: boolean | null
@@ -905,6 +917,7 @@ export type Database = {
           cidade?: string | null
           cnpj_validado?: boolean | null
           complemento?: string | null
+          corretor_id?: string | null
           cpf_cnpj?: string | null
           cpf_validado?: boolean | null
           created_at?: string | null
@@ -916,15 +929,20 @@ export type Database = {
           estado_civil?: string | null
           id?: never
           instagram?: string | null
+          lead_id?: number | null
           nacionalidade?: string | null
           nome?: string
           numero?: string | null
           observacoes?: string | null
           origem_cliente?: string | null
           profissao?: string | null
+          regiao_interesse?: string | null
+          status_aprovacao?: string
           telefone?: string | null
           tipo_cliente?: string | null
+          tipo_negocio?: string | null
           usuario_id?: string | null
+          valor_pretendido?: number | null
         }
         Relationships: [
           {
@@ -939,6 +957,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
           {
@@ -2756,54 +2781,82 @@ export type Database = {
       }
       lead_perfil_busca: {
         Row: {
+          area_max: number | null
+          area_min: number | null
           ativo: boolean
           bairros: string[]
+          caracteristicas: string[] | null
           cidades: string[]
+          cliente_id: number | null
           created_at: string | null
           empresa_id: number
           finalidade: string | null
           id: number
-          lead_id: number
+          lead_id: number | null
+          observacoes: string | null
           preco_max: number | null
           preco_min: number | null
+          quartos_max: number | null
           quartos_min: number | null
+          suites_min: number | null
           tipos: string[]
           updated_at: string | null
           vagas_min: number | null
         }
         Insert: {
+          area_max?: number | null
+          area_min?: number | null
           ativo?: boolean
           bairros?: string[]
+          caracteristicas?: string[] | null
           cidades?: string[]
+          cliente_id?: number | null
           created_at?: string | null
           empresa_id: number
           finalidade?: string | null
           id?: number
-          lead_id: number
+          lead_id?: number | null
+          observacoes?: string | null
           preco_max?: number | null
           preco_min?: number | null
+          quartos_max?: number | null
           quartos_min?: number | null
+          suites_min?: number | null
           tipos?: string[]
           updated_at?: string | null
           vagas_min?: number | null
         }
         Update: {
+          area_max?: number | null
+          area_min?: number | null
           ativo?: boolean
           bairros?: string[]
+          caracteristicas?: string[] | null
           cidades?: string[]
+          cliente_id?: number | null
           created_at?: string | null
           empresa_id?: number
           finalidade?: string | null
           id?: number
-          lead_id?: number
+          lead_id?: number | null
+          observacoes?: string | null
           preco_max?: number | null
           preco_min?: number | null
+          quartos_max?: number | null
           quartos_min?: number | null
+          suites_min?: number | null
           tipos?: string[]
           updated_at?: string | null
           vagas_min?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_perfil_busca_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lead_perfil_busca_empresa_id_fkey"
             columns: ["empresa_id"]

@@ -123,6 +123,15 @@ export interface SegmentoConfig {
      */
     comissaoPorNegocio?: boolean
     /**
+     * Cliente é a MESMA pessoa do funil: a ficha mostra etapa, score e corretor.
+     *
+     * No varejo, cliente é quem já comprou — a lista fala de compras e total gasto.
+     * Na imobiliária a mesma tela é o cadastro de quem ainda está decidindo, com
+     * status de aprovação e preferências de imóvel. Duas telas diferentes para a
+     * palavra "cliente", e a capacidade é o que escolhe qual.
+     */
+    clienteComPipeline?: boolean
+    /**
      * Ranking conta IMÓVEIS captados, além de leads.
      *
      * Onde o corretor traz o produto para a loja vender, captação é do ativo — era o
@@ -239,7 +248,7 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     interesseLabel: 'Imóvel interessado',
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     abasExtraConfiguracoes: [{ id: 'portais', label: 'Portais' }],
-    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true },
+    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },
   },
   saude: {
     label: 'Saúde / Clínica',
