@@ -116,5 +116,15 @@ n "segmentos.ts nao declara funil"      "lib/segmentos.ts" "funil: ["
 v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
 v "padrao do codigo tem Aprovados"      "components/modules/leads/types.ts" "label: 'Aprovados'"
 
+echo "== gestao de leads (20/08) =="
+v "faixa de atraso tem fonte unica"    "lib/lead-parado.ts" "export function gravidadeDoAtraso"
+n "dashboard nao redefine a faixa"     "app/(dashboard)/dashboard/leads-parados.tsx" "function prioridade"
+v "dias parados usa o marco recente"   "lib/lead-parado.ts" "Math.max(...marcos)"
+v "tela corta etapa terminal"          "app/(dashboard)/gestao-leads/page.tsx" "terminais.has"
+v "so faixa que pode acontecer"        "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "g.desde >= limiteDias"
+v "rodar reativacao recarrega numero"  "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "router.refresh()"
+v "texto da mensagem e da loja"        "app/(dashboard)/gestao-leads/page.tsx" "mensagens_templates"
+n "menu nao renomeia mais conversao"   "lib/segmentos.ts" "'/conversao': 'Gest"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

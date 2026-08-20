@@ -181,6 +181,8 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/clientes', label: 'Clientes', icon: 'Users' },
       { href: '/fila', label: 'Fila do dia', icon: 'ListChecks' },
       { href: '/marketing', label: 'Marketing', icon: 'Megaphone' },
+      // Cobranca do que parou: opcional porque nasce ligado so onde o dono pediu.
+      { href: '/gestao-leads', label: 'Gestão de Leads', icon: 'CircleAlert', opcional: true },
       { href: '/orcamentos', label: 'Orçamentos', icon: 'Receipt' },
       { href: '/propostas', label: 'Propostas', icon: 'FileText', adminOnly: true },
     ],

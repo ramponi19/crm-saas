@@ -8,6 +8,7 @@ import { Card, Badge } from '@/components/ui'
 import type { ScoreConfig } from '@/lib/lead-score'
 import { TermometroLeads } from './termometro-leads'
 import { LeadsParados, type LeadParado } from './leads-parados'
+import { diasParado, DIAS_PARADO } from '@/lib/lead-parado'
 
 type LeadRow = {
   id: number; nome: string | null; kanban_status: string | null; origem: string | null
@@ -21,8 +22,6 @@ const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: 
 const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-/** Lead sem nenhuma tratativa por mais dias que isto entra no painel de parados. */
-const DIAS_PARADO = 7
 /** Janela dos "próximos compromissos" — hoje mais os dias seguintes. */
 const DIAS_AGENDA = 7
 
@@ -163,16 +162,18 @@ export default async function DashboardImob() {
   const terminais = new Set(colunas.filter(c => c.tipo === 'ganho' || c.tipo === 'perdido').map(c => c.id))
   const parados: LeadParado[] = leads
     .filter(l => !terminais.has(l.kanban_status ?? 'novo'))
-    .map(l => {
-      const ref = l.ultima_mensagem_at ?? l.ultima_tratativa ?? l.created_at
-      return {
-        id: l.id,
-        nome: l.nome || 'Lead sem nome',
-        etapa: colunas.find(c => c.id === (l.kanban_status ?? 'novo'))?.label ?? '—',
-        responsavel: l.responsavel_id ? (nomePorUsuario.get(l.responsavel_id) ?? '—') : 'sem dono',
-        dias: ref ? Math.floor((nowMs - new Date(ref).getTime()) / 864e5) : 0,
-      }
-    })
+    .map(l => ({
+      id: l.id,
+      nome: l.nome || 'Lead sem nome',
+      etapa: colunas.find(c => c.id === (l.kanban_status ?? 'novo'))?.label ?? '—',
+      responsavel: l.responsavel_id ? (nomePorUsuario.get(l.responsavel_id) ?? '—') : 'sem dono',
+      /**
+       * Antes: `ultima_mensagem_at ?? ultima_tratativa ?? created_at` — o PRIMEIRO
+       * não-nulo. Lead com mensagem antiga e tratativa de ontem contava os dias da
+       * mensagem e aparecia parado sem estar. Agora vale o marco mais RECENTE.
+       */
+      dias: diasParado(l, nowMs),
+    }))
     .filter(l => l.dias >= DIAS_PARADO)
     .sort((a, b) => b.dias - a.dias)
     .slice(0, 6)
