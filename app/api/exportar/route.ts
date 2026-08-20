@@ -25,7 +25,7 @@ const TABELAS: Record<string, { tabela: string; colunas: string; data?: string; 
   imob_pipeline:   { tabela: 'leads', data: 'created_at', corretor: 'responsavel_id',
                      colunas: 'nome, kanban_status, origem, valor_estimado, ultima_tratativa, ultima_mensagem_at, responsavel_id, created_at' },
   imob_financeiro: { tabela: 'negocios_imobiliarios', data: 'created_at', corretor: 'corretor_id',
-                     colunas: 'tipo, valor, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, comissao_status, status, assinado_em, corretor_id, captador_id, created_at' },
+                     colunas: 'origem, cliente_nome, imovel_codigo, tipo, valor, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, cashback_percentual, comissao_status, comissao_aprovada_em, comissao_paga_em, status, assinado_em, corretor_id, captador_id, created_at' },
   imob_corretores: { tabela: 'visitas', data: 'data_hora', corretor: 'corretor_id',
                      colunas: 'titulo, tipo, status, data_hora, corretor_id, lead_id, imovel_id, created_at' },
 }
