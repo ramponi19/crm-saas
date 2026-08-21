@@ -227,7 +227,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
        * conversão por etapa: o menu prometia uma coisa e abria outra. O nome passou
        * para a tela que faz aquilo (`/gestao-leads`).
        */
-      '/metas': 'Meta da empresa',
       '/executivo': 'Dashboard Executivo',
       /* O menu diz "Metas e Ranking"; sem isto a barra do topo da MESMA tela dizia
          "Ranking & Metas" — dois nomes para o mesmo lugar. */

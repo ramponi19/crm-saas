@@ -252,10 +252,14 @@ export const CATALOGO: MenuGroupBase[] = [
       // segmento herda por acidente — só quem tem '/executivo' na lista habilitada.
       { href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true },
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true },
-      { href: '/conversao', label: 'Conversão', icon: 'Filter', adminOnly: true },
-      { href: '/metas', label: 'Metas', icon: 'Gauge', adminOnly: true },
       { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true },
-      { href: '/equipe', label: 'Equipe', icon: 'UserCog', modulo: 'multi_usuario', adminOnly: true },
+      /**
+       * Equipe, Conversão e Meta da empresa SAÍRAM daqui (21/08/2026).
+       *
+       * Eram três itens de menu para telas que só o dono abre, e uma delas nem era
+       * ferramenta: conversão é leitura. Vivem no /admin, onde já estavam Equipe,
+       * Relatórios e Financeiro — e o middleware redireciona as rotas antigas.
+       */
     ],
   },
   // O antigo grupo "Sistema" (canais, funil, cadências, permissões, aparência,

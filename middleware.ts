@@ -23,6 +23,13 @@ const cacheModulos = new Map<number, { habilitados: Set<string>; expira: number 
 const LEGADO_ADMIN = [
   '/canais', '/modelos', '/funil', '/cadencias', '/distribuicao', '/scoring',
   '/meu-menu', '/permissoes', '/aparencia', '/configuracoes', '/empresa', '/planos',
+  /**
+   * Saíram do menu do CRM em 21/08/2026 e passaram a viver só no /admin: são
+   * leitura e definição de GESTÃO, não ferramenta de quem atende. Ficam na lista
+   * para que link salvo, favorito e atalho antigo caiam no painel em vez de abrir
+   * a mesma tela por uma porta que não existe mais no menu.
+   */
+  '/equipe', '/conversao', '/metas',
 ]
 
 export async function middleware(request: NextRequest) {
