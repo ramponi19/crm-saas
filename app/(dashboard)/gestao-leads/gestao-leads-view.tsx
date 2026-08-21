@@ -356,7 +356,7 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
                           {sugestoes.length === 0 ? (
                             <p className="text-[12.5px] text-ink-2">
                               Nenhum texto cadastrado ainda. Escreva os seus em{' '}
-                              <Link href="/admin/modelos" className="font-semibold text-accent hover:underline">Modelos</Link>
+                              <Link href="/admin/configuracoes?aba=modelos" className="font-semibold text-accent hover:underline">Configurações → Modelos</Link>
                               {' '}— o sistema não escreve a mensagem no seu lugar.
                             </p>
                           ) : (
