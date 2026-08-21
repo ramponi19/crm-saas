@@ -2409,6 +2409,67 @@ export type Database = {
           },
         ]
       }
+      integracao_eventos: {
+        Row: {
+          acao: string | null
+          created_at: string
+          detalhes: string | null
+          empresa_id: number
+          externo_id: string | null
+          id: number
+          lead_id: number | null
+          origem: string
+          payload: Json | null
+          status: string
+        }
+        Insert: {
+          acao?: string | null
+          created_at?: string
+          detalhes?: string | null
+          empresa_id: number
+          externo_id?: string | null
+          id?: number
+          lead_id?: number | null
+          origem: string
+          payload?: Json | null
+          status: string
+        }
+        Update: {
+          acao?: string | null
+          created_at?: string
+          detalhes?: string | null
+          empresa_id?: number
+          externo_id?: string | null
+          id?: number
+          lead_id?: number | null
+          origem?: string
+          payload?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_eventos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_eventos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_eventos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventario_unidades: {
         Row: {
           anatel_resultado: string | null
