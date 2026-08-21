@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText, ArrowLeftRight } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
@@ -88,7 +89,15 @@ const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeh
 const supabase = createClient()
 
 export function ConfiguracoesView({ official, instagram, messenger, taxas, segmento, slug }: Props) {
-  const [aba, setAba]       = useState('integracoes')
+  /**
+   * A aba pode vir na URL (`?aba=modelos`).
+   *
+   * Sem isso, qualquer tela que mande o lojista "editar os textos de mensagem" o
+   * deixava em Integrações, procurando um campo que está a doze abas de distância —
+   * foi o que aconteceu com o link da Gestão de Leads.
+   */
+  const params = useSearchParams()
+  const [aba, setAba]       = useState(params.get('aba') || 'integracoes')
   /**
    * As abas extra vêm do contrato, não de uma cascata de `if`.
    *
