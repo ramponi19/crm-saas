@@ -227,7 +227,6 @@ export const CATALOGO: MenuGroupBase[] = [
     label: 'Imóveis',
     items: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home', opcional: true },
-      { href: '/proprietarios', label: 'Proprietários', icon: 'KeyRound', opcional: true },
       { href: '/chaves', label: 'Chaves', icon: 'Key', opcional: true },
     ],
   },

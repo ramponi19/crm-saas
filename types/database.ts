@@ -868,6 +868,7 @@ export type Database = {
           observacoes: string | null
           origem_cliente: string | null
           profissao: string | null
+          proprietario: boolean
           regiao_interesse: string | null
           status_aprovacao: string
           telefone: string | null
@@ -902,6 +903,7 @@ export type Database = {
           observacoes?: string | null
           origem_cliente?: string | null
           profissao?: string | null
+          proprietario?: boolean
           regiao_interesse?: string | null
           status_aprovacao?: string
           telefone?: string | null
@@ -936,6 +938,7 @@ export type Database = {
           observacoes?: string | null
           origem_cliente?: string | null
           profissao?: string | null
+          proprietario?: boolean
           regiao_interesse?: string | null
           status_aprovacao?: string
           telefone?: string | null
@@ -2404,7 +2407,7 @@ export type Database = {
             foreignKeyName: "imoveis_proprietario_id_fkey"
             columns: ["proprietario_id"]
             isOneToOne: false
-            referencedRelation: "proprietarios"
+            referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
         ]
@@ -4202,57 +4205,6 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      proprietarios: {
-        Row: {
-          cpf_cnpj: string | null
-          created_at: string | null
-          email: string | null
-          empresa_id: number
-          id: number
-          nome: string
-          observacoes: string | null
-          telefone: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          cpf_cnpj?: string | null
-          created_at?: string | null
-          email?: string | null
-          empresa_id: number
-          id?: number
-          nome: string
-          observacoes?: string | null
-          telefone?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          cpf_cnpj?: string | null
-          created_at?: string | null
-          email?: string | null
-          empresa_id?: number
-          id?: number
-          nome?: string
-          observacoes?: string | null
-          telefone?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "proprietarios_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proprietarios_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
         ]

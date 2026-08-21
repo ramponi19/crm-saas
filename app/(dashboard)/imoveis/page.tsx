@@ -13,7 +13,12 @@ export default async function ImoveisPage() {
 
   const [{ data: imoveis }, { data: proprietarios }, { data: equipeRaw }] = await Promise.all([
     supabase.from('imoveis').select('*').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
-    supabase.from('proprietarios').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    /**
+     * Proprietário É um cliente (21/08/2026): a lista de escolha são as PESSOAS da
+     * carteira, não uma tabela paralela. Quem for escolhido no imóvel ganha o papel
+     * de proprietário por trigger no banco — inclusive vindo do import de portais.
+     */
+    supabase.from('clientes').select('id, nome, proprietario').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     /**
      * A equipe, para o campo "Captado por".
      *

@@ -138,6 +138,18 @@ export async function middleware(request: NextRequest) {
   // desligava o módulo e ele seguia funcionando. Papel e plano já travam nas
   // próprias páginas (requireEmpresaRole / exigirPlano); esta trava cuida só da
   // camada que não tinha nenhuma.
+  /**
+   * Telas que VIRARAM outra coisa (não foram para /admin).
+   *
+   * Proprietário passou a ser papel de cliente (21/08/2026), então a tela dele
+   * deixou de existir. Link salvo cai em Clientes em vez de bater num 404.
+   */
+  if (user) {
+    const FUNDIDAS: Record<string, string> = { '/proprietarios': '/clientes' }
+    const destino = FUNDIDAS[request.nextUrl.pathname]
+    if (destino) return NextResponse.redirect(new URL(destino, request.url))
+  }
+
   const modulo = user ? moduloDaRota(request.nextUrl.pathname) : null
   if (modulo) {
     // SUPERADMIN PASSA. Ele constrói módulo novo antes de existir liberação, e a

@@ -8,7 +8,8 @@ import { Button, IconButton, Input, Select, Textarea, Modal, ConfirmDialog, Card
 import type { Tables, TablesInsert } from '@/types/database'
 
 type Imovel = Tables<'imoveis'>
-type ProprietarioMin = { id: number; nome: string }
+/** Pessoa da carteira que pode ser dona do imóvel — cliente, com o papel marcado. */
+type ProprietarioMin = { id: number; nome: string; proprietario?: boolean | null }
 
 const TIPOS = ['apartamento', 'casa', 'terreno', 'comercial', 'sala', 'galpao', 'cobertura', 'sitio']
 const FINALIDADES = [{ v: 'venda', l: 'Venda' }, { v: 'locacao', l: 'Locação' }, { v: 'ambos', l: 'Venda e Locação' }]
@@ -277,9 +278,19 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
           <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
             {STATUS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
           </Select>
-          <Select label="Proprietário" value={form.proprietario_id} onChange={e => set('proprietario_id', e.target.value)}>
+          {/* A lista são os CLIENTES: proprietário é papel de pessoa, não cadastro
+              separado. Quem é escolhido aqui passa a constar como proprietário na
+              ficha dele — a marcação é feita no banco, para valer também no import. */}
+          <Select
+            label="Proprietário"
+            hint="Escolha alguém da carteira de clientes. Não está lá? Cadastre em Clientes."
+            value={form.proprietario_id}
+            onChange={e => set('proprietario_id', e.target.value)}
+          >
             <option value="">— nenhum —</option>
-            {proprietarios.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            {proprietarios.map(p => (
+              <option key={p.id} value={p.id}>{p.nome}{p.proprietario ? ' · proprietário' : ''}</option>
+            ))}
           </Select>
           {/* Captação: é o que o ranking do corretor mede e o que o negócio usa
               para saber com quem dividir a comissão. Sem este campo a coluna do
