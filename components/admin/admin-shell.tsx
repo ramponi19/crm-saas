@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
-  SlidersHorizontal, Link2, FileSignature,
+  SlidersHorizontal, Link2, FileSignature, Filter, Gauge,
 } from 'lucide-react'
 
 /**
@@ -26,6 +26,8 @@ const navGroups = [
       { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
       { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
       { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
+      { href: '/admin/conversao', label: 'Conversão', icon: Filter },
+      { href: '/admin/metas', label: 'Meta da empresa', icon: Gauge },
     ],
   },
   {
