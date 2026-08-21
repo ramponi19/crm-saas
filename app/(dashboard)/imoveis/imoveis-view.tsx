@@ -1,15 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
-import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Globe } from 'lucide-react'
+import { ESTADOS, estadoDaChave, comQuemEsta, chaveAtrasada, rotuloEstado, type EstadoChave } from '@/lib/chave-imovel'
+import { formatarData } from '@/lib/datas'
+import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Globe, KeyRound, ArrowRightLeft, Undo2 } from 'lucide-react'
 import { Button, IconButton, Input, Select, Textarea, Modal, ConfirmDialog, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables, TablesInsert } from '@/types/database'
 
 type Imovel = Tables<'imoveis'>
 /** Pessoa da carteira que pode ser dona do imóvel — cliente, com o papel marcado. */
 type ProprietarioMin = { id: number; nome: string; proprietario?: boolean | null }
+
+/** Chave cadastrada de um imóvel. A tela própria de Chaves saiu em 21/08/2026. */
+export interface ChaveDoImovel {
+  id: number
+  imovel_id: number | null
+  codigo: string | null
+  status: string
+  com_quem: string | null
+  retirada_em: string | null
+  devolucao_prevista: string | null
+  observacoes: string | null
+}
 
 const TIPOS = ['apartamento', 'casa', 'terreno', 'comercial', 'sala', 'galpao', 'cobertura', 'sitio']
 const FINALIDADES = [{ v: 'venda', l: 'Venda' }, { v: 'locacao', l: 'Locação' }, { v: 'ambos', l: 'Venda e Locação' }]
@@ -42,7 +56,7 @@ const vazio = {
   codigo: '', titulo: '', tipo: 'apartamento', finalidade: 'venda', status: 'disponivel', proprietario_id: '',
   valor_venda: '', valor_locacao: '', valor_condominio: '', valor_iptu: '', iptu_periodicidade: 'anual',
   area_util: '', area_total: '', quartos: '', suites: '', banheiros: '', vagas: '',
-  matricula: '', status_chaves: '',
+  matricula: '',
   captado_por: '', captado_em: '',
   cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '',
   descricao: '',
@@ -50,10 +64,18 @@ const vazio = {
 }
 type FormT = typeof vazio
 
-export default function ImoveisView({ inicial, proprietarios, equipe, empresaId, slug }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; equipe: { id: string; nome: string }[]; empresaId: number; slug: string }) {
+export default function ImoveisView({ inicial, proprietarios, equipe, empresaId, slug, chaves = [] }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; equipe: { id: string; nome: string }[]; empresaId: number; slug: string; chaves?: ChaveDoImovel[] }) {
   const supabase = createClient()
   const [lista, setLista] = useState<Imovel[]>(inicial)
   const [busca, setBusca] = useState('')
+  /** Filtro por estado da chave — o que a tela "Chaves" respondia em lista própria. */
+  const [fChave, setFChave] = useState<EstadoChave | 'todas'>('todas')
+  const [listaChaves, setListaChaves] = useState<ChaveDoImovel[]>(chaves)
+  // Empréstimo dentro da ficha: linha que abre, em vez de modal sobre modal.
+  const [emprestando, setEmprestando] = useState<number | null>(null)
+  const [comQuem, setComQuem] = useState('')
+  const [devolucao, setDevolucao] = useState('')
+  const [novaChave, setNovaChave] = useState('')
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState<Imovel | null>(null)
   const [loading, setLoading] = useState(false)
@@ -105,7 +127,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       iptu_periodicidade: im.iptu_periodicidade ?? 'anual',
       area_util: im.area_util?.toString() ?? '', area_total: im.area_total?.toString() ?? '',
       quartos: im.quartos?.toString() ?? '', suites: im.suites?.toString() ?? '', banheiros: im.banheiros?.toString() ?? '', vagas: im.vagas?.toString() ?? '',
-      matricula: im.matricula ?? '', status_chaves: im.status_chaves ?? '',
+      matricula: im.matricula ?? '',
       captado_por: im.captado_por ?? '', captado_em: im.captado_em ?? '',
       cep: im.cep ?? '', logradouro: im.logradouro ?? '', numero: im.numero ?? '', complemento: im.complemento ?? '', bairro: im.bairro ?? '', cidade: im.cidade ?? '', uf: im.uf ?? '',
       descricao: im.descricao ?? '',
@@ -126,7 +148,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       valor_condominio: n(form.valor_condominio), valor_iptu: n(form.valor_iptu), iptu_periodicidade: form.iptu_periodicidade,
       area_util: n(form.area_util), area_total: n(form.area_total),
       quartos: i(form.quartos), suites: i(form.suites), banheiros: i(form.banheiros), vagas: i(form.vagas),
-      matricula: form.matricula || null, status_chaves: form.status_chaves || null,
+      matricula: form.matricula || null,
       // Quem captou alimenta "Captações" no ranking e o rateio da comissão do
       // negócio. Vazio é resposta válida: imóvel vindo de portal não tem captador.
       captado_por: form.captado_por || null,
@@ -159,12 +181,73 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
     notify.ok('Imóvel excluído')
   }
 
-  const filtrada = lista.filter(im =>
-    (im.titulo ?? '').toLowerCase().includes(busca.toLowerCase()) ||
-    (im.codigo ?? '').toLowerCase().includes(busca.toLowerCase()) ||
-    (im.bairro ?? '').toLowerCase().includes(busca.toLowerCase()) ||
-    (im.cidade ?? '').toLowerCase().includes(busca.toLowerCase())
-  )
+  /** Chaves agrupadas por imóvel — a lista, o filtro e a ficha leem daqui. */
+  const chavesPorImovel = useMemo(() => {
+    const m = new Map<number, ChaveDoImovel[]>()
+    for (const c of listaChaves) {
+      if (c.imovel_id == null) continue
+      const arr = m.get(c.imovel_id)
+      if (arr) arr.push(c); else m.set(c.imovel_id, [c])
+    }
+    return m
+  }, [listaChaves])
+
+  const filtrada = lista.filter(im => {
+    const termo = busca.toLowerCase()
+    const casaBusca =
+      (im.titulo ?? '').toLowerCase().includes(termo) ||
+      (im.codigo ?? '').toLowerCase().includes(termo) ||
+      (im.bairro ?? '').toLowerCase().includes(termo) ||
+      (im.cidade ?? '').toLowerCase().includes(termo)
+    if (!casaBusca) return false
+    if (fChave === 'todas') return true
+    return estadoDaChave(chavesPorImovel.get(im.id) ?? []) === fChave
+  })
+
+  /** Quantos imóveis em cada estado — o chip mostra o número, como o placar antigo. */
+  const contagemChave = useMemo(() => {
+    const c: Record<EstadoChave, number> = { sem: 0, na_imobiliaria: 0, emprestada: 0, atrasada: 0 }
+    for (const im of lista) c[estadoDaChave(chavesPorImovel.get(im.id) ?? [])] += 1
+    return c
+  }, [lista, chavesPorImovel])
+
+  // ── Ações de chave (eram a tela /chaves) ──
+  async function criarChave(imovelId: number) {
+    const { data, error } = await supabase.from('chaves_imoveis')
+      .insert({ empresa_id: empresaId, imovel_id: imovelId, codigo: novaChave.trim() || null, status: 'na_imobiliaria' } as never)
+      .select('id, imovel_id, codigo, status, com_quem, retirada_em, devolucao_prevista, observacoes').single()
+    if (error) { notify.bad('Não foi possível cadastrar', error.message); return }
+    setListaChaves(l => [data as ChaveDoImovel, ...l])
+    setNovaChave('')
+    notify.ok('Chave cadastrada')
+  }
+
+  async function emprestarChave(c: ChaveDoImovel) {
+    if (!comQuem.trim()) { notify.warn('Diga com quem a chave fica'); return }
+    const patch = {
+      status: 'emprestada', com_quem: comQuem.trim(),
+      retirada_em: new Date().toISOString(), devolucao_prevista: devolucao || null,
+    }
+    const { error } = await supabase.from('chaves_imoveis').update(patch as never).eq('id', c.id)
+    if (error) { notify.bad('Não foi possível registrar', error.message); return }
+    setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
+    setEmprestando(null); setComQuem(''); setDevolucao('')
+    notify.ok('Empréstimo registrado')
+  }
+
+  async function devolverChave(c: ChaveDoImovel) {
+    const patch = { status: 'na_imobiliaria', com_quem: null, retirada_em: null, devolucao_prevista: null }
+    const { error } = await supabase.from('chaves_imoveis').update(patch as never).eq('id', c.id)
+    if (error) { notify.bad('Não foi possível devolver', error.message); return }
+    setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
+    notify.ok('Chave devolvida')
+  }
+
+  async function removerChave(c: ChaveDoImovel) {
+    const { error } = await supabase.from('chaves_imoveis').delete().eq('id', c.id)
+    if (error) { notify.bad('Não foi possível remover', error.message); return }
+    setListaChaves(l => l.filter(x => x.id !== c.id))
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
@@ -191,6 +274,33 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
           )}
           <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={abrirNovo}>Novo imóvel</Button>
         </div>
+      </div>
+
+      {/* Filtro por chave: o que a tela "Chaves" respondia — quem está com chave e
+          o que está atrasado — agora recorta a lista de imóveis. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-6 pb-4">
+        <button
+          onClick={() => setFChave('todas')}
+          aria-pressed={fChave === 'todas'}
+          className={`rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+            fChave === 'todas' ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink-2 hover:text-ink'
+          }`}
+        >
+          Todos os imóveis
+        </button>
+        {ESTADOS.map(e => (
+          <button
+            key={e.id}
+            onClick={() => setFChave(fChave === e.id ? 'todas' : e.id)}
+            aria-pressed={fChave === e.id}
+            className={`inline-flex items-center gap-1.5 rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+              fChave === e.id ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink-2 hover:text-ink'
+            }`}
+          >
+            <KeyRound size={13} strokeWidth={1.8} />{e.label}
+            <span className="num opacity-70">{contagemChave[e.id]}</span>
+          </button>
+        ))}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
@@ -224,9 +334,25 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
                         </div>
                         <Badge tone={STATUS_TONE[im.status] ?? 'neutro'} dot={im.status === 'disponivel'}>{st?.l ?? im.status}</Badge>
                       </div>
-                      <div className="mb-3 text-[12.5px] text-ink-2">
+                      <div className="mb-2 text-[12.5px] text-ink-2">
                         {cap(im.tipo)} · {(im.bairro || im.cidade) ? [im.bairro, im.cidade].filter(Boolean).join(', ') : 'sem endereço'}
                       </div>
+                      {/* Chave no card: antes era preciso abrir outra tela para saber
+                          se a chave do imóvel está na loja, na rua ou atrasada. */}
+                      {(() => {
+                        const dele = chavesPorImovel.get(im.id) ?? []
+                        const est = estadoDaChave(dele)
+                        if (est === 'sem') return null
+                        const r = rotuloEstado(est)
+                        const quem = comQuemEsta(dele)
+                        return (
+                          <div className="mb-3 flex items-center gap-1.5 text-[12px] text-ink-2">
+                            <KeyRound size={12} strokeWidth={1.8} className="text-ink-3" />
+                            <Badge tone={r.tone}>{r.label}</Badge>
+                            {quem && <span className="truncate">com {quem}</span>}
+                          </div>
+                        )
+                      })()}
                       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-2">
                         {im.quartos ? <span>{im.quartos} qto</span> : null}
                         {im.vagas ? <span>{im.vagas} vaga</span> : null}
@@ -342,7 +468,75 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
           <Campo label="Banheiros" value={form.banheiros} onChange={str('banheiros')} tipo="number" />
           <Campo label="Vagas" value={form.vagas} onChange={str('vagas')} tipo="number" />
           <Campo label="Matrícula" value={form.matricula} onChange={str('matricula')} />
-          <Campo label="Chaves" value={form.status_chaves} onChange={str('status_chaves')} ph="Ex: na imobiliária" />
+          {/*
+            CHAVES — era um campo de texto livre ("Ex: na imobiliária") que dizia a
+            mesma coisa que o cadastro de chaves, à mão e sem ninguém garantir que
+            batia. Agora é o cadastro de verdade, dentro do imóvel: cadastrar,
+            emprestar, devolver. Só na edição, porque chave precisa de imóvel salvo.
+          */}
+          {editando && (
+            <div className="sm:col-span-2">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink-2">
+                <KeyRound size={13} strokeWidth={1.8} />Chaves deste imóvel
+              </div>
+              <div className="rounded-control border border-line bg-bg p-2.5">
+                {(chavesPorImovel.get(editando.id) ?? []).length === 0 ? (
+                  <p className="mb-2 text-[12px] text-ink-3">Nenhuma chave cadastrada.</p>
+                ) : (
+                  <div className="mb-2 divide-y divide-line-soft">
+                    {(chavesPorImovel.get(editando.id) ?? []).map(c => {
+                      const atrasou = chaveAtrasada(c)
+                      return (
+                        <div key={c.id} className="py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="num text-[12.5px] font-semibold text-ink">{c.codigo || 'sem código'}</span>
+                            {atrasou
+                              ? <Badge tone="bad">atrasada</Badge>
+                              : <Badge tone={c.status === 'emprestada' ? 'warn' : 'ok'}>{c.status === 'emprestada' ? 'emprestada' : 'na imobiliária'}</Badge>}
+                            {c.status === 'emprestada' && (
+                              <span className="truncate text-[11.5px] text-ink-2">
+                                com {c.com_quem} · devolver {formatarData(c.devolucao_prevista, undefined, 'sem data')}
+                              </span>
+                            )}
+                            <span className="ml-auto flex items-center gap-1">
+                              {c.status === 'na_imobiliaria' ? (
+                                <Button type="button" variant="outline" size="sm" icon={<ArrowRightLeft size={13} strokeWidth={1.7} />}
+                                  onClick={() => { setEmprestando(c.id); setComQuem(''); setDevolucao('') }}>
+                                  Emprestar
+                                </Button>
+                              ) : (
+                                <Button type="button" variant="outline" size="sm" icon={<Undo2 size={13} strokeWidth={1.7} />} onClick={() => devolverChave(c)}>
+                                  Devolver
+                                </Button>
+                              )}
+                              <IconButton size="sm" variant="danger" aria-label="Remover chave" onClick={() => removerChave(c)}>
+                                <Trash2 size={13} strokeWidth={1.7} />
+                              </IconButton>
+                            </span>
+                          </div>
+                          {/* Empréstimo abre AQUI, e não em outro modal: modal sobre
+                              modal esconde o que a pessoa estava fazendo. */}
+                          {emprestando === c.id && (
+                            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+                              <Input aria-label="Com quem fica" value={comQuem} onChange={e => setComQuem(e.target.value)} placeholder="Com quem fica" />
+                              <Input aria-label="Devolução prevista" type="date" className="num" value={devolucao} onChange={e => setDevolucao(e.target.value)} />
+                              <Button type="button" size="sm" onClick={() => emprestarChave(c)}>Confirmar</Button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input aria-label="Código da nova chave" value={novaChave} onChange={e => setNovaChave(e.target.value)} placeholder="Código da chave (ex: CH-014)" />
+                  <Button type="button" variant="outline" size="sm" icon={<Plus size={13} strokeWidth={1.7} />} onClick={() => criarChave(editando.id)}>
+                    Cadastrar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <Secao>Endereço</Secao>

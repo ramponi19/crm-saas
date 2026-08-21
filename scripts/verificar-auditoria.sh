@@ -56,7 +56,8 @@ v "pagina publica mostra o item"      "app/orcamento/[token]/orcamento-view.tsx"
 v "encomenda copia a serie"           "components/modules/historico/historico-view.tsx" "serieDaUnidade"
 v "datas: helper existe"              "lib/datas.ts" "SO_DATA"
 v "compras usa o helper"              "app/(dashboard)/compras/components/compras-view.tsx" "formatarDiaMes"
-v "chaves usa o helper"               "app/(dashboard)/chaves/chaves-view.tsx" "paraData"
+# A tela /chaves saiu (21/08/2026); a regra da data pura mudou de casa junto.
+v "chave usa o helper de data"         "lib/chave-imovel.ts" "paraData"
 
 echo "== passada 4 e 5: o que era meu =="
 v "rota da empresa existe"            "app/api/empresa/route.ts" "requireEmpresaRoleApi"
@@ -243,6 +244,16 @@ v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "from(
 v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"
 v "papel se marca na ficha"            "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "proprietario: form.proprietario"
 v "filtro so proprietarios"            "app/(dashboard)/clientes/components/clientes-view.tsx" "soProprietarios"
+
+echo "== chave e atributo do imovel (21/08) =="
+n "nao existe mais tela de chaves"     "lib/menu.ts" "href: '/chaves'"
+v "rota antiga cai em imoveis"         "middleware.ts" "'/chaves': '/imoveis'"
+v "estado da chave tem fonte unica"    "lib/chave-imovel.ts" "export function estadoDaChave"
+v "atraso conta so o dia passado"      "lib/chave-imovel.ts" "prevista < new Date(agora.getFullYear()"
+v "pior noticia ganha no imovel"       "lib/chave-imovel.ts" "chaves.some(chaveAtrasada)"
+v "lista de imoveis filtra por chave"  "app/(dashboard)/imoveis/imoveis-view.tsx" "estadoDaChave(chavesPorImovel.get(im.id)"
+v "emprestimo mora na ficha"           "app/(dashboard)/imoveis/imoveis-view.tsx" "async function emprestarChave"
+n "campo de texto de chave saiu"       "app/(dashboard)/imoveis/imoveis-view.tsx" "status_chaves"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
