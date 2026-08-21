@@ -68,6 +68,10 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/api/planos-publicos') ||
                         request.nextUrl.pathname.startsWith('/api/register') ||
                         request.nextUrl.pathname.startsWith('/api/portais/') ||
+                        // Webhook do Contact2Sale: parceiro nao tem sessao, e a
+                        // autenticacao e o token secreto na propria URL — mesmo
+                        // desenho do webhook dos portais.
+                        request.nextUrl.pathname.startsWith('/api/webhook/') ||
                         request.nextUrl.pathname.startsWith('/api/imob/') ||
                         request.nextUrl.pathname.startsWith('/imovel/') ||
                         request.nextUrl.pathname.startsWith('/imob/') ||

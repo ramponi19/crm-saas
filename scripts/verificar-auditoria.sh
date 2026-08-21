@@ -255,5 +255,17 @@ v "lista de imoveis filtra por chave"  "app/(dashboard)/imoveis/imoveis-view.tsx
 v "emprestimo mora na ficha"           "app/(dashboard)/imoveis/imoveis-view.tsx" "async function emprestarChave"
 n "campo de texto de chave saiu"       "app/(dashboard)/imoveis/imoveis-view.tsx" "status_chaves"
 
+echo "== contact2sale (21/08) =="
+v "webhook e rota publica"            "middleware.ts" "startsWith('/api/webhook/')"
+v "token deles entra cifrado"         "app/api/admin/c2s/route.ts" "cifrarToken(t)"
+v "token deles nunca volta pra tela"  "app/admin/integracoes/page.tsx" "temToken: !!cfgC2S.token"
+v "valida token antes de guardar"     "app/api/admin/c2s/route.ts" "const teste = await testarToken(t)"
+v "repeticao nao duplica lead"        "app/api/webhook/c2s/[slug]/route.ts" ".eq('origem_id', lead.externoId)"
+v "update nao apaga o que nao veio"   "app/api/webhook/c2s/[slug]/route.ts" "if (lead.produto) patch.produto_interessado"
+v "log grava o payload cru"           "app/api/webhook/c2s/[slug]/route.ts" "payload: (dados.payload ?? null)"
+v "teto de requisicao no webhook"     "app/api/webhook/c2s/[slug]/route.ts" "excedeuLimite(svc,"
+v "avisa do um-endpoint-por-token"    "app/api/admin/c2s/route.ts" "um endereço por token"
+v "vendedor casa por e-mail"          "app/api/webhook/c2s/[slug]/route.ts" "eq('email', lead.vendedorEmail)"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

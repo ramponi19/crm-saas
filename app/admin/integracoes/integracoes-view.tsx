@@ -7,6 +7,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, Badge, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { C2SCard, type EstadoC2S, type EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
   return (
@@ -33,10 +34,13 @@ function UrlLinha({ label, url, onCopy }: { label: string; url: string; onCopy: 
   )
 }
 
-export default function IntegracoesView({ slug, segmento, token, feedUrlInicial, ultimaImportacao, appId }: {
+export default function IntegracoesView({ slug, segmento, token, feedUrlInicial, ultimaImportacao, appId, c2s, eventosC2S = [] }: {
   slug: string; segmento: string; token: string; feedUrlInicial: string; ultimaImportacao: string | null
   /** App ID da Meta — público, roda no navegador dentro do conector oficial. */
   appId: string
+  /** Contact2Sale: estado da ligação (sem o token deles) e últimos eventos. */
+  c2s?: EstadoC2S
+  eventosC2S?: EventoIntegracao[]
 }) {
   const [origin, setOrigin] = useState('')
   useEffect(() => { setOrigin(window.location.origin) }, [])
@@ -114,6 +118,10 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
             </IntegracaoCard>
 
             {isImob && (<>
+            {/* Contact2Sale: por onde a imobiliária recebe lead hoje. Vem antes do
+                resto porque é a fonte que já está em produção na operação dela. */}
+            {c2s && <C2SCard estado={c2s} eventos={eventosC2S} />}
+
             {/* Importar imóveis do site */}
             <IntegracaoCard icon={DownloadCloud} titulo="Conectar seu site (importar imóveis)" desc="Seu site continua o dono dos imóveis; o CRM importa o acervo do XML que ele já gera pros portais.">
               <label className="mb-1.5 block text-[12px] font-medium text-ink-2">URL do feed XML de imóveis</label>
