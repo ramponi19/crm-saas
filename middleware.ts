@@ -145,7 +145,12 @@ export async function middleware(request: NextRequest) {
    * deixou de existir. Link salvo cai em Clientes em vez de bater num 404.
    */
   if (user) {
-    const FUNDIDAS: Record<string, string> = { '/proprietarios': '/clientes' }
+    const FUNDIDAS: Record<string, string> = {
+      '/proprietarios': '/clientes',
+      // A chave virou atributo do imóvel (21/08/2026): estado na lista, filtro nos
+      // chips e empréstimo dentro da ficha.
+      '/chaves': '/imoveis',
+    }
     const destino = FUNDIDAS[request.nextUrl.pathname]
     if (destino) return NextResponse.redirect(new URL(destino, request.url))
   }

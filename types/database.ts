@@ -2285,7 +2285,6 @@ export type Database = {
           publicar_portais: boolean | null
           quartos: number | null
           status: string
-          status_chaves: string | null
           suites: number | null
           tipo: string
           titulo: string | null
@@ -2327,7 +2326,6 @@ export type Database = {
           publicar_portais?: boolean | null
           quartos?: number | null
           status?: string
-          status_chaves?: string | null
           suites?: number | null
           tipo?: string
           titulo?: string | null
@@ -2369,7 +2367,6 @@ export type Database = {
           publicar_portais?: boolean | null
           quartos?: number | null
           status?: string
-          status_chaves?: string | null
           suites?: number | null
           tipo?: string
           titulo?: string | null

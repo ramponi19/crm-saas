@@ -235,7 +235,6 @@ export const SEGMENTOS: Record<Segmento, SegmentoConfig> = {
     // Agenda e Tarefas passaram ao núcleo (grupo "Hoje", todos os segmentos) — ver lib/menu.
     modulosExtra: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home' },
-      { href: '/chaves', label: 'Chaves', icon: 'Key' },
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator' },
       /**
        * RANKING NO MENU DO TIME — e só aqui.
