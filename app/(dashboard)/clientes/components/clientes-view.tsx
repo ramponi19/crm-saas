@@ -38,6 +38,8 @@ interface Cliente {
   lead_id?: number | null
   tipo_negocio?: string | null
   status_aprovacao?: string | null
+  /** Papel: é dono de imóvel na carteira. Acumula com o tipo de negócio. */
+  proprietario?: boolean | null
   corretor_id?: string | null
   valor_pretendido?: number | null
   regiao_interesse?: string | null
@@ -97,6 +99,14 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
   const [fCorretor, setFCorretor] = useState('')
   const [fTipo, setFTipo] = useState('')
   const [fStatus, setFStatus] = useState('')
+  /**
+   * Filtro de PAPEL, não de tipo.
+   *
+   * Substitui a tela "Proprietários", que era uma segunda lista de pessoas: a
+   * pergunta que ela respondia ("quem são meus proprietários?") vira um filtro
+   * aqui, sem obrigar ninguém a cadastrar a mesma pessoa duas vezes.
+   */
+  const [soProprietarios, setSoProprietarios] = useState(false)
 
   const filtrados = useMemo(() => {
     if (!search) return clientes
@@ -130,9 +140,10 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
       if (fCorretor && (jornada[c.id]?.corretorNome ?? '') !== fCorretor) return false
       if (fTipo && c.tipo_negocio !== fTipo) return false
       if (fStatus && (c.status_aprovacao ?? 'pendente') !== fStatus) return false
+      if (soProprietarios && !c.proprietario) return false
       return true
     })
-  }, [filtrados, imob, fCorretor, fTipo, fStatus, jornada])
+  }, [filtrados, imob, fCorretor, fTipo, fStatus, soProprietarios, jornada])
 
   function openCliente(c: Cliente) { setClienteSelecionado(c); setIsNew(false); setModalOpen(true) }
   function openNovo() { setClienteSelecionado(null); setIsNew(true); setModalOpen(true) }
@@ -146,7 +157,12 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
             {getInitials(c.nome)}
           </span>
           <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold text-ink">{c.nome}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-[13px] font-semibold text-ink">{c.nome}</span>
+              {/* O papel aparece SEM precisar filtrar: era uma tela inteira antes, e
+                  quem abre a lista precisa saber de quem é o imóvel que administra. */}
+              {c.proprietario && <Badge tone="warn">Proprietário</Badge>}
+            </div>
             {c.email && <div className="truncate text-[11px] text-ink-3">{c.email}</div>}
           </div>
         </div>
@@ -275,6 +291,15 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
             <option value="">Todos</option>
             {STATUS_APROVACAO.map((st) => <option key={st.v} value={st.v}>{st.l}</option>)}
           </Select>
+          <label className="flex items-end gap-2 pb-2 text-[13px] text-ink">
+            <input
+              type="checkbox"
+              checked={soProprietarios}
+              onChange={(e) => setSoProprietarios(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Só proprietários
+          </label>
         </div>
       )}
 

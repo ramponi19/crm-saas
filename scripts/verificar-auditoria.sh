@@ -235,5 +235,14 @@ n "folha Mais tambem nao"              "components/layout/bottom-nav.tsx" "grupo
 v "sidebar usa a lista plana"          "components/layout/sidebar.tsx" "resolverMenuPlano({"
 # Href salvo que nao existe mais e ignorado; item novo entra no fim, nao desaparece.
 v "ordem plana tolera href sumido"     "lib/menu.ts" "if (!usados.has(item.href)) saida.push(item)"
+echo "== proprietario e um cliente (21/08) =="
+n "nao existe mais tela paralela"      "lib/menu.ts" "href: '/proprietarios'"
+n "segmento nao declara a tela"        "lib/segmentos.ts" "href: '/proprietarios'"
+v "rota antiga cai em clientes"        "middleware.ts" "'/proprietarios': '/clientes'"
+v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "from('clientes').select('id, nome, proprietario')"
+v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"
+v "papel se marca na ficha"            "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "proprietario: form.proprietario"
+v "filtro so proprietarios"            "app/(dashboard)/clientes/components/clientes-view.tsx" "soProprietarios"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

@@ -43,6 +43,7 @@ interface Cliente {
   lead_id?: number | null
   tipo_negocio?: string | null
   status_aprovacao?: string | null
+  proprietario?: boolean | null
   corretor_id?: string | null
   valor_pretendido?: number | null
   regiao_interesse?: string | null
@@ -112,7 +113,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
     nome: '', cpf_cnpj: '', telefone: '', email: '',
     origem_cliente: '', corretor_id: '', tipo_negocio: '',
     valor_pretendido: '', regiao_interesse: '', status_aprovacao: 'pendente',
-    observacoes: '',
+    observacoes: '', proprietario: false,
   }
   const [form, setForm] = useState(() => cliente ? {
     nome: cliente.nome ?? '',
@@ -126,8 +127,11 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
     regiao_interesse: cliente.regiao_interesse ?? '',
     status_aprovacao: cliente.status_aprovacao ?? 'pendente',
     observacoes: cliente.observacoes ?? '',
+    proprietario: !!cliente.proprietario,
   } : vazio)
   const set = (k: keyof typeof vazio, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  /** `proprietario` é booleano; `set` só serve para texto. */
+  const setBool = (k: 'proprietario', v: boolean) => setForm((f) => ({ ...f, [k]: v }))
 
   const [prefs, setPrefs] = useState<Preferencias | null>(null)
   const [editandoPrefs, setEditandoPrefs] = useState(false)
@@ -222,6 +226,14 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
       regiao_interesse: form.regiao_interesse.trim() || null,
       status_aprovacao: form.status_aprovacao || 'pendente',
       observacoes: form.observacoes.trim() || null,
+      /**
+       * Papel de proprietário — o que substituiu a tela "Proprietários".
+       *
+       * Marcar aqui é para quem cadastra o dono ANTES de ter o imóvel; quando o
+       * imóvel é salvo apontando para ele, o banco marca sozinho (trigger), porque
+       * imóvel também entra por import de portal e por API.
+       */
+      proprietario: form.proprietario,
     }
     if (isNew) {
       const { data: emp } = await supabase.rpc('get_empresa_id')
@@ -348,6 +360,17 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
           <Select label="Status de aprovação" value={form.status_aprovacao} onChange={(e) => set('status_aprovacao', e.target.value)}>
             {STATUS_APROVACAO.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
           </Select>
+          {/* Papel, ao lado dos dados da pessoa: um proprietário pode também estar
+              comprando, então isto NÃO é o tipo de negócio dele — acumula com ele. */}
+          <label className="flex items-center gap-2 text-[13px] text-ink sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.proprietario}
+              onChange={(e) => setBool('proprietario', e.target.checked)}
+              className="h-4 w-4"
+            />
+            É proprietário de imóvel na carteira
+          </label>
           <Textarea wrapperClassName="sm:col-span-2" label="Observações" rows={2} value={form.observacoes} onChange={(e) => set('observacoes', e.target.value)} />
         </div>
       ) : (
