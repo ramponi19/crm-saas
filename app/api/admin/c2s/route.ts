@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import {
   ACOES, assinar, cancelar, carregarConfig, cifrarToken, getOrCreateTokenEntrada,
-  salvarConfig, testarToken, tokenEmClaro, type AcaoC2S,
+  salvarConfig, testarToken, tokenEmClaro, basePublica, type AcaoC2S,
 } from '@/lib/c2s'
 
 /**
@@ -72,7 +72,19 @@ export async function POST(req: Request) {
     if (!empresa?.slug) return NextResponse.json({ error: 'A empresa precisa de um slug para receber webhook' }, { status: 400 })
 
     const entrada = await getOrCreateTokenEntrada(svc, empresaId)
-    const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || new URL(req.url).origin
+    const { base, local } = basePublica(new URL(req.url).origin)
+    /**
+     * Recusa assinar endereco LOCAL.
+     *
+     * O C2S guarda a URL do lado dele: assinar `localhost` registra um endereco que
+     * nunca responde, e o sintoma aparece dias depois como "o lead nao chegou".
+     * Melhor recusar aqui do que deixar a integracao parecendo pronta.
+     */
+    if (local) {
+      return NextResponse.json({
+        error: 'Este ambiente e local. Assine pelo endereco publico do CRM — o C2S guarda a URL do lado dele.',
+      }, { status: 400 })
+    }
     const url = `${base}/api/webhook/c2s/${empresa.slug}?token=${entrada}`
 
     const pedidos = (b.gatilhos?.length ? b.gatilhos : ACOES.map((a) => a.id))
@@ -89,6 +101,8 @@ export async function POST(req: Request) {
       ...atual,
       assinaturas: [...new Set([...(atual.assinaturas ?? []), ...feitos])],
       assinado_em: feitos.length ? new Date().toISOString() : atual.assinado_em ?? null,
+      // Guarda o endereco EXATO que o C2S passou a conhecer.
+      url_assinada: feitos.length ? url : atual.url_assinada ?? null,
     })
 
     return NextResponse.json({

@@ -266,6 +266,10 @@ v "log grava o payload cru"           "app/api/webhook/c2s/[slug]/route.ts" "pay
 v "teto de requisicao no webhook"     "app/api/webhook/c2s/[slug]/route.ts" "excedeuLimite(svc,"
 v "avisa do um-endpoint-por-token"    "app/api/admin/c2s/route.ts" "um endereço por token"
 v "vendedor casa por e-mail"          "app/api/webhook/c2s/[slug]/route.ts" "eq('email', lead.vendedorEmail)"
+v "recusa assinar endereco local"    "app/api/admin/c2s/route.ts" "if (local) {"
+v "guarda a url que foi assinada"    "app/api/admin/c2s/route.ts" "url_assinada: feitos.length ? url"
+v "tela e rota usam a mesma conta"   "app/admin/integracoes/page.tsx" "basePublica(hostReq"
+v "tela mostra divergencia de url"   "components/modules/integracoes/c2s-card.tsx" "estado.urlAssinada !== estado.urlWebhook"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
