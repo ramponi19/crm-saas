@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getOrCreatePortalToken } from '@/lib/portal-token'
-import { carregarConfig, getOrCreateTokenEntrada } from '@/lib/c2s'
+import { basePublica, carregarConfig, getOrCreateTokenEntrada } from '@/lib/c2s'
 import type { EstadoC2S, EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
 import IntegracoesView from './integracoes-view'
 
@@ -33,27 +33,16 @@ export default async function IntegracoesPage() {
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 
   /**
-   * Base da URL do webhook.
+   * Base da URL do webhook — a MESMA conta que a rota de assinatura faz.
    *
-   * Sai do env porque o C2S guarda o endereço do lado DELE: precisa ser o domínio
-   * definitivo, não o host da requisição em que a tela foi aberta — abrir o painel
-   * por um domínio de preview registraria o webhook apontando para o preview.
-   */
-  const envBase = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  const limpo = envBase.endsWith('/') ? envBase.slice(0, -1) : envBase
-  /**
-   * Fallback pelo host da requisicao.
-   *
-   * A variavel de ambiente e a preferencia — o C2S guarda este endereco do lado
-   * DELE, entao tem de ser o dominio definitivo. Mas em ambiente local ela aponta
-   * para localhost, e na Vercel pode nao existir: sem fallback a tela mostraria uma
-   * URL vazia e o lojista copiaria um endereco quebrado.
+   * Antes esta tela tinha a sua própria conta e a rota tinha outra: as duas podiam
+   * discordar sobre o endereço, e a tela mostrava um webhook que nunca foi registrado.
+   * Agora as duas chamam `basePublica`, e o que aparece como registrado é o valor
+   * guardado no momento da assinatura (`url_assinada`) — não um recálculo.
    */
   const h = await headers()
   const hostReq = h.get('host')
-  const baseUrl = limpo && !limpo.includes('localhost')
-    ? limpo
-    : hostReq ? 'https://' + hostReq : limpo
+  const { base: baseUrl } = basePublica(hostReq ? 'https://' + hostReq : '')
 
   return (
     <IntegracoesView
@@ -67,6 +56,7 @@ export default async function IntegracoesPage() {
         temToken: !!cfgC2S.token,
         assinaturas: cfgC2S.assinaturas ?? [],
         assinadoEm: cfgC2S.assinado_em ?? null,
+        urlAssinada: cfgC2S.url_assinada ?? null,
         urlWebhook: `${baseUrl}/api/webhook/c2s/${empresa?.slug ?? ''}?token=${entradaC2S}`,
       } satisfies EstadoC2S}
       eventosC2S={(eventosC2S ?? []) as EventoIntegracao[]}

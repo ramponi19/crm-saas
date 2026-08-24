@@ -36,6 +36,14 @@ export interface ConfigC2S {
   entrada?: string
   assinaturas?: AcaoC2S[]
   assinado_em?: string | null
+  /**
+   * A URL que foi REGISTRADA no C2S — guardada, não recalculada.
+   *
+   * O endereço fica do lado deles; recalcular na tela mostra o que nós ACHAMOS que
+   * está lá. Se a variável de ambiente mudar, ou o painel for aberto por outro
+   * domínio, os dois divergem e ninguém percebe até o lead não chegar.
+   */
+  url_assinada?: string | null
 }
 
 /** Config crua do banco (o token segue cifrado). */
@@ -103,6 +111,23 @@ async function chamar(caminho: string, token: string, body?: unknown): Promise<R
   } catch (e) {
     return { ok: false, status: 0, corpo: e instanceof Error ? e.message : 'falha de rede' }
   }
+}
+
+/**
+ * Base pública do CRM, com a mesma regra em todo lugar.
+ *
+ * `localhost` é recusado de propósito: em ambiente local a variável aponta para a
+ * máquina do desenvolvedor, e assinar isso no C2S registraria um endereço que nunca
+ * responde — integração que parece ligada e nunca recebe nada.
+ */
+export function basePublica(origemDaRequisicao: string): { base: string; local: boolean } {
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim()
+  const limpo = env.endsWith('/') ? env.slice(0, -1) : env
+  const candidato = limpo && !limpo.includes('localhost') && !limpo.includes('127.0.0.1')
+    ? limpo
+    : origemDaRequisicao
+  const local = candidato.includes('localhost') || candidato.includes('127.0.0.1')
+  return { base: candidato, local }
 }
 
 export const assinar = (token: string, acao: AcaoC2S, url: string) =>

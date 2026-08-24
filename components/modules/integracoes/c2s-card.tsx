@@ -18,6 +18,8 @@ export interface EstadoC2S {
   assinaturas: string[]
   assinadoEm: string | null
   urlWebhook: string
+  /** O endereço que o C2S realmente conhece, guardado ao assinar. Pode divergir do de cima. */
+  urlAssinada: string | null
 }
 
 export interface EventoIntegracao {
@@ -115,6 +117,19 @@ export function C2SCard({ estado, eventos }: { estado: EstadoC2S; eventos: Event
         <p className="mt-1 text-[11px] text-ink-3">
           Contém um token secreto: é ele que autentica a chamada, porque o C2S não assina o corpo. Não publique.
         </p>
+        {/*
+          DIVERGÊNCIA VISÍVEL. O endereço fica guardado do lado do C2S; se ele mudar
+          aqui — variável de ambiente, domínio novo, painel aberto por outro host — o
+          C2S continua chamando o antigo e o lead simplesmente não chega, sem erro em
+          lugar nenhum. Mostrar os dois é o que transforma isso em algo perceptível.
+        */}
+        {estado.urlAssinada && estado.urlAssinada !== estado.urlWebhook && (
+          <p className="mt-2 rounded-control border border-warn/30 bg-warn-soft px-3 py-2 text-[11.5px] leading-snug text-ink-2">
+            <strong>O C2S está chamando outro endereço:</strong>{' '}
+            <code className="break-all">{estado.urlAssinada}</code>. Assine de novo para
+            atualizar do lado deles — até lá, o lead vai para o endereço antigo.
+          </p>
+        )}
       </div>
 
       {estado.temToken ? (
@@ -167,6 +182,9 @@ export function C2SCard({ estado, eventos }: { estado: EstadoC2S; eventos: Event
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
           {estado.assinaturas.map((a) => <Badge key={a} tone="acc">{GATILHOS[a] ?? a}</Badge>)}
           {estado.assinadoEm && <span className="text-[11.5px] text-ink-3">desde {quando(estado.assinadoEm)}</span>}
+          {estado.urlAssinada === null && (
+            <span className="text-[11.5px] text-ink-3">endereço registrado antes desta versão — reassine para conferir</span>
+          )}
         </div>
       )}
 
