@@ -141,12 +141,25 @@ export function C2SCard({ estado, eventos }: { estado: EstadoC2S; eventos: Event
             wrapperClassName="min-w-[260px] flex-1"
             label="Token do Contact2Sale"
             type="password"
-            hint="Gerado no C2S. É validado antes de salvar e nunca volta para esta tela."
+            hint="Validado antes de salvar e nunca volta para esta tela."
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="cole aqui"
           />
           <Button loading={ocupado === 'salvar_token'} onClick={() => agir('salvar_token', { token })}>Validar e salvar</Button>
+          {/*
+            GERE UM TOKEN EXCLUSIVO. O C2S guarda um endereço de webhook POR TOKEN
+            e apaga o anterior quando um novo é assinado. Reaproveitar um token que
+            já serve outro sistema derruba aquele sistema calado — e não há endpoint
+            para consultar o que um token já tem assinado, então não dá para
+            descobrir isso antes. Com token próprio, o risco deixa de existir.
+          */}
+          <p className="w-full text-[11.5px] leading-snug text-ink-3">
+            <strong className="text-ink-2">Gere um token só para o Nexus</strong> no C2S
+            (Integrações → Informações de integração por e-mail e API → Gerar Token, dando um nome).
+            Cada token guarda um endereço de webhook: com um token próprio, nenhuma outra
+            integração sua para de receber. O C2S mostra o token uma única vez — guarde ao gerar.
+          </p>
         </div>
       )}
 
