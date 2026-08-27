@@ -65,7 +65,10 @@ export function CanaisView({ appId }: { appId: string }) {
   const [avisoWhats, setAvisoWhats] = useState(false)
   // Cliente com mais de uma Página: guarda o código para reenviar com a escolha
   // dele, em vez de conectar a primeira no escuro.
-  const [escolha, setEscolha] = useState<{ code: string; paginas: { id: string; nome: string }[] } | null>(null)
+  const [escolha, setEscolha] = useState<{
+    code: string
+    paginas: { id: string; nome: string; instagram?: string | null }[]
+  } | null>(null)
 
   // Caixa-preta: o SDK da Meta falha no NAVEGADOR, antes de qualquer chamada ao
   // servidor. Sem isto a única fonte de verdade seria o console do usuário.
@@ -702,9 +705,17 @@ export function CanaisView({ appId }: { appId: string }) {
             <Button
               key={p.id}
               variant="outline"
+              className="flex-col items-start gap-0.5 py-2 text-left"
               onClick={() => { const c = escolha.code; setEscolha(null); setConectando('instagram'); gravarMeta(c, p.id) }}
             >
-              {p.nome}
+              <span>{p.nome}</span>
+              {/*
+                O @ vinculado decide qual Instagram entra. Sem isto, escolher a Pagina
+                e adivinhar qual Direct vem com ela.
+              */}
+              <span className="text-[11px] font-normal text-ink-3">
+                {p.instagram ? '@' + p.instagram : 'sem Instagram vinculado'}
+              </span>
             </Button>
           ))}
         </div>

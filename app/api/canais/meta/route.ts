@@ -168,7 +168,21 @@ export async function POST(req: Request) {
       pagina: pagina.nome,
       instagram: pagina.instagram?.username ? `@${pagina.instagram.username}` : null,
       // Mais de uma Página autorizada: a UI pergunta qual, em vez de escolher no escuro.
-      outrasPaginas: lista.paginas.length > 1 ? lista.paginas.map((p) => ({ id: p.id, nome: p.nome })) : [],
+      /**
+       * Qual Instagram vem com cada Pagina — o nome da Pagina nao basta.
+       *
+       * A conta do Instagram que o CRM conecta NAO e a que o lojista marca no
+       * dialogo da Meta: e a que esta vinculada a Pagina escolhida
+       * (`instagram_business_account`), e uma Pagina tem no maximo uma. O Lucas
+       * marcou `jmstore_jaguariuna` tres vezes com a Pagina de Mogi selecionada, e
+       * as tres vezes o CRM gravou `jmstore_importados` — corretamente, e sem ter
+       * como avisar que a escolha dele nao tinha efeito.
+       *
+       * O token da Pagina JAMAIS entra aqui: so id, nome e o @ do Instagram.
+       */
+      outrasPaginas: lista.paginas.length > 1
+        ? lista.paginas.map((p) => ({ id: p.id, nome: p.nome, instagram: p.instagram?.username ?? null }))
+        : [],
       avisos,
     })
   } catch (e) {

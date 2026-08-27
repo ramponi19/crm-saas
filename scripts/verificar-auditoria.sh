@@ -296,6 +296,8 @@ v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx
 v "canal novo nasce na loja atual"    "app/api/canais/meta/route.ts" "update({ filial_id: loja })"
 v "reconexao nao mexe na loja"        "app/api/canais/meta/route.ts" "if (existia.has(l.tipo"
 v "numero novo nasce na loja atual"   "app/api/canais/whatsapp/route.ts" "loja != null && !jaExistia"
+v "escolha de pagina mostra o insta"  "components/modules/canais/canais-view.tsx" "sem Instagram vinculado"
+v "rota manda o @ de cada pagina"     "app/api/canais/meta/route.ts" "instagram: p.instagram?.username"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
