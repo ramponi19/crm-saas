@@ -285,6 +285,10 @@ v "selecao valida a empresa"         "app/api/filial/selecionar/route.ts" "eq('e
 v "loja da pessoa e validada"        "app/api/equipe/atualizar-usuario/route.ts" "Loja não encontrada nesta empresa"
 v "campo de loja so no /admin"       "app/admin/equipe/page.tsx" "filiais={(filiais ?? "
 v "CRM nao apaga a loja ao salvar"   "app/(dashboard)/equipe/components/equipe-view.tsx" "...(escolheLoja ?"
+v "canal pode ser de uma loja"       "app/api/canais/[id]/route.ts" "filial_id: filialId ?? null"
+v "canal valida a loja da empresa"   "app/api/canais/[id]/route.ts" "Loja nao encontrada nesta empresa."
+v "tela explica canal da rede"       "components/modules/canais/canais-view.tsx" "Toda a rede"
+v "campo de loja do canal so com 2"  "components/modules/canais/canais-view.tsx" "lojas.length >= 2"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

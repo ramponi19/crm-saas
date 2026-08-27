@@ -20,7 +20,10 @@ type Canal = {
   ultimo_erro: string | null
   ultima_msg_em: string | null
   sync_historico_pct: number | null
+  /** Loja que este canal atende. Nulo = da rede (todas as lojas). */
+  filial_id: number | null
 }
+type Loja = { id: number; nome: string; cidade: string | null }
 type Pronto = { meta: boolean; cofre: boolean; configWhatsapp: boolean; configMeta: boolean }
 
 type RespostaFb = { status?: string; authResponse?: { code?: string } | null }
@@ -53,6 +56,8 @@ const dataBr = (iso: string | null) =>
 
 export function CanaisView({ appId }: { appId: string }) {
   const [canais, setCanais] = useState<Canal[]>([])
+  const [lojas, setLojas] = useState<Loja[]>([])
+  const [mudandoLoja, setMudandoLoja] = useState<number | null>(null)
   const [pronto, setPronto] = useState<Pronto | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [conectando, setConectando] = useState<Canal['tipo'] | null>(null)
@@ -264,10 +269,30 @@ export function CanaisView({ appId }: { appId: string }) {
     window.location.assign(`https://www.facebook.com/v25.0/dialog/oauth?${p.toString()}`)
   }
 
+  /**
+   * A quem este canal atende: uma loja, ou toda a rede.
+   *
+   * So aparece com duas ou mais lojas. Com uma, a pergunta tem uma unica resposta
+   * possivel e o campo seria ruido.
+   */
+  async function definirLoja(canal: Canal, valor: string) {
+    setMudandoLoja(canal.id)
+    const r = await fetch(`/api/canais/${canal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filialId: valor ? Number(valor) : null }),
+    })
+    const j = await r.json().catch(() => ({}))
+    setMudandoLoja(null)
+    if (!r.ok || j?.error) { notify.bad('Nao deu certo', j?.error); return }
+    setCanais((atual) => atual.map((c) => (c.id === canal.id ? { ...c, filial_id: j.filialId ?? null } : c)))
+    notify.ok(valor ? 'Canal passou a atender uma loja' : 'Canal passou a atender toda a rede')
+  }
+
   const buscar = useCallback(async () => {
     const r = await fetch('/api/canais')
     const j = await r.json()
-    if (r.ok) { setCanais(j.canais ?? []); setPronto(j.pronto ?? null) }
+    if (r.ok) { setCanais(j.canais ?? []); setPronto(j.pronto ?? null); setLojas(j.filiais ?? []) }
     else notify.bad(j.error ?? 'Não foi possível carregar os canais.')
     setCarregando(false)
   }, [])
@@ -454,6 +479,27 @@ export function CanaisView({ appId }: { appId: string }) {
         </div>
       )}
 
+      {/*
+        Com mais de uma loja, a primeira duvida da tela e "de quem sao estes canais".
+        Dizer antes da lista evita a leitura errada de que a loja nova herdou os
+        canais da primeira por engano.
+      */}
+      {lojas.length >= 2 && (
+        <div className="flex items-start gap-2.5 rounded-control border border-line bg-surface p-3 text-[12.5px] leading-snug text-ink-2">
+          <Info className="mt-0.5 h-4 w-4 flex-none text-ink-3" />
+          <p>
+            Canal marcado como <strong>Toda a rede</strong> vale para as suas{' '}
+            {lojas.length} lojas — e o caso do Instagram e da Pagina da marca. O
+            telefone de uma loja deve ser marcado com o nome dela: assim so quem
+            trabalha nela ve aquele canal.{' '}
+            <span className="text-ink-3">
+              Por enquanto, o lead que chega por qualquer canal nasce na loja
+              principal; a entrega na loja do canal ainda esta sendo feita.
+            </span>
+          </p>
+        </div>
+      )}
+
       {(['whatsapp', 'instagram', 'messenger'] as const).map((tipo) => {
         const c = por(tipo)
         const { nome, icone: Icone, cor } = META[tipo]
@@ -498,6 +544,30 @@ export function CanaisView({ appId }: { appId: string }) {
                   )}
                 </div>
               </div>
+
+              {/*
+                A QUEM O CANAL ATENDE.
+                A JM cadastrou a segunda loja e esta tela mostrou o Instagram, o
+                Messenger e o WhatsApp da primeira, sem dizer por que. Canal sem loja
+                e da REDE — certo para o Instagram da marca, errado para o telefone
+                de uma loja. Agora a tela diz qual dos dois e deixa mudar.
+              */}
+              {c && lojas.length >= 2 && (
+                <label className="flex w-full flex-wrap items-center gap-2 border-t border-line-soft pt-3 text-[12.5px] text-ink-2 sm:w-auto sm:border-0 sm:pt-0">
+                  <span className="text-ink-3">Atende</span>
+                  <select
+                    value={c.filial_id ?? ''}
+                    disabled={mudandoLoja === c.id}
+                    onChange={(e) => definirLoja(c, e.target.value)}
+                    className="rounded-control border border-line bg-card px-2 py-1 text-[12.5px] text-ink disabled:opacity-60"
+                  >
+                    <option value="">Toda a rede</option>
+                    {lojas.map((l) => (
+                      <option key={l.id} value={l.id}>{l.cidade ? `${l.nome} · ${l.cidade}` : l.nome}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <div className="flex flex-none items-center gap-2">
                 {c ? (
