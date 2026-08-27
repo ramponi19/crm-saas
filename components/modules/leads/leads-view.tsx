@@ -31,6 +31,15 @@ interface LeadsViewProps {
   restringe?: boolean
   /** ID do usuário logado (usado com `restringe` no realtime). */
   meuId?: string
+  /**
+   * Como ESTE segmento chama quem atende. Padrão "Vendedor".
+   *
+   * O filtro do funil dizia "Todos os corretores" em toda empresa — vocabulário de
+   * imobiliária numa tela do núcleo, que a loja de celular lê como texto de outro
+   * sistema. Vem de fora porque a palavra é do segmento, não desta tela: o mesmo
+   * caminho que o Ranking já usa.
+   */
+  equipeLabel?: string
 }
 
 /**
@@ -46,7 +55,7 @@ function porMensagemRecente(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => quando(b) - quando(a))
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor' }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -55,8 +64,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
   const [soEsteira, setSoEsteira] = useState(false)
-  /** '' = todos os corretores. Filtro de quem gerencia a equipe. */
-  const [corretorId, setCorretorId] = useState('')
+  /** '' = toda a equipe. Filtro de quem gerencia a equipe. */
+  const [responsavelId, setResponsavelId] = useState('')
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
@@ -69,15 +78,15 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   )
   const esteiraCount = useMemo(() => leadsDoFunilBase.filter(l => !l.responsavel_id && l.ativo !== false).length, [leadsDoFunilBase])
   /**
-   * Esteira e corretor são EXCLUSIVOS: esteira é "sem dono", corretor é "dono é
-   * este". Ligar os dois devolveria quadro vazio sempre, e quadro vazio por
+   * Esteira e responsável são EXCLUSIVOS: esteira é "sem dono", responsável é "o
+   * dono é este". Ligar os dois devolveria quadro vazio sempre, e quadro vazio por
    * combinação de filtro parece sistema sem lead. Os botões também se desligam.
    */
   const leadsDoFunil = useMemo(() => {
     if (soEsteira) return leadsDoFunilBase.filter(l => !l.responsavel_id)
-    if (corretorId) return leadsDoFunilBase.filter(l => l.responsavel_id === corretorId)
+    if (responsavelId) return leadsDoFunilBase.filter(l => l.responsavel_id === responsavelId)
     return leadsDoFunilBase
-  }, [leadsDoFunilBase, soEsteira, corretorId])
+  }, [leadsDoFunilBase, soEsteira, responsavelId])
 
   useEffect(() => {
     const supabase = createClient()
@@ -229,18 +238,24 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
             <div className="flex items-center gap-1.5">
               <Filter size={15} strokeWidth={1.8} className="shrink-0 text-ink-3" />
               <Select
-                aria-label="Filtrar por corretor"
-                value={corretorId}
-                onChange={e => { setCorretorId(e.target.value); if (e.target.value) setSoEsteira(false) }}
+                aria-label={`Filtrar por ${equipeLabel.toLowerCase()}`}
+                value={responsavelId}
+                onChange={e => { setResponsavelId(e.target.value); if (e.target.value) setSoEsteira(false) }}
                 className="min-w-[190px]"
               >
-                <option value="">Todos os corretores</option>
+                {/*
+                  "Toda a equipe", e não o plural de `equipeLabel`, porque a lista
+                  abaixo tem o dono e os administradores também — qualquer um pode ser
+                  responsável por um lead. "Todos os vendedores" prometeria uma lista
+                  só de vendedores.
+                */}
+                <option value="">Toda a equipe</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome || 'Sem nome'}</option>)}
               </Select>
             </div>
           )}
           <button
-            onClick={() => { setSoEsteira(v => !v); setCorretorId('') }}
+            onClick={() => { setSoEsteira(v => !v); setResponsavelId('') }}
             className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${soEsteira ? 'border-warn bg-warn-soft text-warn' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
           >
             Esteira{esteiraCount > 0 ? ` (${esteiraCount})` : ''}
