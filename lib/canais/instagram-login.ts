@@ -159,23 +159,33 @@ export async function renovarToken(
 }
 
 /**
- * Quem é a conta, perguntado à API.
+ * Quem é a conta, perguntado à API. E a Meta devolve DOIS ids.
  *
- * O `id` daqui é o que vale, e NÃO o `user_id` da troca do código: é este que
- * aparece como `entry[].id` no webhook, e é por ele que a função de borda acha o
- * tenant. A Meta tem mais de um espaço de id para a mesma conta do Instagram —
- * confiar no id errado dá canal que recebe webhook e não casa com ninguém.
+ * `GET /me` da conta @jmstore_jaguariuna respondeu:
+ *   id      = 37856994697280891   → identificador da conta NO ESCOPO DESTE APP
+ *   user_id = 17841437924151547   → id da CONTA PROFISSIONAL do Instagram
+ *
+ * O QUE VALE PARA CASAR O WEBHOOK É O `user_id`. A prova está no canal que já
+ * funciona: o `@jmstore_importados`, conectado pela Página, está gravado como
+ * 17841460104258132 — o mesmo espaço de id — e recebe Direct há semanas. Na
+ * primeira versão eu gravei o `id` e o webhook não casaria com ninguém.
+ *
+ * Devolve os dois para quem chamar decidir, em vez de esconder a ambiguidade.
  */
 export async function perfil(
   token: string,
-): Promise<{ id: string; username: string | null } | Erro> {
+): Promise<{ id: string; contaProfissionalId: string | null; username: string | null } | Erro> {
   try {
-    const r = await fetch(`${GRAPH}/me?fields=id,username&access_token=${encodeURIComponent(token)}`, {
+    const r = await fetch(`${GRAPH}/me?fields=id,username,user_id&access_token=${encodeURIComponent(token)}`, {
       signal: AbortSignal.timeout(15000),
     })
     const j = await json(r)
     if (!r.ok || !j.id) return { erro: mensagemDeErro(j, 'Não foi possível ler o perfil do Instagram.') }
-    return { id: String(j.id), username: j.username ? String(j.username) : null }
+    return {
+      id: String(j.id),
+      contaProfissionalId: j.user_id ? String(j.user_id) : null,
+      username: j.username ? String(j.username) : null,
+    }
   } catch (e) {
     return { erro: e instanceof Error ? e.message : 'falha de rede ao ler o perfil' }
   }
