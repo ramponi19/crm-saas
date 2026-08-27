@@ -114,21 +114,12 @@ async function chamar(caminho: string, token: string, body?: unknown): Promise<R
 }
 
 /**
- * Base pública do CRM, com a mesma regra em todo lugar.
- *
- * `localhost` é recusado de propósito: em ambiente local a variável aponta para a
- * máquina do desenvolvedor, e assinar isso no C2S registraria um endereço que nunca
- * responde — integração que parece ligada e nunca recebe nada.
+ * Base pública do CRM. A conta mora em `lib/url-publica.ts` desde que o conector
+ * do Instagram passou a precisar da MESMA regra para o `redirect_uri` — duas
+ * cópias divergiriam, e divergência aqui significa endereço registrado no parceiro
+ * que ninguém atende.
  */
-export function basePublica(origemDaRequisicao: string): { base: string; local: boolean } {
-  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim()
-  const limpo = env.endsWith('/') ? env.slice(0, -1) : env
-  const candidato = limpo && !limpo.includes('localhost') && !limpo.includes('127.0.0.1')
-    ? limpo
-    : origemDaRequisicao
-  const local = candidato.includes('localhost') || candidato.includes('127.0.0.1')
-  return { base: candidato, local }
-}
+export { basePublica } from '@/lib/url-publica'
 
 export const assinar = (token: string, acao: AcaoC2S, url: string) =>
   chamar('/api/subscribe', token, { hook_action: acao, hook_url: url })
