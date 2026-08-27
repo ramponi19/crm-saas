@@ -31,6 +31,17 @@ const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") ?? "v25.0";
 const APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
+/**
+ * Segredo do app do INSTAGRAM — outro par, nao o do Facebook.
+ *
+ * A Meta assina o webhook com o segredo do app QUE ORIGINOU a assinatura. O
+ * conector "Instagram API with Instagram Login" tem app id e app secret proprios
+ * (aba Instagram do mesmo app na Meta), entao o webhook dele chega assinado com
+ * ESTE segredo. Validar so com o do Facebook recusava tudo com 403 — foi o que
+ * aconteceu em 27/08/2026: a Meta entregava, o log dizia "assinatura invalida" e a
+ * mensagem nunca virava lead.
+ */
+const INSTAGRAM_APP_SECRET = Deno.env.get("INSTAGRAM_APP_SECRET") ?? "";
 const VERIFY_TOKEN = Deno.env.get("WEBHOOK_VERIFY_TOKEN") ?? "";
 const CHANNEL_KEY_RAW = Deno.env.get("CHANNEL_ENCRYPTION_KEY") ?? "";
 
@@ -73,22 +84,42 @@ async function decifrarToken(cifrado: string | null): Promise<string | null> {
   }
 }
 
-// Assinatura do webhook: HMAC-SHA256 do corpo CRU com o App Secret.
-// Sem isso, quem descobre a URL injeta lead falso.
-async function assinaturaValida(req: Request, corpoCru: string): Promise<boolean> {
-  if (!APP_SECRET) { console.error("META_APP_SECRET ausente — sem como validar assinatura"); return false; }
-  const header = req.headers.get("x-hub-signature-256");
-  if (!header || !header.startsWith("sha256=")) return false;
+/** Confere a assinatura contra UM segredo. Comparacao em tempo constante. */
+async function assinaturaConfere(segredo: string, recebido: string, corpoCru: string): Promise<boolean> {
   const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+    "raw", new TextEncoder().encode(segredo), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(corpoCru));
   const esperado = Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const recebido = header.slice(7);
   if (recebido.length !== esperado.length) return false;
   let diff = 0;
   for (let i = 0; i < esperado.length; i++) diff |= esperado.charCodeAt(i) ^ recebido.charCodeAt(i);
   return diff === 0;
+}
+
+/**
+ * Assinatura do webhook: HMAC-SHA256 do corpo CRU com o App Secret.
+ * Sem isso, quem descobre a URL injeta lead falso.
+ *
+ * ACEITA DOIS SEGREDOS, e isso NAO afrouxa nada: os dois sao nossos, do mesmo app
+ * na Meta. A Meta assina com o segredo do app que originou a assinatura do webhook —
+ * o do Facebook para WhatsApp, Pagina e Instagram-via-Pagina; o do Instagram para o
+ * conector com login do Instagram. Como `object=instagram` chega pelos DOIS
+ * caminhos, nao da para escolher o segredo pelo tipo do evento: tenta um, tenta o
+ * outro. Quem nao tem nenhum dos dois continua sendo recusado.
+ */
+async function assinaturaValida(req: Request, corpoCru: string): Promise<boolean> {
+  if (!APP_SECRET && !INSTAGRAM_APP_SECRET) {
+    console.error("nenhum app secret configurado — sem como validar assinatura");
+    return false;
+  }
+  const header = req.headers.get("x-hub-signature-256");
+  if (!header || !header.startsWith("sha256=")) return false;
+  const recebido = header.slice(7);
+
+  if (APP_SECRET && await assinaturaConfere(APP_SECRET, recebido, corpoCru)) return true;
+  if (INSTAGRAM_APP_SECRET && await assinaturaConfere(INSTAGRAM_APP_SECRET, recebido, corpoCru)) return true;
+  return false;
 }
 
 // ── Resolução do tenant ─────────────────────────────────────────────────────
@@ -1120,7 +1151,10 @@ serve(async (req: Request) => {
       `contas=${JSON.stringify(contas ?? [])}`,
       `campos=${JSON.stringify(((entrada?.changes as Record<string, unknown>[] | undefined) ?? []).map((c) => c?.field))}`,
       `temAssinatura=${!!req.headers.get("x-hub-signature-256")}`,
-      `segredoConfigurado=${!!APP_SECRET}`,
+      // Os DOIS, porque "segredoConfigurado=true" com o segredo errado foi
+      // exatamente o que me fez procurar no lugar errado.
+      `segredoFacebook=${!!APP_SECRET}`,
+      `segredoInstagram=${!!INSTAGRAM_APP_SECRET}`,
     );
     return new Response("assinatura invalida", { status: 403, headers: cors });
   }
