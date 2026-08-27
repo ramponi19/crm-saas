@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   try {
     const auth = await requireOwnerOrAdminApi()
     if (auth.error) return auth.error
-    const { empresaId } = auth
+    const { empresaId, supabase } = auth
 
     if (!metaConfigurada()) {
       return NextResponse.json({ error: 'Integração Meta não configurada no servidor.' }, { status: 503 })
@@ -122,6 +122,27 @@ export async function POST(req: Request) {
       )
     }
 
+    /**
+     * Canal NOVO nasce na loja selecionada no topo. Em modo Rede nasce da rede
+     * (nulo), que e o que vale para todas as lojas.
+     *
+     * Por que NAO entra no upsert: `onConflict: 'tipo,external_id'` faz do upsert um
+     * UPDATE quando o canal ja existe, e a coluna iria junto — uma reconexao apagaria
+     * a loja que o dono escolheu na tela. Mesmo estrago que o webhook do C2S causou
+     * ao mandar payload parcial. Por isso a loja e gravada DEPOIS, e so no que
+     * acabou de nascer.
+     *
+     * Sem isto, a loja nova precisa marcar "Atende" a mao em cada canal recem
+     * conectado — e enquanto nao marcar, o canal dela aparece para a outra loja.
+     */
+    const [{ data: lojaSel }, { data: jaExistiam }] = await Promise.all([
+      supabase.rpc('filial_atual'),
+      svc.from('canais_conectados').select('tipo, external_id')
+        .in('external_id', linhas.map((l) => l.external_id)),
+    ])
+    const existia = new Set(((jaExistiam ?? []) as { tipo: string; external_id: string }[])
+      .map((e) => e.tipo + ':' + e.external_id))
+
     const { error } = await svc.from('canais_conectados')
       .upsert(linhas, { onConflict: 'tipo,external_id' })
 
@@ -131,6 +152,15 @@ export async function POST(req: Request) {
         { error: conflito ? 'Esta Página já está conectada em outra conta do sistema.' : error.message },
         { status: conflito ? 409 : 500 },
       )
+    }
+
+    const loja = lojaSel as number | null
+    if (loja != null) {
+      for (const l of linhas) {
+        if (existia.has(l.tipo + ':' + l.external_id)) continue
+        await svc.from('canais_conectados').update({ filial_id: loja })
+          .eq('tipo', l.tipo).eq('external_id', l.external_id).eq('empresa_id', empresaId)
+      }
     }
 
     return NextResponse.json({
