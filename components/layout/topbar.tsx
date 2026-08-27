@@ -95,12 +95,28 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
         scheduleLoad()
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            /**
+             * O LEAD SER VISÍVEL É A CONDIÇÃO, não só a fonte do título.
+             *
+             * Esta assinatura escuta `lead_mensagens` inteira, sem filtro — e a
+             * notificação saía com o TEXTO da mensagem antes de qualquer checagem.
+             * Com filiais isso virou visível: o dono, com a Jaguariúna selecionada
+             * no topo, recebia aviso de lead de Mogi Guaçu.
+             *
+             * A consulta abaixo passa pela RLS, que já sabe a empresa e a loja
+             * selecionada. Lead que ela não devolve é lead que esta pessoa não pode
+             * ver agora — então não há notificação. Quem decide é o banco, não um
+             * filtro que eu escreveria aqui e esqueceria de atualizar depois.
+             */
             let titulo = 'Nova mensagem'
+            let podeVer = false
             try {
               const { data } = await supabase.from('leads').select('nome, origem').eq('id', payload.new.lead_id).maybeSingle()
+              podeVer = !!data
               if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
               else if (data?.origem) titulo = `Nova mensagem · ${data.origem}`
-            } catch {}
+            } catch { /* falha de rede: sem certeza, não notifica */ }
+            if (!podeVer) return
             try {
               const notif = new Notification(titulo, {
                 body: payload.new.conteudo?.slice(0, 120) ?? '',
