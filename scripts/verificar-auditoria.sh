@@ -291,6 +291,8 @@ v "canal pode ser de uma loja"       "app/api/canais/[id]/route.ts" "filial_id: 
 v "canal valida a loja da empresa"   "app/api/canais/[id]/route.ts" "Loja nao encontrada nesta empresa."
 v "tela explica canal da rede"       "components/modules/canais/canais-view.tsx" "Toda a rede"
 v "campo de loja do canal so com 2"  "components/modules/canais/canais-view.tsx" "lojas.length >= 2"
+v "retorno da meta preserva o code"   "app/admin/canais/page.tsx" "const q = query.toString()"
+v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx" "replaceState({}, '', '/admin/integracoes')"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

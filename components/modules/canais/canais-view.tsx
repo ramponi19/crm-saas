@@ -317,7 +317,10 @@ export function CanaisView({ appId }: { appId: string }) {
 
     const tipo = (() => { try { return sessionStorage.getItem('canal_conectando') } catch { return null } })()
     try { sessionStorage.removeItem('canal_conectando') } catch { /* ignora */ }
-    window.history.replaceState({}, '', '/admin/canais')
+    // Limpa o codigo da barra de endereco, para um F5 nao tentar reusar um codigo
+    // ja gasto. Aponta para /admin/integracoes, que e onde a tela vive: apontar
+    // para /admin/canais deixava o endereco visivel sendo um redirecionamento.
+    window.history.replaceState({}, '', '/admin/integracoes')
 
     if (erroMeta) {
       registrar('retorno_erro', { erro: erroMeta, canal: tipo })
