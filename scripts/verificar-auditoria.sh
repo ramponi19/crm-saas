@@ -310,6 +310,8 @@ v "envio do IG usa me/messages"       "supabase/functions/webhook-leads/index.ts
 v "assinatura aceita os 2 segredos"   "supabase/functions/webhook-leads/index.ts" "assinaturaConfere(INSTAGRAM_APP_SECRET"
 v "recusa sem nenhum dos 2 segredos"  "supabase/functions/webhook-leads/index.ts" "!APP_SECRET && !INSTAGRAM_APP_SECRET"
 v "log diz QUAL segredo existe"       "supabase/functions/webhook-leads/index.ts" "segredoInstagram="
+v "perfil do IG pelo host certo"      "supabase/functions/webhook-leads/index.ts" "graph.instagram.com\" : \"https://graph.facebook.com"
+v "lead nasce na loja do canal"       "supabase/functions/webhook-leads/index.ts" "canal.filial_id != null ? { filial_id: canal.filial_id }"
 v "assina o webhook na conta"         "lib/canais/instagram-login.ts" "me/subscribed_apps"
 v "state confere na volta"            "app/api/canais/instagram/retorno/route.ts" "state !== esperado"
 v "recusa ambiente local"             "app/api/canais/instagram/iniciar/route.ts" "if (local) {"
