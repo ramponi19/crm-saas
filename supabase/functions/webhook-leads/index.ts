@@ -138,14 +138,38 @@ async function eventoOrfao(tipo: string, externalId: string | undefined, campo: 
   } catch { /* diagnóstico nunca pode atrapalhar o recebimento */ }
 }
 
+/** Colunas que `montar` espera. Uma lista so, para os dois caminhos de busca. */
+const COLUNAS = "id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id";
+
 async function canalPorExternalId(tipo: string, externalId: string | undefined): Promise<Canal | null> {
   if (!externalId) return null;
   const chave = `${tipo}:${externalId}`;
   const emCache = cache.get(chave);
   if (emCache !== undefined) return emCache;
-  const { data } = await db.from("canais_conectados")
-    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id")
+
+  let { data } = await db.from("canais_conectados")
+    .select(COLUNAS)
     .eq("tipo", tipo).eq("external_id", String(externalId)).maybeSingle();
+
+  /**
+   * SEGUNDA TENTATIVA PELO `ig_user_id`, e ela nao e paranoia.
+   *
+   * A Meta tem DOIS ids para a mesma conta do Instagram, e o `GET /me` do login do
+   * Instagram devolve os dois: `id` (escopo do app) e `user_id` (conta
+   * profissional). Qual deles vem como `entry[].id` no webhook e a unica coisa que
+   * a documentacao nao diz com clareza. Gravamos os dois e procuramos pelos dois:
+   * assim o lead entra independente da resposta, em vez de virar evento orfao.
+   *
+   * Duas consultas em vez de um `.or()` de proposito: o id vem do payload da Meta,
+   * e interpolar isso na sintaxe de filtro do PostgREST seria abrir uma porta.
+   */
+  if (!data) {
+    const alt = await db.from("canais_conectados")
+      .select(COLUNAS)
+      .eq("tipo", tipo).eq("ig_user_id", String(externalId)).maybeSingle();
+    data = alt.data;
+  }
+
   const canal = data ? montar(data, await decifrarToken(data.access_token_enc as string | null)) : null;
   cache.set(chave, canal);
   if (!canal) console.log(`canal desconhecido (${chave}) — evento ignorado, não cria lixo`);
@@ -157,7 +181,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
 // e derrubaria o envio) — pega o conectado mais recentemente, de forma determinística.
 async function canalPorEmpresa(empresaId: number, tipo: string): Promise<Canal | null> {
   const { data } = await db.from("canais_conectados")
-    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id")
+    .select(COLUNAS)
     .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
     .order("conectado_em", { ascending: false }).limit(1);
   const linha = data?.[0];
@@ -940,7 +964,14 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
    */
   let destinoUrl: string;
   if (canal.tipo === "instagram" && canal.via === "instagram") {
-    destinoUrl = `https://graph.instagram.com/${GRAPH}/${canal.external_id}/messages?access_token=${canal.token}`;
+    /**
+     * `/me/messages`, e nao `/{id}/messages`.
+     *
+     * O token E da conta, entao `me` a identifica sem ambiguidade — e a Meta tem
+     * dois ids para a mesma conta, o do escopo do app e o da conta profissional.
+     * Usar `me` tira a duvida de qual deles a API de envio espera.
+     */
+    destinoUrl = `https://graph.instagram.com/${GRAPH}/me/messages?access_token=${canal.token}`;
   } else {
     let pageId = canal.external_id;
     if (canal.tipo === "instagram") {

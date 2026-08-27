@@ -58,13 +58,19 @@ export async function GET(req: Request) {
   if (ehErro(longo)) return voltar(base, { ig_erro: longo.erro })
 
   /**
-   * O id que vale é o que a API devolve em `/me`, não o `user_id` da troca do
-   * código: é ele que aparece como `entry[].id` no webhook, e é por ele que a
-   * função de borda acha o tenant. A Meta tem mais de um espaço de id para a mesma
-   * conta — casar pelo errado dá canal que recebe e não pertence a ninguém.
+   * A Meta devolve DOIS ids para a mesma conta, e o que casa o webhook é o da
+   * CONTA PROFISSIONAL (`user_id`), não o do escopo do app (`id`).
+   *
+   * Prova: o `@jmstore_importados`, que recebe Direct há semanas pelo caminho da
+   * Página, está gravado como 17841460104258132 — o espaço do `user_id`. Eu gravei
+   * o outro na primeira versão e o webhook não casaria com ninguém.
+   *
+   * Se por algum motivo o `user_id` não vier, cai no `id` em vez de recusar a
+   * conexão: a função de borda procura pelos dois campos.
    */
   const quem = await perfil(longo.token)
   if (ehErro(quem)) return voltar(base, { ig_erro: quem.erro })
+  const idDoWebhook = quem.contaProfissionalId ?? quem.id
 
   const svc = createServiceClient()
 
@@ -76,7 +82,7 @@ export async function GET(req: Request) {
    */
   const { data: existente } = await svc.from('canais_conectados')
     .select('id, empresa_id, filial_id')
-    .eq('tipo', 'instagram').eq('external_id', quem.id).maybeSingle()
+    .eq('tipo', 'instagram').eq('external_id', idDoWebhook).maybeSingle()
 
   if (existente && existente.empresa_id !== empresaId) {
     return voltar(base, { ig_erro: 'Esta conta do Instagram já está conectada em outra conta do sistema.' })
@@ -90,7 +96,9 @@ export async function GET(req: Request) {
     tipo: 'instagram',
     // Diz por qual caminho este canal foi conectado: decide o ENVIO (host e token).
     via: 'instagram',
-    external_id: quem.id,
+    external_id: idDoWebhook,
+    // Guarda o id do escopo do app tambem: e por ele que `GET /me` responde, e é o
+    // que aparece nos painéis da Meta. Ter os dois torna a busca do webhook tolerante.
     ig_user_id: quem.id,
     waba_id: null,
     nome_exibicao: quem.username ? `@${quem.username}` : 'Instagram',
@@ -124,7 +132,7 @@ export async function GET(req: Request) {
     const filial = loja as number | null
     if (filial != null) {
       await svc.from('canais_conectados').update({ filial_id: filial } as never)
-        .eq('tipo', 'instagram').eq('external_id', quem.id).eq('empresa_id', empresaId)
+        .eq('tipo', 'instagram').eq('external_id', idDoWebhook).eq('empresa_id', empresaId)
     }
   }
 
