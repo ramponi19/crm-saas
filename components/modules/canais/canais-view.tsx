@@ -22,6 +22,11 @@ type Canal = {
   sync_historico_pct: number | null
   /** Loja que este canal atende. Nulo = da rede (todas as lojas). */
   filial_id: number | null
+  /**
+   * Como foi conectado: 'pagina' (token da Pagina) ou 'instagram' (login pelo
+   * proprio Instagram, sem Pagina). Decide o caminho de envio no servidor.
+   */
+  via?: 'pagina' | 'instagram'
 }
 type Loja = { id: number; nome: string; cidade: string | null }
 type Pronto = { meta: boolean; cofre: boolean; configWhatsapp: boolean; configMeta: boolean }
@@ -61,6 +66,7 @@ export function CanaisView({ appId }: { appId: string }) {
   const [pronto, setPronto] = useState<Pronto | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [conectando, setConectando] = useState<Canal['tipo'] | null>(null)
+  const [abrindoInstagram, setAbrindoInstagram] = useState(false)
   const [aDesconectar, setADesconectar] = useState<Canal | null>(null)
   const [avisoWhats, setAvisoWhats] = useState(false)
   // Cliente com mais de uma Página: guarda o código para reenviar com a escolha
@@ -292,6 +298,30 @@ export function CanaisView({ appId }: { appId: string }) {
     notify.ok(valor ? 'Canal passou a atender uma loja' : 'Canal passou a atender toda a rede')
   }
 
+  /**
+   * Instagram SEM Pagina do Facebook — "Instagram API with Instagram Login".
+   *
+   * Caminho separado do de cima de proposito: outro app id, outro token, outro
+   * host. Existe porque uma Pagina aceita UM Instagram profissional, e a loja que
+   * so tem Instagram nao entrava de jeito nenhum.
+   *
+   * O servidor devolve a URL em vez de redirecionar, para o erro chegar como aviso
+   * legivel; e o retorno e tratado por rota de API, nao por esta tela — o `code` na
+   * URL de pagina foi o que quebrou o conector via Pagina hoje.
+   */
+  async function conectarInstagramSemPagina() {
+    setAbrindoInstagram(true)
+    registrar('ig_login_iniciando')
+    const r = await fetch('/api/canais/instagram/iniciar', { method: 'POST' })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j?.url) {
+      setAbrindoInstagram(false)
+      notify.bad('Nao foi possivel abrir o login do Instagram', j?.error)
+      return
+    }
+    window.location.assign(j.url as string)
+  }
+
   const buscar = useCallback(async () => {
     const r = await fetch('/api/canais')
     const j = await r.json()
@@ -301,6 +331,21 @@ export function CanaisView({ appId }: { appId: string }) {
   }, [])
 
   useEffect(() => { buscar() }, [buscar])
+
+  /**
+   * Volta do login do Instagram: a rota de API ja fez tudo e devolve o resultado na
+   * querystring. Aqui e so avisar e limpar o endereco.
+   */
+  useEffect(() => {
+    const u = new URL(window.location.href)
+    const ok = u.searchParams.get('ig_ok')
+    const erro = u.searchParams.get('ig_erro')
+    if (!ok && !erro) return
+    window.history.replaceState({}, '', '/admin/integracoes')
+    if (erro) notify.bad('Instagram nao conectou', erro)
+    else notify.ok('Instagram conectado', ok !== '1' ? '@' + ok : undefined)
+    buscar()
+  }, [buscar])
 
   // Volta da Meta: o código chega na própria URL. Conclui a conexão e limpa o
   // endereço, para um F5 não tentar reusar um código já gasto.
@@ -593,6 +638,23 @@ export function CanaisView({ appId }: { appId: string }) {
                     </Button>
                   </>
                 ) : (
+                  <>
+                  {/*
+                    SEM PAGINA, para o Instagram. Uma Pagina do Facebook aceita UM
+                    Instagram profissional — a Meta recusa o segundo com essas
+                    palavras. Entao a segunda loja da rede, e qualquer loja que so
+                    tenha Instagram, precisa deste caminho: login pela propria conta.
+                  */}
+                  {tipo === 'instagram' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={abrindoInstagram}
+                      onClick={conectarInstagramSemPagina}
+                    >
+                      Conectar sem Página
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
@@ -607,6 +669,7 @@ export function CanaisView({ appId }: { appId: string }) {
                           ? 'Carregando conector…'
                           : 'Conectar'}
                   </Button>
+                  </>
                 )}
               </div>
             </div>

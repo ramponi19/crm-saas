@@ -95,6 +95,18 @@ async function assinaturaValida(req: Request, corpoCru: string): Promise<boolean
 type Canal = {
   id: number; empresa_id: number; tipo: string; external_id: string;
   waba_id: string | null; token: string | null; coexistencia: boolean;
+  /**
+   * Como o canal foi conectado. Decide o ENVIO:
+   *   'pagina'    → graph.facebook.com/{id da Pagina}/messages, token da Pagina
+   *   'instagram' → graph.instagram.com/{id da conta}/messages, token da conta
+   *
+   * Existe porque uma Pagina do Facebook aceita UM Instagram profissional, e a
+   * loja que so tem Instagram (ou a segunda loja da rede) precisa do caminho do
+   * "Instagram API with Instagram Login", que dispensa Pagina.
+   */
+  via: string;
+  /** Loja que o canal atende. Nulo = da rede. Usado para achar a Pagina certa. */
+  filial_id: number | null;
 };
 const cache = new Map<string, Canal | null>();
 
@@ -103,6 +115,8 @@ function montar(data: Record<string, unknown>, token: string | null): Canal {
     id: data.id as number, empresa_id: data.empresa_id as number, tipo: data.tipo as string,
     external_id: String(data.external_id ?? ""), waba_id: (data.waba_id as string | null) ?? null,
     token, coexistencia: !!data.coexistencia,
+    via: (data.via as string | null) ?? "pagina",
+    filial_id: (data.filial_id as number | null) ?? null,
   };
 }
 
@@ -130,7 +144,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
   const emCache = cache.get(chave);
   if (emCache !== undefined) return emCache;
   const { data } = await db.from("canais_conectados")
-    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia")
+    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id")
     .eq("tipo", tipo).eq("external_id", String(externalId)).maybeSingle();
   const canal = data ? montar(data, await decifrarToken(data.access_token_enc as string | null)) : null;
   cache.set(chave, canal);
@@ -143,7 +157,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
 // e derrubaria o envio) — pega o conectado mais recentemente, de forma determinística.
 async function canalPorEmpresa(empresaId: number, tipo: string): Promise<Canal | null> {
   const { data } = await db.from("canais_conectados")
-    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia")
+    .select("id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id")
     .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
     .order("conectado_em", { ascending: false }).limit(1);
   const linha = data?.[0];
@@ -915,18 +929,54 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
     ? { attachment: { type: tipoMidia, payload: { url: midiaUrl, is_reusable: true } } }
     : { text: texto ? assinatura + texto : texto };
 
-  // O envio é sempre pela PÁGINA — inclusive no Instagram. Como o canal do IG
-  // guarda o id da CONTA do Instagram, busca-se a Página da mesma empresa.
-  let pageId = canal.external_id;
-  if (canal.tipo === "instagram") {
-    const { data } = await db.from("canais_conectados").select("external_id")
-      .eq("empresa_id", canal.empresa_id).eq("tipo", "messenger").maybeSingle();
-    if (data?.external_id) pageId = String(data.external_id);
+  /**
+   * DOIS CAMINHOS DE ENVIO, e o canal diz qual.
+   *
+   * Instagram conectado pelo login do Instagram (sem Pagina) fala com
+   * graph.instagram.com usando o token da PROPRIA CONTA, e o id da URL e o da conta.
+   * Instagram conectado pela Pagina fala com graph.facebook.com usando o token da
+   * Pagina, e o id da URL e o da PAGINA — e o canal do IG guarda o id da conta,
+   * entao a Pagina precisa ser encontrada.
+   */
+  let destinoUrl: string;
+  if (canal.tipo === "instagram" && canal.via === "instagram") {
+    destinoUrl = `https://graph.instagram.com/${GRAPH}/${canal.external_id}/messages?access_token=${canal.token}`;
+  } else {
+    let pageId = canal.external_id;
+    if (canal.tipo === "instagram") {
+      /**
+       * Acha a Pagina da MESMA LOJA, e nunca com maybeSingle.
+       *
+       * A versao anterior usava `maybeSingle()`: com duas Paginas na mesma empresa
+       * — o que acontece assim que a rede tem duas lojas — a consulta ERRA e o envio
+       * inteiro cai. E, mesmo funcionando, escolher "a Pagina da empresa" com duas
+       * lojas era escolher no escuro. A loja do canal desempata; sem loja, vale a
+       * conectada mais recentemente, de forma deterministica.
+       */
+      let q = db.from("canais_conectados").select("external_id")
+        .eq("empresa_id", canal.empresa_id).eq("tipo", "messenger").eq("via", "pagina");
+      if (canal.filial_id != null) q = q.eq("filial_id", canal.filial_id);
+      const { data } = await q.order("conectado_em", { ascending: false }).limit(1);
+      const achado = data?.[0]?.external_id;
+      if (achado) pageId = String(achado);
+    }
+    destinoUrl = `https://graph.facebook.com/${GRAPH}/${pageId}/messages?access_token=${canal.token}`;
   }
 
-  const r = await fetch(`https://graph.facebook.com/${GRAPH}/${pageId}/messages?access_token=${canal.token}`, {
+  /**
+   * `messaging_type` e da Send API da Pagina e NAO existe no caminho do Instagram
+   * Login — a doc de mensagens de la descreve apenas `recipient` e `message`.
+   * Mandar campo que a API nao conhece e pedir recusa por um motivo que nao tem
+   * nada a ver com a mensagem.
+   */
+  const viaInstagram = canal.tipo === "instagram" && canal.via === "instagram";
+  const corpoEnvio = viaInstagram
+    ? { recipient: { id: origemId }, message }
+    : { recipient: { id: origemId }, message, messaging_type: "RESPONSE" };
+
+  const r = await fetch(destinoUrl, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recipient: { id: origemId }, message, messaging_type: "RESPONSE" }),
+    body: JSON.stringify(corpoEnvio),
   });
   const data = await r.json();
   if (!r.ok) {

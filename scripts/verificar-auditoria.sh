@@ -299,5 +299,19 @@ v "numero novo nasce na loja atual"   "app/api/canais/whatsapp/route.ts" "loja !
 v "escolha de pagina mostra o insta"  "components/modules/canais/canais-view.tsx" "sem Instagram vinculado"
 v "rota manda o @ de cada pagina"     "app/api/canais/meta/route.ts" "instagram: p.instagram?.username"
 
+echo "== instagram sem pagina (27/08) =="
+v "app do instagram e outro par"      "lib/canais/instagram-login.ts" "INSTAGRAM_APP_ID"
+v "escopo de mensagem do instagram"   "lib/canais/instagram-login.ts" "instagram_business_manage_messages"
+v "token curto vira longo"            "lib/canais/instagram-login.ts" "ig_exchange_token"
+v "id vem do proprio perfil"          "lib/canais/instagram-login.ts" "me?fields=id,username"
+v "assina o webhook na conta"         "lib/canais/instagram-login.ts" "me/subscribed_apps"
+v "state confere na volta"            "app/api/canais/instagram/retorno/route.ts" "state !== esperado"
+v "recusa ambiente local"             "app/api/canais/instagram/iniciar/route.ts" "if (local) {"
+v "conta de outro tenant e recusada"  "app/api/canais/instagram/retorno/route.ts" "existente.empresa_id !== empresaId"
+v "retorno resolvido no servidor"     "app/api/canais/instagram/retorno/route.ts" "const curto = await trocarCodigo"
+v "envio escolhe o host pelo via"     "supabase/functions/webhook-leads/index.ts" "graph.instagram.com/"
+v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts" "order(\"conectado_em\", { ascending: false }).limit(1)"
+v "messaging_type so no caminho FB"   "supabase/functions/webhook-leads/index.ts" "const corpoEnvio = viaInstagram"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

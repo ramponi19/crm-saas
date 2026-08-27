@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { cofreConfigurado } from '@/lib/canais/crypto'
 import { metaConfigurada } from '@/lib/canais/meta'
+import { configurado as instagramConfigurado } from '@/lib/canais/instagram-login'
 
 // Lista os canais da empresa. Nunca devolve token: a coluna cifrada não é nem
 // selecionada aqui, e o banco também não daria permissão de ler.
@@ -17,7 +18,7 @@ export async function GET() {
         'id, tipo, external_id, waba_id, ig_user_id, nome_exibicao, status, coexistencia, ' +
           'token_expira_em, data_access_expira_em, ultimo_erro, ultimo_erro_em, ' +
           'conectado_em, ultima_msg_em, sync_contatos_em, sync_historico_em, sync_historico_pct, ' +
-          'filial_id',
+          'filial_id, via',
       )
       .eq('empresa_id', empresaId)
       // Ordem IMPORTA: a tela mostra um cartão por canal e pegava o primeiro da
@@ -56,6 +57,9 @@ export async function GET() {
       pronto: {
         meta: metaConfigurada(),
         cofre: cofreConfigurado(),
+        // Conector do Instagram sem Pagina: credenciais PROPRIAS, do app do
+        // Instagram, que nao sao as do app do Facebook.
+        instagramLogin: instagramConfigurado(),
         configWhatsapp: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_WA,
         configMeta: !!process.env.NEXT_PUBLIC_META_CONFIG_ID_IGMSG,
       },
