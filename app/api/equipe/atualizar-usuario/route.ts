@@ -15,7 +15,8 @@ function podeAtribuir(callerRole: string, targetRole: string): boolean {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { id, nome, role } = await req.json()
+  const { id, nome, role, filialId } = await req.json() as
+    { id?: string; nome?: string; role?: string; filialId?: number | null }
   if (!id || !nome || !role)
     return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 })
 
@@ -79,9 +80,33 @@ export async function PATCH(req: NextRequest) {
     .eq('id', id)
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 })
 
+  /**
+   * A loja da pessoa entra no MESMO update do papel.
+   *
+   * `filialId` ausente no corpo significa "a tela nao tem esse campo" (o CRM nao
+   * tem) e a loja fica como esta. `null` explicito significa "sem loja definida",
+   * que e uma escolha valida: a pessoa cai na loja principal.
+   */
+  const patch: { role: string; filial_id?: number | null } = { role: role as string }
+  if (filialId !== undefined) {
+    if (filialId === null) {
+      patch.filial_id = null
+    } else {
+      const { data: filial } = await service
+        .from('filiais')
+        .select('id')
+        .eq('id', filialId)
+        .eq('empresa_id', empresaId)
+        .eq('ativo', true)
+        .maybeSingle()
+      if (!filial) return NextResponse.json({ error: 'Loja não encontrada nesta empresa' }, { status: 400 })
+      patch.filial_id = filialId
+    }
+  }
+
   const { error: euErr } = await service
     .from('empresa_usuarios')
-    .update({ role })
+    .update(patch)
     .eq('usuario_id', id)
     .eq('empresa_id', empresaId)
   if (euErr) return NextResponse.json({ error: euErr.message }, { status: 400 })

@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
   LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
-  SlidersHorizontal, Link2, FileSignature, Filter, Gauge,
+  SlidersHorizontal, Link2, FileSignature, Filter, Gauge, Store,
 } from 'lucide-react'
 
 /**
@@ -52,6 +52,8 @@ const navGroups = [
       { href: '/admin/aparencia', label: 'Aparência', icon: Palette },
       { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
       { href: '/admin/empresa', label: 'Minha empresa', icon: Building2 },
+      // Ao lado de "Minha empresa" porque é o mesmo assunto: cadastro da casa.
+      { href: '/admin/filiais', label: 'Filiais', icon: Store },
       { href: '/admin/planos', label: 'Planos', icon: CreditCard },
     ],
   },

@@ -26,10 +26,10 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
   // Janela pela função única — ver janelaDoPeriodo: o cálculo anterior dava 3h.
   const { ini: inicioMes, fim: fimMes } = janelaDoPeriodo(mesAtual)
 
-  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }] = await Promise.all([
+  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }] = await Promise.all([
     supabase
       .from('empresa_usuarios')
-      .select('role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(*)')
+      .select('role, ativo, filial_id, usuarios!empresa_usuarios_usuario_public_fkey(*)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('usuario_id'),
@@ -46,13 +46,23 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       .gte('created_at', inicioMes)
       .lt('created_at', fimMes)
       .eq('status', 'pago'),
+    /**
+     * Lojas da empresa — so este painel carrega.
+     *
+     * A tela /equipe do CRM nao recebe a lista, entao nao mostra campo de loja
+     * nenhum: quem define onde a pessoa trabalha e o dono, aqui. Mesma convencao da
+     * aba "Uso da equipe".
+     */
+    supabase.from('filiais').select('id, nome, cidade')
+      .eq('empresa_id', empresaId).eq('ativo', true)
+      .order('matriz', { ascending: false }).order('nome'),
   ])
 
-  type VinculoRow = { role: string | null; ativo: boolean | null; usuarios: Embed<Tables<'usuarios'>> }
+  type VinculoRow = { role: string | null; ativo: boolean | null; filial_id: number | null; usuarios: Embed<Tables<'usuarios'>> }
   const usuariosMapped = ((usuarios ?? []) as unknown as VinculoRow[])
     .map(eu => {
       const u = one(eu.usuarios)
-      return u ? { ...u, role: eu.role } : null
+      return u ? { ...u, role: eu.role, filial_id: eu.filial_id } : null
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
 
@@ -64,6 +74,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       comissoesPagas={comissoesMes ?? []}
       mesAtual={mesAtual}
       uso={<UsoEquipe sessoes={uso.sessoes} resumo={uso.resumo} dias={dias} />}
+      filiais={(filiais ?? []) as { id: number; nome: string; cidade: string | null }[]}
     />
   )
 }

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from './command-palette'
+import { SeletorFilial } from './seletor-filial'
 import { useRotuloDaRota } from './rotulos-context'
 
 interface TopbarProps {
@@ -148,6 +149,12 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
           ))}
         </div>
       )}
+
+      {/*
+        Em qual loja estou. Vem antes da busca porque muda o significado de tudo
+        que a tela mostra — e some sozinho quando a empresa tem uma loja só.
+      */}
+      <SeletorFilial />
 
       {/* Gatilho do Command Palette (⌘K) */}
       <button

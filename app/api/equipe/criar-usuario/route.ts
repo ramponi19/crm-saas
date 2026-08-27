@@ -8,11 +8,14 @@ import { verificarLimite } from '@/lib/limites'
 const ROLES_PERMITIDOS = ['admin', 'vendedor'] as const
 
 export async function POST(req: NextRequest) {
-  const { nome, email, senha, role } = await req.json()
+  const { nome, email, senha, role, filialId } = await req.json() as
+    { nome?: string; email?: string; senha?: string; role?: string; filialId?: number | null }
   if (!nome || !email || !senha || !role)
     return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 })
 
-  if (!ROLES_PERMITIDOS.includes(role))
+  // O cast existe porque `role` passou a ser tipado na desestruturacao; a
+  // verificacao em si continua a mesma, feita em tempo de execucao.
+  if (!ROLES_PERMITIDOS.includes(role as (typeof ROLES_PERMITIDOS)[number]))
     return NextResponse.json({ error: 'Papel inválido' }, { status: 400 })
 
   const supabase = await createClient()
@@ -41,6 +44,22 @@ export async function POST(req: NextRequest) {
 
     if (!eu || !['owner', 'admin'].includes(eu.role))
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
+
+  /**
+   * Loja onde a pessoa trabalha. Nula = sem loja definida (cai na principal).
+   *
+   * Validada aqui, antes de qualquer escrita, porque este e o unico ponto em que a
+   * pessoa nasce na empresa: cadastrar todo mundo sem loja e depois pedir para o
+   * dono redistribuir a mao e trabalho que ninguem faz.
+   */
+  let lojaValida: number | null = null
+  if (filialId != null) {
+    const { data: filial } = await createServiceClient()
+      .from('filiais').select('id')
+      .eq('id', filialId).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle()
+    if (!filial) return NextResponse.json({ error: 'Loja nao encontrada nesta empresa' }, { status: 400 })
+    lojaValida = filialId
   }
 
   // Enforcement de limite de usuários do plano
@@ -82,7 +101,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { error: reErr } = await service
-      .from('empresa_usuarios').update({ role, ativo: true })
+      .from('empresa_usuarios').update({ role, ativo: true, filial_id: lojaValida })
       .eq('usuario_id', existente.id).eq('empresa_id', empresaId)
     if (reErr) return NextResponse.json({ error: reErr.message }, { status: 400 })
 
@@ -134,6 +153,7 @@ export async function POST(req: NextRequest) {
     usuario_id: userId,
     role,
     ativo: true,
+    filial_id: lojaValida,
   })
   if (vErr) {
     await service.from('usuarios').delete().eq('id', userId)

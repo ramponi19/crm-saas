@@ -14,7 +14,11 @@ import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge,
 interface Usuario {
   id: string; nome: string; email: string | null; role: string | null
   modulos_acesso: string[] | null; ultimo_acesso: string | null; created_at: string | null
+  /** Loja da pessoa. Só o /admin carrega — no CRM vem indefinido. */
+  filial_id?: number | null
 }
+/** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
+export interface LojaOpcao { id: number; nome: string; cidade: string | null }
 interface Meta {
   id?: number; usuario_id: string | null; mes_ano: string
   meta_vendas_valor: number | null; meta_vendas_qtd: number | null
@@ -38,6 +42,12 @@ interface Props {
    * Vem pronto de cima porque a consulta é do servidor e exige papel de admin.
    */
   uso?: React.ReactNode
+  /**
+   * Lojas da empresa. Mesma convenção da prop `uso`: só o /admin passa, então no
+   * CRM não existe campo de loja nenhum — quem define onde a pessoa trabalha é o
+   * dono, no painel dele.
+   */
+  filiais?: LojaOpcao[]
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -104,11 +114,19 @@ function MonthPicker({ mes, setMes }: { mes: string; setMes: (m: string) => void
 
 // ─── Modal de Usuário ─────────────────────────────────────────────────────────
 
-function UsuarioModal({ usuario, onClose, onSaved }: {
-  usuario: Usuario | null; onClose: () => void; onSaved: () => void
+function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
+  usuario: Usuario | null; onClose: () => void; onSaved: () => void; filiais: LojaOpcao[]
 }) {
   const isNew = !usuario
-  const [form, setForm] = useState({ nome: usuario?.nome ?? '', email: usuario?.email ?? '', senha: '', role: usuario?.role ?? 'vendedor' })
+  /**
+   * O campo de loja só existe com DUAS lojas. Com uma, escolher é perguntar algo
+   * que tem uma única resposta possível.
+   */
+  const escolheLoja = filiais.length >= 2
+  const [form, setForm] = useState({
+    nome: usuario?.nome ?? '', email: usuario?.email ?? '', senha: '', role: usuario?.role ?? 'vendedor',
+    filialId: usuario?.filial_id != null ? String(usuario.filial_id) : '',
+  })
   const [saving, setSaving] = useState(false)
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
@@ -123,7 +141,10 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
       if (isNew) {
         const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string; readmitido?: boolean }>('/api/equipe/criar-usuario', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome: form.nome, email: form.email, senha: form.senha, role: form.role }),
+          body: JSON.stringify({
+            nome: form.nome, email: form.email, senha: form.senha, role: form.role,
+            filialId: escolheLoja && form.filialId ? Number(form.filialId) : null,
+          }),
         })
         // Sessão expirada já avisou e está redirecionando: não empilha um segundo
         // toast dizendo "erro ao criar", que sugeriria problema no cadastro.
@@ -133,7 +154,12 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
       } else {
         const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: usuario!.id, nome: form.nome, role: form.role }),
+          body: JSON.stringify({
+            id: usuario!.id, nome: form.nome, role: form.role,
+            // Só manda quando a tela tem o campo: sem isto, salvar pelo CRM apagaria
+            // a loja que o dono definiu no /admin.
+            ...(escolheLoja ? { filialId: form.filialId ? Number(form.filialId) : null } : {}),
+          }),
         })
         if (sessaoExpirada) return
         if (!ok) { notify.bad(json.error ?? 'Erro ao salvar'); return }
@@ -177,6 +203,15 @@ function UsuarioModal({ usuario, onClose, onSaved }: {
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </Select>
+        {escolheLoja && (
+          <Select label="Loja onde trabalha" value={form.filialId} onChange={e => set('filialId', e.target.value)}
+            hint="Sem loja definida, a pessoa fica na loja principal.">
+            <option value="">Sem loja definida</option>
+            {filiais.map(f => (
+              <option key={f.id} value={f.id}>{f.cidade ? f.nome + ' · ' + f.cidade : f.nome}</option>
+            ))}
+          </Select>
+        )}
         {!isNew && (
           <div className="rounded-control border border-line bg-raised px-3 py-2 text-[12px] text-ink-3">
             E-mail: <strong className="text-ink-2">{usuario?.email ?? '—'}</strong> · não pode ser alterado aqui
@@ -528,7 +563,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios, uso }: Props) {
+export default function EquipeView({ usuarios, uso, filiais = [] }: Props) {
   const router = useRouter()
   const TABS = uso ? [...TABS_BASE, { value: 'uso', label: 'Uso da equipe' }] : TABS_BASE
 
@@ -595,6 +630,15 @@ export default function EquipeView({ usuarios, uso }: Props) {
       key: 'perfil', header: 'Perfil',
       render: (u) => { const rb = ROLES.find(r => r.value === u.role); return <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge> },
     },
+    ...(filiais.length >= 2 ? [{
+      key: 'loja', header: 'Loja', hideOnMobile: true,
+      render: (u: Usuario) => {
+        const f = filiais.find(x => x.id === u.filial_id)
+        return f
+          ? <span className="text-ink-2">{f.nome}</span>
+          : <span className="text-ink-3">principal (não definida)</span>
+      },
+    } as Column<Usuario>] : []),
     { key: 'acesso', header: 'Último acesso', align: 'right', hideOnMobile: true, render: (u) => <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span> },
     {
       key: 'acoes', header: '', align: 'right',
@@ -656,6 +700,7 @@ export default function EquipeView({ usuarios, uso }: Props) {
           usuario={modal.usuario}
           onClose={() => setModal({ open: false, usuario: null })}
           onSaved={onSaved}
+          filiais={filiais}
         />
       )}
 
