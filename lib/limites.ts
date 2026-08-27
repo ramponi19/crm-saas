@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export type RecursoLimitado = 'leads' | 'usuarios'
 
@@ -29,22 +30,23 @@ export async function verificarLimite(
     ? (empresa?.limite_leads ?? 0)
     : (empresa?.limite_usuarios ?? 0)
 
-  let usoAtual = 0
-  if (recurso === 'leads') {
-    const { count } = await supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('empresa_id', empresaId)
-      .eq('ativo', true)
-    usoAtual = count ?? 0
-  } else {
-    const { count } = await supabase
-      .from('empresa_usuarios')
-      .select('*', { count: 'exact', head: true })
-      .eq('empresa_id', empresaId)
-      .eq('ativo', true)
-    usoAtual = count ?? 0
-  }
+  /**
+   * O USO E CONTADO PELA EMPRESA, e por isso pelo service-role.
+   *
+   * A RLS de `leads` passou a filtrar pela loja selecionada no topo (filiais). Se a
+   * contagem viesse pelo cliente com RLS, uma empresa com duas lojas zeraria o
+   * contador ao trocar de loja: enche a Loja 1 ate o teto, troca para a Loja 2 e o
+   * teto "volta ao zero" — passando do plano que ela paga, sem nada barrar.
+   *
+   * O limite e do plano da EMPRESA, entao a conta tambem tem de ser.
+   */
+  const svc = createServiceClient()
+  const { count } = recurso === 'leads'
+    ? await svc.from('leads').select('id', { count: 'exact', head: true })
+        .eq('empresa_id', empresaId).eq('ativo', true)
+    : await svc.from('empresa_usuarios').select('id', { count: 'exact', head: true })
+        .eq('empresa_id', empresaId).eq('ativo', true)
+  const usoAtual = count ?? 0
 
   const percentual = limite > 0 ? (usoAtual / limite) * 100 : 0
   return {

@@ -271,5 +271,20 @@ v "guarda a url que foi assinada"    "app/api/admin/c2s/route.ts" "url_assinada:
 v "tela e rota usam a mesma conta"   "app/admin/integracoes/page.tsx" "basePublica(hostReq"
 v "tela mostra divergencia de url"   "components/modules/integracoes/c2s-card.tsx" "estado.urlAssinada !== estado.urlWebhook"
 
+echo "== filiais (24/08) =="
+v "limite do plano conta a empresa"  "lib/limites.ts" "const svc = createServiceClient()"
+v "uso do plano usa total da rede"   "app/admin/page.tsx" "const leadsDaRede = rede?.total"
+v "consolidado le fora da RLS"       "lib/filiais-consulta.ts" "eq('empresa_id', empresaId)"
+v "seletor some com uma loja so"     "components/layout/seletor-filial.tsx" "if (filiais.length < 2) return null"
+v "vendedor nao troca de loja"       "components/layout/seletor-filial.tsx" "if (!podeTrocar) {"
+v "troca de loja recarrega tudo"     "components/layout/seletor-filial.tsx" "window.location.reload()"
+v "matriz nao se desativa"           "app/api/admin/filiais/route.ts" "if (alvo.matriz) {"
+v "matriz unica troca em ordem"      "app/api/admin/filiais/route.ts" "eq('matriz', true)"
+v "desativar solta quem estava nela" "app/api/admin/filiais/route.ts" "eq('filial_id', b.id)"
+v "selecao valida a empresa"         "app/api/filial/selecionar/route.ts" "eq('empresa_id', empresaId).eq('ativo', true)"
+v "loja da pessoa e validada"        "app/api/equipe/atualizar-usuario/route.ts" "Loja não encontrada nesta empresa"
+v "campo de loja so no /admin"       "app/admin/equipe/page.tsx" "filiais={(filiais ?? "
+v "CRM nao apaga a loja ao salvar"   "app/(dashboard)/equipe/components/equipe-view.tsx" "...(escolheLoja ?"
+
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

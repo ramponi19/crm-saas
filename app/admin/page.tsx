@@ -3,11 +3,14 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
 import { Topbar } from '@/components/layout/topbar'
-import { Card, StatCard } from '@/components/ui'
+import { createServiceClient } from '@/lib/supabase/service'
+import { contarLeadsPorFilial } from '@/lib/filiais-consulta'
+import { rotuloDaFilial } from '@/lib/filiais'
+import { Card, StatCard, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
   Users, Target, Package, Wallet, UserCog, Settings, Building2,
-  ArrowUpRight, CreditCard, TrendingUp,
+  ArrowUpRight, CreditCard, TrendingUp, Store,
 } from 'lucide-react'
 
 export const metadata = { title: 'Administração' }
@@ -49,9 +52,34 @@ export default async function AdminOverviewPage() {
     .eq('id', planoRes.data?.plano ?? '')
     .maybeSingle()
 
+  /**
+   * CONSOLIDADO DA REDE — leads ativos por loja e o total.
+   *
+   * Lido pelo service-role de proposito: a RLS de `leads` filtra pela loja
+   * selecionada no topo, e a pergunta aqui e sobre a empresa inteira. Com uma loja
+   * so, o bloco nao aparece.
+   */
+  const svcRede = createServiceClient()
+  const { data: filiaisRede } = await svcRede.from('filiais')
+    .select('id, nome, cidade, matriz, ativo')
+    .eq('empresa_id', empresaId).eq('ativo', true)
+    .order('matriz', { ascending: false }).order('nome')
+  const lojas = (filiaisRede ?? []) as { id: number; nome: string; cidade: string | null; matriz: boolean }[]
+  const rede = lojas.length >= 2
+    ? await contarLeadsPorFilial(svcRede, empresaId, lojas, { soAtivos: true })
+    : null
+
   const limiteLeads = empresa?.limite_leads ?? planoCfg?.limite_leads ?? 0
   const limiteUsuarios = empresa?.limite_usuarios ?? planoCfg?.limite_usuarios ?? 0
-  const pctLeads = limiteLeads > 0 ? Math.min(100, Math.round((leadsAtivos / limiteLeads) * 100)) : 0
+  /**
+   * O uso do plano usa o total da REDE, nao `leadsAtivos`.
+   *
+   * `leadsAtivos` vem pelo cliente com RLS, entao com uma loja selecionada ele
+   * mostra so aquela loja — e a barra de uso do plano compararia parte do uso com o
+   * limite inteiro. O limite e da empresa; a conta tambem.
+   */
+  const leadsDaRede = rede?.total ?? leadsAtivos
+  const pctLeads = limiteLeads > 0 ? Math.min(100, Math.round((leadsDaRede / limiteLeads) * 100)) : 0
   const pctUsuarios = limiteUsuarios > 0 ? Math.min(100, Math.round((usuarios / limiteUsuarios) * 100)) : 0
 
   const trialDias = empresa?.trial_ends_at
@@ -92,6 +120,45 @@ export default async function AdminOverviewPage() {
               <StatCard bare key={s.label} label={s.label} value={s.value} delta={s.sub} deltaTone="neutral" />
             ))}
           </div>
+
+          {/* Consolidado da rede: aparece so quando existe mais de uma loja. */}
+          {rede && (
+            <Card
+              title={<span className="inline-flex items-center gap-2"><Store size={15} strokeWidth={1.8} className="text-accent" />Leads por loja</span>}
+              actions={<Badge tone="acc">{rede.total} na rede</Badge>}
+            >
+              <div className="divide-y divide-line-soft">
+                {lojas.map((f) => {
+                  const n = rede.porFilial.get(f.id) ?? 0
+                  const pct = rede.total > 0 ? Math.round((n / rede.total) * 100) : 0
+                  return (
+                    <div key={f.id} className="flex items-center gap-3 py-2.5">
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                        {rotuloDaFilial(f)}
+                        {f.matriz && <span className="ml-1.5 text-[11px] text-ink-3">principal</span>}
+                      </span>
+                      <div className="hidden h-1.5 w-[160px] overflow-hidden rounded-full bg-ink/[0.06] sm:block">
+                        <div className="h-full rounded-full bg-accent" style={{ width: pct + '%' }} />
+                      </div>
+                      <span className="num w-16 text-right text-[13px] font-semibold text-ink">{n}</span>
+                      <span className="num w-10 text-right text-[12px] text-ink-3">{pct}%</span>
+                    </div>
+                  )
+                })}
+                {rede.semFilial > 0 && (
+                  <div className="flex items-center gap-3 py-2.5">
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-bad">Sem loja definida</span>
+                    <span className="num w-16 text-right text-[13px] font-semibold text-bad">{rede.semFilial}</span>
+                    <span className="w-10" />
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+                Total da rede, independente da loja selecionada no topo. Para ver a
+                operação de uma loja isolada, escolha-a no seletor.
+              </p>
+            </Card>
+          )}
 
           {/* Plano + uso */}
           <div className="grid gap-4 lg:grid-cols-2">

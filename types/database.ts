@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1516,6 +1516,7 @@ export type Database = {
           ausente_em: string | null
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           role: string
           usuario_id: string
@@ -1526,6 +1527,7 @@ export type Database = {
           ausente_em?: string | null
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: number
           role?: string
           usuario_id: string
@@ -1536,6 +1538,7 @@ export type Database = {
           ausente_em?: string | null
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: number
           role?: string
           usuario_id?: string
@@ -1553,6 +1556,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_usuarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1747,6 +1757,87 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      filiais: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string
+          email: string | null
+          empresa_id: number
+          endereco: string | null
+          estado: string | null
+          id: number
+          matriz: boolean
+          nome: string
+          numero: string | null
+          representante_cpf: string | null
+          representante_nome: string | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          empresa_id: number
+          endereco?: string | null
+          estado?: string | null
+          id?: number
+          matriz?: boolean
+          nome: string
+          numero?: string | null
+          representante_cpf?: string | null
+          representante_nome?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          empresa_id?: number
+          endereco?: string | null
+          estado?: string | null
+          id?: number
+          matriz?: boolean
+          nome?: string
+          numero?: string | null
+          representante_cpf?: string | null
+          representante_nome?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filiais_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "filiais_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
         ]
@@ -2951,6 +3042,7 @@ export type Database = {
           devolucoes: number
           devolvido_em: string | null
           empresa_id: number
+          filial_id: number | null
           foto_url: string | null
           funil_id: number | null
           id: number
@@ -2985,6 +3077,7 @@ export type Database = {
           devolucoes?: number
           devolvido_em?: string | null
           empresa_id: number
+          filial_id?: number | null
           foto_url?: string | null
           funil_id?: number | null
           id?: never
@@ -3019,6 +3112,7 @@ export type Database = {
           devolucoes?: number
           devolvido_em?: string | null
           empresa_id?: number
+          filial_id?: number | null
           foto_url?: string | null
           funil_id?: number | null
           id?: never
@@ -3064,6 +3158,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -5107,6 +5208,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          filial_atual_id: number | null
           id: string
           impersonando_empresa_id: number | null
           impersonando_expires_at: string | null
@@ -5120,6 +5222,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
+          filial_atual_id?: number | null
           id: string
           impersonando_empresa_id?: number | null
           impersonando_expires_at?: string | null
@@ -5133,6 +5236,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
+          filial_atual_id?: number | null
           id?: string
           impersonando_empresa_id?: number | null
           impersonando_expires_at?: string | null
@@ -5144,6 +5248,13 @@ export type Database = {
           ultimo_acesso?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "usuarios_filial_atual_id_fkey"
+            columns: ["filial_atual_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "usuarios_impersonando_empresa_id_fkey"
             columns: ["impersonando_empresa_id"]
@@ -5736,6 +5847,9 @@ export type Database = {
       }
     }
     Functions: {
+      filiais_visiveis: { Args: never; Returns: number[] }
+      filial_atual: { Args: never; Returns: number }
+      filial_gravacao: { Args: { p_empresa: number }; Returns: number }
       fundir_clientes: {
         Args: { p_empresa: number; p_principal: number; p_secundario: number }
         Returns: Json
