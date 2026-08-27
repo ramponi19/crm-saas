@@ -490,9 +490,18 @@ async function salvarFotoPerfil(canal: Canal, origemId: string, url: string): Pr
   } catch (e) { console.error("salvarFotoPerfil:", e); return null; }
 }
 
-async function fetchProfile(id: string, token: string, fields: string) {
+/**
+ * Perfil de quem enviou. O HOST depende de como o canal foi conectado.
+ *
+ * Token de conta do Instagram nao vale em graph.facebook.com: a resposta e
+ * "Invalid OAuth access token - Cannot parse access token" (codigo 190), e o lead
+ * entra SEM NOME. Foi o que aconteceu no primeiro Direct real da Jaguariuna, em
+ * 27/08/2026 — a mensagem chegou, o nome nao.
+ */
+async function fetchProfile(id: string, token: string, fields: string, viaInstagram = false) {
+  const base = viaInstagram ? "https://graph.instagram.com" : "https://graph.facebook.com";
   try {
-    const r = await fetch(`https://graph.facebook.com/${GRAPH}/${id}?fields=${fields}&access_token=${token}`);
+    const r = await fetch(`${base}/${GRAPH}/${id}?fields=${fields}&access_token=${token}`);
     if (!r.ok) { console.error("profile:", id, await r.text()); return null; }
     return await r.json() as Record<string, string>;
   } catch (e) { console.error("fetchProfile:", e); return null; }
@@ -570,11 +579,24 @@ async function upsertLead(canal: Canal, p: {
 
   let leadId: number | null = existente?.id ?? null;
   if (!leadId) {
+    /**
+     * O LEAD NASCE NA LOJA DO CANAL.
+     *
+     * Sem isto o gatilho do banco decide, e ele nao tem sessao para consultar:
+     * cai na matriz. Resultado observado no primeiro Direct real da Jaguariuna —
+     * a mensagem entrou, mas o lead ficou em Mogi, e com a Jaguariuna selecionada
+     * no topo ele era INVISIVEL para o dono. Mensagem que chega e ninguem ve e
+     * pior do que mensagem que nao chega, porque ninguem vai investigar.
+     *
+     * Canal da rede (filial nula) continua caindo no gatilho, que manda para a
+     * matriz — o certo para o canal da marca, que atende todas as lojas.
+     */
     const { data: novo, error } = await db.from("leads").insert([{
       empresa_id: empresaId, nome: p.nome, telefone: p.telefone, instagram: p.instagramUser,
       origem: p.origem, origem_id: p.origemId, primeira_msg: p.texto,
       kanban_status: "novo", ativo: true, foto_url: p.fotoUrl ?? null,
       anuncio: p.anuncio ?? null,
+      ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
     }]).select("id").single();
     if (error) {
       const { data: again } = await db.from("leads").select("id")
@@ -1367,7 +1389,7 @@ serve(async (req: Request) => {
             // profile_pic vem em IG e Messenger; a URL é de CDN e EXPIRA, por isso
             // a imagem é copiada para o Storage logo abaixo.
             const campos = tipo === "instagram" ? "name,username,profile_pic" : "name,first_name,profile_pic";
-            const p = await fetchProfile(remetente, canal.token, campos);
+            const p = await fetchProfile(remetente, canal.token, campos, canal.via === "instagram");
             nome = p?.name || p?.username || p?.first_name || null;
             username = p?.username || null;
             if (p?.profile_pic) fotoUrl = await salvarFotoPerfil(canal, remetente, p.profile_pic);
