@@ -93,6 +93,23 @@ export async function middleware(request: NextRequest) {
                         request.nextUrl.pathname === '/manifest.webmanifest'
 
   if (!user && !isAuthRoute && !isPublicRoute) {
+    /**
+     * O retorno do login do Instagram e uma NAVEGACAO, nao uma chamada de tela.
+     *
+     * Ele e uma rota de API por desenho — o codigo da Meta nao pode passear pela
+     * URL de uma pagina, foi assim que o conector via Pagina quebrou hoje. Mas quem
+     * chega nela e o navegador do lojista voltando do instagram.com. Se a sessao
+     * tiver expirado nesse meio, responder JSON deixa a pessoa olhando
+     * `{"error":...}` na tela, sem nem saber que perdeu a sessao. Manda para o
+     * login, que e o que ela precisa fazer.
+     */
+    if (request.nextUrl.pathname === '/api/canais/instagram/retorno') {
+      // Sem parametro de retorno: a tela de login nao le nenhum, e inventar um
+      // seria prometer na URL algo que o sistema nao faz. Depois de entrar, o
+      // lojista volta em Integracoes e clica de novo — o codigo da Meta expira em
+      // minutos de qualquer forma, entao nao havia o que salvar.
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
     if (request.nextUrl.pathname.startsWith('/api')) {
       // A mensagem chega como toast na tela. "Unauthorized" fazia sessão expirada
       // parecer falta de PERMISSÃO — o dono da empresa clicava em criar usuário,

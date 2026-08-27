@@ -312,6 +312,7 @@ v "retorno resolvido no servidor"     "app/api/canais/instagram/retorno/route.ts
 v "envio escolhe o host pelo via"     "supabase/functions/webhook-leads/index.ts" "graph.instagram.com/"
 v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts" "order(\"conectado_em\", { ascending: false }).limit(1)"
 v "messaging_type so no caminho FB"   "supabase/functions/webhook-leads/index.ts" "const corpoEnvio = viaInstagram"
+v "retorno do IG vai pro login"       "middleware.ts" "/api/canais/instagram/retorno"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
