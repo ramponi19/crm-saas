@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   try {
     const auth = await requireOwnerOrAdminApi()
     if (auth.error) return auth.error
-    const { empresaId } = auth
+    const { empresaId, supabase } = auth
 
     if (!metaConfigurada()) {
       return NextResponse.json({ error: 'Integração Meta não configurada no servidor.' }, { status: 503 })
@@ -97,6 +97,25 @@ export async function POST(req: Request) {
 
     // 2. grava antes de qualquer outra chamada
     const svc = createServiceClient()
+
+    /**
+     * Canal NOVO nasce na loja selecionada no topo. Em modo Rede nasce da rede
+     * (nulo), que e o que vale para todas as lojas.
+     *
+     * Por que NAO entra no upsert: `onConflict: 'tipo,external_id'` faz do upsert um
+     * UPDATE quando o canal ja existe, e a coluna iria junto — uma reconexao apagaria
+     * a loja que o dono escolheu na tela. Mesmo estrago que o webhook do C2S causou
+     * ao mandar payload parcial. Por isso a loja e gravada DEPOIS, e so no que
+     * acabou de nascer.
+     *
+     * Sem isto, a loja nova precisa marcar "Atende" a mao em cada canal recem
+     * conectado — e enquanto nao marcar, o canal dela aparece para a outra loja.
+     */
+    const [{ data: lojaSel }, { data: jaExistia }] = await Promise.all([
+      supabase.rpc('filial_atual'),
+      svc.from('canais_conectados').select('id')
+        .eq('tipo', 'whatsapp').eq('external_id', String(phoneNumberId)).maybeSingle(),
+    ])
     const { data: canal, error: erroGravar } = await svc
       .from('canais_conectados')
       .upsert(
@@ -130,6 +149,13 @@ export async function POST(req: Request) {
         },
         { status: conflito ? 409 : 500 },
       )
+    }
+
+    // Numero NOVO fica com a loja selecionada; reconexao nao mexe na loja.
+    const loja = lojaSel as number | null
+    if (loja != null && !jaExistia && canal?.id) {
+      await svc.from('canais_conectados').update({ filial_id: loja })
+        .eq('id', canal.id).eq('empresa_id', empresaId)
     }
 
     const avisos: string[] = []

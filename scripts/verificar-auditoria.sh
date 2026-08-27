@@ -293,6 +293,9 @@ v "tela explica canal da rede"       "components/modules/canais/canais-view.tsx"
 v "campo de loja do canal so com 2"  "components/modules/canais/canais-view.tsx" "lojas.length >= 2"
 v "retorno da meta preserva o code"   "app/admin/canais/page.tsx" "const q = query.toString()"
 v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx" "replaceState({}, '', '/admin/integracoes')"
+v "canal novo nasce na loja atual"    "app/api/canais/meta/route.ts" "update({ filial_id: loja })"
+v "reconexao nao mexe na loja"        "app/api/canais/meta/route.ts" "if (existia.has(l.tipo"
+v "numero novo nasce na loja atual"   "app/api/canais/whatsapp/route.ts" "loja != null && !jaExistia"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
