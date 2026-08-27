@@ -1,0 +1,21 @@
+# Configuração do projeto Supabase — só o que é do deploy da função.
+#
+# `project_id` não é segredo: é o mesmo identificador que aparece na URL pública
+# do projeto (`https://<ref>.supabase.co`).
+project_id = "guiuzbcqkvelqcuogxtd"
+
+# ⚠️ verify_jwt = false NÃO É DESCUIDO, é requisito.
+#
+# `webhook-leads` é o endereço que a META chama. Quem chama é servidor da Meta, que
+# não tem — nem poderia ter — um JWT do Supabase. Com a verificação ligada, toda
+# entrada de WhatsApp, Instagram e Messenger passa a receber 401 e o recebimento
+# para inteiro, calado do ponto de vista do lojista.
+#
+# A autenticação existe, e é outra: a função confere `hub.verify_token` no
+# handshake e valida a assinatura da requisição. Ver `WEBHOOK_VERIFY_TOKEN`.
+#
+# Este ajuste vivia só nas configurações do projeto na nuvem — invisível no
+# repositório e fácil de perder num deploy feito de outro jeito. Agora está
+# declarado aqui.
+[functions.webhook-leads]
+verify_jwt = false
