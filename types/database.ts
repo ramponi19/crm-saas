@@ -581,6 +581,7 @@ export type Database = {
           data_access_expira_em: string | null
           empresa_id: number
           external_id: string
+          filial_id: number | null
           id: number
           ig_user_id: string | null
           nome_exibicao: string | null
@@ -606,6 +607,7 @@ export type Database = {
           data_access_expira_em?: string | null
           empresa_id: number
           external_id: string
+          filial_id?: number | null
           id?: number
           ig_user_id?: string | null
           nome_exibicao?: string | null
@@ -631,6 +633,7 @@ export type Database = {
           data_access_expira_em?: string | null
           empresa_id?: number
           external_id?: string
+          filial_id?: number | null
           id?: number
           ig_user_id?: string | null
           nome_exibicao?: string | null
@@ -660,6 +663,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canais_conectados_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
         ]
