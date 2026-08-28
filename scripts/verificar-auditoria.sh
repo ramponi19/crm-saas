@@ -327,6 +327,8 @@ v "transferida chega como pendente"   "app/api/estoque/transferir/route.ts" "sta
 v "so transfere o disponivel"         "app/api/estoque/transferir/route.ts" ".eq('status', TRANSFERIVEL)"
 v "recebimento zera na transferencia" "app/api/estoque/transferir/route.ts" "recebido_em: null"
 v "movimento nas duas lojas"          "app/api/estoque/transferir/route.ts" "transferencia_entrada"
+v "nao lidas contadas no banco"      "app/(dashboard)/leads/page.tsx" "v_leads_nao_lidas"
+v "sino conta no banco tambem"       "components/layout/topbar.tsx" "v_leads_nao_lidas"
 v "assina o webhook na conta"         "lib/canais/instagram-login.ts" "me/subscribed_apps"
 v "state confere na volta"            "app/api/canais/instagram/retorno/route.ts" "state !== esperado"
 v "recusa ambiente local"             "app/api/canais/instagram/iniciar/route.ts" "if (local) {"
