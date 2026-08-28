@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -175,6 +175,7 @@ export type Database = {
         Row: {
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           fotos_urls: string | null
           id: number
           km: number | null
@@ -190,6 +191,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           fotos_urls?: string | null
           id?: never
           km?: number | null
@@ -205,6 +207,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           fotos_urls?: string | null
           id?: never
           km?: number | null
@@ -230,6 +233,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_usados_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -355,6 +365,7 @@ export type Database = {
           concluida_em: string | null
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           lead_id: number
           passo_ordem: number
@@ -367,6 +378,7 @@ export type Database = {
           concluida_em?: string | null
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           lead_id: number
           passo_ordem?: number
@@ -379,6 +391,7 @@ export type Database = {
           concluida_em?: string | null
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           lead_id?: number
           passo_ordem?: number
@@ -406,6 +419,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadencia_inscricoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -596,6 +616,7 @@ export type Database = {
           ultimo_erro: string | null
           ultimo_erro_em: string | null
           updated_at: string
+          via: string
           waba_id: string | null
         }
         Insert: {
@@ -622,6 +643,7 @@ export type Database = {
           ultimo_erro?: string | null
           ultimo_erro_em?: string | null
           updated_at?: string
+          via?: string
           waba_id?: string | null
         }
         Update: {
@@ -648,6 +670,7 @@ export type Database = {
           ultimo_erro?: string | null
           ultimo_erro_em?: string | null
           updated_at?: string
+          via?: string
           waba_id?: string | null
         }
         Relationships: [
@@ -735,6 +758,7 @@ export type Database = {
           direcao: string
           duracao_seg: number | null
           empresa_id: number
+          filial_id: number | null
           id: number
           lead_id: number | null
           observacao: string | null
@@ -746,6 +770,7 @@ export type Database = {
           direcao?: string
           duracao_seg?: number | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           observacao?: string | null
@@ -757,6 +782,7 @@ export type Database = {
           direcao?: string
           duracao_seg?: number | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           observacao?: string | null
@@ -776,6 +802,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamadas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -869,6 +902,7 @@ export type Database = {
           endereco: string | null
           estado: string | null
           estado_civil: string | null
+          filial_id: number | null
           id: number
           instagram: string | null
           lead_id: number | null
@@ -904,6 +938,7 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           estado_civil?: string | null
+          filial_id?: number | null
           id?: never
           instagram?: string | null
           lead_id?: number | null
@@ -939,6 +974,7 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           estado_civil?: string | null
+          filial_id?: number | null
           id?: never
           instagram?: string | null
           lead_id?: number | null
@@ -973,6 +1009,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clientes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clientes_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -994,6 +1037,7 @@ export type Database = {
           created_at: string
           descricao: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           linha_digitavel: string | null
           link_pagamento: string | null
@@ -1015,6 +1059,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           linha_digitavel?: string | null
           link_pagamento?: string | null
@@ -1036,6 +1081,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           linha_digitavel?: string | null
           link_pagamento?: string | null
@@ -1075,6 +1121,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cobrancas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cobrancas_os_id_fkey"
             columns: ["os_id"]
             isOneToOne: false
@@ -1095,6 +1148,7 @@ export type Database = {
           created_at: string | null
           data_pagamento: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           mes_referencia: string | null
           percentual: number | null
@@ -1109,6 +1163,7 @@ export type Database = {
           created_at?: string | null
           data_pagamento?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           mes_referencia?: string | null
           percentual?: number | null
@@ -1123,6 +1178,7 @@ export type Database = {
           created_at?: string | null
           data_pagamento?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           mes_referencia?: string | null
           percentual?: number | null
@@ -1146,6 +1202,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1368,6 +1431,7 @@ export type Database = {
           dados: Json
           documento_id: number | null
           empresa_id: number
+          filial_id: number | null
           garantia_dias: number | null
           html: string
           id: number
@@ -1381,6 +1445,7 @@ export type Database = {
           dados: Json
           documento_id?: number | null
           empresa_id: number
+          filial_id?: number | null
           garantia_dias?: number | null
           html: string
           id?: never
@@ -1394,6 +1459,7 @@ export type Database = {
           dados?: Json
           documento_id?: number | null
           empresa_id?: number
+          filial_id?: number | null
           garantia_dias?: number | null
           html?: string
           id?: never
@@ -1434,6 +1500,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_venda_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
         ]
@@ -1710,6 +1783,7 @@ export type Database = {
           created_at: string | null
           empresa_id: number
           entrada: number | null
+          filial_id: number | null
           id: number
           lead_id: number | null
           observacoes: string | null
@@ -1724,6 +1798,7 @@ export type Database = {
           created_at?: string | null
           empresa_id: number
           entrada?: number | null
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           observacoes?: string | null
@@ -1738,6 +1813,7 @@ export type Database = {
           created_at?: string | null
           empresa_id?: number
           entrada?: number | null
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           observacoes?: string | null
@@ -1760,6 +1836,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_financiamento_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1926,6 +2009,7 @@ export type Database = {
           chave: string
           created_at: string
           empresa_id: number
+          filial_id: number | null
           id: number
           lead_id: number | null
           regra: string
@@ -1935,6 +2019,7 @@ export type Database = {
           chave: string
           created_at?: string
           empresa_id: number
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           regra: string
@@ -1944,6 +2029,7 @@ export type Database = {
           chave?: string
           created_at?: string
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           regra?: string
@@ -1962,6 +2048,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followups_gerados_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2155,6 +2248,7 @@ export type Database = {
           dias_garantia_restantes: number | null
           empresa_id: number
           estado_entrada: string | null
+          filial_id: number | null
           id: number
           imei_serial: string | null
           modelo_reserva: string | null
@@ -2181,6 +2275,7 @@ export type Database = {
           dias_garantia_restantes?: number | null
           empresa_id: number
           estado_entrada?: string | null
+          filial_id?: number | null
           id?: never
           imei_serial?: string | null
           modelo_reserva?: string | null
@@ -2207,6 +2302,7 @@ export type Database = {
           dias_garantia_restantes?: number | null
           empresa_id?: number
           estado_entrada?: string | null
+          filial_id?: number | null
           id?: never
           imei_serial?: string | null
           modelo_reserva?: string | null
@@ -2242,6 +2338,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "garantias_assistencias_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2586,6 +2689,7 @@ export type Database = {
           custo_reparo: number | null
           empresa_id: number
           estado: string | null
+          filial_id: number | null
           fornecedor_id: number | null
           fotos_urls: string | null
           grupo_pdv: string | null
@@ -2625,6 +2729,7 @@ export type Database = {
           custo_reparo?: number | null
           empresa_id: number
           estado?: string | null
+          filial_id?: number | null
           fornecedor_id?: number | null
           fotos_urls?: string | null
           grupo_pdv?: string | null
@@ -2664,6 +2769,7 @@ export type Database = {
           custo_reparo?: number | null
           empresa_id?: number
           estado?: string | null
+          filial_id?: number | null
           fornecedor_id?: number | null
           fotos_urls?: string | null
           grupo_pdv?: string | null
@@ -2712,6 +2818,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventario_unidades_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventario_unidades_fornecedor_id_fkey"
             columns: ["fornecedor_id"]
             isOneToOne: false
@@ -2749,6 +2862,7 @@ export type Database = {
           data_venc: string
           descricao: string
           empresa_id: number
+          filial_id: number | null
           forma_pgto: string | null
           id: number
           observacoes: string | null
@@ -2766,6 +2880,7 @@ export type Database = {
           data_venc: string
           descricao: string
           empresa_id: number
+          filial_id?: number | null
           forma_pgto?: string | null
           id?: number
           observacoes?: string | null
@@ -2783,6 +2898,7 @@ export type Database = {
           data_venc?: string
           descricao?: string
           empresa_id?: number
+          filial_id?: number | null
           forma_pgto?: string | null
           id?: number
           observacoes?: string | null
@@ -2808,6 +2924,13 @@ export type Database = {
             referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lancamentos_financeiros_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
         ]
       }
       lead_atribuicoes: {
@@ -2816,6 +2939,7 @@ export type Database = {
           created_at: string
           de_responsavel: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           lead_id: number
           para_responsavel: string | null
@@ -2826,6 +2950,7 @@ export type Database = {
           created_at?: string
           de_responsavel?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           lead_id: number
           para_responsavel?: string | null
@@ -2836,6 +2961,7 @@ export type Database = {
           created_at?: string
           de_responsavel?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           lead_id?: number
           para_responsavel?: string | null
@@ -2857,6 +2983,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_atribuicoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_atribuicoes_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -2873,6 +3006,7 @@ export type Database = {
           empresa_id: number
           erro_envio: string | null
           external_id: string | null
+          filial_id: number | null
           id: number
           lead_id: number | null
           lida: boolean | null
@@ -2890,6 +3024,7 @@ export type Database = {
           empresa_id: number
           erro_envio?: string | null
           external_id?: string | null
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           lida?: boolean | null
@@ -2907,6 +3042,7 @@ export type Database = {
           empresa_id?: number
           erro_envio?: string | null
           external_id?: string | null
+          filial_id?: number | null
           id?: never
           lead_id?: number | null
           lida?: boolean | null
@@ -2930,6 +3066,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_mensagens_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2952,6 +3095,7 @@ export type Database = {
           cliente_id: number | null
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           finalidade: string | null
           id: number
           lead_id: number | null
@@ -2975,6 +3119,7 @@ export type Database = {
           cliente_id?: number | null
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           finalidade?: string | null
           id?: number
           lead_id?: number | null
@@ -2998,6 +3143,7 @@ export type Database = {
           cliente_id?: number | null
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           finalidade?: string | null
           id?: number
           lead_id?: number | null
@@ -3031,6 +3177,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_perfil_busca_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3335,6 +3488,7 @@ export type Database = {
           created_at: string | null
           empresa_id: number
           escopo: string
+          filial_id: number | null
           id: number
           periodo: string
           tipo: string
@@ -3345,6 +3499,7 @@ export type Database = {
           created_at?: string | null
           empresa_id: number
           escopo?: string
+          filial_id?: number | null
           id?: never
           periodo: string
           tipo?: string
@@ -3355,6 +3510,7 @@ export type Database = {
           created_at?: string | null
           empresa_id?: number
           escopo?: string
+          filial_id?: number | null
           id?: never
           periodo?: string
           tipo?: string
@@ -3375,12 +3531,20 @@ export type Database = {
             referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "metas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
         ]
       }
       metas_comissoes: {
         Row: {
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           mes_ano: string
           meta_vendas_qtd: number | null
@@ -3391,6 +3555,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           mes_ano: string
           meta_vendas_qtd?: number | null
@@ -3401,6 +3566,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           mes_ano?: string
           meta_vendas_qtd?: number | null
@@ -3421,6 +3587,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_comissoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3544,6 +3717,7 @@ export type Database = {
         Row: {
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           observacoes: string | null
           produto_id: number | null
@@ -3554,6 +3728,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           observacoes?: string | null
           produto_id?: number | null
@@ -3564,6 +3739,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           observacoes?: string | null
           produto_id?: number | null
@@ -3584,6 +3760,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacao_estoque_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3800,6 +3983,7 @@ export type Database = {
           created_at: string | null
           defeito: string | null
           empresa_id: number
+          filial_id: number | null
           garantia_dias: number | null
           id: number
           imei: string | null
@@ -3831,6 +4015,7 @@ export type Database = {
           created_at?: string | null
           defeito?: string | null
           empresa_id: number
+          filial_id?: number | null
           garantia_dias?: number | null
           id?: never
           imei?: string | null
@@ -3862,6 +4047,7 @@ export type Database = {
           created_at?: string | null
           defeito?: string | null
           empresa_id?: number
+          filial_id?: number | null
           garantia_dias?: number | null
           id?: never
           imei?: string | null
@@ -3901,6 +4087,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamentos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3955,6 +4148,7 @@ export type Database = {
           cliente_nome: string | null
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           itens: Json
           mesa: string | null
@@ -3967,6 +4161,7 @@ export type Database = {
           cliente_nome?: string | null
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: never
           itens?: Json
           mesa?: string | null
@@ -3979,6 +4174,7 @@ export type Database = {
           cliente_nome?: string | null
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           itens?: Json
           mesa?: string | null
@@ -4002,6 +4198,13 @@ export type Database = {
             referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pedidos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pedidos_compra: {
@@ -4010,6 +4213,7 @@ export type Database = {
           data_pedido: string | null
           descricao: string | null
           empresa_id: number
+          filial_id: number | null
           fornecedor_id: number | null
           id: number
           observacoes: string | null
@@ -4022,6 +4226,7 @@ export type Database = {
           data_pedido?: string | null
           descricao?: string | null
           empresa_id: number
+          filial_id?: number | null
           fornecedor_id?: number | null
           id?: never
           observacoes?: string | null
@@ -4034,6 +4239,7 @@ export type Database = {
           data_pedido?: string | null
           descricao?: string | null
           empresa_id?: number
+          filial_id?: number | null
           fornecedor_id?: number | null
           id?: never
           observacoes?: string | null
@@ -4054,6 +4260,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_compra_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -4126,6 +4339,7 @@ export type Database = {
           created_at: string | null
           desconto_valor: number | null
           empresa_id: number
+          filial_id: number | null
           grupo_id: string | null
           id: number
           inventario_unidade_id: number | null
@@ -4142,6 +4356,7 @@ export type Database = {
           created_at?: string | null
           desconto_valor?: number | null
           empresa_id: number
+          filial_id?: number | null
           grupo_id?: string | null
           id?: never
           inventario_unidade_id?: number | null
@@ -4158,6 +4373,7 @@ export type Database = {
           created_at?: string | null
           desconto_valor?: number | null
           empresa_id?: number
+          filial_id?: number | null
           grupo_id?: string | null
           id?: never
           inventario_unidade_id?: number | null
@@ -4182,6 +4398,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_vendas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -4322,6 +4545,7 @@ export type Database = {
           cliente_nome: string
           created_at: string
           empresa_id: number
+          filial_id: number | null
           id: number
           itens: Json
           lead_id: number | null
@@ -4334,6 +4558,7 @@ export type Database = {
           cliente_nome?: string
           created_at?: string
           empresa_id: number
+          filial_id?: number | null
           id?: never
           itens?: Json
           lead_id?: number | null
@@ -4346,6 +4571,7 @@ export type Database = {
           cliente_nome?: string
           created_at?: string
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           itens?: Json
           lead_id?: number | null
@@ -4367,6 +4593,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -4802,6 +5035,7 @@ export type Database = {
           categoria: string | null
           created_at: string
           empresa_id: number
+          filial_id: number | null
           id: number
           nome: string
           preco: number
@@ -4812,6 +5046,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           empresa_id: number
+          filial_id?: number | null
           id?: never
           nome: string
           preco?: number
@@ -4822,12 +5057,21 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           empresa_id?: number
+          filial_id?: number | null
           id?: never
           nome?: string
           preco?: number
           tempo_estimado_min?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "servicos_reparo_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       solicitacoes_marketing: {
         Row: {
@@ -5060,6 +5304,7 @@ export type Database = {
           created_at: string | null
           descricao: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           lead_id: number | null
           responsavel_id: string | null
@@ -5073,6 +5318,7 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: number
           lead_id?: number | null
           responsavel_id?: string | null
@@ -5086,6 +5332,7 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: number
           lead_id?: number | null
           responsavel_id?: string | null
@@ -5106,6 +5353,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -5355,6 +5609,7 @@ export type Database = {
           desconto_motivo: string | null
           desconto_valor: number | null
           empresa_id: number
+          filial_id: number | null
           forma_pagamento: string | null
           grupo_pdv: string | null
           id: number
@@ -5383,6 +5638,7 @@ export type Database = {
           desconto_motivo?: string | null
           desconto_valor?: number | null
           empresa_id: number
+          filial_id?: number | null
           forma_pagamento?: string | null
           grupo_pdv?: string | null
           id?: never
@@ -5411,6 +5667,7 @@ export type Database = {
           desconto_motivo?: string | null
           desconto_valor?: number | null
           empresa_id?: number
+          filial_id?: number | null
           forma_pagamento?: string | null
           grupo_pdv?: string | null
           id?: never
@@ -5455,6 +5712,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -5506,6 +5770,7 @@ export type Database = {
           aceito_em: string
           aceito_por: string | null
           empresa_id: number
+          filial_id: number | null
           id: number
           mensagem: string
           tipo: string
@@ -5517,6 +5782,7 @@ export type Database = {
           aceito_em?: string
           aceito_por?: string | null
           empresa_id: number
+          filial_id?: number | null
           id?: number
           mensagem: string
           tipo: string
@@ -5528,6 +5794,7 @@ export type Database = {
           aceito_em?: string
           aceito_por?: string | null
           empresa_id?: number
+          filial_id?: number | null
           id?: number
           mensagem?: string
           tipo?: string
@@ -5558,6 +5825,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendas_alertas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendas_alertas_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
@@ -5571,6 +5845,7 @@ export type Database = {
           bandeira_cartao: string | null
           created_at: string | null
           empresa_id: number
+          filial_id: number | null
           forma_pagamento: string
           id: number
           parcelas: number | null
@@ -5582,6 +5857,7 @@ export type Database = {
           bandeira_cartao?: string | null
           created_at?: string | null
           empresa_id: number
+          filial_id?: number | null
           forma_pagamento: string
           id?: never
           parcelas?: number | null
@@ -5593,6 +5869,7 @@ export type Database = {
           bandeira_cartao?: string | null
           created_at?: string | null
           empresa_id?: number
+          filial_id?: number | null
           forma_pagamento?: string
           id?: never
           parcelas?: number | null
@@ -5616,6 +5893,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendas_pagamentos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendas_pagamentos_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
@@ -5631,6 +5915,7 @@ export type Database = {
           assinado_por: string | null
           criado_em: string
           empresa_id: number
+          filial_id: number | null
           id: number
           status: string
           tipo: string
@@ -5642,6 +5927,7 @@ export type Database = {
           assinado_por?: string | null
           criado_em?: string
           empresa_id: number
+          filial_id?: number | null
           id?: number
           status?: string
           tipo: string
@@ -5653,6 +5939,7 @@ export type Database = {
           assinado_por?: string | null
           criado_em?: string
           empresa_id?: number
+          filial_id?: number | null
           id?: number
           status?: string
           tipo?: string
@@ -5681,6 +5968,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendas_termos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendas_termos_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
@@ -5696,6 +5990,7 @@ export type Database = {
           created_at: string | null
           data_hora: string
           empresa_id: number
+          filial_id: number | null
           fim: string | null
           id: number
           imovel_id: number | null
@@ -5714,6 +6009,7 @@ export type Database = {
           created_at?: string | null
           data_hora: string
           empresa_id: number
+          filial_id?: number | null
           fim?: string | null
           id?: number
           imovel_id?: number | null
@@ -5732,6 +6028,7 @@ export type Database = {
           created_at?: string | null
           data_hora?: string
           empresa_id?: number
+          filial_id?: number | null
           fim?: string | null
           id?: number
           imovel_id?: number | null
@@ -5771,6 +6068,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {

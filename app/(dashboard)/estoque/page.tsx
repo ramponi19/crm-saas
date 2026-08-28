@@ -1,6 +1,8 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { getEmpresaRole } from '@/lib/owner'
+import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Estoque' }
@@ -11,7 +13,7 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function EstoquePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }] = await Promise.all([
+  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }, { data: filiaisRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
       // NÃO dá para embutir o responsável aqui: `inventario_unidades.usuario_id`
@@ -37,7 +39,15 @@ export default async function EstoquePage() {
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
     // Fornecedor faltava no formulário da aba — só o modal tinha.
     supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
+    // Lojas da rede: destino possível de uma transferência, e o nome que aparece
+    // na coluna quando se está vendo a rede inteira. Empresa de uma loja só
+    // devolve uma linha, e a tela esconde tudo que é de rede.
+    supabase.from('filiais').select('id, nome, cidade, ativo').eq('empresa_id', empresaId).eq('ativo', true)
+      .order('matriz', { ascending: false }).order('nome'),
   ])
+
+  // Transferir mexe no estoque de duas lojas — mesma régua da tela de filiais.
+  const papel = await getEmpresaRole()
 
   // Nome de quem respondeu pela unidade (entrada por troca). Consulta à parte
   // porque o embed não é possível — ver o comentário no select acima.
@@ -57,6 +67,9 @@ export default async function EstoquePage() {
     produtos: Embed<{ nome: string | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
     fornecedores: Embed<{ nome_fantasia: string | null }>
   }
+  const filiais = (filiaisRaw ?? []) as { id: number; nome: string; cidade: string | null; ativo: boolean }[]
+  const nomePorFilial = new Map(filiais.map(f => [f.id, f.nome]))
+
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
     return {
@@ -67,6 +80,7 @@ export default async function EstoquePage() {
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       fornecedor_nome: one(u.fornecedores)?.nome_fantasia ?? null,
       responsavel_nome: u.usuario_id ? nomePorUsuario.get(u.usuario_id) ?? null : null,
+      filial_nome: u.filial_id ? nomePorFilial.get(u.filial_id) ?? null : null,
     }
   })
 
@@ -116,6 +130,8 @@ export default async function EstoquePage() {
       fornecedores={(fornecedoresRaw ?? []) as { id: number; nome_fantasia: string }[]}
       empresaId={empresaId!}
       segmento={normalizarSegmento(empresa?.segmento)}
+      filiais={filiais}
+      podeTransferir={separacaoAtiva(filiais) && (papel === 'owner' || papel === 'admin')}
     />
   )
 }
