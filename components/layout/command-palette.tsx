@@ -89,7 +89,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
       setResults([
         ...((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>).map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
-        ...((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null }>).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: '/leads' })),
+        // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
+        // seco — e quem já estava em /leads clicava no próprio resultado e nada
+        // acontecia, porque `router.push` para a rota atual não faz nada.
+        ...((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null }>).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: `/leads?lead=${l.id}` })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
