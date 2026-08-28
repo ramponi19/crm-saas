@@ -6159,6 +6159,36 @@ export type Database = {
           },
         ]
       }
+      v_leads_nao_lidas: {
+        Row: {
+          empresa_id: number | null
+          lead_id: number | null
+          nao_lidas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_mensagens_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       filiais_visiveis: { Args: never; Returns: number[] }

@@ -33,17 +33,18 @@ export default async function LeadsPage() {
       .select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(id, nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
-    // Contagem real de não-lidas — apenas leads desta empresa
-    supabase
-      .from('lead_mensagens')
-      .select('lead_id, leads!inner(empresa_id, ativo)')
-      .eq('leads.empresa_id', empresaId)
-      // Lead arquivado não entra: a contagem era cruzada com a lista (que já
-      // filtra ativo), então o resultado saía certo, mas trazia milhares de
-      // linhas de conversa arquivada a cada abertura do funil para descartar.
-      .eq('leads.ativo', true)
-      .eq('lida', false)
-      .eq('direcao', 'recebida'),
+    /**
+     * Contagem real de não-lidas, JÁ AGRUPADA PELO BANCO.
+     *
+     * Antes vinha uma linha por mensagem para agrupar aqui. Com 1.437 não lidas
+     * na JM, a resposta da API era cortada e o cabeçalho anunciou "145
+     * aguardando resposta" onde eram 174 — vinte e nove conversas de cliente
+     * fora do contador, erro que cresce com a base e sempre para menos.
+     *
+     * A view devolve uma linha por lead COM pendência (174), e já filtra lead
+     * arquivado. Ver a migração `contar_nao_lidas_no_banco`.
+     */
+    supabase.from('v_leads_nao_lidas').select('lead_id, nao_lidas').eq('empresa_id', empresaId),
     supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
@@ -62,11 +63,10 @@ export default async function LeadsPage() {
     camposObrigatorios: Array.isArray(e.campos_obrigatorios) ? (e.campos_obrigatorios as string[]) : [],
   }))
 
-  // Agrupa não-lidas por lead_id
+  // A view já vem agrupada: uma linha por lead, com o total dele.
   const contagem: Record<number, number> = {}
-  for (const m of (msgsNaoLidas ?? []) as Array<{ lead_id: number | null }>) {
-    const id = m.lead_id
-    if (id != null) contagem[id] = (contagem[id] ?? 0) + 1
+  for (const r of (msgsNaoLidas ?? []) as Array<{ lead_id: number | null; nao_lidas: number | null }>) {
+    if (r.lead_id != null) contagem[r.lead_id] = r.nao_lidas ?? 0
   }
 
   // Sobrescreve msgs_nao_lidas de cada lead com a contagem real
