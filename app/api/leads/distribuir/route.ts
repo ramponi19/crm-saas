@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   if (body.leadId) {
     const { data: lead } = await svc.from('leads')
-      .select('id, origem, valor_estimado, responsavel_id')
+      .select('id, origem, valor_estimado, responsavel_id, filial_id')
       .eq('id', body.leadId).eq('empresa_id', empresaId).maybeSingle()
     if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
     const responsavel = await distribuirExistente(svc, empresaId, lead)
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     if (!isAdmin) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
     const { data: leads } = await svc.from('leads')
-      .select('id, origem, valor_estimado, responsavel_id')
+      .select('id, origem, valor_estimado, responsavel_id, filial_id')
       .eq('empresa_id', empresaId).eq('ativo', true).is('responsavel_id', null).limit(500)
 
     let distribuidos = 0
