@@ -263,7 +263,9 @@ async function usuarioDoEnvio(req: Request, empresaId: number): Promise<{ id: st
  * asteriscos crus; teste do dono no app do Instagram mostrou que renderiza
  * igual ao WhatsApp.
  */
-async function assinaturaDe(empresaId: number, nomeUsuario: string, markdown: boolean): Promise<string> {
+async function assinaturaDe(
+  empresaId: number, nomeUsuario: string, markdown: boolean, filialId?: number | null,
+): Promise<string> {
   try {
     const primeiro = nomeUsuario.split(/\s+/)[0];
     if (!primeiro) return "";
@@ -274,9 +276,27 @@ async function assinaturaDe(empresaId: number, nomeUsuario: string, markdown: bo
 
     let quem = primeiro;
     if (v.incluir_empresa !== false) {
-      const { data: emp } = await db.from("empresas").select("nome").eq("id", empresaId).maybeSingle();
-      const nomeEmp = (emp?.nome as string | null) ?? "";
-      if (nomeEmp) quem = `${primeiro} - ${nomeEmp.toUpperCase()}`;
+      /**
+       * QUEM ASSINA E A LOJA, quando o canal e de uma.
+       *
+       * Antes lia sempre `empresas.nome`, e o resultado apareceu no primeiro Direct
+       * real da Jaguariuna: a resposta chegou assinada "JM STORE IMPORTADOS", que e
+       * o nome de Mogi. O cliente da loja nova recebia o nome da loja errada — e ele
+       * nem sabe que existe outra.
+       *
+       * Canal da rede (sem filial) segue com o nome da empresa, que e o certo para o
+       * canal da marca.
+       */
+      let nomeAssina = "";
+      if (filialId != null) {
+        const { data: fil } = await db.from("filiais").select("nome").eq("id", filialId).maybeSingle();
+        nomeAssina = (fil?.nome as string | null) ?? "";
+      }
+      if (!nomeAssina) {
+        const { data: emp } = await db.from("empresas").select("nome").eq("id", empresaId).maybeSingle();
+        nomeAssina = (emp?.nome as string | null) ?? "";
+      }
+      if (nomeAssina) quem = `${primeiro} - ${nomeAssina.toUpperCase()}`;
     }
     return markdown ? `*_${quem}:_*\n` : `${quem}:\n`;
   } catch (e) {
@@ -1128,7 +1148,7 @@ serve(async (req: Request) => {
           id: 0, empresa_id: lead.empresa_id as number, tipo: "whatsapp",
           external_id: "", waba_id: null, token: null, coexistencia: false,
         };
-        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true), usuario.id);
+        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true, canal.filial_id), usuario.id);
       }
 
       const nomeCanal = body.canal as string | undefined;
@@ -1140,7 +1160,7 @@ serve(async (req: Request) => {
       const canal = await canalPorEmpresa(lead.empresa_id as number, nomeCanal);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
       return await enviarMeta(canal, String(lead.origem_id), body,
-        await assinaturaDe(lead.empresa_id as number, usuario.nome, true), usuario.id);
+        await assinaturaDe(lead.empresa_id as number, usuario.nome, true, canal.filial_id), usuario.id);
     } catch (e) {
       console.error("envio:", e);
       return json({ error: (e as Error).message }, 500);
