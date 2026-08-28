@@ -67,23 +67,33 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
 
         updateTitle()
 
-        // Busca nome do lead
-        let titulo = 'Nova mensagem'
-        const corpo = novo.conteudo?.slice(0, 100) ?? ''
+        /**
+         * SÓ AVISA SE A PESSOA PODE VER O LEAD — quem decide é a RLS.
+         *
+         * Com a Jaguariúna selecionada no topo, o lead de Mogi some da lista mas
+         * a notificação dele subia na tela, com o texto da mensagem do cliente.
+         * A consulta abaixo já era feita, e o resultado nulo era ignorado: o
+         * toast aparecia mesmo assim, como "Nova mensagem" genérica. Aviso que
+         * vaza é pior que lista que vaza, porque chega sozinho e ninguém pediu.
+         *
+         * Não replicar a regra de loja aqui: pergunta-se ao banco, e o banco
+         * responde com o que aquela sessão enxerga.
+         */
+        let lead: { nome: string | null } | null = null
         try {
           const { data } = await supabase
             .from('leads')
-            .select('nome, origem')
+            .select('nome')
             .eq('id', novo.lead_id)
             .maybeSingle()
-          if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
-        } catch {}
+          lead = data as { nome: string | null } | null
+        } catch { return }
+        if (!lead) return
 
-        // Toast in-app
         addToast({
           id: `${novo.id}-${Date.now()}`,
-          titulo,
-          corpo,
+          titulo: lead.nome ? `Nova mensagem de ${lead.nome}` : 'Nova mensagem',
+          corpo: novo.conteudo?.slice(0, 100) ?? '',
           leadId: novo.lead_id,
         })
       })
@@ -125,7 +135,7 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
             )}
             {t.leadId && (
               <button
-                onClick={() => { router.push('/leads'); removeToast(t.id) }}
+                onClick={() => { router.push(`/leads?lead=${t.leadId}`); removeToast(t.id) }}
                 className="mt-1.5 text-[11.5px] font-semibold text-accent transition-colors hover:text-accent/80"
               >
                 Abrir lead →

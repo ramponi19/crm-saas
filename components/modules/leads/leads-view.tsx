@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Filter } from 'lucide-react'
 import { Button, Select } from '@/components/ui'
 import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo, type Funil } from './types'
@@ -61,11 +62,36 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   const [showNewLead,    setShowNewLead]    = useState(false)
   const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
 
+  /**
+   * `/leads?lead=123` abre a conversa daquele lead.
+   *
+   * Existe porque a busca do topo e o toast de notificação mandavam para
+   * `/leads` e pronto: estando já em /leads, `router.push('/leads')` não faz
+   * absolutamente nada — o usuário clica no próprio nome no resultado da busca e
+   * a tela não se mexe. Resultado que não abre é pior que resultado que não
+   * aparece, porque parece defeito do clique.
+   *
+   * O parâmetro é limpo ao fechar o modal, senão a mesma conversa reabriria a
+   * cada re-render e o botão Voltar ficaria preso nela.
+   */
+  const router = useRouter()
+  const params = useSearchParams()
+  const leadNaUrl = params.get('lead')
+
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
   const [soEsteira, setSoEsteira] = useState(false)
   /** '' = toda a equipe. Filtro de quem gerencia a equipe. */
   const [responsavelId, setResponsavelId] = useState('')
+
+  useEffect(() => {
+    if (!leadNaUrl) return
+    const alvo = leads.find(l => String(l.id) === leadNaUrl)
+    // Lead que a RLS não devolve (outra loja, arquivado) simplesmente não abre —
+    // e o endereço é limpo, para não ficar um parâmetro morto pendurado na URL.
+    if (alvo) setSelectedLead(alvo)
+    else router.replace('/leads')
+  }, [leadNaUrl, leads, router])
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
@@ -298,7 +324,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           // cadastrado") justamente onde agora se marca Perdido — e sem erro
           // algum na tela, que é o pior jeito de faltar dado.
           motivos={motivos}
-          onClose={() => setSelectedLead(null)}
+          onClose={() => { setSelectedLead(null); if (leadNaUrl) router.replace('/leads') }}
           onUpdate={handleLeadUpdate}
         />
       )}
