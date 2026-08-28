@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { proximoResponsavel } from '@/lib/roleta'
+import { membrosElegiveis, proximoResponsavel } from '@/lib/roleta'
 
 /**
  * Motor de distribuição de leads (Sprint 2.2).
@@ -12,7 +12,11 @@ import { proximoResponsavel } from '@/lib/roleta'
 
 type Db = SupabaseClient
 
-export interface LeadLike { origem?: string | null; valor_estimado?: number | null }
+/**
+ * `filial_id` ausente vale como "a matriz" — que é onde o lead nasce quando quem
+ * o cria não tem sessão (formulário público, portal, C2S). Ver `membrosElegiveis`.
+ */
+export interface LeadLike { origem?: string | null; valor_estimado?: number | null; filial_id?: number | null }
 interface RegraRow { id: number; criterio: string; config: Record<string, unknown>; destinatarios: string[]; rodizio_ptr: number }
 
 function criterioBate(r: RegraRow, lead: LeadLike): boolean {
@@ -37,13 +41,27 @@ export async function escolherResponsavel(svc: Db, empresaId: number, lead: Lead
     .select('id, criterio, config, destinatarios, rodizio_ptr')
     .eq('empresa_id', empresaId).eq('ativo', true).order('ordem', { ascending: true })
 
-  if (!regras || regras.length === 0) return proximoResponsavel(svc as never, empresaId)
+  if (!regras || regras.length === 0) return proximoResponsavel(svc as never, empresaId, lead.filial_id)
+
+  /**
+   * A regra manda, a LOJA veta.
+   *
+   * Uma regra é da empresa (não tem `filial_id`), então seus destinatários fixos
+   * podem incluir gente de outra loja. Entregar o lead a essa pessoa a torna
+   * responsável por algo que a RLS não deixa ela ver. Por isso a lista da regra
+   * é cruzada com quem pode receber daquela loja, em vez de aplicada crua.
+   */
+  const { ids: podem } = await membrosElegiveis(svc as never, empresaId, lead.filial_id)
 
   for (const raw of regras as unknown as RegraRow[]) {
     if (!criterioBate(raw, lead)) continue
-    const dests = Array.isArray(raw.destinatarios) ? (raw.destinatarios as string[]) : []
+    const declarados = Array.isArray(raw.destinatarios) ? (raw.destinatarios as string[]) : []
+    const dests = declarados.filter(d => podem.includes(d))
     if (dests.length === 0) {
-      const geral = await proximoResponsavel(svc as never, empresaId)
+      // Regra sem destinatário — ou com todos de outra loja — cai na roleta da
+      // loja do lead. Se lá também não houver ninguém, segue para a próxima
+      // regra e, no fim, o lead fica na esteira.
+      const geral = await proximoResponsavel(svc as never, empresaId, lead.filial_id)
       if (geral) return geral
       continue
     }
@@ -58,7 +76,7 @@ export async function escolherResponsavel(svc: Db, empresaId: number, lead: Lead
 /** Atribui um lead JÁ existente (esteira/Meta) e registra em lead_atribuicoes. */
 export async function distribuirExistente(
   svc: Db, empresaId: number,
-  lead: { id: number; origem?: string | null; valor_estimado?: number | null; responsavel_id?: string | null },
+  lead: { id: number; origem?: string | null; valor_estimado?: number | null; responsavel_id?: string | null; filial_id?: number | null },
 ): Promise<string | null> {
   if (lead.responsavel_id) return lead.responsavel_id
   const escolhido = await escolherResponsavel(svc, empresaId, lead)
