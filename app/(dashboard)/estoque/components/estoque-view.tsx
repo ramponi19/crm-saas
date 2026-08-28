@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck, ArrowLeftRight } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
@@ -11,7 +11,7 @@ import { buscarModeloApple } from '@/lib/apple-modelos'
 import { camposDaCategoria } from '@/lib/estoque-campos'
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
-  type Column, BuscaSelect } from '@/components/ui'
+  Modal, type Column, BuscaSelect } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
 import { SEGMENTOS, normalizarSegmento, type Segmento } from '@/lib/segmentos'
 
@@ -47,6 +47,9 @@ export interface Unidade {
   responsavel_nome?: string | null
   /** Fechamento do PDV que trouxe a unidade — agrupa as trocas da mesma venda. */
   grupo_pdv?: string | null
+  /** Loja onde a peça está. Nulo em empresa de uma loja só. */
+  filial_id?: number | null
+  filial_nome?: string | null
   created_at: string | null
   // Veículos (segmento concessionaria)
   placa: string | null
@@ -77,7 +80,12 @@ interface Props {
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
   segmento: Segmento
+  filiais: FilialOpt[]
+  /** Falso em empresa de uma loja, e para quem não é dono nem admin. */
+  podeTransferir: boolean
 }
+
+export type FilialOpt = { id: number; nome: string; cidade: string | null }
 
 /** Produto do catálogo + o que a entrada precisa saber dele. */
 export interface ProdutoOpt {
@@ -119,6 +127,8 @@ const TIPO_BADGE: Record<string, { label: string; tone: Tone }> = {
   ajuste:  { label: 'Ajuste',  tone: 'warn' },
   compra:  { label: 'Entrada', tone: 'ok' },
   venda:   { label: 'Saída',   tone: 'bad' },
+  transferencia_saida:   { label: 'Enviado p/ outra loja', tone: 'warn' },
+  transferencia_entrada: { label: 'Veio de outra loja',    tone: 'acc' },
 }
 
 const STATUS_FILTER = [
@@ -145,7 +155,7 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, segmento }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, segmento, filiais, podeTransferir }: Props) {
   // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
   const isVeiculo = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaPlaca
@@ -178,6 +188,61 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     } finally {
       setConfirmando(null)
       setConfirmar(null)
+    }
+  }
+
+  /**
+   * Transferência entre lojas — a peça sai daqui e chega lá como `pendente`.
+   *
+   * Não fica disponível na hora de propósito: entre uma cidade e outra existe
+   * uma viagem, e peça vendável nos dois lugares ao mesmo tempo é venda dobrada.
+   * Quem recebe usa o mesmo "Confirmar chegada" das trocas do PDV.
+   */
+  const [transferir, setTransferir] = useState<Unidade | null>(null)
+  const [destino, setDestino] = useState('')
+  const [notaTransf, setNotaTransf] = useState('')
+  const [transferindo, setTransferindo] = useState(false)
+
+  const destinosPossiveis = useMemo(
+    () => filiais.filter(f => f.id !== (transferir?.filial_id ?? null)),
+    [filiais, transferir],
+  )
+
+  function abrirTransferencia(u: Unidade) {
+    setTransferir(u)
+    // Rede de duas lojas: o destino é óbvio, e pré-selecionar poupa um clique
+    // sem esconder a escolha — o campo continua lá, mostrando para onde vai.
+    const opcoes = filiais.filter(f => f.id !== (u.filial_id ?? null))
+    setDestino(opcoes.length === 1 ? String(opcoes[0].id) : '')
+    setNotaTransf('')
+  }
+
+  async function enviarTransferencia() {
+    if (!transferir || !destino) return
+    const alvo = transferir
+    setTransferindo(true)
+    try {
+      const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string; destino?: string; aviso?: string }>('/api/estoque/transferir', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [alvo.id], filialDestino: Number(destino), observacoes: notaTransf }),
+      })
+      if (sessaoExpirada) return
+      if (!ok) { notify.bad('Não foi possível transferir', json.error); return }
+
+      const nomeDestino = filiais.find(f => f.id === Number(destino))?.nome ?? 'outra loja'
+      /**
+       * Some da lista de quem está vendo UMA loja; muda de loja para quem está
+       * vendo a rede. É o mesmo que a RLS fará no próximo carregamento — sem
+       * isto a peça ficaria na tela como se nada tivesse acontecido.
+       */
+      setItens(prev => prev.map(i => i.id === alvo.id
+        ? { ...i, filial_id: Number(destino), filial_nome: nomeDestino, status: 'pendente' }
+        : i))
+      notify.ok('Transferência registrada', `${alvo.produto_nome} está a caminho de ${nomeDestino}. Lá, confirme a chegada quando a peça for recebida.`)
+      if (json.aviso) notify.warn('Histórico', json.aviso)
+      setTransferir(null)
+    } finally {
+      setTransferindo(false)
     }
   }
 
@@ -292,6 +357,17 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     },
     detalheCol,
     varianteCol,
+    /**
+     * A loja só aparece quando há mais de uma.
+     *
+     * Vendo "Rede (todas)", a lista mistura o estoque das lojas e sem esta
+     * coluna não dá para saber onde a peça está — que é justamente a pergunta
+     * de quem olha a rede. Com uma loja só, seria uma coluna repetindo o óbvio.
+     */
+    ...(filiais.length > 1 ? [{
+      key: 'loja', header: 'Loja', hideOnMobile: true,
+      render: (u: Unidade) => <span className="text-ink-2">{u.filial_nome ?? '—'}</span>,
+    } as Column<Unidade>] : []),
     {
       key: 'custo', header: 'Custo', align: 'right', hideOnMobile: true, className: 'num',
       render: (u) => <span className="text-ink-2">{u.preco_custo ? fmt(u.preco_custo) : '—'}</span>,
@@ -318,12 +394,27 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     },
     {
       key: 'chegada', header: '', align: 'right',
-      render: (u) => u.status === 'pendente' ? (
-        <Button size="sm" variant="outline" icon={<PackageCheck size={12} strokeWidth={1.8} />}
-          loading={confirmando === u.id} onClick={() => setConfirmar(u)}>
-          Confirmar chegada
-        </Button>
-      ) : null,
+      render: (u) => {
+        if (u.status === 'pendente') {
+          return (
+            <Button size="sm" variant="outline" icon={<PackageCheck size={12} strokeWidth={1.8} />}
+              loading={confirmando === u.id} onClick={() => setConfirmar(u)}>
+              Confirmar chegada
+            </Button>
+          )
+        }
+        // Só o que está na prateleira viaja — a rota recusa o resto de qualquer
+        // forma, e oferecer um botão que dá erro é pior que não oferecer.
+        if (podeTransferir && u.status === 'disponivel') {
+          return (
+            <Button size="sm" variant="ghost" icon={<ArrowLeftRight size={12} strokeWidth={1.8} />}
+              onClick={() => abrirTransferencia(u)}>
+              Transferir
+            </Button>
+          )
+        }
+        return null
+      },
     },
   ]
 
@@ -509,6 +600,59 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         }
         confirmLabel="Chegou, confirmar"
       />
+
+      <Modal
+        open={!!transferir}
+        onClose={() => setTransferir(null)}
+        disableOverlayClose={transferindo}
+        title="Transferir para outra loja"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setTransferir(null)} disabled={transferindo}>Cancelar</Button>
+            <Button variant="primary" onClick={enviarTransferencia} loading={transferindo} disabled={!destino}>
+              Enviar
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] text-ink-2">
+            <span className="font-semibold text-ink">{transferir?.produto_nome}</span>
+            {transferir?.imei ? ` · IMEI ${transferir.imei}` : ''}
+            {transferir?.filial_nome ? ` · hoje em ${transferir.filial_nome}` : ''}
+          </p>
+
+          <Select
+            label="Loja de destino"
+            value={destino}
+            onChange={(e) => setDestino(e.target.value)}
+          >
+            <option value="">Escolha a loja…</option>
+            {destinosPossiveis.map(f => (
+              <option key={f.id} value={f.id}>{f.cidade ? `${f.nome} · ${f.cidade}` : f.nome}</option>
+            ))}
+          </Select>
+
+          <Textarea
+            label="Observação (opcional)"
+            placeholder="Ex.: vai com o Carlos na sexta"
+            value={notaTransf}
+            onChange={(e) => setNotaTransf(e.target.value)}
+            rows={2}
+          />
+
+          {/* O que acontece depois de clicar, dito antes de clicar: a peça some
+              da loja de origem e não fica vendável no destino até alguém
+              confirmar que ela chegou de verdade. */}
+          <p className="rounded-control bg-accent-soft px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+            A peça sai deste estoque agora e chega na outra loja como
+            <span className="font-semibold text-ink"> pendente</span>. Ela só volta a ser vendável
+            quando alguém de lá clicar em <span className="font-semibold text-ink">Confirmar chegada</span> —
+            até lá, nenhuma das duas lojas pode vendê-la.
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }
