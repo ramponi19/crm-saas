@@ -330,6 +330,8 @@ v "movimento nas duas lojas"          "app/api/estoque/transferir/route.ts" "tra
 v "nao lidas contadas no banco"      "app/(dashboard)/leads/page.tsx" "v_leads_nao_lidas"
 v "sino conta no banco tambem"       "components/layout/topbar.tsx" "v_leads_nao_lidas"
 v "renovador de token agendado"      "vercel.json" "renovar-tokens"
+v "cron passa pelo middleware"       "middleware.ts" "/api/cron/"
+v "cron ainda exige o segredo"       "app/api/cron/[job]/route.ts" "verificarCronSecret"
 v "cron sabe renovar token"          "app/api/cron/[job]/route.ts" "renovarTokensInstagram"
 v "renova antes de vencer"           "lib/canais/renovacao.ts" "DIAS_DE_ANTECEDENCIA"
 v "token vencido vira expirado"      "lib/canais/renovacao.ts" "expirado"

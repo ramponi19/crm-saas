@@ -72,6 +72,25 @@ export async function middleware(request: NextRequest) {
                         // autenticacao e o token secreto na propria URL — mesmo
                         // desenho do webhook dos portais.
                         request.nextUrl.pathname.startsWith('/api/webhook/') ||
+                        /**
+                         * ⚠️ OS CRONS NUNCA RODARAM. Descoberto em 01/09/2026.
+                         *
+                         * Quem chama e o agendador da Vercel, que nao tem sessao —
+                         * entao o middleware devolvia 401 antes de a rota existir, e
+                         * a Vercel marcava o disparo como bem-sucedido. Falha
+                         * perfeitamente silenciosa: cinco jobs agendados, zero
+                         * execucoes, nenhum erro em lugar nenhum.
+                         *
+                         * A prova estava no dado: a Imobiliaria com trial vencido ha
+                         * 47 dias e ainda `ativo` (o `expirar-trials` teria suspendido
+                         * em 17/07), e `followups_gerados` vazia desde sempre.
+                         *
+                         * A autenticacao existe e e outra: `verificarCronSecret`
+                         * compara o Bearer com `CRON_SECRET` em tempo constante e
+                         * FALHA FECHADO se a variavel nao estiver configurada. Mesmo
+                         * desenho do webhook dos portais, logo acima.
+                         */
+                        request.nextUrl.pathname.startsWith('/api/cron/') ||
                         request.nextUrl.pathname.startsWith('/api/imob/') ||
                         request.nextUrl.pathname.startsWith('/imovel/') ||
                         request.nextUrl.pathname.startsWith('/imob/') ||
