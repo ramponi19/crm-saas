@@ -39,6 +39,10 @@ const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
     endereco: 'Avenida Central', numero: '250', complemento: 'Loja 3', bairro: 'Centro',
     cidade: 'Campinas', estado: 'SP',
     representanteNome: 'Responsável Exemplo', representanteCpf: '000.000.000-00',
+    representanteNacionalidade: 'brasileiro', representanteEstadoCivil: 'casado',
+    representanteProfissao: 'empresário',
+    bancoNome: 'Banco Exemplo', bancoAgencia: '0001', bancoConta: '00000-0',
+    bancoPix: 'chave@sualoja.com.br',
   },
   comprador: {
     nome: 'Maria Souza Lima', cpf_cnpj: '000.000.000-00', nacionalidade: 'brasileira',

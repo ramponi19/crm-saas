@@ -32,6 +32,8 @@ interface ComissaoPaga {
 
 interface Props {
   usuarios: Usuario[]
+  /** Quem está no CRM no momento do primeiro desenho. A tela revalida depois. */
+  onlineInicial?: string[]
   metasIniciais: Meta[]
   vendasMes: VendaResumo[]
   comissoesPagas: ComissaoPaga[]
@@ -563,8 +565,34 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios, uso, filiais = [] }: Props) {
+export default function EquipeView({ usuarios, uso, filiais = [], onlineInicial = [] }: Props) {
   const router = useRouter()
+
+  /**
+   * Bolinha verde de quem está no CRM agora.
+   *
+   * Repergunta a cada minuto em vez de recarregar a página: a lista de equipe
+   * inteira não muda, só quem está online. E é o servidor que decide — a conta
+   * de "está dentro da janela?" vive em `lib/presenca.ts`, junto da explicação
+   * de por que a janela é de 10 minutos e não de 5.
+   *
+   * Falha de rede não apaga a bolinha: mantém o último estado conhecido, porque
+   * piscar "offline" a cada oscilação de Wi-Fi seria pior que atrasar um minuto.
+   */
+  const [online, setOnline] = useState<Set<string>>(new Set(onlineInicial))
+  useEffect(() => {
+    let vivo = true
+    const buscar = async () => {
+      try {
+        const r = await fetch('/api/equipe/online')
+        if (!r.ok) return
+        const j = (await r.json()) as { online?: string[] }
+        if (vivo && Array.isArray(j.online)) setOnline(new Set(j.online))
+      } catch { /* mantém o que já estava */ }
+    }
+    const id = setInterval(buscar, 60_000)
+    return () => { vivo = false; clearInterval(id) }
+  }, [])
   const TABS = uso ? [...TABS_BASE, { value: 'uso', label: 'Uso da equipe' }] : TABS_BASE
 
   /**
@@ -639,7 +667,17 @@ export default function EquipeView({ usuarios, uso, filiais = [] }: Props) {
           : <span className="text-ink-3">principal (não definida)</span>
       },
     } as Column<Usuario>] : []),
-    { key: 'acesso', header: 'Último acesso', align: 'right', hideOnMobile: true, render: (u) => <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span> },
+    {
+      key: 'acesso', header: 'Último acesso', align: 'right', hideOnMobile: true,
+      render: (u) => online.has(u.id) ? (
+        <span className="inline-flex items-center gap-1.5 font-semibold text-ok">
+          <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />
+          Online
+        </span>
+      ) : (
+        <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span>
+      ),
+    },
     {
       key: 'acoes', header: '', align: 'right',
       // O proprietário não sai da equipe (é o dono da conta) e ninguém remove a
