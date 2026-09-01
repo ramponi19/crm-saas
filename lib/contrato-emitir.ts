@@ -127,6 +127,13 @@ const CAMPOS_LOJA: { marcador: string; label: string; ler: (l: ContratoLoja) => 
   { marcador: 'loja.cidade_estado',     label: 'Cidade e estado',        ler: (l) => [l.cidade, l.estado].filter(Boolean).join('') },
   { marcador: 'loja.representante',     label: 'Quem assina pela loja',  ler: (l) => l.representanteNome },
   { marcador: 'loja.representante_cpf', label: 'CPF de quem assina',     ler: (l) => l.representanteCpf },
+  { marcador: 'loja.representante_nacionalidade', label: 'Nacionalidade de quem assina', ler: (l) => l.representanteNacionalidade },
+  { marcador: 'loja.representante_estado_civil',  label: 'Estado civil de quem assina',  ler: (l) => l.representanteEstadoCivil },
+  { marcador: 'loja.representante_profissao',     label: 'Profissão de quem assina',     ler: (l) => l.representanteProfissao },
+  { marcador: 'loja.banco',             label: 'Banco',                  ler: (l) => l.bancoNome },
+  { marcador: 'loja.agencia',           label: 'Agência',                ler: (l) => l.bancoAgencia },
+  { marcador: 'loja.conta',             label: 'Conta corrente',         ler: (l) => l.bancoConta },
+  { marcador: 'loja.pix',               label: 'Chave PIX',              ler: (l) => l.bancoPix },
 ]
 
 /**
@@ -175,7 +182,7 @@ function camposFaltantesLoja(loja: ContratoLoja, modelo: ModeloContrato): string
 export async function emitirContrato(supabase: Client, input: EmitirContratoInput): Promise<ContratoEmitido> {
   const [empRes, cliRes, garantiaLoja, modelo] = await Promise.all([
     supabase.from('empresas')
-      .select('nome, cnpj, telefone, wl_logo_url, email, cep, endereco, numero, complemento, bairro, cidade, estado, representante_nome, representante_cpf')
+      .select('nome, cnpj, telefone, wl_logo_url, email, cep, endereco, numero, complemento, bairro, cidade, estado, representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix')
       .eq('id', input.empresaId).maybeSingle(),
     input.clienteId
       ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()
@@ -221,6 +228,10 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     email?: string | null; cep?: string | null; endereco?: string | null; numero?: string | null
     complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null
     representante_nome?: string | null; representante_cpf?: string | null
+    representante_nacionalidade?: string | null; representante_estado_civil?: string | null
+    representante_profissao?: string | null
+    banco_nome?: string | null; banco_agencia?: string | null
+    banco_conta?: string | null; banco_pix?: string | null
   } | null
   const c = cliRes.data as Partial<ContratoComprador> | null
 
@@ -232,6 +243,11 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
       endereco: e?.endereco ?? null, numero: e?.numero ?? null, complemento: e?.complemento ?? null,
       bairro: e?.bairro ?? null, cidade: e?.cidade ?? null, estado: e?.estado ?? null,
       representanteNome: e?.representante_nome ?? null, representanteCpf: e?.representante_cpf ?? null,
+      representanteNacionalidade: e?.representante_nacionalidade ?? null,
+      representanteEstadoCivil: e?.representante_estado_civil ?? null,
+      representanteProfissao: e?.representante_profissao ?? null,
+      bancoNome: e?.banco_nome ?? null, bancoAgencia: e?.banco_agencia ?? null,
+      bancoConta: e?.banco_conta ?? null, bancoPix: e?.banco_pix ?? null,
     },
     comprador: { ...COMPRADOR_VAZIO, ...(c ?? {}) },
     // Congela a garantia item a item: o produto pode mudar de política depois,

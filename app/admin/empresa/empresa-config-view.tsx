@@ -52,6 +52,13 @@ export default function EmpresaConfigPage() {
     estado: '',
     representante_nome: '',
     representante_cpf: '',
+    representante_nacionalidade: '',
+    representante_estado_civil: '',
+    representante_profissao: '',
+    banco_nome: '',
+    banco_agencia: '',
+    banco_conta: '',
+    banco_pix: '',
     wl_slogan: '',
     wl_whatsapp: '',
     wl_cor: '#2E5CE6',
@@ -74,6 +81,13 @@ export default function EmpresaConfigPage() {
         estado:             empresa.estado             ?? '',
         representante_nome: empresa.representante_nome ?? '',
         representante_cpf:  empresa.representante_cpf  ?? '',
+        representante_nacionalidade: empresa.representante_nacionalidade ?? '',
+        representante_estado_civil: empresa.representante_estado_civil ?? '',
+        representante_profissao: empresa.representante_profissao ?? '',
+        banco_nome: empresa.banco_nome ?? '',
+        banco_agencia: empresa.banco_agencia ?? '',
+        banco_conta: empresa.banco_conta ?? '',
+        banco_pix: empresa.banco_pix ?? '',
         wl_slogan:     empresa.wl_slogan    ?? '',
         wl_whatsapp:   empresa.wl_whatsapp  ?? '',
         wl_cor:        empresa.wl_cor       ?? '#2E5CE6',
@@ -153,6 +167,13 @@ export default function EmpresaConfigPage() {
         estado:             form.estado.trim().toUpperCase() || null,
         representante_nome: form.representante_nome.trim()  || null,
         representante_cpf:  form.representante_cpf.trim()   || null,
+        representante_nacionalidade: form.representante_nacionalidade.trim() || null,
+        representante_estado_civil: form.representante_estado_civil.trim() || null,
+        representante_profissao: form.representante_profissao.trim() || null,
+        banco_nome: form.banco_nome.trim() || null,
+        banco_agencia: form.banco_agencia.trim() || null,
+        banco_conta: form.banco_conta.trim() || null,
+        banco_pix: form.banco_pix.trim() || null,
         // White-label fields only saved for plans that include the module
         ...(temWL ? {
           wl_slogan:   form.wl_slogan   || null,
@@ -261,6 +282,24 @@ export default function EmpresaConfigPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input label="Quem assina pela loja" value={form.representante_nome} onChange={e => setForm(f => ({ ...f, representante_nome: e.target.value }))} placeholder="Nome do responsável legal" hint="Aparece no contrato como representante." />
                   <Input label="CPF de quem assina" value={form.representante_cpf} onChange={e => setForm(f => ({ ...f, representante_cpf: e.target.value }))} placeholder="000.000.000-00" className="num" />
+                </div>
+                {/*
+                  QUALIFICAÇÃO DE QUEM ASSINA E CONTA QUE RECEBE.
+                  Sem estes campos, a única saída era digitar fixo no modelo — e
+                  foi assim que dois contratos reais da JM foram para a mão do
+                  cliente com "estado civil", "profissão" e "Banco XXXX"
+                  impressos literalmente. Estão aqui porque contrato pede.
+                */}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Input label="Nacionalidade de quem assina" value={form.representante_nacionalidade} onChange={e => setForm(f => ({ ...f, representante_nacionalidade: e.target.value }))} placeholder="brasileiro" />
+                  <Input label="Estado civil de quem assina" value={form.representante_estado_civil} onChange={e => setForm(f => ({ ...f, representante_estado_civil: e.target.value }))} placeholder="solteiro" />
+                  <Input label="Profissão de quem assina" value={form.representante_profissao} onChange={e => setForm(f => ({ ...f, representante_profissao: e.target.value }))} placeholder="empresário" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Input label="Banco" value={form.banco_nome} onChange={e => setForm(f => ({ ...f, banco_nome: e.target.value }))} placeholder="PagBank" hint="Conta que recebe, impressa no contrato." />
+                  <Input label="Agência" value={form.banco_agencia} onChange={e => setForm(f => ({ ...f, banco_agencia: e.target.value }))} placeholder="0001" className="num" />
+                  <Input label="Conta corrente" value={form.banco_conta} onChange={e => setForm(f => ({ ...f, banco_conta: e.target.value }))} placeholder="00000-0" className="num" />
+                  <Input label="Chave PIX" value={form.banco_pix} onChange={e => setForm(f => ({ ...f, banco_pix: e.target.value }))} placeholder="CNPJ, e-mail ou telefone" />
                 </div>
                 <Input label="Slogan" value={form.wl_slogan} onChange={e => setForm(f => ({ ...f, wl_slogan: e.target.value }))} placeholder="Ex: Importados com qualidade" />
                 <Input label="WhatsApp (com DDI)" value={form.wl_whatsapp} onChange={e => setForm(f => ({ ...f, wl_whatsapp: e.target.value }))} placeholder="5511999999999" />

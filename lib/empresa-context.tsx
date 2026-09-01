@@ -41,6 +41,14 @@ export interface Empresa {
   estado: string | null
   representante_nome: string | null
   representante_cpf: string | null
+  /** Qualificação de quem assina e conta que recebe — o contrato imprime. */
+  representante_nacionalidade: string | null
+  representante_estado_civil: string | null
+  representante_profissao: string | null
+  banco_nome: string | null
+  banco_agencia: string | null
+  banco_conta: string | null
+  banco_pix: string | null
   plano: Plano
   status: string
   wl_cor: string | null

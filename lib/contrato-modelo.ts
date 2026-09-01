@@ -177,6 +177,16 @@ export function marcadores(d: DadosMescla): Record<string, string> {
     'loja.cidade_estado': esc([d.loja.cidade, d.loja.estado].filter(Boolean).join(' - ')),
     'loja.representante': esc(d.loja.representanteNome ?? ''),
     'loja.representante_cpf': esc(d.loja.representanteCpf ?? ''),
+    // Qualificação de quem assina pela loja. Sem estes, o modelo só tinha a saída
+    // de escrever fixo — e foi assim que "estado civil" e "profissão" foram
+    // impressos como as próprias palavras num contrato entregue ao cliente.
+    'loja.representante_nacionalidade': esc(d.loja.representanteNacionalidade ?? 'brasileiro(a)'),
+    'loja.representante_estado_civil': esc(d.loja.representanteEstadoCivil ?? ''),
+    'loja.representante_profissao': esc(d.loja.representanteProfissao ?? ''),
+    'loja.banco': esc(d.loja.bancoNome ?? ''),
+    'loja.agencia': esc(d.loja.bancoAgencia ?? ''),
+    'loja.conta': esc(d.loja.bancoConta ?? ''),
+    'loja.pix': esc(d.loja.bancoPix ?? ''),
     'cliente.nome': esc(c.nome),
     'cliente.cpf': esc(c.cpf_cnpj ?? ''),
     'cliente.nacionalidade': esc(c.nacionalidade ?? 'brasileiro(a)'),
@@ -276,6 +286,13 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'loja.cep', rotulo: 'CEP da loja' },
   { chave: 'loja.representante', rotulo: 'Quem assina pela loja' },
   { chave: 'loja.representante_cpf', rotulo: 'CPF de quem assina pela loja' },
+  { chave: 'loja.representante_nacionalidade', rotulo: 'Nacionalidade de quem assina' },
+  { chave: 'loja.representante_estado_civil', rotulo: 'Estado civil de quem assina' },
+  { chave: 'loja.representante_profissao', rotulo: 'Profissão de quem assina' },
+  { chave: 'loja.banco', rotulo: 'Banco da loja' },
+  { chave: 'loja.agencia', rotulo: 'Agência da loja' },
+  { chave: 'loja.conta', rotulo: 'Conta corrente da loja' },
+  { chave: 'loja.pix', rotulo: 'Chave PIX da loja' },
 ]
 
 /**

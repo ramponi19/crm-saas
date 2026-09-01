@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
 import { janelaDoPeriodo } from '@/lib/ranking'
+import { usuariosOnline } from '@/lib/presenca'
 import EquipeView from './components/equipe-view'
 import type { Tables } from '@/types/database'
 
@@ -46,9 +47,14 @@ export default async function EquipePage() {
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
 
+  // Quem está no CRM neste instante. A tela revalida sozinha depois; isto é o
+  // estado do primeiro desenho, para a bolinha não aparecer só um minuto depois.
+  const online = await usuariosOnline(supabase, empresaId!)
+
   return (
     <EquipeView
       usuarios={usuariosMapped}
+      onlineInicial={online}
       metasIniciais={metas ?? []}
       vendasMes={vendasMes ?? []}
       comissoesPagas={comissoesMes ?? []}

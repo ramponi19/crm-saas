@@ -1660,6 +1660,10 @@ export type Database = {
       empresas: {
         Row: {
           bairro: string | null
+          banco_agencia: string | null
+          banco_conta: string | null
+          banco_nome: string | null
+          banco_pix: string | null
           cep: string | null
           cidade: string | null
           cnpj: string | null
@@ -1680,7 +1684,10 @@ export type Database = {
           permissoes: Json | null
           plano: string
           representante_cpf: string | null
+          representante_estado_civil: string | null
+          representante_nacionalidade: string | null
           representante_nome: string | null
+          representante_profissao: string | null
           segmento: string
           slug: string
           status: string
@@ -1699,6 +1706,10 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          banco_agencia?: string | null
+          banco_conta?: string | null
+          banco_nome?: string | null
+          banco_pix?: string | null
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
@@ -1719,7 +1730,10 @@ export type Database = {
           permissoes?: Json | null
           plano?: string
           representante_cpf?: string | null
+          representante_estado_civil?: string | null
+          representante_nacionalidade?: string | null
           representante_nome?: string | null
+          representante_profissao?: string | null
           segmento?: string
           slug: string
           status?: string
@@ -1738,6 +1752,10 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          banco_agencia?: string | null
+          banco_conta?: string | null
+          banco_nome?: string | null
+          banco_pix?: string | null
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
@@ -1758,7 +1776,10 @@ export type Database = {
           permissoes?: Json | null
           plano?: string
           representante_cpf?: string | null
+          representante_estado_civil?: string | null
+          representante_nacionalidade?: string | null
           representante_nome?: string | null
+          representante_profissao?: string | null
           segmento?: string
           slug?: string
           status?: string

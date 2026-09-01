@@ -28,6 +28,20 @@ export interface ContratoLoja {
   estado: string | null
   representanteNome: string | null
   representanteCpf: string | null
+  /**
+   * Qualificação de quem assina e conta que recebe.
+   *
+   * Faltavam, e o resultado não foi campo em branco — foi texto fixo esquecido:
+   * os contratos de 12/08/2026 saíram com `Banco XXXX` e CPF `111.111.111-11`
+   * no lugar do representante, e foram para a mão do cliente assim.
+   */
+  representanteNacionalidade: string | null
+  representanteEstadoCivil: string | null
+  representanteProfissao: string | null
+  bancoNome: string | null
+  bancoAgencia: string | null
+  bancoConta: string | null
+  bancoPix: string | null
 }
 
 export interface ContratoComprador {
