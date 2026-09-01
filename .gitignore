@@ -43,3 +43,7 @@ supabase/.temp/
 /hb-*.png
 /janela-*.png
 /page-*.png
+
+# Arquivo pessoal do Lucas (backups, videos de App Review, chaves) — 763MB que
+# NUNCA podem entrar num commit: ha token, chave SSH e codigos MFA la dentro.
+/arquivos/
