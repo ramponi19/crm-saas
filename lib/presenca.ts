@@ -20,13 +20,24 @@ type Client = SupabaseClient<any>
  */
 export const JANELA_ONLINE_MIN = 10
 
-/** Ids de quem está online na empresa. Vazio quando não há ninguém. */
-export async function usuariosOnline(supabase: Client, empresaId: number): Promise<string[]> {
+/**
+ * `usuario_id` → instante do último pulso, das sessões ainda abertas.
+ *
+ * Devolve o CARIMBO, não só quem está dentro da janela, porque a tela precisa
+ * conseguir apagar a bolinha sozinha: fechar a aba não escreve nada no banco,
+ * então nenhum evento vai chegar avisando que a pessoa saiu — só o relógio
+ * revela. Com o carimbo em mãos, o navegador recalcula sem pedir nada a
+ * ninguém.
+ */
+export async function sinaisDePresenca(
+  supabase: Client,
+  empresaId: number,
+): Promise<Record<string, string>> {
   const corte = new Date(Date.now() - JANELA_ONLINE_MIN * 60_000).toISOString()
 
   const { data, error } = await supabase
     .from('acessos')
-    .select('usuario_id')
+    .select('usuario_id, ultimo_sinal')
     .eq('empresa_id', empresaId)
     // Sessão ainda aberta: quem saiu pelo botão já tem `saida` preenchida.
     .is('saida', null)
@@ -34,8 +45,20 @@ export async function usuariosOnline(supabase: Client, empresaId: number): Promi
 
   // Falhar aqui não pode derrubar a tela de Equipe: sem presença, a coluna volta
   // a mostrar só o último acesso, que é o comportamento de antes.
-  if (error) return []
+  if (error) return {}
 
-  const ids = (data ?? []).map((a) => (a as { usuario_id: string | null }).usuario_id)
-  return [...new Set(ids.filter((id): id is string => !!id))]
+  const sinais: Record<string, string> = {}
+  for (const linha of (data ?? []) as Array<{ usuario_id: string | null; ultimo_sinal: string | null }>) {
+    if (!linha.usuario_id || !linha.ultimo_sinal) continue
+    // A pessoa pode ter mais de uma sessão aberta (dois aparelhos): vale a mais
+    // recente, senão um pulso velho de outro dispositivo a marcaria offline.
+    const atual = sinais[linha.usuario_id]
+    if (!atual || linha.ultimo_sinal > atual) sinais[linha.usuario_id] = linha.ultimo_sinal
+  }
+  return sinais
+}
+
+/** Ids de quem está online agora — a leitura já filtrada pela janela. */
+export async function usuariosOnline(supabase: Client, empresaId: number): Promise<string[]> {
+  return Object.keys(await sinaisDePresenca(supabase, empresaId))
 }
