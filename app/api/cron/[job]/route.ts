@@ -5,13 +5,15 @@ import { executarAcao } from '@/lib/automacoes'
 import { reavaliarScores } from '@/lib/scoring-server'
 import { reativarFrios } from '@/lib/reativacao'
 import { atualizarReferencia } from '@/lib/fipe'
+import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
 // Vercel Cron envia o header 'authorization: Bearer <CRON_SECRET>'.
-// Jobs: expirar-trials | arquivar-eventos | sync-stripe
+// Jobs: expirar-trials | arquivar-eventos | sync-stripe | gerar-followups
+//       sync-fipe | renovar-tokens
 // ============================================================
 
 type Embed<T> = T | T[] | null
@@ -336,6 +338,19 @@ export async function GET(
         // são cacheados sob demanda em fipe_consultas ao serem consultados.
         const { codigo, mes } = await atualizarReferencia(supabase)
         return NextResponse.json({ ok: true, job, codigo, mes })
+      }
+
+      case 'renovar-tokens': {
+        /**
+         * O token do Instagram conectado por login vale 60 DIAS. O da Página
+         * nao expira — por isso este job so existe depois do conector novo.
+         *
+         * Sem ele, todo Instagram de todo cliente cai sozinho dois meses depois
+         * de conectar, sem erro em tela: o lojista so percebe pelo silencio.
+         */
+        const r = await renovarTokensInstagram(supabase)
+        if (r.falhas.length) console.error('[cron/renovar-tokens] falhas:', JSON.stringify(r.falhas))
+        return NextResponse.json({ ok: true, job, ...r })
       }
 
       default:

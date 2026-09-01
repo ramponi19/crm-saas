@@ -1,6 +1,8 @@
 import { headers } from 'next/headers'
+import { after } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { getOrCreatePortalToken } from '@/lib/portal-token'
 import { basePublica, carregarConfig, getOrCreateTokenEntrada } from '@/lib/c2s'
 import type { EstadoC2S, EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
@@ -29,6 +31,21 @@ export default async function IntegracoesPage() {
       .eq('empresa_id', empresaId).eq('origem', 'contact2sale')
       .order('created_at', { ascending: false }).limit(20),
   ])
+
+  /**
+   * Segunda chance de renovar o token do Instagram, fora do agendador.
+   *
+   * O cron diário é quem faz o trabalho; isto existe porque agendador falha em
+   * silêncio — e esta é justamente a tela onde alguém apareceria para ver que o
+   * canal caiu. Renovar aqui transforma a visita em conserto.
+   *
+   * Dentro de `after`: roda depois da resposta, então não segura a página. Uma
+   * falha aqui não pode derrubar a tela — ela já é anotada no próprio canal.
+   */
+  after(async () => {
+    try { await renovarTokensInstagram(svc, empresaId) }
+    catch (e) { console.error('[integracoes] renovação de token falhou:', e) }
+  })
 
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 
