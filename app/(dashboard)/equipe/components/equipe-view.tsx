@@ -1,10 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
 import { janelaDoPeriodo } from '@/lib/ranking'
+import { JANELA_ONLINE_MIN } from '@/lib/presenca'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
@@ -32,8 +33,8 @@ interface ComissaoPaga {
 
 interface Props {
   usuarios: Usuario[]
-  /** Quem está no CRM no momento do primeiro desenho. A tela revalida depois. */
-  onlineInicial?: string[]
+  /** usuario_id → último pulso, no primeiro desenho. Depois manda o realtime. */
+  sinaisIniciais?: Record<string, string>
   metasIniciais: Meta[]
   vendasMes: VendaResumo[]
   comissoesPagas: ComissaoPaga[]
@@ -565,34 +566,78 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios, uso, filiais = [], onlineInicial = [] }: Props) {
+export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {} }: Props) {
   const router = useRouter()
 
   /**
-   * Bolinha verde de quem está no CRM agora.
+   * Bolinha verde de quem está no CRM agora — por REALTIME, não por consulta
+   * repetida.
    *
-   * Repergunta a cada minuto em vez de recarregar a página: a lista de equipe
-   * inteira não muda, só quem está online. E é o servidor que decide — a conta
-   * de "está dentro da janela?" vive em `lib/presenca.ts`, junto da explicação
-   * de por que a janela é de 10 minutos e não de 5.
+   * A tela escuta `acessos`: entrar grava um INSERT e sair pelo botão grava a
+   * `saida`, então as duas transições acendem e apagam na hora.
    *
-   * Falha de rede não apaga a bolinha: mantém o último estado conhecido, porque
-   * piscar "offline" a cada oscilação de Wi-Fi seria pior que atrasar um minuto.
+   * ⚠️ MAS FECHAR A ABA NÃO ESCREVE NADA. Ninguém avisa o banco, nenhum evento
+   * é gerado, e a pessoa ficaria eternamente verde se a tela só reagisse a
+   * eventos. Por isso o relógio local: a cada 20s o componente recalcula quem
+   * ainda está dentro da janela a partir do último pulso de cada um. É esse
+   * tique que apaga a bolinha de quem sumiu — e ele não custa rede nenhuma.
+   *
+   * A régua da janela vive em `lib/presenca.ts`, junto da explicação de por que
+   * são 10 minutos e não 5.
    */
-  const [online, setOnline] = useState<Set<string>>(new Set(onlineInicial))
+  const [sinais, setSinais] = useState<Record<string, number>>(() =>
+    Object.fromEntries(Object.entries(sinaisIniciais).map(([id, iso]) => [id, new Date(iso).getTime()])),
+  )
+  const [agora, setAgora] = useState(() => Date.now())
+
   useEffect(() => {
-    let vivo = true
-    const buscar = async () => {
+    const id = setInterval(() => setAgora(Date.now()), 20_000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    /** Foto do estado atual. Usada no início e a cada reconexão. */
+    const sincronizar = async () => {
       try {
         const r = await fetch('/api/equipe/online')
         if (!r.ok) return
-        const j = (await r.json()) as { online?: string[] }
-        if (vivo && Array.isArray(j.online)) setOnline(new Set(j.online))
-      } catch { /* mantém o que já estava */ }
+        const j = (await r.json()) as { sinais?: Record<string, string> }
+        if (!j.sinais) return
+        setSinais(Object.fromEntries(Object.entries(j.sinais).map(([id, iso]) => [id, new Date(iso).getTime()])))
+      } catch { /* mantém o que já estava: piscar por queda de rede é pior */ }
     }
-    const id = setInterval(buscar, 60_000)
-    return () => { vivo = false; clearInterval(id) }
+
+    const canal = supabase
+      .channel(`presenca_equipe_${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'acessos' }, (payload) => {
+        const linha = payload.new as { usuario_id?: string; ultimo_sinal?: string; saida?: string | null } | null
+        if (!linha?.usuario_id) return
+        setSinais((prev) => {
+          const proximo = { ...prev }
+          // `saida` preenchida = saiu pelo botão. Fora da lista na hora.
+          if (linha.saida) delete proximo[linha.usuario_id!]
+          else if (linha.ultimo_sinal) proximo[linha.usuario_id!] = new Date(linha.ultimo_sinal).getTime()
+          return proximo
+        })
+      })
+      .subscribe((status) => {
+        /**
+         * Ressincroniza ao (re)conectar: durante a queda os eventos se perderam,
+         * e sem esta foto a tela mostraria alguém que já saiu — que é o erro que
+         * o realtime deveria eliminar, não criar.
+         */
+        if (status === 'SUBSCRIBED') void sincronizar()
+      })
+
+    return () => { void supabase.removeChannel(canal) }
   }, [])
+
+  const online = useMemo(() => {
+    const limite = agora - JANELA_ONLINE_MIN * 60_000
+    return new Set(Object.entries(sinais).filter(([, t]) => t > limite).map(([id]) => id))
+  }, [sinais, agora])
   const TABS = uso ? [...TABS_BASE, { value: 'uso', label: 'Uso da equipe' }] : TABS_BASE
 
   /**
