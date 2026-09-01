@@ -1,31 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { Building2, Palette, CreditCard, Check, Lock, Upload } from 'lucide-react'
+import { Building2, Palette, Check, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/plano'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Card, Tabs, notify, type TabItem } from '@/components/ui'
 
-type Aba = 'loja' | 'visual' | 'plano'
-
-interface PlanoConfig {
-  id: string
-  nome: string
-  preco_centavos: number
-  cor: string
-  limite_usuarios: number
-  limite_leads: number
-}
+type Aba = 'loja' | 'visual'
 
 export default function EmpresaConfigPage() {
   const { empresa, refetch } = useEmpresa()
   const [aba, setAba] = useState<Aba>('loja')
   const [loading, setLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
-  const [planosConfig, setPlanosConfig] = useState<PlanoConfig[]>([])
-  const [usoAtual, setUsoAtual] = useState<{ leads: number; usuarios: number } | null>(null)
 
   const [form, setForm] = useState({
     nome: '',
@@ -87,32 +75,6 @@ export default function EmpresaConfigPage() {
       })
     }
   }, [empresa])
-
-  useEffect(() => {
-    if (aba === 'plano' && planosConfig.length === 0) carregarPlanos()
-    if (aba === 'plano') carregarUso()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aba])
-
-  async function carregarUso() {
-    if (!empresa) return
-    const supabase = createClient()
-    const [{ count: leads }, { count: usuarios }] = await Promise.all([
-      supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('ativo', true),
-      supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('ativo', true),
-    ])
-    setUsoAtual({ leads: leads ?? 0, usuarios: usuarios ?? 0 })
-  }
-
-  async function carregarPlanos() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('planos_config')
-      .select('id, nome, preco_centavos, cor, limite_usuarios, limite_leads')
-      .eq('ativo', true)
-      .order('ordem')
-    if (data) setPlanosConfig(data as PlanoConfig[])
-  }
 
   async function salvar() {
     if (!empresa) return
@@ -181,22 +143,8 @@ export default function EmpresaConfigPage() {
   const ABAS: TabItem[] = [
     { value: 'loja',   label: <span className="flex items-center gap-2"><Building2 size={15} strokeWidth={1.7} /> Dados da loja</span> },
     { value: 'visual', label: <span className="flex items-center gap-2"><Palette size={15} strokeWidth={1.7} /> Visual / White-label</span> },
-    { value: 'plano',  label: <span className="flex items-center gap-2"><CreditCard size={15} strokeWidth={1.7} /> Plano</span> },
   ]
 
-  function fmtPreco(centavos: number) {
-    if (centavos === 0) return 'Grátis'
-    return `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}/mês`
-  }
-
-  const planoAtualConfig = planosConfig.find(p => p.id === empresa?.plano)
-  const planoAtual = planoAtualConfig
-    ? { nome: planoAtualConfig.nome, preco: fmtPreco(planoAtualConfig.preco_centavos), cor: planoAtualConfig.cor, usuarios: planoAtualConfig.limite_usuarios, leads: planoAtualConfig.limite_leads }
-    : { nome: empresa?.plano ?? 'Free', preco: '–', cor: '#5C6E84', usuarios: 1, leads: 100 }
-  const diasTrial  = empresa?.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000))
-    : 0
-  const emTrial    = diasTrial > 0
 
   return (
     <div className="flex h-full flex-col">
@@ -323,62 +271,7 @@ export default function EmpresaConfigPage() {
             </>
           )}
 
-          {(aba === 'plano') && (
-            <div className="space-y-4">
-              <Card title="Plano atual">
-                <div className="flex items-center justify-between">
-                  <p className="flex items-center gap-2 text-[17px] font-bold text-ink">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: planoAtual.cor }} />
-                    {planoAtual.nome}
-                  </p>
-                  <p className="text-[13px] font-semibold text-ink-2">{planoAtual.preco}</p>
-                </div>
-                {emTrial && (
-                  <div className="mt-3 rounded-control border border-warn/20 bg-warn-soft px-3 py-2">
-                    <p className="text-[12px] font-medium text-warn">Trial gratuito — {diasTrial} dia{diasTrial !== 1 ? 's' : ''} restante{diasTrial !== 1 ? 's' : ''}</p>
-                  </div>
-                )}
-                <div className="mt-4 space-y-3">
-                  {[
-                    { label: 'Leads', uso: usoAtual?.leads ?? 0, limite: planoAtual.leads },
-                    { label: 'Usuários', uso: usoAtual?.usuarios ?? 0, limite: planoAtual.usuarios },
-                  ].map(({ label, uso, limite }) => {
-                    const ilimitado = limite >= 99999
-                    const pct = ilimitado ? 0 : Math.min(100, (uso / limite) * 100)
-                    const barra = pct >= 100 ? 'bg-bad' : pct >= 80 ? 'bg-warn' : 'bg-ok'
-                    return (
-                      <div key={label}>
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-[12px] text-ink-2">{label}</span>
-                          <span className="num text-[12px] font-semibold text-ink-2">
-                            {usoAtual ? `${uso} / ${ilimitado ? '∞' : limite}` : '…'}
-                          </span>
-                        </div>
-                        {!ilimitado && (
-                          <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
-                            <div className={`h-full rounded-full transition-all duration-500 ${barra}`}
-                              style={{ width: `${pct}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </Card>
-              {empresa?.plano !== 'pro' && (
-                <Card title="Fazer upgrade">
-                  <p className="text-[13px] text-ink-2">Desbloqueie mais usuários, leads ilimitados e white-label completo.</p>
-                  <a href="https://wa.me/5519999999999?text=Quero+fazer+upgrade+do+meu+plano"
-                    target="_blank" rel="noopener noreferrer"
-                    className="mt-4 inline-flex h-9 items-center gap-2 rounded-control bg-ink px-4 text-[13px] font-medium text-white transition-colors hover:bg-ink/90">
-                    Falar com suporte
-                  </a>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {(aba === 'loja' || aba === 'visual') && (
+          {(
             <Button onClick={salvar} loading={loading}
               icon={sucesso ? <Check size={15} strokeWidth={1.7} /> : <Upload size={15} strokeWidth={1.7} />}>
               {sucesso ? 'Salvo!' : 'Salvar alterações'}
