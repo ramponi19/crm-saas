@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { Building2, Palette, CreditCard, Users, Check, Lock, Upload } from 'lucide-react'
+import { Building2, Palette, CreditCard, Check, Lock, Upload } from 'lucide-react'
 import { planoTemAcesso } from '@/lib/plano'
 import { Topbar } from '@/components/layout/topbar'
-import { Button, Input, Card, Badge, Tabs, notify, type TabItem } from '@/components/ui'
+import { Button, Input, Card, Tabs, notify, type TabItem } from '@/components/ui'
 
-type Aba = 'loja' | 'visual' | 'plano' | 'equipe'
+type Aba = 'loja' | 'visual' | 'plano'
 
 interface PlanoConfig {
   id: string
@@ -19,19 +19,11 @@ interface PlanoConfig {
   limite_leads: number
 }
 
-interface MembroEquipe {
-  usuario_id: string
-  role: string
-  ativo: boolean
-  usuarios: { nome: string; email: string; role: string } | { nome: string; email: string; role: string }[] | null
-}
-
 export default function EmpresaConfigPage() {
   const { empresa, refetch } = useEmpresa()
   const [aba, setAba] = useState<Aba>('loja')
   const [loading, setLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
-  const [membros, setMembros] = useState<MembroEquipe[]>([])
   const [planosConfig, setPlanosConfig] = useState<PlanoConfig[]>([])
   const [usoAtual, setUsoAtual] = useState<{ leads: number; usuarios: number } | null>(null)
 
@@ -97,20 +89,10 @@ export default function EmpresaConfigPage() {
   }, [empresa])
 
   useEffect(() => {
-    if (aba === 'equipe') carregarEquipe()
     if (aba === 'plano' && planosConfig.length === 0) carregarPlanos()
     if (aba === 'plano') carregarUso()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba])
-
-  async function carregarEquipe() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('empresa_usuarios')
-      .select('usuario_id, role, ativo, usuarios!empresa_usuarios_usuario_public_fkey(nome, email, role)')
-      .eq('ativo', true)
-    if (data) setMembros(data as unknown as MembroEquipe[])
-  }
 
   async function carregarUso() {
     if (!empresa) return
@@ -195,23 +177,11 @@ export default function EmpresaConfigPage() {
     setTimeout(() => setSucesso(false), 3000)
   }
 
-  function getNomeUsuario(m: MembroEquipe): string {
-    if (!m.usuarios) return '—'
-    if (Array.isArray(m.usuarios)) return m.usuarios[0]?.nome ?? '—'
-    return m.usuarios.nome
-  }
-
-  function getEmailUsuario(m: MembroEquipe): string {
-    if (!m.usuarios) return ''
-    if (Array.isArray(m.usuarios)) return m.usuarios[0]?.email ?? ''
-    return m.usuarios.email
-  }
 
   const ABAS: TabItem[] = [
     { value: 'loja',   label: <span className="flex items-center gap-2"><Building2 size={15} strokeWidth={1.7} /> Dados da loja</span> },
     { value: 'visual', label: <span className="flex items-center gap-2"><Palette size={15} strokeWidth={1.7} /> Visual / White-label</span> },
     { value: 'plano',  label: <span className="flex items-center gap-2"><CreditCard size={15} strokeWidth={1.7} /> Plano</span> },
-    { value: 'equipe', label: <span className="flex items-center gap-2"><Users size={15} strokeWidth={1.7} /> Equipe</span> },
   ]
 
   function fmtPreco(centavos: number) {
@@ -405,26 +375,6 @@ export default function EmpresaConfigPage() {
                   </a>
                 </Card>
               )}
-            </div>
-          )}
-
-          {(aba === 'equipe') && (
-            <div className="space-y-3">
-              {membros.length === 0 ? (
-                <p className="text-[13px] text-ink-2">Nenhum membro encontrado.</p>
-              ) : membros.map(m => (
-                <div key={m.usuario_id} className="flex items-center justify-between rounded-card border border-line bg-card px-4 py-3">
-                  <div>
-                    <p className="text-[13px] font-semibold text-ink">{getNomeUsuario(m)}</p>
-                    <p className="text-[12px] text-ink-2">{getEmailUsuario(m)}</p>
-                  </div>
-                  <Badge tone="neutro" className="capitalize">{m.role}</Badge>
-                </div>
-              ))}
-              <p className="pt-2 text-[12px] text-ink-3">
-                {membros.length}/{planoAtual.usuarios === 999 ? '∞' : planoAtual.usuarios} usuários no plano {planoAtual.nome}.
-                {empresa?.plano !== 'pro' && ' Faça upgrade para adicionar mais.'}
-              </p>
             </div>
           )}
 
