@@ -1,14 +1,14 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
+// Next 16: o eslint-config-next passou a exportar flat config nativa — o
+// FlatCompat de antes quebrava com "config-validator". Imports diretos, como
+// manda o guia de upgrade.
+import { defineConfig, globalIgnores } from 'eslint/config'
+import nextVitals from 'eslint-config-next/core-web-vitals'
+import nextTs from 'eslint-config-next/typescript'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({ baseDirectory: __dirname })
-
-const config = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+const config = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'supabase/functions/**', 'arquivos/**']),
   {
     rules: {
       'no-unused-vars': 'off',
@@ -20,6 +20,17 @@ const config = [
       '@typescript-eslint/no-explicit-any': 'warn',
       'react/no-unescaped-entities': 'warn',
       'prefer-const': 'warn',
+      // Regras NOVAS do react-hooks v6 (preset do Next 16, era React Compiler).
+      // Apontaram 85 ocorrências em código que sempre rodou — padrão antigo,
+      // não regressão. Ficam como AVISO para não travar build/CI enquanto o
+      // refactor não vira mutirão próprio; não apagar, o sinal é o backlog.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
     },
   },
   {
@@ -43,6 +54,6 @@ const config = [
     files: ['components/ui/animated-value.tsx', 'components/ui/area-chart.tsx'],
     rules: { 'no-restricted-syntax': 'off' },
   },
-]
+])
 
 export default config

@@ -32,7 +32,7 @@ const LEGADO_ADMIN = [
   '/equipe', '/conversao', '/metas',
 ]
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,7 +160,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Guarda de /superadmin: além da checagem no layout (defesa em profundidade),
-  // bloqueia o acesso à rota já no middleware para quem não é super admin.
+  // bloqueia o acesso à rota já no proxy para quem não é super admin.
   if (user && request.nextUrl.pathname.startsWith('/superadmin')) {
     const { data: usuario } = await supabase
       .from('usuarios')
@@ -252,5 +252,6 @@ export const config = {
 }
 
 
-// Forçar Node.js runtime no middleware — o Supabase não suporta Edge Runtime
-export const runtime = 'nodejs'
+// Não há mais `export const runtime`: no Next 16 este arquivo (proxy.ts, o
+// antigo middleware.ts) roda SEMPRE em Node.js e não aceita configuração de
+// runtime — que é justamente o que o Supabase precisa.
