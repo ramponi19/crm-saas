@@ -493,11 +493,26 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       setChat(msgs)
       setLoadingChat(false)
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
-      if ((lead.msgs_nao_lidas ?? 0) > 0) {
-        await supabase.from('lead_mensagens').update({ lida: true }).eq('lead_id', lead.id).eq('lida', false)
-        await supabase.from('leads').update({ msgs_nao_lidas: 0 }).eq('id', lead.id)
-        onUpdate({ ...lead, msgs_nao_lidas: 0 })
-      }
+      /**
+       * MARCA COMO LIDA SEM PERGUNTAR AO CONTADOR.
+       *
+       * Isto era `if ((lead.msgs_nao_lidas ?? 0) > 0)`, e a condição criava um
+       * poço sem saída: com o contador errado para baixo — o que acontecia,
+       * porque ele era somado à mão em três lugares — abrir a conversa não
+       * marcava nada, as mensagens ficavam não lidas para sempre e o cliente
+       * seguia esperando resposta sem ninguém ver. Medido em 01/09/2026: 15
+       * leads presos assim, 17 mensagens invisíveis.
+       *
+       * Quem abriu a conversa leu o que estava nela; é a verdade, não uma
+       * dedução a partir de um número que pode estar torto. O contador agora é
+       * espelho: o gatilho `nao_lidas_sincroniza` o recalcula a partir desta
+       * própria escrita, então não é preciso zerá-lo aqui.
+       */
+      const { count } = await supabase
+        .from('lead_mensagens')
+        .update({ lida: true }, { count: 'exact' })
+        .eq('lead_id', lead.id).eq('lida', false).eq('direcao', 'recebida')
+      if (count || (lead.msgs_nao_lidas ?? 0) > 0) onUpdate({ ...lead, msgs_nao_lidas: 0 })
     }
     load()
 

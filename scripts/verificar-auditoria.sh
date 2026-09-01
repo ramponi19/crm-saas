@@ -329,6 +329,8 @@ v "recebimento zera na transferencia" "app/api/estoque/transferir/route.ts" "rec
 v "movimento nas duas lojas"          "app/api/estoque/transferir/route.ts" "transferencia_entrada"
 v "nao lidas contadas no banco"      "app/(dashboard)/leads/page.tsx" "v_leads_nao_lidas"
 v "sino conta no banco tambem"       "components/layout/topbar.tsx" "v_leads_nao_lidas"
+n "borda nao soma nao lidas a mao"   "supabase/functions/webhook-leads/index.ts" "rpc(\"incrementar_msgs_nao_lidas\""
+v "abrir conversa marca sem perguntar" "components/modules/leads/lead-modal.tsx" "count: 'exact'"
 v "renovador de token agendado"      "vercel.json" "renovar-tokens"
 v "cron passa pelo middleware"       "middleware.ts" "/api/cron/"
 v "cron ainda exige o segredo"       "app/api/cron/[job]/route.ts" "verificarCronSecret"
