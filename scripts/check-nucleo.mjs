@@ -41,7 +41,7 @@ import { join, relative, sep } from 'node:path'
 
 const RAIZ = process.cwd()
 const PASTAS = ['app', 'components', 'lib']
-const ARQUIVOS_SOLTOS = ['middleware.ts']
+const ARQUIVOS_SOLTOS = ['proxy.ts'] // o middleware do Next 15 virou proxy.ts no 16
 
 /** Comparação do segmento com um literal — o padrão que acopla núcleo e vertical. */
 const PADRAO = /segmento[^\n]{0,40}(===|!==)\s*['"](varejo|assistencia|servicos|imobiliaria|saude|food|concessionaria)['"]/
