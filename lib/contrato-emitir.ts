@@ -187,6 +187,35 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
   // Sem modelo não há contrato. Sai antes de montar dado nenhum.
   if (!modelo) return { html: null, salvo: false, semModelo: true }
 
+  /**
+   * Pagamento dividido: busca as partes para o contrato poder DESCREVÊ-LAS.
+   *
+   * `vendas.forma_pagamento` guarda o código `multiplo` quando o cliente pagou
+   * de duas maneiras, e quem chama passa só essa string adiante. No teste de
+   * 01/09/2026 o contrato saiu dizendo "na forma escolhida nesta venda:
+   * multiplo" — código interno impresso num documento que vai para a mão do
+   * cliente e vale como prova.
+   *
+   * A busca acontece AQUI, e não em cada tela, porque PDV, Histórico e Garantia
+   * emitem pelo mesmo caminho: consertar em um lugar conserta nos três.
+   */
+  let pagamentos: DadosMescla['pagamentos']
+  if (input.forma_pagamento === 'multiplo' && input.vendaIds.length) {
+    const { data: partes } = await supabase
+      .from('vendas_pagamentos')
+      .select('forma_pagamento, valor_pago, parcelas')
+      .in('venda_id', input.vendaIds)
+      .order('id')
+    const linhas = (partes ?? []) as Array<{ forma_pagamento: string | null; valor_pago: number | string | null; parcelas: number | null }>
+    if (linhas.length) {
+      pagamentos = linhas.map((p) => ({
+        forma: p.forma_pagamento ?? '',
+        valor: Number(p.valor_pago) || 0,
+        parcelas: p.parcelas,
+      }))
+    }
+  }
+
   const e = empRes.data as {
     nome?: string; cnpj?: string | null; telefone?: string | null; wl_logo_url?: string | null
     email?: string | null; cep?: string | null; endereco?: string | null; numero?: string | null
@@ -212,6 +241,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     desconto: input.desconto,
     forma_pagamento: input.forma_pagamento,
     parcelas: input.parcelas,
+    pagamentos,
     garantia_dias: garantiaLoja,
     vendedor: input.vendedor,
     data: input.data,
