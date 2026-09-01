@@ -59,6 +59,16 @@ const ROTULO_STATUS: Record<Canal['status'], { texto: string; tom: 'ok' | 'warn'
 const dataBr = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null
 
+/** Limite a partir do qual o vencimento do token vira assunto do lojista. */
+const DIAS_PARA_ALARMAR = 7
+
+/** Dias inteiros até vencer, ou `null` quando ainda não é para incomodar. */
+const diasParaVencer = (iso: string | null): number | null => {
+  if (!iso) return null
+  const dias = Math.floor((new Date(iso).getTime() - Date.now()) / 86400_000)
+  return dias <= DIAS_PARA_ALARMAR ? Math.max(0, dias) : null
+}
+
 export function CanaisView({ appId }: { appId: string }) {
   const [canais, setCanais] = useState<Canal[]>([])
   const [lojas, setLojas] = useState<Loja[]>([])
@@ -556,6 +566,15 @@ export function CanaisView({ appId }: { appId: string }) {
         const { nome, icone: Icone, cor } = META[tipo]
         const st = c ? ROTULO_STATUS[c.status] : null
         const acessoExpira = dataBr(c?.data_access_expira_em ?? null)
+        /**
+         * Dias até o token vencer, e SÓ quando já está em zona de risco.
+         *
+         * O token do Instagram-login vale 60 dias e é renovado por conta própria
+         * com 15 de antecedência (ver `lib/canais/renovacao.ts`). Chegar a 7 dias
+         * significa que a renovação falhou uns oito dias seguidos: aí, sim, é
+         * assunto do lojista. Acima disso, nada aparece.
+         */
+        const tokenVencendo = diasParaVencer(c?.token_expira_em ?? null)
 
         return (
           <div key={tipo} className="rounded-control border border-line bg-surface p-4 sm:p-5">
@@ -581,6 +600,17 @@ export function CanaisView({ appId }: { appId: string }) {
                       {acessoExpira && (
                         <p className="text-xs text-warn">
                           Precisa reconectar até {acessoExpira} — é um prazo da Meta, não do sistema.
+                        </p>
+                      )}
+                      {/* Só aparece quando a renovação automática já vem falhando
+                          há dias — no caminho normal o token se renova sozinho e
+                          esta linha nunca existe. Avisar sempre treinaria o
+                          lojista a ignorar o aviso justamente no dia que importa. */}
+                      {tokenVencendo != null && (
+                        <p className="text-xs text-bad">
+                          {tokenVencendo > 0
+                            ? `O acesso ao Instagram vence em ${tokenVencendo === 1 ? '1 dia' : `${tokenVencendo} dias`} e a renovação automática não está passando. Clique em Reconectar.`
+                            : 'O acesso ao Instagram venceu. Clique em Reconectar para voltar a receber mensagens.'}
                         </p>
                       )}
                     </div>
@@ -623,10 +653,22 @@ export function CanaisView({ appId }: { appId: string }) {
               <div className="flex flex-none items-center gap-2">
                 {c ? (
                   <>
+                    {/*
+                      RECONECTAR VOLTA PELO MESMO CAMINHO da conexão original.
+                      Mandava todo mundo para o diálogo da Página, inclusive um
+                      Instagram conectado por login — que não tem Página. O
+                      lojista clicaria em Reconectar, atravessaria a autorização
+                      do Facebook e voltaria sem resolver, justamente no momento
+                      em que o canal caiu e ele está com pressa.
+                    */}
                     <Button
                       variant="ghost" size="sm"
-                      onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
-                      disabled={conectando === tipo || voltandoDaMeta || !!faltaConfig || (tipo === 'whatsapp' && !sdkPronto)}
+                      onClick={() => (
+                        tipo === 'whatsapp' ? setAvisoWhats(true)
+                        : c.via === 'instagram' ? conectarInstagramSemPagina()
+                        : irParaMeta('meta')
+                      )}
+                      disabled={conectando === tipo || voltandoDaMeta || abrindoInstagram || (c.via !== 'instagram' && !!faltaConfig) || (tipo === 'whatsapp' && !sdkPronto)}
                     >
                       {conectando === tipo
                         ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -640,21 +682,22 @@ export function CanaisView({ appId }: { appId: string }) {
                 ) : (
                   <>
                   {/*
-                    SEM PAGINA, para o Instagram. Uma Pagina do Facebook aceita UM
-                    Instagram profissional — a Meta recusa o segundo com essas
-                    palavras. Entao a segunda loja da rede, e qualquer loja que so
-                    tenha Instagram, precisa deste caminho: login pela propria conta.
+                    INSTAGRAM CONECTA PELO PRÓPRIO LOGIN, e só por ele.
+                    Uma Página do Facebook aceita UM Instagram profissional, então
+                    o caminho da Página nunca serviu para a segunda loja da rede
+                    nem para quem não tem Página — e era a maioria. Com o acesso
+                    avançado aprovado pela Meta em 28/08/2026, qualquer conta
+                    autoriza direto: some a Página, some o portfólio, some a
+                    escolha entre dois botões que o lojista não tinha como fazer.
+                    O que já está conectado pela Página continua funcionando; é a
+                    coluna `via` que decide o envio.
+                    O Messenger segue pela Página porque Página é da natureza dele.
                   */}
-                  {tipo === 'instagram' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={abrindoInstagram}
-                      onClick={conectarInstagramSemPagina}
-                    >
-                      Conectar sem Página
+                  {tipo === 'instagram' ? (
+                    <Button size="sm" loading={abrindoInstagram} onClick={conectarInstagramSemPagina}>
+                      Conectar
                     </Button>
-                  )}
+                  ) : (
                   <Button
                     size="sm"
                     onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
@@ -669,12 +712,18 @@ export function CanaisView({ appId }: { appId: string }) {
                           ? 'Carregando conector…'
                           : 'Conectar'}
                   </Button>
+                  )}
                   </>
                 )}
               </div>
             </div>
 
-            {tipo === 'messenger' && !por('messenger') && por('instagram') && (
+            {/*
+              Só vale quando o Instagram veio PELA PÁGINA. Conectado pelo login,
+              ele não tem Página nenhuma, e a frase mandaria o lojista procurar
+              algo que não existe.
+            */}
+            {tipo === 'messenger' && !por('messenger') && por('instagram')?.via !== 'instagram' && por('instagram') && (
               <p className="mt-3 flex gap-2 text-xs text-ink-3">
                 <Info className="h-3.5 w-3.5 flex-none" />
                 Instagram e Messenger conectam juntos, pela mesma Página.
