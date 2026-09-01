@@ -657,7 +657,16 @@ async function upsertLead(canal: Canal, p: {
   }]);
   if (msgErr) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
 
-  await db.rpc("incrementar_msgs_nao_lidas", { lead_id_param: leadId });
+  /**
+   * O contador de nao lidas NAO e somado aqui — quem mantem e o gatilho
+   * `nao_lidas_sincroniza`, disparado pelo insert acima.
+   *
+   * Somar aqui era uma das tres maos que mexiam no mesmo numero, e o resultado
+   * era ele derivar sem volta. O RPC `incrementar_msgs_nao_lidas` foi mantido no
+   * banco como no-op justamente para esta chamada poder sair sem pressa: se uma
+   * versao antiga desta funcao ainda estiver no ar, ela nao quebra nem
+   * atrapalha. Ver a migracao `contador_de_nao_lidas_vira_espelho`.
+   */
   await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", leadId);
   await db.from("canais_conectados").update({ ultima_msg_em: new Date().toISOString() }).eq("id", canal.id);
   return leadId;
