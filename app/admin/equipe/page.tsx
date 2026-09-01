@@ -3,6 +3,7 @@ import { janelaDoPeriodo } from '@/lib/ranking'
 import EquipeView from '@/app/(dashboard)/equipe/components/equipe-view'
 import { UsoEquipe } from '@/components/admin/uso-equipe'
 import { carregarUsoDaEquipe } from '@/lib/uso-equipe'
+import { sinaisDePresenca } from '@/lib/presenca'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Tables } from '@/types/database'
 
@@ -66,9 +67,18 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
 
+  /**
+   * Presença no primeiro desenho. ESTA é a tela que o menu do /admin abre — sem
+   * isto a bolinha só aparecia quando o websocket conectasse, um instante
+   * depois. As duas rotas (/equipe e /admin/equipe) compartilham a view, então
+   * o que uma passa a outra precisa passar também.
+   */
+  const sinais = await sinaisDePresenca(supabase, empresaId!)
+
   return (
     <EquipeView
       usuarios={usuariosMapped}
+      sinaisIniciais={sinais}
       metasIniciais={metas ?? []}
       vendasMes={vendasMes ?? []}
       comissoesPagas={comissoesMes ?? []}
