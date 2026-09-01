@@ -73,6 +73,15 @@ export interface DadosMescla {
   desconto?: number
   forma_pagamento: string | null
   parcelas?: number | null
+  /**
+   * A divisão do pagamento, quando houve mais de uma forma.
+   *
+   * `forma_pagamento` guarda o código `multiplo` nesse caso, e um contrato que
+   * diz "na forma escolhida nesta venda: multiplo" não diz nada — foi o que saiu
+   * no teste de 01/09/2026. Com as partes em mãos, o documento descreve o que
+   * realmente foi pago e como.
+   */
+  pagamentos?: { forma: string; valor: number; parcelas?: number | null }[]
   garantia_dias: number
   vendedor?: string | null
   data?: string
@@ -86,6 +95,23 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&a
 const PGTO: Record<string, string> = {
   dinheiro: 'dinheiro', pix: 'PIX', debito: 'cartão de débito', credito: 'cartão de crédito',
   link: 'link de pagamento', boleto: 'boleto', crediario: 'crediário',
+  // Rede de segurança: `multiplo` só chega aqui se a divisão não veio junto.
+  // "forma combinada" é vago, mas é português — `multiplo` é código interno.
+  multiplo: 'forma combinada',
+}
+
+/** "PIX (R$ 395,00) e cartão de crédito em 12x (R$ 3.000,00)". */
+function descreverPagamentos(partes: NonNullable<DadosMescla['pagamentos']>): string {
+  const txt = partes
+    .filter((p) => Number(p.valor) > 0)
+    .map((p) => {
+      const nome = PGTO[p.forma] ?? p.forma
+      const parc = p.parcelas && p.parcelas > 1 ? ` em ${p.parcelas}x` : ''
+      return `${nome}${parc} (${brl(Number(p.valor))})`
+    })
+  if (txt.length === 0) return ''
+  if (txt.length === 1) return txt[0]
+  return `${txt.slice(0, -1).join(', ')} e ${txt[txt.length - 1]}`
 }
 
 function dataExtenso(iso?: string): string {
@@ -131,8 +157,10 @@ function tabelaItens(itens: ContratoItem[], garantiaPadrao: number): string {
 export function marcadores(d: DadosMescla): Record<string, string> {
   const c = d.comprador
   const itensDesc = d.itens.filter((i) => i.descricao?.trim()).map((i) => i.descricao)
-  const pgto = PGTO[d.forma_pagamento ?? ''] ?? (d.forma_pagamento ?? '—')
-  const parcelaTxt = d.parcelas && d.parcelas > 1 ? ` em ${d.parcelas}x` : ''
+  // A divisão detalhada manda quando existe; a forma única é o caminho comum.
+  const detalhado = d.pagamentos?.length ? descreverPagamentos(d.pagamentos) : ''
+  const pgto = detalhado || (PGTO[d.forma_pagamento ?? ''] ?? (d.forma_pagamento ?? '—'))
+  const parcelaTxt = detalhado ? '' : (d.parcelas && d.parcelas > 1 ? ` em ${d.parcelas}x` : '')
   return {
     'loja.nome': esc(d.loja.nome),
     'loja.cnpj': esc(d.loja.cnpj ?? ''),
