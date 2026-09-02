@@ -437,7 +437,7 @@ export default function Performance2Page() {
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--dim)" }}>Score: {alert.score}</div>
-                      <UrgencyDot urgency={alert.urgency as any} />
+                      <UrgencyDot urgency={alert.urgency} />
                     </div>
                   </div>
                 </Link>

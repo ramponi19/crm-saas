@@ -1,5 +1,7 @@
 "use client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
+import type { Lead } from "@/types/zapintel";
+import type { MatchSuggestion } from "@/lib/zapintel/merge/matchEngine";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Check, X, Zap, ArrowRight, Users, Search } from "lucide-react";
@@ -201,7 +203,7 @@ function Pill({ label, count, color }: { label: string; count: number; color: st
   );
 }
 
-function MatchCard({ match, onConfirm, onReject }: { match: any; onConfirm: () => void; onReject: () => void }) {
+function MatchCard({ match, onConfirm, onReject }: { match: MatchSuggestion; onConfirm: () => void; onReject: () => void }) {
   const { whatsappLead: wa, instagramLead: ig, confidence, reasons, status } = match;
   const borderColor = status === "confirmed" ? "rgba(34,197,94,.4)" : status === "rejected" ? "rgba(107,114,128,.3)" : "var(--brd)";
   const confColor = confidence >= 80 ? "var(--green)" : confidence >= 60 ? "var(--yellow)" : "var(--orange)";
@@ -249,7 +251,7 @@ function MatchCard({ match, onConfirm, onReject }: { match: any; onConfirm: () =
   );
 }
 
-function ContactCard({ label, lead, labelColor }: { label: string; lead: any; labelColor: string }) {
+function ContactCard({ label, lead, labelColor }: { label: string; lead: Lead; labelColor: string }) {
   return (
     <div style={{ flex: 1, background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: labelColor, marginBottom: 8 }}>{label}</div>

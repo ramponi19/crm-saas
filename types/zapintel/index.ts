@@ -33,6 +33,14 @@ export interface RawMessage {
   mediaCaption: string;
   quotedMessage: string;
   isStore: boolean;
+  /**
+   * De qual canal a mensagem veio, quando a conversa é fruto de FUSÃO.
+   *
+   * Escrito em `lib/zapintel/merge/matchEngine.ts`, ao juntar o histórico de
+   * WhatsApp com o de Instagram do mesmo contato. Ausente em conversa de um
+   * canal só — ali o canal é o do lead inteiro.
+   */
+  source?: "whatsapp" | "instagram";
 }
 
 export interface Lead {
@@ -59,6 +67,22 @@ export interface Lead {
   lossRisk: number;
   manualSale?: ManualSale;
   sellerName: string;
+  /**
+   * Canal de origem, gravado na IMPORTAÇÃO (`hooks/zapintel/useLeads.tsx`).
+   *
+   * Existia em tempo de execução sem estar declarado aqui, e o resultado foram
+   * 47 `as any` espalhados pelo módulo — cada um um ponto onde o compilador
+   * parava de proteger o objeto INTEIRO, não só este campo.
+   */
+  _channel?: "whatsapp" | "instagram";
+  /**
+   * As duas conversas originais, quando este lead é fruto de FUSÃO.
+   *
+   * Presença de `_sources` é o que significa "veio dos dois canais" — é assim
+   * que as telas decidem mostrar a etiqueta "both". Escrito em
+   * `lib/zapintel/merge/matchEngine.ts`.
+   */
+  _sources?: { whatsapp: Lead; instagram: Lead };
 }
 
 export interface Objection {

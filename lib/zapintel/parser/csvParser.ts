@@ -37,7 +37,7 @@ const NAME_PATTERNS = [
 ];
 const KNOWN_SELLERS = ["pedro","matheus","ana","joão","joao","lucas","gabriel","rafael","carlos","fernanda","julia","júlia","maria","beatriz"];
 
-function detectSeller(messages: { body: string; isStore: boolean }[]): string {
+function detectSeller(messages: { body: string; isStore: boolean; name?: string }[]): string {
   // First: check if seller introduces by name in store messages
   for (const msg of messages) {
     if (!msg.isStore) continue;
@@ -58,9 +58,9 @@ function detectSeller(messages: { body: string; isStore: boolean }[]): string {
     }
   }
   // Third: extract name from store username field
-  const storeMsg = messages.find(m => m.isStore && (m as any).name);
-  if (storeMsg && (storeMsg as any).name) {
-    const storeName: string = (storeMsg as any).name;
+  const storeMsg = messages.find(m => m.isStore && m.name);
+  if (storeMsg && storeMsg.name) {
+    const storeName: string = storeMsg.name;
     // "JM Store 5519998862028" → ignore generic names
     if (!storeName.match(/^\d+$/) && !storeName.toLowerCase().includes("store")) {
       const firstName = storeName.split(" ")[0];
@@ -149,7 +149,7 @@ export function parseCombinedCSV(raw: string): Lead[] {
     const buySignals = extractBuySignals(leadText);
     const objections = extractObjections(leadText);
 
-    const sellerName = detectSeller(messages.map(m => ({ body: m.body, isStore: m.isStore, name: (m as any).name })));
+    const sellerName = detectSeller(messages.map(m => ({ body: m.body, isStore: m.isStore, name: m.name })));
     leads.push({
       id: `lead-${idx++}`,
       contact,

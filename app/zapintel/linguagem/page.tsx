@@ -285,7 +285,7 @@ export default function LinguagemPage() {
               ]} barSize={40}>
                 <XAxis dataKey="name" tick={{fill:"var(--dim)",fontSize:10}} axisLine={false} tickLine={false}/>
                 <YAxis tick={{fill:"var(--muted)",fontSize:9}} axisLine={false} tickLine={false}/>
-                <Tooltip {...TT} formatter={(v:any) => [`${v} caracteres`,"Média"]}/>
+                <Tooltip {...TT} formatter={(v) => [`${Number(v ?? 0)} caracteres`, "Média"]}/>
                 <Bar dataKey="chars" fill="var(--purple)" radius={[4,4,0,0]}>
                 </Bar>
               </BarChart>

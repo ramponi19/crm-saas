@@ -10,9 +10,9 @@ import { generateMatchSuggestions, mergeLeads, type MatchSuggestion } from "@/li
 import SAMPLE from "@/lib/zapintel/sample-data/sample";
 
 export function detectLeadOrigin(lead: Lead): "whatsapp" | "instagram" {
-  if ((lead as any)._channel === "instagram") return "instagram";
-  if ((lead as any).filename?.toLowerCase().endsWith(".json")) return "instagram";
-  if ((lead as any).filename?.toLowerCase().includes("instagram")) return "instagram";
+  if (lead._channel === "instagram") return "instagram";
+  if (lead.filename?.toLowerCase().endsWith(".json")) return "instagram";
+  if (lead.filename?.toLowerCase().includes("instagram")) return "instagram";
   const digits = (lead.phone || "").replace(/[^0-9]/g, "");
   if (lead.phone && digits.length < 4 && /[a-zA-Z_]/.test(lead.phone)) return "instagram";
   return "whatsapp";

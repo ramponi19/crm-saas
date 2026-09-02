@@ -87,8 +87,8 @@ Gere um relatório com estas seções:
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setReport(data.text?.trim() || "");
-    } catch (e: any) {
-      setError(e?.message || "Erro ao gerar. Verifique a chave da API.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar. Verifique a chave da API.");
     }
     setLoading(false);
   }

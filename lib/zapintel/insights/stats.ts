@@ -128,7 +128,7 @@ export function computeStats(leads: Lead[]): DashboardStats {
   // ── Seller distribution ──────────────────────────────────────────────────────
   const sellerCount: Record<string, number> = {};
   for (const lead of leads) {
-    const seller = (lead as any).sellerName || "Loja";
+    const seller = lead.sellerName || "Loja";
     sellerCount[seller] = (sellerCount[seller] || 0) + 1;
   }
   const sellerDistribution = Object.entries(sellerCount)

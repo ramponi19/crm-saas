@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { Badge } from "@/components/zapintel/ui/atoms";
 import { STATUS_META } from "@/types/zapintel";
+import type { Lead } from "@/types/zapintel";
 import { FileSpreadsheet, UserCheck, Search } from "lucide-react";
 
 function WAButton({ phone }: { phone: string }) {
@@ -44,7 +45,7 @@ function formatPhone(raw: string): string {
   return raw;
 }
 
-function getChannel(lead: any): "whatsapp" | "instagram" | "both" {
+function getChannel(lead: Lead): "whatsapp" | "instagram" | "both" {
   if (lead._sources) return "both";
   if (lead._channel === "instagram") return "instagram";
   if (lead.filename?.toLowerCase().endsWith(".json")) return "instagram";
@@ -61,7 +62,7 @@ function channelLabel(ch: ReturnType<typeof getChannel>) {
 }
 
 // ── Excel export (pure JS, no library needed) ────────────────────────────────
-function exportExcel(leads: any[]) {
+function exportExcel(leads: Lead[]) {
   // Build CSV with BOM for Excel compatibility
   const rows = [
     ["Nome", "Telefone", "Status", "Score", "Canal", "Perfil", "Primeiro Contato", "Último Contato", "Sinais de Compra", "Objeções"]
@@ -77,7 +78,7 @@ function exportExcel(leads: any[]) {
       lead.firstDate,
       lead.lastDate,
       lead.buySignals.join("; "),
-      lead.objections.map((o: any) => o.label).join("; "),
+      lead.objections.map((o) => o.label).join("; "),
     ]);
   }
 
@@ -90,7 +91,7 @@ function exportExcel(leads: any[]) {
 }
 
 // ── vCard export ─────────────────────────────────────────────────────────────
-function exportVCard(leads: any[]) {
+function exportVCard(leads: Lead[]) {
   const vcards = leads.map(lead => {
     const phone = lead.phone?.replace(/\D/g, "") || "";
     const nameParts = lead.contact.trim().split(" ");
@@ -372,7 +373,7 @@ export default function ContactsPage() {
           }}>
             <FileSpreadsheet size={14} /> Excel
           </button>
-          <button onClick={() => exportVCard(exportTargets.filter((l: any) => !!l.phone))} style={{
+          <button onClick={() => exportVCard(exportTargets.filter((l) => !!l.phone))} style={{
             display: "flex", alignItems: "center", gap: 6,
             background: "rgba(59,130,246,.15)", border: "1px solid rgba(59,130,246,.4)",
             color: "var(--blue)", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
