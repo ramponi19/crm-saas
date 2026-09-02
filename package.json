@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:nucleo && next build",
+    "build": "npm run check:nucleo && npm run check:avisos && next build",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "types:gen": "supabase gen types typescript --project-id guiuzbcqkvelqcuogxtd > types/database.ts",
     "db:sync": "npm run types:gen && npm run type-check",
     "check:nucleo": "node scripts/check-nucleo.mjs",
-    "check": "npm run check:nucleo && npm run type-check"
+    "check": "npm run check:nucleo && npm run check:avisos && npm run type-check",
+    "check:avisos": "node scripts/check-avisos.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
