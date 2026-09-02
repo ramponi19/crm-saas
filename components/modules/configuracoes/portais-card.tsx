@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+
+import { useOrigem } from '@/lib/navegador'
 import { Card, Button, Badge, notify } from '@/components/ui'
 import { Copy, ExternalLink, Rss } from 'lucide-react'
 
@@ -9,8 +10,8 @@ import { Copy, ExternalLink, Rss } from 'lucide-react'
  * que o tenant cadastra no portal. O feed já é servido por /api/portais/[slug].
  */
 export function PortaisCard({ slug }: { slug: string | null }) {
-  const [base, setBase] = useState(process.env.NEXT_PUBLIC_APP_URL || '')
-  useEffect(() => { if (!base && typeof window !== 'undefined') setBase(window.location.origin) }, [base])
+  const origem = useOrigem()
+  const base = process.env.NEXT_PUBLIC_APP_URL || origem
 
   const url = slug ? `${base.replace(/\/$/, '')}/api/portais/${slug}` : ''
 

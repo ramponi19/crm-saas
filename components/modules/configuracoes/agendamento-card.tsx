@@ -1,14 +1,15 @@
 'use client'
 
+
 import { useState, useEffect } from 'react'
+import { useOrigem } from '@/lib/navegador'
 import { Card, Button, notify } from '@/components/ui'
 import { CalendarClock, Copy, ExternalLink, Download } from 'lucide-react'
 
 /** Agendamento online 24h (Saúde): URL pública + QR. O paciente marca sozinho. */
 export function AgendamentoCard({ slug }: { slug: string | null }) {
-  const [base, setBase] = useState('')
+  const base = useOrigem()
   const [qr, setQr] = useState('')
-  useEffect(() => { if (typeof window !== 'undefined') setBase(window.location.origin) }, [])
 
   const url = slug && base ? `${base.replace(/\/$/, '')}/agendar/${slug}` : ''
 

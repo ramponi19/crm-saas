@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+
+import { useState } from 'react'
+import { useOrigem } from '@/lib/navegador'
 import 'next/link'
 import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
@@ -42,8 +44,7 @@ export default function IntegracoesView({ slug, segmento, token, feedUrlInicial,
   c2s?: EstadoC2S
   eventosC2S?: EventoIntegracao[]
 }) {
-  const [origin, setOrigin] = useState('')
-  useEffect(() => { setOrigin(window.location.origin) }, [])
+  const origin = useOrigem()
   const base = origin
 
   const feedUrl = `${base}/api/portais/${slug}`

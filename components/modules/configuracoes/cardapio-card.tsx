@@ -1,14 +1,15 @@
 'use client'
 
+
 import { useState, useEffect } from 'react'
+import { useOrigem } from '@/lib/navegador'
 import { Card, Button, notify } from '@/components/ui'
 import { UtensilsCrossed, Copy, ExternalLink, Download } from 'lucide-react'
 
 /** Cardápio digital (Food): URL pública + QR pra imprimir na mesa. QR gerado no cliente. */
 export function CardapioCard({ slug }: { slug: string | null }) {
-  const [base, setBase] = useState('')
+  const base = useOrigem()
   const [qr, setQr] = useState('')
-  useEffect(() => { if (typeof window !== 'undefined') setBase(window.location.origin) }, [])
 
   const url = slug && base ? `${base.replace(/\/$/, '')}/menu/${slug}` : ''
 
