@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { Badge, ScoreRing } from "@/components/zapintel/ui/atoms";
@@ -68,6 +69,7 @@ function OrigemBadge({ lead }: { lead: Lead }) {
 
 export default function LeadsPage() {
   const { leads, loaded, loadSample, loading } = useLeads();
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");
   const [sort, setSort] = useState<"score" | "date_asc" | "date_desc" | "msgs">("score");
@@ -264,7 +266,7 @@ export default function LeadsPage() {
                 style={{ borderBottom: "1px solid var(--card2)", transition: "background .1s", cursor: "pointer" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "var(--card2)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                onClick={() => window.location.href = `/zapintel/leads/${l.id}`}
+                onClick={() => router.push(`/zapintel/leads/${l.id}`)}
               >
                 {/* Contato */}
                 <td style={{ padding: "9px 10px", overflow: "hidden" }}>

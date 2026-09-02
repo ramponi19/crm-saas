@@ -41,6 +41,9 @@ export async function apiFetch<T = Record<string, unknown>>(
     notify.warn('Sua sessão expirou', 'Levando você para a tela de entrada…')
     // Delay curto só para o toast ser lido. `location.href` em vez de router.push:
     // o estado do cliente já está velho, e recarregar limpa tudo.
+    // Recarga inteira de propósito: a sessão morreu, e `router.push` levaria
+    // para o login com todo o estado de cliente da sessão antiga em memória.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     setTimeout(() => { window.location.href = '/login' }, 1600)
     return { ok: false, status: 401, json, sessaoExpirada: true }
   }

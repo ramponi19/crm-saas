@@ -13,6 +13,8 @@ export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
       await fetch('/api/superadmin/empresas/0/impersonar', { method: 'DELETE' })
       // Navegação hard: garante que o servidor re-renderize sem a impersonação,
       // sem risco de servir o /dashboard em cache da empresa anterior.
+      // Sair da personificação troca o tenant inteiro: recarga limpa tudo.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/superadmin/empresas'
     } catch {
       setSaindo(false)
