@@ -91,7 +91,20 @@ export function Sidebar({
       <div className="flex shrink-0 items-center gap-2.5 px-4 py-3.5" style={{ borderBottom: '1px solid color-mix(in srgb, var(--sb-text) 12%, transparent)' }}>
         {empresaLogo ? (
           <div className="grid h-[26px] w-[26px] shrink-0 place-items-center overflow-hidden rounded-[7px] bg-card">
-            <Image src={empresaLogo} alt="Logo" width={26} height={26} className="object-contain" />
+            {/*
+              `unoptimized` NÃO é preguiça — é o que impede a sidebar de derrubar
+              o CRM inteiro.
+
+              `empresaLogo` é uma URL que o lojista digita em Minha empresa →
+              Visual ("URL do logo"), então o host é arbitrário. O otimizador de
+              imagem do Next recusa host que não esteja em `images.remotePatterns`
+              e LANÇA — e esta barra aparece em toda tela do CRM. Não dá para
+              listar hosts que o cliente ainda vai inventar.
+
+              Hoje nenhum tenant tem logo, e por isso nunca estourou. As telas de
+              OS e Proposta já faziam assim; a sidebar tinha ficado de fora.
+            */}
+            <Image src={empresaLogo} alt="Logo" width={26} height={26} className="object-contain" unoptimized />
           </div>
         ) : (
           <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-ink text-[12px] font-bold text-white">
