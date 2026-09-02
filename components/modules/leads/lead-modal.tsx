@@ -222,6 +222,9 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
   const { empresa } = useEmpresa()
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  // Relógio congelado no mount: a janela de 24h do WhatsApp era calculada com
+  // `Date.now()` a cada render, o que deixa o componente impuro.
+  const [agora] = useState(() => Date.now())
   const [draft, setDraft] = useState('')
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const [meuId, setMeuId] = useState<string | null>(null)
@@ -406,7 +409,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
   const janelaFechada =
     lead.origem === 'whatsapp' &&
     chat.length > 0 &&
-    (!ultimaDoCliente || Date.now() - new Date(ultimaDoCliente).getTime() > 24 * 60 * 60 * 1000)
+    (!ultimaDoCliente || agora - new Date(ultimaDoCliente).getTime() > 24 * 60 * 60 * 1000)
 
   // Retomada por modelo aprovado — só carrega a lista quando o vendedor pede.
   type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string }

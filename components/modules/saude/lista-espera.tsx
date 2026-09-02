@@ -14,6 +14,8 @@ export function ListaEspera({ empresaId, onAgendar }: { empresaId: number; onAge
   const [carregou, setCarregou] = useState(false)
   const [form, setForm] = useState({ nome: '', telefone: '', observacao: '' })
   const [salvando, setSalvando] = useState(false)
+  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
+  const [agora] = useState(() => Date.now())
 
   const carregar = useCallback(async () => {
     const { data } = await supabase.from('lista_espera').select('id, nome, telefone, observacao, created_at').eq('empresa_id', empresaId).order('created_at')
@@ -37,7 +39,7 @@ export function ListaEspera({ empresaId, onAgendar }: { empresaId: number; onAge
     if (error) { notify.bad('Erro ao remover'); return }
     carregar()
   }
-  const dias = (iso: string | null) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 864e5) : 0)
+  const dias = (iso: string | null) => (iso ? Math.floor((agora - new Date(iso).getTime()) / 864e5) : 0)
 
   if (!carregou) return null
 

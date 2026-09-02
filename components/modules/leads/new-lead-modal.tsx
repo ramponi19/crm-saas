@@ -34,6 +34,8 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
     let cancel = false
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (cancel || !user || !usuarios.some((u) => u.id === user.id)) return
+      // Devolver o MESMO objeto é o jeito sancionado de desistir da atualização.
+      // eslint-disable-next-line react-hooks/immutability
       setForm((f) => (f.responsavel_id ? f : { ...f, responsavel_id: user.id }))
     })
     return () => { cancel = true }

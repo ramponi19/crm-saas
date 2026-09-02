@@ -42,12 +42,14 @@ function fmtPreco(centavos: number) {
 export default function PlanosView({ empresa, planos }: Props) {
   const [loadingPlano, setLoadingPlano] = useState<string | null>(null)
   const [loadingPortal, setLoadingPortal] = useState(false)
+  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
+  const [agora] = useState(() => Date.now())
 
   const planoAtual = empresa?.plano ?? 'free'
   const temAssinatura = !!empresa?.stripe_customer_id
 
   const diasTrial = empresa?.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000))
+    ? Math.max(0, Math.ceil((new Date(empresa.trial_ends_at).getTime() - agora) / 86400000))
     : 0
   const emTrial = diasTrial > 0
 
@@ -61,6 +63,8 @@ export default function PlanosView({ empresa, planos }: Props) {
         body: JSON.stringify({ planoId }),
       })
       const data = await res.json()
+      // `data.url` é o checkout do Stripe, fora do app: navegação do Next não serve.
+      // eslint-disable-next-line react-hooks/immutability
       if (data.url) window.location.href = data.url
     } catch {
       // error shown via redirect failure

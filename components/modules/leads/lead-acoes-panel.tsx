@@ -100,7 +100,7 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
     notify.ok('Visita agendada')
   }
 
-  const agora = Date.now()
+  const [agora] = useState(() => Date.now())
 
   return (
     <div className="border-t border-line-soft pt-[13px]">

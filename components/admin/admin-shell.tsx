@@ -141,7 +141,7 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-bg">
       {/* Sidebar desktop */}
-      <aside className="hidden w-[216px] shrink-0 border-r border-line-soft bg-raised md:block"><Nav /></aside>
+      <aside className="hidden w-[216px] shrink-0 border-r border-line-soft bg-raised md:block">{Nav({})}</aside>
 
       {/* Drawer mobile */}
       {drawer && (
@@ -149,7 +149,7 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
           <div className="absolute inset-0 bg-ink/40" />
           <div className="absolute left-0 top-0 h-full w-[260px] max-w-[82%] border-r border-line bg-raised shadow-[0_0_40px_rgba(0,0,0,0.2)]">
             <button aria-label="Fechar" onClick={() => setDrawer(false)} className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-control text-ink-3 hover:text-ink"><X size={18} strokeWidth={1.8} /></button>
-            <Nav onNavigate={() => setDrawer(false)} />
+            {Nav({ onNavigate: () => setDrawer(false) })}
           </div>
         </div>
       )}

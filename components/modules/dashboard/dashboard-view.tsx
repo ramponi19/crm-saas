@@ -209,6 +209,8 @@ function FollowupsCard() {
   type Task = { id: number; titulo: string; vencimento: string | null; lead_nome: string | null }
   const [tarefas, setTarefas] = useState<Task[]>([])
   const [loaded, setLoaded] = useState(false)
+  // Relógio congelado no mount: `Date.now()` em render deixa o componente impuro.
+  const [nowMs] = useState(() => Date.now())
 
   useEffect(() => {
     const supabase = createClient()
@@ -227,7 +229,6 @@ function FollowupsCard() {
   }, [])
 
   if (!loaded || tarefas.length === 0) return null
-  const nowMs = Date.now()
   const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
   return (

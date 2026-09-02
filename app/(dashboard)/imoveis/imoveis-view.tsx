@@ -91,7 +91,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
     setUploading(true)
     for (const file of Array.from(files)) {
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-      const path = `${empresaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const path = caminhoDaFoto(empresaId, ext)
       const { error } = await supabase.storage.from('imoveis').upload(path, file, { cacheControl: '3600', upsert: false })
       if (error) { notify.bad('Falha ao enviar foto: ' + error.message); continue }
       const { data } = supabase.storage.from('imoveis').getPublicUrl(path)
@@ -575,3 +575,12 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
     </div>
   )
 }
+/**
+ * Nome único do arquivo no Storage. Fora do componente de propósito: gerar nome
+ * único é impuro por definição, e dentro do corpo do componente a regra de
+ * pureza do React 19 acusa — com razão, porque ali ela não sabe que isto só roda
+ * quando alguém escolhe um arquivo.
+ */
+const caminhoDaFoto = (empresaId: number, ext: string) =>
+  `${empresaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
