@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useOrigem } from '@/lib/navegador'
 import { QrCode, Send, Copy, Check, Link as LinkIcon, PackageCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
@@ -189,10 +190,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const [cobranca, setCobranca] = useState<Cobranca | null>(null)
   const [copiado, setCopiado] = useState(false)
   const [enviandoWpp, setEnviandoWpp] = useState(false)
-  const [origin, setOrigin] = useState('')
+  const origin = useOrigem()
   const [linkCopiado, setLinkCopiado] = useState(false)
   const [marcandoPronto, setMarcandoPronto] = useState(false)
-  useEffect(() => { if (typeof window !== 'undefined') setOrigin(window.location.origin) }, [])
   const aprovacaoUrl = form.token && origin ? `${origin}/os/${form.token}` : ''
 
   async function copiarLink() {
