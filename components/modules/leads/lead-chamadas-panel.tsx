@@ -19,7 +19,7 @@ const quando = (iso: string | null) => (iso ? new Date(iso).toLocaleString('pt-B
 
 export function LeadChamadasPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [itens, setItens] = useState<Chamada[]>([])
   const [carregou, setCarregou] = useState(false)
   const [direcao, setDirecao] = useState('saida')

@@ -42,10 +42,15 @@ export default async function HistoricoPage() {
     .order('data_venda', { ascending: false })
     .limit(500)
 
-  const [{ data: vendasRaw }, { data: empresa }] = await Promise.all([
-    soMinhas ? baseVendas.eq('vendedor_id', user!.id) : baseVendas,
-    supabase.from('empresas').select('nome, cnpj, telefone, wl_logo_url').eq('id', empresaId).maybeSingle(),
-  ])
+  /**
+   * A consulta a `empresas` saiu daqui porque o resultado nunca era usado.
+   *
+   * Era uma ida ao banco por abertura do Histórico, buscando nome, CNPJ,
+   * telefone e logo para jogar fora — provavelmente sobra de quando esta tela
+   * montava o contrato. Quem emite documento hoje é `emitirContrato`, que busca
+   * os dados da loja por conta própria.
+   */
+  const { data: vendasRaw } = soMinhas ? await baseVendas.eq('vendedor_id', user!.id) : await baseVendas
 
   type VendaRow = {
     id: number; data_venda: string | null; valor_venda: number; lucro: number | null

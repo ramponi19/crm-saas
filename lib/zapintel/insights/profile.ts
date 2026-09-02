@@ -1,6 +1,6 @@
 import type { BuyerProfile } from "@/types/zapintel";
 
-export function inferProfile(leadText: string, allText: string): BuyerProfile {
+export function inferProfile(leadText: string, _allText: string): BuyerProfile {
   const lt = leadText.toLowerCase();
 
   if (["urgente","preciso hoje","entrega hoje","amanhã","quando chega","mais rápido"].some(k => lt.includes(k)))

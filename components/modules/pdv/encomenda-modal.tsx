@@ -23,7 +23,7 @@ export function EncomendaModal({ clientes, fornecedores, isAdmin, onClose }: {
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [clienteId, setClienteId] = useState('')
   const [cadastroAberto, setCadastroAberto] = useState(false)
   /** Clientes criados aqui: a prop vem do servidor e só muda no refresh. */

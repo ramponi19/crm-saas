@@ -2,11 +2,11 @@
 import { useMemo, useState } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { computePerformance2 } from "@/lib/zapintel/insights/performance2";
-import { ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
+import { UrgencyDot } from "@/components/zapintel/ui/atoms";
 import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, RadialBarChart, RadialBar, PieChart, Pie,
+  Cell, 
 } from "recharts";
 import {
   Zap, TrendingUp, TrendingDown, Minus, AlertTriangle,
@@ -20,18 +20,6 @@ function fmtMin(m: number) {
   const h = Math.floor(m / 60);
   const rem = m % 60;
   return rem > 0 ? `${h}h ${rem}min` : `${h}h`;
-}
-
-function DeltaBadge({ value, invert = false, suffix = "" }: { value: number; invert?: boolean; suffix?: string }) {
-  const up = invert ? value < 0 : value > 0;
-  const neutral = value === 0;
-  const color = neutral ? "var(--muted)" : up ? "var(--green)" : "var(--red)";
-  const Icon = neutral ? Minus : up ? TrendingUp : TrendingDown;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 700, color }}>
-      <Icon size={11} />{Math.abs(value)}{suffix}
-    </span>
-  );
 }
 
 const SECTION_TABS = [
@@ -338,7 +326,6 @@ export default function Performance2Page() {
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14 }}>Score ajustado leva em conta: inatividade (-pts), engajamento (+pts), intenção de saída (-pts)</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {stats.dynamicScores.slice(0, 20).map(d => {
-                const diff = d.adjustedScore - d.baseScore;
                 const trendColor = d.trend === "rising" ? "var(--green)" : d.trend === "falling" ? "var(--orange)" : d.trend === "critical" ? "var(--red)" : "var(--muted)";
                 const trendEmoji = d.trend === "rising" ? "↑" : d.trend === "falling" ? "↓" : d.trend === "critical" ? "⚠" : "→";
                 return (
@@ -417,7 +404,7 @@ export default function Performance2Page() {
               </div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14 }}>leads com frase de abandono nas últimas mensagens</div>
               <div style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.7 }}>
-                Frases como "vou pensar", "depois te falo" e "to pesquisando" são sinais de que o lead está saindo. Intervir nas próximas 24h dobra a chance de reconversão.
+                Frases como “vou pensar”, “depois te falo” e “to pesquisando” são sinais de que o lead está saindo. Intervir nas próximas 24h dobra a chance de reconversão.
               </div>
             </div>
 
@@ -428,7 +415,7 @@ export default function Performance2Page() {
                 stats.exitIntentAlerts.forEach(a => { counts[a.phrase] = (counts[a.phrase] || 0) + 1; });
                 return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([phrase, count]) => (
                   <div key={phrase} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid var(--brd)" }}>
-                    <span style={{ fontSize: 12, color: "var(--dim)" }}>"{phrase}"</span>
+                    <span style={{ fontSize: 12, color: "var(--dim)" }}>“{phrase}”</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "var(--orange)" }}>{count}x</span>
                   </div>
                 ));
@@ -446,7 +433,7 @@ export default function Performance2Page() {
                   <div className="card2" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, borderLeft: "3px solid var(--orange)" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{alert.contact}</div>
-                      <div style={{ fontSize: 11, color: "var(--orange)" }}>"{alert.phrase}" · {alert.daysAgo === 0 ? "hoje" : `${alert.daysAgo}d atrás`}</div>
+                      <div style={{ fontSize: 11, color: "var(--orange)" }}>“{alert.phrase}” · {alert.daysAgo === 0 ? "hoje" : `${alert.daysAgo}d atrás`}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--dim)" }}>Score: {alert.score}</div>

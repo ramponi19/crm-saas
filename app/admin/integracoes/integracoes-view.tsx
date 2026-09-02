@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle, Instagram, Facebook, ArrowUpRight } from 'lucide-react'
+import 'next/link'
+import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
-import { Card, Button, IconButton, Input, Badge, notify } from '@/components/ui'
+import { Card, Button, IconButton, Input, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { C2SCard, type EstadoC2S, type EventoIntegracao } from '@/components/modules/integracoes/c2s-card'

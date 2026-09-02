@@ -62,15 +62,6 @@ export default function ComparePage() {
     return comparePeriods(leads, cs, ce, ps, pe);
   }, [leads, loaded, preset, ranges, customCurStart, customCurEnd, customPrevStart, customPrevEnd]);
 
-  const chartData = useMemo(() => {
-    if (!comparison) return [];
-    return METRICS.map(m => ({
-      name: m.label,
-      Atual:    comparison.current[m.key] as number,
-      Anterior: comparison.previous[m.key] as number,
-    }));
-  }, [comparison]);
-
   if (!loaded) return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:16}}>
       <BarChart2 size={40} color="var(--purple)"/>

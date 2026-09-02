@@ -46,7 +46,7 @@ function saudacao() {
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 
 // Cores (token hex) para SVG/gráficos — this file não é components/ui.
-const OK = '#188A54', ACC = '#2E5CE6', INK2 = '#5C6470', INK3 = '#9199A3', WARN = '#B45309'
+const OK = '#188A54', ACC = '#2E5CE6', INK2 = '#5C6470', INK3 = '#9199A3'
 
 // ── Donut — vendas por canal ──
 const CANAL_META: Record<string, { color: string; label: string }> = {
@@ -254,7 +254,7 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
 }
 
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
-  const { empresa } = useEmpresa()
+  const {} = useEmpresa()
   const router = useRouter()
   const [userName, setUserName] = useState<string | null>(null)
   const [activePeriod, setActivePeriod] = useState('mes')

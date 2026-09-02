@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { Badge } from "@/components/zapintel/ui/atoms";
 import { STATUS_META } from "@/types/zapintel";
-import { Download, FileSpreadsheet, UserCheck, Search } from "lucide-react";
+import { FileSpreadsheet, UserCheck, Search } from "lucide-react";
 
 function WAButton({ phone }: { phone: string }) {
   const digits = (phone || "").replace(/[^0-9]/g, "");

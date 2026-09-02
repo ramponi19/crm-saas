@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type {} from '@supabase/supabase-js'
 import { permsDoPapel, type PermissoesMap } from './permissoes'
 
 /**

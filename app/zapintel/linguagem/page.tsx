@@ -253,7 +253,7 @@ export default function LinguagemPage() {
               return (
                 <div key={s.phrase}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <span style={{fontSize:13,fontWeight:600,color:"var(--txt)"}}>"{s.phrase}..."</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--txt)"}}>“{s.phrase}...”</span>
                     <div style={{display:"flex",alignItems:"center",gap:12}}>
                       <span style={{fontSize:11,color:"var(--green)"}}>✅ {s.winCount}</span>
                       <span style={{fontSize:11,color:"var(--red)"}}>❌ {s.lossCount}</span>

@@ -25,7 +25,7 @@ const brl = (v: number | null) => (v == null ? '—' : v.toLocaleString('pt-BR',
 
 export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [carregou, setCarregou] = useState(false)
   const [criando, setCriando] = useState(false)

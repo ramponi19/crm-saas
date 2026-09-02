@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import { Copy, CheckCircle2, Plus, Trash2, BookOpen, Search, Tag, TrendingUp } from "lucide-react";
+import { Copy, CheckCircle2, Plus, Trash2, BookOpen, Search, TrendingUp } from "lucide-react";
 
 type Category = "price" | "reconnect" | "closing" | "referral" | "followup" | "objection" | "custom";
 

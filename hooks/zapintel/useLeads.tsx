@@ -54,10 +54,8 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   // Keep WA and IG leads in separate buckets — never overwrite each other
   const [waLeads, setWaLeads] = useState<Lead[]>([]);
   const [igLeads, setIgLeads] = useState<Lead[]>([]);
-  const [mergedIds, setMergedIds] = useState<Set<string>>(new Set());
   const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);

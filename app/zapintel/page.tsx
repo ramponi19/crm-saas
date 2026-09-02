@@ -1,12 +1,11 @@
 "use client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import { Stat, SectionTitle, ScoreRing, Badge, UrgencyDot } from "@/components/zapintel/ui/atoms";
+import { SectionTitle, ScoreRing, Badge, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, CartesianGrid
+  PieChart, Pie, Cell, 
 } from "recharts";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight, TrendingUp, TrendingDown, Clock, DollarSign, Ghost, Users, ShoppingBag, Zap } from "lucide-react";
 
 const PIE_COLORS = ["#4ade80","#f87171","#facc15","#fb923c","#c084fc","#9ca3af","#6b7280"];
@@ -409,49 +408,6 @@ export default function DashboardPage() {
 }
 
 // ── Sub-components ──────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, color = "var(--txt)", filter }: {
-  label: string; value: number | string; sub?: string; color?: string; filter?: string;
-}) {
-  const content = (
-    <div className="card" style={{
-      padding: "14px 16px", cursor: filter ? "pointer" : "default",
-      transition: "border-color .15s, transform .1s",
-      textDecoration: "none",
-    }}
-      onMouseEnter={e => { if (filter) { e.currentTarget.style.borderColor = "var(--purple)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
-      onMouseLeave={e => { if (filter) { e.currentTarget.style.borderColor = "var(--brd)"; e.currentTarget.style.transform = "none"; }}}
-    >
-      <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .7, marginBottom: 6 }}>{label.toUpperCase()}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: -1, marginBottom: 2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: "var(--muted)" }}>{sub}</div>}
-      {filter && <div style={{ fontSize: 9, color: "var(--purple-l)", marginTop: 4, opacity: .7 }}>Clique para ver leads →</div>}
-    </div>
-  );
-  if (!filter) return content;
-  return (
-    <Link href={`/zapintel/leads?filter=${filter}`} style={{ textDecoration: "none" }}>
-      {content}
-    </Link>
-  );
-}
-
-function MetricCard({ icon, label, value, sub, color, detail, detailColor }: {
-  icon: React.ReactNode; label: string; value: string | number;
-  sub: string; color: string; detail: string; detailColor: string;
-}) {
-  return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-        {icon}
-        <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .6 }}>{label.toUpperCase()}</span>
-      </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color, letterSpacing: -1, marginBottom: 4 }}>{value}</div>
-      <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6 }}>{sub}</div>
-      <div style={{ fontSize: 10, color: detailColor, fontWeight: 600 }}>{detail}</div>
-    </div>
-  );
-}
-
 function ClickStat({ href, label, value, sub, color = "var(--txt)" }: {
   href: string; label: string; value: number | string; sub?: string; color?: string;
 }) {

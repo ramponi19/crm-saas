@@ -148,8 +148,6 @@ export default function LeadDetailPage() {
   // Detect if this lead has both sources
   const sources = (lead as any)._sources as { whatsapp: any; instagram: any } | undefined;
   const isMerged = !!sources;
-  const waLead = isMerged ? sources.whatsapp : lead;
-  const igLead = isMerged ? sources.instagram : null;
 
   // Filter messages by tab
   const displayMessages = (() => {
@@ -287,7 +285,7 @@ export default function LeadDetailPage() {
             { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
             { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
             { l: "Risco de perda", v: `${lead.lossRisk}%`, c: lead.lossRisk > 60 ? "var(--red)" : "var(--yellow)" },
-          ].map(({ l, v, c, tip }: any) => (
+          ].map(({ l, v, c, _tip }: any) => (
             <div key={l} className="card2" style={{ padding: "10px 12px" }}>
               <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>

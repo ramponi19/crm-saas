@@ -1,6 +1,5 @@
 import type { Lead } from "@/types/zapintel";
 
-const d = (s: string) => new Date(s);
 const mkMsg = (isStore: boolean, text: string, date = "2026-01-29", time = "10:00:00") => ({
   date, time, phone: isStore ? "5519998862028" : "5519999999999",
   name: isStore ? "JM Store" : "Lead", body: text,

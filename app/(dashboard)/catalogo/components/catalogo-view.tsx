@@ -128,7 +128,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const [saving, setSaving] = useState(false)
   const [removendoPreco, setRemovendoPreco] = useState<number | null>(null)
   const router = useRouter()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [editProd, setEditProd] = useState<Produto | 'new' | null>(null)
 
   // ── Tabela de preços: exportar / importar em massa ──
