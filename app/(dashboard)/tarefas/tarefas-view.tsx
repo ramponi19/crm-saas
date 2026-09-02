@@ -68,7 +68,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
     setLista(l => l.filter(x => x.id !== t.id))
   }
 
-  const agora = Date.now()
+  const [agora] = useState(() => Date.now())
   const pend = lista.filter(t => !t.concluida)
   const atrasadas = pend.filter(t => t.vencimento && new Date(t.vencimento).getTime() < agora)
   const proximas = pend.filter(t => !t.vencimento || new Date(t.vencimento).getTime() >= agora)
@@ -137,9 +137,9 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
             </Card>
           )}
 
-          <Bloco titulo="Atrasadas" itens={atrasadas} dotCls="bg-bad" atrasada />
-          <Bloco titulo="A fazer" itens={proximas} dotCls="bg-accent" />
-          <Bloco titulo="Concluídas" itens={concluidas.slice(0, 20)} dotCls="bg-ok" />
+          {Bloco({ titulo: 'Atrasadas', itens: atrasadas, dotCls: 'bg-bad', atrasada: true })}
+          {Bloco({ titulo: 'A fazer', itens: proximas, dotCls: 'bg-accent' })}
+          {Bloco({ titulo: 'Concluídas', itens: concluidas.slice(0, 20), dotCls: 'bg-ok' })}
         </div>
       </main>
 

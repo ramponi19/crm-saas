@@ -30,6 +30,8 @@ function gerarSlots(dia: Date, inicio: string, fim: string): Date[] {
 export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug: string; nome: string; cor: string; logo: string | null; horario: Horario; ocupadas: string[] }) {
   const dias = useMemo(() => gerarDias(horario.dias), [horario.dias])
   const [diaIdx, setDiaIdx] = useState(0)
+  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
+  const [agora] = useState(() => Date.now())
   const [slotIso, setSlotIso] = useState('')
   const [nomePac, setNomePac] = useState('')
   const [tel, setTel] = useState('')
@@ -38,7 +40,7 @@ export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug
 
   const ocupadasSet = useMemo(() => new Set(ocupadas), [ocupadas])
   const slots = useMemo(() => (dias[diaIdx] ? gerarSlots(dias[diaIdx], horario.inicio, horario.fim) : []), [dias, diaIdx, horario.inicio, horario.fim])
-  const agora = Date.now()
+
 
   async function confirmar() {
     if (!slotIso || !nomePac.trim()) return

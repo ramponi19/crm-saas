@@ -119,7 +119,6 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
 
   useEffect(() => {
     empresaAtualId(supabase).then((id) => { if (id) setEmpresaId(id) })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**

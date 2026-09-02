@@ -59,6 +59,9 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
       const res = await fetch(`/api/superadmin/segmentos/${chave}/preview`, { method: 'POST' })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error ?? 'Falha ao abrir o preview')
+      // Recarga INTEIRA de propósito: entrar no preview de outro segmento troca o
+      // contexto do tenant, e `router.push` manteria cache e estado do anterior.
+      // eslint-disable-next-line react-hooks/immutability, @next/next/no-location-assign-relative-destination
       window.location.href = '/dashboard'
     } catch (e) {
       notify.bad('Não foi possível abrir o preview', e instanceof Error ? e.message : undefined)

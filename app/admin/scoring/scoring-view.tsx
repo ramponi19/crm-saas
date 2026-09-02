@@ -18,6 +18,22 @@ function NumField({ label, value, onChange, hint }: { label: string; value: numb
   return <Input label={label} hint={hint} type="number" value={String(value)} onChange={(e) => onChange(Number(e.target.value) || 0)} />
 }
 
+/**
+ * Fora do componente de propósito.
+ *
+ * Declarada dentro, ela virava um tipo NOVO a cada render: o React não
+ * reconhece o componente como o mesmo, descarta a subárvore e monta outra do
+ * zero — o que apaga o estado de tudo que estiver dentro. Aqui não havia estado
+ * a perder, mas o custo de remontar sete blocos a cada tecla digitada existia,
+ * e a regra nova do React 19 apontou.
+ */
+const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
+  <div className="rounded-card border border-line bg-card p-4">
+    <div className="mb-3 text-[13.5px] font-semibold text-ink">{titulo}</div>
+    {children}
+  </div>
+)
+
 export function ScoringView({ configInicial, cadencias }: { configInicial: ScoreConfig; cadencias: CadenciaOpt[] }) {
   const [cfg, setCfg] = useState<ScoreConfig>(configInicial)
   const [salvando, setSalvando] = useState(false)
@@ -25,12 +41,14 @@ export function ScoringView({ configInicial, cadencias }: { configInicial: Score
 
   // Preview ao vivo.
   const [exOrigem, setExOrigem] = useState('site')
+  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
+  const [agora] = useState(() => Date.now())
   const [exValor, setExValor] = useState('1500')
   const [exDias, setExDias] = useState('2')
   const [exResp, setExResp] = useState(true)
   const [exContatos, setExContatos] = useState('1')
 
-  const previewRef = new Date(Date.now() - (Number(exDias) || 0) * 86400000).toISOString()
+  const previewRef = new Date(agora - (Number(exDias) || 0) * 86400000).toISOString()
   const preview = calcularScore({
     ultima_mensagem_at: previewRef, origem: exOrigem, valor_estimado: Number(exValor) || 0,
     telefone: '1', respondeu: exResp, contatos: Number(exContatos) || 0,
@@ -57,13 +75,6 @@ export function ScoringView({ configInicial, cadencias }: { configInicial: Score
     if (!r.ok) { notify.bad('Erro ao reavaliar', j.error); return }
     notify.ok('Scores reavaliados', `${j.avaliados ?? 0} leads · ${j.enfileirados ?? 0} enfileirados na cadência`)
   }
-
-  const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
-    <div className="rounded-card border border-line bg-card p-4">
-      <div className="mb-3 text-[13.5px] font-semibold text-ink">{titulo}</div>
-      {children}
-    </div>
-  )
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">

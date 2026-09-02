@@ -82,7 +82,9 @@ export default async function AdminOverviewPage() {
   const pctLeads = limiteLeads > 0 ? Math.min(100, Math.round((leadsDaRede / limiteLeads) * 100)) : 0
   const pctUsuarios = limiteUsuarios > 0 ? Math.min(100, Math.round((usuarios / limiteUsuarios) * 100)) : 0
 
+  // Server Component: uma renderização por requisição, sem hidratação.
   const trialDias = empresa?.trial_ends_at
+    // eslint-disable-next-line react-hooks/purity
     ? Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000)
     : null
 

@@ -80,6 +80,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   // qualquer atendimento por mesa usam o mesmo campo.
   const isFood = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaComanda
   const [comanda, setComanda] = useState('')
+  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
+  const [agora] = useState(() => Date.now())
   const [encomendaOpen, setEncomendaOpen] = useState(false)
   const supabase = createClient()
   const router = useRouter()
@@ -239,7 +241,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
   const horasReserva = (iso: string | null) => {
     if (!iso) return '—'
-    const ms = new Date(iso).getTime() - Date.now()
+    const ms = new Date(iso).getTime() - agora
     if (ms <= 0) return 'expirada'
     const h = Math.floor(ms / 3600_000)
     return h >= 1 ? `${h}h restantes` : `${Math.max(1, Math.round(ms / 60_000))}min restantes`
@@ -818,7 +820,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               Enviar via WhatsApp para {clienteSelecionado.nome}
             </Button>
           )}
-          {contexto && <ListaDocumentos />}
+          {contexto && ListaDocumentos()}
         </div>
       </Modal>
 
@@ -873,7 +875,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               </p>
             )}
           </div>
-          <ListaDocumentos />
+          {ListaDocumentos()}
           <Button variant="ghost" className="w-full" onClick={() => { setSucessoOpen(false); setContexto(null); setClienteSelecionado(null) }}>
             Nova venda
           </Button>

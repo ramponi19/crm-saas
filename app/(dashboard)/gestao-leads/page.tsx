@@ -85,6 +85,9 @@ export default async function GestaoLeadsPage() {
     valor_estimado: number | null; responsavel_id: string | null
     ultima_mensagem_at: string | null; ultima_tratativa: string | null; created_at: string | null
   }
+  // Server Component: renderiza uma vez por requisição, não hidrata, e não há
+  // render repetido para divergir — a regra de pureza não se aplica aqui.
+  // eslint-disable-next-line react-hooks/purity
   const agora = Date.now()
   const abertos = ((leadsRaw ?? []) as LeadRow[])
     // Etapa terminal fora: lead ganho ou perdido não está parado, está resolvido.
