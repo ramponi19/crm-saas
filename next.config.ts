@@ -1,5 +1,8 @@
 import type { NextConfig } from 'next'
-import { withSentryConfig } from '@sentry/nextjs'
+// De `@sentry/nextjs/config`, não da raiz: o caminho antigo está depreciado e
+// para de funcionar na v11 do SDK. Avisava a cada build e a cada boot do
+// servidor — ruído que ensina a ignorar aviso de build.
+import { withSentryConfig } from '@sentry/nextjs/config'
 
 /**
  * REGIÃO DO SERVIDOR: `regions: ["gru1"]` em `vercel.json` (São Paulo).

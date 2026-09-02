@@ -95,9 +95,7 @@ export default function LeadsPage() {
     if (s) setSort(s as typeof sort);
   }, [searchParams]);
 
-  // Reset to page 1 when filters change
   const filtered = useMemo(() => {
-    setPage(1);
     let list = [...leads];
     // Text search
     if (q) list = list.filter(l =>
@@ -125,8 +123,23 @@ export default function LeadsPage() {
     return list;
   }, [leads, q, cls, sort, urlUrgency, urlSignal, urlObjection, urlProfile, urlInactMin, urlInactMax, urlScoreMin, urlScoreMax, urlGhost, urlReferral]);
 
+  /**
+   * Volta para a primeira pagina quando os filtros mudam.
+   *
+   * Isto era `setPage(1)` DENTRO do `useMemo` acima — escrever estado durante a
+   * renderizacao, que a regra nova do React 19 (`set-state-in-render`) apontou no
+   * upgrade para o Next 16. Filtrar disparava uma renderizacao dentro de outra;
+   * funcionava por sorte, e em renderizacao concorrente e o tipo de coisa que
+   * vira laco ou resultado descartado.
+   */
+  const chaveDosFiltros = [q, cls, sort, urlUrgency, urlSignal, urlObjection, urlProfile, urlInactMin, urlInactMax, urlScoreMin, urlScoreMax, urlGhost, urlReferral].join('|');
+  useEffect(() => { setPage(1); }, [chaveDosFiltros]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Trava a pagina no intervalo valido: filtrar de 9 paginas para 2 deixaria a
+  // lista vazia por um instante ate o efeito acima rodar.
+  const paginaAtual = Math.min(page, totalPages);
+  const paginated = filtered.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE);
 
   if (!loaded) return (
     <div style={{ textAlign: "center", paddingTop: 80 }}>

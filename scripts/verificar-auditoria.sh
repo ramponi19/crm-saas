@@ -241,7 +241,7 @@ v "ordem plana tolera href sumido"     "lib/menu.ts" "if (!usados.has(item.href)
 echo "== proprietario e um cliente (21/08) =="
 n "nao existe mais tela paralela"      "lib/menu.ts" "href: '/proprietarios'"
 n "segmento nao declara a tela"        "lib/segmentos.ts" "href: '/proprietarios'"
-v "rota antiga cai em clientes"        "middleware.ts" "'/proprietarios': '/clientes'"
+v "rota antiga cai em clientes"        "proxy.ts" "'/proprietarios': '/clientes'"
 v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "from('clientes').select('id, nome, proprietario')"
 v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"
 v "papel se marca na ficha"            "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "proprietario: form.proprietario"
@@ -249,7 +249,7 @@ v "filtro so proprietarios"            "app/(dashboard)/clientes/components/clie
 
 echo "== chave e atributo do imovel (21/08) =="
 n "nao existe mais tela de chaves"     "lib/menu.ts" "href: '/chaves'"
-v "rota antiga cai em imoveis"         "middleware.ts" "'/chaves': '/imoveis'"
+v "rota antiga cai em imoveis"         "proxy.ts" "'/chaves': '/imoveis'"
 v "estado da chave tem fonte unica"    "lib/chave-imovel.ts" "export function estadoDaChave"
 v "atraso conta so o dia passado"      "lib/chave-imovel.ts" "prevista < new Date(agora.getFullYear()"
 v "pior noticia ganha no imovel"       "lib/chave-imovel.ts" "chaves.some(chaveAtrasada)"
@@ -258,7 +258,7 @@ v "emprestimo mora na ficha"           "app/(dashboard)/imoveis/imoveis-view.tsx
 n "campo de texto de chave saiu"       "app/(dashboard)/imoveis/imoveis-view.tsx" "status_chaves"
 
 echo "== contact2sale (21/08) =="
-v "webhook e rota publica"            "middleware.ts" "startsWith('/api/webhook/')"
+v "webhook e rota publica"            "proxy.ts" "startsWith('/api/webhook/')"
 v "token deles entra cifrado"         "app/api/admin/c2s/route.ts" "cifrarToken(t)"
 v "token deles nunca volta pra tela"  "app/admin/integracoes/page.tsx" "temToken: !!cfgC2S.token"
 v "valida token antes de guardar"     "app/api/admin/c2s/route.ts" "const teste = await testarToken(t)"
@@ -343,7 +343,7 @@ v "presenca por realtime"             "app/(dashboard)/equipe/components/equipe-
 v "relogio local apaga quem sumiu"    "app/(dashboard)/equipe/components/equipe-view.tsx" "setAgora(Date.now())"
 v "ressincroniza ao reconectar"       "app/(dashboard)/equipe/components/equipe-view.tsx" "SUBSCRIBED"
 v "renovador de token agendado"      "vercel.json" "renovar-tokens"
-v "cron passa pelo middleware"       "middleware.ts" "/api/cron/"
+v "cron passa pelo middleware"       "proxy.ts" "/api/cron/"
 v "cron ainda exige o segredo"       "app/api/cron/[job]/route.ts" "verificarCronSecret"
 v "cron sabe renovar token"          "app/api/cron/[job]/route.ts" "renovarTokensInstagram"
 v "renova antes de vencer"           "lib/canais/renovacao.ts" "DIAS_DE_ANTECEDENCIA"
@@ -360,7 +360,7 @@ v "retorno resolvido no servidor"     "app/api/canais/instagram/retorno/route.ts
 v "envio escolhe o host pelo via"     "supabase/functions/webhook-leads/index.ts" "graph.instagram.com/"
 v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts" "order(\"conectado_em\", { ascending: false }).limit(1)"
 v "messaging_type so no caminho FB"   "supabase/functions/webhook-leads/index.ts" "const corpoEnvio = viaInstagram"
-v "retorno do IG vai pro login"       "middleware.ts" "/api/canais/instagram/retorno"
+v "retorno do IG vai pro login"       "proxy.ts" "/api/canais/instagram/retorno"
 
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
