@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { getCrossSell } from "@/lib/zapintel/segments/segments";
-import { ArrowRight, Copy, MessageCircle, Users } from "lucide-react";
+import { ArrowRight, Copy } from "lucide-react";
 
 type Offer = { product: string; reason: string; icon: string };
 

@@ -9,7 +9,7 @@ import { Upload, CheckCircle, ChevronDown, Info, X } from "lucide-react";
 type Source = "whatsapp" | "instagram";
 
 export default function ImportPage() {
-  const { loadWhatsapp, loadInstagram, setSegmentId, loading, hasWhatsapp, hasPendingMatches } = useLeads();
+  const { loadWhatsapp, loadInstagram, setSegmentId, loading, hasWhatsapp } = useLeads();
   const [step, setStep] = useState<"segment"|"source"|"upload"|"done">("segment");
   const [selectedSegment, setSelectedSegment] = useState("");
   const [selectedSource, setSelectedSource] = useState<Source>("whatsapp");

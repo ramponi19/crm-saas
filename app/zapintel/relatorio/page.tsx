@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import { FileText, Sparkles, RefreshCw, Copy, CheckCircle2, Download } from "lucide-react";
+import { FileText, Sparkles, RefreshCw, Copy, CheckCircle2 } from "lucide-react";
 
 function fmtCurrency(v: number) {
   if (v >= 1000000) return `R$ ${(v/1000000).toFixed(1)}M`;
@@ -10,7 +10,7 @@ function fmtCurrency(v: number) {
 }
 
 export default function RelatorioPage() {
-  const { leads, stats, loaded, loadSample, storeName, sellerName, segment } = useLeads();
+  const { leads, stats, loaded, loadSample, storeName, segment } = useLeads();
   const loja = storeName || "sua empresa";
   const [report, setReport]     = useState("");
   const [loading, setLoading]   = useState(false);

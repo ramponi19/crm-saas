@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { createClient, getImpersonation } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
 import { EmpresaProvider } from '@/lib/empresa-context'

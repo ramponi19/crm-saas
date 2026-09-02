@@ -18,7 +18,7 @@ const vazio = {
 
 export function LeadMatchPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [form, setForm] = useState(vazio)
   const [salvando, setSalvando] = useState(false)
   const [buscando, setBuscando] = useState(false)

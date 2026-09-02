@@ -4,9 +4,9 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { computePerformance } from "@/lib/zapintel/insights/performance";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, LineChart, Line, CartesianGrid, FunnelChart, Funnel, LabelList,
+  Cell, LineChart, Line, CartesianGrid, 
 } from "recharts";
-import Link from "next/link";
+import "next/link";
 import {
   Zap, Clock, DollarSign, Target, Users, Mic, MessageSquare,
   TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle,

@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import {
   LayoutDashboard, Building2, Settings, UserCog, CreditCard, ArrowUpRight,
-  LogOut, Crown, Plug, Wallet, BarChart3, Menu, X,
+  LogOut, Crown, Wallet, BarChart3, Menu, X,
   GitBranch, Repeat, Split, Flame, MessageSquareText, Shield, Palette,
   SlidersHorizontal, Link2, FileSignature, Filter, Gauge, Store,
 } from 'lucide-react'

@@ -9,7 +9,7 @@ import { rotuloDaFilial } from '@/lib/filiais'
 import { Card, StatCard, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
-  Users, Target, Package, Wallet, UserCog, Settings, Building2,
+  Users, Target, Package, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp, Store,
 } from 'lucide-react'
 

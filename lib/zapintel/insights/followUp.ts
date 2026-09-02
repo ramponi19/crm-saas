@@ -26,7 +26,7 @@ const ACTIONS: Record<Classification, string> = {
   unqualified: "Arquivar — sem perfil de comprador ativo no momento.",
 };
 
-export function generateNextAction({ classification, score, daysInactive, leadText, allText, contact }: ActionInput): ActionOutput {
+export function generateNextAction({ classification, daysInactive, leadText, contact }: ActionInput): ActionOutput {
   const urgencyMap: Record<Classification, ActionOutput["urgency"]> = {
     customer: "low", hot: "critical", warm: "high",
     followup: "high", stalled: "medium", lost: "low", unqualified: "low",

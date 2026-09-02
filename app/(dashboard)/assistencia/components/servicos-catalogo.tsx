@@ -22,7 +22,7 @@ const EMPTY = { nome: '', categoria: '', preco: '', tempo: '' }
 
 export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo[] }) {
   const router = useRouter()
-  const { empresa, resolverEmpresaId } = useEmpresa()
+  const { resolverEmpresaId } = useEmpresa()
   const [edit, setEdit] = useState<ServicoReparo | null>(null)
   const [novo, setNovo] = useState(false)
   const [form, setForm] = useState(EMPTY)

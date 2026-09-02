@@ -25,7 +25,7 @@ const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'b
 }
 const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 
-export function OrcamentosView({ orcamentosIniciais, segmento, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
+export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Era um ternário com o MESMO valor nos dois lados — comparava o segmento e

@@ -1,26 +1,11 @@
 "use client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SectionTitle } from "@/components/zapintel/ui/atoms";
 import Link from "next/link";
 import { MessageSquare, Star, ArrowLeftRight, TrendingUp, AlertTriangle, Users } from "lucide-react";
 
 const TT = { contentStyle: { background: "var(--card)", border: "1px solid var(--brd)", borderRadius: 8, color: "var(--txt)", fontSize: 12 } };
-
-function GaugeBar({ value, max = 100, color, label }: { value: number; max?: number; color: string; label?: string }) {
-  const pct = Math.min(100, Math.round((value / max) * 100));
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-        <span style={{ fontSize: 11, color: "var(--dim)" }}>{label}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color }}>{value}</span>
-      </div>
-      <div style={{ height: 6, background: "var(--brd)", borderRadius: 3 }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width .6s" }} />
-      </div>
-    </div>
-  );
-}
 
 function MetricCard({ icon, title, value, pct, sub, color, tip, tipColor = "var(--dim)" }: {
   icon: React.ReactNode; title: string; value: number; pct: number;
@@ -227,7 +212,7 @@ export default function InsightsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{l.contact}</div>
                       <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        "{lastMsg?.body?.substring(0, 80)}{(lastMsg?.body?.length || 0) > 80 ? "…" : ""}"
+                        “{lastMsg?.body?.substring(0, 80)}{(lastMsg?.body?.length || 0) > 80 ? "…" : ""}”
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--red)", fontWeight: 700, flexShrink: 0 }}>
@@ -282,7 +267,7 @@ export default function InsightsPage() {
         <div className="card" style={{ padding: 20 }}>
           <SectionTitle>🏆 Leads com maior score</SectionTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {topLeads.map((l, i) => (
+            {topLeads.map((l, _i) => (
               <Link key={l.id} href={`/zapintel/leads/${l.id}`} style={{ textDecoration: "none" }}>
                 <div className="card2" style={{ padding: "9px 12px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--purple)")}

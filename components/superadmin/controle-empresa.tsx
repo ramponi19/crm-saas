@@ -112,7 +112,7 @@ export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, item
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[11.5px] text-ink-3">"Herdado" segue a matriz do plano. "Liberar" concede como cortesia; "Bloquear" remove mesmo que o plano permita.</p>
+        <p className="mt-3 text-[11.5px] text-ink-3">“Herdado” segue a matriz do plano. “Liberar” concede como cortesia; “Bloquear” remove mesmo que o plano permita.</p>
       </Card>
 
       <Card title="Menu do tenant (ocultar / renomear)" flush>
