@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import { STATUS_META } from "@/types/zapintel";
+import type { RawMessage } from "@/types/zapintel";
 import Link from "next/link";
 import {
   CalendarDays, CheckCircle2, MessageSquare, Sparkles,
@@ -47,11 +48,11 @@ function buildWaLink(phone: string, msg: string) {
 
 interface AICtx { storeName: string; sellerName: string; segmentName: string; followupContext: string }
 
-async function fetchAISuggestion(card: KanbanCard, messages: any[], ctx: AICtx): Promise<string> {
+async function fetchAISuggestion(card: KanbanCard, messages: RawMessage[], ctx: AICtx): Promise<string> {
   const recent = messages
-    .filter((m: any) => m.body?.trim())
+    .filter((m) => m.body?.trim())
     .slice(-8)
-    .map((m: any) => `[${m.isStore ? ctx.sellerName : card.contact}] ${m.body.trim()}`)
+    .map((m) => `[${m.isStore ? ctx.sellerName : card.contact}] ${m.body.trim()}`)
     .join("\n");
 
   const prompt = `Você é ${ctx.sellerName.toLowerCase()} experiente da ${ctx.storeName} (segmento: ${ctx.segmentName}). ${ctx.followupContext}
@@ -366,7 +367,7 @@ function CardItem({
 
       {/* Next action */}
       <div style={{ fontSize: 10, color: "var(--dim)", marginBottom: 8, lineHeight: 1.5 }}>
-        <UrgencyDot urgency={card.urgency as any} />
+        <UrgencyDot urgency={card.urgency} />
         {card.nextAction}
       </div>
 

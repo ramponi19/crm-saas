@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { Badge, ScoreRing } from "@/components/zapintel/ui/atoms";
 import { STATUS_META } from "@/types/zapintel";
+import type { Lead } from "@/types/zapintel";
 import { Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
@@ -39,7 +40,7 @@ function WAButton({ phone }: { phone: string }) {
   );
 }
 
-function detectOrigin(lead: any): "whatsapp" | "instagram" | "both" {
+function detectOrigin(lead: Lead): "whatsapp" | "instagram" | "both" {
   if (lead._sources) return "both";
   if (lead._channel === "instagram") return "instagram";
   if (lead.filename?.toLowerCase().endsWith(".json")) return "instagram";
@@ -49,7 +50,7 @@ function detectOrigin(lead: any): "whatsapp" | "instagram" | "both" {
   return "whatsapp";
 }
 
-function OrigemBadge({ lead }: { lead: any }) {
+function OrigemBadge({ lead }: { lead: Lead }) {
   const origin = detectOrigin(lead);
   if (origin === "both") return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -269,7 +270,7 @@ export default function LeadsPage() {
                 <td style={{ padding: "9px 10px", overflow: "hidden" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.contact}</div>
                   <div style={{ fontSize: 10, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {(l as any).sellerName && (l as any).sellerName !== "Loja" ? `${(l as any).sellerName} · ` : ""}
+                    {l.sellerName && l.sellerName !== "Loja" ? `${l.sellerName} · ` : ""}
                     {l.daysInactive === 0 ? "Hoje" : l.daysInactive === 1 ? "Ontem" : `${l.daysInactive}d`}
                     {l.lastDate ? ` · ${new Date(l.lastDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
                   </div>
@@ -300,9 +301,9 @@ export default function LeadsPage() {
                   <div style={{ fontSize: 12, color: l.daysInactive <= 1 ? "var(--green)" : l.daysInactive <= 7 ? "var(--yellow)" : "var(--red)", fontWeight: 600 }}>
                     {l.daysInactive === 0 ? "Hoje" : l.daysInactive === 1 ? "Ontem" : `${l.daysInactive}d atrás`}
                   </div>
-                  {(l as any).conversationDays > 0 && (
+                  {l.conversationDays > 0 && (
                     <div style={{ fontSize: 10, color: "var(--teal)", marginTop: 2 }}>
-                      🗓 {(l as any).conversationDays}d de conversa
+                      🗓 {l.conversationDays}d de conversa
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 4, marginTop: 3 }}>

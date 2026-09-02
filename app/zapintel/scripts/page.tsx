@@ -161,7 +161,7 @@ export default function ScriptsPage() {
       {/* Category filters */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
         {([["all","Todos","#6b7280","📋"], ...Object.entries(CATEGORY_META).map(([k,v]) => [k,v.label,v.color,v.emoji])] as [string,string,string,string][]).map(([k,label,color,emoji]) => (
-          <button key={k} onClick={() => setCatFilter(k as any)} style={{
+          <button key={k} onClick={() => setCatFilter(k as Category | "all")} style={{
             display:"flex",alignItems:"center",gap:5,
             padding:"6px 12px",borderRadius:8,fontSize:11,fontWeight:catFilter===k?700:400,
             background:catFilter===k?`${color}20`:"var(--card2)",

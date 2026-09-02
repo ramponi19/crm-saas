@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLeads } from "@/hooks/zapintel/useLeads";
+import type { Lead } from "@/types/zapintel";
 import { getCrossSell } from "@/lib/zapintel/segments/segments";
 import { ArrowRight, Copy } from "lucide-react";
 
@@ -43,10 +44,10 @@ const REFERRAL_SCRIPTS = [
   },
 ];
 
-function detectProductKey(lead: any): string {
+function detectProductKey(lead: Lead): string {
   const sources = [
     lead.manualSale?.product || "",
-    ...(lead.messages || []).filter((m: any) => m.isStore).map((m: any) => m.body || ""),
+    ...(lead.messages || []).filter((m) => m.isStore).map((m) => m.body || ""),
   ].join(" ").toLowerCase();
 
   if (sources.includes("macbook")) return "macbook";

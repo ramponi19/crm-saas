@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLeads } from "@/hooks/zapintel/useLeads";
+import type { Lead } from "@/types/zapintel";
 import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import { generateCopilot, type CopilotResult, type CopilotStrategy } from "@/lib/zapintel/insights/followUp";
 import { getProducts } from "@/lib/zapintel/segments/segments";
@@ -146,17 +147,17 @@ export default function LeadDetailPage() {
   );
 
   // Detect if this lead has both sources
-  const sources = (lead as any)._sources as { whatsapp: any; instagram: any } | undefined;
+  const sources = lead._sources;
   const isMerged = !!sources;
 
   // Filter messages by tab
   const displayMessages = (() => {
     if (!isMerged || tab === "all") return lead.messages;
-    return lead.messages.filter((m: any) => (m.source || "whatsapp") === tab);
+    return lead.messages.filter((m) => (m.source ?? "whatsapp") === tab);
   })();
 
-  const waMessages = isMerged ? lead.messages.filter((m: any) => m.source === "whatsapp") : lead.messages;
-  const igMessages = isMerged ? lead.messages.filter((m: any) => m.source === "instagram") : [];
+  const waMessages = isMerged ? lead.messages.filter((m) => m.source === "whatsapp") : lead.messages;
+  const igMessages = isMerged ? lead.messages.filter((m) => m.source === "instagram") : [];
 
   async function runCopilot() {
     if (!lead) return;
@@ -165,8 +166,8 @@ export default function LeadDetailPage() {
       const result = await generateCopilot(lead);
       setCopilot(result);
       logAction("copilot", "Copilot ativado — diagnóstico e 3 estratégias geradas");
-    } catch (e: any) {
-      setCopilotError(e?.message || "Erro ao gerar. Verifique a chave da API.");
+    } catch (e) {
+      setCopilotError(e instanceof Error ? e.message : "Erro ao gerar. Verifique a chave da API.");
     }
     setCopilotLoading(false);
   }
@@ -222,7 +223,7 @@ export default function LeadDetailPage() {
                   <SourceBadge type="instagram" />
                 </div>
               ) : (
-                <SourceBadge type={(lead as any)._channel === "instagram" ? "instagram" : "whatsapp"} />
+                <SourceBadge type={lead._channel === "instagram" ? "instagram" : "whatsapp"} />
               )}
             </div>
             <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 10 }}>
@@ -281,11 +282,11 @@ export default function LeadDetailPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 14 }}>
           {[
             { l: "Perfil", v: lead.buyerProfile, c: "var(--txt)" },
-            { l: "Duração da conversa", v: (lead as any).conversationDays === 0 ? "1 dia" : `${(lead as any).conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
+            { l: "Duração da conversa", v: lead.conversationDays === 0 ? "1 dia" : `${lead.conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
             { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
             { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
             { l: "Risco de perda", v: `${lead.lossRisk}%`, c: lead.lossRisk > 60 ? "var(--red)" : "var(--yellow)" },
-          ].map(({ l, v, c, _tip }: any) => (
+          ].map(({ l, v, c }) => (
             <div key={l} className="card2" style={{ padding: "10px 12px" }}>
               <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>
@@ -417,7 +418,7 @@ export default function LeadDetailPage() {
 
         {/* Messages */}
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {displayMessages.map((msg: any, i: number) => {
+          {displayMessages.map((msg, i) => {
             const msgSource: "whatsapp" | "instagram" = msg.source || "whatsapp";
             return (
               <div key={i} style={{ display: "flex", justifyContent: msg.isStore ? "flex-end" : "flex-start" }}>
@@ -435,7 +436,7 @@ export default function LeadDetailPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                     <span style={{ fontSize: 9 }}>{msgSource === "instagram" ? "📸" : "💬"}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, color: msg.isStore ? (msgSource === "instagram" ? "#ec4899" : "var(--green)") : (msgSource === "instagram" ? "#ec4899" : "var(--purple-l)") }}>
-                      {msg.isStore ? ((lead as any).sellerName || storeName || "Loja") : lead.contact}
+                      {msg.isStore ? (lead.sellerName || storeName || "Loja") : lead.contact}
                     </span>
                   </div>
                   <p style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
@@ -468,7 +469,7 @@ export default function LeadDetailPage() {
 function SalesCopilot({
   lead, copilot, loading, error, copiedId, regenId, onRun, onCopy, onRegen,
 }: {
-  lead: any;
+  lead: Lead;
   copilot: CopilotResult | null;
   loading: boolean;
   error: string;
