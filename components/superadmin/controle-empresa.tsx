@@ -45,7 +45,7 @@ export function ControleEmpresa({ empresaId, modulosInit, menuOverrideInit, item
   const [limLeads, setLimLeads] = useState(String(limiteLeadsInit))
   const [saving, setSaving] = useState(false)
 
-  const toggle = (href: string) => setHidden((s) => { const n = new Set(s); n.has(href) ? n.delete(href) : n.add(href); return n })
+  const toggle = (href: string) => setHidden((s) => { const n = new Set(s); if (n.has(href)) n.delete(href); else n.add(href); return n })
 
   async function salvar() {
     setSaving(true)

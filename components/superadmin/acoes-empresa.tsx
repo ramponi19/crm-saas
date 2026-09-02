@@ -71,7 +71,9 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
         // Navegação hard (não router.push): força um render fresco do servidor
         // já com a empresa impersonada. Um push para /dashboard serviria o
         // payload em cache da impersonação anterior ("retorna para a JM").
-        window.location.href = '/dashboard'
+        // Entrar na personificação troca o tenant: idem, recarga é o certo.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/dashboard'
         return
       }
       setLoading(false)

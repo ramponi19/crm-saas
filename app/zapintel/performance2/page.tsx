@@ -9,7 +9,7 @@ import {
   Cell, 
 } from "recharts";
 import {
-  Zap, TrendingUp, TrendingDown, Minus, AlertTriangle,
+  Zap, TrendingUp, AlertTriangle,
   MessageSquare, Activity, Clock, BarChart2, Flame,
 } from "lucide-react";
 

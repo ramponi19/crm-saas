@@ -46,6 +46,9 @@ export function LaboratorioView({ itens, emPreview, empresaPreview }: {
       const r = await fetch('/api/superadmin/laboratorio/preview', { method: 'POST' })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { notify.bad('Não consegui entrar no laboratório', j.error); return }
+      // Preview de outro segmento troca o contexto do tenant — mesma razão do
+      // `segmentos-view`: cache do anterior não pode sobrar.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/dashboard'
     } finally { setEntrando(false) }
   }
