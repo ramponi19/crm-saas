@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useLocalStorage } from '@/lib/navegador'
 import { Info, TriangleAlert, Sparkles, X } from 'lucide-react'
 
 export type AvisoBanner = {
@@ -12,6 +12,9 @@ export type AvisoBanner = {
 
 const STORE_KEY = 'avisos_dispensados'
 
+/** Referência FIXA: array novo a cada render faria o store achar que mudou. */
+const VAZIO: number[] = []
+
 const TOM_STYLE: Record<string, { wrap: string; icon: React.ReactNode }> = {
   info: { wrap: 'border-accent/20 bg-accent-soft text-accent', icon: <Info size={15} strokeWidth={1.8} /> },
   alerta: { wrap: 'border-warn/25 bg-warn-soft text-warn', icon: <TriangleAlert size={15} strokeWidth={1.8} /> },
@@ -19,24 +22,20 @@ const TOM_STYLE: Record<string, { wrap: string; icon: React.ReactNode }> = {
 }
 
 export function AvisosBanner({ avisos }: { avisos: AvisoBanner[] }) {
-  const [dispensados, setDispensados] = useState<number[]>([])
-  const [pronto, setPronto] = useState(false)
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORE_KEY)
-      setDispensados(raw ? (JSON.parse(raw) as number[]) : [])
-    } catch { /* ignore */ }
-    setPronto(true)
-  }, [])
+  /**
+   * A lista de dispensados vem do `localStorage` SEM efeito e sem render duplo.
+   *
+   * Antes eram dois renders em toda montagem: o primeiro com a lista vazia (que
+   * mostrava banner já dispensado por um instante), o efeito lia o disco, e o
+   * segundo com a lista certa. O `pronto` existia justamente para esconder esse
+   * primeiro quadro — e deixou de ser necessário.
+   */
+  const [dispensados, gravarDispensados] = useLocalStorage<number[]>(STORE_KEY, VAZIO)
 
   function dispensar(id: number) {
-    const next = [...new Set([...dispensados, id])]
-    setDispensados(next)
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    gravarDispensados([...new Set([...dispensados, id])])
   }
 
-  if (!pronto) return null
   const visiveis = avisos.filter(a => !dispensados.includes(a.id))
   if (visiveis.length === 0) return null
 

@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { usePrefereMenosMovimento } from '@/lib/navegador'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { SEGS, SEG_KEYS, type Tone } from '../data'
@@ -24,12 +25,8 @@ export default function ProductStage() {
   const mockRef = useRef<HTMLDivElement>(null)
   const [seg, setSeg] = useState('varejo')
   const [locked, setLocked] = useState(false) // usuário clicou → autoplay desliga
-  const [reduced, setReduced] = useState(false)
+  const reduced = usePrefereMenosMovimento()
   const s = SEGS[seg]
-
-  useEffect(() => {
-    setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  }, [])
 
   // autoplay do seletor — um timeout por segmento exibido
   useEffect(() => {

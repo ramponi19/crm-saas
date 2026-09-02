@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+
+import { useOrigem } from '@/lib/navegador'
 import { Card, Button, Badge, notify } from '@/components/ui'
 import { Copy, ExternalLink, Rss } from 'lucide-react'
 
@@ -9,8 +10,8 @@ import { Copy, ExternalLink, Rss } from 'lucide-react'
  * tenant cadastra no portal (Webmotors/OLX/iCarros etc.). Atualiza sozinho.
  */
 export function VeiculosPortalCard({ slug }: { slug: string | null }) {
-  const [base, setBase] = useState(process.env.NEXT_PUBLIC_APP_URL || '')
-  useEffect(() => { if (!base && typeof window !== 'undefined') setBase(window.location.origin) }, [base])
+  const origem = useOrigem()
+  const base = process.env.NEXT_PUBLIC_APP_URL || origem
 
   const url = slug ? `${base.replace(/\/$/, '')}/api/veiculos/${slug}` : ''
 
