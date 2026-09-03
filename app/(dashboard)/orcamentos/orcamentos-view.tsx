@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Topbar } from '@/components/layout/topbar'
 import { Button, Badge, EmptyState, ConfirmDialog, notify } from '@/components/ui'
 import { Plus, Pencil, Trash2, Copy, MessageCircle, FileText, Wrench, Sparkles, Repeat2, Smartphone } from 'lucide-react'
 import {
@@ -74,8 +73,7 @@ export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <Topbar title="Orçamentos" />
+    <>
       <div className="mx-auto w-full max-w-[900px] min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
@@ -135,6 +133,6 @@ export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos
 
       <ConfirmDialog open={!!excluir} onClose={() => setExcluir(null)} onConfirm={confirmarExcluir}
         title="Excluir orçamento?" description={`O orçamento de "${excluir?.cliente_nome}" será removido.`} confirmLabel="Excluir" tone="danger" />
-    </div>
+    </>
   )
 }

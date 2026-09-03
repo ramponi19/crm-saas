@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       acessos: {
@@ -5489,6 +5514,212 @@ export type Database = {
           },
         ]
       }
+      troca_cotacoes: {
+        Row: {
+          armazenamento: string
+          avarias: Json
+          bonus: number
+          checklist: Json
+          cliente_id: number | null
+          cliente_nome: string | null
+          created_at: string
+          descontos_total: number
+          empresa_id: number
+          filial_id: number | null
+          id: number
+          imei: string | null
+          lead_id: number | null
+          modelo: string
+          na_troca: number
+          observacoes: string | null
+          orcamento_id: number | null
+          status: string
+          usuario_id: string | null
+          valor_final: number
+        }
+        Insert: {
+          armazenamento?: string
+          avarias?: Json
+          bonus?: number
+          checklist?: Json
+          cliente_id?: number | null
+          cliente_nome?: string | null
+          created_at?: string
+          descontos_total?: number
+          empresa_id: number
+          filial_id?: number | null
+          id?: number
+          imei?: string | null
+          lead_id?: number | null
+          modelo: string
+          na_troca?: number
+          observacoes?: string | null
+          orcamento_id?: number | null
+          status?: string
+          usuario_id?: string | null
+          valor_final?: number
+        }
+        Update: {
+          armazenamento?: string
+          avarias?: Json
+          bonus?: number
+          checklist?: Json
+          cliente_id?: number | null
+          cliente_nome?: string | null
+          created_at?: string
+          descontos_total?: number
+          empresa_id?: number
+          filial_id?: number | null
+          id?: number
+          imei?: string | null
+          lead_id?: number | null
+          modelo?: string
+          na_troca?: number
+          observacoes?: string | null
+          orcamento_id?: number | null
+          status?: string
+          usuario_id?: string | null
+          valor_final?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "troca_cotacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      troca_precos: {
+        Row: {
+          armazenamento: string
+          ativo: boolean
+          atualizado_em: string
+          descontos: Json
+          empresa_id: number
+          id: number
+          modelo: string
+          na_troca: number | null
+        }
+        Insert: {
+          armazenamento?: string
+          ativo?: boolean
+          atualizado_em?: string
+          descontos?: Json
+          empresa_id: number
+          id?: number
+          modelo: string
+          na_troca?: number | null
+        }
+        Update: {
+          armazenamento?: string
+          ativo?: boolean
+          atualizado_em?: string
+          descontos?: Json
+          empresa_id?: number
+          id?: number
+          modelo?: string
+          na_troca?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "troca_precos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_precos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      troca_regras: {
+        Row: {
+          atualizado_em: string
+          bonus_seminovo: number
+          corte_bateria: number
+          empresa_id: number
+          observacoes: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          bonus_seminovo?: number
+          corte_bateria?: number
+          empresa_id: number
+          observacoes?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          bonus_seminovo?: number
+          corte_bateria?: number
+          empresa_id?: number
+          observacoes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "troca_regras_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_regras_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuarios: {
         Row: {
           created_at: string | null
@@ -6261,12 +6492,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6290,11 +6521,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6315,11 +6546,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6340,11 +6571,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6357,11 +6588,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6371,6 +6602,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

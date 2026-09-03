@@ -1,4 +1,5 @@
 import { requireSuperAdminApi, logSuperAdminAction } from '@/lib/superadmin'
+import type { MenuOverrideRow } from '@/lib/menu'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
@@ -12,7 +13,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => ({})) as {
     modulos_override?: Record<string, boolean> | null
-    menu_override?: { hidden?: string[]; labels?: Record<string, string> } | null
+    menu_override?: MenuOverrideRow | null
     limite_usuarios?: number
     limite_leads?: number
   }
