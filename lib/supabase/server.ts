@@ -49,11 +49,23 @@ export async function getEmpresaId(): Promise<number> {
     if (usuario.impersonando_expires_at && new Date(usuario.impersonando_expires_at) > new Date()) {
       return usuario.impersonando_empresa_id
     }
-    // TTL expirado: zera a impersonação no DB (RPC SECURITY DEFINER — o UPDATE
-    // direto em usuarios é barrado pelo trigger/grant; ver rota impersonar).
-    supabase
-      .rpc('set_impersonation') // sem empresa = encerra a impersonação
-      .then(() => {/* fire-and-forget */})
+    /**
+     * TTL expirado: zera a impersonação no banco.
+     *
+     * ⚠️ Isto NUNCA rodou. Era `rpc('set_impersonation')` sem argumento, e essa
+     * sobrecarga não existe (`p_empresa_id` não tem default) — a chamada
+     * falhava, e o `.then()` de fire-and-forget engolia o erro. O sintoma era
+     * uma impersonação VENCIDA parada na linha do superadmin por dias.
+     *
+     * O `await` aqui é de propósito: sem ele, a próxima requisição pode ler a
+     * coluna antes da limpeza terminar e cair de novo neste mesmo ramo. Custa
+     * uma ida ao banco num caminho que só roda quando o TTL acabou de vencer.
+     *
+     * Erro não interrompe: a impersonação já está expirada, então o código
+     * abaixo segue para o vínculo real de qualquer forma. Limpar é higiene.
+     */
+    const { error } = await supabase.rpc('encerrar_impersonacao')
+    if (error) console.warn('[impersonacao] nao consegui limpar o TTL vencido:', error.message)
   }
 
   const { data: vinculo } = await supabase

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Eye, X } from 'lucide-react'
+import { notify } from '@/components/ui'
 
 // Roxo = modo plataforma (superadmin). Barra chapada e discreta (sem gradiente).
 export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
@@ -10,13 +11,32 @@ export function ImpersonationBanner({ empresaNome }: { empresaNome: string }) {
   async function sair() {
     setSaindo(true)
     try {
-      await fetch('/api/superadmin/empresas/0/impersonar', { method: 'DELETE' })
+      const r = await fetch('/api/superadmin/empresas/0/impersonar', { method: 'DELETE' })
+      /**
+       * A RESPOSTA TEM QUE SER CONFERIDA.
+       *
+       * Isto era um `await fetch(...)` solto seguido da navegação. Enquanto a
+       * rota encerrava a impersonação só no cookie — e não na coluna, que é
+       * quem a RLS lê —, o botão levava para /superadmin/empresas e dava a
+       * impressão de ter saído do tenant. Não tinha.
+       *
+       * Redirecionar sem checar é o que transforma uma falha de segurança em
+       * uma tela tranquila. Se não deu para sair, ficar onde está e dizer é
+       * mais seguro do que parecer que saiu.
+       */
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}))
+        notify.bad('Não saí do modo plataforma', j.error ?? 'Tente de novo.')
+        setSaindo(false)
+        return
+      }
       // Navegação hard: garante que o servidor re-renderize sem a impersonação,
       // sem risco de servir o /dashboard em cache da empresa anterior.
       // Sair da personificação troca o tenant inteiro: recarga limpa tudo.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/superadmin/empresas'
     } catch {
+      notify.bad('Não saí do modo plataforma', 'Sem resposta do servidor.')
       setSaindo(false)
     }
   }

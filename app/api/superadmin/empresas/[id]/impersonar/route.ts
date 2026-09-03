@@ -77,10 +77,31 @@ export async function DELETE() {
       .eq('id', user.id)
       .single()
 
-    // Encerra via a mesma RPC, chamada SEM empresa — o argumento tem DEFAULT NULL
-    // no banco. Passar `null` explícito não passa no type-check porque o gerador de
-    // tipos do Supabase não representa valores padrão.
-    await supabase.rpc('set_impersonation')
+    /**
+     * ⚠️ ESTA LINHA JÁ FOI UM BURACO. Não a troque por `set_impersonation()`.
+     *
+     * Era exatamente isso: `supabase.rpc('set_impersonation')` sem argumento,
+     * com um comentário afirmando que o banco tinha `DEFAULT NULL` no primeiro
+     * parâmetro. Não tinha — `set_impersonation()` não existe, a chamada
+     * falhava, o erro não era conferido, e a rota devolvia 200 tendo limpado
+     * apenas o COOKIE.
+     *
+     * E o cookie não é quem decide: `getEmpresaId()` aqui e `get_empresa_id()`
+     * no banco leem a COLUNA. Resultado: "Sair" não saía de nada, e o
+     * superadmin ficava dentro do tenant pelas 4h do TTL.
+     *
+     * `encerrar_impersonacao()` não recebe parâmetro — não há como chamá-la
+     * errado — e o erro é conferido abaixo.
+     */
+    const { error: fimErr } = await supabase.rpc('encerrar_impersonacao')
+    if (fimErr) {
+      // Falhar em silêncio aqui é o bug original. Se não deu para encerrar, quem
+      // clicou precisa saber — senão sai da tela achando que saiu do tenant.
+      return NextResponse.json(
+        { error: `Não foi possível encerrar a impersonação: ${fimErr.message}` },
+        { status: 500 },
+      )
+    }
 
     await logSuperAdminAction({
       adminUserId: user.id,

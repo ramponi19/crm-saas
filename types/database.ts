@@ -6443,6 +6443,7 @@ export type Database = {
       }
     }
     Functions: {
+      encerrar_impersonacao: { Args: never; Returns: undefined }
       filiais_visiveis: { Args: never; Returns: number[] }
       filial_atual: { Args: never; Returns: number }
       filial_gravacao: { Args: { p_empresa: number }; Returns: number }
