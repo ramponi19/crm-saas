@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
-import { CotacaoView, type AparelhoAvaliavel, type CotacaoRecente } from './cotacao-view'
+import { chaveLinha } from '@/lib/troca-modelos'
+import { CotacaoView, type ValoresDoModelo, type CotacaoRecente } from './cotacao-view'
 
 export const metadata = { title: 'Nova cotação' }
 
@@ -26,16 +27,21 @@ export default async function CotacaoPage({
 
   const [{ data: precos }, { data: regras }, { data: recentes }] = await Promise.all([
     /**
-     * SÓ o que tem base entra no seletor.
+     * TUDO o que houver na matriz — inclusive linha com base NULA.
      *
-     * É o que faz a matriz em branco funcionar: a loja preenche os oito modelos
-     * que compra de verdade, e o seletor mostra exatamente esses oito — em vez
-     * de 140 aparelhos dos quais 132 valem R$ 0,00.
+     * ⚠️ AQUI HAVIA UM ERRO DE DESENHO. Era `.not('na_troca', 'is', null)`, e o
+     * seletor mostrava só o que já tinha valor. O raciocínio era "a loja
+     * preenche os oito modelos que compra e o seletor mostra oito" — mas isso
+     * quebra justamente no estado inicial, que é o único que toda loja nova
+     * atravessa: matriz vazia significava seletor vazio, e a tela morria antes
+     * do passo 2.
+     *
+     * A lista de aparelhos vem do CATÁLOGO (lib/troca-modelos), não daqui. Isto
+     * é só o que a loja já preencheu — o resto se digita na hora.
      */
     supabase.from('troca_precos')
       .select('modelo, armazenamento, na_troca, descontos')
-      .eq('empresa_id', empresaId).eq('ativo', true).not('na_troca', 'is', null)
-      .order('modelo'),
+      .eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('troca_regras').select('bonus_seminovo, corte_bateria').eq('empresa_id', empresaId).maybeSingle(),
     // Os chips de "últimos avaliados": o balcão repete modelo o dia inteiro.
     supabase.from('troca_cotacoes')
@@ -43,12 +49,14 @@ export default async function CotacaoPage({
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(8),
   ])
 
-  const aparelhos: AparelhoAvaliavel[] = (precos ?? []).map((p) => ({
-    modelo: p.modelo,
-    armazenamento: p.armazenamento ?? '',
-    na_troca: Number(p.na_troca) || 0,
-    descontos: (p.descontos ?? {}) as Record<string, number>,
-  }))
+  /** Indexado por `modelo|armazenamento` — é como a view procura. */
+  const valores: Record<string, ValoresDoModelo> = {}
+  for (const p of precos ?? []) {
+    valores[chaveLinha(p.modelo, p.armazenamento ?? '')] = {
+      na_troca: p.na_troca == null ? null : Number(p.na_troca),
+      descontos: (p.descontos ?? {}) as Record<string, number>,
+    }
+  }
 
   const ultimas: CotacaoRecente[] = (recentes ?? []).map((c) => ({
     id: c.id,
@@ -59,7 +67,7 @@ export default async function CotacaoPage({
 
   return (
     <CotacaoView
-      aparelhos={aparelhos}
+      valoresIniciais={valores}
       ultimas={ultimas}
       bonusSeminovo={Number(regras?.bonus_seminovo) || 0}
       corteBateria={regras?.corte_bateria ?? 80}
