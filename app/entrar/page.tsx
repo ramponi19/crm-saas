@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { resolverMenu, type MenuConfigDono } from '@/lib/menu'
+import { resolverMenu, type MenuConfigDono, type MenuOverrideRow } from '@/lib/menu'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import type { ModuloPlano } from '@/lib/plano'
 
@@ -64,7 +64,7 @@ export default async function EntrarPage() {
     .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados')
     .eq('chave', emp?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
 
-  const mo = (emp?.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
+  const mo = (emp?.menu_override ?? null) as MenuOverrideRow | null
   const grupos = resolverMenu({
     segmento: normalizarSegmento(emp?.segmento),
     plano: emp?.plano ?? undefined,
@@ -74,6 +74,7 @@ export default async function EntrarPage() {
       modulos: (emp?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
       hidden: mo?.hidden ?? [],
       labels: mo?.labels,
+      habilitados: mo?.habilitados,
     },
     configDono: (emp?.menu_config ?? undefined) as MenuConfigDono | undefined,
     segOverride: segCfg ? {

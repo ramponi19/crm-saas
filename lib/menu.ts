@@ -78,6 +78,57 @@ export interface MenuOverridesSuperadmin {
   hidden?: string[]
   /** renomeia: href -> label */
   labels?: Record<string, string>
+  /**
+   * LIGA hrefs para ESTA empresa, mesmo que o segmento dela não os habilite.
+   *
+   * ══ A LACUNA QUE ISTO FECHA ══════════════════════════════════════════════
+   *
+   * Até aqui, tudo o que era por EMPRESA só sabia desligar (`hidden`,
+   * `modulos: false`). Ligar era só por SEGMENTO — e segmento é compartilhado:
+   * a JM Store e a Preview · Loja são as duas `varejo`. Liberar um módulo novo
+   * "só para a JM" pelo opt-in do segmento o entregaria junto ao tenant de
+   * demonstração, e não existia lever para separar os dois.
+   *
+   * A alternativa seria `if (empresaId === 1)` no código, que envelhece na
+   * primeira empresa nova e não é editável por ninguém.
+   *
+   * Não fura maturidade nem papel: módulo em `construcao` continua só do
+   * superadmin, e `adminOnly` continua valendo. Isto é opt-in, não passe livre.
+   *
+   * ══ HREF FORA DO CATÁLOGO LIBERA SUB-TELA ════════════════════════════════
+   *
+   * A lista responde "esta empresa tem este href?". A sidebar consome a
+   * resposta apenas para os hrefs que existem no CATALOGO — então um href de
+   * sub-tela (`/orcamentos/cotacao`) libera a ABA sem criar item de menu
+   * nenhum. É o que permite entregar uma tela nova dentro de uma existente para
+   * um cliente só, sem um segundo mecanismo de liberação paralelo a este.
+   */
+  habilitados?: string[]
+}
+
+/**
+ * A forma da coluna `empresas.menu_override` no banco.
+ *
+ * Estava escrita à mão como `{ hidden?, labels? }` em QUATRO arquivos (layout do
+ * CRM, /entrar, /admin/meu-menu e a rota do superadmin). Acrescentar
+ * `habilitados` exigiu achar os quatro — e o que ficasse de fora não daria erro
+ * de compilação: só ignoraria a chave nova, silenciosamente.
+ *
+ * NÃO é o mesmo que `MenuOverridesSuperadmin`: `modulos` mora na coluna vizinha
+ * `modulos_override`. Unir os dois tipos convidaria a gravar `modulos` aqui.
+ */
+export type MenuOverrideRow = Omit<MenuOverridesSuperadmin, 'modulos'>
+
+/**
+ * Esta empresa tem este href liberado?
+ *
+ * Existe para as SUB-TELAS, que não passam pelo `resolverMenu`: a página
+ * pergunta direto, e pergunta o mesmo que a sidebar perguntaria. Dois jeitos de
+ * responder "a empresa tem o módulo?" divergiriam no primeiro ajuste — e o
+ * sintoma seria uma aba visível numa loja que não deveria tê-la.
+ */
+export function temHrefLiberado(overrides: MenuOverridesSuperadmin | null | undefined, href: string): boolean {
+  return (overrides?.habilitados ?? []).includes(href)
 }
 
 /** Config do dono dentro da própria empresa (camada 4). Preenchido na Fase 2.B. */
@@ -274,6 +325,10 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   // com fallback derivado da config estática. O núcleo sempre entra.
   const habilitados = new Set<string>(segOverride?.habilitados ?? habilitadosDerivados(seg))
   NUCLEO.forEach((h) => habilitados.add(h))
+  // Camada 3 (positiva): o superadmin liga um módulo para ESTA empresa, sem
+  // passar pelo segmento — que é compartilhado entre tenants. Ver
+  // `MenuOverridesSuperadmin.habilitados`.
+  ;(overrides?.habilitados ?? []).forEach((h) => habilitados.add(h))
 
   const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
 

@@ -12,7 +12,7 @@ import { SessionGuard } from '@/components/layout/session-guard'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { normalizarSegmento, SEGMENTOS } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import type { MenuOverridesSuperadmin, MenuConfigDono, SegOverride } from '@/lib/menu'
+import type { MenuOverridesSuperadmin, MenuOverrideRow, MenuConfigDono, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
@@ -104,7 +104,7 @@ export default async function DashboardLayout({
     .eq('kanban_status', 'novo')
 
   // Camadas 3 (override do superadmin) e 4 (config do dono) do resolverMenu.
-  const mo = (empresa?.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
+  const mo = (empresa?.menu_override ?? null) as MenuOverrideRow | null
   // Enforcement de permissão do papel: esconde itens que o papel não pode ver.
   const perms = permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null)
   const permHidden: string[] = []
@@ -114,6 +114,7 @@ export default async function DashboardLayout({
     modulos: (empresa?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
     hidden: [...(mo?.hidden ?? []), ...permHidden],
     labels: mo?.labels,
+    habilitados: mo?.habilitados,
   }
   const menuConfig = (empresa?.menu_config ?? undefined) as MenuConfigDono | undefined
 

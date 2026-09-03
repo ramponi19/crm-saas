@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
-import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuItem, type SegOverride } from '@/lib/menu'
+import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuOverrideRow, type MenuItem, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { MeuMenuView } from './meu-menu-view'
 
@@ -24,11 +24,12 @@ export default async function MeuMenuPage() {
   const isAdmin = usuario?.is_super_admin || role === 'owner' || role === 'admin'
   if (!isAdmin) redirect('/dashboard')
 
-  const mo = (emp?.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null
+  const mo = (emp?.menu_override ?? null) as MenuOverrideRow | null
   const overrides: MenuOverridesSuperadmin = {
     modulos: (emp?.modulos_override ?? undefined) as MenuOverridesSuperadmin['modulos'],
     hidden: mo?.hidden,
     labels: mo?.labels,
+    habilitados: mo?.habilitados,
   }
 
   /**
