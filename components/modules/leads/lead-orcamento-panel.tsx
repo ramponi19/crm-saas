@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { Receipt, Plus, Copy, Loader2, ArrowDownUp, Hash } from 'lucide-react'
 import { Button, Badge, notify } from '@/components/ui'
 import {
@@ -57,11 +58,29 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
      * O vendedor precisa ler o código na lista para ditar no PDV. Buscar
      * cotação por cotação seria N+1 dentro de um modal que abre a cada lead.
      */
+    /**
+     * ⚠️ A EMPRESA VEM DE `empresaAtualId`, NÃO de `limit(1)`.
+     *
+     * Isto era `.from('empresas').select('menu_override').limit(1)`, contando
+     * que a RLS devolvesse uma linha só. Para usuário comum devolve — mas a
+     * política `superadmin_le_empresas` deixa o superadmin ler TODAS, e o
+     * `limit(1)` então trazia uma empresa qualquer. O sintoma: o botão de
+     * Upgrade/Downgrade não aparecia na JM porque o `menu_override` lido era de
+     * outro tenant.
+     *
+     * `empresaAtualId` chama `get_empresa_id()` — a mesma função que a RLS usa,
+     * e que respeita a impersonação. Contar com "a RLS vai filtrar" em vez de
+     * dizer QUAL linha se quer é o erro; a RLS limita o que se pode ver, não
+     * escolhe por você.
+     */
+    const empresaId = await empresaAtualId(supabase)
     const [{ data }, { data: emp }] = await Promise.all([
       supabase.from('orcamentos')
         .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes!troca_cotacao_id(numero)')
         .eq('lead_id', leadId).order('created_at', { ascending: false }),
-      supabase.from('empresas').select('menu_override').limit(1).maybeSingle(),
+      empresaId
+        ? supabase.from('empresas').select('menu_override').eq('id', empresaId).maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
 
     type Linha = Omit<Orc, 'numero_cotacao'> & { troca_cotacoes: { numero: number | null } | { numero: number | null }[] | null }
