@@ -101,24 +101,41 @@ export async function POST(req: Request) {
       },
     ]
 
+    /**
+     * ⚠️ ESTE CONECTOR NÃO TOCA MAIS NO CANAL DO INSTAGRAM.
+     *
+     * Ele criava/atualizava a linha de `tipo = 'instagram'` com o token da
+     * PÁGINA. Isso era uma mina armada, e ela explodiu em 04/09/2026:
+     *
+     *  · pela Página, o app NÃO TEM permissão de enviar Direct. O acesso
+     *    avançado aprovado pela Meta em 28/08 é do Instagram Login
+     *    (`instagram_business_manage_messages`). Canal em `via = 'pagina'`
+     *    RECEBE normal e falha ao ENVIAR, com `(#3) Application does not have
+     *    the capability to make this API call` — silencioso, porque a entrada
+     *    de mensagens continua funcionando.
+     *
+     *  · o @jmstore_importados ficou de ~25/08 a 04/09 sem enviar por isso, e
+     *    ninguém soube: a equipe respondia pelo celular.
+     *
+     * E pior que recriar o estado antigo: o upsert casa em
+     * `(tipo, external_id)` e sobrescreveria o `access_token_enc` de um canal
+     * já reconectado, deixando `via = 'instagram'` (que fala com
+     * graph.instagram.com) apontando para um token de PÁGINA. Reconectar o
+     * MESSENGER — ação legítima e rotineira — quebraria o Instagram junto.
+     *
+     * Instagram agora entra só pelo próprio login, na tela de Canais. O aviso
+     * abaixo é para o lojista não achar que o Direct veio no pacote.
+     */
     if (pagina.instagram) {
-      linhas.push({
-        empresa_id: empresaId, tipo: 'instagram',
-        // O webhook do IG manda o id da CONTA — é ele que resolve o tenant.
-        external_id: pagina.instagram.id,
-        waba_id: null, ig_user_id: pagina.instagram.id,
-        nome_exibicao: pagina.instagram.username ? `@${pagina.instagram.username}` : pagina.nome,
-        access_token_enc: cifrado,
-        token_expira_em: v?.expiraEm ?? null, data_access_expira_em: v?.acessoDadosExpiraEm ?? null,
-        status: ehErro(assinou) ? 'erro' : 'ativo',
-        ultimo_erro: ehErro(assinou) ? assinou.erro : null,
-        ultimo_erro_em: ehErro(assinou) ? agora : null,
-        coexistencia: false, conectado_em: agora, updated_at: agora,
-      })
+      avisos.push(
+        `A conta @${pagina.instagram.username ?? 'do Instagram'} está vinculada a esta Página, mas o Instagram ` +
+          'NÃO é conectado por aqui: conecte-o pelo botão do Instagram, com o login da própria conta. ' +
+          'Pela Página o Direct chega, mas o envio é recusado pela Meta.',
+      )
     } else {
       avisos.push(
         'Nenhuma conta do Instagram está vinculada a esta Página, então só o Messenger foi conectado. ' +
-          'Para receber Direct, vincule a conta profissional do Instagram à Página e conecte de novo.',
+          'Para o Direct, conecte o Instagram pelo botão dele, com o login da própria conta.',
       )
     }
 

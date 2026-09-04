@@ -689,8 +689,27 @@ export function CanaisView({ appId }: { appId: string }) {
                     avançado aprovado pela Meta em 28/08/2026, qualquer conta
                     autoriza direto: some a Página, some o portfólio, some a
                     escolha entre dois botões que o lojista não tinha como fazer.
-                    O que já está conectado pela Página continua funcionando; é a
-                    coluna `via` que decide o envio.
+                    ⚠️ AQUI ESTAVA ESCRITO "o que já está conectado pela Página
+                    continua funcionando; é a coluna `via` que decide o envio".
+                    NÃO CONTINUA — e a suposição custou 10 dias de silêncio.
+
+                    A coluna `via` decide para onde o envio VAI, mas não dá ao
+                    app a permissão de chegar lá. O acesso avançado aprovado em
+                    28/08/2026 é do Instagram Login
+                    (`instagram_business_manage_messages`); o caminho da Página
+                    precisa de OUTRAS permissões, que o app não tem. Canal em
+                    `via = 'pagina'` RECEBE normalmente e falha ao ENVIAR, com
+                    `(#3) Application does not have the capability to make this
+                    API call`.
+
+                    Foi o que aconteceu com o @jmstore_importados: parou de
+                    enviar por volta de 25/08 e ninguém soube até 04/09, porque
+                    o recebimento seguia intacto e a equipe respondia pelo
+                    celular. Conserto: reconectar por este botão, que faz upsert
+                    em (tipo, external_id) e vira o `via` sem duplicar canal nem
+                    perder a loja.
+
+                    Ou seja: quem estiver em `via = 'pagina'` precisa reconectar.
                     O Messenger segue pela Página porque Página é da natureza dele.
                   */}
                   {tipo === 'instagram' ? (
