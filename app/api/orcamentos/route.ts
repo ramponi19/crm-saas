@@ -23,6 +23,8 @@ interface Body {
   unidade_id?: number | null
   observacoes?: string
   acerto?: string
+  /** Cotação de troca que originou este orçamento (Upgrade/Downgrade). */
+  troca_cotacao_id?: number | null
 }
 
 const TIPOS = ['assistencia', 'melhoria', 'downgrade', 'venda']
@@ -31,6 +33,18 @@ const TIPOS = ['assistencia', 'melhoria', 'downgrade', 'venda']
 // resposta certa: cada negociacao fecha de um jeito, entao as quatro ficam
 // disponiveis para o vendedor escolher na hora.
 const ACERTOS = ['dinheiro', 'credito', 'produto', 'nenhum']
+
+/** A cotação existe e é desta empresa? Senão, nulo — o nome digitado continua valendo. */
+async function cotacaoDaEmpresa(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  empresaId: number,
+  id: number | null | undefined,
+): Promise<number | null> {
+  if (id == null) return null
+  const { data } = await supabase.from('troca_cotacoes')
+    .select('id').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
+  return data?.id ?? null
+}
 
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -100,11 +114,29 @@ export async function POST(req: Request) {
     valor_novo: tipo === 'downgrade' ? (Number(b.valor_novo) || 0) : null,
     aparelho_usado: b.aparelho_usado?.trim() || null,
     valor_entrada: tipo === 'downgrade' ? (Number(b.valor_entrada) || 0) : null,
-    unidade_id: tipo === 'venda' ? (b.unidade_id ?? null) : null,
+    /**
+     * A unidade do estoque agora vale para DOWNGRADE também.
+     *
+     * Era `tipo === 'venda' ? ... : null`, e isso anulava em silêncio o aparelho
+     * que SAI num Upgrade/Downgrade — o campo existe justamente para dizer qual
+     * peça do estoque está prometida ao cliente. Sem ele, o orçamento sabia o
+     * preço mas não a peça, e a reserva não tinha a quem se amarrar.
+     *
+     * Não muda comportamento nenhum a jusante: a baixa automática pelo link
+     * público continua atrás de `tipo === 'venda'` (ver app/api/orcamento/[token]).
+     * No Upgrade/Downgrade a venda fecha no PDV, pelo código da cotação.
+     */
+    unidade_id: tipo === 'venda' || tipo === 'downgrade' ? (b.unidade_id ?? null) : null,
     total,
     valor_devolver: devolver,
     acerto,
     observacoes: b.observacoes?.trim() || null,
+    /**
+     * O vínculo com a cotação, CONFERIDO — id vindo do cliente aponta para
+     * qualquer linha, e um orçamento amarrado à cotação de outro tenant faria o
+     * PDV abater um valor que não é deste cliente. Não é da empresa → nulo.
+     */
+    troca_cotacao_id: await cotacaoDaEmpresa(supabase, empresaId, b.troca_cotacao_id),
   }
 
   if (b.id) {

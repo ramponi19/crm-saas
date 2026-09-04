@@ -120,6 +120,18 @@ export interface MenuOverridesSuperadmin {
 export type MenuOverrideRow = Omit<MenuOverridesSuperadmin, 'modulos'>
 
 /**
+ * O href que liga a cotação de troca (Upgrade/Downgrade) para uma empresa.
+ *
+ * Mora aqui, e não em `lib/troca-acesso.ts`, porque componente de CLIENTE
+ * precisa dele — e `troca-acesso` importa `lib/supabase/server`, que não pode
+ * atravessar a fronteira. `lib/menu.ts` é puro (sem React, sem banco).
+ *
+ * Não está no CATALOGO de propósito: a cotação é ABA de Orçamentos e MODAL do
+ * lead, nunca item de sidebar. Ver `MenuOverridesSuperadmin.habilitados`.
+ */
+export const HREF_COTACAO_TROCA = '/orcamentos/cotacao'
+
+/**
  * Esta empresa tem este href liberado?
  *
  * Existe para as SUB-TELAS, que não passam pelo `resolverMenu`: a página

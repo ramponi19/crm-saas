@@ -170,10 +170,21 @@ export function OrcamentoEditorModal({
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Select label="Tipo" value={editor.tipo} onChange={(e) => setEditor({ ...editor, tipo: e.target.value })}>
+            {/**
+              * `venda` SAIU da lista. Era "Venda (novo/semi-novo)" e fazia a
+              * mesma coisa que o Upgrade/Downgrade faz melhor: entra um
+              * aparelho, sai um do estoque. Nenhum orçamento com esse tipo
+              * existia no banco, então tirar não deixa histórico órfão.
+              *
+              * `downgrade` FICA — mas só para EDITAR. Os novos nascem no modal
+              * de Upgrade/Downgrade, que avalia o aparelho de entrada de
+              * verdade. Se a opção saísse daqui, abrir um Upgrade/Downgrade
+              * salvo para corrigir uma vírgula mostraria o select vazio e
+              * mudaria o tipo no salvamento, sem ninguém pedir.
+              */}
             <option value="assistencia">Conserto</option>
-            <option value="melhoria">Upgrade (melhoria)</option>
-            <option value="venda">Venda (novo/semi-novo)</option>
-            <option value="downgrade">Downgrade (com diferença)</option>
+            <option value="melhoria">Melhoria (peças/serviço)</option>
+            <option value="downgrade">Upgrade/Downgrade</option>
           </Select>
           <ClienteAutocomplete
             nome={editor.cliente_nome}

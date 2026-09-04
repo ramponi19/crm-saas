@@ -124,18 +124,21 @@ export async function POST(req: Request) {
   }
 
   if (b.id) {
-    const { error } = await supabase.from('troca_cotacoes').update(dados as never).eq('id', b.id)
+    const { data, error } = await supabase.from('troca_cotacoes')
+      .update(dados as never).eq('id', b.id).select('numero').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, id: b.id, ...conta })
+    return NextResponse.json({ ok: true, id: b.id, numero: data?.numero ?? null, ...conta })
   }
 
   // `usuario_id` só na criação, como em orçamentos: é o dono da cotação, e o
   // admin que corrigir uma vírgula não pode virar dono dela.
   const { data, error } = await supabase.from('troca_cotacoes')
     .insert({ ...dados, usuario_id: user.id } as never)
-    .select('id').single()
+    // `numero` vem do gatilho `numerar_cotacao_troca`, contado por empresa. É o
+    // código que o vendedor digita no PDV — quem chama precisa recebê-lo.
+    .select('id, numero').single()
   if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
-  return NextResponse.json({ ok: true, id: data.id, ...conta })
+  return NextResponse.json({ ok: true, id: data.id, numero: data.numero, ...conta })
 }
 
 export async function DELETE(req: Request) {
