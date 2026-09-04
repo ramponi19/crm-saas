@@ -7,6 +7,8 @@ import { Plus, Pencil, Trash2, Copy, MessageCircle, FileText, Wrench, Sparkles, 
 import {
   OrcamentoEditorModal, orcamentoVazio, editorDoOrcamento, type EditorOrcamento,
 } from '@/components/modules/orcamentos/orcamento-editor-modal'
+import { TrocaModal } from '@/components/modules/orcamentos/troca-modal'
+import type { ValoresDoModelo } from '@/components/modules/orcamentos/avaliar-aparelho'
 
 export type { ItemOrc, Orcamento, UnidadeOpt, PrecoRef } from './tipos'
 import type { Orcamento, UnidadeOpt, PrecoRef } from './tipos'
@@ -17,14 +19,27 @@ const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency',
 // codigo dizendo 'troca' e tela dizendo outra coisa. NAO confundir com
 // `inventario_unidades.tipo = 'troca'`, que continua 'troca' — e o tipo de ENTRADA
 // da peca no estoque, outro dominio, usado pelo PDV.
-const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Upgrade', Icon: Sparkles }, downgrade: { label: 'Downgrade', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
+const TIPO = { assistencia: { label: 'Conserto', Icon: Wrench }, melhoria: { label: 'Melhoria', Icon: Sparkles }, downgrade: { label: 'Upgrade/Downgrade', Icon: Repeat2 }, venda: { label: 'Venda', Icon: Smartphone } } as const
 const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'bad' }> = {
   rascunho: { label: 'Rascunho', tone: 'neutro' }, enviado: { label: 'Enviado', tone: 'acc' },
   aprovado: { label: 'Aprovado', tone: 'ok' }, recusado: { label: 'Recusado', tone: 'bad' },
 }
 const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 
-export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos = [] }: { orcamentosIniciais: Orcamento[]; segmento?: string; unidades?: UnidadeOpt[]; tabelaPrecos?: PrecoRef[] }) {
+export function OrcamentosView({
+  orcamentosIniciais, unidades = [], tabelaPrecos = [],
+  trocaLiberada = false, valoresTroca = {}, bonusSeminovo = 0, corteBateria = 80,
+}: {
+  orcamentosIniciais: Orcamento[]
+  segmento?: string
+  unidades?: UnidadeOpt[]
+  tabelaPrecos?: PrecoRef[]
+  /** Módulo de cotação ligado nesta empresa — libera o Upgrade/Downgrade. */
+  trocaLiberada?: boolean
+  valoresTroca?: Record<string, ValoresDoModelo>
+  bonusSeminovo?: number
+  corteBateria?: number
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Era um ternário com o MESMO valor nos dois lados — comparava o segmento e
@@ -33,6 +48,7 @@ export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos
   const tipoPadrao = 'assistencia'
   const [editor, setEditor] = useState<EditorOrcamento | null>(null)
   const [excluir, setExcluir] = useState<Orcamento | null>(null)
+  const [trocaAberta, setTrocaAberta] = useState(false)
 
   // Pré-preenchimento quando vem de um link antigo (?nome=&tel=&lead=&tipo=).
   // O chat do lead não usa mais este caminho — abre o editor por cima da
@@ -80,7 +96,17 @@ export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos
             <h1 className="text-[18px] font-semibold text-ink">Orçamentos</h1>
             <p className="text-[13px] text-ink-3">Conserto, upgrade e troca — com link pro cliente aprovar.</p>
           </div>
-          <Button icon={<Plus size={15} strokeWidth={1.8} />} onClick={() => abrir()} className="shrink-0">Novo orçamento</Button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {/* Upgrade/Downgrade é o caminho para troca de aparelho; "Novo
+                orçamento" segue servindo conserto e melhoria. Os dois botões
+                juntos evitam o que havia antes: um único editor genérico onde o
+                vendedor tinha que escolher o tipo antes de saber o resultado. */}
+            {trocaLiberada && (
+              <Button variant="outline" icon={<Repeat2 size={15} strokeWidth={1.8} />}
+                onClick={() => setTrocaAberta(true)}>Upgrade / Downgrade</Button>
+            )}
+            <Button icon={<Plus size={15} strokeWidth={1.8} />} onClick={() => abrir()}>Novo orçamento</Button>
+          </div>
         </div>
 
         {orcamentosIniciais.length === 0 ? (
@@ -120,6 +146,17 @@ export function OrcamentosView({ orcamentosIniciais, unidades = [], tabelaPrecos
           </div>
         )}
       </div>
+
+      {trocaAberta && (
+        <TrocaModal
+          valores={valoresTroca}
+          unidades={unidades}
+          bonusSeminovo={bonusSeminovo}
+          corteBateria={corteBateria}
+          onClose={() => setTrocaAberta(false)}
+          onSaved={() => router.refresh()}
+        />
+      )}
 
       {editor && (
         <OrcamentoEditorModal

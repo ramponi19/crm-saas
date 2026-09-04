@@ -4043,6 +4043,7 @@ export type Database = {
           tipo: string
           token: string
           total: number
+          troca_cotacao_id: number | null
           unidade_id: number | null
           usuario_id: string | null
           valor_devolver: number
@@ -4075,6 +4076,7 @@ export type Database = {
           tipo?: string
           token?: string
           total?: number
+          troca_cotacao_id?: number | null
           unidade_id?: number | null
           usuario_id?: string | null
           valor_devolver?: number
@@ -4107,6 +4109,7 @@ export type Database = {
           tipo?: string
           token?: string
           total?: number
+          troca_cotacao_id?: number | null
           unidade_id?: number | null
           usuario_id?: string | null
           valor_devolver?: number
@@ -4147,6 +4150,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
+            columns: ["troca_cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "troca_cotacoes"
             referencedColumns: ["id"]
           },
           {
@@ -5531,11 +5541,13 @@ export type Database = {
           lead_id: number | null
           modelo: string
           na_troca: number
+          numero: number | null
           observacoes: string | null
-          orcamento_id: number | null
           status: string
+          usada_em: string | null
           usuario_id: string | null
           valor_final: number
+          venda_id: number | null
         }
         Insert: {
           armazenamento?: string
@@ -5553,11 +5565,13 @@ export type Database = {
           lead_id?: number | null
           modelo: string
           na_troca?: number
+          numero?: number | null
           observacoes?: string | null
-          orcamento_id?: number | null
           status?: string
+          usada_em?: string | null
           usuario_id?: string | null
           valor_final?: number
+          venda_id?: number | null
         }
         Update: {
           armazenamento?: string
@@ -5575,11 +5589,13 @@ export type Database = {
           lead_id?: number | null
           modelo?: string
           na_troca?: number
+          numero?: number | null
           observacoes?: string | null
-          orcamento_id?: number | null
           status?: string
+          usada_em?: string | null
           usuario_id?: string | null
           valor_final?: number
+          venda_id?: number | null
         }
         Relationships: [
           {
@@ -5618,17 +5634,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "troca_cotacoes_orcamento_id_fkey"
-            columns: ["orcamento_id"]
-            isOneToOne: false
-            referencedRelation: "orcamentos"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "troca_cotacoes_usuario_id_fkey"
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "troca_cotacoes_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]

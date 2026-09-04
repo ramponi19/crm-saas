@@ -2,6 +2,9 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
+import { chaveLinha } from '@/lib/troca-modelos'
+import type { ValoresDoModelo } from '@/components/modules/orcamentos/avaliar-aparelho'
 import { OrcamentosView, type Orcamento, type UnidadeOpt, type PrecoRef } from './orcamentos-view'
 
 export const metadata = { title: 'Orçamentos' }
@@ -56,5 +59,44 @@ export default async function OrcamentosPage() {
 
   const tabelaPrecos = ((tabelaRaw ?? []) as unknown as PrecoRef[])
 
-  return <OrcamentosView orcamentosIniciais={orcamentos} segmento={normalizarSegmento(emp?.segmento)} unidades={unidades} tabelaPrecos={tabelaPrecos} />
+  /**
+   * A matriz de troca e as regras — só quando o módulo está liberado.
+   *
+   * Buscar sempre custaria duas consultas em todo tenant para servir um. E o
+   * `trocaLiberada` é a MESMA pergunta que o layout faz para desenhar as abas:
+   * respondida por `lib/troca-acesso`, num lugar só.
+   */
+  const trocaLiberada = await cotacaoDeTrocaLiberada()
+  const valoresTroca: Record<string, ValoresDoModelo> = {}
+  let bonusSeminovo = 0
+  let corteBateria = 80
+  if (trocaLiberada) {
+    const [{ data: tp }, { data: tr }] = await Promise.all([
+      supabase.from('troca_precos').select('modelo, armazenamento, na_troca, descontos')
+        .eq('empresa_id', empresaId).eq('ativo', true),
+      supabase.from('troca_regras').select('bonus_seminovo, corte_bateria')
+        .eq('empresa_id', empresaId).maybeSingle(),
+    ])
+    for (const p of tp ?? []) {
+      valoresTroca[chaveLinha(p.modelo, p.armazenamento ?? '')] = {
+        na_troca: p.na_troca == null ? null : Number(p.na_troca),
+        descontos: (p.descontos ?? {}) as Record<string, number>,
+      }
+    }
+    bonusSeminovo = Number(tr?.bonus_seminovo) || 0
+    corteBateria = tr?.corte_bateria ?? 80
+  }
+
+  return (
+    <OrcamentosView
+      orcamentosIniciais={orcamentos}
+      segmento={normalizarSegmento(emp?.segmento)}
+      unidades={unidades}
+      tabelaPrecos={tabelaPrecos}
+      trocaLiberada={trocaLiberada}
+      valoresTroca={valoresTroca}
+      bonusSeminovo={bonusSeminovo}
+      corteBateria={corteBateria}
+    />
+  )
 }

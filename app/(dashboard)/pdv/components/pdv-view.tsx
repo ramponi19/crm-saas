@@ -56,8 +56,24 @@ interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; l
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
 interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
-/** Aparelho entregue na troca. `valor` fica string porque vem de <input>. */
-interface TrocaItem { aparelho: string; imei: string; valor: string }
+/**
+ * Aparelho entregue na troca. `valor` fica string porque vem de <input>.
+ *
+ * `cotacaoId`/`cotacaoNumero` aparecem quando a linha foi preenchida por CÓDIGO
+ * — o número que a cotação de Upgrade/Downgrade gerou. Guardar o id é o que
+ * permite marcar a cotação como usada no fechamento e impedir que o mesmo
+ * abatimento entre em duas vendas.
+ */
+interface TrocaItem {
+  aparelho: string
+  imei: string
+  valor: string
+  codigo?: string
+  cotacaoId?: number | null
+  cotacaoNumero?: number | null
+  /** A cotação já tinha sido consumida em outra venda. Só avisa; não bloqueia. */
+  cotacaoJaUsada?: boolean
+}
 /**
  * Contexto da venda fechada, guardado para emitir o documento escolhido.
  * Inclui `empresaId` porque ele é resolvido dentro do fechamento.
@@ -119,6 +135,47 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   // seu valor, e a soma abate do total.
   const [trocaAtiva, setTrocaAtiva] = useState(false)
   const [trocas, setTrocas] = useState<TrocaItem[]>([{ aparelho: '', imei: '', valor: '' }])
+  /** Índice da linha cujo código está sendo buscado — para o "buscando…". */
+  const [buscandoCodigo, setBuscandoCodigo] = useState<number | null>(null)
+
+  /**
+   * O CÓDIGO DA COTAÇÃO preenche a linha da troca.
+   *
+   * Pedido do dono: "quando for realizar a venda do aparelho digitar o codigo e
+   * ja vir o valor de abatimento". O ganho não é digitar menos — é o valor do
+   * usado chegar EXATAMENTE como foi cotado. Redigitado com o cliente na frente,
+   * ele muda; e muda sempre para cima.
+   *
+   * A cotação já usada não bloqueia: existe caso legítimo (venda cancelada e
+   * refeita). Ela avisa, e quem decide é o vendedor — mas o aviso é vermelho,
+   * porque abater duas vezes é dinheiro saindo duas vezes.
+   */
+  async function aplicarCodigoTroca(i: number, codigo: string) {
+    const limpo = codigo.replace(/\D/g, '')
+    if (!limpo) return
+    setBuscandoCodigo(i)
+    const r = await fetch(`/api/troca/cotacoes/buscar?numero=${limpo}`)
+    setBuscandoCodigo(null)
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) { notify.bad('Código não encontrado', j.error); return }
+
+    setTrocas((ts) => ts.map((x, k) => (k === i ? {
+      ...x,
+      aparelho: j.aparelho,
+      imei: j.imei || x.imei,
+      valor: String(j.valor),
+      codigo: String(j.numero),
+      cotacaoId: j.id,
+      cotacaoNumero: j.numero,
+      cotacaoJaUsada: !!j.ja_usada,
+    } : x)))
+
+    if (j.ja_usada) {
+      notify.warn(`Cotação #${j.numero} JÁ FOI USADA`, 'Confira antes de fechar — o abatimento pode sair em dobro.')
+    } else {
+      notify.ok(`Cotação #${j.numero}`, `${j.aparelho} · ${fmt(j.valor)}`)
+    }
+  }
   // #2 entrega pendente (semi-novo que não sai na hora)
   const [entregaPendente, setEntregaPendente] = useState(false)
   // Termo de garantia a assinar. Marcado aqui, a venda entra na fila de Garantia
@@ -527,6 +584,25 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           observacoes: `${t.aparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
           ativo: true,
         } as never)
+      }
+
+      /**
+       * A cotação usada é MARCADA — é o que impede abater duas vezes.
+       *
+       * O código vale dinheiro: digitado em duas vendas, o cliente recebe o
+       * abatimento duas vezes e ninguém percebe até o fechamento do mês. A
+       * marca é o que faz a próxima leitura do código dizer "já usada".
+       *
+       * `is('usada_em', null)` no filtro: marcar de novo apagaria a venda
+       * original de uma cotação reaproveitada, e é justamente a primeira que
+       * interessa para auditar.
+       */
+      for (const t of trocasValidas) {
+        if (!t.cotacaoId) continue
+        await supabase.from('troca_cotacoes')
+          .update({ usada_em: new Date().toISOString(), venda_id: primeiraVendaId } as never)
+          .eq('id', t.cotacaoId)
+          .is('usada_em', null)
       }
 
       // Pagamentos do fechamento, na primeira venda do grupo: as formas que o
@@ -1209,6 +1285,30 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 <div className="mt-2.5 space-y-2.5">
                   {trocas.map((t, i) => (
                     <div key={i} className="space-y-2 rounded-control border border-line-soft bg-raised p-2">
+                      {/* CÓDIGO DA COTAÇÃO — o caminho curto. Preenche aparelho,
+                          IMEI e valor com o que foi cotado no atendimento, em vez
+                          de o vendedor redigitar o valor do usado na frente do
+                          cliente. Os campos abaixo seguem editáveis: cotação é
+                          ponto de partida, não camisa de força. */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={t.codigo ?? ''}
+                          inputMode="numeric"
+                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, codigo: e.target.value } : x)))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicarCodigoTroca(i, e.currentTarget.value) } }}
+                          onBlur={(e) => { if (e.target.value && t.cotacaoNumero == null) void aplicarCodigoTroca(i, e.target.value) }}
+                          placeholder="Código da cotação"
+                          aria-label={`Código da cotação do aparelho ${i + 1}`}
+                          className="num h-9 w-[150px] flex-none rounded-control border border-dashed border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-solid focus:border-accent" />
+                        {buscandoCodigo === i
+                          ? <span className="text-[11.5px] text-ink-3">buscando…</span>
+                          : t.cotacaoNumero != null && (
+                            <span className={cn('text-[11.5px] font-medium', t.cotacaoJaUsada ? 'text-bad' : 'text-ok')}>
+                              {t.cotacaoJaUsada ? `#${t.cotacaoNumero} já usada` : `#${t.cotacaoNumero} aplicada`}
+                            </span>
+                          )}
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <input value={t.aparelho}
                           onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, aparelho: e.target.value } : x)))}

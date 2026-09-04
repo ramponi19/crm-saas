@@ -1,18 +1,14 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { temHrefLiberado, type MenuOverrideRow } from '@/lib/menu'
+import { temHrefLiberado, HREF_COTACAO_TROCA, type MenuOverrideRow } from '@/lib/menu'
 
 /**
- * O href que liga a cotação de troca para uma empresa.
+ * Reexportado para as telas de servidor que só falam com este módulo.
  *
- * Não está no CATALOGO de propósito: a cotação é ABA de Orçamentos, não item de
- * sidebar (foi a escolha do dono — um menu só, abas dentro). Como href fora do
- * catálogo, ele libera a aba e não desenha nada no menu. Ver
- * `MenuOverridesSuperadmin.habilitados`.
- *
- * É também a rota real (`/orcamentos/cotacao`), então o href não é uma etiqueta
- * inventada: é o endereço da tela que ele libera.
+ * A constante mora em `lib/menu.ts` porque componente de CLIENTE (o painel de
+ * orçamentos do lead) também precisa dela, e este arquivo importa
+ * `lib/supabase/server` — que não atravessa a fronteira do cliente.
  */
-export const HREF_COTACAO_TROCA = '/orcamentos/cotacao'
+export { HREF_COTACAO_TROCA }
 
 /**
  * Esta empresa tem a cotação de troca?
