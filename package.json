@@ -11,8 +11,9 @@
     "types:gen": "supabase gen types typescript --project-id guiuzbcqkvelqcuogxtd > types/database.ts",
     "db:sync": "npm run types:gen && npm run type-check",
     "check:nucleo": "node scripts/check-nucleo.mjs",
-    "check": "npm run check:nucleo && npm run check:avisos && npm run type-check",
-    "check:avisos": "node scripts/check-avisos.mjs"
+    "check": "npm run check:nucleo && npm run check:avisos && npm run type-check && npm run check:edge",
+    "check:avisos": "node scripts/check-avisos.mjs",
+    "check:edge": "deno check --no-lock \"supabase/functions/*/index.ts\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
