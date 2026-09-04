@@ -76,7 +76,14 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
     const empresaId = await empresaAtualId(supabase)
     const [{ data }, { data: emp }] = await Promise.all([
       supabase.from('orcamentos')
-        .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes!troca_cotacao_id(numero)')
+        // O embed é nomeado pela CONSTRAINT. O hint pela coluna
+        // (`!troca_cotacao_id`) também resolve — medido nos dois —, mas o nome da
+        // constraint é único por definição, então não passa a ambíguo no dia em
+        // que aparecer uma segunda FK entre as mesmas tabelas.
+        //
+        // Hint que o PostgREST não resolve falha ALTO, com PGRST200 ("no matches
+        // were found"), não em silêncio — conferido com um hint inventado.
+        .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
         .eq('lead_id', leadId).order('created_at', { ascending: false }),
       empresaId
         ? supabase.from('empresas').select('menu_override').eq('id', empresaId).maybeSingle()
