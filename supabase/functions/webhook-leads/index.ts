@@ -138,6 +138,14 @@ type Canal = {
   via: string;
   /** Loja que o canal atende. Nulo = da rede. Usado para achar a Pagina certa. */
   filial_id: number | null;
+  /**
+   * Nome da conta/pagina como o lojista a conhece ("@jmstore_jaguariuna").
+   *
+   * Entra por causa da mensagem de erro: dizer "a conta X nao conhece esta
+   * conversa" e o que permite ao vendedor entender que a resposta saiu pela
+   * conta da outra loja. Sem o nome, o erro nao aponta para nada.
+   */
+  nome_exibicao: string | null;
 };
 const cache = new Map<string, Canal | null>();
 
@@ -148,6 +156,7 @@ function montar(data: Record<string, unknown>, token: string | null): Canal {
     token, coexistencia: !!data.coexistencia,
     via: (data.via as string | null) ?? "pagina",
     filial_id: (data.filial_id as number | null) ?? null,
+    nome_exibicao: (data.nome_exibicao as string | null) ?? null,
   };
 }
 
@@ -170,7 +179,7 @@ async function eventoOrfao(tipo: string, externalId: string | undefined, campo: 
 }
 
 /** Colunas que `montar` espera. Uma lista so, para os dois caminhos de busca. */
-const COLUNAS = "id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id";
+const COLUNAS = "id, empresa_id, tipo, external_id, waba_id, access_token_enc, coexistencia, via, filial_id, nome_exibicao";
 
 async function canalPorExternalId(tipo: string, externalId: string | undefined): Promise<Canal | null> {
   if (!externalId) return null;
@@ -210,7 +219,50 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
 // Escolhe o canal de ENVIO da empresa. Uma empresa pode ter mais de um número ou
 // página no mesmo canal, então aqui NÃO se usa maybeSingle (que erra com 2 linhas
 // e derrubaria o envio) — pega o conectado mais recentemente, de forma determinística.
-async function canalPorEmpresa(empresaId: number, tipo: string): Promise<Canal | null> {
+/**
+ * O CANAL PELO QUAL RESPONDER — o da LOJA do lead, não "o mais recente".
+ *
+ * ══ O BUG QUE ISTO CONSERTA (04/09/2026) ═══════════════════════════════════
+ *
+ * Isto era `canalPorEmpresa(empresaId, tipo)`: filtrava empresa + tipo e pegava
+ * `order by conectado_em desc limit 1`. Com UMA loja funciona. Com duas, sempre
+ * devolve o canal conectado por último — para TODOS os leads da empresa.
+ *
+ * A JM tem dois Instagram: `@jmstore_importados` (Mogi, filial 3, conectado
+ * 27/08 17:30) e `@jmstore_jaguariuna` (Jaguariúna, filial 6, conectado 28/08
+ * 11:28). Desde 28/08 11:28 toda resposta de Instagram saía pela conta de
+ * Jaguariúna — inclusive para os 104 leads de Mogi.
+ *
+ * E o IGSID/PSID do destinatário é escopado à CONTA que recebeu a conversa.
+ * Mandar o id de um lead de Mogi pela conta de Jaguariúna faz a Meta responder
+ * `(#100) No matching user found` — que em pt-BR chega como
+ * **"Não foi possível encontrar o usuário solicitado"**, o erro que o vendedor
+ * viu hoje às 09:12 tentando responder a lead 2239.
+ *
+ * Ficou 7 dias invisível porque a equipe responde quase tudo pelo celular:
+ * 1.631 mensagens de Instagram pelo aparelho contra 73 pelo CRM em Mogi. A
+ * última que saiu do CRM em Jaguariúna é de 28/08 11:29 — um minuto depois de o
+ * canal ser conectado.
+ *
+ * ══ A REGRA ════════════════════════════════════════════════════════════════
+ *
+ * Prefere o canal da loja do lead. Sem canal naquela loja, cai no mais recente
+ * da empresa — que é o comportamento antigo, e é o certo para quem tem uma loja
+ * só ou um canal sem loja definida (o Messenger da JM é `filial_id` nulo).
+ *
+ * Vale para WhatsApp também. Hoje a JM tem só o número de Mogi, então lá não
+ * quebra — mas quebraria igual no dia em que Jaguariúna ganhar o seu.
+ */
+async function canalDaLoja(empresaId: number, tipo: string, filialId: number | null): Promise<Canal | null> {
+  if (filialId != null) {
+    const { data } = await db.from("canais_conectados")
+      .select(COLUNAS)
+      .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
+      .eq("filial_id", filialId)
+      .order("conectado_em", { ascending: false }).limit(1);
+    const daLoja = data?.[0];
+    if (daLoja) return montar(daLoja, await decifrarToken(daLoja.access_token_enc as string | null));
+  }
   const { data } = await db.from("canais_conectados")
     .select(COLUNAS)
     .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
@@ -1093,8 +1145,40 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
   });
   const data = await r.json();
   if (!r.ok) {
-    const msg = data?.error?.message ?? `erro ao enviar pelo ${nomeCanal}`;
-    if (data?.error?.code === 190) await marcarErroNoCanal(canal.id, msg, "expirado");
+    const cod = data?.error?.code as number | undefined;
+    const cru = data?.error?.message ?? `erro ao enviar pelo ${nomeCanal}`;
+    let msg = cru;
+
+    /**
+     * ESTE ERRO FICOU 7 DIAS INVISÍVEL. Não repetir a omissão.
+     *
+     * O caminho de falha só fazia `return json({error})` — sem log. Resultado:
+     * de 28/08 a 04/09 toda resposta de Instagram a lead de Mogi falhou, e não
+     * havia uma linha em log nenhum. O que apareceu foi o vendedor avisando.
+     */
+    console.error("envio_meta_falhou", JSON.stringify({
+      canal: canal.id, tipo: canal.tipo, via: canal.via, filial: canal.filial_id,
+      lead: leadId, destinatario: origemId, http: r.status, codigo: cod, meta: cru,
+    }));
+
+    if (cod === 190) await marcarErroNoCanal(canal.id, msg, "expirado");
+
+    /**
+     * `(#100) No matching user found` — em pt-BR "Não foi possível encontrar o
+     * usuário solicitado". O id do destinatário é escopado à CONTA que recebeu
+     * a conversa: este erro significa que a mensagem saiu pela conta errada, ou
+     * que a pessoa apagou/bloqueou o perfil.
+     *
+     * A mensagem crua da Meta não diz nada disso a quem está no balcão. Trocada
+     * por uma que diz o que fazer — e que nomeia a conta usada, porque foi
+     * exatamente essa informação que faltou para achar o problema hoje.
+     */
+    if (cod === 100) {
+      msg = `A ${nomeCanal === "instagram" ? "conta" : "página"} "${canal.nome_exibicao ?? canal.external_id}" `
+          + "não conhece esta conversa. Ou ela pertence a outra loja, ou a pessoa apagou/bloqueou o perfil. "
+          + "Se a loja tem mais de uma conta conectada, confira em Canais qual está ligada a esta loja.";
+    }
+
     return json({ error: msg }, r.status);
   }
   await db.from("lead_mensagens").insert([{
@@ -1136,15 +1220,20 @@ serve(async (req: Request) => {
       const leadId = body.leadId as string | undefined;
       if (!leadId) return json({ error: "leadId obrigatório" }, 400);
 
+      // `filial_id` do lead entra no SELECT: é ele que diz por qual conta
+      // responder. Sem ele, a escolha do canal caía no "conectado por último".
       const { data: lead } = await db.from("leads")
-        .select("id, empresa_id, origem_id").eq("id", leadId).maybeSingle();
+        .select("id, empresa_id, origem_id, filial_id").eq("id", leadId).maybeSingle();
       if (!lead) return json({ error: "lead não encontrado" }, 404);
 
       const usuario = await usuarioDoEnvio(req, lead.empresa_id as number);
       if (!usuario) return json({ error: "não autorizado" }, 401);
 
+      const empresaId = lead.empresa_id as number;
+      const lojaDoLead = (lead.filial_id as number | null) ?? null;
+
       if (action === "send_template") {
-        const canal = await canalPorEmpresa(lead.empresa_id as number, "whatsapp");
+        const canal = await canalDaLoja(empresaId, "whatsapp", lojaDoLead);
         if (!canal) return json({ error: "WhatsApp não conectado nesta empresa" }, 502);
         return await enviarModelo(canal, body, usuario.id);
       }
@@ -1153,11 +1242,21 @@ serve(async (req: Request) => {
         if (!body.number || (!body.text && !body.midiaUrl)) {
           return json({ error: "number e text ou midiaUrl são obrigatórios" }, 400);
         }
-        const canal = (await canalPorEmpresa(lead.empresa_id as number, "whatsapp")) ?? {
-          id: 0, empresa_id: lead.empresa_id as number, tipo: "whatsapp",
+        /**
+         * Canal "vazio" quando a empresa não tem WhatsApp conectado.
+         *
+         * `enviarWhatsApp` sabe lidar com isso (sem token ele devolve a
+         * orientação de conectar). O objeto precisa estar COMPLETO: faltavam
+         * `via` e `filial_id`, e a linha seguinte lê `canal.filial_id` — que
+         * chegava `undefined` na assinatura. Passou porque esta função fica
+         * FORA do `tsc` do projeto (só o Deno a compila, no deploy).
+         */
+        const canal: Canal = (await canalDaLoja(empresaId, "whatsapp", lojaDoLead)) ?? {
+          id: 0, empresa_id: empresaId, tipo: "whatsapp",
           external_id: "", waba_id: null, token: null, coexistencia: false,
+          via: "pagina", filial_id: lojaDoLead, nome_exibicao: null,
         };
-        return await enviarWhatsApp(canal, body, await assinaturaDe(lead.empresa_id as number, usuario.nome, true, canal.filial_id), usuario.id);
+        return await enviarWhatsApp(canal, body, await assinaturaDe(empresaId, usuario.nome, true, canal.filial_id), usuario.id);
       }
 
       const nomeCanal = body.canal as string | undefined;
@@ -1166,10 +1265,10 @@ serve(async (req: Request) => {
       }
       if (!body.texto && !body.midiaUrl) return json({ error: "texto ou midiaUrl" }, 400);
       if (!lead.origem_id) return json({ error: "lead sem origem_id" }, 400);
-      const canal = await canalPorEmpresa(lead.empresa_id as number, nomeCanal);
+      const canal = await canalDaLoja(empresaId, nomeCanal, lojaDoLead);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
       return await enviarMeta(canal, String(lead.origem_id), body,
-        await assinaturaDe(lead.empresa_id as number, usuario.nome, true, canal.filial_id), usuario.id);
+        await assinaturaDe(empresaId, usuario.nome, true, canal.filial_id), usuario.id);
     } catch (e) {
       console.error("envio:", e);
       return json({ error: (e as Error).message }, 500);
