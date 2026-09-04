@@ -76,7 +76,21 @@ async function decifrarToken(cifrado: string | null): Promise<string | null> {
     const ct = Uint8Array.from(atob(ctB64), (c) => c.charCodeAt(0));
     const juntos = new Uint8Array(ct.length + tag.length);
     juntos.set(ct); juntos.set(tag, ct.length);
-    const key = await crypto.subtle.importKey("raw", bytesDaChave(CHANNEL_KEY_RAW), "AES-GCM", false, ["decrypt"]);
+    /**
+     * O `as BufferSource` é variância de TIPO, não conserto de comportamento.
+     *
+     * Nas versões novas do TS, `Uint8Array` é genérico no buffer:
+     * `Uint8Array.from(...)` produz `Uint8Array<ArrayBufferLike>`, e
+     * `BufferSource` exige `ArrayBufferView<ArrayBuffer>` — daí a reclamação de
+     * que `SharedArrayBuffer` não serviria. Aqui não pode ser um: o buffer é
+     * construído duas linhas acima, dentro de `bytesDaChave`.
+     *
+     * Anotação em vez de mexer no corpo de `bytesDaChave` de propósito: esta
+     * função decifra o token de TODOS os canais, e uma anotação é apagada na
+     * compilação — não muda um byte do que roda.
+     */
+    const key = await crypto.subtle.importKey(
+      "raw", bytesDaChave(CHANNEL_KEY_RAW) as BufferSource, "AES-GCM", false, ["decrypt"]);
     return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, juntos));
   } catch (e) {
     console.error("decifrarToken falhou:", (e as Error).message);
@@ -167,7 +181,11 @@ function montar(data: Record<string, unknown>, token: string | null): Canal {
 // Agora sobra registro: fica no log da função e numa linha de diagnóstico, para
 // eu conseguir dizer QUANTAS e DE QUAL id se perderam — e reconectar sabendo.
 // Nunca quebra o recebimento: falha ao registrar é ignorada de propósito.
-async function eventoOrfao(tipo: string, externalId: string | undefined, campo: string | null) {
+// `campo` aceita `undefined` porque é o que os chamadores têm: ele sai de um
+// campo opcional do payload do webhook. Declarado só como `string | null`, o
+// `deno check` reclamava — e a conversão no chamador seria mentira, porque o
+// valor realmente pode não vir.
+async function eventoOrfao(tipo: string, externalId: string | undefined, campo: string | null | undefined) {
   console.error(`evento orfao: ${tipo} id=${externalId ?? "(sem id)"} campo=${campo ?? "-"} — nenhum canal conectado com este id`);
   try {
     await db.from("diagnostico_canais").insert({

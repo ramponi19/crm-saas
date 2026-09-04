@@ -47,3 +47,10 @@ supabase/.temp/
 # Arquivo pessoal do Lucas (backups, videos de App Review, chaves) — 763MB que
 # NUNCA podem entrar num commit: ha token, chave SSH e codigos MFA la dentro.
 /arquivos/
+
+# O `deno check` da Edge Function roda com --no-lock: um lock aqui fixaria
+# `@supabase/supabase-js@2` numa versao exata, e o bundler do
+# `supabase functions deploy` resolve o `@2` flutuante por conta propria — hash
+# divergente faria o deploy da funcao falhar. Fixar versao, se for o caso, se faz
+# no import do codigo, deliberadamente; nao de raspao por um arquivo de cache.
+deno.lock
