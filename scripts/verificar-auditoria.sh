@@ -26,8 +26,10 @@ v "garantia calculada pelo IMEI"         "app/(dashboard)/assistencia/components
 v "garantia procura pela unidade"        "app/(dashboard)/assistencia/components/os-modal.tsx" "inventario_unidades"
 v "financeiro avisa das vendas"          "app/(dashboard)/financeiro/components/financeiro-view.tsx" "As vendas não entram"
 v "relatorio avisa custo faltando"       "components/modules/relatorios/relatorios-view.tsx" "sem custo lançado"
-v "encomenda avisa custo zero"           "components/modules/pdv/encomenda-modal.tsx" "Encomenda sem custo de compra"
-v "encomenda exige preco de venda"       "components/modules/pdv/encomenda-modal.tsx" "Informe quanto o cliente vai pagar"
+v "encomenda exige decisao de custo"     "components/modules/pdv/encomenda-form.tsx" "Falta o custo de compra"
+v "encomenda exige preco de venda"       "components/modules/pdv/encomenda-form.tsx" "Informe quanto o cliente vai pagar"
+v "encomenda grava o prazo prometido"    "components/modules/pdv/encomenda-form.tsx" "previsao_entrega: prazo"
+v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"
@@ -53,7 +55,7 @@ v "estoque grava quem deu entrada"    "app/(dashboard)/estoque/components/estoqu
 v "PDV amarra a peca na venda"        "app/(dashboard)/pdv/components/pdv-view.tsx" "unidade_id: c.item.id,"
 v "PDV nao chama recebido de venda"   "app/(dashboard)/pdv/components/pdv-view.tsx" "Recebido do cliente"
 v "pagina publica mostra o item"      "app/orcamento/[token]/orcamento-view.tsx" "dados.tipo === 'venda' &&"
-v "encomenda copia a serie"           "components/modules/historico/historico-view.tsx" "serieDaUnidade"
+v "encomenda copia a serie"           "lib/encomendas.ts" "serieDaUnidade"
 v "datas: helper existe"              "lib/datas.ts" "SO_DATA"
 v "compras usa o helper"              "app/(dashboard)/compras/components/compras-view.tsx" "formatarDiaMes"
 # A tela /chaves saiu (21/08/2026); a regra da data pura mudou de casa junto.

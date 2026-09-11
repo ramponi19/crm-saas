@@ -3,6 +3,7 @@ import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { TOLERANCIA_PADRAO } from '@/lib/troca-referencia'
 import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
+import type { EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'PDV' }
@@ -36,6 +37,7 @@ export default async function PDVPage() {
     usuarioRes,
     { data: tabelaPrecos },
     { data: cfgTroca },
+    { data: encomendasRaw },
   ] = await Promise.all([
     supabase
       .from('inventario_unidades')
@@ -68,6 +70,21 @@ export default async function PDVPage() {
       .eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('configuracoes_sistema').select('valor')
       .eq('empresa_id', empresaId).eq('chave', 'troca').maybeSingle(),
+    /**
+     * ENCOMENDAS EM ABERTO — a aba nova do PDV.
+     *
+     * Sem limite de propósito: é uma lista de pendências, não um histórico. As
+     * três da JM estavam paradas há 28, 21 e 1 dia sem ninguém ver — cortar a
+     * lista seria recriar o problema com outro nome.
+     *
+     * O embed de `vendas_pagamentos` traz o sinal já pago; o de
+     * `pedidos_compra`, se a peça chegou.
+     */
+    supabase.from('vendas')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra!pedido_compra_id(id, status, fornecedor_id), vendas_pagamentos(valor_pago)')
+      .eq('empresa_id', empresaId)
+      .in('status', ['encomenda', 'pendente_entrega'])
+      .order('previsao_entrega', { ascending: true, nullsFirst: false }),
   ])
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
@@ -126,6 +143,40 @@ export default async function PDVPage() {
     produto_nome: one(v.produtos)?.nome ?? '—',
   }))
 
+  type EncomendaRow = {
+    id: number; valor_venda: number | null; valor_custo: number | null
+    previsao_entrega: string | null; status: string | null; observacoes: string | null
+    unidade_id: number | null; data_venda: string | null
+    clientes: Embed<{ nome: string | null; telefone: string | null }>
+    produtos: Embed<{ nome: string | null }>
+    pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null }>
+    vendas_pagamentos: { valor_pago: number | null }[] | null
+  }
+  const encomendas: EncomendaPDV[] = ((encomendasRaw ?? []) as unknown as EncomendaRow[]).map((v) => {
+    const ped = one(v.pedidos_compra)
+    return {
+      id: v.id,
+      cliente_nome: one(v.clientes)?.nome ?? 'Sem cliente',
+      cliente_telefone: one(v.clientes)?.telefone ?? null,
+      // O nome do produto vem do cadastro quando existe; senão, do texto que o
+      // vendedor digitou ("Encomenda: iPhone 17 256GB Lavanda."), que é o caso
+      // de produto que a loja ainda não cadastrou.
+      produto_nome: one(v.produtos)?.nome
+        ?? (v.observacoes?.replace(/^Encomenda:\s*/i, '').split('.')[0]?.trim() || 'Produto não identificado'),
+      valor_venda: Number(v.valor_venda) || 0,
+      valor_custo: Number(v.valor_custo) || 0,
+      previsao_entrega: v.previsao_entrega,
+      status: v.status ?? 'encomenda',
+      unidade_id: v.unidade_id,
+      lancada_em: v.data_venda,
+      pedido_id: ped?.id ?? null,
+      status_pedido: ped?.status ?? null,
+      tem_fornecedor: ped?.fornecedor_id != null,
+      // Somado aqui, no servidor: a lista só precisa do total já pago.
+      sinal_pago: (v.vendas_pagamentos ?? []).reduce((s, p) => s + (Number(p.valor_pago) || 0), 0),
+    }
+  })
+
   return (
     <>
       <Topbar eyebrow="VENDAS" title="PDV — Ponto de Venda" />
@@ -145,6 +196,7 @@ export default async function PDVPage() {
           isAdmin={isAdmin}
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
+          encomendas={encomendas}
         documentos={documentos} />
       </div>
     </>

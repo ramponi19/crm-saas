@@ -10,7 +10,9 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
-import { EncomendaModal } from '@/components/modules/pdv/encomenda-modal'
+import { EncomendaForm } from '@/components/modules/pdv/encomenda-form'
+import { EncomendasAbertas, type EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
+import { diagnosticar } from '@/lib/encomendas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
@@ -54,7 +56,7 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /**
  * Aparelho entregue na troca. `valor` fica string porque vem de <input>.
@@ -91,14 +93,28 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
   // Comanda é comportamento (mesa/balcão), não segmento: bar, cafeteria e
   // qualquer atendimento por mesa usam o mesmo campo.
   const isFood = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaComanda
   const [comanda, setComanda] = useState('')
   // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
   const [agora] = useState(() => Date.now())
-  const [encomendaOpen, setEncomendaOpen] = useState(false)
+  /**
+   * AS DUAS NATUREZAS DE VENDA DO BALCÃO.
+   *
+   * `pronta` é vender o que está na prateleira: escaneia, cobra, entrega.
+   * `encomenda` é vender o que a loja ainda não tem — outro ritmo, outro
+   * conjunto de campos (prazo, sinal, fornecedor) e, sobretudo, um depois: a
+   * venda fica pendente até a peça chegar. Misturar as duas na mesma tela era o
+   * que fazia a encomenda virar um botão discreto e as pendências sumirem.
+   */
+  const [aba, setAba] = useState<'pronta' | 'encomenda'>('pronta')
+  /** Só para pintar o contador da aba de vermelho quando há algo estourado. */
+  const encomendasAtrasadas = useMemo(
+    () => encomendas.filter((e) => diagnosticar(e).situacao === 'atrasada').length,
+    [encomendas],
+  )
   const supabase = createClient()
   const router = useRouter()
 
@@ -959,7 +975,43 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       </Modal>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
-        <div className="mx-auto grid max-w-[1320px] grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
+        <div className="mx-auto max-w-[1320px]">
+
+        {/* ── AS DUAS ABAS DO PDV ── */}
+        <div className="mb-5 flex items-center gap-1 border-b border-line">
+          {([
+            ['pronta', 'Pronta Entrega', null],
+            ['encomenda', 'Encomenda', encomendas.length || null],
+          ] as const).map(([k, label, n]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setAba(k)}
+              className={cn(
+                'relative -mb-px flex items-center gap-2 border-b-2 px-3.5 pb-2.5 pt-1 text-[13.5px] font-semibold transition-colors',
+                aba === k ? 'border-ink text-ink' : 'border-transparent text-ink-3 hover:text-ink-2',
+              )}
+            >
+              {label}
+              {n ? (
+                <span className={cn(
+                  'num rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-bold',
+                  // Vermelho só quando há atraso: contador colorido que nunca
+                  // muda de cor deixa de ser lido depois da primeira semana.
+                  encomendasAtrasadas > 0 ? 'bg-bad-soft text-bad' : 'bg-ink/[0.06] text-ink-2',
+                )}>{n}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+
+        {aba === 'encomenda' ? (
+          <div className="mx-auto max-w-[720px] space-y-4">
+            <EncomendaForm clientes={clientes} fornecedores={fornecedores} isAdmin={isAdmin} />
+            <EncomendasAbertas encomendas={encomendas} />
+          </div>
+        ) : (
+        <div className="grid grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
 
           {/* ── ESQUERDA: catálogo ── */}
           <div>
@@ -989,9 +1041,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 placeholder="Escaneie o código de barras ou busque um produto…"
                 className="h-11 text-[14px]"
               />
-              <Button variant="outline" className="h-11 shrink-0" icon={<Package size={16} strokeWidth={1.7} />} onClick={() => setEncomendaOpen(true)}>Encomenda</Button>
             </div>
-            {encomendaOpen && <EncomendaModal clientes={clientes} fornecedores={fornecedores} isAdmin={isAdmin} onClose={() => setEncomendaOpen(false)} />}
 
             {abaCat === 'reservas' && reservas.length > 0 ? (
               <div className="space-y-2.5">
@@ -1497,6 +1547,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               {finalizando ? 'Finalizando…' : `Finalizar venda · ${fmt(resumoPag.cobrado || totais.total)}`}
             </Button>
           </div>
+        </div>
+        )}
         </div>
       </div>
     </>
