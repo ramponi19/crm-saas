@@ -651,6 +651,28 @@ async function extrairMidiaMeta(
     const aUrl = (a?.payload as Record<string, unknown> | undefined)?.url as string | undefined;
     rotulo = ROTULO_ANEXO[aType] ?? "";
 
+    /**
+     * O STORY QUE A PRÓPRIA LOJA POSTOU NÃO É ANEXO DE CONVERSA.
+     *
+     * Quando a JM publica um story e marca contatos, chega um echo de
+     * `story_mention` POR MENÇÃO — e cada um baixava o mesmo vídeo de novo.
+     * Medido em 11/09/2026: 80 arquivos para 38 vídeos, 203 MB, 15% do bucket
+     * inteiro. Um story de 13 MB virou 39 MB. As cinco cópias de um deles
+     * nasceram entre 11:18:24 e 11:18:26 — três segundos.
+     *
+     * E o conteúdo é a peça de divulgação da própria loja, numa conversa que em
+     * boa parte é com as contas da própria equipe. A loja sabe o que publicou; o
+     * story saiu do ar em 24h. O que o CRM precisa guardar é o FATO ("marcamos
+     * este contato no story"), que cabe numa linha.
+     *
+     * ⚠️ Só o ECHO. O story RECEBIDO — cliente marcando a loja — continua
+     * baixando: é divulgação espontânea, prova social, e não tem embed nem link
+     * público de onde resgatar depois.
+     */
+    if (message?.is_echo && aType === "story_mention") {
+      return { tipo: "texto", midiaUrl: null, texto: texto || "Contato marcado no story da loja" };
+    }
+
     // BAIXA QUALQUER ANEXO COM URL — antes só image/video/audio passavam, e todo
     // o resto (share, story, reel) virava "[midia]" sem arquivo nenhum.
     if (aUrl) {
