@@ -5886,6 +5886,7 @@ export type Database = {
           observacoes: string | null
           parcelas: number | null
           pedido_compra_id: number | null
+          previsao_entrega: string | null
           produto_id: number | null
           quantidade: number
           status: string | null
@@ -5915,6 +5916,7 @@ export type Database = {
           observacoes?: string | null
           parcelas?: number | null
           pedido_compra_id?: number | null
+          previsao_entrega?: string | null
           produto_id?: number | null
           quantidade?: number
           status?: string | null
@@ -5944,6 +5946,7 @@ export type Database = {
           observacoes?: string | null
           parcelas?: number | null
           pedido_compra_id?: number | null
+          previsao_entrega?: string | null
           produto_id?: number | null
           quantidade?: number
           status?: string | null

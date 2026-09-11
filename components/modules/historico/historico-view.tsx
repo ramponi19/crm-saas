@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { contratosDaVenda, emitirContrato, type DocumentoDisponivel, type ContratoArquivado } from '@/lib/contrato-emitir'
 import { descreverPagamentos, type PagamentoGravado } from '@/lib/pdv-pagamentos'
+import { finalizarEncomenda } from '@/lib/encomendas'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 
 interface Venda {
@@ -157,41 +158,18 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     notify.ok('Venda transferida'); setTransf(null); setNovoVend(''); router.refresh()
   }
 
-  async function finalizarEncomenda(id: number) {
+  /**
+   * A regra de "entregar" mora em `lib/encomendas` — a aba Encomenda do PDV faz
+   * a mesma coisa, e duas cópias seriam duas verdades. O detalhe que justifica a
+   * extração (a série do aparelho, que só existe na unidade) está documentado lá.
+   */
+  async function entregarEncomenda(id: number) {
     setFinalizando(id)
-    const supabase = createClient()
-    // Se houver unidade reservada (veio da compra recebida), baixa do estoque.
-    const { data: v } = await supabase.from('vendas')
-      .select('unidade_id, numero_serie, inventario_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
-      .eq('id', id).maybeSingle()
-
-    /**
-     * A SÉRIE DO APARELHO ENTRA AQUI, na conclusão.
-     *
-     * Venda de encomenda nasce sem série — no ato do pedido o aparelho ainda não
-     * existe. Quem digita o IMEI é o estoque, na unidade, quando a caixa chega.
-     * Se ninguém copiar para a venda, a loja fica com uma venda concluída sem
-     * identificar o que saiu: consulta de garantia por IMEI não acha, e o termo
-     * de garantia sai sem número de série. Só preenche o que está vazio — série
-     * já registrada no PDV não é sobrescrita.
-     */
-    const uni = Array.isArray(v?.inventario_unidades) ? v?.inventario_unidades[0] : v?.inventario_unidades
-    const serieDaUnidade = uni?.imei || uni?.numero_serie || null
-    const patch: { status: string; data_venda: string; numero_serie?: string } = {
-      status: 'concluida',
-      data_venda: new Date().toISOString(),
-    }
-    if (!v?.numero_serie && serieDaUnidade) patch.numero_serie = serieDaUnidade
-
-    const { error } = await supabase.from('vendas').update(patch as never).eq('id', id)
-    if (!error && v?.unidade_id) {
-      await supabase.from('inventario_unidades').update({ status: 'vendido' }).eq('id', v.unidade_id)
-    }
-
+    const r = await finalizarEncomenda(createClient(), id)
     setFinalizando(null)
-    if (error) { notify.bad('Erro ao finalizar'); return }
+    if (!r.ok) { notify.bad('Erro ao finalizar', r.erro); return }
     notify.ok('Venda concluída',
-      v?.unidade_id ? 'Unidade baixada do estoque · emita os documentos no ícone 📄' : 'Contabilizada no faturamento')
+      r.baixouEstoque ? 'Unidade baixada do estoque · emita os documentos no ícone 📄' : 'Contabilizada no faturamento')
     router.refresh()
   }
 
@@ -263,7 +241,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
         if (v.status === 'encomenda' || v.status === 'pendente_entrega') return (
           <div className="flex items-center justify-end gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
-            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); finalizarEncomenda(v.id) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
+            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); entregarEncomenda(v.id) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
           </div>
         )
         return <div className="flex items-center justify-end gap-2">{contrato}<Badge tone={s.tone}>{s.label}</Badge></div>
