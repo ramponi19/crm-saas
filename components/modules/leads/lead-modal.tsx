@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import { useEmpresa } from '@/lib/empresa-context'
+import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
@@ -165,6 +166,67 @@ function AnuncioChat({ conteudo, midiaUrl }: { conteudo: string; midiaUrl?: stri
           </a>
         )}
         {a.anuncio_id && <div className="mt-1 text-[10px] text-ink-3">ID da campanha: {a.anuncio_id}</div>}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * REEL COMPARTILHADO NA CONVERSA.
+ *
+ * A Meta não entrega o arquivo do reel — entrega a página dele. Antes o CRM
+ * guardava esse HTML e o vendedor via um "documento" que não abre; 31 dessas
+ * eram cliente mandando algo que ninguém conseguiu ver.
+ *
+ * Agora guardamos só o código do post e mostramos o embed OFICIAL, que é
+ * público e busca capa e vídeo na hora — por isso não guardamos imagem nenhuma
+ * (a capa da Meta é URL de CDN e expira em dias).
+ *
+ * O iframe só carrega quando o vendedor pede. São scripts do Instagram na
+ * máquina dele: abrir 20 conversas não deve disparar 20 embeds de terceiro, e
+ * quem só está lendo o histórico não precisa assistir nada.
+ */
+function ReelChat({ conteudo }: { conteudo: string }) {
+  const [tocando, setTocando] = useState(false)
+  const reel = lerReelCard(conteudo)
+  if (!reel) return <span className="text-[13px] italic text-[#667781]">Reel compartilhado</span>
+
+  return (
+    <div className="mb-1 overflow-hidden rounded-[8px] border border-[#c13584]/25 bg-[#fdf7fb]">
+      {tocando ? (
+        <iframe
+          src={urlEmbed(reel.shortcode)}
+          title={`Reel de ${reel.autor ?? 'Instagram'}`}
+          className="h-[420px] w-full border-0"
+          loading="lazy"
+          allow="encrypted-media"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setTocando(true)}
+          className="flex w-full items-center gap-2 bg-[#c13584]/[0.07] px-2.5 py-2 text-left transition-colors hover:bg-[#c13584]/[0.12]"
+        >
+          <Play size={14} strokeWidth={2} className="shrink-0 text-[#c13584]" />
+          <span className="text-[11.5px] font-semibold text-[#c13584]">Ver o reel aqui</span>
+        </button>
+      )}
+      <div className="px-2.5 py-2">
+        <div className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#c13584]">
+          <Instagram size={11} strokeWidth={2} />
+          Reel{reel.autor ? ` · ${reel.autor}` : ''}
+        </div>
+        {reel.legenda && (
+          <div className="line-clamp-3 text-[11.5px] leading-snug text-[#667781]">{reel.legenda}</div>
+        )}
+        <a
+          href={reel.url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 block text-[11px] font-medium text-[#c13584] underline"
+        >
+          Abrir no Instagram
+        </a>
       </div>
     </div>
   )
@@ -1162,6 +1224,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                         </div>
                       )}
                       {m.tipo === 'anuncio' && <AnuncioChat conteudo={m.text} midiaUrl={m.midiaUrl} />}
+                      {m.tipo === 'reel' && <ReelChat conteudo={m.text} />}
                       {m.midiaUrl && m.tipo === 'imagem' && (
                         <a href={m.midiaUrl} target="_blank" rel="noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1189,7 +1252,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                           </span>
                         </a>
                       )}
-                      {m.tipo === 'anuncio' ? null
+                      {m.tipo === 'anuncio' || m.tipo === 'reel' ? null
                         : m.midiaUrl && m.tipo === 'documento' ? null : ehPlaceholderMidia(m.text)
                         // Placeholder SEM arquivo: até 12/08/2026 o eco do celular
                         // não baixava a mídia, e a bolha exibia o texto cru
