@@ -465,33 +465,137 @@ async function traduzirWhatsApp(
 const MIDIA_MAX = 20 * 1024 * 1024;
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
-  "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
+  "image/heic": "heic", "image/heif": "heif",
+  "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/3gpp": "3gp",
   "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/webm": "webm",
   "audio/aac": "aac", "audio/amr": "amr", "audio/wav": "wav",
+  // Documento que o cliente manda no chat. Sem estes o arquivo era salvo como
+  // ".bin" e o navegador não sabia abrir: 31 PDFs reais da JM estão assim.
+  "application/pdf": "pdf", "text/plain": "txt", "text/csv": "csv",
+  "application/msword": "doc", "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/zip": "zip",
 };
+
+/**
+ * PÁGINA NÃO É ANEXO.
+ *
+ * Quando a URL do anexo exige sessão (story e reel do Instagram, principalmente),
+ * a Meta não devolve erro: devolve **200 com a página de login**. O código olhava
+ * só o `res.ok` e guardava 640 kB de HTML da Instagram como se fosse o arquivo do
+ * cliente — 62 vezes, 38 MB, e no chat do vendedor aparecia um "documento" que
+ * não abre.
+ *
+ * Recusar aqui faz a mensagem cair no caminho de sempre (`guardarBruto` + rótulo
+ * "publicação compartilhada"), que é honesto: não temos o arquivo.
+ */
+const MIME_NAO_E_MIDIA = /^(text\/html|application\/xhtml)/i;
+
+/**
+ * NOME ESTÁVEL PARA A MESMA MÍDIA — a peça que impede a cópia no reenvio.
+ *
+ * ══ O QUE ACONTECIA ════════════════════════════════════════════════════════
+ *
+ * O arquivo era salvo com `crypto.randomUUID()` ANTES de a mensagem ser gravada.
+ * A Meta reenvia o webhook sempre que não recebe o 200 depressa — e é exatamente
+ * o que acontece enquanto o CRM baixa um vídeo de 13 MB. No reenvio o fluxo
+ * baixava tudo de novo, sorteava outro UUID, e só então o índice único recusava
+ * a mensagem (`msg duplicada ignorada`). O arquivo ficava, para sempre.
+ *
+ * O ciclo se retroalimentava: quanto maior o vídeo, mais lento o download, mais
+ * provável o reenvio. Medido em 11/09/2026 na JM: 1.454 arquivos órfãos (259 MB)
+ * e 434 cópias byte a byte de arquivos em uso (331 MB) — 39% do bucket. O vídeo
+ * de 13,4 MB estava lá 4 vezes; um de 7 MB, 7 vezes.
+ *
+ * ══ A CORREÇÃO ═════════════════════════════════════════════════════════════
+ *
+ * O caminho passa a vir do id que a Meta dá à mídia (WhatsApp) ou à mensagem
+ * (Instagram/Messenger) — o MESMO em todos os reenvios. Então:
+ *
+ *  · já existe → devolve a URL e NÃO BAIXA NADA. Além de não duplicar, isto
+ *    responde o webhook em milissegundos, o que corta o próprio reenvio que
+ *    causava o problema.
+ *  · não existe → baixa e grava com `upsert`. Se dois reenvios correrem juntos,
+ *    os dois escrevem no mesmo caminho e sobra um arquivo, não dois.
+ *
+ * Sem chave (origem que não identifica a mídia) o comportamento antigo continua:
+ * melhor um arquivo repetido do que mensagem sem anexo.
+ */
+function caminhoDaMidia(empresaId: number, chave: string, ext: string): string {
+  const limpa = chave.replace(/[^A-Za-z0-9_-]/g, "").slice(-100);
+  return `${empresaId}/m/${limpa}.${ext}`;
+}
+
+/**
+ * Procura a mídia já salva desta chave. Null = ainda não existe.
+ *
+ * Isto é ECONOMIA, não a garantia: quem impede a duplicata é o `upsert` no
+ * caminho determinístico logo abaixo. Se esta busca falhar, o pior que acontece
+ * é baixar o arquivo de novo e sobrescrever o mesmo caminho — desperdício de
+ * banda, nunca um arquivo a mais. Por isso ela nunca interrompe o fluxo.
+ *
+ * ⚠️ A BARRA FINAL NO PREFIXO É OBRIGATÓRIA. `list()` manda o caminho cru para
+ * `storage.search()`, que casa por prefixo literal: "1/m" não encontra nada e
+ * "1/m/" encontra tudo. Medido no banco de produção antes de subir — sem a
+ * barra, a busca devolveria vazio para sempre, calada.
+ */
+async function midiaJaSalva(
+  empresaId: number, chave: string,
+): Promise<{ url: string; mime: string } | null> {
+  try {
+    const limpa = chave.replace(/[^A-Za-z0-9_-]/g, "").slice(-100);
+    const { data, error } = await db.storage.from("chat-midia")
+      .list(`${empresaId}/m/`, { search: limpa, limit: 20 });
+    if (error || !data?.length) return null;
+    // `search` é "contém", não "igual": uma chave pode aparecer dentro de outra,
+    // então o nome certo é procurado na lista em vez de assumir o primeiro.
+    const achado = data.find((o) => o.name.startsWith(limpa + "."));
+    if (!achado) return null;
+    const mime = (achado.metadata as Record<string, unknown> | null)?.mimetype as string | undefined;
+    return {
+      url: db.storage.from("chat-midia").getPublicUrl(`${empresaId}/m/${achado.name}`).data.publicUrl,
+      mime: mime ?? "application/octet-stream",
+    };
+  } catch (e) { console.error("midiaJaSalva:", e); return null; }
+}
 
 // Pasta POR EMPRESA (a v26 jogava tudo em "1/"). Falha degrada para placeholder.
 // Devolve o MIME junto porque no Instagram o tipo do anexo não diz o que é: um
 // "share" pode ser foto, vídeo ou reel, e quem sabe de verdade é o arquivo.
 async function baixarParaStorage(
-  empresaId: number, url: string, bearer?: string,
+  empresaId: number, url: string, chave?: string | null, bearer?: string,
 ): Promise<{ url: string; mime: string } | null> {
   try {
+    // Antes de gastar banda: esta mídia já veio num reenvio anterior?
+    if (chave) {
+      const existente = await midiaJaSalva(empresaId, chave);
+      if (existente) { console.log("midia reaproveitada:", chave); return existente; }
+    }
+
     const res = await fetch(url, bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : undefined);
     if (!res.ok) { console.error("midia download:", res.status); return null; }
+    const ct = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
+    // A recusa vem ANTES de ler o corpo: página de login não merece 640 kB de
+    // download, muito menos uma vaga no Storage.
+    if (MIME_NAO_E_MIDIA.test(ct)) { console.error("midia recusada, veio pagina:", ct); return null; }
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MIDIA_MAX) { console.log("midia acima do limite:", buf.byteLength); return null; }
-    const ct = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
-    const path = `${empresaId}/${crypto.randomUUID()}.${EXT[ct] ?? "bin"}`;
-    const { error } = await db.storage.from("chat-midia").upload(path, buf, { contentType: ct });
+    const path = chave
+      ? caminhoDaMidia(empresaId, chave, EXT[ct] ?? "bin")
+      : `${empresaId}/${crypto.randomUUID()}.${EXT[ct] ?? "bin"}`;
+    const { error } = await db.storage.from("chat-midia")
+      .upload(path, buf, { contentType: ct, upsert: !!chave });
     if (error) { console.error("midia upload:", error.message); return null; }
     return { url: db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl, mime: ct };
   } catch (e) { console.error("baixarParaStorage:", e); return null; }
 }
 
 /** Só a URL — para quem já sabe o tipo (WhatsApp diz no payload). */
-async function salvarMidia(empresaId: number, url: string, bearer?: string): Promise<string | null> {
-  return (await baixarParaStorage(empresaId, url, bearer))?.url ?? null;
+async function salvarMidia(
+  empresaId: number, url: string, chave?: string | null, bearer?: string,
+): Promise<string | null> {
+  return (await baixarParaStorage(empresaId, url, chave, bearer))?.url ?? null;
 }
 
 /** Quem manda é o arquivo: "share" do Instagram pode ser foto, vídeo ou reel. */
@@ -528,7 +632,11 @@ async function salvarMidiaWhatsApp(canal: Canal, mediaId: string | undefined): P
     });
     if (!info.ok) { console.error("WA media info:", await info.text()); return null; }
     const meta = await info.json();
-    return meta?.url ? await salvarMidia(canal.empresa_id, meta.url as string, canal.token) : null;
+    // `mediaId` é o id que a Meta dá ao ARQUIVO: o mesmo em todos os reenvios,
+    // e o mesmo quando o histórico é reprocessado. É a chave perfeita.
+    return meta?.url
+      ? await salvarMidia(canal.empresa_id, meta.url as string, `wa-${mediaId}`, canal.token)
+      : null;
   } catch (e) { console.error("salvarMidiaWhatsApp:", e); return null; }
 }
 
@@ -546,7 +654,11 @@ async function extrairMidiaMeta(
     // BAIXA QUALQUER ANEXO COM URL — antes só image/video/audio passavam, e todo
     // o resto (share, story, reel) virava "[midia]" sem arquivo nenhum.
     if (aUrl) {
-      const salvo = await baixarParaStorage(canal.empresa_id, aUrl);
+      // No Instagram/Messenger o anexo não tem id próprio, mas a MENSAGEM tem
+      // (`mid`) — e é ele que o reenvio repete. Um anexo por mensagem aqui
+      // (lemos `attachments[0]`), então o `mid` identifica a mídia sem ambiguidade.
+      const mid = message?.mid as string | undefined;
+      const salvo = await baixarParaStorage(canal.empresa_id, aUrl, mid ? `ig-${mid}` : null);
       if (salvo) {
         const tipo = TIPO_DB[aType] ?? tipoPorMime(salvo.mime);
         return { tipo, midiaUrl: salvo.url, texto: texto || rotulo || `[${tipo}]` };
