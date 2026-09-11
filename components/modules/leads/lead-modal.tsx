@@ -194,13 +194,25 @@ function ReelChat({ conteudo }: { conteudo: string }) {
   return (
     <div className="mb-1 overflow-hidden rounded-[8px] border border-[#c13584]/25 bg-[#fdf7fb]">
       {tocando ? (
-        <iframe
-          src={urlEmbed(reel.shortcode)}
-          title={`Reel de ${reel.autor ?? 'Instagram'}`}
-          className="h-[420px] w-full border-0"
-          loading="lazy"
-          allow="encrypted-media"
-        />
+        <>
+          <iframe
+            src={urlEmbed(reel.shortcode)}
+            title={`Reel de ${reel.autor ?? 'Instagram'}`}
+            className="h-[420px] w-full border-0"
+            loading="lazy"
+            allow="encrypted-media"
+          />
+          {/* Aberto, o embed come 420px da conversa. Sem isto só fechando o
+              modal do lead — e quem rola o histórico passa por todos eles. */}
+          <button
+            type="button"
+            onClick={() => setTocando(false)}
+            className="flex w-full items-center justify-center gap-1 bg-[#c13584]/[0.07] py-1.5 text-[11px] font-semibold text-[#c13584] transition-colors hover:bg-[#c13584]/[0.12]"
+          >
+            <X size={12} strokeWidth={2.2} />
+            Fechar o reel
+          </button>
+        </>
       ) : (
         <button
           type="button"
