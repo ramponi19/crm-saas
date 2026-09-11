@@ -493,6 +493,44 @@ const EXT: Record<string, string> = {
 const MIME_NAO_E_MIDIA = /^(text\/html|application\/xhtml)/i;
 
 /**
+ * O REEL: a página que a Meta devolve VALE, só não como arquivo.
+ *
+ * Ela traz em `og:` quem postou, a legenda e o link. Guardamos esse texto (uns
+ * 200 bytes) e o chat mostra o reel pelo embed oficial, que é público.
+ *
+ * ⚠️ NÃO guardar a capa (`og:image`): é URL de CDN e expira em dias — a capa
+ * salva em 10/09 já devolvia 403 em 11/09. O embed busca a dele na hora.
+ *
+ * Espelha `lib/reel-instagram.ts`. São dois mundos (Deno aqui, Node no app) e a
+ * Edge Function não importa de `lib/` — se mexer em um, mexa no outro.
+ */
+function desescaparHtml(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
+function extrairReel(html: string): { shortcode: string; autor: string | null; legenda: string | null; url: string } | null {
+  const meta = (p: string) => {
+    const m = new RegExp(`property="${p}"\\s+content="([^"]*)"`, "i").exec(html);
+    return m?.[1] ? desescaparHtml(m[1]) : null;
+  };
+  const url = meta("og:url");
+  if (!url) return null;
+  const m = /instagram\.com\/(?:([^/]+)\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/.exec(url);
+  if (!m) return null;
+  const t = /^(.*?)\s+on Instagram:\s*"?([\s\S]*?)"?$/.exec(meta("og:title") ?? "");
+  return {
+    shortcode: m[2],
+    autor: t?.[1]?.trim() || m[1] || null,
+    legenda: (t?.[2] ?? meta("og:description") ?? "").trim() || null,
+    url: `https://www.instagram.com/reel/${m[2]}/`,
+  };
+}
+
+/**
  * NOME ESTÁVEL PARA A MESMA MÍDIA — a peça que impede a cópia no reenvio.
  *
  * ══ O QUE ACONTECIA ════════════════════════════════════════════════════════
@@ -563,31 +601,52 @@ async function midiaJaSalva(
 // Pasta POR EMPRESA (a v26 jogava tudo em "1/"). Falha degrada para placeholder.
 // Devolve o MIME junto porque no Instagram o tipo do anexo não diz o que é: um
 // "share" pode ser foto, vídeo ou reel, e quem sabe de verdade é o arquivo.
+type Baixado = {
+  /** Nulo quando o que veio foi um reel: o cartão é o conteúdo, não há arquivo. */
+  url: string | null;
+  mime: string;
+  reel: { shortcode: string; autor: string | null; legenda: string | null; url: string } | null;
+};
+
 async function baixarParaStorage(
   empresaId: number, url: string, chave?: string | null, bearer?: string,
-): Promise<{ url: string; mime: string } | null> {
+): Promise<Baixado | null> {
   try {
     // Antes de gastar banda: esta mídia já veio num reenvio anterior?
     if (chave) {
       const existente = await midiaJaSalva(empresaId, chave);
-      if (existente) { console.log("midia reaproveitada:", chave); return existente; }
+      if (existente) { console.log("midia reaproveitada:", chave); return { ...existente, reel: null }; }
     }
 
     const res = await fetch(url, bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : undefined);
     if (!res.ok) { console.error("midia download:", res.status); return null; }
     const ct = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
-    // A recusa vem ANTES de ler o corpo: página de login não merece 640 kB de
-    // download, muito menos uma vaga no Storage.
-    if (MIME_NAO_E_MIDIA.test(ct)) { console.error("midia recusada, veio pagina:", ct); return null; }
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MIDIA_MAX) { console.log("midia acima do limite:", buf.byteLength); return null; }
+
+    /**
+     * VEIO PÁGINA, NÃO ARQUIVO — e às vezes a página é o conteúdo.
+     *
+     * Reel compartilhado: a Meta responde 200 com o HTML do post. Guardar isso
+     * como anexo custava 640 kB e entregava um "documento" que não abre. Agora
+     * vira cartão (autor, legenda, link) e o chat mostra pelo embed oficial.
+     *
+     * HTML que não é post (erro, login) continua recusado: nada no Storage.
+     */
+    if (MIME_NAO_E_MIDIA.test(ct)) {
+      const reel = extrairReel(new TextDecoder().decode(buf));
+      if (reel) { console.log("reel identificado:", reel.shortcode); return { url: null, mime: ct, reel }; }
+      console.error("midia recusada, veio pagina sem post:", ct);
+      return null;
+    }
+
     const path = chave
       ? caminhoDaMidia(empresaId, chave, EXT[ct] ?? "bin")
       : `${empresaId}/${crypto.randomUUID()}.${EXT[ct] ?? "bin"}`;
     const { error } = await db.storage.from("chat-midia")
       .upload(path, buf, { contentType: ct, upsert: !!chave });
     if (error) { console.error("midia upload:", error.message); return null; }
-    return { url: db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl, mime: ct };
+    return { url: db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl, mime: ct, reel: null };
   } catch (e) { console.error("baixarParaStorage:", e); return null; }
 }
 
@@ -694,7 +753,12 @@ async function extrairMidiaMeta(
       // (lemos `attachments[0]`), então o `mid` identifica a mídia sem ambiguidade.
       const mid = message?.mid as string | undefined;
       const salvo = await baixarParaStorage(canal.empresa_id, aUrl, mid ? `ig-${mid}` : null);
-      if (salvo) {
+      // Reel: o CONTEÚDO é o cartão. Mesmo desenho do card de anúncio — tipo
+      // próprio e JSON no texto —, e o chat sabe renderizar (`ReelChat`).
+      if (salvo?.reel) {
+        return { tipo: "reel", midiaUrl: null, texto: JSON.stringify(salvo.reel) };
+      }
+      if (salvo?.url) {
         const tipo = TIPO_DB[aType] ?? tipoPorMime(salvo.mime);
         return { tipo, midiaUrl: salvo.url, texto: texto || rotulo || `[${tipo}]` };
       }
