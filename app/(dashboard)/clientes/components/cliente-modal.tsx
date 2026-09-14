@@ -110,7 +110,22 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
       return
     }
     setSaving(true)
-    const { total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
+    /**
+     * ⚠️ O `id` NÃO PODE IR NO PAYLOAD.
+     *
+     * `form` nasce de `{ ...EMPTY, ...cliente }`, então na edição ele carrega o
+     * `id` junto — e `clientes.id` é `GENERATED ALWAYS AS IDENTITY`. O Postgres
+     * recusa qualquer UPDATE que mencione a coluna, mesmo mandando o MESMO
+     * valor: `column "id" can only be updated to DEFAULT`.
+     *
+     * Reportado da loja em 14/09/2026: o vendedor não conseguia salvar cliente
+     * nenhum. O id continua sendo usado no `.eq('id', ...)` — é só do corpo do
+     * update que ele sai.
+     *
+     * Os três de baixo são colunas CALCULADAS (view/gatilho), não existem para
+     * escrita. Já saíam; o `id` é que faltava.
+     */
+    const { id: _id, total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
     const data = { ...payload, ativo: true }
     if (isNew) {
       const empId = await empresaAtualId(supabase)
