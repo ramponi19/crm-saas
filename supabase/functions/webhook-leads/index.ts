@@ -392,6 +392,43 @@ const BAIXAVEIS: Record<string, string> = {
 };
 
 /**
+ * FOTO E VÍDEO QUE A PRÓPRIA LOJA MANDOU NÃO SÃO GUARDADOS.
+ *
+ * ══ O QUE A MEDIÇÃO MOSTROU (14/09/2026) ═══════════════════════════════════
+ *
+ * 81% de toda a mídia do bucket é a JM ENVIANDO, não o cliente mandando — e
+ * 100% disso saiu do celular da equipe (`usuario_id` nulo), nunca do CRM. Só em
+ * vídeo são 623 MB contra 95 MB recebidos. O CRM guardava uma segunda cópia,
+ * para sempre, de arquivo que já está no aparelho de quem enviou.
+ *
+ * ══ O QUE FICA E O QUE SAI ═════════════════════════════════════════════════
+ *
+ * SAI: imagem e vídeo de eco. São ilustração — o aparelho, a peça, a vitrine —
+ * e a loja os tem na origem. Fica o registro: "Vídeo enviado pelo celular".
+ *
+ * FICA: **áudio**, porque é a VOZ DO VENDEDOR respondendo. Sem ele a conversa
+ * fica com um lado só — o cliente pergunta e o histórico não responde. E
+ * **documento**, que é contrato e comprovante: peso irrisório, valor de registro
+ * alto.
+ *
+ * FICA TAMBÉM tudo o que o CLIENTE manda, em qualquer formato. Esse é o
+ * princípio: o que o cliente envia é dele e se preserva; o que a loja envia é
+ * reproduzível.
+ *
+ * ⚠️ A PERDA, dita na cara: quem abrir o CRM não vê mais a foto nem o vídeo que
+ * a equipe mandou. Em disputa ("não é o aparelho que vocês mostraram"), a prova
+ * passa a existir só no celular de quem enviou — e celular de vendedor não é
+ * arquivo da empresa. Decisão consciente do dono em 14/09/2026, tomada com esse
+ * risco na mesa.
+ */
+const ECO_NAO_GUARDA = new Set(["imagem", "video"]);
+
+/** O que a bolha mostra no lugar do arquivo. "pelo celular" explica sozinho. */
+function rotuloEco(tipoDb: string): string {
+  return tipoDb === "video" ? "Vídeo enviado pelo celular" : "Foto enviada pelo celular";
+}
+
+/**
  * O que escrever quando a mensagem NÃO tem arquivo para baixar.
  *
  * Localização, contato e reação existem na conversa e precisam ser legíveis; o
@@ -438,7 +475,7 @@ function descreverSemArquivo(t: string, m: Record<string, unknown>): string {
  * durante todo o primeiro dia de uso.
  */
 async function traduzirWhatsApp(
-  canal: Canal, m: Record<string, unknown>,
+  canal: Canal, m: Record<string, unknown>, ehEco = false,
 ): Promise<{ tipo: string; conteudo: string; midiaUrl: string | null }> {
   const t = String(m.type ?? "text");
 
@@ -452,6 +489,13 @@ async function traduzirWhatsApp(
   const bloco = m[t] as Record<string, unknown> | undefined;
   const legenda = bloco?.caption ? String(bloco.caption) : "";
   const nome = bloco?.filename ? String(bloco.filename) : "";
+
+  // Foto e vídeo que a loja mandou pelo celular: fica o registro, não o arquivo.
+  // A legenda é preservada — ela é do vendedor e não existe em outro lugar.
+  if (ehEco && ECO_NAO_GUARDA.has(tipoDb)) {
+    return { tipo: "texto", midiaUrl: null, conteudo: legenda || rotuloEco(tipoDb) };
+  }
+
   const url = await salvarMidiaWhatsApp(canal, bloco?.id as string | undefined);
 
   if (!url) {
@@ -735,6 +779,18 @@ async function extrairMidiaMeta(
      * ⚠️ A PERDA, dita na cara: quem abrir só o CRM não vê o que o cliente
      * postou. Foi uma escolha consciente do dono (11/09/2026), não um descuido.
      */
+    /**
+     * Eco de foto/vídeo no Instagram e Messenger — mesma regra do WhatsApp.
+     *
+     * Aqui o tipo vem do anexo (`aType`), não do arquivo. Quando ele não diz
+     * ("share", "fallback"), o download acontece: é raro, e errar para o lado de
+     * guardar é melhor do que descartar mídia do cliente por engano.
+     */
+    if (message?.is_echo && ECO_NAO_GUARDA.has(TIPO_DB[aType] ?? "")) {
+      const t = TIPO_DB[aType];
+      return { tipo: "texto", midiaUrl: null, texto: texto || rotuloEco(t) };
+    }
+
     if (aType === "story_mention") {
       return {
         tipo: "texto",
@@ -1648,7 +1704,8 @@ serve(async (req: Request) => {
                * não aparecia porque lá o eco traz a URL direta no attachment; no
                * WhatsApp vem um ID que precisa ser trocado pelo arquivo com o token.
                */
-              const { tipo, conteudo, midiaUrl } = await traduzirWhatsApp(canal, e);
+              // `true`: e eco, a loja que mandou. Foto e video viram registro, nao arquivo.
+              const { tipo, conteudo, midiaUrl } = await traduzirWhatsApp(canal, e, true);
               // No echo o cliente é o "to" — o "from" é o número do negócio.
               await registrarEcho(canal, String(e.to ?? "").replace(/\D/g, ""), e.id as string,
                 conteudo, "whatsapp", tipo, midiaUrl);
