@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, Truck } from 'lucide-react'
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
 import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda } from '@/lib/encomendas'
@@ -49,6 +50,7 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
   const supabase = createClient()
   const [ocupado, setOcupado] = useState<number | null>(null)
   const [editando, setEditando] = useState<number | null>(null)
+  const [entregando, setEntregando] = useState<number | null>(null)
 
   /**
    * `hoje` fixado no primeiro render.
@@ -81,19 +83,33 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
     router.refresh()
   }
 
-  /** Entrega: conclui a venda e baixa a unidade. Regra em lib/encomendas. */
-  async function entregar(e: EncomendaPDV) {
+  /**
+   * Entrega: recebe o saldo, conclui a venda e baixa a unidade.
+   *
+   * O recebimento vai junto porque é aqui que o dinheiro entra de verdade — e
+   * até 15/09/2026 ele não era gravado em lugar nenhum: 11 encomendas
+   * entregues, R$ 84.540, todas sem uma linha em `vendas_pagamentos`.
+   */
+  async function entregar(e: EncomendaPDV, forma: string, parcelas: number | null) {
+    const saldo = Math.max(0, e.valor_venda - e.sinal_pago)
+    const empresaId = await empresaAtualId(supabase)
+    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página.'); return }
+
     setOcupado(e.id)
-    const r = await finalizarEncomenda(supabase, e.id)
+    const r = await finalizarEncomenda(supabase, e.id,
+      saldo > 0.005 ? { forma, valor: saldo, parcelas, empresaId } : null)
     setOcupado(null)
     if (!r.ok) { notify.bad('Erro ao finalizar', r.erro); return }
-    const falta = Math.max(0, e.valor_venda - e.sinal_pago)
-    notify.ok(
-      'Venda concluída',
-      falta > 0.005
-        ? `Receba ${formatCurrency(falta)} do cliente.`
-        : r.baixouEstoque ? 'Unidade baixada do estoque.' : 'Contabilizada no faturamento.',
-    )
+
+    if (saldo > 0.005 && !r.registrouPagamento) {
+      notify.warn('Entrega concluída, mas o recebimento não foi gravado',
+        `Lance ${formatCurrency(saldo)} manualmente no financeiro.`)
+    } else {
+      notify.ok('Venda concluída',
+        saldo > 0.005 ? `${formatCurrency(saldo)} recebido em ${forma}.`
+          : r.baixouEstoque ? 'Unidade baixada do estoque.' : 'Contabilizada no faturamento.')
+    }
+    setEntregando(null)
     router.refresh()
   }
 
@@ -221,7 +237,7 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
                         onClick={() => avisar(e)}>Avisar</Button>
                     )}
                     <Button size="sm" loading={ocupado === e.id} icon={<Check size={13} strokeWidth={2} />}
-                      onClick={() => entregar(e)}>Entregar</Button>
+                      onClick={() => setEntregando(entregando === e.id ? null : e.id)}>Entregar</Button>
                   </>
                 ) : (
                   <Button size="sm" variant="outline" loading={ocupado === e.id}
@@ -230,6 +246,17 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
                 )}
               </div>
             </div>
+
+            {entregando === e.id && (
+              <ReceberNaEntrega
+                key={`entrega-${e.id}`}
+                total={e.valor_venda}
+                jaPago={e.sinal_pago}
+                salvando={ocupado === e.id}
+                onCancelar={() => setEntregando(null)}
+                onConfirmar={(forma, parcelas) => entregar(e, forma, parcelas)}
+              />
+            )}
 
             {editando === e.id && (
               <AjusteInline
@@ -243,6 +270,92 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const FORMAS_ENTREGA = [
+  { key: 'dinheiro', label: 'Dinheiro' },
+  { key: 'pix', label: 'PIX' },
+  { key: 'debito', label: 'Débito' },
+  { key: 'credito', label: 'Crédito' },
+  { key: 'link', label: 'Link' },
+]
+/** Só crédito e link parcelam — mesma regra do PDV. */
+const PARCELA = new Set(['credito', 'link'])
+
+/**
+ * O RECEBIMENTO DO SALDO, no ato da entrega.
+ *
+ * Um passo a mais entre "Entregar" e a venda concluída, e ele existe por um
+ * motivo medido: as 11 encomendas já entregues da JM somam R$ 84.540 e nenhuma
+ * tem uma linha de pagamento. O botão concluía a venda e o dinheiro não entrava
+ * em lugar nenhum.
+ *
+ * Quando a entrada já cobriu tudo, não há o que receber e o passo só confirma.
+ */
+function ReceberNaEntrega({ total, jaPago, salvando, onConfirmar, onCancelar }: {
+  total: number
+  jaPago: number
+  salvando: boolean
+  onConfirmar: (forma: string, parcelas: number | null) => void
+  onCancelar: () => void
+}) {
+  const saldo = Math.max(0, total - jaPago)
+  const [forma, setForma] = useState('pix')
+  const [parcelas, setParcelas] = useState(2)
+  const parcela = PARCELA.has(forma)
+
+  return (
+    <div className="mt-3 border-t border-line-soft pt-3">
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span className="text-[12.5px] font-semibold text-ink">
+          {saldo > 0.005 ? 'Receber na entrega' : 'Nada a receber — já está pago'}
+        </span>
+        <span className="text-[11.5px] text-ink-3">
+          <span className="num">{formatCurrency(total)}</span> total
+          {jaPago > 0.005 && <> · <span className="num text-ok">{formatCurrency(jaPago)}</span> de entrada</>}
+        </span>
+      </div>
+
+      {saldo > 0.005 && (
+        <>
+          <div className="mb-2.5 text-[22px] font-bold tracking-[-0.03em] text-ink num">{formatCurrency(saldo)}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {FORMAS_ENTREGA.map((f) => (
+              <button key={f.key} type="button" onClick={() => setForma(f.key)}
+                className={`h-8 rounded-control px-3 text-[12px] font-semibold transition-colors ${
+                  forma === f.key ? 'bg-ink text-white' : 'border border-line bg-card text-ink-2 hover:bg-line-soft'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {parcela && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {[1, 2, 3, 4, 6, 10, 12].map((n) => (
+                <button key={n} type="button" onClick={() => setParcelas(n)}
+                  className={`num h-7 w-10 rounded-control border text-[12px] font-bold transition-colors ${
+                    parcelas === n ? 'border-ink/30 bg-ink/[0.06] text-ink' : 'border-line text-ink-2 hover:bg-line-soft'}`}>
+                  {n}x
+                </button>
+              ))}
+              {parcelas > 1 && (
+                <span className="text-[11.5px] text-ink-3">
+                  de <span className="num">{formatCurrency(saldo / parcelas)}</span>
+                </span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="mt-3 flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancelar}>Cancelar</Button>
+        <Button size="sm" loading={salvando} icon={<Check size={13} strokeWidth={2} />}
+          onClick={() => onConfirmar(forma, parcela ? parcelas : null)}>
+          {saldo > 0.005 ? `Receber e entregar` : 'Confirmar entrega'}
+        </Button>
+      </div>
     </div>
   )
 }
