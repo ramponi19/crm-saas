@@ -38,6 +38,31 @@ export interface EncomendaAberta {
   /** `recebido` = a peça chegou e está reservada para este cliente. */
   status_pedido: string | null
   unidade_id: number | null
+  /** Quando alguém pediu o aparelho ao fornecedor. Nulo = ninguém pediu ainda. */
+  solicitado_em?: string | null
+}
+
+/**
+ * AS QUATRO PARADAS DA ENCOMENDA, na ordem em que acontecem.
+ *
+ * A etapa `solicitada` foi a que faltou por mais tempo: o pedido nascia e ia
+ * direto para "chegou", então uma encomenda parada há 32 dias era
+ * indistinguível de uma pedida ontem — e o vendedor não sabia se cobrava o dono
+ * ou se só esperava.
+ */
+export const ETAPAS = ['lancada', 'solicitada', 'chegou', 'entregue'] as const
+export type Etapa = (typeof ETAPAS)[number]
+
+/** Em que ponto da trilha esta encomenda está. */
+export function etapaAtual(e: EncomendaAberta): Etapa {
+  if (e.status === 'concluida') return 'entregue'
+  if (e.status_pedido === 'recebido' || e.unidade_id != null) return 'chegou'
+  return e.solicitado_em ? 'solicitada' : 'lancada'
+}
+
+/** Índice da etapa — para a trilha saber o que já passou. */
+export function indiceEtapa(e: EncomendaAberta): number {
+  return ETAPAS.indexOf(etapaAtual(e))
 }
 
 export interface Diagnostico {

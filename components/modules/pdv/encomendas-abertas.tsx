@@ -1,12 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
-import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, Truck } from 'lucide-react'
+import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
-import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda } from '@/lib/encomendas'
+import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 
@@ -40,13 +40,55 @@ export interface EncomendaPDV {
   status_pedido: string | null
   tem_fornecedor: boolean
   sinal_pago: number
+  /** Quando o aparelho foi pedido ao fornecedor. Nulo = ninguem pediu ainda. */
+  solicitado_em: string | null
+}
+
+const ROTULO_ETAPA: Record<Etapa, string> = {
+  lancada: 'Lançada', solicitada: 'Pedido', chegou: 'Chegou', entregue: 'Entregue',
+}
+
+/**
+ * A TRILHA — onde esta encomenda está, sem ninguém precisar perguntar.
+ *
+ * Antes da etapa "Pedido" existir, uma encomenda parada há 32 dias era
+ * indistinguível de uma pedida ontem: o vendedor não sabia se cobrava o dono ou
+ * se só esperava o fornecedor. A bolinha preenchida responde isso de longe.
+ */
+function Trilha({ e }: { e: EncomendaPDV }) {
+  const atual = indiceEtapa(e)
+  return (
+    <div className="mt-2.5 flex items-start">
+      {ETAPAS.map((etapa, i) => {
+        const feita = i <= atual
+        const quando = etapa === 'solicitada' && e.solicitado_em ? dataBR(e.solicitado_em) : null
+        return (
+          <Fragment key={etapa}>
+            {i > 0 && (
+              <div className={`mt-[5px] h-[2px] flex-1 ${i <= atual ? 'bg-ok' : 'bg-line'}`} />
+            )}
+            <div className="flex flex-col items-center gap-1" style={{ minWidth: 58 }}>
+              <span className={`h-[11px] w-[11px] rounded-full border-2 ${
+                feita ? 'border-ok bg-ok' : 'border-line bg-card'}`} />
+              <span className={`text-[10px] leading-none ${feita ? 'font-semibold text-ink-2' : 'text-ink-3'}`}>
+                {ROTULO_ETAPA[etapa]}
+              </span>
+              {quando && <span className="num text-[9.5px] leading-none text-ink-3">{quando}</span>}
+            </div>
+          </Fragment>
+        )
+      })}
+    </div>
+  )
 }
 
 const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split('-').reverse().join('/') : null
 
-export function EncomendasAbertas({ encomendas, taxas = [] }: { encomendas: EncomendaPDV[]; taxas?: Taxa[] }) {
+export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
+  encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean
+}) {
   const router = useRouter()
   const supabase = createClient()
   const [ocupado, setOcupado] = useState<number | null>(null)
@@ -81,6 +123,33 @@ export function EncomendasAbertas({ encomendas, taxas = [] }: { encomendas: Enco
     const j = await r.json().catch(() => ({}))
     if (!r.ok) { notify.bad('Não deu para registrar a chegada', j.error); return }
     notify.ok('Chegou', `Reservado para ${e.cliente_nome}. Avise que está na loja.`)
+    router.refresh()
+  }
+
+  /**
+   * "PEDIDO FEITO" — o dono marca que encomendou o aparelho ao fornecedor.
+   *
+   * É a etapa que faltava no ciclo: sem ela, uma encomenda parada há 32 dias
+   * era indistinguível de uma pedida ontem, e o vendedor não sabia se cobrava o
+   * dono ou se só esperava. Fica gravado QUEM marcou e QUANDO.
+   *
+   * `is('solicitado_em', null)` no filtro: marcar de novo trocaria a data do
+   * pedido original, que é justamente a que interessa para cobrar o fornecedor.
+   */
+  async function marcarSolicitado(e: EncomendaPDV) {
+    if (!e.pedido_id) {
+      notify.bad('Encomenda sem pedido de compra', 'Confira em Compras.')
+      return
+    }
+    setOcupado(e.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('pedidos_compra')
+      .update({ solicitado_em: new Date().toISOString(), solicitado_por: user?.id ?? null } as never)
+      .eq('id', e.pedido_id)
+      .is('solicitado_em', null)
+    setOcupado(null)
+    if (error) { notify.bad('Não deu para marcar', error.message); return }
+    notify.ok('Pedido registrado', `${e.produto_nome} — a equipe já vê que foi encomendado.`)
     router.refresh()
   }
 
@@ -223,6 +292,7 @@ export function EncomendasAbertas({ encomendas, taxas = [] }: { encomendas: Enco
                     {!e.tem_fornecedor && <span>⚠ sem fornecedor</span>}
                   </div>
                 )}
+                <Trilha e={e} />
               </div>
 
               <div className="flex flex-none flex-wrap items-center gap-1.5">
@@ -241,9 +311,17 @@ export function EncomendasAbertas({ encomendas, taxas = [] }: { encomendas: Enco
                       onClick={() => setEntregando(entregando === e.id ? null : e.id)}>Entregar</Button>
                   </>
                 ) : (
-                  <Button size="sm" variant="outline" loading={ocupado === e.id}
-                    icon={<PackageCheck size={13} strokeWidth={1.8} />}
-                    onClick={() => receber(e)}>Chegou</Button>
+                  <>
+                    {/* Só quem compra marca que pediu — mas todo mundo vê na trilha. */}
+                    {isAdmin && !e.solicitado_em && (
+                      <Button size="sm" variant="outline" loading={ocupado === e.id}
+                        icon={<ShoppingCart size={13} strokeWidth={1.8} />}
+                        onClick={() => marcarSolicitado(e)}>Pedido feito</Button>
+                    )}
+                    <Button size="sm" variant="outline" loading={ocupado === e.id}
+                      icon={<PackageCheck size={13} strokeWidth={1.8} />}
+                      onClick={() => receber(e)}>Chegou</Button>
+                  </>
                 )}
               </div>
             </div>

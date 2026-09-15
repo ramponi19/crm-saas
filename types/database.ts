@@ -4267,6 +4267,8 @@ export type Database = {
         Row: {
           created_at: string | null
           data_pedido: string | null
+          solicitado_em: string | null
+          solicitado_por: string | null
           descricao: string | null
           empresa_id: number
           filial_id: number | null
@@ -4280,6 +4282,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           data_pedido?: string | null
+          solicitado_em?: string | null
+          solicitado_por?: string | null
           descricao?: string | null
           empresa_id: number
           filial_id?: number | null
@@ -4293,6 +4297,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           data_pedido?: string | null
+          solicitado_em?: string | null
+          solicitado_por?: string | null
           descricao?: string | null
           empresa_id?: number
           filial_id?: number | null
