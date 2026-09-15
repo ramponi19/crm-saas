@@ -103,6 +103,16 @@ export interface ResultadoFinalizar {
   baixouEstoque: boolean
   /** A série foi copiada da unidade para a venda nesta finalização. */
   copiouSerie: boolean
+  /** O recebimento do saldo foi gravado em `vendas_pagamentos`. */
+  registrouPagamento: boolean
+}
+
+/** O dinheiro que entra NA ENTREGA — o saldo que faltava. */
+export interface PagamentoNaEntrega {
+  forma: string
+  valor: number
+  parcelas?: number | null
+  empresaId: number
 }
 
 /**
@@ -122,6 +132,7 @@ export interface ResultadoFinalizar {
 export async function finalizarEncomenda(
   supabase: SupabaseClient,
   vendaId: number,
+  pagamento?: PagamentoNaEntrega | null,
 ): Promise<ResultadoFinalizar> {
   const { data: v } = await supabase.from('vendas')
     .select('unidade_id, numero_serie, inventario_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
@@ -131,7 +142,10 @@ export async function finalizarEncomenda(
   const serieDaUnidade = uni?.imei || uni?.numero_serie || null
   const copiouSerie = !v?.numero_serie && !!serieDaUnidade
 
-  const patch: { status: string; data_venda: string; numero_serie?: string } = {
+  const patch: {
+    status: string; data_venda: string; numero_serie?: string
+    forma_pagamento?: string; parcelas?: number
+  } = {
     status: 'concluida',
     // A data da venda passa a ser a da ENTREGA: é quando o dinheiro entra e é
     // por ela que o faturamento do mês conta.
@@ -139,11 +153,43 @@ export async function finalizarEncomenda(
   }
   if (copiouSerie) patch.numero_serie = serieDaUnidade as string
 
+  /**
+   * ⚠️ O DINHEIRO DA ENTREGA PRECISA SER GRAVADO AQUI.
+   *
+   * Até 15/09/2026 não era: as 11 encomendas já entregues da JM, R$ 84.540 de
+   * faturamento, estavam TODAS com `vendas_pagamentos` vazio e `forma_pagamento`
+   * nulo. A venda virava concluída e contava no faturamento, mas nenhum
+   * relatório por forma de pagamento — fechamento de caixa, conciliação de taxa
+   * de cartão — enxergava um centavo dela.
+   *
+   * O saldo é recebido justamente neste momento: a entrada (se houve) entrou no
+   * lançamento, o resto entra agora. Por isso a forma vai junto na venda também,
+   * como em qualquer venda do PDV.
+   */
+  if (pagamento && pagamento.valor > 0.005) {
+    patch.forma_pagamento = pagamento.forma
+    if (pagamento.parcelas && pagamento.parcelas > 1) patch.parcelas = pagamento.parcelas
+  }
+
   const { error } = await supabase.from('vendas').update(patch as never).eq('id', vendaId)
-  if (error) return { ok: false, erro: error.message, baixouEstoque: false, copiouSerie: false }
+  if (error) return { ok: false, erro: error.message, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
+
+  let registrouPagamento = false
+  if (pagamento && pagamento.valor > 0.005) {
+    const { error: ePag } = await supabase.from('vendas_pagamentos').insert({
+      empresa_id: pagamento.empresaId,
+      venda_id: vendaId,
+      forma_pagamento: pagamento.forma,
+      valor_pago: pagamento.valor,
+      parcelas: pagamento.parcelas && pagamento.parcelas > 1 ? pagamento.parcelas : null,
+    } as never)
+    // A venda JÁ está concluída: falhar aqui não desfaz a entrega, que é fato
+    // consumado no balcão. Quem chamou avisa para lançar o pagamento à mão.
+    registrouPagamento = !ePag
+  }
 
   if (v?.unidade_id) {
     await supabase.from('inventario_unidades').update({ status: 'vendido' } as never).eq('id', v.unidade_id)
   }
-  return { ok: true, baixouEstoque: !!v?.unidade_id, copiouSerie }
+  return { ok: true, baixouEstoque: !!v?.unidade_id, copiouSerie, registrouPagamento }
 }
