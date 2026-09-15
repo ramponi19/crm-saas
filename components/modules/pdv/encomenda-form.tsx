@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
+import { ChevronDown, MapPin, Plus, Smartphone, Trash2, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
+import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 
 interface Cli { id: number; nome: string }
-interface Forn { id: number; nome_fantasia: string }
+
+/** Aparelho recebido como entrada. `valor` fica string porque vem de <input>. */
+interface AparelhoEntrada { aparelho: string; imei: string; valor: string }
 
 /**
  * LANÇAR UMA ENCOMENDA — o formulário que mora na aba, não num modal.
@@ -41,6 +44,7 @@ const FORMAS = [
   { key: 'debito', label: 'Débito' },
   { key: 'credito', label: 'Crédito' },
   { key: 'link', label: 'Link' },
+  { key: 'aparelho', label: 'Aparelho semi-novo' },
 ]
 
 /** `YYYY-MM-DD` de hoje + n dias, no fuso local (nada de toISOString aqui). */
@@ -59,8 +63,8 @@ function umaLinha(c: Record<string, string | null> | null): string {
   return [rua, compl, c.bairro, cidade, c.cep].filter(Boolean).join(' · ')
 }
 
-export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
-  clientes: Cli[]; fornecedores: Forn[]; isAdmin: boolean
+export function EncomendaForm({ clientes, taxas = [] }: {
+  clientes: Cli[]; taxas?: Taxa[]
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -83,9 +87,9 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   const [entrada, setEntrada] = useState('')
   const [formaEntrada, setFormaEntrada] = useState('pix')
   const [pagamento, setPagamento] = useState<'a_vista' | 'parcelado'>('a_vista')
-  const [parcelas, setParcelas] = useState('2')
+  const [parcelas, setParcelas] = useState(2)
+  const [aparelhos, setAparelhos] = useState<AparelhoEntrada[]>([{ aparelho: '', imei: '', valor: '' }])
   const [prazo, setPrazo] = useState('')
-  const [fornecedorId, setFornecedorId] = useState('')
   const [obs, setObs] = useState('')
   const [vendedor, setVendedor] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -94,9 +98,35 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   const endereco = enderecoDe?.id === clienteId ? enderecoDe.texto : null
   const especif = [capacidade, cor].filter(Boolean).join(' ')
   const vVenda = Number(valorVenda) || 0
-  const vEntrada = Number(entrada) || 0
+
+  /**
+   * A entrada pode vir em dinheiro OU em aparelho — às vezes nos dois.
+   *
+   * Quando o cliente entrega um semi-novo, o valor avaliado abate do total do
+   * mesmo jeito que o PIX abateria: para a conta do restante, dá na mesma.
+   * A diferença aparece depois — o aparelho vira uma unidade no estoque.
+   */
+  const aparelhosValidos = aparelhos.filter((a) => (Number(a.valor) || 0) > 0)
+  const vAparelhos = aparelhosValidos.reduce((s, a) => s + (Number(a.valor) || 0), 0)
+  const vDinheiro = formaEntrada === 'aparelho' ? 0 : Number(entrada) || 0
+  const vEntrada = vDinheiro + vAparelhos
   const restante = Math.max(0, vVenda - vEntrada)
-  const nParcelas = Math.max(2, Number(parcelas) || 2)
+
+  /**
+   * Parcelas e juros saem das TAXAS CADASTRADAS, não de uma lista fixa.
+   *
+   * Cada loja fecha sua maquininha com percentuais próprios por bandeira e por
+   * número de parcelas. Oferecer 12x quando a loja só tem taxa até 6x é
+   * prometer o que o caixa não consegue cobrar.
+   */
+  const opcoesParcela = parcelasDisponiveis(
+    { id: 'enc', forma: 'credito', valor: restante, bandeira: 'visa_master' }, taxas,
+  )
+  const nParcelas = parcelas
+  const totalComJuros = valorComJuros(
+    { id: 'enc', forma: 'credito', valor: restante, parcelas: nParcelas, bandeira: 'visa_master' }, taxas,
+  )
+  const juros = Math.max(0, totalComJuros - restante)
 
   /** Quem está lançando — vai gravado e aparece na tela para conferência. */
   useEffect(() => {
@@ -141,7 +171,8 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   function limpar() {
     setClienteId(''); setEnderecoDe(null); setProduto(''); setProdutoId(null); setCor(''); setCapacidade('')
     setCoresDisp([]); setArmazDisp([]); setValorVenda(''); setEntrada(''); setFormaEntrada('pix')
-    setPagamento('a_vista'); setParcelas('2'); setPrazo(''); setFornecedorId(''); setObs('')
+    setPagamento('a_vista'); setParcelas(2); setPrazo(''); setObs('')
+    setAparelhos([{ aparelho: '', imei: '', valor: '' }])
   }
 
   async function salvar() {
@@ -174,7 +205,9 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
 
     const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
       empresa_id: empresaId,
-      fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
+      // Fornecedor sai do balcão: quem compra define depois, em Compras. O
+      // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.
+      fornecedor_id: null,
       descricao: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}${cliNome ? ` — ${cliNome}` : ''}`,
       // Sem custo no lançamento: quem define preço de compra preenche depois,
       // pelo lápis da lista. O pedido nasce com zero de propósito.
@@ -224,14 +257,44 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
      * Se este insert falhar, a encomenda FICA: desfazer uma venda válida por
      * causa da entrada seria trocar um problema pequeno por um grande.
      */
+    const vendaId = (venda as { id: number }).id
     if (vEntrada > 0) {
       const { error: e3 } = await supabase.from('vendas_pagamentos').insert({
         empresa_id: empresaId,
-        venda_id: (venda as { id: number }).id,
-        forma_pagamento: formaEntrada,
+        venda_id: vendaId,
+        // Aparelho é pagamento em espécie: entra como `troca`, o mesmo nome que
+        // o PDV usa, para o relatório não ter duas palavras para a mesma coisa.
+        forma_pagamento: formaEntrada === 'aparelho' ? 'troca' : formaEntrada,
         valor_pago: vEntrada,
       } as never)
       if (e3) notify.warn('Encomenda lançada, mas a entrada não foi registrada', 'Lance o pagamento manualmente.')
+    }
+
+    /**
+     * O APARELHO RECEBIDO VIRA ESTOQUE, igual à troca do PDV.
+     *
+     * Entra como `usado` / `tipo: troca` / `status: pendente` — pendente porque
+     * ainda não passou pela avaliação técnica que define preço de revenda. O
+     * valor avaliado no balcão vai como `preco_custo`: foi o que a loja "pagou"
+     * pelo aparelho, abatendo do que o cliente devia.
+     *
+     * Falhar aqui NÃO desfaz a encomenda: o aparelho está fisicamente na loja e
+     * a venda é real. O aviso manda cadastrar no estoque à mão.
+     */
+    if (formaEntrada === 'aparelho' && aparelhosValidos.length > 0) {
+      const { error: e4 } = await supabase.from('inventario_unidades').insert(
+        aparelhosValidos.map((a) => ({
+          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca',
+          status: 'pendente', usuario_id: user?.id ?? null,
+          preco_custo: Number(a.valor) || 0, imei: a.imei.trim() || null,
+          observacoes: `${a.aparelho.trim() || 'Aparelho recebido'} — entrada de encomenda${cliNome ? ` (cliente ${cliNome})` : ''}.`,
+          ativo: true,
+        })) as never,
+      )
+      if (e4) {
+        notify.warn(`${aparelhosValidos.length > 1 ? 'Aparelhos não entraram' : 'Aparelho não entrou'} no estoque`,
+          'A encomenda foi lançada. Cadastre a entrada em Estoque.')
+      }
     }
 
     setSalvando(false)
@@ -320,13 +383,65 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
         <Input label="Total a ser pago (R$)" type="number" required
           value={valorVenda} onChange={(e) => setValorVenda(e.target.value)} placeholder="0,00" />
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Entrada (R$)" type="number" value={entrada}
-            onChange={(e) => setEntrada(e.target.value)} placeholder="0,00" />
-          {vEntrada > 0 && (
-            <Select label="Forma da entrada" value={formaEntrada} onChange={(e) => setFormaEntrada(e.target.value)}>
-              {FORMAS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-            </Select>
+        <div>
+          <Select label="Entrada" value={formaEntrada} onChange={(e) => setFormaEntrada(e.target.value)}>
+            <option value="">— Sem entrada —</option>
+            {FORMAS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </Select>
+
+          {formaEntrada && formaEntrada !== 'aparelho' && (
+            <div className="mt-2.5">
+              <Input type="number" value={entrada} onChange={(e) => setEntrada(e.target.value)} placeholder="0,00" />
+            </div>
+          )}
+
+          {/**
+            * APARELHO COMO ENTRADA.
+            *
+            * O cliente entrega o usado e leva o novo encomendado — na conta do
+            * restante dá no mesmo que ter pago em PIX. A diferença aparece no
+            * fechamento: cada aparelho vira uma unidade no estoque, com o valor
+            * avaliado como custo, igual à troca do PDV.
+            *
+            * IMEI aqui não é burocracia: é o que liga o aparelho recebido ao
+            * cliente que entregou, e sem ele a unidade entra anônima no estoque.
+            */}
+          {formaEntrada === 'aparelho' && (
+            <div className="mt-2.5 space-y-2">
+              {aparelhos.map((a, i) => (
+                <div key={i} className="rounded-control border border-line-soft bg-bg p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Smartphone size={14} strokeWidth={1.8} className="shrink-0 text-ink-3" />
+                    <Input wrapperClassName="flex-1" placeholder="Aparelho (ex.: iPhone 13 128GB Azul)"
+                      value={a.aparelho}
+                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, aparelho: e.target.value } : x))} />
+                    {aparelhos.length > 1 && (
+                      <button type="button" aria-label="Remover aparelho"
+                        onClick={() => setAparelhos((xs) => xs.filter((_, j) => j !== i))}
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-control text-ink-3 transition-colors hover:text-bad">
+                        <Trash2 size={14} strokeWidth={1.8} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Input placeholder="IMEI" value={a.imei}
+                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, imei: e.target.value } : x))} />
+                    <Input type="number" placeholder="Valor avaliado (R$)" value={a.valor}
+                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, valor: e.target.value } : x))} />
+                  </div>
+                </div>
+              ))}
+              <button type="button"
+                onClick={() => setAparelhos((xs) => [...xs, { aparelho: '', imei: '', valor: '' }])}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-accent transition-opacity hover:opacity-80">
+                <Plus size={13} strokeWidth={2} /> Outro aparelho
+              </button>
+              {vAparelhos > 0 && (
+                <p className="text-[12px] text-ink-2">
+                  Entrada em aparelho: <strong className="num text-ink">{formatCurrency(vAparelhos)}</strong>
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -350,13 +465,34 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
             ))}
           </div>
           {pagamento === 'parcelado' && (
-            <div className="mt-2.5 flex items-center gap-2">
-              <Input type="number" min={2} max={24} value={parcelas}
-                onChange={(e) => setParcelas(e.target.value)} wrapperClassName="w-24" />
-              <span className="text-[12.5px] text-ink-2">
-                parcelas{restante > 0 ? ` de ${formatCurrency(restante / nParcelas)}` : ''}
-              </span>
-            </div>
+            opcoesParcela.length > 0 ? (
+              <div className="mt-2.5">
+                <div className="flex flex-wrap gap-1.5">
+                  {opcoesParcela.map((n) => (
+                    <button key={n} type="button" onClick={() => setParcelas(n)}
+                      className={`num h-7 w-11 rounded-control border text-[12px] font-bold transition-colors ${
+                        nParcelas === n ? 'border-ink/30 bg-ink/[0.06] text-ink' : 'border-line text-ink-2 hover:bg-line-soft'}`}>
+                      {n}x
+                    </button>
+                  ))}
+                </div>
+                {restante > 0 && (
+                  <p className="mt-1.5 text-[12px] text-ink-2">
+                    {nParcelas}× de <strong className="num text-ink">{formatCurrency(totalComJuros / nParcelas)}</strong>
+                    {juros > 0.005 && (
+                      <> · cobra <span className="num">{formatCurrency(totalComJuros)}</span> com a taxa da maquininha</>
+                    )}
+                  </p>
+                )}
+              </div>
+            ) : (
+              // Sem taxa cadastrada não dá para prometer parcela: o número que
+              // apareceria aqui seria chute, e quem cobra é o caixa.
+              <p className="mt-2 text-[12px] text-warn">
+                Nenhuma taxa de parcelamento cadastrada. Configure em Administração → Taxas
+                para o sistema calcular as parcelas.
+              </p>
+            )
           )}
         </div>
 
@@ -381,12 +517,6 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
           </div>
         )}
 
-        {isAdmin && (
-          <Select label="Fornecedor (opcional)" value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)}>
-            <option value="">— Definir depois —</option>
-            {fornecedores.map((f) => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
-          </Select>
-        )}
 
         <Textarea label="Observações" rows={2} value={obs} onChange={(e) => setObs(e.target.value)}
           placeholder="Detalhe combinado com o cliente, referência do fornecedor…" />

@@ -8,6 +8,7 @@ import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, Truck } from
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
 import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
+import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 
 /**
  * AS ENCOMENDAS EM ABERTO, no lugar onde o vendedor já está.
@@ -45,7 +46,7 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split('-').reverse().join('/') : null
 
-export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }) {
+export function EncomendasAbertas({ encomendas, taxas = [] }: { encomendas: EncomendaPDV[]; taxas?: Taxa[] }) {
   const router = useRouter()
   const supabase = createClient()
   const [ocupado, setOcupado] = useState<number | null>(null)
@@ -253,6 +254,7 @@ export function EncomendasAbertas({ encomendas }: { encomendas: EncomendaPDV[] }
                 total={e.valor_venda}
                 jaPago={e.sinal_pago}
                 salvando={ocupado === e.id}
+                taxas={taxas}
                 onCancelar={() => setEntregando(null)}
                 onConfirmar={(forma, parcelas) => entregar(e, forma, parcelas)}
               />
@@ -294,17 +296,21 @@ const PARCELA = new Set(['credito', 'link'])
  *
  * Quando a entrada já cobriu tudo, não há o que receber e o passo só confirma.
  */
-function ReceberNaEntrega({ total, jaPago, salvando, onConfirmar, onCancelar }: {
+function ReceberNaEntrega({ total, jaPago, salvando, taxas, onConfirmar, onCancelar }: {
   total: number
   jaPago: number
   salvando: boolean
+  taxas: Taxa[]
   onConfirmar: (forma: string, parcelas: number | null) => void
   onCancelar: () => void
 }) {
   const saldo = Math.max(0, total - jaPago)
   const [forma, setForma] = useState('pix')
-  const [parcelas, setParcelas] = useState(2)
+  const [parcelas, setParcelas] = useState(1)
   const parcela = PARCELA.has(forma)
+  const linha = { id: 'ent', forma, valor: saldo, parcelas, bandeira: 'visa_master' as const }
+  const opcoes = parcelasDisponiveis(linha, taxas)
+  const comJuros = valorComJuros(linha, taxas)
 
   return (
     <div className="mt-3 border-t border-line-soft pt-3">
@@ -330,21 +336,29 @@ function ReceberNaEntrega({ total, jaPago, salvando, onConfirmar, onCancelar }: 
               </button>
             ))}
           </div>
+          {/* Parcelas e juros vêm das taxas cadastradas — as mesmas do PDV. */}
           {parcela && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {[1, 2, 3, 4, 6, 10, 12].map((n) => (
-                <button key={n} type="button" onClick={() => setParcelas(n)}
-                  className={`num h-7 w-10 rounded-control border text-[12px] font-bold transition-colors ${
-                    parcelas === n ? 'border-ink/30 bg-ink/[0.06] text-ink' : 'border-line text-ink-2 hover:bg-line-soft'}`}>
-                  {n}x
-                </button>
-              ))}
-              {parcelas > 1 && (
-                <span className="text-[11.5px] text-ink-3">
-                  de <span className="num">{formatCurrency(saldo / parcelas)}</span>
-                </span>
-              )}
-            </div>
+            opcoes.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {opcoes.map((n) => (
+                  <button key={n} type="button" onClick={() => setParcelas(n)}
+                    className={`num h-7 w-10 rounded-control border text-[12px] font-bold transition-colors ${
+                      parcelas === n ? 'border-ink/30 bg-ink/[0.06] text-ink' : 'border-line text-ink-2 hover:bg-line-soft'}`}>
+                    {n}x
+                  </button>
+                ))}
+                {parcelas > 1 && (
+                  <span className="text-[11.5px] text-ink-3">
+                    de <span className="num">{formatCurrency(comJuros / parcelas)}</span>
+                    {comJuros > saldo + 0.005 && <> · cobra <span className="num">{formatCurrency(comJuros)}</span></>}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-[11.5px] text-warn">
+                Sem taxa cadastrada para esta forma — configure em Administração → Taxas.
+              </p>
+            )
           )}
         </>
       )}
