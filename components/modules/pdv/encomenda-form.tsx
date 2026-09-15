@@ -110,6 +110,18 @@ export function EncomendaForm({ clientes, taxas = [] }: {
   const vAparelhos = aparelhosValidos.reduce((s, a) => s + (Number(a.valor) || 0), 0)
   const vDinheiro = formaEntrada === 'aparelho' ? 0 : Number(entrada) || 0
   const vEntrada = vDinheiro + vAparelhos
+
+  /**
+   * Os aparelhos ficam escritos na observação da venda.
+   *
+   * É o único lugar onde eles existem — não entram no estoque (ver o bloco na
+   * gravação). Sem isto, o abatimento apareceria como "troca R$ 2.000" sem
+   * dizer troca de quê, e daqui a três meses ninguém saberia qual aparelho foi.
+   */
+  const textoAparelhos = aparelhosValidos.length === 0 ? '' :
+    ` Entrada em aparelho: ${aparelhosValidos.map((a) =>
+      `${a.aparelho.trim() || 'aparelho'}${a.imei.trim() ? ` (IMEI ${a.imei.trim()})` : ''} — ${formatCurrency(Number(a.valor) || 0)}`,
+    ).join('; ')}.`
   const restante = Math.max(0, vVenda - vEntrada)
 
   /**
@@ -237,7 +249,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
       previsao_entrega: prazo || null,
       produto_id: produtoId,
       pedido_compra_id: pedidoId,
-      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${obs.trim() ? ' ' + obs.trim() : ''}`,
+      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${textoAparelhos}${obs.trim() ? ' ' + obs.trim() : ''}`,
     } as never).select('id').single()
 
     if (e2 || !venda) {
@@ -271,31 +283,20 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     }
 
     /**
-     * O APARELHO RECEBIDO VIRA ESTOQUE, igual à troca do PDV.
+     * ⚠️ O APARELHO NÃO ENTRA NO ESTOQUE — decisão do dono em 15/09/2026.
      *
-     * Entra como `usado` / `tipo: troca` / `status: pendente` — pendente porque
-     * ainda não passou pela avaliação técnica que define preço de revenda. O
-     * valor avaliado no balcão vai como `preco_custo`: foi o que a loja "pagou"
-     * pelo aparelho, abatendo do que o cliente devia.
+     * A troca do PDV cria uma unidade (`usado` / `tipo: troca` / `pendente`).
+     * Aqui, por ora, o aparelho é só REGISTRO: descrição, IMEI e valor ficam na
+     * observação da venda, e o abatimento aparece como pagamento em `troca`.
      *
-     * Falhar aqui NÃO desfaz a encomenda: o aparelho está fisicamente na loja e
-     * a venda é real. O aviso manda cadastrar no estoque à mão.
+     * O que se ganha: ninguém precisa avaliar e precificar uma fila de unidades
+     * pendentes que o balcão criou sem querer.
+     *
+     * O QUE SE PERDE, dito na cara: o aparelho existe fisicamente na loja e não
+     * existe no inventário. Quem for vendê-lo cadastra na mão, e o custo dele
+     * não entra em nenhum relatório de estoque. Quando a encomenda virar rotina,
+     * vale revisitar — a informação está guardada na observação para isso.
      */
-    if (formaEntrada === 'aparelho' && aparelhosValidos.length > 0) {
-      const { error: e4 } = await supabase.from('inventario_unidades').insert(
-        aparelhosValidos.map((a) => ({
-          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca',
-          status: 'pendente', usuario_id: user?.id ?? null,
-          preco_custo: Number(a.valor) || 0, imei: a.imei.trim() || null,
-          observacoes: `${a.aparelho.trim() || 'Aparelho recebido'} — entrada de encomenda${cliNome ? ` (cliente ${cliNome})` : ''}.`,
-          ativo: true,
-        })) as never,
-      )
-      if (e4) {
-        notify.warn(`${aparelhosValidos.length > 1 ? 'Aparelhos não entraram' : 'Aparelho não entrou'} no estoque`,
-          'A encomenda foi lançada. Cadastre a entrada em Estoque.')
-      }
-    }
 
     setSalvando(false)
     notify.ok(
