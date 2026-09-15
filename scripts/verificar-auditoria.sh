@@ -26,9 +26,11 @@ v "garantia calculada pelo IMEI"         "app/(dashboard)/assistencia/components
 v "garantia procura pela unidade"        "app/(dashboard)/assistencia/components/os-modal.tsx" "inventario_unidades"
 v "financeiro avisa das vendas"          "app/(dashboard)/financeiro/components/financeiro-view.tsx" "As vendas não entram"
 v "relatorio avisa custo faltando"       "components/modules/relatorios/relatorios-view.tsx" "sem custo lançado"
-v "encomenda exige decisao de custo"     "components/modules/pdv/encomenda-form.tsx" "Falta o custo de compra"
-v "encomenda exige preco de venda"       "components/modules/pdv/encomenda-form.tsx" "Informe quanto o cliente vai pagar"
+v "encomenda exige o total"             "components/modules/pdv/encomenda-form.tsx" "Informe o total a ser pago"
+v "custo editavel na lista"             "components/modules/pdv/encomendas-abertas.tsx" "sem custo"
 v "encomenda grava o prazo prometido"    "components/modules/pdv/encomenda-form.tsx" "previsao_entrega: prazo"
+v "entrega registra o pagamento"        "lib/encomendas.ts" "registrouPagamento"
+v "pedido feito nao troca a data"       "components/modules/pdv/encomendas-abertas.tsx" "solicitado_em., null"
 v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
 
 echo "== passada 2: rotas abertas =="
