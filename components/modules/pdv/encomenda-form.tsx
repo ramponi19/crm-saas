@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { ChevronDown, Plus, UserPlus } from 'lucide-react'
+import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
@@ -22,16 +22,17 @@ interface Forn { id: number; nome_fantasia: string }
  * pendências que acabava de aumentar. Aqui o formulário recolhe para cima da
  * própria lista — lançou, fechou, e a encomenda nova está na tela.
  *
- * ══ O QUE MUDOU NA REGRA ═══════════════════════════════════════════════════
+ * ══ OS CAMPOS ══════════════════════════════════════════════════════════════
  *
- * Três coisas que as encomendas reais da JM mostraram estar faltando:
+ * A ordem e o conjunto vieram do dono (15/09/2026), que listou o que a loja
+ * precisa ter na mão ao encomendar: cliente, endereço, produto, capacidade,
+ * cor, total, entrada, restante, à vista ou parcelado, prazo e vendedor.
  *
- *  1. PRAZO em coluna (`vendas.previsao_entrega`), não em texto livre. A #37
- *     dizia "Entregar hoje" — escrito em 21/08. Texto não vira alerta.
- *  2. CUSTO como ESCOLHA, não como campo que dá para pular sem perceber. As
- *     três reais estavam com custo 0 → margem de 100% no relatório.
- *  3. SINAL registrado em `vendas_pagamentos` no ato. Antes o dinheiro que o
- *     cliente adiantava não existia em lugar nenhum do sistema.
+ * ⚠️ NÃO TEM CAMPO DE CUSTO, e isso é escolha, não esquecimento. O custo é
+ * informação do dono, não de quem atende o balcão — e o vendedor não sabe por
+ * quanto a loja vai comprar. Ele continua editável no lápis da lista de
+ * encomendas em aberto, que é onde o aviso "sem custo" aparece e onde quem
+ * define preço de compra vai corrigir.
  */
 
 const FORMAS = [
@@ -49,6 +50,15 @@ function emDias(n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** Endereço em uma linha, pulando o que o cadastro não tem. */
+function umaLinha(c: Record<string, string | null> | null): string {
+  if (!c) return ''
+  const rua = [c.endereco, c.numero].filter(Boolean).join(', ')
+  const compl = c.complemento ? `(${c.complemento})` : ''
+  const cidade = [c.cidade, c.estado].filter(Boolean).join('/')
+  return [rua, compl, c.bairro, cidade, c.cep].filter(Boolean).join(' · ')
+}
+
 export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   clientes: Cli[]; fornecedores: Forn[]; isAdmin: boolean
 }) {
@@ -58,6 +68,7 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
 
   const [aberto, setAberto] = useState(false)
   const [clienteId, setClienteId] = useState('')
+  const [enderecoDe, setEnderecoDe] = useState<{ id: string; texto: string } | null>(null)
   const [cadastroAberto, setCadastroAberto] = useState(false)
   /** Clientes criados aqui: a prop vem do servidor e só muda no refresh. */
   const [clientesNovos, setClientesNovos] = useState<Cli[]>([])
@@ -69,19 +80,56 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   const [cor, setCor] = useState('')
   const [capacidade, setCapacidade] = useState('')
   const [valorVenda, setValorVenda] = useState('')
-  const [custoConhecido, setCustoConhecido] = useState<boolean | null>(null)
-  const [custo, setCusto] = useState('')
+  const [entrada, setEntrada] = useState('')
+  const [formaEntrada, setFormaEntrada] = useState('pix')
+  const [pagamento, setPagamento] = useState<'a_vista' | 'parcelado'>('a_vista')
+  const [parcelas, setParcelas] = useState('2')
   const [prazo, setPrazo] = useState('')
-  const [sinal, setSinal] = useState('')
-  const [formaSinal, setFormaSinal] = useState('pix')
   const [fornecedorId, setFornecedorId] = useState('')
   const [obs, setObs] = useState('')
+  const [vendedor, setVendedor] = useState('')
   const [salvando, setSalvando] = useState(false)
 
+  /** So vale o endereco do cliente que esta selecionado agora. */
+  const endereco = enderecoDe?.id === clienteId ? enderecoDe.texto : null
   const especif = [capacidade, cor].filter(Boolean).join(' ')
   const vVenda = Number(valorVenda) || 0
-  const vSinal = Number(sinal) || 0
-  const falta = Math.max(0, vVenda - vSinal)
+  const vEntrada = Number(entrada) || 0
+  const restante = Math.max(0, vVenda - vEntrada)
+  const nParcelas = Math.max(2, Number(parcelas) || 2)
+
+  /** Quem está lançando — vai gravado e aparece na tela para conferência. */
+  useEffect(() => {
+    let vivo = true
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !vivo) return
+      const { data } = await supabase.from('usuarios').select('nome').eq('id', user.id).maybeSingle()
+      if (vivo) setVendedor(data?.nome ?? user.email ?? '')
+    })()
+    return () => { vivo = false }
+  }, [supabase])
+
+  /**
+   * O endereço vem do cadastro do cliente, não é digitado de novo.
+   *
+   * Encomenda costuma ser entregue ou retirada, e o endereço errado só aparece
+   * na hora ruim. Mostrado aqui para conferir na frente do cliente — quando
+   * falta, o aviso manda completar no cadastro em vez de anotar na observação.
+   */
+  useEffect(() => {
+    if (!clienteId) return
+    let vivo = true
+    ;(async () => {
+      const { data } = await supabase.from('clientes')
+        .select('endereco, numero, complemento, bairro, cidade, estado, cep')
+        .eq('id', Number(clienteId)).maybeSingle()
+      // Guardado COM o id de quem é: trocar de cliente não pode deixar na tela
+      // o endereço do anterior enquanto a consulta nova não volta.
+      if (vivo) setEnderecoDe({ id: clienteId, texto: umaLinha(data as Record<string, string | null> | null) })
+    })()
+    return () => { vivo = false }
+  }, [clienteId, supabase])
 
   async function escolherProduto(p: { id: number; nome: string; preco: number | null }) {
     setProduto(p.nome); setProdutoId(p.id); setCor(''); setCapacidade('')
@@ -91,51 +139,30 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
   }
 
   function limpar() {
-    setClienteId(''); setProduto(''); setProdutoId(null); setCor(''); setCapacidade('')
-    setCoresDisp([]); setArmazDisp([]); setValorVenda(''); setCustoConhecido(null); setCusto('')
-    setPrazo(''); setSinal(''); setFormaSinal('pix'); setFornecedorId(''); setObs('')
+    setClienteId(''); setEnderecoDe(null); setProduto(''); setProdutoId(null); setCor(''); setCapacidade('')
+    setCoresDisp([]); setArmazDisp([]); setValorVenda(''); setEntrada(''); setFormaEntrada('pix')
+    setPagamento('a_vista'); setParcelas('2'); setPrazo(''); setFornecedorId(''); setObs('')
   }
 
   async function salvar() {
-    // Cliente é obrigatório na encomenda: o produto vai ser comprado por causa
-    // dele e alguém precisa avisá-lo quando chegar. Encomenda sem contato é
-    // encomenda que fica encalhada na prateleira.
+    // Cliente é obrigatório: o produto vai ser comprado por causa dele e alguém
+    // precisa avisá-lo quando chegar. Encomenda sem contato encalha na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
     if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
     /**
-     * O PREÇO DE VENDA É OBRIGATÓRIO — e aqui é bloqueio, não aviso.
+     * O TOTAL É OBRIGATÓRIO — e aqui é bloqueio, não aviso.
      *
      * Uma encomenda entrou com o campo vazio e virou venda de R$ 0,00. Pior: uma
      * das reais da JM saiu com R$ 7,60 num iPhone 17 Pro Max — dígito trocado,
-     * ninguém viu. Diferente do custo, que às vezes só aparece com a nota do
-     * fornecedor, o preço cobrado é o que a loja ACABOU de combinar com o
-     * cliente. Se ninguém sabe quanto vai cobrar, não há encomenda para lançar.
+     * ninguém viu. O preço cobrado é o que a loja ACABOU de combinar com o
+     * cliente: se ninguém sabe quanto vai cobrar, não há encomenda para lançar.
      */
     if (!(vVenda > 0)) {
-      notify.warn('Informe quanto o cliente vai pagar', 'Sem isso a encomenda entra como venda de R$ 0,00.')
+      notify.warn('Informe o total a ser pago', 'Sem isso a encomenda entra como venda de R$ 0,00.')
       return
     }
-    /**
-     * CUSTO: ESCOLHA EXPLÍCITA, não campo pulável.
-     *
-     * `valor_custo` alimenta o lucro da venda. Em branco, a encomenda entra como
-     * se o aparelho fosse de graça — margem de 100% num item que a loja ainda
-     * vai pagar. As TRÊS encomendas reais da JM estavam assim, todas com 0.
-     *
-     * O aviso antigo não resolveu porque some sozinho. Agora é preciso dizer
-     * "ainda não sei" — o que é uma resposta legítima (a nota do fornecedor às
-     * vezes chega depois) e fica registrada na lista até alguém preencher.
-     */
-    if (custoConhecido === null) {
-      notify.warn('Falta o custo de compra', 'Informe o valor ou marque "ainda não sei" — sem isso o lucro sai errado.')
-      return
-    }
-    if (custoConhecido && !(Number(custo) > 0)) {
-      notify.warn('Informe o custo de compra', 'Ou marque "ainda não sei" para preencher quando a nota chegar.')
-      return
-    }
-    if (vSinal > vVenda) {
-      notify.warn('Sinal maior que o valor da venda', 'Confira os dois números.')
+    if (vEntrada > vVenda) {
+      notify.warn('Entrada maior que o total', 'Confira os dois números.')
       return
     }
 
@@ -144,13 +171,14 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
     setSalvando(true)
     const { data: { user } } = await supabase.auth.getUser()
     const cliNome = listaClientes.find((c) => String(c.id) === clienteId)?.nome ?? ''
-    const vCusto = custoConhecido ? Number(custo) || 0 : 0
 
     const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
       empresa_id: empresaId,
       fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
       descricao: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}${cliNome ? ` — ${cliNome}` : ''}`,
-      valor_total: vCusto,
+      // Sem custo no lançamento: quem define preço de compra preenche depois,
+      // pelo lápis da lista. O pedido nasce com zero de propósito.
+      valor_total: 0,
       status: 'aberto',
       usuario_id: user?.id ?? null,
       data_pedido: new Date().toISOString(),
@@ -164,13 +192,14 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
     const { data: venda, error: e2 } = await supabase.from('vendas').insert({
       empresa_id: empresaId,
       valor_venda: vVenda,
-      // Agora VAI para a venda, não só para o pedido: é daqui que sai o lucro.
-      valor_custo: vCusto,
       status: 'encomenda',
       cliente_id: Number(clienteId),
       vendedor_id: user?.id ?? null,
       canal_venda: 'encomenda',
       data_venda: new Date().toISOString(),
+      // O combinado com o cliente, para a entrega já saber o que cobrar.
+      forma_pagamento: pagamento,
+      parcelas: pagamento === 'parcelado' ? nParcelas : null,
       // O prazo prometido em coluna: é o que vira "3 dias de atraso" na lista.
       previsao_entrega: prazo || null,
       produto_id: produtoId,
@@ -185,31 +214,30 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
     }
 
     /**
-     * O SINAL entra como pagamento da venda pendente.
+     * A ENTRADA entra como pagamento da venda pendente.
      *
      * Não é faturamento — a venda só conta quando é entregue. Mas o dinheiro já
      * está no caixa, e antes disto ele não existia em lugar nenhum: o vendedor
-     * escrevia "pagou 500 de sinal" na observação e a conferência do dia não
-     * batia. `vendas_pagamentos` é 1:N, então o resto entra na entrega.
+     * escrevia "pagou 500 de entrada" na observação e a conferência do dia não
+     * batia. `vendas_pagamentos` é 1:N, então o restante entra na entrega.
      *
      * Se este insert falhar, a encomenda FICA: desfazer uma venda válida por
-     * causa do sinal seria trocar um problema pequeno por um grande. O aviso
-     * diz o que fazer.
+     * causa da entrada seria trocar um problema pequeno por um grande.
      */
-    if (vSinal > 0) {
+    if (vEntrada > 0) {
       const { error: e3 } = await supabase.from('vendas_pagamentos').insert({
         empresa_id: empresaId,
         venda_id: (venda as { id: number }).id,
-        forma_pagamento: formaSinal,
-        valor_pago: vSinal,
+        forma_pagamento: formaEntrada,
+        valor_pago: vEntrada,
       } as never)
-      if (e3) notify.warn('Encomenda lançada, mas o sinal não foi registrado', 'Lance o pagamento manualmente.')
+      if (e3) notify.warn('Encomenda lançada, mas a entrada não foi registrada', 'Lance o pagamento manualmente.')
     }
 
     setSalvando(false)
     notify.ok(
       'Encomenda lançada',
-      falta > 0.005 ? `Falta receber ${formatCurrency(falta)} na entrega.` : 'Pedido de compra criado + venda pendente.',
+      restante > 0.005 ? `Falta receber ${formatCurrency(restante)} na entrega.` : 'Pedido de compra criado + venda pendente.',
     )
     limpar(); setAberto(false); router.refresh()
   }
@@ -254,7 +282,21 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
           </button>
         </div>
 
-        <ProdutoAutocomplete label="Produto a encomendar" value={produto}
+        {/* Endereço do cadastro — não se digita de novo, só se confere. */}
+        {clienteId && (
+          <div className="flex items-start gap-2 rounded-control bg-bg px-3 py-2">
+            <MapPin size={14} strokeWidth={1.8} className="mt-[3px] shrink-0 text-ink-3" />
+            {endereco ? (
+              <span className="text-[12.5px] leading-snug text-ink-2">{endereco}</span>
+            ) : (
+              <span className="text-[12.5px] leading-snug text-warn">
+                Cliente sem endereço no cadastro — complete em Clientes se a encomenda for entregue.
+              </span>
+            )}
+          </div>
+        )}
+
+        <ProdutoAutocomplete label="Produto" value={produto}
           onChange={(v) => { setProduto(v); setProdutoId(null); setCoresDisp([]); setArmazDisp([]); setCor(''); setCapacidade('') }}
           onSelect={escolherProduto} />
 
@@ -275,33 +317,46 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
           </div>
         )}
 
-        <Input label="Venda — quanto o cliente paga (R$)" type="number" required
+        <Input label="Total a ser pago (R$)" type="number" required
           value={valorVenda} onChange={(e) => setValorVenda(e.target.value)} placeholder="0,00" />
 
-        {/* CUSTO: a pergunta vem antes do campo, e não dá para atravessar. */}
-        <div className="rounded-control border border-line-soft bg-bg p-3">
-          <p className="text-[12px] font-medium text-ink-2">Custo de compra</p>
-          <div className="mt-2 flex gap-2">
-            <button type="button" onClick={() => setCustoConhecido(true)}
-              className={`h-8 rounded-control px-3 text-[12px] font-semibold transition-colors ${
-                custoConhecido === true ? 'bg-ink text-white' : 'border border-line bg-card text-ink-2 hover:bg-line-soft'}`}>
-              Sei o valor
-            </button>
-            <button type="button" onClick={() => { setCustoConhecido(false); setCusto('') }}
-              className={`h-8 rounded-control px-3 text-[12px] font-semibold transition-colors ${
-                custoConhecido === false ? 'bg-ink text-white' : 'border border-line bg-card text-ink-2 hover:bg-line-soft'}`}>
-              Ainda não sei
-            </button>
-          </div>
-          {custoConhecido === true && (
-            <div className="mt-2.5">
-              <Input type="number" value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="0,00" autoFocus />
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Entrada (R$)" type="number" value={entrada}
+            onChange={(e) => setEntrada(e.target.value)} placeholder="0,00" />
+          {vEntrada > 0 && (
+            <Select label="Forma da entrada" value={formaEntrada} onChange={(e) => setFormaEntrada(e.target.value)}>
+              {FORMAS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </Select>
           )}
-          {custoConhecido === false && (
-            <p className="mt-2 text-[11px] text-warn">
-              A encomenda fica marcada como <strong>sem custo</strong> na lista até alguém preencher — o lucro dela sai como 100% enquanto isso.
-            </p>
+        </div>
+
+        {/* O restante é a conta que o cliente leva na cabeça — fica na tela. */}
+        {vVenda > 0 && (
+          <div className="flex items-baseline justify-between rounded-control bg-accent-soft px-3 py-2">
+            <span className="text-[12.5px] font-medium text-ink-2">Restante a pagar na entrega</span>
+            <span className="num text-[16px] font-bold text-accent">{formatCurrency(restante)}</span>
+          </div>
+        )}
+
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-ink-2">Como o restante será pago</p>
+          <div className="flex gap-2">
+            {([['a_vista', 'À vista'], ['parcelado', 'Parcelado']] as const).map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setPagamento(k)}
+                className={`h-8 rounded-control px-3.5 text-[12px] font-semibold transition-colors ${
+                  pagamento === k ? 'bg-ink text-white' : 'border border-line bg-card text-ink-2 hover:bg-line-soft'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {pagamento === 'parcelado' && (
+            <div className="mt-2.5 flex items-center gap-2">
+              <Input type="number" min={2} max={24} value={parcelas}
+                onChange={(e) => setParcelas(e.target.value)} wrapperClassName="w-24" />
+              <span className="text-[12.5px] text-ink-2">
+                parcelas{restante > 0 ? ` de ${formatCurrency(restante / nParcelas)}` : ''}
+              </span>
+            </div>
           )}
         </div>
 
@@ -319,20 +374,11 @@ export function EncomendaForm({ clientes, fornecedores, isAdmin }: {
           </div>
         </div>
 
-        {/* SINAL: opcional. Quem não pegou sinal deixa em branco e segue. */}
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Sinal pago agora (opcional)" type="number" value={sinal}
-            onChange={(e) => setSinal(e.target.value)} placeholder="0,00" />
-          {vSinal > 0 && (
-            <Select label="Forma do sinal" value={formaSinal} onChange={(e) => setFormaSinal(e.target.value)}>
-              {FORMAS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-            </Select>
-          )}
-        </div>
-        {vSinal > 0 && vVenda > 0 && (
-          <p className="-mt-1 text-[12px] text-ink-2">
-            Falta receber na entrega: <strong className="num text-ink">{formatCurrency(falta)}</strong>
-          </p>
+        {vendedor && (
+          <div className="flex items-baseline justify-between rounded-control bg-bg px-3 py-2">
+            <span className="text-[12px] text-ink-3">Vendedor</span>
+            <span className="text-[12.5px] font-semibold text-ink-2">{vendedor}</span>
+          </div>
         )}
 
         {isAdmin && (
