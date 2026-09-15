@@ -56,7 +56,7 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; fornecedores?: { id: number; nome_fantasia: string }[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /**
  * Aparelho entregue na troca. `valor` fica string porque vem de <input>.
@@ -93,7 +93,7 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, fornecedores = [], isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
   // Comanda é comportamento (mesa/balcão), não segmento: bar, cafeteria e
   // qualquer atendimento por mesa usam o mesmo campo.
   const isFood = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaComanda
@@ -1007,8 +1007,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
         {aba === 'encomenda' ? (
           <div className="mx-auto max-w-[720px] space-y-4">
-            <EncomendaForm clientes={clientes} fornecedores={fornecedores} isAdmin={isAdmin} />
-            <EncomendasAbertas encomendas={encomendas} />
+            <EncomendaForm clientes={clientes} taxas={taxas} />
+            <EncomendasAbertas encomendas={encomendas} taxas={taxas} />
           </div>
         ) : (
         <div className="grid grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">

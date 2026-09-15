@@ -14,8 +14,6 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function PDVPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: { user } } = await supabase.auth.getUser()
-
   // Expiração preguiçosa das reservas de lead (48h): vencida volta a disponível.
   await supabase
     .from('inventario_unidades')
@@ -32,9 +30,6 @@ export default async function PDVPage() {
     { data: taxas },
     { data: vendasRecentes },
     { data: empresa },
-    { data: fornecedores },
-    vinculoRes,
-    usuarioRes,
     { data: tabelaPrecos },
     { data: cfgTroca },
     { data: encomendasRaw },
@@ -62,9 +57,6 @@ export default async function PDVPage() {
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
     supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
-    supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
-    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
-    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     // Referência de preço do aparelho recebido em troca + a tolerância da loja.
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),
@@ -88,9 +80,6 @@ export default async function PDVPage() {
   ])
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
-
-  const role = (vinculoRes?.data as { role?: string } | null)?.role
-  const isAdmin = !!((usuarioRes?.data as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
   type UnidadeRow = Tables<'inventario_unidades'> & {
     produtos: Embed<{
@@ -192,8 +181,6 @@ export default async function PDVPage() {
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
           segmento={empresa?.segmento ?? null}
-          fornecedores={fornecedores ?? []}
-          isAdmin={isAdmin}
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
           encomendas={encomendas}
