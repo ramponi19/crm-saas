@@ -73,11 +73,20 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra!pedido_compra_id(id, status, fornecedor_id), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
   ])
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: vinculo }, { data: usuario }] = await Promise.all([
+    user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
+    user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+  ])
+  // Quem compra e quem marca "pedido feito" — o vendedor ve a etapa, nao o botao.
+  const role = (vinculo as { role?: string } | null)?.role
+  const isAdmin = !!((usuario as { is_super_admin?: boolean } | null)?.is_super_admin || role === 'owner' || role === 'admin')
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
 
@@ -138,7 +147,7 @@ export default async function PDVPage() {
     unidade_id: number | null; data_venda: string | null
     clientes: Embed<{ nome: string | null; telefone: string | null }>
     produtos: Embed<{ nome: string | null }>
-    pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null }>
+    pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null; solicitado_em: string | null }>
     vendas_pagamentos: { valor_pago: number | null }[] | null
   }
   const encomendas: EncomendaPDV[] = ((encomendasRaw ?? []) as unknown as EncomendaRow[]).map((v) => {
@@ -161,6 +170,7 @@ export default async function PDVPage() {
       pedido_id: ped?.id ?? null,
       status_pedido: ped?.status ?? null,
       tem_fornecedor: ped?.fornecedor_id != null,
+      solicitado_em: ped?.solicitado_em ?? null,
       // Somado aqui, no servidor: a lista só precisa do total já pago.
       sinal_pago: (v.vendas_pagamentos ?? []).reduce((s, p) => s + (Number(p.valor_pago) || 0), 0),
     }
@@ -184,6 +194,7 @@ export default async function PDVPage() {
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
           encomendas={encomendas}
+          isAdmin={isAdmin}
         documentos={documentos} />
       </div>
     </>
