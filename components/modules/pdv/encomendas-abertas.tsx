@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
-import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
+import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 
@@ -44,6 +44,43 @@ export interface EncomendaPDV {
   solicitado_em: string | null
 }
 
+/** Uma encomenda na tela: os itens somados, com a lista por dentro. */
+interface Encomenda extends EncomendaPDV {
+  itens: EncomendaPDV[]
+}
+
+/**
+ * OS ITENS VIRAM UMA ENCOMENDA SÓ.
+ *
+ * Cada item é uma venda própria no banco — é o que deixa um aparelho chegar
+ * antes do outro. Na tela isso vira um card, porque o cliente encomendou UMA
+ * vez: três linhas soltas do mesmo nome fariam parecer três pendências.
+ *
+ * ⚠️ O ESTADO DO GRUPO É O DO ITEM MENOS ADIANTADO. Uma encomenda de três
+ * aparelhos com dois na loja ainda não é "chegou" — entregar assim mandaria o
+ * cliente embora sem um dos produtos. Só quando o último chega é que a
+ * encomenda chegou.
+ */
+function juntar(itens: EncomendaPDV[]): Encomenda {
+  const base = itens[0]
+  const soma = (f: (i: EncomendaPDV) => number) => itens.reduce((s, i) => s + f(i), 0)
+  const todos = (f: (i: EncomendaPDV) => boolean) => itens.every(f)
+  return {
+    ...base,
+    valor_venda: soma((i) => i.valor_venda),
+    valor_custo: soma((i) => i.valor_custo),
+    sinal_pago: soma((i) => i.sinal_pago),
+    produto_nome: itens.length === 1 ? base.produto_nome : `${itens.length} produtos`,
+    status_pedido: todos((i) => i.status_pedido === 'recebido') ? 'recebido' : null,
+    unidade_id: todos((i) => i.unidade_id != null) ? base.unidade_id : null,
+    solicitado_em: todos((i) => !!i.solicitado_em) ? base.solicitado_em : null,
+    tem_fornecedor: todos((i) => i.tem_fornecedor),
+    // O prazo do grupo é o mais apertado: é por ele que a encomenda atrasa.
+    previsao_entrega: itens.map((i) => i.previsao_entrega).filter(Boolean).sort()[0] ?? null,
+    itens,
+  }
+}
+
 const ROTULO_ETAPA: Record<Etapa, string> = {
   lancada: 'Lançada', solicitada: 'Pedido', chegou: 'Chegou', entregue: 'Entregue',
 }
@@ -55,7 +92,7 @@ const ROTULO_ETAPA: Record<Etapa, string> = {
  * indistinguível de uma pedida ontem: o vendedor não sabia se cobrava o dono ou
  * se só esperava o fornecedor. A bolinha preenchida responde isso de longe.
  */
-function Trilha({ e }: { e: EncomendaPDV }) {
+function Trilha({ e }: { e: Encomenda }) {
   const atual = indiceEtapa(e)
   return (
     <div className="mt-2.5 flex items-start">
@@ -103,26 +140,49 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * mesma lista. Um PDV fica aberto a noite inteira no balcão.
    */
   const [hoje] = useState(() => new Date())
-  const ordenadas = useMemo(() => ordenarPorUrgencia(encomendas, hoje), [encomendas, hoje])
+  // Agrupa ANTES de ordenar: a urgencia e da encomenda, nao do item solto.
+  const ordenadas = useMemo(
+    () => ordenarPorUrgencia(agruparPorEncomenda(encomendas).map((g) => juntar(g.itens)), hoje),
+    [encomendas, hoje],
+  )
 
   const atrasadas = ordenadas.filter((e) => diagnosticar(e, hoje).situacao === 'atrasada').length
   const chegaram = ordenadas.filter((e) => diagnosticar(e, hoje).situacao === 'chegou').length
 
-  /** A peça chegou: dá entrada no estoque, já reservada para este cliente. */
-  async function receber(e: EncomendaPDV) {
-    if (!e.pedido_id) {
+  /**
+   * A peça chegou: dá entrada no estoque, já reservada para este cliente.
+   *
+   * Roda item a item — cada um tem seu pedido de compra, e é isso que permite
+   * receber uma encomenda de três aparelhos quando os três chegam juntos, que é
+   * o caso comum, sem impedir o dia em que chegarem separados.
+   *
+   * Item já recebido é pulado pelo próprio endpoint (`jaRecebido`), então
+   * apertar de novo não cria unidade duplicada.
+   */
+  async function receber(e: Encomenda) {
+    const pendentes = e.itens.filter((i) => i.pedido_id && i.status_pedido !== 'recebido')
+    if (pendentes.length === 0) {
       notify.bad('Encomenda sem pedido de compra', 'Não dá para dar entrada sem o pedido. Confira em Compras.')
       return
     }
     setOcupado(e.id)
-    const r = await fetch('/api/compras/receber', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pedidoId: e.pedido_id }),
-    })
+    let ok = 0; let erro: string | null = null
+    for (const item of pendentes) {
+      const r = await fetch('/api/compras/receber', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoId: item.pedido_id }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (r.ok) ok++
+      else if (!erro) erro = j.error ?? 'falha ao dar entrada'
+    }
     setOcupado(null)
-    const j = await r.json().catch(() => ({}))
-    if (!r.ok) { notify.bad('Não deu para registrar a chegada', j.error); return }
-    notify.ok('Chegou', `Reservado para ${e.cliente_nome}. Avise que está na loja.`)
+    if (ok === 0) { notify.bad('Não deu para registrar a chegada', erro ?? undefined); return }
+    if (erro) {
+      notify.warn(`${ok} de ${pendentes.length} itens deram entrada`, `O restante falhou: ${erro}`)
+    } else {
+      notify.ok('Chegou', `Reservado para ${e.cliente_nome}. Avise que está na loja.`)
+    }
     router.refresh()
   }
 
@@ -136,20 +196,24 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * `is('solicitado_em', null)` no filtro: marcar de novo trocaria a data do
    * pedido original, que é justamente a que interessa para cobrar o fornecedor.
    */
-  async function marcarSolicitado(e: EncomendaPDV) {
-    if (!e.pedido_id) {
+  async function marcarSolicitado(e: Encomenda) {
+    const ids = e.itens.map((i) => i.pedido_id).filter((x): x is number => x != null)
+    if (ids.length === 0) {
       notify.bad('Encomenda sem pedido de compra', 'Confira em Compras.')
       return
     }
     setOcupado(e.id)
     const { data: { user } } = await supabase.auth.getUser()
+    // Todos os itens de uma vez: o dono liga para o fornecedor e pede a
+    // encomenda inteira — cobrar um clique por aparelho seria atrito à toa.
     const { error } = await supabase.from('pedidos_compra')
       .update({ solicitado_em: new Date().toISOString(), solicitado_por: user?.id ?? null } as never)
-      .eq('id', e.pedido_id)
+      .in('id', ids)
       .is('solicitado_em', null)
     setOcupado(null)
     if (error) { notify.bad('Não deu para marcar', error.message); return }
-    notify.ok('Pedido registrado', `${e.produto_nome} — a equipe já vê que foi encomendado.`)
+    notify.ok('Pedido registrado',
+      `${e.produto_nome} — a equipe já vê que ${ids.length > 1 ? 'foram encomendados' : 'foi encomendado'}.`)
     router.refresh()
   }
 
@@ -160,24 +224,38 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * até 15/09/2026 ele não era gravado em lugar nenhum: 11 encomendas
    * entregues, R$ 84.540, todas sem uma linha em `vendas_pagamentos`.
    */
-  async function entregar(e: EncomendaPDV, forma: string, parcelas: number | null) {
+  async function entregar(e: Encomenda, forma: string, parcelas: number | null) {
     const saldo = Math.max(0, e.valor_venda - e.sinal_pago)
     const empresaId = await empresaAtualId(supabase)
     if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página.'); return }
 
     setOcupado(e.id)
-    const r = await finalizarEncomenda(supabase, e.id,
-      saldo > 0.005 ? { forma, valor: saldo, parcelas, empresaId } : null)
+    /**
+     * Cada item conclui a sua venda, mas o DINHEIRO ENTRA UMA VEZ SÓ.
+     *
+     * O saldo é do conjunto: o cliente paga o que falta da encomenda inteira,
+     * não parcela por aparelho. Gravar o recebimento em cada venda multiplicaria
+     * o valor recebido pelo número de itens — um erro de caixa que só apareceria
+     * no fechamento do mês.
+     */
+    let falhou: string | null = null
+    let pagou = false
+    for (const [n, item] of e.itens.entries()) {
+      const r = await finalizarEncomenda(supabase, item.id,
+        n === 0 && saldo > 0.005 ? { forma, valor: saldo, parcelas, empresaId } : null)
+      if (!r.ok) { falhou = r.erro ?? 'erro ao concluir'; break }
+      if (n === 0) pagou = r.registrouPagamento
+    }
     setOcupado(null)
-    if (!r.ok) { notify.bad('Erro ao finalizar', r.erro); return }
 
-    if (saldo > 0.005 && !r.registrouPagamento) {
+    if (falhou) { notify.bad('Erro ao finalizar', falhou); return }
+    if (saldo > 0.005 && !pagou) {
       notify.warn('Entrega concluída, mas o recebimento não foi gravado',
         `Lance ${formatCurrency(saldo)} manualmente no financeiro.`)
     } else {
       notify.ok('Venda concluída',
         saldo > 0.005 ? `${formatCurrency(saldo)} recebido em ${forma}.`
-          : r.baixouEstoque ? 'Unidade baixada do estoque.' : 'Contabilizada no faturamento.')
+          : 'Contabilizada no faturamento.')
     }
     setEntregando(null)
     router.refresh()
@@ -195,19 +273,33 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * O custo vai junto para o pedido de compra: são o mesmo número visto de dois
    * lados, e deixar um só atualizado seria criar a divergência que ninguém acha.
    */
-  async function salvarAjuste(e: EncomendaPDV, venda: string, custo: string, prazo: string) {
-    const vVenda = Number(venda)
-    if (!(vVenda > 0)) { notify.warn('O valor da venda precisa ser maior que zero'); return }
-    const vCusto = Number(custo) || 0
+  async function salvarAjuste(
+    e: Encomenda,
+    linhas: { id: number; venda: string; custo: string }[],
+    prazo: string,
+  ) {
+    if (linhas.some((l) => !(Number(l.venda) > 0))) {
+      notify.warn('Cada item precisa de um valor maior que zero')
+      return
+    }
     setOcupado(e.id)
-    const { error } = await supabase.from('vendas')
-      .update({ valor_venda: vVenda, valor_custo: vCusto, previsao_entrega: prazo || null } as never)
-      .eq('id', e.id)
-    if (!error && e.pedido_id && vCusto > 0) {
-      await supabase.from('pedidos_compra').update({ valor_total: vCusto } as never).eq('id', e.pedido_id)
+    let erro: string | null = null
+    for (const l of linhas) {
+      const vCusto = Number(l.custo) || 0
+      const { error } = await supabase.from('vendas')
+        .update({ valor_venda: Number(l.venda), valor_custo: vCusto, previsao_entrega: prazo || null } as never)
+        .eq('id', l.id)
+      if (error) { erro = error.message; break }
+      // O custo vai junto para o pedido de compra do MESMO item: são o mesmo
+      // número visto de dois lados, e deixar um só atualizado cria a
+      // divergência que ninguém acha depois.
+      const pedido = e.itens.find((i) => i.id === l.id)?.pedido_id
+      if (pedido && vCusto > 0) {
+        await supabase.from('pedidos_compra').update({ valor_total: vCusto } as never).eq('id', pedido)
+      }
     }
     setOcupado(null)
-    if (error) { notify.bad('Não deu para salvar', error.message); return }
+    if (erro) { notify.bad('Não deu para salvar', erro); return }
     notify.ok('Encomenda atualizada')
     setEditando(null)
     router.refresh()
@@ -237,7 +329,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[12.5px] font-semibold tracking-[0.04em] text-ink-2">EM ABERTO</span>
-        <span className="text-[12px] text-ink-3">{encomendas.length}</span>
+        <span className="text-[12px] text-ink-3">{ordenadas.length}</span>
         {atrasadas > 0 && <Badge tone="bad" dot>{atrasadas} atrasada{atrasadas > 1 ? 's' : ''}</Badge>}
         {chegaram > 0 && <Badge tone="ok" dot>{chegaram} para entregar</Badge>}
       </div>
@@ -262,6 +354,9 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-[13.5px] font-semibold text-ink">{e.cliente_nome}</span>
                   <span className="truncate text-[13px] text-ink-2">· {e.produto_nome}</span>
+                  {e.itens.length > 1 && (
+                    <Badge tone="acc">{e.itens.length} itens</Badge>
+                  )}
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">
@@ -292,6 +387,25 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
                     {!e.tem_fornecedor && <span>⚠ sem fornecedor</span>}
                   </div>
                 )}
+                {/* Os itens, quando são mais de um: cada linha com o que falta
+                    nela, porque um aparelho pode ter chegado e o outro não. */}
+                {e.itens.length > 1 && (
+                  <ul className="mt-2 space-y-1 border-l-2 border-line-soft pl-2.5">
+                    {e.itens.map((i) => {
+                      const chegouItem = i.status_pedido === 'recebido' || i.unidade_id != null
+                      return (
+                        <li key={i.id} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
+                          <span className={chegouItem ? 'text-ink-2' : 'text-ink-3'}>{i.produto_nome}</span>
+                          <span className="num text-ink-3">{formatCurrency(i.valor_venda)}</span>
+                          {chegouItem
+                            ? <span className="text-[10.5px] font-semibold text-ok">na loja</span>
+                            : <span className="text-[10.5px] text-ink-3">{i.solicitado_em ? 'pedido' : 'a pedir'}</span>}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
                 <Trilha e={e} />
               </div>
 
@@ -344,7 +458,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
                 encomenda={e}
                 salvando={ocupado === e.id}
                 onCancelar={() => setEditando(null)}
-                onSalvar={(venda, custo, prazo) => salvarAjuste(e, venda, custo, prazo)}
+                onSalvar={(linhas, prazo) => { void salvarAjuste(e, linhas, prazo) }}
               />
             )}
           </div>
@@ -454,25 +568,46 @@ function ReceberNaEntrega({ total, jaPago, salvando, taxas, onConfirmar, onCance
 
 /** Os três campos que a encomenda pode ter nascido errados. */
 function AjusteInline({ encomenda, salvando, onSalvar, onCancelar }: {
-  encomenda: EncomendaPDV
+  encomenda: Encomenda
   salvando: boolean
-  onSalvar: (venda: string, custo: string, prazo: string) => void
+  onSalvar: (linhas: { id: number; venda: string; custo: string }[], prazo: string) => void
   onCancelar: () => void
 }) {
-  const [venda, setVenda] = useState(String(encomenda.valor_venda || ''))
-  const [custo, setCusto] = useState(encomenda.valor_custo > 0 ? String(encomenda.valor_custo) : '')
+  const [linhas, setLinhas] = useState(
+    encomenda.itens.map((i) => ({
+      id: i.id,
+      nome: i.produto_nome,
+      venda: String(i.valor_venda || ''),
+      custo: i.valor_custo > 0 ? String(i.valor_custo) : '',
+    })),
+  )
   const [prazo, setPrazo] = useState(encomenda.previsao_entrega?.slice(0, 10) ?? '')
+  const mexer = (id: number, patch: Partial<{ venda: string; custo: string }>) =>
+    setLinhas((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x)))
 
   return (
     <div className="mt-3 border-t border-line-soft pt-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Input label="Venda (R$)" type="number" value={venda} onChange={(ev) => setVenda(ev.target.value)} />
-        <Input label="Custo (R$)" type="number" value={custo} onChange={(ev) => setCusto(ev.target.value)} placeholder="0,00" />
-        <Input label="Prazo prometido" type="date" value={prazo} onChange={(ev) => setPrazo(ev.target.value)} />
+      <div className="space-y-2.5">
+        {linhas.map((l) => (
+          <div key={l.id}>
+            {linhas.length > 1 && (
+              <p className="mb-1 truncate text-[11.5px] font-medium text-ink-2">{l.nome}</p>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <Input label="Venda (R$)" type="number" value={l.venda}
+                onChange={(ev) => mexer(l.id, { venda: ev.target.value })} />
+              <Input label="Custo (R$)" type="number" value={l.custo} placeholder="0,00"
+                onChange={(ev) => mexer(l.id, { custo: ev.target.value })} />
+            </div>
+          </div>
+        ))}
+        <Input label="Prazo prometido" type="date" value={prazo}
+          onChange={(ev) => setPrazo(ev.target.value)}
+          hint={linhas.length > 1 ? 'Vale para a encomenda inteira.' : undefined} />
       </div>
       <div className="mt-2.5 flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onCancelar}>Cancelar</Button>
-        <Button size="sm" loading={salvando} onClick={() => onSalvar(venda, custo, prazo)}>Salvar</Button>
+        <Button size="sm" loading={salvando} onClick={() => onSalvar(linhas, prazo)}>Salvar</Button>
       </div>
     </div>
   )
