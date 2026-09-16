@@ -107,6 +107,30 @@ export function diagnosticar(e: EncomendaAberta, hoje = new Date()): Diagnostico
   return { situacao: 'no_prazo', dias, rotulo: `Faltam ${-dias} ${dias === -1 ? 'dia' : 'dias'}`, tom: 'acc' }
 }
 
+/**
+ * JUNTA OS ITENS DA MESMA ENCOMENDA.
+ *
+ * Cada item vira uma venda própria — é o que deixa um aparelho chegar antes do
+ * outro. Mas na tela isso não pode virar três cards do mesmo cliente: quem
+ * atende encomendou UMA vez, e ver o pedido rachado em linhas soltas faz
+ * parecer que há três pendências onde há uma.
+ *
+ * Encomenda antiga (antes de 16/09/2026) não tem grupo: cada uma é o próprio
+ * grupo, e o `id` da venda serve de chave.
+ */
+export function agruparPorEncomenda<T extends { id: number; grupo_pdv?: string | null }>(
+  lista: T[],
+): { chave: string; itens: T[] }[] {
+  const mapa = new Map<string, T[]>()
+  for (const v of lista) {
+    const chave = v.grupo_pdv ?? `venda-${v.id}`
+    const atual = mapa.get(chave)
+    if (atual) atual.push(v)
+    else mapa.set(chave, [v])
+  }
+  return [...mapa].map(([chave, itens]) => ({ chave, itens }))
+}
+
 /** Atrasada e sem prazo primeiro: é o que precisa de alguém. */
 export function ordenarPorUrgencia<T extends EncomendaAberta>(lista: T[], hoje = new Date()): T[] {
   const peso: Record<Situacao, number> = {

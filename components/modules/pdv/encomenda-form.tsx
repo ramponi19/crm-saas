@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { ChevronDown, MapPin, Plus, Smartphone, Trash2, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, notify } from '@/components/ui'
-import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
+import { EncomendaItens, itemVazio, itensValidos, descreverItem, type ItemEncomenda } from './encomenda-itens'
 
 interface Cli { id: number; nome: string }
 
@@ -77,13 +77,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
   /** Clientes criados aqui: a prop vem do servidor e só muda no refresh. */
   const [clientesNovos, setClientesNovos] = useState<Cli[]>([])
   const listaClientes = [...clientesNovos, ...clientes.filter((c) => !clientesNovos.some((n) => n.id === c.id))]
-  const [produto, setProduto] = useState('')
-  const [produtoId, setProdutoId] = useState<number | null>(null)
-  const [coresDisp, setCoresDisp] = useState<string[]>([])
-  const [armazDisp, setArmazDisp] = useState<string[]>([])
-  const [cor, setCor] = useState('')
-  const [capacidade, setCapacidade] = useState('')
-  const [valorVenda, setValorVenda] = useState('')
+  const [itens, setItens] = useState<ItemEncomenda[]>([itemVazio()])
   const [entrada, setEntrada] = useState('')
   const [formaEntrada, setFormaEntrada] = useState('pix')
   const [pagamento, setPagamento] = useState<'a_vista' | 'parcelado'>('a_vista')
@@ -96,8 +90,10 @@ export function EncomendaForm({ clientes, taxas = [] }: {
 
   /** So vale o endereco do cliente que esta selecionado agora. */
   const endereco = enderecoDe?.id === clienteId ? enderecoDe.texto : null
-  const especif = [capacidade, cor].filter(Boolean).join(' ')
-  const vVenda = Number(valorVenda) || 0
+  /** O total e a SOMA dos itens: com varios produtos, digitar a mao seria
+   *  convidar a divergencia que ninguem acha depois. */
+  const validos = itensValidos(itens)
+  const vVenda = validos.reduce((s, i) => s + (Number(i.valor) || 0), 0)
 
   /**
    * A entrada pode vir em dinheiro OU em aparelho — às vezes nos dois.
@@ -173,35 +169,49 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     return () => { vivo = false }
   }, [clienteId, supabase])
 
-  async function escolherProduto(p: { id: number; nome: string; preco: number | null }) {
-    setProduto(p.nome); setProdutoId(p.id); setCor(''); setCapacidade('')
-    if (!valorVenda && p.preco) setValorVenda(String(p.preco))
-    const { data } = await supabase.from('produtos').select('cores, armazenamentos').eq('id', p.id).maybeSingle()
-    setCoresDisp(data?.cores ?? []); setArmazDisp(data?.armazenamentos ?? [])
-  }
-
   function limpar() {
-    setClienteId(''); setEnderecoDe(null); setProduto(''); setProdutoId(null); setCor(''); setCapacidade('')
-    setCoresDisp([]); setArmazDisp([]); setValorVenda(''); setEntrada(''); setFormaEntrada('pix')
+    setClienteId(''); setEnderecoDe(null); setItens([itemVazio()]); setEntrada(''); setFormaEntrada('pix')
     setPagamento('a_vista'); setParcelas(2); setPrazo(''); setObs('')
     setAparelhos([{ aparelho: '', imei: '', valor: '' }])
+  }
+
+  /**
+   * Desfaz o que ESTA tentativa gravou.
+   *
+   * Sem RPC o lancamento nao e atomico: com tres itens, o terceiro pode falhar
+   * com os dois primeiros ja no banco. Deixar meia encomenda seria pior que
+   * nao lancar — o cliente some da lista pela metade e ninguem entende.
+   */
+  async function desfazer(criados: { vendaId: number; pedidoId: number }[]) {
+    for (const c of criados) {
+      await supabase.from('vendas').delete().eq('id', c.vendaId)
+      await supabase.from('pedidos_compra').delete().eq('id', c.pedidoId)
+    }
   }
 
   async function salvar() {
     // Cliente é obrigatório: o produto vai ser comprado por causa dele e alguém
     // precisa avisá-lo quando chegar. Encomenda sem contato encalha na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
-    if (!produto.trim()) { notify.warn('Informe o produto a encomendar'); return }
     /**
-     * O TOTAL É OBRIGATÓRIO — e aqui é bloqueio, não aviso.
+     * CADA ITEM PRECISA DE PRODUTO E PREÇO — e aqui é bloqueio, não aviso.
      *
      * Uma encomenda entrou com o campo vazio e virou venda de R$ 0,00. Pior: uma
      * das reais da JM saiu com R$ 7,60 num iPhone 17 Pro Max — dígito trocado,
      * ninguém viu. O preço cobrado é o que a loja ACABOU de combinar com o
      * cliente: se ninguém sabe quanto vai cobrar, não há encomenda para lançar.
+     *
+     * Com vários itens, apontar QUAL linha está incompleta evita o vendedor
+     * caçar o erro numa lista de cinco produtos.
      */
-    if (!(vVenda > 0)) {
-      notify.warn('Informe o total a ser pago', 'Sem isso a encomenda entra como venda de R$ 0,00.')
+    if (validos.length === 0) {
+      notify.warn('Informe o produto e o preço', 'Cada item da encomenda precisa dos dois.')
+      return
+    }
+    const incompleto = itens.findIndex((i) =>
+      (i.produto.trim() || i.valor) && !(i.produto.trim() && (Number(i.valor) || 0) > 0))
+    if (incompleto >= 0) {
+      notify.warn(`Item ${incompleto + 1} está incompleto`, 'Preencha o produto e o preço, ou remova a linha.')
       return
     }
     if (vEntrada > vVenda) {
@@ -215,48 +225,85 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     const { data: { user } } = await supabase.auth.getUser()
     const cliNome = listaClientes.find((c) => String(c.id) === clienteId)?.nome ?? ''
 
-    const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
-      empresa_id: empresaId,
-      // Fornecedor sai do balcão: quem compra define depois, em Compras. O
-      // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.
-      fornecedor_id: null,
-      descricao: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}${cliNome ? ` — ${cliNome}` : ''}`,
-      // Sem custo no lançamento: quem define preço de compra preenche depois,
-      // pelo lápis da lista. O pedido nasce com zero de propósito.
-      valor_total: 0,
-      status: 'aberto',
-      usuario_id: user?.id ?? null,
-      data_pedido: new Date().toISOString(),
-      observacoes: obs.trim() || null,
-    } as never).select('id').single()
+    /**
+     * UM PAR (pedido de compra + venda) POR ITEM, amarrados pelo mesmo grupo.
+     *
+     * ══ POR QUE UM PEDIDO POR ITEM, e não um só para a encomenda toda ═══════
+     *
+     * Porque os itens chegam em datas diferentes. O botão "Chegou" recebe UM
+     * pedido e cria UMA unidade reservada; com um pedido só para três aparelhos,
+     * receber o primeiro marcaria os três como chegados e criaria uma unidade
+     * para três peças. O 1:1 entre venda e pedido é o que deixa cada item andar
+     * no seu ritmo.
+     *
+     * O `grupo_pdv` é o que diz "isto foi UMA encomenda": é ele que junta os
+     * itens de volta na lista e o que amarra a entrada ao conjunto. Mesmo padrão
+     * que o PDV usa para uma venda de vários itens.
+     *
+     * ⚠️ Rollback à mão: sem RPC isto não é atômico. Se o segundo item falhar,
+     * o primeiro já está gravado — então desfazemos o que esta tentativa criou,
+     * em vez de deixar meia encomenda no banco.
+     */
+    const grupo = crypto.randomUUID()
+    const criados: { vendaId: number; pedidoId: number }[] = []
 
-    // Sem pedido de compra não há como "Chegou" depois → não cria venda órfã.
-    if (e1 || !pedido) { setSalvando(false); notify.bad('Erro ao criar o pedido de compra', e1?.message); return }
-    const pedidoId = (pedido as { id: number }).id
+    for (const [n, item] of validos.entries()) {
+      const descricao = descreverItem(item)
+      const vItem = Number(item.valor) || 0
 
-    const { data: venda, error: e2 } = await supabase.from('vendas').insert({
-      empresa_id: empresaId,
-      valor_venda: vVenda,
-      status: 'encomenda',
-      cliente_id: Number(clienteId),
-      vendedor_id: user?.id ?? null,
-      canal_venda: 'encomenda',
-      data_venda: new Date().toISOString(),
-      // O combinado com o cliente, para a entrega já saber o que cobrar.
-      forma_pagamento: pagamento,
-      parcelas: pagamento === 'parcelado' ? nParcelas : null,
-      // O prazo prometido em coluna: é o que vira "3 dias de atraso" na lista.
-      previsao_entrega: prazo || null,
-      produto_id: produtoId,
-      pedido_compra_id: pedidoId,
-      observacoes: `Encomenda: ${produto.trim()}${especif ? ` ${especif}` : ''}.${textoAparelhos}${obs.trim() ? ' ' + obs.trim() : ''}`,
-    } as never).select('id').single()
+      const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
+        empresa_id: empresaId,
+        // Fornecedor sai do balcão: quem compra define depois, em Compras. O
+        // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.
+        fornecedor_id: null,
+        descricao: `Encomenda: ${descricao}${cliNome ? ` — ${cliNome}` : ''}`,
+        // Sem custo no lançamento: quem define preço de compra preenche depois,
+        // pelo lápis da lista. O pedido nasce com zero de propósito.
+        valor_total: 0,
+        status: 'aberto',
+        usuario_id: user?.id ?? null,
+        data_pedido: new Date().toISOString(),
+        observacoes: obs.trim() || null,
+      } as never).select('id').single()
 
-    if (e2 || !venda) {
-      // Venda falhou: remove o pedido recém-criado para não deixar pedido sem venda.
-      await supabase.from('pedidos_compra').delete().eq('id', pedidoId)
-      setSalvando(false); notify.bad('Erro ao lançar encomenda', e2?.message); return
+      // Sem pedido de compra não há como "Chegou" depois → não cria venda órfã.
+      if (e1 || !pedido) {
+        await desfazer(criados)
+        setSalvando(false); notify.bad(`Erro ao criar o pedido do item ${n + 1}`, e1?.message); return
+      }
+      const pedidoId = (pedido as { id: number }).id
+
+      const { data: venda, error: e2 } = await supabase.from('vendas').insert({
+        empresa_id: empresaId,
+        grupo_pdv: grupo,
+        valor_venda: vItem,
+        status: 'encomenda',
+        cliente_id: Number(clienteId),
+        vendedor_id: user?.id ?? null,
+        canal_venda: 'encomenda',
+        data_venda: new Date().toISOString(),
+        // O combinado com o cliente, para a entrega já saber o que cobrar.
+        forma_pagamento: pagamento,
+        parcelas: pagamento === 'parcelado' ? nParcelas : null,
+        // O prazo prometido em coluna: é o que vira "3 dias de atraso" na lista.
+        previsao_entrega: prazo || null,
+        produto_id: item.produtoId,
+        pedido_compra_id: pedidoId,
+        // A entrada é do CONJUNTO: fica descrita só na primeira venda, que é
+        // também onde o pagamento é gravado. Repetir em todas faria três vezes
+        // o mesmo aparelho aparecer no histórico.
+        observacoes: `Encomenda: ${descricao}.${n === 0 ? textoAparelhos : ''}${obs.trim() ? ' ' + obs.trim() : ''}`,
+      } as never).select('id').single()
+
+      if (e2 || !venda) {
+        await supabase.from('pedidos_compra').delete().eq('id', pedidoId)
+        await desfazer(criados)
+        setSalvando(false); notify.bad(`Erro ao lançar o item ${n + 1}`, e2?.message); return
+      }
+      criados.push({ vendaId: (venda as { id: number }).id, pedidoId })
     }
+
+    const venda = { id: criados[0].vendaId }
 
     /**
      * A ENTRADA entra como pagamento da venda pendente.
@@ -360,29 +407,15 @@ export function EncomendaForm({ clientes, taxas = [] }: {
           </div>
         )}
 
-        <ProdutoAutocomplete label="Produto" value={produto}
-          onChange={(v) => { setProduto(v); setProdutoId(null); setCoresDisp([]); setArmazDisp([]); setCor(''); setCapacidade('') }}
-          onSelect={escolherProduto} />
+        <EncomendaItens itens={itens} onChange={setItens} />
 
-        {(coresDisp.length > 0 || armazDisp.length > 0) && (
-          <div className="grid grid-cols-2 gap-3">
-            {armazDisp.length > 0 && (
-              <Select label="Capacidade" value={capacidade} onChange={(e) => setCapacidade(e.target.value)}>
-                <option value="">Selecionar…</option>
-                {armazDisp.map((a) => <option key={a} value={a}>{a}</option>)}
-              </Select>
-            )}
-            {coresDisp.length > 0 && (
-              <Select label="Cor" value={cor} onChange={(e) => setCor(e.target.value)}>
-                <option value="">Selecionar…</option>
-                {coresDisp.map((c) => <option key={c} value={c}>{c}</option>)}
-              </Select>
-            )}
+        {/* O total sai da soma dos itens — nao e digitado. */}
+        {vVenda > 0 && (
+          <div className="flex items-baseline justify-between rounded-control bg-bg px-3 py-2">
+            <span className="text-[12.5px] font-medium text-ink-2">Total a ser pago</span>
+            <span className="num text-[17px] font-bold text-ink">{formatCurrency(vVenda)}</span>
           </div>
         )}
-
-        <Input label="Total a ser pago (R$)" type="number" required
-          value={valorVenda} onChange={(e) => setValorVenda(e.target.value)} placeholder="0,00" />
 
         <div>
           <Select label="Entrada" value={formaEntrada} onChange={(e) => setFormaEntrada(e.target.value)}>
