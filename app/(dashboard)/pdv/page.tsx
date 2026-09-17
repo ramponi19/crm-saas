@@ -90,6 +90,25 @@ export default async function PDVPage() {
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
 
+  /**
+   * OS APARELHOS QUE ENTRARAM COMO ENTRADA das encomendas abertas.
+   *
+   * Amarrados pelo `grupo_pdv` — o mesmo que junta os itens da encomenda. Sem
+   * trazer isto, o aparelho existiria no estoque e não na tela onde a encomenda
+   * vive, e o vendedor não teria como conferir na frente do cliente o que foi
+   * entregue na entrada.
+   */
+  const gruposAbertos = [...new Set(
+    ((encomendasRaw ?? []) as { grupo_pdv: string | null }[])
+      .map((v) => v.grupo_pdv).filter((g): g is string => !!g),
+  )]
+  const { data: trocasRaw } = gruposAbertos.length > 0
+    ? await supabase.from('inventario_unidades')
+        .select('id, grupo_pdv, imei, preco_custo, observacoes, status')
+        .eq('empresa_id', empresaId).eq('tipo', 'troca').eq('ativo', true)
+        .in('grupo_pdv', gruposAbertos)
+    : { data: [] }
+
   type UnidadeRow = Tables<'inventario_unidades'> & {
     produtos: Embed<{
       nome: string | null; garantia_dias: number | null; foto_url: string | null
@@ -150,11 +169,25 @@ export default async function PDVPage() {
     pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null; solicitado_em: string | null }>
     vendas_pagamentos: { valor_pago: number | null }[] | null
   }
+  const trocaPorGrupo = new Map<string, { descricao: string; imei: string | null; valor: number }[]>()
+  for (const t of (trocasRaw ?? []) as { grupo_pdv: string | null; imei: string | null; preco_custo: number | null; observacoes: string | null }[]) {
+    if (!t.grupo_pdv) continue
+    const lista = trocaPorGrupo.get(t.grupo_pdv) ?? []
+    lista.push({
+      // A descricao mora antes do travessao: "iPhone 13 128GB — entrada da encomenda de Fulano."
+      descricao: (t.observacoes ?? '').split(' — ')[0] || 'Aparelho',
+      imei: t.imei,
+      valor: Number(t.preco_custo) || 0,
+    })
+    trocaPorGrupo.set(t.grupo_pdv, lista)
+  }
+
   const encomendas: EncomendaPDV[] = ((encomendasRaw ?? []) as unknown as EncomendaRow[]).map((v) => {
     const ped = one(v.pedidos_compra)
     return {
       id: v.id,
       grupo_pdv: v.grupo_pdv,
+      trocas: v.grupo_pdv ? (trocaPorGrupo.get(v.grupo_pdv) ?? []) : [],
       cliente_nome: one(v.clientes)?.nome ?? 'Sem cliente',
       cliente_telefone: one(v.clientes)?.telefone ?? null,
       // O nome do produto vem do cadastro quando existe; senão, do texto que o

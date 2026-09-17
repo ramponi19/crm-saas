@@ -330,20 +330,56 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     }
 
     /**
-     * ⚠️ O APARELHO NÃO ENTRA NO ESTOQUE — decisão do dono em 15/09/2026.
+     * O APARELHO DA ENTRADA VIRA ESTOQUE, AMARRADO À ENCOMENDA.
      *
-     * A troca do PDV cria uma unidade (`usado` / `tipo: troca` / `pendente`).
-     * Aqui, por ora, o aparelho é só REGISTRO: descrição, IMEI e valor ficam na
-     * observação da venda, e o abatimento aparece como pagamento em `troca`.
+     * ══ POR QUE VOLTOU ════════════════════════════════════════════════════
      *
-     * O que se ganha: ninguém precisa avaliar e precificar uma fila de unidades
-     * pendentes que o balcão criou sem querer.
+     * Em 15/09/2026 isto era só registro na observação, por decisão do dono. No
+     * dia seguinte ele corrigiu, e a razão é boa: "é dinheiro/entrada da venda".
+     * Um aparelho que abateu R$ 2.000 de uma encomenda não é uma anotação — é um
+     * bem que entrou na loja e que alguém vai revender.
      *
-     * O QUE SE PERDE, dito na cara: o aparelho existe fisicamente na loja e não
-     * existe no inventário. Quem for vendê-lo cadastra na mão, e o custo dele
-     * não entra em nenhum relatório de estoque. Quando a encomenda virar rotina,
-     * vale revisitar — a informação está guardada na observação para isso.
+     * ══ COMO A AMARRAÇÃO FUNCIONA ═════════════════════════════════════════
+     *
+     * O `grupo_pdv` é o mesmo da encomenda. É ele que responde "de onde veio
+     * este aparelho?" e "o que o cliente entregou naquele pedido?" — sem coluna
+     * nova e com o mesmo mecanismo que junta os itens da encomenda.
+     *
+     * `cliente_id` vai junto: se amanhã aparecer defeito oculto, a loja sabe de
+     * quem recebeu sem garimpar observação.
+     *
+     * Entra como `usado` / `tipo: troca` / `status: pendente` — pendente porque
+     * ainda não passou pela avaliação técnica que define preço de revenda. É o
+     * mesmo estado que a troca do PDV cria, então o estoque não ganha duas
+     * espécies de aparelho usado.
+     *
+     * ⚠️ Falhar aqui NÃO desfaz a encomenda: o aparelho está fisicamente no
+     * balcão e a venda é real. O aviso manda dar entrada pelo Estoque.
      */
+    if (formaEntrada === 'aparelho' && aparelhosValidos.length > 0) {
+      const { error: e4 } = await supabase.from('inventario_unidades').insert(
+        aparelhosValidos.map((a) => ({
+          empresa_id: empresaId,
+          grupo_pdv: grupo,
+          cliente_id: Number(clienteId),
+          produto_id: null,
+          condicao: 'usado',
+          tipo: 'troca',
+          status: 'pendente',
+          usuario_id: user?.id ?? null,
+          preco_custo: Number(a.valor) || 0,
+          imei: a.imei.trim() || null,
+          observacoes: `${a.aparelho.trim() || 'Aparelho recebido'} — entrada da encomenda${cliNome ? ` de ${cliNome}` : ''}.`,
+          ativo: true,
+        })) as never,
+      )
+      if (e4) {
+        notify.warn(
+          aparelhosValidos.length > 1 ? 'Aparelhos não entraram no estoque' : 'Aparelho não entrou no estoque',
+          'A encomenda foi lançada. Dê entrada em Estoque.',
+        )
+      }
+    }
 
     setSalvando(false)
     notify.ok(

@@ -30,6 +30,8 @@ v "encomenda exige produto e preco"    "components/modules/pdv/encomenda-form.ts
 v "itens da encomenda no mesmo grupo"   "components/modules/pdv/encomenda-form.tsx" "grupo_pdv: grupo"
 v "um pedido de compra por item"        "components/modules/pdv/encomenda-form.tsx" "for (const .n, item. of validos.entries())"
 v "entrega cobra o saldo uma vez so"    "components/modules/pdv/encomendas-abertas.tsx" "n === 0 && saldo > 0.005"
+v "troca amarrada pelo grupo"           "components/modules/pdv/encomenda-form.tsx" "grupo_pdv: grupo,"
+v "troca guarda de quem veio"           "components/modules/pdv/encomenda-form.tsx" "cliente_id: Number(clienteId),"
 v "custo editavel na lista"             "components/modules/pdv/encomendas-abertas.tsx" "sem custo"
 v "encomenda grava o prazo prometido"    "components/modules/pdv/encomenda-form.tsx" "previsao_entrega: prazo"
 v "entrega registra o pagamento"        "lib/encomendas.ts" "registrouPagamento"
