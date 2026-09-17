@@ -73,7 +73,7 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
@@ -161,7 +161,7 @@ export default async function PDVPage() {
   }))
 
   type EncomendaRow = {
-    id: number; valor_venda: number | null; valor_custo: number | null; grupo_pdv: string | null
+    id: number; valor_venda: number | null; valor_custo: number | null; grupo_pdv: string | null; cliente_id: number | null
     previsao_entrega: string | null; status: string | null; observacoes: string | null
     unidade_id: number | null; data_venda: string | null
     clientes: Embed<{ nome: string | null; telefone: string | null }>
@@ -187,6 +187,7 @@ export default async function PDVPage() {
     return {
       id: v.id,
       grupo_pdv: v.grupo_pdv,
+      cliente_id: v.cliente_id,
       trocas: v.grupo_pdv ? (trocaPorGrupo.get(v.grupo_pdv) ?? []) : [],
       cliente_nome: one(v.clientes)?.nome ?? 'Sem cliente',
       cliente_telefone: one(v.clientes)?.telefone ?? null,
