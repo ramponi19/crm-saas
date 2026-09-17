@@ -42,6 +42,8 @@ export interface EncomendaPDV {
   sinal_pago: number
   /** Quando o aparelho foi pedido ao fornecedor. Nulo = ninguem pediu ainda. */
   solicitado_em: string | null
+  /** Aparelhos que o cliente entregou como entrada — amarrados pelo grupo. */
+  trocas: { descricao: string; imei: string | null; valor: number }[]
 }
 
 /** Uma encomenda na tela: os itens somados, com a lista por dentro. */
@@ -75,6 +77,8 @@ function juntar(itens: EncomendaPDV[]): Encomenda {
     unidade_id: todos((i) => i.unidade_id != null) ? base.unidade_id : null,
     solicitado_em: todos((i) => !!i.solicitado_em) ? base.solicitado_em : null,
     tem_fornecedor: todos((i) => i.tem_fornecedor),
+    // A troca e do grupo, nao do item: todos carregam a mesma lista.
+    trocas: base.trocas,
     // O prazo do grupo é o mais apertado: é por ele que a encomenda atrasa.
     previsao_entrega: itens.map((i) => i.previsao_entrega).filter(Boolean).sort()[0] ?? null,
     itens,
@@ -387,6 +391,27 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
                     {!e.tem_fornecedor && <span>⚠ sem fornecedor</span>}
                   </div>
                 )}
+                {/**
+                  * O QUE O CLIENTE ENTREGOU NA ENTRADA.
+                  *
+                  * O aparelho abateu do total e está no estoque amarrado a esta
+                  * encomenda. Mostrar aqui é o que permite conferir na frente do
+                  * cliente — "o senhor deixou o 13, certo?" — sem abrir Estoque.
+                  */}
+                {e.trocas.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11.5px]">
+                    <span className="font-semibold text-ok">Entrada em aparelho:</span>
+                    {e.trocas.map((t, i) => (
+                      <span key={i} className="text-ink-2">
+                        {t.descricao}
+                        {t.imei && <span className="num text-ink-3"> · {t.imei}</span>}
+                        <span className="num"> · {formatCurrency(t.valor)}</span>
+                        {i < e.trocas.length - 1 && <span className="text-ink-3">;</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Os itens, quando são mais de um: cada linha com o que falta
                     nela, porque um aparelho pode ter chegado e o outro não. */}
                 {e.itens.length > 1 && (
