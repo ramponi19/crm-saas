@@ -1,14 +1,16 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
-import { diagnosticar, ordenarPorUrgencia, finalizarEncomenda, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
+import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
-import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
+import { type Taxa } from '@/lib/pdv-pagamentos'
+import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
+import { EncomendaFechar } from './encomenda-fechar'
 
 /**
  * AS ENCOMENDAS EM ABERTO, no lugar onde o vendedor já está.
@@ -44,6 +46,8 @@ export interface EncomendaPDV {
   solicitado_em: string | null
   /** Aparelhos que o cliente entregou como entrada — amarrados pelo grupo. */
   trocas: { descricao: string; imei: string | null; valor: number }[]
+  cliente_id: number | null
+  grupo_pdv: string | null
 }
 
 /** Uma encomenda na tela: os itens somados, com a lista por dentro. */
@@ -127,8 +131,8 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split('-').reverse().join('/') : null
 
-export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
-  encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean
+export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, documentos = [] }: {
+  encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -143,6 +147,24 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * dois renders na virada da meia-noite dariam diagnósticos diferentes para a
    * mesma lista. Um PDV fica aberto a noite inteira no balcão.
    */
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+  const [vendedor, setVendedor] = useState<string | null>(null)
+  /** Empresa e vendedor: o fechamento precisa dos dois para gravar e assinar. */
+  useEffect(() => {
+    let vivo = true
+    ;(async () => {
+      const emp = await empresaAtualId(supabase)
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = user
+        ? await supabase.from('usuarios').select('nome').eq('id', user.id).maybeSingle()
+        : { data: null }
+      if (!vivo) return
+      setEmpresaId(emp ?? null)
+      setVendedor(data?.nome ?? user?.email ?? null)
+    })()
+    return () => { vivo = false }
+  }, [supabase])
+
   const [hoje] = useState(() => new Date())
   // Agrupa ANTES de ordenar: a urgencia e da encomenda, nao do item solto.
   const ordenadas = useMemo(
@@ -228,43 +250,6 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
    * até 15/09/2026 ele não era gravado em lugar nenhum: 11 encomendas
    * entregues, R$ 84.540, todas sem uma linha em `vendas_pagamentos`.
    */
-  async function entregar(e: Encomenda, forma: string, parcelas: number | null) {
-    const saldo = Math.max(0, e.valor_venda - e.sinal_pago)
-    const empresaId = await empresaAtualId(supabase)
-    if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página.'); return }
-
-    setOcupado(e.id)
-    /**
-     * Cada item conclui a sua venda, mas o DINHEIRO ENTRA UMA VEZ SÓ.
-     *
-     * O saldo é do conjunto: o cliente paga o que falta da encomenda inteira,
-     * não parcela por aparelho. Gravar o recebimento em cada venda multiplicaria
-     * o valor recebido pelo número de itens — um erro de caixa que só apareceria
-     * no fechamento do mês.
-     */
-    let falhou: string | null = null
-    let pagou = false
-    for (const [n, item] of e.itens.entries()) {
-      const r = await finalizarEncomenda(supabase, item.id,
-        n === 0 && saldo > 0.005 ? { forma, valor: saldo, parcelas, empresaId } : null)
-      if (!r.ok) { falhou = r.erro ?? 'erro ao concluir'; break }
-      if (n === 0) pagou = r.registrouPagamento
-    }
-    setOcupado(null)
-
-    if (falhou) { notify.bad('Erro ao finalizar', falhou); return }
-    if (saldo > 0.005 && !pagou) {
-      notify.warn('Entrega concluída, mas o recebimento não foi gravado',
-        `Lance ${formatCurrency(saldo)} manualmente no financeiro.`)
-    } else {
-      notify.ok('Venda concluída',
-        saldo > 0.005 ? `${formatCurrency(saldo)} recebido em ${forma}.`
-          : 'Contabilizada no faturamento.')
-    }
-    setEntregando(null)
-    router.refresh()
-  }
-
   /**
    * AJUSTAR O QUE FALTA, SEM SAIR DAQUI.
    *
@@ -465,15 +450,27 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
               </div>
             </div>
 
-            {entregando === e.id && (
-              <ReceberNaEntrega
+            {entregando === e.id && empresaId != null && (
+              <EncomendaFechar
                 key={`entrega-${e.id}`}
-                total={e.valor_venda}
-                jaPago={e.sinal_pago}
-                salvando={ocupado === e.id}
+                encomenda={{
+                  id: e.id,
+                  cliente_nome: e.cliente_nome,
+                  clienteId: e.cliente_id,
+                  produto_nome: e.produto_nome,
+                  valor_venda: e.valor_venda,
+                  sinal_pago: e.sinal_pago,
+                  grupo_pdv: e.grupo_pdv,
+                  itens: e.itens.map((i) => ({
+                    id: i.id, produto_nome: i.produto_nome, valor_venda: i.valor_venda,
+                  })),
+                }}
                 taxas={taxas}
+                documentos={documentos}
+                empresaId={empresaId}
+                vendedor={vendedor}
                 onCancelar={() => setEntregando(null)}
-                onConfirmar={(forma, parcelas) => entregar(e, forma, parcelas)}
+                onPronto={() => { setEntregando(null); router.refresh() }}
               />
             )}
 
@@ -489,104 +486,6 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false }: {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-const FORMAS_ENTREGA = [
-  { key: 'dinheiro', label: 'Dinheiro' },
-  { key: 'pix', label: 'PIX' },
-  { key: 'debito', label: 'Débito' },
-  { key: 'credito', label: 'Crédito' },
-  { key: 'link', label: 'Link' },
-]
-/** Só crédito e link parcelam — mesma regra do PDV. */
-const PARCELA = new Set(['credito', 'link'])
-
-/**
- * O RECEBIMENTO DO SALDO, no ato da entrega.
- *
- * Um passo a mais entre "Entregar" e a venda concluída, e ele existe por um
- * motivo medido: as 11 encomendas já entregues da JM somam R$ 84.540 e nenhuma
- * tem uma linha de pagamento. O botão concluía a venda e o dinheiro não entrava
- * em lugar nenhum.
- *
- * Quando a entrada já cobriu tudo, não há o que receber e o passo só confirma.
- */
-function ReceberNaEntrega({ total, jaPago, salvando, taxas, onConfirmar, onCancelar }: {
-  total: number
-  jaPago: number
-  salvando: boolean
-  taxas: Taxa[]
-  onConfirmar: (forma: string, parcelas: number | null) => void
-  onCancelar: () => void
-}) {
-  const saldo = Math.max(0, total - jaPago)
-  const [forma, setForma] = useState('pix')
-  const [parcelas, setParcelas] = useState(1)
-  const parcela = PARCELA.has(forma)
-  const linha = { id: 'ent', forma, valor: saldo, parcelas, bandeira: 'visa_master' as const }
-  const opcoes = parcelasDisponiveis(linha, taxas)
-  const comJuros = valorComJuros(linha, taxas)
-
-  return (
-    <div className="mt-3 border-t border-line-soft pt-3">
-      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="text-[12.5px] font-semibold text-ink">
-          {saldo > 0.005 ? 'Receber na entrega' : 'Nada a receber — já está pago'}
-        </span>
-        <span className="text-[11.5px] text-ink-3">
-          <span className="num">{formatCurrency(total)}</span> total
-          {jaPago > 0.005 && <> · <span className="num text-ok">{formatCurrency(jaPago)}</span> de entrada</>}
-        </span>
-      </div>
-
-      {saldo > 0.005 && (
-        <>
-          <div className="mb-2.5 text-[22px] font-bold tracking-[-0.03em] text-ink num">{formatCurrency(saldo)}</div>
-          <div className="flex flex-wrap gap-1.5">
-            {FORMAS_ENTREGA.map((f) => (
-              <button key={f.key} type="button" onClick={() => setForma(f.key)}
-                className={`h-8 rounded-control px-3 text-[12px] font-semibold transition-colors ${
-                  forma === f.key ? 'bg-ink text-white' : 'border border-line bg-card text-ink-2 hover:bg-line-soft'}`}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          {/* Parcelas e juros vêm das taxas cadastradas — as mesmas do PDV. */}
-          {parcela && (
-            opcoes.length > 0 ? (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                {opcoes.map((n) => (
-                  <button key={n} type="button" onClick={() => setParcelas(n)}
-                    className={`num h-7 w-10 rounded-control border text-[12px] font-bold transition-colors ${
-                      parcelas === n ? 'border-ink/30 bg-ink/[0.06] text-ink' : 'border-line text-ink-2 hover:bg-line-soft'}`}>
-                    {n}x
-                  </button>
-                ))}
-                {parcelas > 1 && (
-                  <span className="text-[11.5px] text-ink-3">
-                    de <span className="num">{formatCurrency(comJuros / parcelas)}</span>
-                    {comJuros > saldo + 0.005 && <> · cobra <span className="num">{formatCurrency(comJuros)}</span></>}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="mt-2 text-[11.5px] text-warn">
-                Sem taxa cadastrada para esta forma — configure em Administração → Taxas.
-              </p>
-            )
-          )}
-        </>
-      )}
-
-      <div className="mt-3 flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={onCancelar}>Cancelar</Button>
-        <Button size="sm" loading={salvando} icon={<Check size={13} strokeWidth={2} />}
-          onClick={() => onConfirmar(forma, parcela ? parcelas : null)}>
-          {saldo > 0.005 ? `Receber e entregar` : 'Confirmar entrega'}
-        </Button>
-      </div>
     </div>
   )
 }

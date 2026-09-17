@@ -1008,7 +1008,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         {aba === 'encomenda' ? (
           <div className="mx-auto max-w-[720px] space-y-4">
             <EncomendaForm clientes={clientes} taxas={taxas} />
-            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} />
+            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} documentos={documentos} />
           </div>
         ) : (
         <div className="grid grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
