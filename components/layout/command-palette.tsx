@@ -33,11 +33,36 @@ const ACOES: Acao[] = [
 
 const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }
 
+/**
+ * QUANTO SE BUSCA vs. QUANTO SE MOSTRA.
+ *
+ * Eram 4 por tipo, direto do banco e SEM `order` — o Postgres devolvia quatro
+ * quaisquer, na ordem física da tabela. Quem tem 80 leads digitava um nome,
+ * recebia quatro que não tinham nada a ver e concluía que a busca não achava:
+ * "puxa apenas 4 e trava nisso" (18/09/2026).
+ *
+ * Agora o banco devolve um lote maior, a relevância é decidida aqui e a lista
+ * mostra os melhores. A paleta é atalho, não relatório: passar de ~8 por tipo
+ * vira rolagem, e para varrer tudo existem as telas de Leads e Clientes.
+ */
+const LOTE = 20
+const MOSTRAR = 8
+
+/** Começa com o termo > tem palavra que começa com ele > contém em algum lugar. */
+function relevancia(nome: string | null, termo: string): number {
+  const n = (nome ?? '').toLowerCase()
+  const t = termo.toLowerCase()
+  if (n.startsWith(t)) return 0
+  if (n.includes(' ' + t)) return 1
+  return 2
+}
+
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [temMais, setTemMais] = useState(false)
   const [sel, setSel] = useState(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -67,9 +92,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       const supabase = createClient()
       const q = query.trim()
       const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }] = await Promise.all([
-        supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('leads').select('id, nome, produto_interessado').ilike('nome', `%${q}%`).eq('ativo', true).limit(4),
-        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(3),
+        supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
+        // O lead também atende por telefone: quem liga para a loja é procurado pelo
+        // número, e antes só quem já era cliente aparecia nessa busca.
+        supabase.from('leads').select('id, nome, produto_interessado, telefone, ultima_mensagem_at').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(LOTE),
+        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
         supabase.from('produtos').select('id').ilike('nome', `%${q}%`).limit(10),
       ])
       type EstoqueRow = { id: number; imei: string | null; numero_serie: string | null; produtos: { nome: string | null } | { nome: string | null }[] | null }
@@ -79,20 +106,27 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         const { data } = await supabase
           .from('inventario_unidades')
           .select('id, imei, numero_serie, produtos!produto_id(nome)')
-          .in('produto_id', produtoIds).eq('ativo', true).limit(4)
+          .in('produto_id', produtoIds).eq('ativo', true).limit(LOTE)
         estoqueNome = (data ?? []) as unknown as EstoqueRow[]
       }
       const allEstoque = [...((estoque ?? []) as unknown as EstoqueRow[]), ...estoqueNome]
       const seen = new Set<number>()
-      const estoqueDedup = allEstoque.filter((u) => { if (seen.has(u.id)) return false; seen.add(u.id); return true }).slice(0, 4)
+      const estoqueDedup = allEstoque.filter((u) => { if (seen.has(u.id)) return false; seen.add(u.id); return true }).slice(0, MOSTRAR)
       const estNome = (r: EstoqueRow['produtos']): string | null => (Array.isArray(r) ? r[0]?.nome : r?.nome) ?? null
 
+      const porRelevancia = <T extends { nome: string | null }>(xs: T[]) =>
+        [...xs].sort((a, b) => relevancia(a.nome, q) - relevancia(b.nome, q))
+
+      const cli = porRelevancia((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>)
+      const lds = porRelevancia((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null; telefone: string | null }>)
+      setTemMais(cli.length > MOSTRAR || lds.length > MOSTRAR)
+
       setResults([
-        ...((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>).map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
+        ...cli.slice(0, MOSTRAR).map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
         // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
-        ...((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null }>).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? 'sem produto', href: `/leads?lead=${l.id}` })),
+        ...lds.slice(0, MOSTRAR).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
@@ -188,6 +222,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </button>
             )
           })}
+          {temMais && !searching && (
+            <div className="px-4 py-2 text-[11px] text-ink-3">
+              Mostrando os mais relevantes. Refine a busca, ou abra Leads e Clientes para a lista inteira.
+            </div>
+          )}
           {query.trim().length >= 2 && !searching && results.length === 0 && (
             <div className="px-4 py-2 text-[12px] text-ink-3">Nenhum resultado para “{query}”.</div>
           )}

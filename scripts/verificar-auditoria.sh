@@ -42,6 +42,8 @@ v "pedido feito nao troca a data"       "components/modules/pdv/encomendas-abert
 v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
 v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens.tsx" "onChange((xs) =>"
 n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
+v "busca global ordena o lead"        "components/layout/command-palette.tsx" "order(.ultima_mensagem_at."
+n "busca global nao volta ao teto de 4" "components/layout/command-palette.tsx" "limit(4)"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"
