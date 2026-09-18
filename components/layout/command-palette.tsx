@@ -34,19 +34,18 @@ const ACOES: Acao[] = [
 const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }
 
 /**
- * QUANTO SE BUSCA vs. QUANTO SE MOSTRA.
+ * A CAIXA ROLA, A BUSCA NAO CORTA.
  *
- * Eram 4 por tipo, direto do banco e SEM `order` — o Postgres devolvia quatro
- * quaisquer, na ordem física da tabela. Quem tem 80 leads digitava um nome,
- * recebia quatro que não tinham nada a ver e concluía que a busca não achava:
- * "puxa apenas 4 e trava nisso" (18/09/2026).
+ * Eram quatro por tipo, fixos no banco e SEM order: o Postgres devolvia quatro
+ * quaisquer, na ordem fisica da tabela. Com 80 leads, digitar um nome trazia
+ * quatro sem relacao com o termo e o procurado ficava de fora — "puxa apenas
+ * 4 e trava nisso" (18/09/2026).
  *
- * Agora o banco devolve um lote maior, a relevância é decidida aqui e a lista
- * mostra os melhores. A paleta é atalho, não relatório: passar de ~8 por tipo
- * vira rolagem, e para varrer tudo existem as telas de Leads e Clientes.
+ * Mostrar so os N melhores foi a primeira correcao, e o dono pediu melhor: a
+ * lista traz tudo e a caixa rola. Entao o unico teto que sobra e de seguranca,
+ * para uma busca de duas letras nao arrastar a base inteira para o navegador.
  */
-const LOTE = 20
-const MOSTRAR = 8
+const LOTE = 50
 
 /** Começa com o termo > tem palavra que começa com ele > contém em algum lugar. */
 function relevancia(nome: string | null, termo: string): number {
@@ -66,6 +65,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const [sel, setSel] = useState(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const listaRef = useRef<HTMLDivElement>(null)
 
   // Atalho global ⌘K / Ctrl+K
   useEffect(() => {
@@ -82,6 +82,14 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   useEffect(() => {
     if (open) { setQuery(''); setResults([]); setSel(0); setTimeout(() => inputRef.current?.focus(), 30) }
   }, [open])
+
+  /**
+   * A seta rola a caixa junto. Sem isto a selecao anda para fora da area
+   * visivel e o Enter abre um item que a pessoa nao esta vendo.
+   */
+  useEffect(() => {
+    listaRef.current?.querySelector('[data-idx="' + sel + '"]')?.scrollIntoView({ block: 'nearest' })
+  }, [sel])
 
   // Busca com debounce (portada do topbar)
   useEffect(() => {
@@ -111,7 +119,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       }
       const allEstoque = [...((estoque ?? []) as unknown as EstoqueRow[]), ...estoqueNome]
       const seen = new Set<number>()
-      const estoqueDedup = allEstoque.filter((u) => { if (seen.has(u.id)) return false; seen.add(u.id); return true }).slice(0, MOSTRAR)
+      const estoqueDedup = allEstoque.filter((u) => { if (seen.has(u.id)) return false; seen.add(u.id); return true })
       const estNome = (r: EstoqueRow['produtos']): string | null => (Array.isArray(r) ? r[0]?.nome : r?.nome) ?? null
 
       const porRelevancia = <T extends { nome: string | null }>(xs: T[]) =>
@@ -119,14 +127,15 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
       const cli = porRelevancia((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>)
       const lds = porRelevancia((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null; telefone: string | null }>)
-      setTemMais(cli.length > MOSTRAR || lds.length > MOSTRAR)
+      // Lote cheio: pode haver mais la fora do que coube nesta consulta.
+      setTemMais(cli.length >= LOTE || lds.length >= LOTE)
 
       setResults([
-        ...cli.slice(0, MOSTRAR).map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
+        ...cli.map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
         // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
-        ...lds.slice(0, MOSTRAR).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
+        ...lds.map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
@@ -157,6 +166,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
   if (!open || typeof document === 'undefined') return null
 
+
   let idx = -1
   return createPortal(
     <div
@@ -176,7 +186,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           />
         </div>
 
-        <div className="max-h-[52vh] overflow-y-auto py-1.5 scrollbar-thin">
+        <div ref={listaRef} className="max-h-[min(52vh,17rem)] overflow-y-auto py-1.5 scrollbar-thin">
           {acoesFiltradas.length > 0 && (
             <>
               <div className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.07em] text-ink-3">Ações rápidas</div>
@@ -187,6 +197,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 return (
                   <button
                     key={a.id}
+                    data-idx={i}
                     onMouseEnter={() => setSel(i)}
                     onClick={() => exec(i)}
                     className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] ${sel === i ? 'bg-accent-soft' : ''}`}
@@ -210,6 +221,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             return (
               <button
                 key={`${r.tipo}-${r.id}`}
+                data-idx={i}
                 onMouseEnter={() => setSel(i)}
                 onClick={() => exec(i)}
                 className={`flex w-full items-center gap-3 px-4 py-2.5 text-left ${sel === i ? 'bg-accent-soft' : ''}`}
@@ -224,7 +236,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           })}
           {temMais && !searching && (
             <div className="px-4 py-2 text-[11px] text-ink-3">
-              Mostrando os mais relevantes. Refine a busca, ou abra Leads e Clientes para a lista inteira.
+              Muitos resultados — refine a busca para estreitar.
             </div>
           )}
           {query.trim().length >= 2 && !searching && results.length === 0 && (
