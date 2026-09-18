@@ -48,6 +48,8 @@ v "lead e procurado na loja do canal"   "supabase/functions/webhook-leads/index.
 v "echo tambem respeita a loja"         "supabase/functions/webhook-leads/index.ts" "ql = ql.eq(.filial_id., canal.filial_id)"
 v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.ts" "qh = qh.eq(.filial_id., canal.filial_id)"
 v "mensagem guarda o canal de entrada"  "supabase/functions/webhook-leads/index.ts" "canal_id: canal.id"
+v "modal aberto recebe o realtime"      "components/modules/leads/leads-view.tsx" "setSelectedLead(prev =>"
+n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"

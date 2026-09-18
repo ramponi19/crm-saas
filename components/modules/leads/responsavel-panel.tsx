@@ -12,14 +12,29 @@ const ACAO_LABEL: Record<string, string> = {
   pegar: 'pegou', devolver: 'devolveu à esteira', transferir: 'transferiu', atribuir: 'atribuiu',
 }
 
-export function ResponsavelPanel({ leadId, usuarios, responsavelInicial, onChange }: {
+/**
+ * O DONO VEM DE CIMA — este painel nao guarda copia.
+ *
+ * Antes o responsavel era `useState(responsavelInicial)`, e a prop so alimentava
+ * o primeiro render. Quando o lead era assumido POR FORA — responder o cliente
+ * assume o lead, em `assumirSeLivre` no modal — o banco e o estado do pai
+ * mudavam e aqui continuava "Na esteira — sem dono".
+ *
+ * O estrago nao era so visual: sem dono na tela aparece "Pegar lead" e o botao
+ * de DEVOLVER some, entao quem assumiu sem querer nao tinha como desfazer.
+ * Relatado em 18/09/2026: "fui retirar e nao estava dando a opcao de salvar...
+ * dei F5 e estava como responsavel jm".
+ *
+ * Sem estado espelhado nao ha o que dessincronizar: a acao avisa o pai, o pai
+ * manda a prop nova, a tela segue. Por isso `onChange` e obrigatorio.
+ */
+export function ResponsavelPanel({ leadId, usuarios, responsavel, onChange }: {
   leadId: number
   usuarios: Usuario[]
-  responsavelInicial: string | null
-  onChange?: (id: string | null) => void
+  responsavel: string | null
+  onChange: (id: string | null) => void
 }) {
   const supabase = createClient()
-  const [respId, setRespId] = useState<string | null>(responsavelInicial)
   const [meuId, setMeuId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [hist, setHist] = useState<HistItem[]>([])
@@ -56,8 +71,7 @@ export function ResponsavelPanel({ leadId, usuarios, responsavelInicial, onChang
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error)
-      setRespId(j.responsavel_id ?? null)
-      onChange?.(j.responsavel_id ?? null)
+      onChange(j.responsavel_id ?? null)
       notify.ok('Responsável atualizado')
       setTransferir('')
       await carregarHist()
@@ -68,6 +82,7 @@ export function ResponsavelPanel({ leadId, usuarios, responsavelInicial, onChang
     }
   }
 
+  const respId = responsavel
   const souDono = respId && respId === meuId
 
   return (

@@ -1165,7 +1165,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             <ResponsavelPanel
               leadId={lead.id}
               usuarios={usuarios}
-              responsavelInicial={lead.responsavel_id}
+              responsavel={lead.responsavel_id}
               onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
             />
             {/* Painéis da vertical, na ordem que o segmento declarou. Acrescentar

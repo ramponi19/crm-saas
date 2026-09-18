@@ -197,6 +197,19 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
             }
             return porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x))
           })
+          /**
+           * O MODAL ABERTO TAMBEM E ATUALIZADO.
+           *
+           * O tratador so mexia na lista. Com a conversa aberta, mudanca vinda
+           * de fora — outro vendedor assumindo, ou a propria posse gravada ao
+           * responder — nao chegava na tela, e so aparecia depois do F5.
+           * Relatado em 18/09/2026: o lead mostrava "sem ninguem" enquanto no
+           * banco ja tinha dono.
+           *
+           * Mescla em vez de trocar: o payload do realtime traz a linha do
+           * banco, e o que esta na tela pode ter campo que so existe aqui.
+           */
+          setSelectedLead(prev => (prev && prev.id === l.id ? { ...prev, ...l } : prev))
         })
       // Lead removido do banco: some da lista na hora
       .on('postgres_changes',
