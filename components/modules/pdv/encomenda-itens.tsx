@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
 import { Input, Select } from '@/components/ui'
@@ -54,26 +54,43 @@ export function descreverItem(i: ItemEncomenda): string {
 
 export function EncomendaItens({ itens, onChange }: {
   itens: ItemEncomenda[]
-  onChange: (itens: ItemEncomenda[]) => void
+  onChange: Dispatch<SetStateAction<ItemEncomenda[]>>
 }) {
   const supabase = createClient()
   const [buscando, setBuscando] = useState<string | null>(null)
 
-  const mexer = (id: string, patch: Partial<ItemEncomenda>) =>
-    onChange(itens.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+  /**
+   * Toda escrita parte do item ATUAL, nunca da lista congelada no render.
+   *
+   * Não é preciosismo: escolher um produto grava duas vezes, uma antes e outra
+   * depois do await que busca as variantes. Com a lista do closure, a segunda
+   * escrita reconstruía tudo a partir do estado velho e apagava o produto que a
+   * primeira tinha acabado de gravar — o campo voltava para o texto digitado e a
+   * sugestão reabria. Foi o bug de 18/09/2026: "digitei 17 pro, ele localiza
+   * iPhone 17 Pro, mas ao clicar não puxa".
+   */
+  const mexer = (
+    id: string,
+    patch: Partial<ItemEncomenda> | ((x: ItemEncomenda) => Partial<ItemEncomenda>),
+  ) =>
+    onChange((xs) =>
+      xs.map((x) => (x.id === id ? { ...x, ...(typeof patch === 'function' ? patch(x) : patch) } : x)))
 
   async function escolherProduto(id: string, p: { id: number; nome: string; preco: number | null }) {
-    const atual = itens.find((x) => x.id === id)
-    mexer(id, {
+    mexer(id, (x) => ({
       produto: p.nome, produtoId: p.id, cor: '', capacidade: '',
       // O preço do cadastro entra só se o vendedor ainda não digitou um: o que
       // ele combinou com o cliente vale mais que a tabela.
-      valor: !atual?.valor && p.preco ? String(p.preco) : (atual?.valor ?? ''),
-    })
+      valor: !x.valor && p.preco ? String(p.preco) : x.valor,
+    }))
     setBuscando(id)
     const { data } = await supabase.from('produtos').select('cores, armazenamentos').eq('id', p.id).maybeSingle()
     setBuscando(null)
-    mexer(id, { coresDisp: data?.cores ?? [], armazDisp: data?.armazenamentos ?? [] })
+    // As variantes só entram se a linha ainda for deste produto: entre o clique e
+    // a resposta o vendedor pode ter trocado de modelo ou limpado o campo.
+    mexer(id, (x) => (x.produtoId === p.id
+      ? { coresDisp: data?.cores ?? [], armazDisp: data?.armazenamentos ?? [] }
+      : {}))
   }
 
   const total = itens.reduce((s, i) => s + (Number(i.valor) || 0), 0)
@@ -88,7 +105,7 @@ export function EncomendaItens({ itens, onChange }: {
             </span>
             {itens.length > 1 && (
               <button type="button" aria-label={`Remover item ${n + 1}`}
-                onClick={() => onChange(itens.filter((x) => x.id !== item.id))}
+                onClick={() => onChange((xs) => xs.filter((x) => x.id !== item.id))}
                 className="grid h-7 w-7 place-items-center rounded-control text-ink-3 transition-colors hover:text-bad">
                 <Trash2 size={14} strokeWidth={1.8} />
               </button>
@@ -132,7 +149,7 @@ export function EncomendaItens({ itens, onChange }: {
       ))}
 
       <button type="button"
-        onClick={() => onChange([...itens, itemVazio()])}
+        onClick={() => onChange((xs) => [...xs, itemVazio()])}
         className="flex items-center gap-1.5 text-[12px] font-semibold text-accent transition-opacity hover:opacity-80">
         <Plus size={13} strokeWidth={2} /> Outro produto
       </button>

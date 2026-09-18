@@ -40,6 +40,8 @@ v "encomenda grava o prazo prometido"    "components/modules/pdv/encomenda-form.
 v "entrega registra o pagamento"        "lib/encomendas.ts" "registrouPagamento"
 v "pedido feito nao troca a data"       "components/modules/pdv/encomendas-abertas.tsx" "solicitado_em., null"
 v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
+v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens.tsx" "onChange((xs) =>"
+n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"
