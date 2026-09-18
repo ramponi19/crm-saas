@@ -44,6 +44,10 @@ v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens
 n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
 v "busca global ordena o lead"        "components/layout/command-palette.tsx" "order(.ultima_mensagem_at."
 n "busca global nao volta ao teto de 4" "components/layout/command-palette.tsx" "limit(4)"
+v "lead e procurado na loja do canal"   "supabase/functions/webhook-leads/index.ts" "busca = busca.eq(.filial_id., canal.filial_id)"
+v "echo tambem respeita a loja"         "supabase/functions/webhook-leads/index.ts" "ql = ql.eq(.filial_id., canal.filial_id)"
+v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.ts" "qh = qh.eq(.filial_id., canal.filial_id)"
+v "mensagem guarda o canal de entrada"  "supabase/functions/webhook-leads/index.ts" "canal_id: canal.id"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"

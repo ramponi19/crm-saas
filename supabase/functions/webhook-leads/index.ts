@@ -910,19 +910,46 @@ async function upsertLead(canal: Canal, p: {
 
   // TODA busca de lead filtra empresa_id. Sem isso (v26), dois clientes com o
   // mesmo consumidor tinham a conversa misturada — vazamento entre empresas.
-  const { data: byId } = await db.from("leads")
+  /**
+   * O LEAD E PROCURADO NA LOJA DO CANAL, nao so pela empresa.
+   *
+   * ══ O BUG QUE ISTO CONSERTA (18/09/2026) ═══════════════════════════════════
+   *
+   * A busca era empresa + telefone. Com dois numeros na mesma empresa, o
+   * primeiro contato decidia a loja do lead PARA SEMPRE: o dono mandou um teste
+   * para o numero novo de Jaguariuna as 11:11, o lead nasceu la, e quando Mogi
+   * respondeu pelo numero de Mogi a mensagem caiu no mesmo chat. Do lado da
+   * loja, a conversa de um cliente de Mogi aparecia em Jaguariuna — e a resposta
+   * pelo CRM saia pelo numero da outra loja, porque quem responde e
+   * canalDaLoja(.., lead.filial_id).
+   *
+   * A regra do dono: "era para ter meu lead em jaguariuna e mogi e nao
+   * transferir os chats". Cada loja tem a sua conversa.
+   *
+   * Canal sem loja (o Messenger da marca, que atende a rede) nao filtra: segue
+   * caindo no lead unico da empresa, que e o certo para a marca.
+   *
+   * limit(1) no lugar de maybeSingle: sem o filtro de loja agora podem existir
+   * dois leads do mesmo telefone na empresa, e maybeSingle derrubaria o
+   * recebimento com erro em vez de gravar a mensagem.
+   */
+  let busca = db.from("leads")
     .select("id, nome, instagram, foto_url")
-    .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true).maybeSingle();
-  let existente = byId as { id: number; nome: string | null; instagram: string | null; foto_url?: string | null } | null;
+    .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true);
+  if (canal.filial_id != null) busca = busca.eq("filial_id", canal.filial_id);
+  const { data: achados } = await busca.order("id", { ascending: true }).limit(1);
+  let existente = (achados?.[0] ?? null) as { id: number; nome: string | null; instagram: string | null; foto_url?: string | null } | null;
 
   // Lead criado à mão tem telefone e origem_id nulo — casa pelos últimos 8 dígitos.
   if (!existente && p.origem === "whatsapp") {
     const last8 = p.origemId.replace(/\D/g, "").slice(-8);
     if (last8.length >= 8) {
-      const { data: cands } = await db.from("leads")
+      let qc = db.from("leads")
         .select("id, nome, instagram, telefone")
         .eq("empresa_id", empresaId).eq("ativo", true)
-        .is("origem_id", null).ilike("telefone", `%${last8}%`).limit(20);
+        .is("origem_id", null).ilike("telefone", `%${last8}%`);
+      if (canal.filial_id != null) qc = qc.eq("filial_id", canal.filial_id);
+      const { data: cands } = await qc.limit(20);
       const match = (cands ?? []).find((l) => {
         const d = (l.telefone || "").replace(/\D/g, "");
         return d === p.origemId || d.slice(-8) === last8;
@@ -956,9 +983,11 @@ async function upsertLead(canal: Canal, p: {
       ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
     }]).select("id").single();
     if (error) {
-      const { data: again } = await db.from("leads").select("id")
-        .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true).maybeSingle();
-      leadId = (again?.id as number | undefined) ?? null;
+      let qa = db.from("leads").select("id")
+        .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true);
+      if (canal.filial_id != null) qa = qa.eq("filial_id", canal.filial_id);
+      const { data: again } = await qa.order("id", { ascending: true }).limit(1);
+      leadId = (again?.[0]?.id as number | undefined) ?? null;
       if (!leadId) { console.error("criar lead:", error.message); return null; }
     } else leadId = novo.id as number;
   } else {
@@ -981,7 +1010,7 @@ async function upsertLead(canal: Canal, p: {
   // índice único impede um segundo card.
   if (p.anuncio) {
     await db.from("lead_mensagens").insert([{
-      empresa_id: empresaId, lead_id: leadId, direcao: "recebida",
+      empresa_id: empresaId, lead_id: leadId, direcao: "recebida", canal_id: canal.id,
       conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
       external_id: p.externalId ? `anuncio:${p.externalId}` : null,
       tipo: "anuncio", midia_url: p.anuncio.midia,
@@ -989,7 +1018,7 @@ async function upsertLead(canal: Canal, p: {
   }
 
   const { error: msgErr } = await db.from("lead_mensagens").insert([{
-    empresa_id: empresaId, lead_id: leadId, direcao: "recebida", conteudo: p.texto,
+    empresa_id: empresaId, lead_id: leadId, direcao: "recebida", conteudo: p.texto, canal_id: canal.id,
     origem: p.origem, lida: false, external_id: p.externalId, tipo, midia_url: midiaUrl,
   }]);
   if (msgErr) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
@@ -1016,11 +1045,44 @@ async function registrarEcho(
 ) {
   try {
     if (!destinatario || !mid) return;
-    const { data: lead } = await db.from("leads").select("id")
-      .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true).maybeSingle();
+    /**
+     * O ECHO TAMBEM E POR LOJA — e este foi o caminho do caso de 18/09/2026.
+     *
+     * Echo e a mensagem que a loja mandou PELO CELULAR, devolvida pela Meta na
+     * coexistencia. Buscando so por empresa + telefone, a resposta enviada pelo
+     * aparelho de Mogi caiu no chat que estava em Jaguariuna.
+     *
+     * Se o cliente ainda nao tem conversa NESTA loja mas ja tem em outra, o lead
+     * e aberto aqui: a loja falou com ele por este numero, entao a conversa
+     * existe e precisa aparecer na loja certa. Sem isso o echo seria descartado
+     * e a mensagem sumiria do CRM.
+     *
+     * Contato novo de verdade (sem lead em lugar nenhum) continua nao criando
+     * nada por echo — o lead nasce quando o cliente responde, como sempre foi.
+     */
+    let ql = db.from("leads").select("id")
+      .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true);
+    if (canal.filial_id != null) ql = ql.eq("filial_id", canal.filial_id);
+    const { data: naLoja } = await ql.order("id", { ascending: true }).limit(1);
+    let lead = (naLoja?.[0] ?? null) as { id: number } | null;
+
+    if (!lead && canal.filial_id != null) {
+      const { data: noutraLoja } = await db.from("leads").select("id, nome, telefone")
+        .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true).limit(1);
+      const conhecido = noutraLoja?.[0];
+      if (conhecido) {
+        const { data: criado } = await db.from("leads").insert([{
+          empresa_id: canal.empresa_id, nome: (conhecido.nome as string | null) ?? destinatario,
+          telefone: (conhecido.telefone as string | null) ?? destinatario,
+          origem, origem_id: destinatario, kanban_status: "novo", ativo: true,
+          filial_id: canal.filial_id,
+        }]).select("id").single();
+        lead = (criado ?? null) as { id: number } | null;
+      }
+    }
     if (!lead?.id) return;
     const { error } = await db.from("lead_mensagens").insert([{
-      empresa_id: canal.empresa_id, lead_id: lead.id, direcao: "enviada", conteudo: texto,
+      empresa_id: canal.empresa_id, lead_id: lead.id, direcao: "enviada", conteudo: texto, canal_id: canal.id,
       origem, lida: true, external_id: mid, tipo, midia_url: midiaUrl,
       // Echo = a mensagem comprovadamente saiu (foi enviada pelo app do celular).
       // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
@@ -1115,7 +1177,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
           ? ((m.text as Record<string, string> | undefined)?.body ?? "")
           : TIPO_DB[tipoMsg] ? `[${TIPO_DB[tipoMsg]}]` : descreverSemArquivo(tipoMsg, m);
         const linha: Record<string, unknown> = {
-          empresa_id: canal.empresa_id,
+          empresa_id: canal.empresa_id, canal_id: canal.id,
           direcao: doNegocio ? "enviada" : "recebida", conteudo, origem: "whatsapp",
           lida: true, external_id: m.id ?? null,
           tipo: TIPO_DB[tipoMsg] ?? "texto", midia_url: null,
@@ -1135,16 +1197,22 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       // INATIVO pelo origem_id, que é REATIVADO (o zerar do funil não pode
       // significar perder o histórico de quem volta); 4º cria.
       let leadId: number | null = null;
-      const { data: ativo } = await db.from("leads").select("id")
-        .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", true).maybeSingle();
-      leadId = (ativo?.id as number | undefined) ?? null;
+      // Na LOJA DO CANAL: o historico importado e daquele numero, e sem este
+      // filtro ele grudava na conversa que a outra loja ja tinha com o cliente.
+      let qh = db.from("leads").select("id")
+        .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", true);
+      if (canal.filial_id != null) qh = qh.eq("filial_id", canal.filial_id);
+      const { data: ativo } = await qh.order("id", { ascending: true }).limit(1);
+      leadId = (ativo?.[0]?.id as number | undefined) ?? null;
 
       if (!leadId) {
         const last8 = fone.slice(-8);
         if (last8.length >= 8) {
-          const { data: cands } = await db.from("leads").select("id, telefone")
+          let qhc = db.from("leads").select("id, telefone")
             .eq("empresa_id", canal.empresa_id).eq("ativo", true)
-            .is("origem_id", null).ilike("telefone", `%${last8}%`).limit(20);
+            .is("origem_id", null).ilike("telefone", `%${last8}%`);
+          if (canal.filial_id != null) qhc = qhc.eq("filial_id", canal.filial_id);
+          const { data: cands } = await qhc.limit(20);
           const match = (cands ?? []).find((l) => {
             const d = (l.telefone || "").replace(/\D/g, "");
             return d === fone || d.slice(-8) === last8;
@@ -1157,9 +1225,11 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       }
 
       if (!leadId) {
-        const { data: inativo } = await db.from("leads").select("id")
-          .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", false)
-          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        let qhi = db.from("leads").select("id")
+          .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", false);
+        if (canal.filial_id != null) qhi = qhi.eq("filial_id", canal.filial_id);
+        const { data: inativos } = await qhi.order("created_at", { ascending: false }).limit(1);
+        const inativo = inativos?.[0] as { id: number } | undefined;
         if (inativo?.id) {
           leadId = inativo.id as number;
           await db.from("leads").update({ ativo: true }).eq("id", leadId);
@@ -1171,6 +1241,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
         const { data: novo, error } = await db.from("leads").insert([{
           empresa_id: canal.empresa_id, nome: fone, telefone: fone,
           origem: "whatsapp", origem_id: fone,
+          ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
           primeira_msg: primeiraTexto || null,
           kanban_status: "novo", ativo: true,
           ...(ultimaEm ? { ultima_mensagem_at: ultimaEm } : {}),
@@ -1280,7 +1351,7 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
     }
     if (leadId) {
       await db.from("lead_mensagens").insert([{
-        empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo,
+        empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo, canal_id: canal.id,
         origem: "whatsapp", lida: true, tipo: tipoDb, midia_url: midiaUrl ?? null,
         external_id: (data?.messages?.[0]?.id as string) ?? null,
         usuario_id: usuarioId,
@@ -1347,7 +1418,7 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
 
   if (leadId) {
     await db.from("lead_mensagens").insert([{
-      empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
+      empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", canal_id: canal.id,
       conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
       tipo: "texto", external_id: (data?.messages?.[0]?.id as string) ?? null,
       usuario_id: usuarioId,
@@ -1467,7 +1538,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
     return json({ error: msg }, r.status);
   }
   await db.from("lead_mensagens").insert([{
-    empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada",
+    empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", canal_id: canal.id,
     conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, lida: true,
     tipo: tipoDb, midia_url: midiaUrl ?? null, external_id: (data?.message_id as string) ?? null,
     usuario_id: usuarioId,
