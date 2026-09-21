@@ -50,6 +50,10 @@ v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.
 v "mensagem guarda o canal de entrada"  "supabase/functions/webhook-leads/index.ts" "canal_id: canal.id"
 v "modal aberto recebe o realtime"      "components/modules/leads/leads-view.tsx" "setSelectedLead(prev =>"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
+v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
+v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"
+v "menu do chat tem contador"           "lib/menu.ts" "badge: .chat."
+v "contagem so apos inscrever"          "hooks/use-chat-nao-lidas.ts" "status === .SUBSCRIBED."
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"

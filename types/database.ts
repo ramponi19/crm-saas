@@ -845,6 +845,49 @@ export type Database = {
           },
         ]
       }
+      chat_leituras: {
+        Row: {
+          conversa: string
+          empresa_id: number
+          lido_ate: string
+          usuario_id: string
+        }
+        Insert: {
+          conversa: string
+          empresa_id: number
+          lido_ate?: string
+          usuario_id: string
+        }
+        Update: {
+          conversa?: string
+          empresa_id?: number
+          lido_ate?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_leituras_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_leituras_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chaves_imoveis: {
         Row: {
           codigo: string | null
@@ -3046,6 +3089,7 @@ export type Database = {
       }
       lead_mensagens: {
         Row: {
+          canal_id: number | null
           conteudo: string
           created_at: string | null
           direcao: string
@@ -3064,6 +3108,7 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          canal_id?: number | null
           conteudo: string
           created_at?: string | null
           direcao: string
@@ -3082,6 +3127,7 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          canal_id?: number | null
           conteudo?: string
           created_at?: string | null
           direcao?: string
@@ -3100,6 +3146,13 @@ export type Database = {
           usuario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_mensagens_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_conectados"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lead_mensagens_empresa_id_fkey"
             columns: ["empresa_id"]
@@ -4267,14 +4320,14 @@ export type Database = {
         Row: {
           created_at: string | null
           data_pedido: string | null
-          solicitado_em: string | null
-          solicitado_por: string | null
           descricao: string | null
           empresa_id: number
           filial_id: number | null
           fornecedor_id: number | null
           id: number
           observacoes: string | null
+          solicitado_em: string | null
+          solicitado_por: string | null
           status: string | null
           usuario_id: string | null
           valor_total: number | null
@@ -4282,14 +4335,14 @@ export type Database = {
         Insert: {
           created_at?: string | null
           data_pedido?: string | null
-          solicitado_em?: string | null
-          solicitado_por?: string | null
           descricao?: string | null
           empresa_id: number
           filial_id?: number | null
           fornecedor_id?: number | null
           id?: never
           observacoes?: string | null
+          solicitado_em?: string | null
+          solicitado_por?: string | null
           status?: string | null
           usuario_id?: string | null
           valor_total?: number | null
@@ -4297,14 +4350,14 @@ export type Database = {
         Update: {
           created_at?: string | null
           data_pedido?: string | null
-          solicitado_em?: string | null
-          solicitado_por?: string | null
           descricao?: string | null
           empresa_id?: number
           filial_id?: number | null
           fornecedor_id?: number | null
           id?: never
           observacoes?: string | null
+          solicitado_em?: string | null
+          solicitado_por?: string | null
           status?: string | null
           usuario_id?: string | null
           valor_total?: number | null
@@ -4336,6 +4389,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_compra_solicitado_por_fkey"
+            columns: ["solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
           {
@@ -6468,6 +6528,14 @@ export type Database = {
       }
     }
     Functions: {
+      chat_marcar_lido: { Args: { p_conversa: string }; Returns: undefined }
+      chat_nao_lidas_por_conversa: {
+        Args: never
+        Returns: {
+          conversa: string
+          nao_lidas: number
+        }[]
+      }
       encerrar_impersonacao: { Args: never; Returns: undefined }
       filiais_visiveis: { Args: never; Returns: number[] }
       filial_atual: { Args: never; Returns: number }

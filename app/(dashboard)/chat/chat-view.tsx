@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useChatNaoLidas, marcarConversaLida } from '@/hooks/use-chat-nao-lidas'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { Send, Megaphone, MessageSquare, Trash2, Bell, BellRing } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
@@ -40,6 +41,26 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
   const peerRef = useRef(peer); useEffect(() => { peerRef.current = peer }, [peer])
 
   const scrollFim = useCallback(() => { setTimeout(() => fimRef.current?.scrollIntoView({ behavior: 'smooth' }), 40) }, [])
+
+  const { porConversa } = useChatNaoLidas()
+  /** 'mural' ou 'direto:<uuid>' — a chave que o banco usa para a leitura. */
+  const conversaAtual = aba === 'mural' ? 'mural' : peer ? `direto:${peer}` : null
+  const naoLidasDe = (chave: string) => porConversa[chave] ?? 0
+  const diretosNaoLidos = Object.entries(porConversa)
+    .filter(([k]) => k.startsWith('direto:'))
+    .reduce((soma, [, n]) => soma + n, 0)
+
+  /**
+   * Ler e o ato de ABRIR a conversa, nao o de receber.
+   *
+   * Roda ao trocar de aba, ao escolher com quem falar e a cada mensagem que
+   * chega com a conversa ja aberta — nesse caso a pessoa esta olhando, e
+   * deixar o contador subir na cara dela seria pedir para ignorar o contador.
+   */
+  useEffect(() => {
+    if (!conversaAtual) return
+    void marcarConversaLida(conversaAtual)
+  }, [conversaAtual, mural.length, direto.length])
 
   // Estado das notificações: já inscrito neste dispositivo?
   useEffect(() => {
@@ -147,6 +168,11 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
               <button key={id} onClick={() => setAba(id)}
                 className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-[13.5px] font-semibold transition-colors ${aba === id ? 'border-accent text-accent' : 'border-transparent text-ink-3 hover:text-ink-2'}`}>
                 <Icon size={15} strokeWidth={1.7} />{label}
+                {(id === 'mural' ? naoLidasDe('mural') : diretosNaoLidos) > 0 && (
+                  <span className="num rounded-full bg-accent px-1.5 py-px text-[10px] font-bold text-white">
+                    {id === 'mural' ? naoLidasDe('mural') : diretosNaoLidos}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -170,7 +196,13 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
           <div className="border-b border-line-soft px-4 py-3">
             <Select label="Conversar com" value={peer} onChange={(e) => setPeer(e.target.value)}>
               <option value="">Selecionar usuário…</option>
-              {outros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              {/* A contagem vai no texto porque isto e um <select> nativo: nao ha
+                  onde pendurar um selo, e "(2)" e o que o sistema operacional
+                  sabe desenhar em qualquer aparelho. */}
+              {outros.map((m) => {
+                const n = naoLidasDe(`direto:${m.id}`)
+                return <option key={m.id} value={m.id}>{n > 0 ? `${m.nome} (${n})` : m.nome}</option>
+              })}
             </Select>
           </div>
         )}

@@ -16,7 +16,7 @@
 import { planoTemAcesso, type ModuloPlano } from './plano'
 import { SEGMENTOS, type Segmento } from './segmentos'
 
-export type BadgeKey = 'leads' | 'garantia'
+export type BadgeKey = 'leads' | 'garantia' | 'chat'
 
 /**
  * Maturidade do módulo — é o que permite liberar o CRM por partes.
@@ -253,7 +253,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
       { href: '/tarefas', label: 'Tarefas', icon: 'CheckSquare' },
       { href: '/agenda', label: 'Agenda', icon: 'Calendar', opcional: true },
-      { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true },
+      { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true, badge: 'chat' },
     ],
   },
   {

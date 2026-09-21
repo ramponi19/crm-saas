@@ -11,6 +11,7 @@ import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
 import { NavRolavel } from './nav-rolavel'
 import { AusenciaPopover } from './ausencia-popover'
+import { useChatNaoLidas } from '@/hooks/use-chat-nao-lidas'
 import { resolveTheme, themeVars, type SidebarTheme } from '@/lib/wl-menu'
 
 const PLANO_LABEL: Record<string, string> = { free: 'Plano Free', starter: 'Plano Starter', pro: 'Plano Pro' }
@@ -55,6 +56,7 @@ export function Sidebar({
   const router = useRouter()
   const supabase = createClient()
 
+  const { total: chatNaoLidas } = useChatNaoLidas()
   const t = theme ?? resolveTheme(null)
   const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
   /**
@@ -73,7 +75,11 @@ export function Sidebar({
   }
 
   const iniciais = (userEmpresa ?? userName).slice(0, 2).toUpperCase()
-  const badgeCount = (key?: string) => (key === 'leads' ? leadsCount : key === 'garantia' ? garantiasCount : 0)
+  // O contador do chat NAO vem do servidor como os outros: ele muda enquanto a
+  // pessoa esta na tela, e recarregar a pagina para ver recado de colega e
+  // exatamente a reclamacao que ele existe para resolver.
+  const badgeCount = (key?: string) =>
+    key === 'leads' ? leadsCount : key === 'garantia' ? garantiasCount : key === 'chat' ? chatNaoLidas : 0
   const strong = t.dark ? 'text-white' : 'text-ink'
   const faint = t.dark ? 'text-white/55' : 'text-ink-3'
 
