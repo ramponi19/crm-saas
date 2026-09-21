@@ -62,6 +62,34 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
     void marcarConversaLida(conversaAtual)
   }, [conversaAtual, mural.length, direto.length])
 
+  /**
+   * O SERVICE WORKER PRECISA SABER O QUE ESTOU LENDO.
+   *
+   * Sem isto o push toca mesmo com a conversa na tela — a pessoa le a mensagem
+   * e o celular apita depois, para dizer o que ela acabou de ler.
+   *
+   * Avisa ao trocar de conversa, quando a aba some ou volta, e a cada 25s: o
+   * navegador encerra o service worker quando quer, e o aviso repetido e o que
+   * mantem essa informacao viva sem depender de sorte. Ao sair da tela manda
+   * `null`, senao a ultima conversa ficaria eternamente "aberta" e o push dela
+   * nunca mais tocaria.
+   */
+  useEffect(() => {
+    const sw = () => navigator.serviceWorker?.controller
+    const avisar = () => sw()?.postMessage({
+      tipo: 'chat:conversa',
+      conversa: document.visibilityState === 'visible' ? conversaAtual : null,
+    })
+    avisar()
+    const relogio = setInterval(avisar, 25000)
+    document.addEventListener('visibilitychange', avisar)
+    return () => {
+      clearInterval(relogio)
+      document.removeEventListener('visibilitychange', avisar)
+      sw()?.postMessage({ tipo: 'chat:conversa', conversa: null })
+    }
+  }, [conversaAtual])
+
   // Estado das notificações: já inscrito neste dispositivo?
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) { setPush('unsupported'); return }

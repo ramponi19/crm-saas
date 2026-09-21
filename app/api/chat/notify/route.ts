@@ -24,6 +24,9 @@ export async function POST(req: Request) {
     body: texto,
     url: '/chat',
     tag: `chat-${user.id}`,
+    // Mesma chave que a tela usa para "conversa aberta": com ela o service
+    // worker cala a notificacao de quem esta sendo lido neste instante.
+    conversa: `direto:${user.id}`,
   })
   return NextResponse.json({ ok: true })
 }

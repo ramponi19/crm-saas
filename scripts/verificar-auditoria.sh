@@ -54,6 +54,10 @@ v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"
 v "menu do chat tem contador"           "lib/menu.ts" "badge: .chat."
 v "contagem so apos inscrever"          "hooks/use-chat-nao-lidas.ts" "status === .SUBSCRIBED."
+v "push cala na conversa aberta"        "public/sw.js" "data.conversa === conversaAberta"
+v "so cala com a tela a vista"          "public/sw.js" "visibilityState === .visible."
+v "tela avisa o sw qual conversa"       "app/(dashboard)/chat/chat-view.tsx" "tipo: .chat:conversa."
+v "push diz de qual conversa veio"      "app/api/chat/notify/route.ts" "conversa: .direto:"
 
 echo "== passada 2: rotas abertas =="
 v "cadastro publico com teto"       "app/api/register/route.ts" "excedeuLimite"

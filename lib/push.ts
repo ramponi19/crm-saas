@@ -15,7 +15,18 @@ function garantirConfig(): boolean {
   return true
 }
 
-export interface PushPayload { title: string; body: string; url?: string; tag?: string }
+export interface PushPayload {
+  title: string
+  body: string
+  url?: string
+  tag?: string
+  /**
+   * Conversa de origem ('direto:<uuid do autor>'). O service worker compara com
+   * a que está na tela e cala a notificação de quem está sendo lido agora — sem
+   * isto o celular apita para avisar o que a pessoa acabou de ler.
+   */
+  conversa?: string
+}
 
 /** Envia um push a todos os dispositivos inscritos de um usuário (dentro da empresa). */
 export async function enviarPush(usuarioId: string, empresaId: number, payload: PushPayload) {
