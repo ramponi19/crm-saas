@@ -49,6 +49,8 @@ v "echo tambem respeita a loja"         "supabase/functions/webhook-leads/index.
 v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.ts" "qh = qh.eq(.filial_id., canal.filial_id)"
 v "mensagem guarda o canal de entrada"  "supabase/functions/webhook-leads/index.ts" "canal_id: canal.id"
 v "modal aberto recebe o realtime"      "components/modules/leads/leads-view.tsx" "setSelectedLead(prev =>"
+v "coluna do kanban guarda a rolagem"  "components/modules/leads/kanban-column.tsx" "ondeParei.current = e.currentTarget.scrollTop"
+v "rolagem reposta antes de pintar"    "components/modules/leads/kanban-column.tsx" "useLayoutEffect"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

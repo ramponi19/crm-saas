@@ -1,5 +1,6 @@
 'use client'
 
+import { useLayoutEffect, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Lead, Usuario, KanbanColumn as KanbanColumnType } from './types'
@@ -19,6 +20,47 @@ const fmtK = (v: number) =>
 
 export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}`, data: { status: column.id } })
+
+  /**
+   * A COLUNA NAO PERDE O LUGAR QUANDO UM CARD SOBE.
+   *
+   * ══ O QUE ACONTECIA (25/09/2026) ═══════════════════════════════════════════
+   *
+   * Quem estava lendo cards antigos, la embaixo, e respondia um cliente era
+   * jogado de volta ao topo. O card subir e o certo — o dono confirmou —, mas a
+   * COLUNA ia junto, e voltar ao ponto de leitura exigia rolar centenas de cards.
+   *
+   * ══ POR QUE ════════════════════════════════════════════════════════════════
+   *
+   * Nao e codigo nosso rolando. Medido em producao: no instante da reordenacao o
+   * scroll vai a zero sem NENHUMA chamada de `scrollTop`, `scrollTo` ou
+   * `scrollIntoView` — o unico evento registrado e o do proprio navegador.
+   * Ao reordenar, o React tira e repoe nos dentro deste container; enquanto eles
+   * estao fora, a altura rolavel cai abaixo da posicao atual e o navegador apara
+   * o scroll. Os nos voltam, a altura volta, a posicao nao.
+   *
+   * Os nos sao MOVIDOS, nao recriados (marquei-os no DOM e sobreviveram), e
+   * mesmo assim a posicao se perde — por isso nao adianta mexer nas keys.
+   *
+   * ══ A CORRECAO ═════════════════════════════════════════════════════════════
+   *
+   * Guardar onde a PESSOA deixou a rolagem e repor depois do commit e antes da
+   * pintura (`useLayoutEffect`), para nao existir um quadro intermediario no
+   * topo.
+   *
+   * A margem de 4px separa o que o navegador aparou do que a pessoa rolou: sem
+   * ela, a reposicao brigaria com a rolagem do proprio usuario.
+   */
+  const caixaRef = useRef<HTMLDivElement | null>(null)
+  const ondeParei = useRef(0)
+
+  useLayoutEffect(() => {
+    const el = caixaRef.current
+    if (!el) return
+    if (ondeParei.current > 0 && Math.abs(el.scrollTop - ondeParei.current) > 4) {
+      el.scrollTop = ondeParei.current
+    }
+  }, [leads])
 
   const soma = column.tipo === 'negociacao'
     ? leads.reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
@@ -41,7 +83,8 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
 
       {/* Drop zone */}
       <div
-        ref={setNodeRef}
+        ref={(el) => { setNodeRef(el); caixaRef.current = el }}
+        onScroll={(e) => { ondeParei.current = e.currentTarget.scrollTop }}
         className={`flex min-h-[90px] flex-1 flex-col gap-2 overflow-y-auto rounded-card p-0.5 transition-colors scrollbar-thin ${
           isOver ? 'bg-accent-soft outline outline-1 outline-dashed outline-accent/40' : ''
         }`}
