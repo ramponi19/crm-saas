@@ -85,16 +85,23 @@ export const opcoesComuns = {
      * erro ou a URL dizem "extension" — este não diz nem uma coisa nem outra,
      * e foi por isso que passou.
      *
-     * Só roda quando NENHUM quadro da pilha é do nosso código: erro nosso já
-     * chega com arquivo e linha, e não precisa deste contexto.
+     * Olha ONDE O ERRO ESTOUROU — o último quadro —, não a pilha inteira.
+     *
+     * A primeira versão exigia que NENHUM quadro fosse nosso, e nunca disparava:
+     * o SDK embrulha `setTimeout` e `addEventListener`, então quase todo erro
+     * assíncrono carrega um quadro do nosso bundle mesmo quando quem quebrou foi
+     * código de fora. Só descobri porque disparei um erro de teste em produção e
+     * fui ler o que saiu na rede — a regra parecia certa lendo o código.
+     *
+     * Erro nosso estoura em arquivo nosso e não precisa deste contexto.
      */
     if (typeof document !== 'undefined') {
       const quadros = evento.exception?.values?.[0]?.stacktrace?.frames ?? []
-      const nossos = quadros.filter((q) => {
-        const f = q.filename ?? ''
-        return f.startsWith('http') || f.startsWith('/') || f.startsWith('app:')
-      })
-      if (nossos.length === 0) {
+      const ondeEstourou = quadros[quadros.length - 1]?.filename ?? ''
+      const ehNosso = ondeEstourou.startsWith('http')
+        || ondeEstourou.startsWith('/')
+        || ondeEstourou.startsWith('app:')
+      if (!ehNosso) {
         const scripts = Array.from(document.querySelectorAll('script'))
         const externos = scripts.map((s) => s.src).filter(Boolean)
         evento.contexts = {
