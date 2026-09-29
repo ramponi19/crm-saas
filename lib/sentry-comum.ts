@@ -61,6 +61,63 @@ export const opcoesComuns = {
         delete req.headers.cookie
       }
     }
+
+    /**
+     * ERRO SEM ARQUIVO: anexa QUEM estava carregado na página.
+     *
+     * ══ O CASO QUE PEDIU ISTO (29/09/2026) ════════════════════════════════
+     *
+     * `ReferenceError: Can't find variable: EmptyRanges`, em `/leads`, só no
+     * Safari de um Mac. O símbolo não existe em nenhum arquivo do projeto
+     * (nem nas dependências), o stacktrace é `undefined:1701` — arquivo SEM
+     * NOME — e não há relação com deploy: um dos eventos aconteceu com o
+     * deploy mais próximo três horas DEPOIS, o outro sem nenhum deploy em 24h.
+     *
+     * Tudo aponta para script de terceiro rodando no navegador da pessoa, que
+     * o `window.onerror` captura porque ele escuta a página inteira. Só que
+     * "aponta" não é "prova", e sem o nome do script a conversa morre aqui.
+     *
+     * Extensão do Safari injeta script com endereço `safari-web-extension://`;
+     * no Chrome é `chrome-extension://`. Listando o que a página carregou no
+     * momento do erro, o próximo evento entrega o culpado com nome e sobrenome.
+     *
+     * `ignoreErrors` já descarta extensão conhecida, mas só quando o texto do
+     * erro ou a URL dizem "extension" — este não diz nem uma coisa nem outra,
+     * e foi por isso que passou.
+     *
+     * Só roda quando NENHUM quadro da pilha é do nosso código: erro nosso já
+     * chega com arquivo e linha, e não precisa deste contexto.
+     */
+    if (typeof document !== 'undefined') {
+      const quadros = evento.exception?.values?.[0]?.stacktrace?.frames ?? []
+      const nossos = quadros.filter((q) => {
+        const f = q.filename ?? ''
+        return f.startsWith('http') || f.startsWith('/') || f.startsWith('app:')
+      })
+      if (nossos.length === 0) {
+        const scripts = Array.from(document.querySelectorAll('script'))
+        const externos = scripts.map((s) => s.src).filter(Boolean)
+        evento.contexts = {
+          ...evento.contexts,
+          origem_desconhecida: {
+            // De onde a página carregou script que NÃO é http(s) — é assim que
+            // extensão aparece.
+            nao_http: externos.filter((u) => !/^https?:/i.test(u)).slice(0, 20),
+            // Domínios de terceiros, sem caminho nem query: o que interessa é
+            // QUEM serviu o script, não a URL completa.
+            dominios: Array.from(new Set(
+              externos
+                .filter((u) => /^https?:/i.test(u))
+                .map((u) => { try { return new URL(u).host } catch { return '?' } })
+                .filter((h) => h !== location.host),
+            )).slice(0, 20),
+            scripts_inline: scripts.filter((s) => !s.src).length,
+            total_de_scripts: scripts.length,
+          },
+        }
+      }
+    }
+
     return evento
   },
 

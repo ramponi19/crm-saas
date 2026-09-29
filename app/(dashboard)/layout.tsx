@@ -9,6 +9,7 @@ import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { RotulosProvider } from '@/components/layout/rotulos-context'
 import { SessionGuard } from '@/components/layout/session-guard'
+import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { normalizarSegmento, SEGMENTOS } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
@@ -133,6 +134,14 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
+      {/* Erro que chega sem dono custa uma investigação inteira — ver o
+          componente. Fica no layout porque vale para TODAS as telas logadas. */}
+      <SentryUsuario
+        id={user.id}
+        nome={usuario?.nome ?? 'sem nome'}
+        papel={role}
+        empresa={empresa?.nome}
+      />
       <div className="flex h-[100dvh] overflow-hidden bg-bg">
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
