@@ -42,6 +42,7 @@ const ONDA = 8
 export const limpa = (s: string) => (s || '').replace(/[\r\n;]+/g, ' ').trim()
 
 export type MsgBanco = {
+  id: number
   lead_id: number
   direcao: string
   conteudo: string | null
@@ -141,6 +142,14 @@ export interface Conversas {
   nomeDaLoja: string
   segmentId: string
   totalMensagens: number
+  /**
+   * O id da mensagem mais recente que ENTROU nesta análise.
+   *
+   * É a âncora do "tem coisa nova": a tela compara este número com o pulso do
+   * servidor. Comparar por contagem não serviria — mensagem apagada faria o
+   * total cair e o painel pareceria atualizado quando não está.
+   */
+  ultimaMensagem: number
 }
 
 /**
@@ -175,7 +184,7 @@ export async function carregarConversas(
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
   if (!porId.size) {
     return {
-      analisados: [], porId, nomeDaLoja, segmentId, totalMensagens: 0,
+      analisados: [], porId, nomeDaLoja, segmentId, totalMensagens: 0, ultimaMensagem: 0,
       tempos: { leads: t1 - t0, mensagens: 0, motor: 0 },
     }
   }
@@ -183,7 +192,7 @@ export async function carregarConversas(
   const alvo = [...porId.keys()]
   const msgs = await buscarTudo<MsgBanco>((de, ate) => {
     let q = db.from('lead_mensagens')
-      .select('lead_id, direcao, conteudo, tipo, created_at')
+      .select('id, lead_id, direcao, conteudo, tipo, created_at')
       .eq('empresa_id', empresaId)
     // Filtrar por id só quando o recorte é pequeno: um `in` com milhares de
     // itens vira uma URL que o servidor recusa. Na empresa inteira o filtro de
@@ -207,8 +216,11 @@ export async function carregarConversas(
   const analisados = parseCombinedCSV(montarCsv(porId, msgs, nomeDaLoja))
   const t3 = Date.now()
 
+  let ultimaMensagem = 0
+  for (const m of msgs) if (m.id > ultimaMensagem) ultimaMensagem = m.id
+
   return {
-    analisados, porId, nomeDaLoja, segmentId, totalMensagens: msgs.length,
+    analisados, porId, nomeDaLoja, segmentId, totalMensagens: msgs.length, ultimaMensagem,
     tempos: { leads: t1 - t0, mensagens: t2 - t1, motor: t3 - t2 },
   }
 }

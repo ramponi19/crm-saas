@@ -91,7 +91,7 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
         }}>
           {atualizando ? "● Recalculando…"
             : tempoReal === "ligado" ? "● Conectado ao CRM"
-            : tempoReal === "caiu" ? "● Tempo real caiu — recarregue"
+            : tempoReal === "caiu" ? "● Sem contato com o servidor"
             : "● Conectando…"}
         </div>
         {/*

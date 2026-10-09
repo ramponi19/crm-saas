@@ -7,7 +7,6 @@ import { aliviar, agregar, type LeadLeve, type Agregados, type Loja, type Painel
 import { generateMatchSuggestions, mergeLeads, type MatchSuggestion } from "@/lib/zapintel/merge/matchEngine";
 import { getSegment, getRole, DEFAULT_SEGMENT_ID } from "@/lib/zapintel/segments/segments";
 import type { SegmentConfig } from "@/lib/zapintel/segments/segments";
-import { createClient } from "@/lib/supabase/client";
 import SAMPLE from "@/lib/zapintel/sample-data/sample";
 
 /**
@@ -69,12 +68,12 @@ interface LeadStore {
   /** Está recalculando por conta de mensagem nova. */
   atualizando: boolean;
   /**
-   * A assinatura de tempo real está de pé.
+   * O servidor está respondendo ao pulso.
    *
    * Existe para a tela poder DIZER quando não está: sem isto, "Conectado ao
-   * CRM" era texto fixo, e um canal caído ficaria igual a um canal silencioso
-   * — números velhos com aparência de números vivos, que é exatamente o
-   * problema que este trabalho veio consertar.
+   * CRM" era texto fixo, e servidor mudo ficaria igual a loja parada — números
+   * velhos com aparência de números vivos, que é exatamente o problema que
+   * este trabalho veio consertar.
    */
   tempoReal: "conectando" | "ligado" | "caiu";
 
@@ -116,6 +115,9 @@ const ESPERA_MS = 8000;
 /** Piso entre dois recálculos, por mais movimento que haja. */
 const INTERVALO_MINIMO_MS = 60000;
 
+/** De quanto em quanto tempo a tela pergunta ao servidor se chegou mensagem. */
+const PULSO_MS = 20000;
+
 export function LeadProvider({ children }: { children: ReactNode }) {
   const [painel, setPainel] = useState<Painel | null>(null);
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
@@ -154,44 +156,75 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
   // ── Tempo real ────────────────────────────────────────────────────────────
   //
+  // ── Atualizar sozinho ─────────────────────────────────────────────────────
+  //
   // Mensagem nova em qualquer conversa invalida os agregados — a média de
   // inatividade, o funil, o sentimento. Recalcular a cada mensagem seria
   // absurdo numa loja movimentada, então espera-se o silêncio (8 s) e respeita-
-  // se um piso de 1 min entre recálculos. Durante a espera a tela continua
+  // se um piso de 1 min entre recálculos. Durante a espera a tela segue
   // mostrando o número anterior, com `atualizando` ligado.
   //
-  // ASSINA UMA VEZ SÓ. A primeira versão dependia de `painel`, e como cada
-  // recálculo troca o painel, o canal era derrubado e recriado a cada volta —
-  // justamente quando mais chega mensagem. Evento que caísse nessa janela
-  // sumia, e o painel ficaria parado sem nada indicar que parou.
+  // ══ POR QUE PERGUNTA EM VEZ DE ASSINAR ═══════════════════════════════════
+  //
+  // A primeira versão assinava `lead_mensagens` no Supabase. Não funcionava, e
+  // falhava calada: o canal roda AQUI, sob o RLS do usuário, que para dono e
+  // admin enxerga só a loja selecionada no CRM. O painel mostra a rede inteira.
+  // Com a conta parada em Jaguariúna, 100 mensagens entraram em Mogi e 1 em
+  // Jaguariúna em 45 minutos — a tela não reagia a 99% do movimento, e o canal
+  // respondia "SUBSCRIBED" o tempo todo, porque entrar no canal e estar
+  // autorizado a receber linha são coisas diferentes.
+  //
+  // O pulso pergunta ao servidor, que olha com os mesmos olhos do painel. Custa
+  // uma linha a cada 20 s, e só com a aba à vista.
   const ultimoCalculo = useRef(0);
   const agendado = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vistoAte = useRef(0);
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!painel) return;
+    // Âncora: a mensagem mais nova que ENTROU no cálculo que está na tela.
+    vistoAte.current = Math.max(vistoAte.current, painel.ultimaMensagem);
+  }, [painel]);
+
+  useEffect(() => {
+    let vivo = true;
 
     const agendar = () => {
-      if (agendado.current) clearTimeout(agendado.current);
+      if (agendado.current) return; // já há recálculo a caminho
       const desdeOUltimo = Date.now() - ultimoCalculo.current;
       const espera = Math.max(ESPERA_MS, INTERVALO_MINIMO_MS - desdeOUltimo);
       setAtualizando(true);
       agendado.current = setTimeout(() => {
+        agendado.current = null;
         ultimoCalculo.current = Date.now();
         void buscar();
       }, espera);
     };
 
-    const canal = supabase
-      .channel(`zapintel-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "lead_mensagens" }, agendar)
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") setTempoReal("ligado");
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setTempoReal("caiu");
-      });
+    const bater = async () => {
+      if (!vivo || document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch("/zapintel/api/pulso", { cache: "no-store" });
+        const d = (await r.json()) as { ultima?: number; erro?: string };
+        if (!vivo) return;
+        if (d?.erro || typeof d.ultima !== "number") { setTempoReal("caiu"); return; }
+        setTempoReal("ligado");
+        if (vistoAte.current > 0 && d.ultima > vistoAte.current) agendar();
+      } catch {
+        if (vivo) setTempoReal("caiu");
+      }
+    };
+
+    void bater();
+    const relogio = setInterval(() => void bater(), PULSO_MS);
+    // Voltar para a aba vale como batida: quem reabre quer ver o de agora.
+    document.addEventListener("visibilitychange", bater);
 
     return () => {
-      if (agendado.current) clearTimeout(agendado.current);
-      void supabase.removeChannel(canal);
+      vivo = false;
+      clearInterval(relogio);
+      document.removeEventListener("visibilitychange", bater);
+      if (agendado.current) { clearTimeout(agendado.current); agendado.current = null; }
     };
   }, [buscar]);
 

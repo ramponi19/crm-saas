@@ -74,6 +74,8 @@ export interface Painel {
   empresaNome: string
   segmentId: string
   mensagens: number
+  /** Id da mensagem mais recente que entrou nesta análise. Ver `Conversas`. */
+  ultimaMensagem: number
   /**
    * Leads ATIVOS que não têm uma única mensagem.
    *
@@ -212,7 +214,7 @@ export async function montarPainel(
   empresaId: number,
 ): Promise<{ painel: Painel; linhas: LinhaAnalise[] }> {
   const inicio = Date.now()
-  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, tempos } =
+  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, ultimaMensagem, tempos } =
     await carregarConversas(db, empresaId)
   const leu = Date.now()
 
@@ -260,6 +262,7 @@ export async function montarPainel(
     empresaNome: nomeDaLoja,
     segmentId,
     mensagens: totalMensagens,
+    ultimaMensagem,
     semConversa: porId.size - comConversa.length,
     leads: leves,
     lojas,
