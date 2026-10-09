@@ -12,11 +12,37 @@ export const metadata = {
   title: 'Leads — CRM SaaS',
 }
 
-export default async function LeadsPage() {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
-
-  const [{ data: leads }, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }, { data: funisRaw }] = await Promise.all([
-    supabase
+/**
+ * TRAZ TODOS OS LEADS, nao os primeiros mil.
+ *
+ * ══ O QUE ACONTECIA (09/10/2026) ═══════════════════════════════════════════
+ *
+ * A consulta nao paginava, e o PostgREST corta em 1000 linhas EM SILENCIO. Com
+ * 2.198 leads ativos, a tela mostrava 1.000 e escondia o resto — e como a ordem
+ * e pela conversa mais recente, o que sumia era a cauda antiga.
+ *
+ * Nao era so a lista: os contadores do topo sao calculados sobre o que foi
+ * carregado, entao TODOS mentiam. Medido em Mogi Guacu:
+ *
+ *   leads ativos ....... tela 1.000   banco 1.841
+ *   aguardando resposta  tela   632   banco   754
+ *   na esteira ......... tela   951   banco 1.763
+ *
+ * Oitocentos leads invisiveis, a maioria SEM DONO. Lead sem dono que ninguem ve
+ * e lead que ninguem atende — e o "1.000" tinha cara de numero da operacao,
+ * nao de teto de consulta.
+ *
+ * O mesmo teto de 1000 ja havia mordido a busca do Cmd+K e o ZapIntel. Quando
+ * uma consulta pode passar de mil linhas, ou ela pagina ou ela mente.
+ */
+async function todosOsLeads(
+  supabase: SupabaseClient,
+  empresaId: number,
+): Promise<Lead[]> {
+  const PAGINA = 1000
+  const fora: Lead[] = []
+  for (let de = 0; ; de += PAGINA) {
+    const { data } = await supabase
       .from('leads')
       .select(`
         id, nome, telefone, instagram, origem, kanban_status,
@@ -27,7 +53,21 @@ export default async function LeadsPage() {
       `)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
-      .order('ultima_mensagem_at', { ascending: false, nullsFirst: false }),
+      .order('ultima_mensagem_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false })
+      .range(de, de + PAGINA - 1)
+    const lote = (data ?? []) as unknown as Lead[]
+    fora.push(...lote)
+    if (lote.length < PAGINA) break
+  }
+  return fora
+}
+
+export default async function LeadsPage() {
+  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+
+  const [leads, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }, { data: funisRaw }] = await Promise.all([
+    todosOsLeads(supabase, empresaId),
     supabase
       .from('empresa_usuarios')
       .select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(id, nome)')

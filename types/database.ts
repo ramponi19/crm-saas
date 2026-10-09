@@ -6430,6 +6430,103 @@ export type Database = {
           },
         ]
       }
+      zapintel_analise: {
+        Row: {
+          calculado_em: string
+          canal: string | null
+          classificacao: string | null
+          dias_conversa: number | null
+          dias_inativo: number | null
+          empresa_id: number
+          filial_id: number | null
+          insight: string | null
+          lead_id: number
+          mensagens_lead: number | null
+          mensagens_loja: number | null
+          objecoes: Json | null
+          perfil: string | null
+          primeira_em: string | null
+          proxima_acao: string | null
+          risco_perda: number | null
+          score: number | null
+          sinais_compra: Json | null
+          total_mensagens: number | null
+          ultima_em: string | null
+          urgencia: string | null
+          vendedor: string | null
+        }
+        Insert: {
+          calculado_em?: string
+          canal?: string | null
+          classificacao?: string | null
+          dias_conversa?: number | null
+          dias_inativo?: number | null
+          empresa_id: number
+          filial_id?: number | null
+          insight?: string | null
+          lead_id: number
+          mensagens_lead?: number | null
+          mensagens_loja?: number | null
+          objecoes?: Json | null
+          perfil?: string | null
+          primeira_em?: string | null
+          proxima_acao?: string | null
+          risco_perda?: number | null
+          score?: number | null
+          sinais_compra?: Json | null
+          total_mensagens?: number | null
+          ultima_em?: string | null
+          urgencia?: string | null
+          vendedor?: string | null
+        }
+        Update: {
+          calculado_em?: string
+          canal?: string | null
+          classificacao?: string | null
+          dias_conversa?: number | null
+          dias_inativo?: number | null
+          empresa_id?: number
+          filial_id?: number | null
+          insight?: string | null
+          lead_id?: number
+          mensagens_lead?: number | null
+          mensagens_loja?: number | null
+          objecoes?: Json | null
+          perfil?: string | null
+          primeira_em?: string | null
+          proxima_acao?: string | null
+          risco_perda?: number | null
+          score?: number | null
+          sinais_compra?: Json | null
+          total_mensagens?: number | null
+          ultima_em?: string | null
+          urgencia?: string | null
+          vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zapintel_analise_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zapintel_analise_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "v_empresas_plano"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zapintel_analise_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       v_empresas_plano: {
