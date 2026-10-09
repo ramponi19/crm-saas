@@ -96,7 +96,7 @@ export interface Painel {
    * voltar a apertar o número já estará à mão, sem precisar instrumentar de
    * novo no escuro.
    */
-  tempos: { ler: number; agregar: number }
+  tempos: { ler: number; agregar: number; leads: number; mensagens: number; motor: number }
 }
 
 const PALAVRAS_INDICACAO = ['indicação', 'indicacao', 'indicou', 'me indicou', 'amigo', 'amiga']
@@ -212,7 +212,7 @@ export async function montarPainel(
   empresaId: number,
 ): Promise<{ painel: Painel; linhas: LinhaAnalise[] }> {
   const inicio = Date.now()
-  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens } =
+  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, tempos } =
     await carregarConversas(db, empresaId)
   const leu = Date.now()
 
@@ -266,7 +266,7 @@ export async function montarPainel(
     agregados,
     calculadoEm: new Date().toISOString(),
     ms: Date.now() - inicio,
-    tempos: { ler: leu - inicio, agregar: Date.now() - comecouAgregar },
+    tempos: { ler: leu - inicio, agregar: Date.now() - comecouAgregar, ...tempos },
   }
 
   // A tabela é gravada no MESMO passo que alimenta a tela: assim o que o

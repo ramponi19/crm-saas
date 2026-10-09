@@ -125,7 +125,15 @@ export const idDoLead = (lead: Lead): number | null => {
   return m ? Number(m[1]) : null
 }
 
+/** Onde o tempo da leitura foi. Vai junto na resposta: ver `Painel.tempos`. */
+export interface TemposLeitura {
+  leads: number
+  mensagens: number
+  motor: number
+}
+
 export interface Conversas {
+  tempos: TemposLeitura
   /** O que o motor produziu, COM as mensagens. Nunca deve viajar inteiro. */
   analisados: Lead[]
   /** Os leads como estão no CRM, por id — é daqui que sai a loja de cada um. */
@@ -153,6 +161,7 @@ export async function carregarConversas(
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
   const segmentId = mapCrmSegmento((empresa as { segmento?: string } | null)?.segmento)
 
+  const t0 = Date.now()
   const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
     let q = db.from('leads')
       .select('id, nome, telefone, origem_id, origem, filial_id, empresa_id')
@@ -161,8 +170,15 @@ export async function carregarConversas(
     return q.order('id', { ascending: true }).range(de, ate)
   })
 
+  const t1 = Date.now()
+
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
-  if (!porId.size) return { analisados: [], porId, nomeDaLoja, segmentId, totalMensagens: 0 }
+  if (!porId.size) {
+    return {
+      analisados: [], porId, nomeDaLoja, segmentId, totalMensagens: 0,
+      tempos: { leads: t1 - t0, mensagens: 0, motor: 0 },
+    }
+  }
 
   const alvo = [...porId.keys()]
   const msgs = await buscarTudo<MsgBanco>((de, ate) => {
@@ -186,6 +202,13 @@ export async function carregarConversas(
   // memória, sobre dado já carregado: milissegundos.
   msgs.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
 
+  const t2 = Date.now()
+
   const analisados = parseCombinedCSV(montarCsv(porId, msgs, nomeDaLoja))
-  return { analisados, porId, nomeDaLoja, segmentId, totalMensagens: msgs.length }
+  const t3 = Date.now()
+
+  return {
+    analisados, porId, nomeDaLoja, segmentId, totalMensagens: msgs.length,
+    tempos: { leads: t1 - t0, mensagens: t2 - t1, motor: t3 - t2 },
+  }
 }

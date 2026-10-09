@@ -18,7 +18,14 @@ function formatCurrency(v: number) {
 }
 
 export default function DashboardPage() {
-  const { leads, stats, loaded, loading, loadSample, storeName } = useLeads();
+  const { leads, stats, loaded, loading, loadSample, storeName, lojas, lojaAtiva } = useLeads();
+
+  // Com o recorte por loja, o título precisa dizer QUAL recorte está na tela —
+  // senão "Dashboard — JM Store Importados" fica no alto enquanto os números
+  // embaixo são só os de Jaguariúna.
+  const ondeEstou = lojaAtiva == null
+    ? storeName
+    : (lojas.find(l => l.id === lojaAtiva)?.nome ?? storeName);
 
   if (!loaded) return <EmptyState loading={loading} onLoad={loadSample} />;
 
@@ -45,7 +52,7 @@ export default function DashboardPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -.5, marginBottom: 4 }}>
-          Dashboard{storeName ? ` — ${storeName}` : ""}
+          Dashboard{ondeEstou ? ` — ${ondeEstou}` : ""}
         </h1>
         <p style={{ fontSize: 12, color: "var(--dim)" }}>
           {s.total} conversas · Score médio {s.avgScore}/100 · Inatividade média {s.avgDaysInactive}d

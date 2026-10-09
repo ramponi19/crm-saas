@@ -13,6 +13,19 @@ import { analisarLeads, gravarAnalise } from '@/lib/zapintel/analise'
  *  · `{ desde: 0 }` — carga completa, em lotes. Devolve `proximo` para a tela
  *    continuar de onde parou.
  *
+ * ══ QUEM CHAMA ISTO HOJE ═══════════════════════════════════════════════════
+ *
+ * Só `scripts/carga-analise-zapintel.mts`, à mão. As telas do ZapIntel NÃO
+ * leem `zapintel_analise`: desde 09/10/2026 elas são servidas por
+ * `/zapintel/api/painel`, que calcula ao vivo em 3,4 s e não grava nada — 2.200
+ * upserts a cada vez que alguém abre uma tela, por uma tabela que ninguém leu,
+ * seria custo sem leitor.
+ *
+ * A tabela continua de pé porque o destino dela é outro: dar ao módulo de
+ * Leads o score e a classificação do ZapIntel sem recalcular. Enquanto esse
+ * leitor não existir, ela envelhece — e é por isso que este aviso está aqui, e
+ * não num comentário escondido.
+ *
  * ══ POR QUE EM LOTES ═══════════════════════════════════════════════════════
  *
  * Medido em 09/10/2026: analisar os 2.039 leads de uma vez leva 13,4 s, acima
