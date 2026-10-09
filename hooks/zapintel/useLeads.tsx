@@ -68,6 +68,15 @@ interface LeadStore {
   calculadoEm: string | null;
   /** Está recalculando por conta de mensagem nova. */
   atualizando: boolean;
+  /**
+   * A assinatura de tempo real está de pé.
+   *
+   * Existe para a tela poder DIZER quando não está: sem isto, "Conectado ao
+   * CRM" era texto fixo, e um canal caído ficaria igual a um canal silencioso
+   * — números velhos com aparência de números vivos, que é exatamente o
+   * problema que este trabalho veio consertar.
+   */
+  tempoReal: "conectando" | "ligado" | "caiu";
 
   loadSample: () => void;
   loadWhatsapp: (text: string, channel?: "whatsapp" | "instagram") => void;
@@ -113,6 +122,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+  const [tempoReal, setTempoReal] = useState<"conectando" | "ligado" | "caiu">("conectando");
 
   // Caminho legado: importação manual de CSV (/zapintel/import). Fora da
   // navegação hoje; quando usado, roda os motores aqui e produz exatamente a
@@ -149,11 +159,15 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   // absurdo numa loja movimentada, então espera-se o silêncio (8 s) e respeita-
   // se um piso de 1 min entre recálculos. Durante a espera a tela continua
   // mostrando o número anterior, com `atualizando` ligado.
+  //
+  // ASSINA UMA VEZ SÓ. A primeira versão dependia de `painel`, e como cada
+  // recálculo troca o painel, o canal era derrubado e recriado a cada volta —
+  // justamente quando mais chega mensagem. Evento que caísse nessa janela
+  // sumia, e o painel ficaria parado sem nada indicar que parou.
   const ultimoCalculo = useRef(0);
   const agendado = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!painel) return;
     const supabase = createClient();
 
     const agendar = () => {
@@ -170,14 +184,16 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     const canal = supabase
       .channel(`zapintel-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "lead_mensagens" }, agendar)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setTempoReal("ligado");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setTempoReal("caiu");
+      });
 
     return () => {
       if (agendado.current) clearTimeout(agendado.current);
       void supabase.removeChannel(canal);
     };
-    // Só precisa (re)assinar quando o painel passa a existir.
-  }, [painel, buscar]);
+  }, [buscar]);
 
   // ── O recorte ativo ───────────────────────────────────────────────────────
   const chave = lojaAtiva == null ? "geral" : String(lojaAtiva);
@@ -316,6 +332,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     semConversa: painel?.semConversa ?? 0,
     calculadoEm: painel?.calculadoEm ?? null,
     atualizando,
+    tempoReal,
     loadSample, loadWhatsapp, loadInstagram,
     markSaleClosed, clearData,
     syncFromCRM, syncing,

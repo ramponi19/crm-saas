@@ -21,7 +21,7 @@ const NAV = [
 
 export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: string }) {
   const path = usePathname();
-  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm, atualizando } = useLeads();
+  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm, atualizando, tempoReal } = useLeads();
   return (
     <aside style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
       <div style={{ padding: "8px 8px 20px", borderBottom: "1px solid var(--brd)", marginBottom: 8 }}>
@@ -80,8 +80,19 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
       )}
 
       <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: atualizando ? "var(--yellow)" : "var(--green)", fontWeight: 700, marginBottom: 4 }}>
-          {atualizando ? "● Recalculando…" : "● Conectado ao CRM"}
+        {/*
+          O estado real da assinatura, não um rótulo fixo. Canal caído some em
+          silêncio: a tela continuaria mostrando os últimos números como se
+          fossem os de agora.
+        */}
+        <div style={{
+          fontSize: 10, fontWeight: 700, marginBottom: 4,
+          color: atualizando ? "var(--yellow)" : tempoReal === "caiu" ? "var(--red)" : tempoReal === "ligado" ? "var(--green)" : "var(--muted)",
+        }}>
+          {atualizando ? "● Recalculando…"
+            : tempoReal === "ligado" ? "● Conectado ao CRM"
+            : tempoReal === "caiu" ? "● Tempo real caiu — recarregue"
+            : "● Conectando…"}
         </div>
         {/*
           O que o painel analisou, em números — e não a promessa de que analisa.
