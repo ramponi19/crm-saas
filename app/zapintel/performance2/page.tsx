@@ -1,7 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import { computePerformance2 } from "@/lib/zapintel/insights/performance2";
 import { UrgencyDot } from "@/components/zapintel/ui/atoms";
 import Link from "next/link";
 import {
@@ -35,11 +34,13 @@ const SECTION_TABS = [
 ];
 
 export default function Performance2Page() {
-  const { leads, loaded, loadSample, sellerName } = useLeads();
+  const { leads, agregados, loaded, loadSample, sellerName } = useLeads();
   const vend = sellerName.toLowerCase();
   const [activeTab, setActiveTab] = useState("speed");
 
-  const stats = useMemo(() => loaded && leads.length ? computePerformance2(leads) : null, [leads, loaded]);
+  // Calculado no servidor, sobre a conversa inteira. As listas por lead vêm
+  // cortadas no tamanho que esta tela mostra — ver `enxugar` em lib/zapintel/painel.
+  const stats = agregados?.performance2 ?? null;
 
   if (!loaded) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 16 }}>

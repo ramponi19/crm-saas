@@ -21,7 +21,7 @@ const NAV = [
 
 export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: string }) {
   const path = usePathname();
-  const { syncFromCRM, syncing } = useLeads();
+  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm, atualizando } = useLeads();
   return (
     <aside style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
       <div style={{ padding: "8px 8px 20px", borderBottom: "1px solid var(--brd)", marginBottom: 8 }}>
@@ -49,9 +49,54 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
 
       <div style={{ flex: 1 }} />
 
+      {/* Recorte: toda a rede, ou uma loja. Só aparece quando há mais de uma. */}
+      {lojas.length > 2 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, marginBottom: 5, paddingLeft: 2 }}>VENDO</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {lojas.map((loja) => {
+              const ativa = loja.id === lojaAtiva;
+              return (
+                <button
+                  key={loja.id ?? "geral"}
+                  onClick={() => setLojaAtiva(loja.id)}
+                  title={`${loja.leads} conversas analisadas`}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                    width: "100%", textAlign: "left", cursor: "pointer",
+                    background: ativa ? "var(--purple)" : "var(--card2)",
+                    border: `1px solid ${ativa ? "var(--purple)" : "var(--brd2)"}`,
+                    color: ativa ? "#fff" : "var(--dim)",
+                    borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: ativa ? 700 : 400,
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loja.nome}</span>
+                  <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{loja.leads}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: "var(--green)", fontWeight: 700, marginBottom: 4 }}>● Conectado ao CRM</div>
-        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8 }}>Sincroniza sozinho das conversas reais dos leads</div>
+        <div style={{ fontSize: 10, color: atualizando ? "var(--yellow)" : "var(--green)", fontWeight: 700, marginBottom: 4 }}>
+          {atualizando ? "● Recalculando…" : "● Conectado ao CRM"}
+        </div>
+        {/*
+          O que o painel analisou, em números — e não a promessa de que analisa.
+          Antes dizia só "sincroniza sozinho", enquanto por baixo cortava a
+          análise em 40.000 mensagens e parava três semanas atrás.
+        */}
+        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8, lineHeight: 1.5 }}>
+          {mensagens > 0 ? (
+            <>
+              {mensagens.toLocaleString("pt-BR")} mensagens analisadas
+              {semConversa > 0 && <> · {semConversa} lead{semConversa > 1 ? "s" : ""} sem conversa</>}
+              {calculadoEm && <><br />às {new Date(calculadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}, atualiza sozinho</>}
+            </>
+          ) : "Lendo as conversas reais dos leads"}
+        </div>
         <button
           onClick={syncFromCRM}
           disabled={syncing}

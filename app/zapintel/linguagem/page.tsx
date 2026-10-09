@@ -1,115 +1,27 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { MessageSquare, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const TT = { contentStyle:{ background:"var(--card)", border:"1px solid var(--brd)", borderRadius:8, color:"var(--txt)", fontSize:12 } };
 
-// Words/phrases that correlate with success
-const POWER_WORDS = [
-  "olha","perfeito","excelente","ótimo","bacana","certinho","show","manda","mandei","foto",
-  "garantia","segurança","confiança","parcela","entrada","facilita","exclusivo","especial",
-  "só pra você","reservei","último","chegou agora","zero km","aprovado",
-];
-// Words that correlate with loss
-const WEAK_WORDS = [
-  "não sei","qualquer coisa","qualquer dúvida","quando quiser","sem pressão","à vontade",
-  "pode ser","talvez","se quiser","não tem problema","tudo bem se não","não precisa",
-];
-// Palavras que o vendedor deve evitar
-const AVOID_WORDS = [
-  "entendido","compreendido","certo","ok","okay","tá","né",
-];
-
-function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[^\w\sàáâãäéêëíïóôõöúüçñ]/g,"").split(/\s+/).filter(Boolean);
-}
-
-function countPhrase(texts: string[], phrase: string): number {
-  return texts.filter(t => t.toLowerCase().includes(phrase)).length;
-}
-
-interface WordStat { word: string; winCount: number; lossCount: number; totalCount: number; winRate: number }
+/**
+ * As listas de palavras e todo o cálculo saíram daqui para
+ * `lib/zapintel/insights/linguagem.ts`.
+ *
+ * Enquanto moravam nesta tela, o cálculo exigia o texto das 54 mil mensagens
+ * dentro do navegador — e foi esse peso que levou a análise a ser truncada.
+ * Agora roda no servidor, sobre a conversa inteira, e o que chega aqui é o
+ * resultado.
+ */
 
 export default function LinguagemPage() {
-  const { leads, loaded, loadSample, sellerName } = useLeads();
+  const { agregados, loaded, loadSample, sellerName } = useLeads();
   const vend = sellerName.toLowerCase();
   const [tab, setTab] = useState<"words"|"phrases"|"patterns">("words");
 
-  const analysis = useMemo(() => {
-    if (!leads.length) return null;
-
-    const winLeads  = leads.filter(l => l.classification === "customer" || l.classification === "hot");
-    const lossLeads = leads.filter(l => l.classification === "lost" || l.classification === "stalled");
-
-    // Somente mensagens da loja (linguagem do vendedor)
-    const winMsgs  = winLeads.flatMap(l => l.messages.filter(m => m.isStore).map(m => m.body || ""));
-    const lossMsgs = lossLeads.flatMap(l => l.messages.filter(m => m.isStore).map(m => m.body || ""));
-    const allStoreMsgs = leads.flatMap(l => l.messages.filter(m => m.isStore).map(m => m.body || ""));
-
-    // Word frequency per category
-    const winTokens  = winMsgs.flatMap(tokenize);
-    const lossTokens = lossMsgs.flatMap(tokenize);
-
-    // Build word stats for power/weak words
-    const powerStats: WordStat[] = POWER_WORDS.map(w => {
-      const wc = winTokens.filter(t => t.includes(w)).length;
-      const lc = lossTokens.filter(t => t.includes(w)).length;
-      const total = wc + lc;
-      return { word:w, winCount:wc, lossCount:lc, totalCount:total, winRate:total>0?Math.round((wc/total)*100):0 };
-    }).filter(s => s.totalCount > 0).sort((a,b) => b.winRate - a.winRate).slice(0,12);
-
-    const weakStats: WordStat[] = WEAK_WORDS.map(w => {
-      const wc = winTokens.filter(t => t.includes(w)).length;
-      const lc = lossTokens.filter(t => t.includes(w)).length;
-      const total = wc + lc;
-      return { word:w, winCount:wc, lossCount:lc, totalCount:total, winRate:total>0?Math.round((wc/total)*100):0 };
-    }).filter(s => s.totalCount > 0).sort((a,b) => a.winRate - b.winRate).slice(0,8);
-
-    // Avoid words usage
-    const avoidUsage = AVOID_WORDS.map(w => ({
-      word:w,
-      count: allStoreMsgs.filter(m => m.toLowerCase().includes(w)).length,
-    })).filter(s => s.count > 0).sort((a,b) => b.count - a.count);
-
-    // Patterns: questions, emojis, response length
-    const avgWinMsgLen  = winMsgs.length  > 0 ? Math.round(winMsgs.reduce((s,m) => s+m.length,0) / winMsgs.length) : 0;
-    const avgLossMsgLen = lossMsgs.length > 0 ? Math.round(lossMsgs.reduce((s,m) => s+m.length,0) / lossMsgs.length) : 0;
-
-    const emojiRx = /[\u{1F300}-\u{1FFFF}]/u;
-    const winWithEmoji  = winMsgs.filter(m => emojiRx.test(m)).length;
-    const lossWithEmoji = lossMsgs.filter(m => emojiRx.test(m)).length;
-    const winEmojiPct  = winMsgs.length  > 0 ? Math.round((winWithEmoji/winMsgs.length)*100) : 0;
-    const lossEmojiPct = lossMsgs.length > 0 ? Math.round((lossWithEmoji/lossMsgs.length)*100) : 0;
-
-    const winWithQ  = winMsgs.filter(m => m.includes("?")).length;
-    const lossWithQ = lossMsgs.filter(m => m.includes("?")).length;
-    const winQPct  = winMsgs.length  > 0 ? Math.round((winWithQ/winMsgs.length)*100) : 0;
-    const lossQPct = lossMsgs.length > 0 ? Math.round((lossWithQ/lossMsgs.length)*100) : 0;
-
-    // Top phrases in winning conversations
-    const TOP_PHRASES = [
-      "garantia de","aceita como entrada","parcela em","só restou","reservar pra você",
-      "mandei a foto","chegou agora","posso ver","vou verificar","tô te mandando",
-      "aqui na jm","melhor custo","você confia","já atendi","cliente meu",
-    ];
-    const phraseStats = TOP_PHRASES.map(p => ({
-      phrase: p,
-      winCount: countPhrase(winMsgs, p),
-      lossCount: countPhrase(lossMsgs, p),
-    })).filter(s => s.winCount + s.lossCount > 0)
-      .sort((a,b) => (b.winCount - b.lossCount) - (a.winCount - a.lossCount))
-      .slice(0,10);
-
-    return {
-      winLeads: winLeads.length, lossLeads: lossLeads.length,
-      winMsgs: winMsgs.length,  lossMsgs: lossMsgs.length,
-      powerStats, weakStats, avoidUsage,
-      avgWinMsgLen, avgLossMsgLen, winEmojiPct, lossEmojiPct, winQPct, lossQPct,
-      phraseStats,
-    };
-  }, [leads]);
+  const analysis = agregados?.linguagem ?? null;
 
   if (!loaded) return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:16}}>

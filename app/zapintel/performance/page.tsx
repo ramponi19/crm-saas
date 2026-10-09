@@ -1,7 +1,5 @@
 "use client";
-import { useMemo } from "react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import { computePerformance } from "@/lib/zapintel/insights/performance";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, LineChart, Line, CartesianGrid, 
@@ -59,9 +57,11 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 }
 
 export default function PerformancePage() {
-  const { leads, loaded, loadSample, loading, storeName, sellerName } = useLeads();
+  const { leads, agregados, loaded, loadSample, loading, storeName, sellerName } = useLeads();
 
-  const perf = useMemo(() => loaded && leads.length > 0 ? computePerformance(leads) : null, [leads, loaded]);
+  // Calculado no servidor, sobre a conversa inteira. Rodar aqui daria zero:
+  // os leads chegam sem as mensagens, de propósito.
+  const perf = agregados?.performance ?? null;
 
   if (!loaded) return (
     <div style={{ textAlign: "center", paddingTop: 80 }}>

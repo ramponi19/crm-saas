@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLeads } from "@/hooks/zapintel/useLeads";
-import type { Lead } from "@/types/zapintel";
+import type { LeadLeve } from "@/lib/zapintel/painel";
 import { getCrossSell } from "@/lib/zapintel/segments/segments";
 import { ArrowRight, Copy } from "lucide-react";
 
@@ -44,19 +44,15 @@ const REFERRAL_SCRIPTS = [
   },
 ];
 
-function detectProductKey(lead: Lead): string {
-  const sources = [
-    lead.manualSale?.product || "",
-    ...(lead.messages || []).filter((m) => m.isStore).map((m) => m.body || ""),
-  ].join(" ").toLowerCase();
-
-  if (sources.includes("macbook")) return "macbook";
-  if (sources.includes("ipad")) return "ipad";
-  if (sources.includes("airpod")) return "airpods";
-  if (sources.includes("apple watch") || sources.includes("watch series") || sources.includes("watch ultra")) return "apple watch";
-  if (sources.includes("perfume") || sources.includes("212 vip") || sources.includes("importado")) return "perfume";
-  if (sources.includes("iphone")) return "iphone";
-  return "default";
+/**
+ * Qual produto a conversa tratou.
+ *
+ * A dedução (varrer o que a loja falou) mudou de lugar: roda no servidor, em
+ * `lib/zapintel/painel.ts`, e chega aqui pronta no campo `produto`. Aqui ela
+ * daria sempre "default", porque o lead chega sem o texto das conversas.
+ */
+function detectProductKey(lead: LeadLeve): string {
+  return lead.produto || "default";
 }
 
 function getProductLabel(key: string): string {

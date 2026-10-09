@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import type { Lead } from "@/types/zapintel";
@@ -120,9 +120,45 @@ type Tab = "whatsapp" | "instagram" | "all";
 export default function LeadDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { leads, markSaleClosed, storeName, sellerName, segment } = useLeads();
+  const { leads, leadsCompletos, markSaleClosed, storeName, sellerName, segment } = useLeads();
   const saleProducts = [...getProducts(segment.id), "Outro"];
-  const lead = leads.find(l => l.id === id);
+  const resumo = leads.find(l => l.id === id);
+
+  /**
+   * A CONVERSA NÃO VEM NA LISTA — É BUSCADA AQUI.
+   *
+   * O painel manda 2.039 leads sem o texto das conversas; mandá-lo todo seria
+   * 4 MB e foi o que obrigava a truncar a análise. Esta tela é a única que
+   * precisa das mensagens de verdade, então pede exatamente uma conversa.
+   *
+   * Em dado importado à mão o texto já está no navegador (`leadsCompletos`) e
+   * não há a quem pedir — por isso os dois caminhos.
+   */
+  const [conversa, setConversa] = useState<Lead | null>(null);
+  const [falhouConversa, setFalhouConversa] = useState(false);
+
+  const daImportacao = leadsCompletos?.find(l => l.id === id) ?? null;
+
+  useEffect(() => {
+    if (daImportacao || !resumo?.leadId) return;
+    let vivo = true;
+    fetch(`/zapintel/api/conversa?lead=${resumo.leadId}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => { if (!vivo) return; if (d?.lead) setConversa(d.lead as Lead); else setFalhouConversa(true); })
+      .catch(() => { if (vivo) setFalhouConversa(true); });
+    return () => { vivo = false; };
+  }, [daImportacao, resumo?.leadId]);
+
+  // Derivado, não guardado: "está carregando" é exatamente "tem o que buscar e
+  // ainda não chegou". Um estado separado só poderia divergir disso.
+  const carregandoConversa = !daImportacao && !!resumo?.leadId && !conversa && !falhouConversa;
+
+  // O resumo (score, classificação, perfil) vem da lista e aparece na hora; as
+  // mensagens chegam depois. Enquanto não chegam, a conversa fica vazia — e a
+  // tela diz que está carregando, em vez de afirmar que não há nada.
+  const lead: Lead | null = daImportacao ?? (resumo
+    ? { ...(resumo as unknown as Lead), messages: conversa?.messages ?? [] }
+    : null);
 
   const [tab, setTab] = useState<Tab>("all");
   const [showSaleModal, setShowSaleModal] = useState(false);
@@ -147,7 +183,7 @@ export default function LeadDetailPage() {
   );
 
   // Detect if this lead has both sources
-  const sources = lead._sources;
+  const sources = (lead as Lead)._sources;
   const isMerged = !!sources;
 
   // Filter messages by tab
@@ -391,7 +427,14 @@ export default function LeadDetailPage() {
       {/* ── Conversation history with tabs ──────────────────────────────── */}
       <div className="card" style={{ padding: 22 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Histórico da Conversa</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>
+            Histórico da Conversa
+            {!carregandoConversa && lead.messages.length > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>
+                {lead.messages.length} mensagens
+              </span>
+            )}
+          </div>
 
           {/* Tabs — only show if merged */}
           {isMerged && (
@@ -415,6 +458,33 @@ export default function LeadDetailPage() {
             </div>
           )}
         </div>
+
+        {/*
+          A conversa chega depois do resumo: a lista de leads vem sem o texto
+          das mensagens, e esta tela pede a dela. Dizer "carregando" é o que
+          impede a tela de afirmar que a conversa está vazia enquanto ela vem.
+        */}
+        {carregandoConversa && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {[70, 48, 62].map((largura, i) => (
+              <div key={i} style={{
+                alignSelf: i % 2 ? "flex-end" : "flex-start",
+                width: `${largura}%`, height: 44, borderRadius: 13,
+                background: "linear-gradient(90deg, var(--card2) 0%, var(--brd) 50%, var(--card2) 100%)",
+                backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite",
+              }} />
+            ))}
+            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+              Buscando a conversa…
+            </div>
+          </div>
+        )}
+
+        {falhouConversa && (
+          <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", padding: "18px 0" }}>
+            Não consegui carregar a conversa agora.
+          </div>
+        )}
 
         {/* Messages */}
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>

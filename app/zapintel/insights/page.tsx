@@ -67,12 +67,10 @@ export default function InsightsPage() {
 
   const topLeads = [...leads].sort((a, b) => b.score - a.score).slice(0, 6);
 
-  // Leads where last message was from the lead (need follow-up)
-  const pendingClose = leads.filter(l => {
-    const msgs = l.messages.filter(m => m.body?.trim());
-    if (msgs.length === 0) return false;
-    return !msgs[msgs.length - 1].isStore;
-  }).slice(0, 5);
+  // Conversa cuja última fala foi do cliente: a loja deve resposta.
+  // Quem decide isso é o servidor (`aguardandoLoja`), que tem a conversa
+  // inteira — aqui só chega a conclusão.
+  const pendingClose = leads.filter(l => l.aguardandoLoja).slice(0, 5);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -203,7 +201,7 @@ export default function InsightsPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {pendingClose.map(l => {
-              const lastMsg = [...l.messages].reverse().find(m => m.body?.trim());
+              const lastMsg = l.ultimaMensagem;
               return (
                 <Link key={l.id} href={`/zapintel/leads/${l.id}`} style={{ textDecoration: "none" }}>
                   <div className="card2" style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "border-color .15s" }}

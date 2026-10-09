@@ -1,15 +1,37 @@
 "use client";
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import type { Lead, DashboardStats, ManualSale } from "@/types/zapintel";
 import { parseCombinedCSV } from "@/lib/zapintel/parser/csvParser";
 import { parseInstagramFile } from "@/lib/zapintel/parser/instagramParser";
-import { computeStats } from "@/lib/zapintel/insights/stats";
+import { aliviar, agregar, type LeadLeve, type Agregados, type Loja, type Painel } from "@/lib/zapintel/painel";
+import { generateMatchSuggestions, mergeLeads, type MatchSuggestion } from "@/lib/zapintel/merge/matchEngine";
 import { getSegment, getRole, DEFAULT_SEGMENT_ID } from "@/lib/zapintel/segments/segments";
 import type { SegmentConfig } from "@/lib/zapintel/segments/segments";
-import { generateMatchSuggestions, mergeLeads, type MatchSuggestion } from "@/lib/zapintel/merge/matchEngine";
+import { createClient } from "@/lib/supabase/client";
 import SAMPLE from "@/lib/zapintel/sample-data/sample";
 
-export function detectLeadOrigin(lead: Lead): "whatsapp" | "instagram" {
+/**
+ * A FONTE DE DADOS DO ZAPINTEL.
+ *
+ * ══ O QUE MUDOU EM 09/10/2026 ══════════════════════════════════════════════
+ *
+ * Antes isto baixava as conversas em CSV e rodava os motores NO NAVEGADOR. O
+ * tamanho da resposta era o limite, e o limite foi pago com truncamento: a
+ * análise parava em 23/09, ignorava 17 mil mensagens, e o painel anunciava
+ * números de três semanas antes com cara de números de hoje.
+ *
+ * Agora quem analisa é `/zapintel/api/painel`, ao lado do banco, sobre 100%
+ * das mensagens. O que chega aqui é a conclusão — e nenhuma conversa.
+ *
+ * ══ LEAD LEVE ══════════════════════════════════════════════════════════════
+ *
+ * Por isso `leads` é `LeadLeve[]`, e não `Lead[]`: o campo `messages` vem
+ * declarado como `never[]`, então qualquer tela que tente ler o texto da
+ * conversa daqui PARA DE COMPILAR em vez de silenciosamente contar zero. Quem
+ * precisa da conversa inteira busca por lead, sob demanda.
+ */
+
+export function detectLeadOrigin(lead: { _channel?: string; filename?: string; phone?: string }): "whatsapp" | "instagram" {
   if (lead._channel === "instagram") return "instagram";
   if (lead.filename?.toLowerCase().endsWith(".json")) return "instagram";
   if (lead.filename?.toLowerCase().includes("instagram")) return "instagram";
@@ -19,11 +41,50 @@ export function detectLeadOrigin(lead: Lead): "whatsapp" | "instagram" {
 }
 
 interface LeadStore {
-  leads: Lead[];
+  /** Os leads do recorte ativo (toda a rede, ou uma loja). Sem as conversas. */
+  leads: LeadLeve[];
+  /**
+   * Os leads COM as conversas — só existe no caminho de importação manual,
+   * onde o texto está no navegador porque foi o usuário quem o trouxe. No
+   * caminho normal é `null`, e quem precisa de uma conversa pede ao servidor.
+   */
+  leadsCompletos: Lead[] | null;
   stats: DashboardStats | null;
+  /** Todos os agregados do recorte ativo, já calculados no servidor. */
+  agregados: Agregados | null;
   segment: SegmentConfig;
   loaded: boolean;
   loading: boolean;
+
+  /** As lojas disponíveis. A primeira é sempre "toda a rede" (`id: null`). */
+  lojas: Loja[];
+  lojaAtiva: number | null;
+  setLojaAtiva: (id: number | null) => void;
+
+  /** Mensagens que entraram na análise — o número que antes vinha truncado. */
+  mensagens: number;
+  /** Leads ativos sem nenhuma conversa. Ficam fora dos agregados, de propósito. */
+  semConversa: number;
+  calculadoEm: string | null;
+  /** Está recalculando por conta de mensagem nova. */
+  atualizando: boolean;
+
+  loadSample: () => void;
+  loadWhatsapp: (text: string, channel?: "whatsapp" | "instagram") => void;
+  loadInstagram: (text: string, filename: string) => void;
+  markSaleClosed: (leadId: string, sale: ManualSale) => void;
+  clearData: () => void;
+  syncFromCRM: () => void;
+  syncing: boolean;
+  storeName: string;
+  sellerName: string;
+
+  // ── Importação manual e fusão WhatsApp×Instagram ────────────────────────
+  //
+  // Caminho LEGADO: `/zapintel/import` e `/zapintel/merge` não estão na
+  // navegação desde que o ZapIntel passou a se alimentar sozinho do CRM. Segue
+  // funcionando porque tirar tela do produto é decisão de quem é dono dele, não
+  // consequência de uma refatoração — mas nada disto é alimentado pelo servidor.
   whatsappLeads: Lead[];
   instagramLeads: Lead[];
   hasWhatsapp: boolean;
@@ -31,200 +92,248 @@ interface LeadStore {
   matchSuggestions: MatchSuggestion[];
   matchesLoading: boolean;
   hasPendingMatches: boolean;
-  loadSample: () => void;
-  loadWhatsapp: (text: string, channel?: "whatsapp" | "instagram") => void;
-  loadInstagram: (text: string, filename: string) => void;
   runMatchSuggestions: () => void;
   confirmMatch: (id: string) => void;
   rejectMatch: (id: string) => void;
   confirmAllMatches: () => void;
   applyMatches: () => void;
-  markSaleClosed: (leadId: string, sale: ManualSale) => void;
   setSegmentId: (id: string) => void;
-  clearData: () => void;
-  syncFromCRM: () => void;
-  syncing: boolean;
-  storeName: string;
-  sellerName: string;
 }
 
 const Ctx = createContext<LeadStore | null>(null);
 
+/** Silêncio necessário antes de recalcular. Evita um recálculo por mensagem. */
+const ESPERA_MS = 8000;
+/** Piso entre dois recálculos, por mais movimento que haja. */
+const INTERVALO_MINIMO_MS = 60000;
+
 export function LeadProvider({ children }: { children: ReactNode }) {
-  // Keep WA and IG leads in separate buckets — never overwrite each other
-  const [waLeads, setWaLeads] = useState<Lead[]>([]);
-  const [igLeads, setIgLeads] = useState<Lead[]>([]);
+  const [painel, setPainel] = useState<Painel | null>(null);
+  const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+
+  // Caminho legado: importação manual de CSV (/zapintel/import). Fora da
+  // navegação hoje; quando usado, roda os motores aqui e produz exatamente a
+  // mesma forma que o servidor produz — uma forma só para as telas.
+  const [waCrus, setWaCrus] = useState<Lead[]>([]);
+  const [igCrus, setIgCrus] = useState<Lead[]>([]);
   const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [storeName, setStoreName] = useState("");
-  const [segmentId, setSegmentIdState] = useState(DEFAULT_SEGMENT_ID);
+  const [segmentManual, setSegmentManual] = useState<string | null>(null);
+
+  // Quem avisa "estou carregando" é o CHAMADOR, não esta função: o primeiro
+  // carregamento já começa com `loading` ligado, e marcar de novo dentro do
+  // efeito dispara renderização em cascata.
+  const buscar = useCallback(async () => {
+    try {
+      const r = await fetch("/zapintel/api/painel", { cache: "no-store" });
+      const d = (await r.json()) as Painel & { erro?: string };
+      if (!d?.erro && Array.isArray(d.leads)) setPainel(d);
+    } catch {
+      // Mantém o que já está na tela: dado velho é melhor que tela vazia, e a
+      // data do cálculo fica visível para quem olha.
+    } finally {
+      setLoading(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  useEffect(() => { void buscar(); }, [buscar]);
+
+  // ── Tempo real ────────────────────────────────────────────────────────────
+  //
+  // Mensagem nova em qualquer conversa invalida os agregados — a média de
+  // inatividade, o funil, o sentimento. Recalcular a cada mensagem seria
+  // absurdo numa loja movimentada, então espera-se o silêncio (8 s) e respeita-
+  // se um piso de 1 min entre recálculos. Durante a espera a tela continua
+  // mostrando o número anterior, com `atualizando` ligado.
+  const ultimoCalculo = useRef(0);
+  const agendado = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!painel) return;
+    const supabase = createClient();
+
+    const agendar = () => {
+      if (agendado.current) clearTimeout(agendado.current);
+      const desdeOUltimo = Date.now() - ultimoCalculo.current;
+      const espera = Math.max(ESPERA_MS, INTERVALO_MINIMO_MS - desdeOUltimo);
+      setAtualizando(true);
+      agendado.current = setTimeout(() => {
+        ultimoCalculo.current = Date.now();
+        void buscar();
+      }, espera);
+    };
+
+    const canal = supabase
+      .channel(`zapintel-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "lead_mensagens" }, agendar)
+      .subscribe();
+
+    return () => {
+      if (agendado.current) clearTimeout(agendado.current);
+      void supabase.removeChannel(canal);
+    };
+    // Só precisa (re)assinar quando o painel passa a existir.
+  }, [painel, buscar]);
+
+  // ── O recorte ativo ───────────────────────────────────────────────────────
+  const chave = lojaAtiva == null ? "geral" : String(lojaAtiva);
+
+  // ── Importação manual (legado) ────────────────────────────────────────────
+  //
+  // Enquanto houver dado importado ele tem precedência: quem abriu a tela de
+  // import quer ver o que importou, não a base do CRM.
+  const crusImportados = useMemo(() => {
+    if (!waCrus.length && !igCrus.length) return null;
+    const confirmados = matchSuggestions.filter((m) => m.status === "confirmed");
+    const fundidosIds = new Set([
+      ...confirmados.map((m) => m.whatsappLead.id),
+      ...confirmados.map((m) => m.instagramLead.id),
+    ]);
+    return [
+      ...confirmados.map((m) => mergeLeads(m.whatsappLead, m.instagramLead)),
+      ...waCrus.filter((l) => !fundidosIds.has(l.id)),
+      ...igCrus.filter((l) => !fundidosIds.has(l.id)),
+    ].sort((a, b) => b.score - a.score);
+  }, [waCrus, igCrus, matchSuggestions]);
+
+  const importado = useMemo(() => {
+    if (!crusImportados) return null;
+    return { leads: crusImportados.map((l) => aliviar(l, null)), agregados: agregar(crusImportados) };
+  }, [crusImportados]);
+
+  const leads = useMemo(() => {
+    if (importado) return importado.leads;
+    if (!painel) return [];
+    return lojaAtiva == null ? painel.leads : painel.leads.filter((l) => l.filialId === lojaAtiva);
+  }, [importado, painel, lojaAtiva]);
+
+  const agregados = importado ? importado.agregados : (painel?.agregados[chave] ?? null);
+
+  const segmentId = segmentManual ?? painel?.segmentId ?? DEFAULT_SEGMENT_ID;
   const segment = getSegment(segmentId);
   const sellerName = getRole(segmentId);
 
-  // Build combined leads list (merged + unmatched WA + unmatched IG)
-  const leads = useMemo(() => {
-    const confirmed = matchSuggestions.filter(m => m.status === "confirmed");
-    const confirmedIds = new Set([
-      ...confirmed.map(m => m.whatsappLead.id),
-      ...confirmed.map(m => m.instagramLead.id),
-    ]);
-    const merged = confirmed.map(m => mergeLeads(m.whatsappLead, m.instagramLead));
-    const unmatchedWA = waLeads.filter(l => !confirmedIds.has(l.id));
-    const unmatchedIG = igLeads.filter(l => !confirmedIds.has(l.id));
-    return [...merged, ...unmatchedWA, ...unmatchedIG].sort((a, b) => b.score - a.score);
-  }, [waLeads, igLeads, matchSuggestions]);
-
-  // Keep stats in sync
-  const currentStats = useMemo(() => computeStats(leads), [leads]);
-
-  const applyLeads = useCallback((data: Lead[], channel: "whatsapp" | "instagram") => {
-    if (channel === "whatsapp") setWaLeads(data);
-    else setIgLeads(data);
-    setLoaded(true);
-    setLoading(false);
-  }, []);
-
   const loadSample = useCallback(() => {
     setLoading(true);
-    setTimeout(() => {
-      setWaLeads(SAMPLE);
-      setIgLeads([]);
-      setMatchSuggestions([]);
-      setLoaded(true);
-      setLoading(false);
-    }, 400);
+    setTimeout(() => { setWaCrus(SAMPLE); setIgCrus([]); setMatchSuggestions([]); setLoading(false); }, 300);
   }, []);
 
   const loadWhatsapp = useCallback((text: string, channel: "whatsapp" | "instagram" = "whatsapp") => {
     setLoading(true);
     setTimeout(() => {
-      const parsed = parseCombinedCSV(text).map(l => ({ ...l, _channel: channel }));
-      applyLeads(parsed, channel);
-      // Reset match suggestions when new data is loaded
+      const lidos = parseCombinedCSV(text).map((l) => ({ ...l, _channel: channel }));
+      if (channel === "whatsapp") setWaCrus(lidos); else setIgCrus(lidos);
       setMatchSuggestions([]);
+      setLoading(false);
     }, 300);
-  }, [segmentId, applyLeads]);
+  }, []);
 
   const loadInstagram = useCallback((text: string, filename: string) => {
-    setLoading(true);
     const result = parseInstagramFile(text, filename);
-    if (!result) { setLoading(false); return; }
-    const csvLines = [
-      "Contato;Arquivo;Date1;Date2;Time;UserPhone;UserName;MessageBody;MediaType;MediaLink;MediaCaption;QuotedMessage;QuotedUserName;QuotedMessageDate;QuotedMessageTime"
+    if (!result) return;
+    const linhas = [
+      "Contato;Arquivo;Date1;Date2;Time;UserPhone;UserName;MessageBody;MediaType;MediaLink;MediaCaption;QuotedMessage;QuotedUserName;QuotedMessageDate;QuotedMessageTime",
     ];
     for (const msg of result.messages) {
-      const row = [
+      linhas.push([
         result.contact, filename, msg.date, msg.date, msg.time,
         msg.isStore ? "5519998862028" : (msg.phone || result.contact),
         msg.isStore ? "Store" : result.contact,
         (msg.body || "").replace(/;/g, ","),
-        msg.mediaType || "", "", msg.mediaCaption || "", "", "", "", ""
-      ].join(";");
-      csvLines.push(row);
+        msg.mediaType || "", "", msg.mediaCaption || "", "", "", "", "",
+      ].join(";"));
     }
-    loadWhatsapp(csvLines.join("\n"), "instagram");
+    loadWhatsapp(linhas.join("\n"), "instagram");
   }, [loadWhatsapp]);
 
-  // Run match suggestions on demand (not automatically — too expensive)
-  const runMatchSuggestions = useCallback(() => {
-    if (waLeads.length === 0 || igLeads.length === 0) return;
-    setMatchesLoading(true);
-    // Use setTimeout to avoid blocking UI
-    setTimeout(() => {
-      const suggestions = generateMatchSuggestions(waLeads, igLeads);
-      setMatchSuggestions(suggestions);
-      setMatchesLoading(false);
-    }, 50);
-  }, [waLeads, igLeads]);
-
-  const confirmMatch = useCallback((id: string) => {
-    setMatchSuggestions(prev => prev.map(m => m.id === id ? { ...m, status: "confirmed" as const } : m));
+  const limparImportado = useCallback(() => {
+    setWaCrus([]); setIgCrus([]); setMatchSuggestions([]);
   }, []);
-
-  const rejectMatch = useCallback((id: string) => {
-    setMatchSuggestions(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" as const } : m));
-  }, []);
-
-  const confirmAllMatches = useCallback(() => {
-    setMatchSuggestions(prev => prev.map(m => m.status === "pending" ? { ...m, status: "confirmed" as const } : m));
-  }, []);
-
-  const applyMatches = useCallback(() => {
-    // Already handled via the leads useMemo above — just navigate away
-  }, []);
-
-  const markSaleClosed = useCallback((leadId: string, sale: ManualSale) => {
-    const update = (l: Lead) => l.id === leadId ? { ...l, classification: "customer" as const, score: 95, manualSale: sale } : l;
-    setWaLeads(prev => prev.map(update));
-    setIgLeads(prev => prev.map(update));
-  }, []);
-
-  const setSegmentId = useCallback((id: string) => setSegmentIdState(id), []);
 
   const clearData = useCallback(() => {
-    setWaLeads([]); setIgLeads([]); setMatchSuggestions([]);
-    setLoaded(false);
+    limparImportado();
+    setLoading(true);
+    void buscar();
+  }, [limparImportado, buscar]);
+
+  const syncFromCRM = useCallback(() => {
+    limparImportado();
+    setSyncing(true);
+    setAtualizando(true);
+    void buscar().finally(() => setSyncing(false));
+  }, [limparImportado, buscar]);
+
+  // Sugerir fusões é caro e só faz sentido com os dois canais importados.
+  const runMatchSuggestions = useCallback(() => {
+    if (!waCrus.length || !igCrus.length) return;
+    setMatchesLoading(true);
+    setTimeout(() => {
+      setMatchSuggestions(generateMatchSuggestions(waCrus, igCrus));
+      setMatchesLoading(false);
+    }, 50);
+  }, [waCrus, igCrus]);
+
+  const confirmMatch = useCallback((id: string) => {
+    setMatchSuggestions((prev) => prev.map((m) => (m.id === id ? { ...m, status: "confirmed" as const } : m)));
+  }, []);
+  const rejectMatch = useCallback((id: string) => {
+    setMatchSuggestions((prev) => prev.map((m) => (m.id === id ? { ...m, status: "rejected" as const } : m)));
+  }, []);
+  const confirmAllMatches = useCallback(() => {
+    setMatchSuggestions((prev) => prev.map((m) => (m.status === "pending" ? { ...m, status: "confirmed" as const } : m)));
+  }, []);
+  // A fusão já acontece em `crusImportados`; a tela só navega para fora.
+  const applyMatches = useCallback(() => {}, []);
+
+  // Marcar venda é visual: vale enquanto a aba está aberta e some no próximo
+  // cálculo. Mantido como estava — virar registro de verdade é outra conversa.
+  const markSaleClosed = useCallback((leadId: string, sale: ManualSale) => {
+    const vendido = { classification: "customer" as const, score: 95, manualSale: sale };
+    const marcarCru = (l: Lead): Lead => (l.id === leadId ? { ...l, ...vendido } : l);
+    setWaCrus((prev) => prev.map(marcarCru));
+    setIgCrus((prev) => prev.map(marcarCru));
+    setPainel((prev) => (prev
+      ? { ...prev, leads: prev.leads.map((l) => (l.id === leadId ? { ...l, ...vendido } : l)) }
+      : prev));
   }, []);
 
-  // Sincroniza com as conversas REAIS dos leads do CRM (lead_mensagens), via
-  // adaptador. Descarta qualquer import manual / dados de exemplo e traz só o
-  // estado atual — é o "excluir os antigos e trazer só os novos". Nada é gravado
-  // no servidor: o ZapIntel roda a análise sobre o snapshot recém-buscado.
-  const syncFromCRM = useCallback(() => {
-    setSyncing(true);
-    setLoading(true);
-    fetch("/zapintel/api/conversas", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        setIgLeads([]); setMatchSuggestions([]);
-        if (d?.empresaNome) setStoreName(d.empresaNome);
-        if (d?.segmentId) setSegmentIdState(d.segmentId);
-        if (d?.csv) loadWhatsapp(d.csv, "whatsapp");
-        else { setWaLeads([]); setLoaded(true); setLoading(false); }
-      })
-      .catch(() => setLoading(false))
-      .finally(() => setSyncing(false));
-  }, [loadWhatsapp]);
+  const valor: LeadStore = {
+    leads,
+    leadsCompletos: crusImportados,
+    stats: agregados?.stats ?? null,
+    agregados,
+    segment,
+    loaded: !!painel || !!importado,
+    loading,
+    lojas: painel?.lojas ?? [],
+    lojaAtiva,
+    setLojaAtiva,
+    mensagens: painel?.mensagens ?? 0,
+    semConversa: painel?.semConversa ?? 0,
+    calculadoEm: painel?.calculadoEm ?? null,
+    atualizando,
+    loadSample, loadWhatsapp, loadInstagram,
+    markSaleClosed, clearData,
+    syncFromCRM, syncing,
+    storeName: painel?.empresaNome ?? "",
+    sellerName,
 
-  // Auto-carrega as conversas reais do CRM (lead_mensagens) via adaptador no
-  // primeiro acesso. Import de CSV / dados de exemplo ficam como fallback manual.
-  useEffect(() => {
-    let ativo = true;
-    setLoading(true);
-    fetch("/zapintel/api/conversas", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!ativo) return;
-        if (d?.empresaNome) setStoreName(d.empresaNome);
-        if (d?.segmentId) setSegmentIdState(d.segmentId);
-        if (d?.csv) loadWhatsapp(d.csv, "whatsapp"); else setLoading(false);
-      })
-      .catch(() => { if (ativo) setLoading(false); });
-    return () => { ativo = false; };
-  }, [loadWhatsapp]);
+    whatsappLeads: waCrus,
+    instagramLeads: igCrus,
+    hasWhatsapp: waCrus.length > 0,
+    hasInstagram: igCrus.length > 0,
+    matchSuggestions,
+    matchesLoading,
+    hasPendingMatches: matchSuggestions.some((m) => m.status === "pending"),
+    runMatchSuggestions, confirmMatch, rejectMatch, confirmAllMatches, applyMatches,
+    setSegmentId: setSegmentManual,
+  };
 
-  return (
-    <Ctx.Provider value={{
-      leads, stats: currentStats, segment, loaded, loading,
-      whatsappLeads: waLeads,
-      instagramLeads: igLeads,
-      hasWhatsapp: waLeads.length > 0,
-      hasInstagram: igLeads.length > 0,
-      matchSuggestions,
-      matchesLoading,
-      hasPendingMatches: matchSuggestions.some(m => m.status === "pending"),
-      loadSample, loadWhatsapp, loadInstagram,
-      runMatchSuggestions,
-      confirmMatch, rejectMatch, confirmAllMatches, applyMatches,
-      markSaleClosed, setSegmentId, clearData,
-      syncFromCRM, syncing, storeName, sellerName,
-    }}>
-      {children}
-    </Ctx.Provider>
-  );
+  return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 
 export function useLeads() {

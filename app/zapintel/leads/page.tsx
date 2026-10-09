@@ -116,8 +116,11 @@ export default function LeadsPage() {
     if (urlInactMax < 9999) list = list.filter(l => l.daysInactive <= urlInactMax);
     if (urlScoreMin > 0)   list = list.filter(l => l.score >= urlScoreMin);
     if (urlScoreMax < 100) list = list.filter(l => l.score <= urlScoreMax);
-    if (urlGhost)    list = list.filter(l => l.classification === "unqualified" || l.messages.some(m => m.body?.toLowerCase().includes("notification_template")));
-    if (urlReferral) list = list.filter(l => l.messages.some(m => ["indicação","indicou","me indicou","amigo","amiga"].some(k => (m.body||"").toLowerCase().includes(k))));
+    // `fantasma` e `indicacao` são decididos no servidor, lendo a conversa
+    // inteira. Antes esta tela varria `messages` — e só achava o que coubesse
+    // nas mensagens que tinham vindo.
+    if (urlGhost)    list = list.filter(l => l.fantasma);
+    if (urlReferral) list = list.filter(l => l.indicacao);
     // Sort
     if (sort === "score") list.sort((a, b) => b.score - a.score);
     else if (sort === "date_desc") list.sort((a, b) => a.daysInactive - b.daysInactive);

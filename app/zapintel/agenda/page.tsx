@@ -151,8 +151,17 @@ export default function AgendaPage() {
     if (!card) return;
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, aiLoading: true, aiSuggestion: "" } : c));
     try {
+      // A sugestão só presta se a IA ler a conversa — e a conversa não vem na
+      // lista (são 54 mil mensagens; mandá-las foi o que obrigou a truncar a
+      // análise). Busca-se esta, no momento em que alguém pede a sugestão.
       const lead = leads.find(l => l.id === card.leadId);
-      const suggestion = await fetchAISuggestion(card, lead?.messages || [], aiCtx);
+      let mensagens: RawMessage[] = [];
+      if (lead?.leadId) {
+        const r = await fetch(`/zapintel/api/conversa?lead=${lead.leadId}`, { cache: "no-store" });
+        const d = await r.json();
+        mensagens = (d?.lead?.messages ?? []) as RawMessage[];
+      }
+      const suggestion = await fetchAISuggestion(card, mensagens, aiCtx);
       setCards(prev => prev.map(c => c.id === cardId ? { ...c, aiLoading: false, aiSuggestion: suggestion } : c));
     } catch {
       setCards(prev => prev.map(c => c.id === cardId ? { ...c, aiLoading: false, aiSuggestion: "Erro — verifique a chave da API." } : c));
