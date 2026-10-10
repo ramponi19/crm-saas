@@ -22,6 +22,16 @@ export interface FatosStats {
   cobertura: number;
   /** Mediana de dias da primeira mensagem ate a venda. */
   cicloMediano: number | null;
+  /**
+   * Taxa MEDIDA de fechamento de quente e morno, em fracao.
+   *
+   * Vem de fora porque so `montarPainel` pode medi-la direito: ela precisa da
+   * classificacao POR COMPORTAMENTO, de antes de o comprador ser carimbado
+   * como `customer`. Medida depois do carimbo daria zero — nao sobra nenhum
+   * comprador dentro de `hot` — e o pipeline inteiro zeraria por construcao.
+   */
+  taxaHot: number;
+  taxaWarm: number;
   /** Este lead comprovadamente gerou venda? Resolvido por quem chama. */
   comprou: (l: Lead) => boolean;
 }
@@ -109,15 +119,8 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   // isso a taxa sairia subestimada na mesma proporcao. Essa correcao supoe que
   // a venda nao-ligada se parece com a ligada; e suposicao, mas e UMA, e esta
   // escrita aqui.
-  const taxaDaClasse = (cls: string): number => {
-    if (!fatos || !fatos.cobertura) return 0;
-    const naClasse = leads.filter((l) => l.classification === cls);
-    if (!naClasse.length) return 0;
-    const compraram = naClasse.filter((l) => ehComprador.has(l)).length;
-    return Math.min(1, compraram / naClasse.length / fatos.cobertura);
-  };
-  const taxaHot = taxaDaClasse("hot");
-  const taxaWarm = taxaDaClasse("warm");
+  const taxaHot = fatos?.taxaHot ?? 0;
+  const taxaWarm = fatos?.taxaWarm ?? 0;
   const pipelineValue = fatos
     ? Math.round(hotLeads.length * fatos.ticket * taxaHot + warmLeads.length * fatos.ticket * taxaWarm)
     : 0;

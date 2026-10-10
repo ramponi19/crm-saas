@@ -89,7 +89,10 @@ v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 # R$ 558k", e o pipeline ainda supunha 70% dos quentes fechando (real: 2,8%).
 n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
 n "pipeline nao supoe 70 por cento"  "lib/zapintel/insights/stats.ts" "ticket \* 0.70"
-v "pipeline usa taxa medida"         "lib/zapintel/insights/stats.ts" "taxaDaClasse"
+v "pipeline usa taxa medida"         "lib/zapintel/painel.ts" "taxaPorClasse"
+# O padrao olha a DECLARACAO, nao a palavra: o arquivo cita `allText` no
+# comentario que explica por que o campo saiu, e o aviso deve continuar la.
+n "classificacao nao le a fala da loja" "lib/zapintel/classification/engine.ts" "allText: string"
 v "conversao vem de venda ligada"    "lib/zapintel/insights/stats.ts" "compradores.length / leads.length"
 v "ciclo vem da ponte"               "lib/zapintel/insights/stats.ts" "fatos?.cicloMediano != null"
 v "sem venda a tela nao inventa"     "app/zapintel/page.tsx" "s.ticketMedido == null"
@@ -106,6 +109,15 @@ v "midia nao conta como fala"         "lib/zapintel/ficha.ts" "function ehFala"
 v "uma regra so para o silencio"      "lib/zapintel/insights/silencio.ts" "falaQueEncerrou"
 v "a tela diz precedeu, nao causou"   "app/zapintel/page.tsx" "Indica onde olhar, não o que culpar"
 v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "montarFicha"
+# -- recalibracao da classificacao (10/10/2026) ----------------------------
+# 133 leads eram marcados "cliente" por palavra; 33 compraram. E a conversa
+# funda no 1o dia prediz (7,65x) enquanto "Pediu 18x" nao prediz nada (+2pp).
+n "cliente nao sai de palavra-chave"  "lib/zapintel/classification/engine.ts" "CUSTOMER_KW ="
+v "cliente vem da ponte"             "lib/zapintel/painel.ts" "vendas.compradores.has(id)"
+v "conversa funda no 1o dia e quente" "lib/zapintel/classification/engine.ts" "trocasInicio >= 15"
+v "trocas medidas so nas 24h"        "lib/zapintel/parser/csvParser.ts" "t - t0 <= 86400000"
+v "taxa medida antes do carimbo"     "lib/zapintel/painel.ts" "const taxaHot = taxaPorClasse"
+n "stats nao mede taxa apos carimbo" "lib/zapintel/insights/stats.ts" "const taxaDaClasse"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"

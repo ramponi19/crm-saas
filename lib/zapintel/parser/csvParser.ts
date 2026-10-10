@@ -142,7 +142,24 @@ export function parseCombinedCSV(raw: string): Lead[] {
     const allText = messages.map(m => m.body).join(" ").toLowerCase();
     const leadText = leadMsgs.map(m => m.body).join(" ").toLowerCase();
 
-    const classification = classifyLead({ leadText, allText, leadMsgs: leadMsgs.length, storeMsgs: storeMsgs.length, daysInactive, messages });
+    /**
+     * Trocas de turno nas primeiras 24 h — o preditor que a calibracao achou.
+     *
+     * Mede a conversa como ela era ANTES de qualquer desfecho. Sobre a conversa
+     * inteira o numero seria maior e mentiroso: quem compra conversa muito
+     * porque comprou (fechar pedido, combinar pagamento, acertar entrega), e um
+     * classificador treinado nisso acerta o passado e erra o futuro.
+     */
+    const trocasInicio = (() => {
+      if (!messages.length) return 0;
+      const hora = (m: RawMessage) => Date.parse(`${m.date}T${m.time || "00:00"}:00`);
+      const t0 = hora(messages[0]);
+      if (Number.isNaN(t0)) return 0;
+      const dentro = messages.filter(m => { const t = hora(m); return !Number.isNaN(t) && t - t0 <= 86400000; });
+      return dentro.reduce((n, m, i) => (i > 0 && m.isStore !== dentro[i - 1].isStore ? n + 1 : n), 0);
+    })();
+
+    const classification = classifyLead({ leadText, leadMsgs: leadMsgs.length, storeMsgs: storeMsgs.length, daysInactive, messages, trocasInicio });
     const score = scoreLead({ classification, leadText, allText, leadMsgs: leadMsgs.length, daysInactive });
     const buyerProfile = inferProfile(leadText, allText);
     const { nextAction, urgency, insight, lossRisk } = generateNextAction({ classification, score, daysInactive, leadText, allText, contact });

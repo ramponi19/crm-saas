@@ -211,9 +211,11 @@ function enxugar(p: Performance2Stats): Performance2Stats {
  * traduzir o lead do motor (`filename = "lead-123"`) para o id do CRM. Motor
  * de analise nao deve saber que existe banco.
  */
-function paraOMotor(f: FatosDeVenda | null): FatosStats | null {
+function paraOMotor(f: FatosDeVenda | null, taxaHot: number, taxaWarm: number): FatosStats | null {
   if (!f) return null
   return {
+    taxaHot,
+    taxaWarm,
     ticket: f.ticket,
     vendas: f.vendas,
     cobertura: f.cobertura,
@@ -255,7 +257,50 @@ export async function montarPainel(
     fatosDeVenda(db, empresaId),
   ])
   const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, ultimaMensagem, tempos } = conversas
-  const fatos = paraOMotor(vendas)
+  // `fatos` depende das taxas, medidas logo abaixo.
+
+  /**
+   * CLIENTE É QUEM COMPROU — e isso é fato registrado, não palavra na conversa.
+   *
+   * O motor tinha uma regra `CUSTOMER_KW` que marcava cliente por texto, e lia
+   * os dois lados. Media: 133 marcados, 33 compraram. O gatilho número 1 era
+   * "imei" (101 leads), que é pergunta de cotação de troca — o oposto de venda
+   * fechada. A regra saiu de `classification/engine.ts` em 10/10/2026.
+   *
+   * O carimbo é aplicado AQUI, antes dos motores de agregado rodarem, e não lá
+   * no fim em `aliviar()`: se a lista dissesse uma coisa e as médias outra,
+   * teríamos dois números verdadeiros para o mesmo lead, que é como este
+   * módulo já enganou duas vezes.
+   */
+  //
+  // A TAXA DE FECHAMENTO SAI DAQUI, E ANTES DO CARIMBO.
+  //
+  // Depois dele nao sobra nenhum comprador dentro de `hot`, entao a taxa
+  // medida la daria zero e o pipeline zeraria por construcao — um numero
+  // errado produzido por um conserto certo. Medida aqui, sobre a
+  // classificacao por COMPORTAMENTO, ela responde o que a pergunta quer
+  // saber: destes quentes de hoje, quantos tendem a fechar.
+  const taxaPorClasse = (cls: string): number => {
+    if (!vendas?.cobertura) return 0
+    const naClasse = analisados.filter((a) => a.classification === cls)
+    if (!naClasse.length) return 0
+    const compraram = naClasse.filter((a) => {
+      const id = idDoLead(a)
+      return id != null && vendas.compradores.has(id)
+    }).length
+    return Math.min(1, compraram / naClasse.length / vendas.cobertura)
+  }
+  const taxaHot = taxaPorClasse('hot')
+  const taxaWarm = taxaPorClasse('warm')
+
+  const fatos = paraOMotor(vendas, taxaHot, taxaWarm)
+
+  if (vendas) {
+    for (const a of analisados) {
+      const id = idDoLead(a)
+      if (id != null && vendas.compradores.has(id)) a.classification = 'customer'
+    }
+  }
   const leu = Date.now()
 
   // Leads sem nenhuma mensagem não saem do parser; entram aqui para que o
