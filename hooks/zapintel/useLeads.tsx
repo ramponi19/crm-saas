@@ -110,13 +110,28 @@ interface LeadStore {
 
 const Ctx = createContext<LeadStore | null>(null);
 
-/** Silêncio necessário antes de recalcular. Evita um recálculo por mensagem. */
-const ESPERA_MS = 8000;
-/** Piso entre dois recálculos, por mais movimento que haja. */
-const INTERVALO_MINIMO_MS = 60000;
+/**
+ * De quanto em quanto tempo a tela pergunta ao servidor se chegou mensagem.
+ *
+ * Era 20 s. Virou 45 s em 09/10/2026, quando a Vercel avisou que a conta tinha
+ * gasto 75% das 4 h de CPU que o plano free dá por mês — e estourar não cobra,
+ * **pausa os projetos**. Cada batida custa ~97 ms de CPU somando o proxy e a
+ * rota: a 20 s eram 1.800 batidas por dia de trabalho (42 min/mês por aba
+ * aberta); a 45 s são 800 (18 min/mês). O que se perde é saber da mensagem
+ * nova até 25 s depois, numa tela que mostra média de 60 dias.
+ */
+const PULSO_MS = 45000;
 
-/** De quanto em quanto tempo a tela pergunta ao servidor se chegou mensagem. */
-const PULSO_MS = 20000;
+/**
+ * Desencontro entre abas, em ms.
+ *
+ * Quando o servidor diz "aceito recalcular às 14h10", TODAS as abas abertas
+ * marcam o mesmo horário. Sem isto elas pediriam juntas no mesmo segundo e
+ * algumas pegariam o cache ainda velho, pedindo de novo logo depois. Um atraso
+ * aleatório de até 10 s basta para a primeira chegar sozinha e as outras já
+ * acharem o cálculo pronto.
+ */
+const DESENCONTRO_MS = 10000;
 
 export function LeadProvider({ children }: { children: ReactNode }) {
   const [painel, setPainel] = useState<Painel | null>(null);
@@ -138,9 +153,13 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   // Quem avisa "estou carregando" é o CHAMADOR, não esta função: o primeiro
   // carregamento já começa com `loading` ligado, e marcar de novo dentro do
   // efeito dispara renderização em cascata.
-  const buscar = useCallback(async () => {
+  const buscar = useCallback(async (forcar = false) => {
     try {
-      const r = await fetch("/zapintel/api/painel", { cache: "no-store" });
+      // `forcar` só sai daqui quando uma PESSOA clica em atualizar. O servidor
+      // segura recálculo por janela (ver lib/zapintel/cache.ts); o clique fura
+      // a janela, o cronômetro não.
+      const url = forcar ? "/zapintel/api/painel?forcar=1" : "/zapintel/api/painel";
+      const r = await fetch(url, { cache: "no-store" });
       const d = (await r.json()) as Painel & { erro?: string };
       if (!d?.erro && Array.isArray(d.leads)) setPainel(d);
     } catch {
@@ -175,8 +194,17 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   // autorizado a receber linha são coisas diferentes.
   //
   // O pulso pergunta ao servidor, que olha com os mesmos olhos do painel. Custa
-  // uma linha a cada 20 s, e só com a aba à vista.
-  const ultimoCalculo = useRef(0);
+  // duas linhas a cada 45 s, e só com a aba à vista.
+  //
+  // ══ QUEM MARCA A HORA DO RECÁLCULO (mudou em 09/10/2026) ═════════════════
+  //
+  // Era esta aba: 8 s de silêncio, 1 min de piso. Cada aba com o seu relógio —
+  // cinco telas abertas na mesma empresa eram cinco recálculos iguais, e cada
+  // recálculo custa 2,76 s do CPU que a conta tem para o mês inteiro.
+  //
+  // Agora quem marca é o servidor, e ele diz a hora no pulso (`proximoEm`).
+  // Esta aba só obedece. O resultado é que cinco telas viram um recálculo, e
+  // que o número que aparece é o mesmo nas cinco.
   const agendado = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vistoAte = useRef(0);
 
@@ -189,14 +217,14 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let vivo = true;
 
-    const agendar = () => {
-      if (agendado.current) return; // já há recálculo a caminho
-      const desdeOUltimo = Date.now() - ultimoCalculo.current;
-      const espera = Math.max(ESPERA_MS, INTERVALO_MINIMO_MS - desdeOUltimo);
+    const agendar = (daquiA: number) => {
+      if (agendado.current) return; // já há busca a caminho
       setAtualizando(true);
+      // O desencontro só vale quando há espera: buscar um cálculo que o
+      // servidor JÁ tem é leitura de cache, e não há herd nenhum a evitar.
+      const espera = daquiA > 0 ? daquiA + Math.random() * DESENCONTRO_MS : 0;
       agendado.current = setTimeout(() => {
         agendado.current = null;
-        ultimoCalculo.current = Date.now();
         void buscar();
       }, espera);
     };
@@ -205,11 +233,30 @@ export function LeadProvider({ children }: { children: ReactNode }) {
       if (!vivo || document.visibilityState !== "visible") return;
       try {
         const r = await fetch("/zapintel/api/pulso", { cache: "no-store" });
-        const d = (await r.json()) as { ultima?: number; erro?: string };
+        const d = (await r.json()) as {
+          ultima?: number; analisadoAte?: number; proximoEm?: number; erro?: string;
+        };
         if (!vivo) return;
         if (d?.erro || typeof d.ultima !== "number") { setTempoReal("caiu"); return; }
         setTempoReal("ligado");
-        if (vistoAte.current > 0 && d.ultima > vistoAte.current) agendar();
+        if (!vistoAte.current) return; // ainda sem painel na tela
+
+        const analisadoAte = d.analisadoAte ?? 0;
+
+        // 1. O servidor já contou mais do que esta tela mostra. Pegar é barato:
+        //    vem do cache, sem calcular nada.
+        if (analisadoAte > vistoAte.current) { agendar(0); return; }
+
+        // 2. Chegou mensagem que ninguém contou ainda. A tela diz que está
+        //    atualizando e espera a hora que o SERVIDOR marcou.
+        if (d.ultima > analisadoAte) {
+          agendar(Math.max(0, (d.proximoEm ?? Date.now()) - Date.now()));
+          return;
+        }
+
+        // 3. Nada pendente — e isso precisa desligar o aviso, senão "atualizando"
+        //    fica aceso para sempre depois de qualquer susto.
+        setAtualizando(false);
       } catch {
         if (vivo) setTempoReal("caiu");
       }
@@ -227,6 +274,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
       if (agendado.current) { clearTimeout(agendado.current); agendado.current = null; }
     };
   }, [buscar]);
+
 
   // ── O recorte ativo ───────────────────────────────────────────────────────
   const chave = lojaAtiva == null ? "geral" : String(lojaAtiva);
@@ -309,11 +357,21 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     void buscar();
   }, [limparImportado, buscar]);
 
+  /**
+   * "Sincronizar agora" — o botão da barra lateral.
+   *
+   * Desde 09/10/2026 ele FURA a janela de recálculo do servidor (`forcar`), e é
+   * o que torna a janela aceitável: ninguém fica preso a um número de dez
+   * minutos atrás sem ter o que fazer. Cronômetro espera; pessoa, não. O custo
+   * não escapa mesmo assim — o servidor mantém um piso curto contra o clique
+   * repetido (ver JANELA_FORCADO_MS em lib/zapintel/cache.ts).
+   */
   const syncFromCRM = useCallback(() => {
+    if (agendado.current) { clearTimeout(agendado.current); agendado.current = null; }
     limparImportado();
     setSyncing(true);
     setAtualizando(true);
-    void buscar().finally(() => setSyncing(false));
+    void buscar(true).finally(() => setSyncing(false));
   }, [limparImportado, buscar]);
 
   // Sugerir fusões é caro e só faz sentido com os dois canais importados.

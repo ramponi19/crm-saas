@@ -89,7 +89,15 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
           fontSize: 10, fontWeight: 700, marginBottom: 4,
           color: atualizando ? "var(--yellow)" : tempoReal === "caiu" ? "var(--red)" : tempoReal === "ligado" ? "var(--green)" : "var(--muted)",
         }}>
-          {atualizando ? "● Recalculando…"
+          {/*
+            Dizia "Recalculando…". Virou mentira em 09/10/2026, quando o
+            recálculo passou a ter janela no servidor (10 min, para caber nas
+            4 h de CPU que o plano da Vercel dá por mês): o aviso podia ficar
+            aceso dez minutos sem nada recalculando. O que é verdade o tempo
+            todo é que chegou mensagem e o número ainda não a inclui — e a
+            linha de baixo diz de quando é o número.
+          */}
+          {atualizando ? "● Chegou mensagem nova"
             : tempoReal === "ligado" ? "● Conectado ao CRM"
             : tempoReal === "caiu" ? "● Sem contato com o servidor"
             : "● Conectando…"}
@@ -104,14 +112,14 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
             <>
               {mensagens.toLocaleString("pt-BR")} mensagens analisadas
               {semConversa > 0 && <> · {semConversa} lead{semConversa > 1 ? "s" : ""} sem conversa</>}
-              {calculadoEm && <><br />às {new Date(calculadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}, atualiza sozinho</>}
+              {calculadoEm && <><br />às {new Date(calculadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · refaz a conta a cada 10 min</>}
             </>
           ) : "Lendo as conversas reais dos leads"}
         </div>
         <button
           onClick={syncFromCRM}
           disabled={syncing}
-          title="Descarta imports manuais e recarrega só as conversas atuais dos leads"
+          title="Refaz a conta agora, sem esperar os 10 minutos. Descarta imports manuais e relê as conversas atuais dos leads"
           style={{
             width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             background: "var(--purple)", color: "#fff", border: "none", borderRadius: 8,

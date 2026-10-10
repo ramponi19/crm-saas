@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { zapintelEmpresa } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
+import { marcaDoCache, ultimaMensagemDoBanco } from '@/lib/zapintel/cache'
 
 /**
- * "CHEGOU MENSAGEM NOVA?" — UMA LINHA, PARA A TELA SABER SE RECALCULA.
+ * "CHEGOU MENSAGEM NOVA, E O SERVIDOR JÁ CONTOU?" — DUAS LINHAS, SEM PAINEL.
  *
  * ══ POR QUE NÃO É UMA ASSINATURA DE TEMPO REAL ═════════════════════════════
  *
@@ -26,24 +27,41 @@ import { rastrDb } from '@/lib/rastreamento/db'
  * do painel. E cairia se uma mensagem fosse apagada, fazendo um painel velho
  * parecer em dia. O maior id só anda para frente, e sai pelo índice da chave
  * primária em milissegundos.
+ *
+ * ══ POR QUE DEVOLVE TAMBÉM O CARIMBO DO CACHE ══════════════════════════════
+ *
+ * Porque desde 09/10/2026 quem decide recalcular é o servidor, e a tela precisa
+ * saber de duas coisas diferentes:
+ *
+ *   `ultima` > `analisadoAte` ........ chegou mensagem que ainda não foi contada
+ *   `analisadoAte` > o que está na tela ... o servidor já recalculou; é só pegar
+ *
+ * Sem o segundo número a tela ficaria pedindo o painel de minuto em minuto para
+ * descobrir que nada mudou. Com ele, ela pede uma vez, na hora certa — e o
+ * `proximoEm` diz que hora é essa. **Nunca** lê a coluna `painel`: seriam
+ * 1,75 MB a cada batida.
  */
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const { empresaId } = await zapintelEmpresa()
+  const db = rastrDb()
 
-  const { data, error } = await rastrDb()
-    .from('lead_mensagens')
-    .select('id')
-    .eq('empresa_id', empresaId)
-    .order('id', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  try {
+    const [ultima, marca] = await Promise.all([
+      ultimaMensagemDoBanco(db, empresaId),
+      marcaDoCache(db, empresaId),
+    ])
 
-  if (error) {
-    console.error('zapintel/pulso:', error.message)
+    return NextResponse.json({
+      ultima,
+      analisadoAte: marca?.ultimaMensagem ?? 0,
+      calculadoEm: marca?.calculadoEm ?? null,
+      // Epoch ms. Sem cache nenhum, agora: a primeira carga não espera janela.
+      proximoEm: marca?.proximoEm ?? Date.now(),
+    })
+  } catch (e) {
+    console.error('zapintel/pulso:', (e as Error).message)
     return NextResponse.json({ erro: 'falha ao consultar' }, { status: 500 })
   }
-
-  return NextResponse.json({ ultima: (data?.id as number | undefined) ?? 0 })
 }

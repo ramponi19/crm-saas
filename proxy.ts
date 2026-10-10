@@ -32,7 +32,57 @@ const LEGADO_ADMIN = [
   '/equipe', '/conversao', '/metas',
 ]
 
+/**
+ * ROTAS QUE NÃO PRECISAM DE SESSÃO — E QUE POR ISSO NEM ABREM O SUPABASE.
+ *
+ * ══ POR QUE ISTO EXISTE (09/10/2026) ═══════════════════════════════════════
+ *
+ * No Next 16 este arquivo roda SEMPRE em Node (ver o rodapé), e na Vercel isso
+ * significa que ele é cobrado como **Active CPU**, em toda requisição que o
+ * matcher pega. Medido no painel da conta: `Edge Middleware Invocations: 0` e
+ * **middleware = 1h 04m dos 2h 26m que o CRM gastou em 30 dias** — 44% do CPU
+ * do projeto, 27% do teto de 4 h/mês que o plano free dá para TODOS os
+ * projetos juntos. Estourar o teto não cobra a mais: **pausa os projetos**.
+ *
+ * São 51 ms de CPU por requisição, quase todos em `supabase.auth.getUser()`.
+ * E a ordem do código fazia esse custo ser pago INCLUSIVE onde ele era
+ * descartado: o `getUser()` vinha antes, e só depois se perguntava se a rota
+ * era pública. Webhook da Meta, disparo de cron, pixel de rastreamento — todos
+ * pagavam uma verificação de sessão cujo resultado ia para o lixo.
+ *
+ * ══ POR QUE ISTO NÃO AFROUXA NADA ══════════════════════════════════════════
+ *
+ * Esta lista é um SUBCONJUNTO de `isPublicRoute`, logo abaixo. Toda rota aqui
+ * já passava direto; a única diferença é que agora passa sem pagar a consulta.
+ * Nenhuma rota autenticada entra aqui — e nenhuma deve entrar sem que alguém
+ * confira esse subconjunto de novo.
+ *
+ * Só `/api/*`, de propósito: `moduloDaRota()` olha o primeiro segmento do
+ * caminho contra os hrefs do menu, que são todos telas. Rota de API nunca cai
+ * na trava de módulo, então sair cedo aqui não escapa de trava nenhuma. Tela
+ * pública (`/imovel/`, `/proposta/`, `/orcamento/`) fica fora desta lista
+ * justamente por isso.
+ */
+const SEM_SESSAO = [
+  '/api/webhook/',
+  '/api/cron/',
+  '/api/rastreamento/',
+  '/api/portais/',
+  '/api/planos-publicos',
+  '/api/os/',
+  '/api/menu/',
+  '/api/veiculos/',
+  '/api/agendar/',
+  '/api/orcamento/',
+  '/api/imob/',
+]
+
 export async function proxy(request: NextRequest) {
+  // Antes de qualquer coisa: a rota precisa mesmo de sessão? Ver SEM_SESSAO.
+  if (SEM_SESSAO.some((p) => request.nextUrl.pathname.startsWith(p))) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
