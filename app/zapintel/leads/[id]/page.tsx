@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import type { Lead } from "@/types/zapintel";
+import type { Ficha } from "@/lib/zapintel/ficha";
 import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import { generateCopilot, type CopilotResult, type CopilotStrategy } from "@/lib/zapintel/insights/followUp";
 import { getProducts } from "@/lib/zapintel/segments/segments";
@@ -135,6 +136,7 @@ export default function LeadDetailPage() {
    * não há a quem pedir — por isso os dois caminhos.
    */
   const [conversa, setConversa] = useState<Lead | null>(null);
+  const [ficha, setFicha] = useState<Ficha | null>(null);
   const [falhouConversa, setFalhouConversa] = useState(false);
 
   const daImportacao = leadsCompletos?.find(l => l.id === id) ?? null;
@@ -144,7 +146,11 @@ export default function LeadDetailPage() {
     let vivo = true;
     fetch(`/zapintel/api/conversa?lead=${resumo.leadId}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(d => { if (!vivo) return; if (d?.lead) setConversa(d.lead as Lead); else setFalhouConversa(true); })
+      .then(d => {
+        if (!vivo) return;
+        if (d?.lead) { setConversa(d.lead as Lead); setFicha((d.ficha as Ficha) ?? null); }
+        else setFalhouConversa(true);
+      })
       .catch(() => { if (vivo) setFalhouConversa(true); });
     return () => { vivo = false; };
   }, [daImportacao, resumo?.leadId]);
@@ -245,6 +251,48 @@ export default function LeadDetailPage() {
       }}>
         <ArrowLeft size={14} /> Voltar
       </button>
+
+      {/*
+        A FICHA — o que aconteceu nesta conversa, antes de qualquer número.
+
+        Pedida pelo Lucas em 10/10/2026: "ao invés de trazer o histórico de
+        chats, trazer como foi ou está sendo a conversa". É o mesmo princípio
+        que as ferramentas do segmento chamam de revisar trechos em vez de
+        médias — o número acha o momento, o trecho mostra o que fazer.
+
+        Fica ACIMA do score e da classificação de propósito: hoje sabemos que
+        a classificação quase não ordena nada fora de `customer` e `hot`
+        (medido em 10/10: `unqualified` converte a 1,2% e `followup` a 0,2%).
+        O relato diz mais do que o rótulo.
+      */}
+      {ficha && (
+        <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: "3px solid var(--purple)" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5, marginBottom: 8 }}>
+            O QUE ACONTECEU
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--txt)", marginBottom: 14 }}>
+            {ficha.relato}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 11, color: "var(--muted)" }}>
+            <span><b style={{ color: "var(--txt)" }}>{ficha.mensagensLead}</b> dele · <b style={{ color: "var(--txt)" }}>{ficha.mensagensLoja}</b> da loja</span>
+            <span><b style={{ color: "var(--txt)" }}>{ficha.trocasDeTurno}</b> trocas de turno</span>
+            {ficha.respostaMedianaMin != null && (
+              <span>responde em <b style={{ color: ficha.respostaMedianaMin > 60 ? "var(--orange)" : "var(--txt)" }}>
+                {ficha.respostaMedianaMin < 60 ? `${ficha.respostaMedianaMin} min` : `${Math.round(ficha.respostaMedianaMin / 60)}h`}
+              </b></span>
+            )}
+            {/* Monólogo: o equivalente em texto do "longest monologue" que o
+                Gong mede em chamada. Acima de 3 já é apresentação, não conversa. */}
+            {ficha.monologoLoja >= 3 && (
+              <span>maior sequência da loja sem resposta: <b style={{ color: "var(--orange)" }}>{ficha.monologoLoja}</b></span>
+            )}
+            <span><b style={{ color: ficha.perguntasDaLoja === 0 ? "var(--red)" : "var(--txt)" }}>{ficha.perguntasDaLoja}</b> perguntas da loja</span>
+            {ficha.tentativasDeRetomada > 0 && (
+              <span><b style={{ color: "var(--txt)" }}>{ficha.tentativasDeRetomada}</b> tentativas de retomada</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Header card ─────────────────────────────────────────────────── */}
       <div className="card" style={{ padding: 24, marginBottom: 14 }}>

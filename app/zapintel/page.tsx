@@ -18,7 +18,7 @@ function formatCurrency(v: number) {
 }
 
 export default function DashboardPage() {
-  const { leads, stats, loaded, loading, loadSample, storeName, lojas, lojaAtiva } = useLeads();
+  const { leads, stats, agregados, loaded, loading, loadSample, storeName, lojas, lojaAtiva } = useLeads();
 
   // Com o recorte por loja, o título precisa dizer QUAL recorte está na tela —
   // senão "Dashboard — JM Store Importados" fica no alto enquanto os números
@@ -489,6 +489,53 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {/*
+        O QUE A LOJA DISSE ANTES DE O CLIENTE SUMIR.
+
+        Pedido do Lucas em 10/10/2026: "vendedor após usar frase X cliente não
+        respondeu mais". É a única coisa desta reconstrução que as ferramentas
+        do segmento não têm — chamada gravada não tem última mensagem antes de
+        sumir.
+
+        O texto da tela insiste em "precedeu" e nunca em "causou", e isso não é
+        preciosismo: a frase mais comum pode ser a que se diz logo depois de
+        mandar um preço alto, e aí quem afastou foi o preço. Ver
+        lib/zapintel/insights/silencio.ts para as duas armadilhas do cálculo.
+      */}
+      {agregados && agregados.silencio.length > 0 && (
+        <div className="card" style={{ padding: 20, marginTop: 14 }}>
+          <SectionTitle>🔇 O que foi dito antes de o cliente sumir</SectionTitle>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, lineHeight: 1.5 }}>
+            Última fala da loja em conversas que estavam vivas e morreram depois dela.
+            Tentativa de retomada não entra — ela é mandada porque a conversa já tinha
+            acabado. <b>Indica onde olhar, não o que culpar.</b>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {agregados.silencio.map((f) => (
+              <div key={f.frase} style={{
+                display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 12px",
+                borderRadius: 8, background: "var(--card2)", border: "1px solid var(--brd2)",
+              }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, minWidth: 34, textAlign: "right",
+                  color: "var(--orange)", fontVariantNumeric: "tabular-nums", paddingTop: 1,
+                }}>
+                  {f.vezes}×
+                </span>
+                <span style={{ fontSize: 12, color: "var(--txt)", flex: 1, lineHeight: 1.45 }}>
+                  &ldquo;{f.frase}&rdquo;
+                </span>
+                {f.venderamMesmoAssim > 0 && (
+                  <span style={{ fontSize: 10.5, color: "var(--green)", whiteSpace: "nowrap", paddingTop: 2 }}>
+                    {f.venderamMesmoAssim} venderam
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

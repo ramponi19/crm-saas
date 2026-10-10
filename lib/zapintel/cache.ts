@@ -69,8 +69,9 @@ export const JANELA_FORCADO_MS = 60_000
  * (v2 nasceu de esquecer de subir a v1: a tela mostrou " leads travados" sem
  * número, porque o cache tinha o formato velho. O mecanismo funcionou — quem
  * falhou fui eu em não usá-lo. Fica o lembrete: mudou a conta, sobe a versão.)
+ *   v3  10/10/2026  ficha por lead e o ranking de frases antes do silêncio
  */
-export const VERSAO_DO_CALCULO = 'v2'
+export const VERSAO_DO_CALCULO = 'v3'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {

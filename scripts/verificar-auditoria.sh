@@ -95,6 +95,17 @@ v "ciclo vem da ponte"               "lib/zapintel/insights/stats.ts" "fatos?.ci
 v "sem venda a tela nao inventa"     "app/zapintel/page.tsx" "s.ticketMedido == null"
 v "sinal ordenado por diferenca"     "lib/zapintel/insights/stats.ts" "b.diferenca - a.diferenca"
 v "cache invalida por versao"        "lib/zapintel/cache.ts" "marca.versao !== VERSAO_DO_CALCULO"
+# -- ficha por lead e frase antes do silencio (10/10/2026) -----------------
+# O corte de 24h e a regra que torna o ranking honesto: sem ele o topo vira a
+# frase de RETOMADA, mandada dias depois para quem ja tinha sumido (740 -> 418
+# conversas). E marcador de midia nao e fala ("Video enviado pelo celular"
+# aparecia 54x).
+v "ficha relata, nao escolhe frase"   "lib/zapintel/ficha.ts" "montarRelato"
+v "silencio exige conversa viva"      "lib/zapintel/ficha.ts" "> 86_400_000) return null"
+v "midia nao conta como fala"         "lib/zapintel/ficha.ts" "function ehFala"
+v "uma regra so para o silencio"      "lib/zapintel/insights/silencio.ts" "falaQueEncerrou"
+v "a tela diz precedeu, nao causou"   "app/zapintel/page.tsx" "Indica onde olhar, não o que culpar"
+v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "montarFicha"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
