@@ -1,6 +1,30 @@
 import type { Lead, DashboardStats } from "@/types/zapintel";
 
-const TICKET_MEDIO = 5200;
+/**
+ * OS FATOS DE VENDA — o que substituiu `const TICKET_MEDIO = 5200`.
+ *
+ * Aquela linha ficou aqui por meses e alimentava os dois cartoes de dinheiro
+ * mais visiveis do dashboard: "PIPELINE ESTIMADO R$ 1,2M" e "OBJECAO MAIS CARA
+ * R$ 558k". Nenhuma venda entrava na conta. O ticket real da JM, medido pela
+ * ponte venda->conversa em 10/10/2026, e R$ 7.045 — 35% acima do chute, e o
+ * chute valia igual para a Imobiliaria, que nunca vendeu um iPhone.
+ *
+ * Quando isto vem `undefined` (empresa sem venda, ou o caminho legado de
+ * importacao manual), os numeros em reais saem ZERADOS de proposito. Tela que
+ * nao tem o dado diz que nao tem; nao arbitra.
+ */
+export interface FatosStats {
+  /** Ticket MEDIDO das vendas concluidas. */
+  ticket: number;
+  /** De quantas vendas ele saiu — viaja junto para a tela poder relativizar. */
+  vendas: number;
+  /** Fracao das vendas que a ponte ligou a uma conversa (0 a 1). */
+  cobertura: number;
+  /** Mediana de dias da primeira mensagem ate a venda. */
+  cicloMediano: number | null;
+  /** Este lead comprovadamente gerou venda? Resolvido por quem chama. */
+  comprou: (l: Lead) => boolean;
+}
 
 const REFERRAL_KW = ["indicação","indicou","me indicou","amigo indicou","pedro indicou","minha amiga","meu amigo","david me enviou","matheus pediu","passou seu contato"];
 
@@ -22,24 +46,43 @@ const MODELS_KW: Record<string, string> = {
   "apple watch": "Apple Watch",
 };
 
-export function computeStats(leads: Lead[]): DashboardStats {
+export function computeStats(leads: Lead[], fatos?: FatosStats | null): DashboardStats {
   const count = (cls: string) => leads.filter(l => l.classification === cls).length;
+
+  // Quem comprou, de verdade. Vazio quando nao ha ponte — e ai os numeros que
+  // dependem disto saem zerados em vez de sairem errados.
+  const compradores = fatos ? leads.filter(fatos.comprou) : [];
+  const ehComprador = new Set(compradores);
 
   const objCount: Record<string, number> = {};
   const signalCount: Record<string, number> = {};
   const profileCount: Record<string, number> = {};
+  /** Por sinal: em quantos compradores (c) e em quantos demais (n) ele aparece. */
+  const sinalPorGrupo: Record<string, { c: number; n: number }> = {};
   for (const lead of leads) {
     for (const obj of lead.objections) objCount[obj.label] = (objCount[obj.label] || 0) + 1;
-    for (const sig of lead.buySignals) signalCount[sig] = (signalCount[sig] || 0) + 1;
+    for (const sig of lead.buySignals) {
+      signalCount[sig] = (signalCount[sig] || 0) + 1;
+      const d = sinalPorGrupo[sig] ?? (sinalPorGrupo[sig] = { c: 0, n: 0 });
+      if (ehComprador.has(lead)) d.c++; else d.n++;
+    }
     profileCount[lead.buyerProfile] = (profileCount[lead.buyerProfile] || 0) + 1;
   }
 
-  // 1. Conversão
-  const conversionRate = leads.length > 0 ? Math.round((count("customer") / leads.length) * 100) : 0;
+  // 1. CONVERSAO — agora de venda registrada, nao de palavra na conversa.
+  //
+  // Era `customer / total`, e `customer` saia de uma regra que lia o texto dos
+  // DOIS lados: dos 130 leads assim marcados em 09/10/2026, so 27 tinham prova
+  // de pagamento, e o gatilho n1 era "imei" (101) — pergunta de cotacao de
+  // troca, o oposto de venda fechada. Dava 6%. O real e 1,6%.
+  const conversionRate = leads.length > 0 && fatos
+    ? Math.round((compradores.length / leads.length) * 1000) / 10
+    : 0;
 
   // 2. Tempo médio para fechar
   const customers = leads.filter(l => l.classification === "customer");
-  const avgDaysToClose = customers.length > 0
+  const avgDaysToClose = fatos?.cicloMediano != null ? fatos.cicloMediano
+    : customers.length > 0
     ? Math.round(customers.reduce((a, l) => {
         const start = l.firstDate ? new Date(l.firstDate).getTime() : 0;
         const end = l.lastDate ? new Date(l.lastDate).getTime() : 0;
@@ -50,7 +93,34 @@ export function computeStats(leads: Lead[]): DashboardStats {
   // 3. Pipeline
   const hotLeads = leads.filter(l => l.classification === "hot");
   const warmLeads = leads.filter(l => l.classification === "warm");
-  const pipelineValue = Math.round(hotLeads.length * TICKET_MEDIO * 0.70 + warmLeads.length * TICKET_MEDIO * 0.25);
+  // ── PIPELINE — as DUAS metades da formula eram inventadas ────────────────
+  //
+  // Era `quentes x 5200 x 0,70 + mornos x 5200 x 0,25`. Trocar o 5200 pelo
+  // ticket medido consertou metade; a outra metade era pior. Medido em
+  // 10/10/2026 contra as vendas de verdade:
+  //
+  //     quentes ... 217 leads, 6 compraram ....  2,8%   (a formula dizia 70%)
+  //     mornos .... 287 leads, 0 compraram ....  0,0%   (a formula dizia 25%)
+  //
+  // Vinte e cinco vezes de diferenca. "PIPELINE R$ 1,58M" eram R$ 43 mil.
+  //
+  // A taxa agora e medida por classificacao. E dividida pela cobertura da
+  // ponte (0,69 na JM) porque 31% das vendas nao tem conversa ligada — sem
+  // isso a taxa sairia subestimada na mesma proporcao. Essa correcao supoe que
+  // a venda nao-ligada se parece com a ligada; e suposicao, mas e UMA, e esta
+  // escrita aqui.
+  const taxaDaClasse = (cls: string): number => {
+    if (!fatos || !fatos.cobertura) return 0;
+    const naClasse = leads.filter((l) => l.classification === cls);
+    if (!naClasse.length) return 0;
+    const compraram = naClasse.filter((l) => ehComprador.has(l)).length;
+    return Math.min(1, compraram / naClasse.length / fatos.cobertura);
+  };
+  const taxaHot = taxaDaClasse("hot");
+  const taxaWarm = taxaDaClasse("warm");
+  const pipelineValue = fatos
+    ? Math.round(hotLeads.length * fatos.ticket * taxaHot + warmLeads.length * fatos.ticket * taxaWarm)
+    : 0;
 
   // 4. Ghost
   const ghostLeads = leads.filter(l => {
@@ -75,8 +145,20 @@ export function computeStats(leads: Lead[]): DashboardStats {
   for (const lead of lostStalled) for (const obj of lead.objections) expObjCount[obj.label] = (expObjCount[obj.label] || 0) + 1;
   const mostExpEntry = Object.entries(expObjCount).sort((a, b) => b[1] - a[1])[0];
   const mostExpensiveObjection = mostExpEntry
-    ? { label: mostExpEntry[0], estimatedLoss: Math.round(mostExpEntry[1] * TICKET_MEDIO * 0.6) }
-    : { label: "Nenhuma detectada", estimatedLoss: 0 };
+    // ── POR QUE ISTO DEIXOU DE SER UM VALOR EM REAIS ───────────────────────
+    //
+    // Era `contagem x TICKET_MEDIO x 0,6` — e os tres fatores eram problema. O
+    // ticket agora e medido, mas o 0,6 supunha que 60% dos leads travados por
+    // aquela objecao teriam comprado. Medido em 10/10/2026: lead `stalled`
+    // compra em 1,0% dos casos e `lost` em 0,0%. Nao em 60%.
+    //
+    // E nao ha como medir o contrafactual: ninguem sabe quantos COMPRARIAM se
+    // a objecao fosse resolvida. Entao o cartao passa a responder a pergunta
+    // que TEM resposta — qual objecao trava mais negocio — e responde com a
+    // contagem, que e fato. Valor em reais aqui so poderia ser chute com cara
+    // de medida, que e o defeito que este arquivo inteiro veio corrigir.
+    ? { label: mostExpEntry[0], leads: mostExpEntry[1] }
+    : { label: "Nenhuma detectada", leads: 0 };
 
   // 7. Indicações
   const referralCount = leads.filter(l => {
@@ -164,6 +246,29 @@ export function computeStats(leads: Lead[]): DashboardStats {
   const lastMsgLead = leads.length - lastMsgStore;
   const lastMsgStorePct = leads.length > 0 ? Math.round((lastMsgStore / leads.length) * 100) : 0;
 
+  // ── Qual sinal PREVE, e nao apenas aparece ───────────────────────────────
+  //
+  // A lista `topBuySignals` ordena por frequencia, e frequencia engana: "Pediu
+  // 18x" e o 3o mais contado (396 leads) e aparece em 21% de quem comprou
+  // contra 19% de quem nao comprou — nao separa nada. "Perguntou sobre
+  // entrega" aparece em 39% contra 7%: e o mais forte, e estava enterrado na
+  // lista por ser menos comum.
+  //
+  // `diferenca` e correlacao, nao causa. Serve para PRIORIZAR atendimento,
+  // nunca para afirmar que perguntar de entrega faz comprar.
+  const nDemais = leads.length - compradores.length;
+  const signalLift = fatos && compradores.length > 0
+    ? Object.entries(sinalPorGrupo)
+        .filter(([, d]) => d.c + d.n >= 25)
+        .map(([label, d]) => {
+          const pctCompradores = Math.round((d.c / compradores.length) * 100);
+          const pctDemais = nDemais > 0 ? Math.round((d.n / nDemais) * 100) : 0;
+          return { label, compradores: d.c, pctCompradores, pctDemais, diferenca: pctCompradores - pctDemais };
+        })
+        .sort((a, b) => b.diferenca - a.diferenca)
+        .slice(0, 8)
+    : null;
+
   return {
     total: leads.length,
     customer: count("customer"), hot: count("hot"), warm: count("warm"),
@@ -180,6 +285,16 @@ export function computeStats(leads: Lead[]): DashboardStats {
     calledByName, calledByNamePct: leads.length > 0 ? Math.round((calledByName / leads.length) * 100) : 0,
     askedReferral, askedReferralPct: leads.length > 0 ? Math.round((askedReferral / leads.length) * 100) : 0,
     lastMsgStore, lastMsgLead, lastMsgStorePct,
+    // Os tres viajam juntos de proposito: valor sem origem e valor sem defesa.
+    ticketMedido: fatos?.ticket ?? null,
+    vendasNaConta: fatos?.vendas ?? 0,
+    coberturaDaPonte: fatos?.cobertura ?? 0,
+    compradoresComprovados: compradores.length,
+    signalLift,
+    // As taxas viajam para a tela poder MOSTRAR de onde o pipeline saiu. Numero
+    // em reais sem a taxa ao lado e exatamente o que estava errado antes.
+    taxaFechamentoHot: Math.round(taxaHot * 1000) / 10,
+    taxaFechamentoWarm: Math.round(taxaWarm * 1000) / 10,
   };
 }
 
@@ -200,12 +315,14 @@ export interface PeriodComparison {
   deltas: { [K in keyof PeriodStats]: number }; // positive = melhora
 }
 
-function buildPeriodStats(leads: Lead[]): PeriodStats {
+function buildPeriodStats(leads: Lead[], ticket: number, taxaHot: number, taxaWarm: number): PeriodStats {
   const customers = leads.filter(l => l.classification === "customer").length;
   const hot       = leads.filter(l => l.classification === "hot").length;
   const hotL      = leads.filter(l => l.classification === "hot");
   const warmL     = leads.filter(l => l.classification === "warm");
-  const pipeline  = Math.round(hotL.length * 5200 * 0.70 + warmL.length * 5200 * 0.25);
+  // Mesmo ticket e mesmas taxas MEDIDAS do painel. Aqui tambem era 5200 com
+  // 70%/25% escritos a mao — e o real e 2,8% e 0,0%.
+  const pipeline  = Math.round(hotL.length * ticket * taxaHot + warmL.length * ticket * taxaWarm);
   return {
     total: leads.length,
     customers,
@@ -223,6 +340,11 @@ export function comparePeriods(
   currentEnd: Date,
   previousStart: Date,
   previousEnd: Date,
+  /** Ticket medido (stats.ticketMedido). Sem ele o pipeline do periodo e zero. */
+  ticket = 0,
+  /** Taxas MEDIDAS de fechamento, em fracao (stats.taxaFechamento* / 100). */
+  taxaHot = 0,
+  taxaWarm = 0,
 ): PeriodComparison {
   function inRange(l: Lead, s: Date, e: Date) {
     if (!l.firstDate) return false;
@@ -231,8 +353,8 @@ export function comparePeriods(
   }
   const curr = leads.filter(l => inRange(l, currentStart, currentEnd));
   const prev = leads.filter(l => inRange(l, previousStart, previousEnd));
-  const c = buildPeriodStats(curr);
-  const p = buildPeriodStats(prev);
+  const c = buildPeriodStats(curr, ticket, taxaHot, taxaWarm);
+  const p = buildPeriodStats(prev, ticket, taxaHot, taxaWarm);
 
   // Positive delta = improvement for all metrics except daysInactive (lower = better)
   const delta = (ck: keyof PeriodStats, invert = false) => {

@@ -1,6 +1,7 @@
 import { carregarConversas, idDoLead } from '@/lib/zapintel/conversas'
+import { fatosDeVenda, type FatosDeVenda } from '@/lib/zapintel/vendas'
 import { linhasDaAnalise, type LinhaAnalise } from '@/lib/zapintel/analise'
-import { computeStats } from '@/lib/zapintel/insights/stats'
+import { computeStats, type FatosStats } from '@/lib/zapintel/insights/stats'
 import { computePerformance } from '@/lib/zapintel/insights/performance'
 import { computePerformance2 } from '@/lib/zapintel/insights/performance2'
 import { computeLinguagem } from '@/lib/zapintel/insights/linguagem'
@@ -193,9 +194,30 @@ function enxugar(p: Performance2Stats): Performance2Stats {
   }
 }
 
-export function agregar(leads: Lead[]): Agregados {
+/**
+ * Converte os fatos de venda no contrato que o motor entende.
+ *
+ * O `comprou` mora aqui, e nao dentro do motor, porque so este arquivo sabe
+ * traduzir o lead do motor (`filename = "lead-123"`) para o id do CRM. Motor
+ * de analise nao deve saber que existe banco.
+ */
+function paraOMotor(f: FatosDeVenda | null): FatosStats | null {
+  if (!f) return null
   return {
-    stats: computeStats(leads),
+    ticket: f.ticket,
+    vendas: f.vendas,
+    cobertura: f.cobertura,
+    cicloMediano: f.cicloMediano,
+    comprou: (l: Lead) => {
+      const id = idDoLead(l)
+      return id != null && f.compradores.has(id)
+    },
+  }
+}
+
+export function agregar(leads: Lead[], fatos: FatosStats | null = null): Agregados {
+  return {
+    stats: computeStats(leads, fatos),
     performance: computePerformance(leads),
     performance2: enxugar(computePerformance2(leads)),
     linguagem: computeLinguagem(leads),
@@ -214,8 +236,15 @@ export async function montarPainel(
   empresaId: number,
 ): Promise<{ painel: Painel; linhas: LinhaAnalise[] }> {
   const inicio = Date.now()
-  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, ultimaMensagem, tempos } =
-    await carregarConversas(db, empresaId)
+  // As duas leituras sao independentes. A de vendas custa duas consultas
+  // pequenas (60 linhas na JM) contra as 55 mil mensagens da outra — pedir em
+  // paralelo nao atrasa nada e paga o fim do ticket inventado.
+  const [conversas, vendas] = await Promise.all([
+    carregarConversas(db, empresaId),
+    fatosDeVenda(db, empresaId),
+  ])
+  const { analisados, porId, nomeDaLoja, segmentId, totalMensagens, ultimaMensagem, tempos } = conversas
+  const fatos = paraOMotor(vendas)
   const leu = Date.now()
 
   // Leads sem nenhuma mensagem não saem do parser; entram aqui para que o
@@ -249,11 +278,16 @@ export async function montarPainel(
   leves.sort((x, y) => y.score - x.score)
 
   const comecouAgregar = Date.now()
-  const agregados: Record<string, Agregados> = { geral: agregar(comConversa) }
+  // O MESMO `fatos` vale para a rede e para cada loja, e isso e correto:
+  // `comprou` olha lead a lead, entao o recorte de uma filial so conta os
+  // compradores dela. O ticket e o ciclo, sim, sao da empresa — a JM tem 55
+  // vendas no total, e quebrar isso por loja daria um ticket de 4 vendas, que
+  // seria ruido com cara de medida.
+  const agregados: Record<string, Agregados> = { geral: agregar(comConversa, fatos) }
   const lojas: Loja[] = [{ id: null, nome: 'Toda a rede', leads: comConversa.length }]
   for (const [filial, lista] of porFilial) {
     if (filial == null) continue
-    agregados[String(filial)] = agregar(lista)
+    agregados[String(filial)] = agregar(lista, fatos)
     lojas.push({ id: filial, nome: nomeDaFilial.get(filial) ?? `Loja ${filial}`, leads: lista.length })
   }
   lojas.sort((a, b) => (a.id ?? -1) - (b.id ?? -1))

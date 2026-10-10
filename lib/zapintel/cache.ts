@@ -49,12 +49,37 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 export const JANELA_FORCADO_MS = 60_000
 
+/**
+ * A VERSÃO DO CÁLCULO. **Suba isto sempre que a conta mudar.**
+ *
+ * Como o cache nunca expira por tempo, código novo não mudaria a tela: o
+ * painel seguiria mostrando a matemática velha até alguém clicar em
+ * "Sincronizar agora", calado. É o mesmo modo de falha que este módulo já teve
+ * duas vezes — análise truncada em 23/09 e canal de tempo real que não recebia
+ * nada —, as duas em silêncio.
+ *
+ * Com a versão, o deploy que muda a conta invalida o cache sozinho: a primeira
+ * abertura depois dele paga um cálculo, e as seguintes voltam a ser de graça.
+ *
+ * Histórico:
+ *   v1  10/10/2026  ticket, conversão e ciclo medidos — fim do TICKET_MEDIO = 5200
+ *   v2  10/10/2026  taxa de fechamento medida no pipeline; "objeção mais cara"
+ *                   virou contagem de leads travados (o 0,6 era invenção)
+ *
+ * (v2 nasceu de esquecer de subir a v1: a tela mostrou " leads travados" sem
+ * número, porque o cache tinha o formato velho. O mecanismo funcionou — quem
+ * falhou fui eu em não usá-lo. Fica o lembrete: mudou a conta, sobe a versão.)
+ */
+export const VERSAO_DO_CALCULO = 'v2'
+
 /** O carimbo do cálculo guardado. */
 export interface Marca {
   /** Maior id de mensagem que entrou no cálculo guardado. */
   ultimaMensagem: number
   mensagens: number
   calculadoEm: string
+  /** Versão do cálculo que produziu este painel. Ver VERSAO_DO_CALCULO. */
+  versao: string
 }
 
 /** O painel guardado, como texto, pronto para virar corpo de resposta. */
@@ -64,18 +89,21 @@ export async function painelDoCache(
 ): Promise<{ texto: string; marca: Marca } | null> {
   const { data, error } = await db
     .from('zapintel_painel')
-    .select('painel, ultima_mensagem, mensagens, calculado_em')
+    .select('painel, ultima_mensagem, mensagens, calculado_em, versao')
     .eq('empresa_id', empresaId)
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) return null
-  const l = data as { painel: string; ultima_mensagem: number; mensagens: number; calculado_em: string }
+  const l = data as {
+    painel: string; ultima_mensagem: number; mensagens: number; calculado_em: string; versao: string
+  }
   return {
     texto: l.painel,
     marca: {
       ultimaMensagem: Number(l.ultima_mensagem) || 0,
       mensagens: Number(l.mensagens) || 0,
       calculadoEm: l.calculado_em,
+      versao: l.versao,
     },
   }
 }
@@ -96,6 +124,7 @@ export async function guardarPainel(
       ultima_mensagem: ultimaMensagem,
       mensagens,
       ms,
+      versao: VERSAO_DO_CALCULO,
       calculado_em: new Date().toISOString(),
     },
     { onConflict: 'empresa_id' },
@@ -113,6 +142,10 @@ export async function guardarPainel(
  */
 export function cacheServe(marca: Marca | null, forcado: boolean): boolean {
   if (!marca) return false
+  // Painel feito por uma conta que não existe mais não serve, por mais novo
+  // que seja — senão código novo subiria e a tela seguiria na matemática
+  // velha, calada. Ver VERSAO_DO_CALCULO.
+  if (marca.versao !== VERSAO_DO_CALCULO) return false
   if (!forcado) return true
   return Date.now() - new Date(marca.calculadoEm).getTime() < JANELA_FORCADO_MS
 }

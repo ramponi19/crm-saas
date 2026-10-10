@@ -94,16 +94,26 @@ export default function DashboardPage() {
       {/* ── NOVAS MÉTRICAS — Row 1 ─────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10, marginBottom: 14 }}>
 
-        {/* Taxa de Conversão */}
+        {/*
+          TAXA DE CONVERSÃO — de venda registrada, não de palavra na conversa.
+          Dizia 6% e "⚠ Abaixo de 10%", comparando com uma média que ninguém
+          mediu, sobre um número que saía de uma regra que lia o texto dos DOIS
+          lados: dos 130 marcados como cliente, 27 tinham prova de pagamento.
+          O real é 1,6% — e o rodapé diz quanto das vendas a ponte alcança,
+          porque 32% delas não têm conversa ligada.
+        */}
         <ClickMetricCard
           href="/zapintel/leads?filter=customer&label=Clientes+Convertidos"
           icon={<TrendingUp size={16} color="#22c55e" />}
           label="Taxa de Conversão"
-          value={`${s.conversionRate}%`}
-          sub={`${s.customer} de ${s.total} viraram clientes`}
+          value={s.ticketMedido == null ? "—" : `${s.conversionRate}%`}
+          sub={s.ticketMedido == null
+            ? "sem venda registrada para comparar"
+            : `${s.compradoresComprovados} de ${s.total} geraram venda`}
           color="var(--green)"
-          detail={s.conversionRate >= 10 ? "✓ Acima da média" : "⚠ Abaixo de 10%"}
-          detailColor={s.conversionRate >= 10 ? "var(--green)" : "var(--yellow)"}
+          detail={s.ticketMedido == null ? "ligue uma venda a uma conversa"
+            : `${Math.round(s.coberturaDaPonte * 100)}% das vendas ligadas à conversa`}
+          detailColor="var(--muted)"
         />
 
         {/* Tempo médio para fechar */}
@@ -112,21 +122,33 @@ export default function DashboardPage() {
           icon={<Clock size={16} color="var(--blue)" />}
           label="Tempo p/ Fechar"
           value={`${s.avgDaysToClose}d`}
-          sub="média entre contato e compra"
+          sub={s.ticketMedido == null
+            ? "estimado pela conversa, sem venda"
+            : "mediana da 1ª mensagem até a venda"}
           color="var(--blue)"
-          detail={s.avgDaysToClose <= 7 ? "✓ Dentro do ciclo" : "⚠ Acima do esperado"}
-          detailColor={s.avgDaysToClose <= 7 ? "var(--green)" : "var(--orange)"}
+          detail={s.ticketMedido == null ? "sem venda registrada"
+            : `medido em ${s.vendasNaConta} vendas`}
+          detailColor="var(--muted)"
         />
 
-        {/* Pipeline */}
+        {/*
+          PIPELINE — as DUAS metades da fórmula eram inventadas: `quentes × 5200
+          × 0,70 + mornos × 5200 × 0,25`. O ticket real é R$ 7.045, e as taxas
+          reais, medidas contra as vendas, são 2,8% dos quentes e 0,0% dos
+          mornos — não 70% e 25%. Vinte e cinco vezes de diferença: "R$ 1,58M"
+          eram R$ 43 mil. O rodapé mostra as taxas usadas, para o valor nunca
+          mais aparecer sem de onde veio. Sem venda registrada: "—".
+        */}
         <ClickMetricCard
           href="/zapintel/leads?filter=hot&label=Leads+Quentes+—+Pipeline"
           icon={<DollarSign size={16} color="var(--yellow)" />}
           label="Pipeline Estimado"
-          value={formatCurrency(s.pipelineValue)}
+          value={s.ticketMedido == null ? "—" : formatCurrency(s.pipelineValue)}
           sub={`${s.hot + s.warm} leads com potencial`}
           color="var(--yellow)"
-          detail="70% hot · 25% morno"
+          detail={s.ticketMedido == null
+            ? "sem venda registrada para estimar"
+            : `${s.taxaFechamentoHot}% dos quentes · ${s.taxaFechamentoWarm}% dos mornos · ticket ${formatCurrency(s.ticketMedido)}`}
           detailColor="var(--muted)"
         />
 
@@ -166,10 +188,19 @@ export default function DashboardPage() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <TrendingDown size={15} color="var(--red)" />
-              <SectionTitle>Objeção mais cara</SectionTitle>
+              <SectionTitle>Objeção que mais trava</SectionTitle>
             </div>
+            {/*
+              Dizia "Objeção mais cara · R$ 558k", de `contagem × 5200 × 0,6`.
+              O 0,6 supunha que 60% dos leads travados teriam comprado; o
+              medido é 1,0% (stalled) e 0,0% (lost). E o contrafactual — quantos
+              comprariam se a objeção fosse resolvida — não é mensurável.
+              Então o cartão passou a responder o que tem resposta: quantos
+              negócios aquela objeção trava.
+            */}
             <div style={{ fontSize: 22, fontWeight: 800, color: "var(--red)", marginBottom: 4 }}>
-              {formatCurrency(s.mostExpensiveObjection.estimatedLoss)}
+              {s.mostExpensiveObjection.leads}
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--dim)" }}> leads travados</span>
             </div>
             <div style={{ fontSize: 13, color: "var(--txt)", marginBottom: 4 }}>{s.mostExpensiveObjection.label}</div>
             <div style={{ fontSize: 11, color: "var(--dim)" }}>
@@ -389,26 +420,74 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Sinais de compra ───────────────────────────────────────────────── */}
+      {/*
+        SINAIS — ordenados por quanto SEPARAM comprador de curioso, não por
+        quanto aparecem. A ordem antiga enganava: "Pediu 18x" é o 3º mais
+        contado (396 leads) e aparece em 21% de quem comprou contra 19% de quem
+        não comprou — não distingue nada. "Perguntou sobre entrega" aparece em
+        39% contra 7% e estava enterrado na lista, por ser menos comum.
+
+        É correlação, não causa, e o texto da tela diz isso: serve para
+        priorizar atendimento, não para afirmar que perguntar de entrega faz
+        comprar. Sem venda ligada, cai de volta na contagem — e avisa.
+      */}
       <div className="card" style={{ padding: 20 }}>
-        <SectionTitle>✅ Sinais de Compra Mais Detectados</SectionTitle>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {s.topBuySignals.map(({ label, count }) => (
-            <Link key={label} href={`/zapintel/leads?signal=${encodeURIComponent(label)}&label=Sinal+de+compra%3A+${encodeURIComponent(label)}`} style={{ textDecoration: "none" }}>
-              <div style={{
-                background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)",
-                borderRadius: 20, padding: "4px 12px", display: "flex", alignItems: "center", gap: 6,
-                cursor: "pointer", transition: "background .15s",
-              }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(34,197,94,.2)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(34,197,94,.1)")}
-              >
-                <span style={{ fontSize: 12, color: "var(--green)" }}>✓ {label}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", opacity: .8 }}>{count}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <SectionTitle>
+          {s.signalLift ? "🎯 Sinais que mais antecedem venda" : "✅ Sinais de Compra Mais Detectados"}
+        </SectionTitle>
+        {s.signalLift ? (
+          <>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, lineHeight: 1.5 }}>
+              Quanto cada sinal aparece a mais em quem comprou do que nos demais —
+              medido em {s.compradoresComprovados} conversas que geraram venda.
+              Indica prioridade, não causa.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {s.signalLift.map((sig) => (
+                <Link key={sig.label} href={`/zapintel/leads?signal=${encodeURIComponent(sig.label)}&label=Sinal+de+compra%3A+${encodeURIComponent(sig.label)}`} style={{ textDecoration: "none" }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "7px 12px",
+                    borderRadius: 8, background: "var(--card2)", border: "1px solid var(--brd2)",
+                    cursor: "pointer",
+                  }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, minWidth: 42, textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      color: sig.diferenca >= 10 ? "var(--green)" : sig.diferenca >= 5 ? "var(--yellow)" : "var(--dim)",
+                    }}>
+                      {sig.diferenca > 0 ? "+" : ""}{sig.diferenca}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--txt)", flex: 1 }}>{sig.label}</span>
+                    <span style={{ fontSize: 10.5, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {sig.pctCompradores}% de quem comprou · {sig.pctDemais}% dos demais
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>
+              Contagem bruta. Sem venda ligada a conversa, não dá para saber quais
+              destes de fato antecedem uma compra.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {s.topBuySignals.map(({ label, count }) => (
+                <Link key={label} href={`/zapintel/leads?signal=${encodeURIComponent(label)}&label=Sinal+de+compra%3A+${encodeURIComponent(label)}`} style={{ textDecoration: "none" }}>
+                  <div style={{
+                    background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)",
+                    borderRadius: 20, padding: "4px 12px", display: "flex", alignItems: "center", gap: 6,
+                    cursor: "pointer",
+                  }}>
+                    <span style={{ fontSize: 12, color: "var(--green)" }}>✓ {label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", opacity: .8 }}>{count}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

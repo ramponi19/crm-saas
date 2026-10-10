@@ -31,7 +31,7 @@ function addDays(d: Date, n: number) {
 function toIso(d: Date) { return d.toISOString().split("T")[0]; }
 
 export default function ComparePage() {
-  const { leads, loaded, loadSample } = useLeads();
+  const { leads, loaded, loadSample, agregados } = useLeads();
   const [preset, setPreset] = useState<Preset>("30d");
 
   const today = useMemo(() => new Date(), []);
@@ -59,8 +59,13 @@ export default function ComparePage() {
     } else {
       cs = ranges.curStart; ce = ranges.curEnd; ps = ranges.prevStart; pe = ranges.prevEnd;
     }
-    return comparePeriods(leads, cs, ce, ps, pe);
-  }, [leads, loaded, preset, ranges, customCurStart, customCurEnd, customPrevStart, customPrevEnd]);
+    // O pipeline do periodo usa o MESMO ticket medido do painel. Era 5200
+    // escrito a mao aqui tambem; sem venda registrada agora da zero.
+    return comparePeriods(leads, cs, ce, ps, pe,
+      agregados?.stats.ticketMedido ?? 0,
+      (agregados?.stats.taxaFechamentoHot ?? 0) / 100,
+      (agregados?.stats.taxaFechamentoWarm ?? 0) / 100);
+  }, [leads, loaded, preset, ranges, customCurStart, customCurEnd, customPrevStart, customPrevEnd, agregados]);
 
   if (!loaded) return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:16}}>

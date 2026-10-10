@@ -84,6 +84,17 @@ v "ponte so olha lead COM conversa"  "supabase/funcoes/zapintel_leads_com_conver
 v "ponte pagina a funcao tambem"     "lib/zapintel/ponte.ts" "buscarTudo<LeadComConversa>"
 v "ponte guarda como e confianca"    "lib/zapintel/ponte.ts" "confianca: candidatos.length > 1"
 v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
+# -- fim dos numeros inventados (10/10/2026) -------------------------------
+# `TICKET_MEDIO = 5200` alimentava "PIPELINE R$ 1,2M" e "objecao mais cara
+# R$ 558k", e o pipeline ainda supunha 70% dos quentes fechando (real: 2,8%).
+n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
+n "pipeline nao supoe 70 por cento"  "lib/zapintel/insights/stats.ts" "ticket \* 0.70"
+v "pipeline usa taxa medida"         "lib/zapintel/insights/stats.ts" "taxaDaClasse"
+v "conversao vem de venda ligada"    "lib/zapintel/insights/stats.ts" "compradores.length / leads.length"
+v "ciclo vem da ponte"               "lib/zapintel/insights/stats.ts" "fatos?.cicloMediano != null"
+v "sem venda a tela nao inventa"     "app/zapintel/page.tsx" "s.ticketMedido == null"
+v "sinal ordenado por diferenca"     "lib/zapintel/insights/stats.ts" "b.diferenca - a.diferenca"
+v "cache invalida por versao"        "lib/zapintel/cache.ts" "marca.versao !== VERSAO_DO_CALCULO"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
