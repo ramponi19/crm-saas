@@ -10,7 +10,7 @@ function fmtCurrency(v: number) {
 }
 
 export default function RelatorioPage() {
-  const { leads, stats, loaded, loadSample, storeName, segment } = useLeads();
+  const { leads, stats, loaded, storeName, segment } = useLeads();
   const loja = storeName || "sua empresa";
   const [report, setReport]     = useState("");
   const [loading, setLoading]   = useState(false);
@@ -132,9 +132,6 @@ Gere um relatório com estas seções:
       <FileText size={40} color="var(--purple)"/>
       <h2 style={{fontSize:18,fontWeight:800}}>Relatório Semanal</h2>
       <p style={{color:"var(--dim)",fontSize:13}}>Importe leads para gerar o relatório.</p>
-      <button onClick={loadSample} style={{background:"var(--purple)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-        Carregar dados de exemplo
-      </button>
     </div>
   );
 

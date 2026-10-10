@@ -55,8 +55,6 @@ v "sentry sabe quem esta na tela"      "app/(dashboard)/layout.tsx" "<SentryUsua
 n "sentry nao manda email do usuario"  "components/layout/sentry-usuario.tsx" "email:"
 v "erro sem arquivo revela a origem"   "lib/sentry-comum.ts" "origem_desconhecida"
 v "tela de leads traz todos"           "app/(dashboard)/leads/page.tsx" "todosOsLeads"
-v "analise do zapintel no servidor"    "lib/zapintel/analise.ts" "analisarLeads"
-v "analise guarda a loja do lead"      "lib/zapintel/analise.ts" "filial_id: lead.filial_id"
 v "painel do zapintel no servidor"     "lib/zapintel/painel.ts" "montarPainel"
 v "conversas lidas em paralelo"        "lib/zapintel/conversas.ts" "Promise.all"
 v "paginacao paralela ordena por id"   "lib/zapintel/conversas.ts" "order(.id., { ascending"
@@ -115,13 +113,24 @@ v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "mont
 n "cliente nao sai de palavra-chave"  "lib/zapintel/classification/engine.ts" "CUSTOMER_KW ="
 v "cliente vem da ponte"             "lib/zapintel/painel.ts" "vendas.compradores.has(id)"
 v "conversa funda no 1o dia e quente" "lib/zapintel/classification/engine.ts" "trocasInicio >= 15"
-v "trocas medidas so nas 24h"        "lib/zapintel/parser/csvParser.ts" "t - t0 <= 86400000"
+v "trocas medidas so nas 24h"        "lib/zapintel/montar.ts" "t - t0 <= DIA_MS"
 v "taxa medida antes do carimbo"     "lib/zapintel/painel.ts" "const taxaHot = taxaPorClasse"
 n "stats nao mede taxa apos carimbo" "lib/zapintel/insights/stats.ts" "const taxaDaClasse"
 v "o historico comeca fechado"       "app/zapintel/leads/[id]/page.tsx" "useState(false)"
 v "a conversa fica a um clique"      "app/zapintel/leads/[id]/page.tsx" "Ver a conversa"
 v "a ficha traz os tres momentos"    "lib/zapintel/ficha.ts" "primeiraFalaDoCliente"
 v "saudacao nao conta como pedido"   "lib/zapintel/ficha.ts" "SAUDACAO.test(soLetras"
+# -- o caminho de importacao manual saiu em 10/10/2026 --------------------
+# O negocio e online; manter o import era guardar duas verdades sobre o mesmo
+# lead e pagar o parser de CSV no meio de cada recalculo.
+v "le as tabelas direto, sem CSV"    "lib/zapintel/conversas.ts" "montarLeads(porId, msgs)"
+n "nao existe mais parser de CSV"    "lib/zapintel/conversas.ts" "parseCombinedCSV"
+# O padrao olha a DECLARACAO: o arquivo cita o numero no comentario que explica
+# por que ele saiu, e esse aviso deve continuar la.
+n "telefone da loja nao esta no codigo" "lib/zapintel/montar.ts" "const STORE_PHONE"
+v "o lado da mensagem vem da direcao" "lib/zapintel/montar.ts" "isStore: m.direcao"
+v "o lead carrega os fatos do CRM"   "lib/zapintel/montar.ts" "kanbanStatus: banco.kanban_status"
+v "vendedor: fato antes de deducao"  "lib/zapintel/montar.ts" "if (responsavel) return responsavel"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"

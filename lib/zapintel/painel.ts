@@ -1,6 +1,5 @@
 import { carregarConversas, idDoLead } from '@/lib/zapintel/conversas'
 import { fatosDeVenda, type FatosDeVenda } from '@/lib/zapintel/vendas'
-import { linhasDaAnalise, type LinhaAnalise } from '@/lib/zapintel/analise'
 import { computeStats, type FatosStats } from '@/lib/zapintel/insights/stats'
 import { computePerformance } from '@/lib/zapintel/insights/performance'
 import { computePerformance2 } from '@/lib/zapintel/insights/performance2'
@@ -270,7 +269,7 @@ export function agregar(leads: Lead[], fatos: FatosStats | null = null): Agregad
 export async function montarPainel(
   db: SupabaseClient,
   empresaId: number,
-): Promise<{ painel: Painel; linhas: LinhaAnalise[] }> {
+): Promise<{ painel: Painel }> {
   const inicio = Date.now()
   // As duas leituras sao independentes. A de vendas custa duas consultas
   // pequenas (60 linhas na JM) contra as 55 mil mensagens da outra — pedir em
@@ -385,8 +384,5 @@ export async function montarPainel(
     tempos: { ler: leu - inicio, agregar: Date.now() - comecouAgregar, ...tempos },
   }
 
-  // A tabela é gravada no MESMO passo que alimenta a tela: assim o que o
-  // módulo de Leads lê de `zapintel_analise` é, por construção, o mesmo número
-  // que o ZapIntel mostra. Dois caminhos dariam dois resultados.
-  return { painel, linhas: linhasDaAnalise(analisados, porId, empresaId) }
+  return { painel }
 }

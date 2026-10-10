@@ -1,14 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, BookUser, ShoppingBag, CalendarDays, BookOpen, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, CalendarDays, BookOpen, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
   { href: "/zapintel", icon: LayoutDashboard, label: "Dashboard", exact: true },
   { href: "/zapintel/leads", icon: Users, label: "Leads" },
   { href: "/zapintel/agenda", icon: CalendarDays, label: "Agenda" },
-  { href: "/zapintel/contacts", icon: BookUser, label: "Contatos" },
+  // "Contatos" saiu em 10/10/2026: era uma segunda lista dos MESMOS leads,
+  // com um botão de WhatsApp. O CRM já tem Leads e Clientes, e manter uma
+  // terceira lista da mesma coisa é convidar os três a divergirem.
   { href: "/zapintel/insights", icon: Lightbulb, label: "Insights" },
   { href: "/zapintel/performance", icon: BarChart2, label: "Performance" },
   { href: "/zapintel/performance2", icon: Gauge, label: "Performance II" },

@@ -17,7 +17,7 @@ const TT = { contentStyle:{ background:"var(--card)", border:"1px solid var(--br
  */
 
 export default function LinguagemPage() {
-  const { agregados, loaded, loadSample, sellerName } = useLeads();
+  const { agregados, loaded, sellerName } = useLeads();
   const vend = sellerName.toLowerCase();
   const [tab, setTab] = useState<"words"|"phrases"|"patterns">("words");
 
@@ -28,9 +28,6 @@ export default function LinguagemPage() {
       <MessageSquare size={40} color="var(--purple)"/>
       <h2 style={{fontSize:18,fontWeight:800}}>Análise de Linguagem</h2>
       <p style={{color:"var(--dim)",fontSize:13}}>Importe leads para analisar o padrão de linguagem.</p>
-      <button onClick={loadSample} style={{background:"var(--purple)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-        Carregar dados de exemplo
-      </button>
     </div>
   );
 

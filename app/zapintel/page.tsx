@@ -18,7 +18,7 @@ function formatCurrency(v: number) {
 }
 
 export default function DashboardPage() {
-  const { leads, stats, agregados, loaded, loading, loadSample, storeName, lojas, lojaAtiva } = useLeads();
+  const { leads, stats, agregados, loaded, loading, storeName, lojas, lojaAtiva } = useLeads();
 
   // Com o recorte por loja, o título precisa dizer QUAL recorte está na tela —
   // senão "Dashboard — JM Store Importados" fica no alto enquanto os números
@@ -27,7 +27,7 @@ export default function DashboardPage() {
     ? storeName
     : (lojas.find(l => l.id === lojaAtiva)?.nome ?? storeName);
 
-  if (!loaded) return <EmptyState loading={loading} onLoad={loadSample} />;
+  if (!loaded) return <EmptyState loading={loading} />;
 
   const s = stats!;
 
@@ -588,25 +588,27 @@ function ClickMetricCard({ href, icon, label, value, sub, color, detail, detailC
   );
 }
 
-function EmptyState({ loading, onLoad }: { loading: boolean; onLoad: () => void }) {
+/**
+ * Tela vazia — sem botao de "ver dados de exemplo".
+ *
+ * A base de exemplo saiu em 10/10/2026 junto com o caminho de importacao
+ * manual. Oferecer dado fabricado num painel que existe para medir a loja de
+ * verdade era convite a confundir os dois.
+ */
+function EmptyState({ loading }: { loading: boolean }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: 20 }}>
-      <div style={{ fontSize: 48 }}>💬</div>
+      <div style={{ fontSize: 48 }}>&#128172;</div>
       <div style={{ textAlign: "center" }}>
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
-          {loading ? "Sincronizando conversas do CRM…" : "Nenhuma conversa ainda"}
+          {loading ? "Lendo as conversas do CRM…" : "Nenhuma conversa ainda"}
         </h2>
         <p style={{ color: "var(--dim)", fontSize: 14, maxWidth: 440, lineHeight: 1.7 }}>
           {loading
             ? "Carregando as conversas reais dos seus leads."
-            : "O ZapIntel analisa automaticamente as conversas dos leads do CRM. Assim que houver conversas, elas aparecem aqui. Use “Sincronizar agora” na barra lateral para atualizar."}
+            : "O ZapIntel analisa as conversas dos leads do CRM. Assim que houver conversas, elas aparecem aqui."}
         </p>
       </div>
-      {!loading && (
-        <button onClick={onLoad} style={{ background: "var(--card2)", border: "1px solid var(--brd2)", color: "var(--txt)", borderRadius: 10, padding: "10px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-          Ver dados de exemplo
-        </button>
-      )}
     </div>
   );
 }

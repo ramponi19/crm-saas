@@ -68,7 +68,7 @@ function OrigemBadge({ lead }: { lead: Lead }) {
 }
 
 export default function LeadsPage() {
-  const { leads, loaded, loadSample, loading } = useLeads();
+  const { leads, loaded } = useLeads();
   const router = useRouter();
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");
@@ -150,9 +150,6 @@ export default function LeadsPage() {
   if (!loaded) return (
     <div style={{ textAlign: "center", paddingTop: 80 }}>
       <p style={{ color: "var(--dim)", marginBottom: 16 }}>Nenhum dado carregado ainda.</p>
-      <button onClick={loadSample} style={{ background: "var(--purple)", color: "#fff", borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", border: "none" }}>
-        {loading ? "Carregando..." : "Carregar exemplo"}
-      </button>
     </div>
   );
 

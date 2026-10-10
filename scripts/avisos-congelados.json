@@ -1,10 +1,10 @@
 {
   "_comentario": "Teto de avisos do ESLint. So pode CAIR — ver scripts/check-avisos.mjs.",
   "_historia": "Nasceu em 02/09/2026 com 107, depois de a limpeza levar de 226 para 107.",
-  "atualizado_em": "2026-10-09",
-  "total": 48,
+  "atualizado_em": "2026-10-10",
+  "total": 47,
   "regras": {
-    "react-hooks/exhaustive-deps": 3,
+    "react-hooks/exhaustive-deps": 2,
     "react-hooks/preserve-manual-memoization": 2,
     "react-hooks/purity": 1,
     "react-hooks/refs": 2,

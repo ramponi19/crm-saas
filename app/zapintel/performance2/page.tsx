@@ -34,7 +34,7 @@ const SECTION_TABS = [
 ];
 
 export default function Performance2Page() {
-  const { leads, agregados, loaded, loadSample, sellerName } = useLeads();
+  const { leads, agregados, loaded, sellerName } = useLeads();
   const vend = sellerName.toLowerCase();
   const [activeTab, setActiveTab] = useState("speed");
 
@@ -47,9 +47,6 @@ export default function Performance2Page() {
       <BarChart2 size={40} color="var(--purple)" />
       <h2 style={{ fontSize: 18, fontWeight: 800 }}>Performance II</h2>
       <p style={{ color: "var(--dim)", fontSize: 13 }}>Importe leads para ver os indicadores avançados.</p>
-      <button onClick={loadSample} style={{ background: "var(--purple)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-        Carregar dados de exemplo
-      </button>
     </div>
   );
 

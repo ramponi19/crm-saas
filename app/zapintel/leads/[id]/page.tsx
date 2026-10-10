@@ -121,7 +121,7 @@ type Tab = "whatsapp" | "instagram" | "all";
 export default function LeadDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { leads, leadsCompletos, markSaleClosed, storeName, sellerName, segment, calculadoEm } = useLeads();
+  const { leads, markSaleClosed, storeName, sellerName, segment, calculadoEm } = useLeads();
   const saleProducts = [...getProducts(segment.id), "Outro"];
   const resumo = leads.find(l => l.id === id);
 
@@ -132,8 +132,9 @@ export default function LeadDetailPage() {
    * 4 MB e foi o que obrigava a truncar a análise. Esta tela é a única que
    * precisa das mensagens de verdade, então pede exatamente uma conversa.
    *
-   * Em dado importado à mão o texto já está no navegador (`leadsCompletos`) e
-   * não há a quem pedir — por isso os dois caminhos.
+   * Caminho único desde 10/10/2026: a importação manual saiu do produto, e com
+   * ela o segundo caminho que existia aqui (texto já no navegador, sem a quem
+   * pedir). Um caminho só é um resultado só.
    */
   const [conversa, setConversa] = useState<Lead | null>(null);
   const [ficha, setFicha] = useState<Ficha | null>(null);
@@ -148,10 +149,8 @@ export default function LeadDetailPage() {
   const [verConversa, setVerConversa] = useState(false);
   const [falhouConversa, setFalhouConversa] = useState(false);
 
-  const daImportacao = leadsCompletos?.find(l => l.id === id) ?? null;
-
   useEffect(() => {
-    if (daImportacao || !resumo?.leadId) return;
+    if (!resumo?.leadId) return;
     let vivo = true;
     fetch(`/zapintel/api/conversa?lead=${resumo.leadId}`, { cache: "no-store" })
       .then(r => r.json())
@@ -162,16 +161,16 @@ export default function LeadDetailPage() {
       })
       .catch(() => { if (vivo) setFalhouConversa(true); });
     return () => { vivo = false; };
-  }, [daImportacao, resumo?.leadId]);
+  }, [resumo?.leadId]);
 
   // Derivado, não guardado: "está carregando" é exatamente "tem o que buscar e
   // ainda não chegou". Um estado separado só poderia divergir disso.
-  const carregandoConversa = !daImportacao && !!resumo?.leadId && !conversa && !falhouConversa;
+  const carregandoConversa = !!resumo?.leadId && !conversa && !falhouConversa;
 
   // O resumo (score, classificação, perfil) vem da lista e aparece na hora; as
   // mensagens chegam depois. Enquanto não chegam, a conversa fica vazia — e a
   // tela diz que está carregando, em vez de afirmar que não há nada.
-  const lead: Lead | null = daImportacao ?? (resumo
+  const lead: Lead | null = (resumo
     ? { ...(resumo as unknown as Lead), messages: conversa?.messages ?? [] }
     : null);
 

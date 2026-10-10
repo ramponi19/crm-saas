@@ -83,7 +83,7 @@ Regras: máx 3 linhas, tom informal brasileiro, específico ao contexto, só a m
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AgendaPage() {
-  const { leads, loaded, loadSample, storeName, sellerName, segment } = useLeads();
+  const { leads, loaded, storeName, sellerName, segment } = useLeads();
   const aiCtx = { storeName: storeName || "sua empresa", sellerName, segmentName: segment.name, followupContext: segment.followupContext };
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -185,9 +185,6 @@ export default function AgendaPage() {
       <CalendarDays size={40} color="var(--purple)" />
       <h2 style={{ fontSize: 18, fontWeight: 800 }}>Agenda de Follow-ups</h2>
       <p style={{ color: "var(--dim)", fontSize: 13 }}>Importe leads para começar.</p>
-      <button onClick={loadSample} style={{ background: "var(--purple)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-        Carregar dados de exemplo
-      </button>
     </div>
   );
 

@@ -1,4 +1,4 @@
-import { parseCombinedCSV } from '@/lib/zapintel/parser/csvParser'
+import { montarLeads } from '@/lib/zapintel/montar'
 import { mapCrmSegmento } from '@/lib/zapintel/segments/segments'
 import type { Lead } from '@/types/zapintel'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -29,9 +29,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * custa um décimo do que custaria contar.
  */
 
-/** Precisa bater com STORE_PHONE do parser — é assim que ele reconhece a loja. */
-const STORE_PHONE = '5519998862028'
-const HEADER = 'Contato;Arquivo;Date1;Date2;Time;UserPhone;UserName;MessageBody;MediaType;MediaLink;MediaCaption;QuotedMessage;QuotedUserName;QuotedMessageDate;QuotedMessageTime'
 
 /** Linhas por página — o teto do PostgREST. */
 const PAGINA = 1000
@@ -50,6 +47,14 @@ export type MsgBanco = {
   created_at: string
 }
 
+/**
+ * O lead como o CRM o guarda.
+ *
+ * Eram 7 campos até 10/10/2026, porque o que viajava daqui tinha de caber nas
+ * colunas fixas de um CSV. Sem o CSV no meio, o limite sumiu — e com ele a
+ * necessidade de ADIVINHAR canal, vendedor, produto e motivo de perda, que o
+ * CRM registra desde sempre.
+ */
 export type LeadBanco = {
   id: number
   nome: string | null
@@ -58,6 +63,19 @@ export type LeadBanco = {
   origem: string | null
   filial_id: number | null
   empresa_id: number
+  created_at: string
+  ultima_mensagem_at: string | null
+  kanban_status: string | null
+  motivo_perda_id: number | null
+  /** Resolvido a partir de `motivos_perda` em `carregarConversas`. */
+  motivo_perda?: string | null
+  perdido_em: string | null
+  produto_interessado: string | null
+  responsavel_id: string | null
+  /** Resolvido a partir de `usuarios` em `carregarConversas`. */
+  responsavel_nome?: string | null
+  convertido_em: number | null
+  anuncio: unknown
 }
 
 type Consulta = (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>
@@ -95,30 +113,6 @@ export async function buscarTudo<T>(consulta: Consulta): Promise<T[]> {
   }
 }
 
-/** Monta o CSV que o parser entende, a partir das linhas do banco. */
-export function montarCsv(leads: Map<number, LeadBanco>, msgs: MsgBanco[], nomeDaLoja: string): string {
-  const linhas = [HEADER]
-  for (const m of msgs) {
-    const lead = leads.get(m.lead_id)
-    if (!lead) continue
-    const contato = limpa(lead.nome || lead.telefone || lead.origem_id || `Lead ${m.lead_id}`)
-    const dt = new Date(m.created_at)
-    const dia = m.created_at.slice(0, 10)
-    const hora = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
-    const enviada = m.direcao === 'enviada'
-    linhas.push([
-      contato,
-      `lead-${m.lead_id}`,
-      dia, dia, hora,
-      enviada ? STORE_PHONE : limpa(lead.telefone || lead.origem_id || String(m.lead_id)),
-      enviada ? nomeDaLoja : contato,
-      limpa(m.conteudo || ''),
-      m.tipo && m.tipo !== 'texto' ? m.tipo : '',
-      '', '', '', '', '', '',
-    ].join(';'))
-  }
-  return linhas.join('\n')
-}
 
 /** O id do lead vem do campo `filename` (`lead-123`), que o parser preserva. */
 export const idDoLead = (lead: Lead): number | null => {
@@ -173,11 +167,45 @@ export async function carregarConversas(
   const t0 = Date.now()
   const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
     let q = db.from('leads')
-      .select('id, nome, telefone, origem_id, origem, filial_id, empresa_id')
+      .select('id, nome, telefone, origem_id, origem, filial_id, empresa_id, created_at,'
+        + ' ultima_mensagem_at, kanban_status, motivo_perda_id, perdido_em,'
+        + ' produto_interessado, responsavel_id, convertido_em, anuncio')
       .eq('empresa_id', empresaId).eq('ativo', true)
     if (ids.length) q = q.in('id', ids)
     return q.order('id', { ascending: true }).range(de, ate)
   })
+
+  // O motivo da perda é escolhido de uma lista por quem perdeu o lead. São
+  // poucas linhas por empresa, então vale uma consulta e um mapa — bem mais
+  // barato que um join carregado em cada página de leads.
+  const { data: motivosRaw } = await db
+    .from('motivos_perda').select('id, label').eq('empresa_id', empresaId)
+  const motivo = new Map<number, string>(
+    ((motivosRaw ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label]),
+  )
+  // O vendedor RESPONSÁVEL, quando alguém atribuiu. É fato; o que o ZapIntel
+  // fazia era deduzir o nome do texto da conversa, e o resultado tinha "hoje",
+  // "Pedroe" e "Pedreo" na lista de vendedores.
+  const { data: usuariosRaw } = (await db
+    .from('empresa_usuarios')
+    .select('usuario_id, usuarios(id, nome)')
+    .eq('empresa_id', empresaId).eq('ativo', true)) as { data: unknown[] | null }
+  const nomeDoUsuario = new Map<string, string>()
+  // O PostgREST devolve o relacionamento como ARRAY quando não consegue provar
+  // que é 1-para-1, então o tipo gerado é mais largo do que a realidade. Achatar
+  // aqui é mais honesto que afirmar um formato com `as`.
+  for (const u of (usuariosRaw ?? []) as unknown[]) {
+    const rel = (u as { usuarios?: unknown }).usuarios
+    for (const x of (Array.isArray(rel) ? rel : [rel])) {
+      const p = x as { id?: string; nome?: string | null } | null
+      if (p?.id && p.nome) nomeDoUsuario.set(p.id, p.nome)
+    }
+  }
+
+  for (const l of leadsRaw) {
+    l.motivo_perda = l.motivo_perda_id != null ? motivo.get(l.motivo_perda_id) ?? null : null
+    l.responsavel_nome = l.responsavel_id ? nomeDoUsuario.get(l.responsavel_id) ?? null : null
+  }
 
   const t1 = Date.now()
 
@@ -196,7 +224,7 @@ export async function carregarConversas(
       .eq('empresa_id', empresaId)
     // Filtrar por id só quando o recorte é pequeno: um `in` com milhares de
     // itens vira uma URL que o servidor recusa. Na empresa inteira o filtro de
-    // empresa já basta, e os poucos leads arquivados caem no `montarCsv`.
+    // empresa já basta, e os poucos leads arquivados são descartados ao montar.
     if (ids.length) q = q.in('lead_id', alvo)
     return q.order('id', { ascending: true }).range(de, ate)
   })
@@ -213,7 +241,7 @@ export async function carregarConversas(
 
   const t2 = Date.now()
 
-  const analisados = parseCombinedCSV(montarCsv(porId, msgs, nomeDaLoja))
+  const analisados = montarLeads(porId, msgs)
   const t3 = Date.now()
 
   let ultimaMensagem = 0

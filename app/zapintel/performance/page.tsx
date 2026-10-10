@@ -57,7 +57,7 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 }
 
 export default function PerformancePage() {
-  const { leads, agregados, loaded, loadSample, loading, storeName, sellerName } = useLeads();
+  const { leads, agregados, loaded, storeName, sellerName } = useLeads();
 
   // Calculado no servidor, sobre a conversa inteira. Rodar aqui daria zero:
   // os leads chegam sem as mensagens, de propósito.
@@ -67,9 +67,6 @@ export default function PerformancePage() {
     <div style={{ textAlign: "center", paddingTop: 80 }}>
       <p style={{ color: "var(--dim)", marginBottom: 16 }}>As conversas carregam automaticamente do CRM. Use “Sincronizar agora” na barra lateral se ainda não apareceram.</p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <button onClick={loadSample} style={{ background: "var(--card2)", border: "1px solid var(--brd2)", color: "var(--txt)", borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          {loading ? "Carregando..." : "Ver dados de exemplo"}
-        </button>
       </div>
     </div>
   );

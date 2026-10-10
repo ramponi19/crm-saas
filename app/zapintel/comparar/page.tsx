@@ -31,7 +31,7 @@ function addDays(d: Date, n: number) {
 function toIso(d: Date) { return d.toISOString().split("T")[0]; }
 
 export default function ComparePage() {
-  const { leads, loaded, loadSample, agregados } = useLeads();
+  const { leads, loaded, agregados } = useLeads();
   const [preset, setPreset] = useState<Preset>("30d");
 
   const today = useMemo(() => new Date(), []);
@@ -72,9 +72,6 @@ export default function ComparePage() {
       <BarChart2 size={40} color="var(--purple)"/>
       <h2 style={{fontSize:18,fontWeight:800}}>Comparação de Períodos</h2>
       <p style={{color:"var(--dim)",fontSize:13}}>Importe leads para comparar períodos.</p>
-      <button onClick={loadSample} style={{background:"var(--purple)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-        Carregar dados de exemplo
-      </button>
     </div>
   );
 

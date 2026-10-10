@@ -123,7 +123,7 @@ function ScriptCard({ name, phone }: { name: string; phone: string }) {
 }
 
 export default function PosVendaPage() {
-  const { leads, loaded, loadSample, loading, segment } = useLeads();
+  const { leads, loaded, segment } = useLeads();
   const crossMap = getCrossSell(segment.id); // celulares tem mapa; demais → genérico
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -167,9 +167,6 @@ export default function PosVendaPage() {
     <div style={{ textAlign: "center", paddingTop: 80 }}>
       <p style={{ color: "var(--dim)", marginBottom: 16 }}>As conversas carregam automaticamente do CRM. Use “Sincronizar agora” na barra lateral se ainda não apareceram.</p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <button onClick={loadSample} style={{ background: "var(--card2)", border: "1px solid var(--brd2)", color: "var(--txt)", borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          {loading ? "Carregando..." : "Ver dados de exemplo"}
-        </button>
       </div>
     </div>
   );

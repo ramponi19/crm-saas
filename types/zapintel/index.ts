@@ -43,6 +43,35 @@ export interface RawMessage {
   source?: "whatsapp" | "instagram";
 }
 
+/**
+ * O QUE O CRM REGISTRA SOBRE O LEAD — fato, não dedução.
+ *
+ * Tudo que está aqui foi gravado pelo sistema ou digitado por gente. Tudo que
+ * está fora daqui, no `Lead`, foi deduzido da conversa pelo ZapIntel.
+ *
+ * A separação é o contrato: quando os dois discordarem — e eles discordam, o
+ * kanban diz 66 convertidos e o registro de vendas diz 33 — a tela mostra a
+ * divergência em vez de escolher um e calar o outro.
+ */
+export interface FatosDoCrm {
+  leadId: number;
+  filialId: number | null;
+  /** `leads.origem`: whatsapp | instagram | messenger | manual… */
+  canal: string;
+  /** Etapa do funil, movida por gente. */
+  kanbanStatus: string | null;
+  /** Rótulo escolhido por quem perdeu o lead ("Comprou com concorrente"…). */
+  motivoPerda: string | null;
+  perdidoEm: string | null;
+  produtoInteressado: string | null;
+  responsavelId: string | null;
+  /** Id do cliente, quando o lead virou cadastro. */
+  convertidoEm: number | null;
+  /** De qual anúncio o lead veio (Meta). */
+  anuncio: Record<string, unknown> | null;
+  criadoEm: string;
+}
+
 export interface Lead {
   id: string;
   contact: string;
@@ -83,6 +112,15 @@ export interface Lead {
    * `lib/zapintel/merge/matchEngine.ts`.
    */
   _sources?: { whatsapp: Lead; instagram: Lead };
+
+  /**
+   * O que o CRM já registra sobre este lead. Ver `FatosDoCrm`.
+   *
+   * Opcional só porque o caminho de importação manual não tem CRM por trás —
+   * e esse caminho está saindo. Quando sair, isto vira obrigatório e o
+   * compilador passa a garantir que nenhuma tela leia dedução onde existe fato.
+   */
+  crm?: FatosDoCrm;
 }
 
 export interface Objection {
