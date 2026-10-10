@@ -75,6 +75,15 @@ n "a tela nao tem relogio nenhum"   "hooks/zapintel/useLeads.tsx" "setInterval"
 n "a tela nao pergunta por pulso"   "hooks/zapintel/useLeads.tsx" "api/pulso"
 v "o botao fura o cache"            "hooks/zapintel/useLeads.tsx" "buscar(true)"
 v "a barra diz de quando e o numero" "components/zapintel/zap-sidebar.tsx" "idadeDoCalculo"
+# -- ponte venda->conversa (10/10/2026) ------------------------------------
+# Sem ligar venda a conversa, todo numero do ZapIntel e heuristica escrita a
+# mao. Estes checks guardam as decisoes que a medicao obrigou.
+v "ponte casa por telefone"          "lib/zapintel/ponte.ts" "chaveTelefone"
+n "ponte nao casa por nome"          "lib/zapintel/ponte.ts" "like .%. || lower"
+v "ponte so olha lead COM conversa"  "supabase/funcoes/zapintel_leads_com_conversa.sql" "join public.lead_mensagens"
+v "ponte pagina a funcao tambem"     "lib/zapintel/ponte.ts" "buscarTudo<LeadComConversa>"
+v "ponte guarda como e confianca"    "lib/zapintel/ponte.ts" "confianca: candidatos.length > 1"
+v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
