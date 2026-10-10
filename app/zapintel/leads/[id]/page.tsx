@@ -121,7 +121,7 @@ type Tab = "whatsapp" | "instagram" | "all";
 export default function LeadDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { leads, leadsCompletos, markSaleClosed, storeName, sellerName, segment } = useLeads();
+  const { leads, leadsCompletos, markSaleClosed, storeName, sellerName, segment, calculadoEm } = useLeads();
   const saleProducts = [...getProducts(segment.id), "Outro"];
   const resumo = leads.find(l => l.id === id);
 
@@ -276,8 +276,37 @@ export default function LeadDetailPage() {
       */}
       {ficha && (
         <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: "3px solid var(--purple)" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5, marginBottom: 8 }}>
-            O QUE ACONTECEU
+          {/*
+            A DATA AO LADO DO TÍTULO, e não escondida no rodapé.
+
+            Esta tela mistura duas idades sem avisar: o cabeçalho (score,
+            classificação, dias inativo) vem do painel em cache, que só é
+            refeito quando alguém clica em "Sincronizar agora"; a ficha é
+            calculada AGORA, a cada abertura, direto da conversa. Duas verdades
+            na mesma tela, com aparências idênticas — que é exatamente o modo
+            de falha deste módulo. Enquanto as duas não vierem do mesmo lugar,
+            cada uma diz de quando é.
+          */}
+          <div style={{
+            display: "flex", alignItems: "baseline", justifyContent: "space-between",
+            gap: 10, marginBottom: 8,
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
+              O QUE ACONTECEU
+            </div>
+            <div style={{ fontSize: 10, color: "var(--dim)" }}>
+              analisado agora · conversa até{" "}
+              {ficha.ultimaEm
+                ? new Date(`${ficha.ultimaEm}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                : "—"}
+              {calculadoEm && (
+                <> · números do painel de{" "}
+                  {new Date(calculadoEm).toLocaleString("pt-BR", {
+                    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                  })}
+                </>
+              )}
+            </div>
           </div>
           <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--txt)", marginBottom: 14 }}>
             {ficha.relato}

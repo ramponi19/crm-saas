@@ -135,12 +135,35 @@ function produtoDaConversa(lead: Lead): string {
 }
 
 /** Tira as conversas do lead e guarda, com nome próprio, o que as telas usam delas. */
-export function aliviar(a: Lead, filialId: number | null): LeadLeve {
+/**
+ * O CANAL VEM DO BANCO, não de adivinhação.
+ *
+ * `detectLeadOrigin` (no hook) chuta o canal pelo formato do telefone e pelo
+ * nome do arquivo, porque na época da importação manual era só o que havia.
+ * Com o CRM alimentando, `leads.origem` diz a verdade — e o chute errava
+ * feio: o `origem_id` do Instagram é numérico e longo (ex.:
+ * 1000392312975947), então os 384 leads de Instagram da JM apareciam todos
+ * como WhatsApp.
+ *
+ * A diferença não é cosmética. Medido em 10/10/2026: conversa de Instagram
+ * tem 13,8 mensagens de média contra 27,6 do WhatsApp — metade do tamanho.
+ * Qualquer regra calibrada sobre profundidade de conversa (e a regra nova de
+ * `hot` é exatamente isso) está tratando os dois canais como se fossem um.
+ *
+ * ⚠ E tem um buraco maior atrás disto: lead de Instagram não tem telefone
+ * (3 em 384), e a ponte venda↔conversa casa por telefone. Os 384 entram no
+ * denominador de toda taxa e NUNCA podem entrar no numerador. "Instagram
+ * converte 0%" não é medição, é impossibilidade de medir.
+ */
+export function aliviar(a: Lead, filialId: number | null, canal?: string | null): LeadLeve {
   const comTexto = (a.messages || []).filter((m) => m.body?.trim())
   const ultima = comTexto[comTexto.length - 1]
   const todoTexto = (a.messages || []).map((m) => (m.body || '').toLowerCase())
 
   const { messages: _m, _sources: _s, ...resto } = a
+  // `_channel` é o campo que as telas já leem; só faltava alguém preenchê-lo
+  // com o que o banco sabe.
+  if (canal === 'instagram' || canal === 'whatsapp') resto._channel = canal
 
   return {
     ...resto,
@@ -325,7 +348,7 @@ export async function montarPainel(
     const a = analisadosPorId.get(id)
     if (!a) continue
     comConversa.push(a)
-    leves.push(aliviar(a, lead.filial_id))
+    leves.push(aliviar(a, lead.filial_id, lead.origem))
     const chave = lead.filial_id ?? null
     const lista = porFilial.get(chave)
     if (lista) lista.push(a); else porFilial.set(chave, [a])

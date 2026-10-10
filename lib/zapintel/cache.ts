@@ -73,8 +73,9 @@ export const JANELA_FORCADO_MS = 60_000
  *   v4  10/10/2026  classificacao recalibrada: `customer` vem da ponte e
  *                   conversa funda no 1o dia vira `hot`
  *   v5  10/10/2026  taxa de fechamento medida ANTES do carimbo de cliente
+ *   v6  10/10/2026  o canal (whatsapp/instagram) passa a vir do banco
  */
-export const VERSAO_DO_CALCULO = 'v5'
+export const VERSAO_DO_CALCULO = 'v6'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {
