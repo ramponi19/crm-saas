@@ -137,6 +137,15 @@ export default function LeadDetailPage() {
    */
   const [conversa, setConversa] = useState<Lead | null>(null);
   const [ficha, setFicha] = useState<Ficha | null>(null);
+  /**
+   * O histórico começa FECHADO.
+   *
+   * Era o padrão abrir, e com ele a ficha virou enfeite: continuava mais
+   * rápido rolar 41 mensagens do que confiar no resumo. Fechado, a ficha
+   * precisa se bastar — e quando não bastar, a conversa está a um clique,
+   * porque esconder a fonte é como se perde confiança no número.
+   */
+  const [verConversa, setVerConversa] = useState(false);
   const [falhouConversa, setFalhouConversa] = useState(false);
 
   const daImportacao = leadsCompletos?.find(l => l.id === id) ?? null;
@@ -273,6 +282,28 @@ export default function LeadDetailPage() {
           <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--txt)", marginBottom: 14 }}>
             {ficha.relato}
           </div>
+
+          {/*
+            OS TRÊS MOMENTOS. É o que alguém procuraria rolando a conversa:
+            o que ele pediu, o que foi oferecido, e como ficou. Sem eles a
+            ficha é resumo — e resumo obriga a abrir as duas coisas.
+          */}
+          {(ficha.primeiraFalaDoCliente || ficha.ultimaOferta || ficha.fraseAntesDoSilencio) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {ficha.primeiraFalaDoCliente && (
+                <Momento rotulo="Ele abriu com" texto={ficha.primeiraFalaDoCliente} cor="var(--blue)" />
+              )}
+              {ficha.ultimaOferta && (
+                <Momento rotulo="A loja ofereceu" texto={ficha.ultimaOferta} cor="var(--yellow)" />
+              )}
+              {ficha.fraseAntesDoSilencio && (
+                <Momento rotulo="Última coisa dita" texto={ficha.fraseAntesDoSilencio} cor="var(--orange)" />
+              )}
+              {ficha.aguardandoLoja && (
+                <Momento rotulo="Parou em" texto="a última fala foi dele — a loja deve resposta" cor="var(--red)" />
+              )}
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 11, color: "var(--muted)" }}>
             <span><b style={{ color: "var(--txt)" }}>{ficha.mensagensLead}</b> dele · <b style={{ color: "var(--txt)" }}>{ficha.mensagensLoja}</b> da loja</span>
             <span><b style={{ color: "var(--txt)" }}>{ficha.trocasDeTurno}</b> trocas de turno</span>
@@ -475,17 +506,29 @@ export default function LeadDetailPage() {
       {/* ── Conversation history with tabs ──────────────────────────────── */}
       <div className="card" style={{ padding: 22 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>
-            Histórico da Conversa
+          {/*
+            Vira botão: a conversa é a FONTE, não a tela. Quem confia na ficha
+            não abre; quem quiser conferir, confere.
+          */}
+          <button
+            onClick={() => setVerConversa(v => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: 7, background: "none",
+              border: "none", padding: 0, cursor: "pointer", color: "var(--txt)",
+              fontSize: 14, fontWeight: 700,
+            }}
+          >
+            {verConversa ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            {verConversa ? "Esconder a conversa" : "Ver a conversa"}
             {!carregandoConversa && lead.messages.length > 0 && (
-              <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)", marginLeft: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)" }}>
                 {lead.messages.length} mensagens
               </span>
             )}
-          </div>
+          </button>
 
           {/* Tabs — only show if merged */}
-          {isMerged && (
+          {isMerged && verConversa && (
             <div style={{ display: "flex", gap: 4, background: "var(--card2)", borderRadius: 10, padding: 4 }}>
               {([
                 { key: "all", label: "Tudo", count: lead.messages.length },
@@ -535,7 +578,7 @@ export default function LeadDetailPage() {
         )}
 
         {/* Messages */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        <div style={{ display: verConversa ? "flex" : "none", flexDirection: "column", gap: 9 }}>
           {displayMessages.map((msg, i) => {
             const msgSource: "whatsapp" | "instagram" = msg.source || "whatsapp";
             return (
@@ -857,6 +900,33 @@ function StrategyCard({ strategy: s, copied, regening, onCopy, onRegen }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Um momento da conversa, citado.
+ *
+ * Citação curta e com rótulo é o que permite fechar o histórico sem perder o
+ * que importa: a pessoa reconhece a própria conversa em uma linha. O texto vem
+ * cortado em 180 caracteres lá na ficha — bloco inteiro de preço vira parágrafo
+ * e desfaz justamente a economia de leitura que isto veio trazer.
+ */
+function Momento({ rotulo, texto, cor }: { rotulo: string; texto: string; cor: string }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+      <span style={{
+        fontSize: 9.5, fontWeight: 700, color: cor, letterSpacing: .4,
+        minWidth: 92, textAlign: "right", paddingTop: 3, textTransform: "uppercase",
+      }}>
+        {rotulo}
+      </span>
+      <span style={{
+        fontSize: 12.5, color: "var(--dim)", lineHeight: 1.5, flex: 1,
+        borderLeft: `2px solid ${cor}`, paddingLeft: 10,
+      }}>
+        {texto}
+      </span>
     </div>
   );
 }

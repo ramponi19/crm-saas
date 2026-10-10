@@ -99,6 +99,17 @@ export interface Ficha {
    */
   tentativasDeRetomada: number
 
+  // ── Os três momentos que dispensam rolar a conversa ─────────────────────
+  //
+  // A ficha só substitui o histórico se responder o que alguém procuraria
+  // nele: o que a pessoa queria, o que a loja ofereceu, e como ficou. Sem
+  // isso ela é resumo, e resumo não substitui fonte — obriga a abrir as duas.
+
+  /** A primeira coisa que o CLIENTE disse, nas palavras dele. O pedido. */
+  primeiraFalaDoCliente: string | null
+  /** A última oferta com preço que a LOJA mandou. O que foi posto na mesa. */
+  ultimaOferta: string | null
+
   // ── Conteúdo ────────────────────────────────────────────────────────────
   /** O que o CLIENTE pediu, nas palavras dele. */
   procurou: string[]
@@ -132,6 +143,30 @@ const SINAL_REPETIDO: Record<string, string> = {
 }
 
 const PALAVRAS_DE_TROCA = ['troca', 'na troca', 'dou o meu', 'entrada o meu', 'meu aparelho']
+
+/**
+ * Cumprimento, não pedido.
+ *
+ * "Ele abriu com: Bom dia" não informa nada — quase toda conversa começa
+ * assim. O que interessa é a primeira frase em que ele diz o que quer, e ela
+ * costuma ser a segunda ou terceira.
+ */
+const SAUDACAO = /^(oi+|oie+|ol[áa]|bom dia|boa tarde|boa noite|bom|boa|e a[íi]|opa|tudo bem|tudo bom|blz|beleza)( (tudo bem|tudo bom|td bem))?$/i
+
+/**
+ * Só as letras, para a comparação não tropeçar em emoji nem em pontuação.
+ *
+ * "Boa tarde" passou batido pelo filtro na primeira versão porque a mensagem
+ * real trazia um emoji no fim — e emoji não é pontuação. Comparar depois de
+ * tirar tudo que não é letra resolve a família inteira de variações de uma
+ * vez, em vez de caçar símbolo por símbolo e descobrir o próximo na semana
+ * seguinte.
+ */
+const soLetras = (t: string): string =>
+  t.toLowerCase().replace(/[^\p{L}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
+
+/** Parece oferta: tem valor em reais. É o que a loja põe na mesa. */
+const ehOferta = (t: string): boolean => /r\$\s*\d/i.test(t)
 
 const quando = (m: RawMessage): number => {
   const t = Date.parse(`${m.date}T${(m.time || '00:00')}:00`)
@@ -326,6 +361,17 @@ export function montarFicha(a: Lead, ctx: ContextoDaFicha): Ficha {
     aguardandoLoja: !!ultima && !ultima.isStore,
     fraseAntesDoSilencio: falaQueEncerrou(a),
     tentativasDeRetomada,
+
+    primeiraFalaDoCliente: (() => {
+      const dele = comTexto.filter((m) => !m.isStore && ehFala(m))
+      // A primeira que não é só cumprimento; se todas forem, vale a primeira.
+      const p = dele.find((m) => !SAUDACAO.test(soLetras(texto(m)))) ?? dele[0]
+      return p ? texto(p).slice(0, TAMANHO_DA_FRASE) : null
+    })(),
+    ultimaOferta: (() => {
+      const o = [...comTexto].reverse().find((m) => m.isStore && ehOferta(texto(m)))
+      return o ? texto(o).slice(0, TAMANHO_DA_FRASE) : null
+    })(),
 
     procurou,
     sinais: [...new Set((a.buySignals ?? []).map((x) => SINAL_REPETIDO[x] ?? x))],
