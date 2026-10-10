@@ -63,22 +63,18 @@ v "paginacao paralela ordena por id"   "lib/zapintel/conversas.ts" "order(.id., 
 v "lead leve nao leva a conversa"      "lib/zapintel/painel.ts" "messages: \[\]"
 n "performance nao calcula no cliente" "app/zapintel/performance2/page.tsx" "computePerformance2("
 n "linguagem nao calcula no cliente"   "app/zapintel/linguagem/page.tsx" "POWER_WORDS"
-v "zapintel pergunta por pulso"        "hooks/zapintel/useLeads.tsx" "api/pulso"
 n "zapintel nao assina sob RLS"        "hooks/zapintel/useLeads.tsx" "postgres_changes"
-# A consulta saiu da rota para lib/zapintel/cache.ts em 09/10/2026 — painel e
-# pulso passaram a perguntar a mesma coisa, e duas copias divergiriam.
-v "pulso compara por id, nao contagem" "lib/zapintel/cache.ts" "order(.id., { ascending: false })"
 # ── o teto de 4h de Active CPU da Vercel (09/10/2026) ──────────────────────
 # Abrir o painel custava 2,76 s de CPU; 5.217 aberturas gastam o mes inteiro e
 # a Vercel PAUSA os projetos. Estes checks guardam o conserto, nao o estilo.
 v "painel serve do cache"             "app/zapintel/api/painel/route.ts" "cacheServe"
 v "cache do painel volta como texto"  "app/zapintel/api/painel/route.ts" "new NextResponse(cache.texto"
 n "painel nao re-serializa o cache"   "app/zapintel/api/painel/route.ts" "NextResponse.json(cache"
-v "quem marca o recalculo e o servidor" "lib/zapintel/cache.ts" "JANELA_MS"
-n "pulso nao baixa o painel inteiro"  "app/zapintel/api/pulso/route.ts" "painelDoCache"
-v "marca do cache nao le a coluna painel" "lib/zapintel/cache.ts" "select('ultima_mensagem, mensagens, calculado_em')"
-v "a aba obedece a hora do servidor"  "hooks/zapintel/useLeads.tsx" "proximoEm"
-n "aba nao tem piso proprio de recalculo" "hooks/zapintel/useLeads.tsx" "INTERVALO_MINIMO_MS"
+v "so o botao recalcula"            "lib/zapintel/cache.ts" "if (!forcado) return true"
+n "a tela nao tem relogio nenhum"   "hooks/zapintel/useLeads.tsx" "setInterval"
+n "a tela nao pergunta por pulso"   "hooks/zapintel/useLeads.tsx" "api/pulso"
+v "o botao fura o cache"            "hooks/zapintel/useLeads.tsx" "buscar(true)"
+v "a barra diz de quando e o numero" "components/zapintel/zap-sidebar.tsx" "idadeDoCalculo"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"

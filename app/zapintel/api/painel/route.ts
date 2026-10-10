@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server'
 import { zapintelEmpresa } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { montarPainel } from '@/lib/zapintel/painel'
-import {
-  cacheServe, guardarPainel, painelDoCache, ultimaMensagemDoBanco,
-} from '@/lib/zapintel/cache'
+import { cacheServe, guardarPainel, painelDoCache } from '@/lib/zapintel/cache'
 
 /**
- * O PAINEL INTEIRO, NUMA CHAMADA — E, QUASE SEMPRE, SEM CALCULAR NADA.
+ * O PAINEL INTEIRO, NUMA CHAMADA — E SÓ CALCULA SE PEDIREM.
  *
  * Substituiu `/zapintel/api/conversas`, que mandava as conversas em CSV para o
  * navegador analisar. Aquilo tinha teto — 4,5 MB de resposta — e o teto foi
@@ -20,10 +18,14 @@ import {
  * mandou aviso de 75% do teto de 4 h/mês do plano free no fim da tarde. O teto
  * não cobra a mais: ele **pausa os projetos**.
  *
- * Agora o resultado mora em `zapintel_painel` e esta rota, na maioria das
- * vezes, só repassa o texto guardado — sem `JSON.parse`, sem `JSON.stringify`.
- * Quem decide quando recalcular é `lib/zapintel/cache.ts`, e a decisão é do
- * SERVIDOR: cinco telas abertas na mesma empresa viram um recálculo, não cinco.
+ * Agora o resultado mora em `zapintel_painel` e esta rota quase sempre só
+ * repassa o texto guardado — sem `JSON.parse`, sem `JSON.stringify`. Medido:
+ * 7.230 ms de cálculo contra 293 ms de leitura.
+ *
+ * `?forcar=1` é o único caminho que calcula, e ele só sai do botão
+ * "Sincronizar agora". Não há relógio nenhum chamando esta rota: abrir a tela
+ * mostra o que está guardado, e a tela diz de quando é. Ver
+ * `lib/zapintel/cache.ts` para o porquê de não haver automático.
  *
  * ══ POR QUE NÃO GRAVA `zapintel_analise` ═══════════════════════════════════
  *
@@ -36,19 +38,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   const { empresaId } = await zapintelEmpresa()
   const db = rastrDb()
-  // `forcar` só chega de clique humano ("Atualizar agora"). Ver JANELA_FORCADO_MS.
   const forcar = new URL(req.url).searchParams.get('forcar') === '1'
 
   try {
-    // As duas leituras são independentes: a do cache traz o blob junto porque
-    // servir é o caso comum. Quando o cálculo acontece mesmo, esse 1,75 MB a
-    // mais é ruído perto dos 8,93 MB que a leitura das conversas custa.
-    const [ultimaNoBanco, cache] = await Promise.all([
-      ultimaMensagemDoBanco(db, empresaId),
-      painelDoCache(db, empresaId),
-    ])
+    const cache = await painelDoCache(db, empresaId)
 
-    if (cache && cacheServe(cache.marca, ultimaNoBanco, forcar)) {
+    if (cache && cacheServe(cache.marca, forcar)) {
       // O texto sai como veio do banco. Transformar em objeto para devolver
       // objeto custaria as duas pontas da serialização, e ninguém aqui precisa
       // olhar dentro dele.

@@ -19,9 +19,36 @@ const NAV = [
   { href: "/zapintel/posvenda", icon: ShoppingBag, label: "Pós Venda" },
 ];
 
+/**
+ * DE QUANDO É O NÚMERO QUE ESTÁ NA TELA — E QUÃO VELHO ISSO JÁ É.
+ *
+ * O painel deixou de se atualizar sozinho em 09/10/2026 (o cálculo custa 2,76 s
+ * de CPU, contra um teto de 4 h por mês que ao estourar PAUSA os projetos na
+ * Vercel). A troca combinada foi essa: não atualiza sozinho, mas DIZ a data.
+ *
+ * Por isso a cor envelhece junto com o número. Data escrita em cinza é fácil de
+ * não ler — e um painel de três dias atrás com cara de painel de agora é
+ * exatamente o defeito que este módulo já teve duas vezes, as duas caladas.
+ */
+function idadeDoCalculo(iso: string | null) {
+  if (!iso) return null
+  const t = new Date(iso)
+  const horas = (Date.now() - t.getTime()) / 3_600_000
+  const hoje = new Date().toDateString() === t.toDateString()
+  const hora = t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  const dia = t.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+  return {
+    texto: hoje ? `Atualizado hoje às ${hora}` : `Atualizado em ${dia} às ${hora}`,
+    // Verde até 2 h, amarelo no mesmo dia, vermelho de ontem para trás. Quem
+    // olha de relance precisa perceber a idade sem ler a data.
+    cor: horas < 2 ? "var(--green)" : horas < 24 ? "var(--yellow)" : "var(--red)",
+  }
+}
+
 export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: string }) {
   const path = usePathname();
-  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm, atualizando, tempoReal } = useLeads();
+  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm } = useLeads();
+  const idade = idadeDoCalculo(calculadoEm);
   return (
     <aside style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
       <div style={{ padding: "8px 8px 20px", borderBottom: "1px solid var(--brd)", marginBottom: 8 }}>
@@ -81,26 +108,14 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
 
       <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
         {/*
-          O estado real da assinatura, não um rótulo fixo. Canal caído some em
-          silêncio: a tela continuaria mostrando os últimos números como se
-          fossem os de agora.
+          A DATA É O TÍTULO DO BLOCO, e não um rodapé em cinza.
+          Antes aqui ficava o estado da assinatura de tempo real ("Conectado ao
+          CRM"). Não há mais assinatura nem pulso: o que o usuário precisa saber
+          agora não é se o canal está de pé, é de quando é o número que ele está
+          lendo.
         */}
-        <div style={{
-          fontSize: 10, fontWeight: 700, marginBottom: 4,
-          color: atualizando ? "var(--yellow)" : tempoReal === "caiu" ? "var(--red)" : tempoReal === "ligado" ? "var(--green)" : "var(--muted)",
-        }}>
-          {/*
-            Dizia "Recalculando…". Virou mentira em 09/10/2026, quando o
-            recálculo passou a ter janela no servidor (10 min, para caber nas
-            4 h de CPU que o plano da Vercel dá por mês): o aviso podia ficar
-            aceso dez minutos sem nada recalculando. O que é verdade o tempo
-            todo é que chegou mensagem e o número ainda não a inclui — e a
-            linha de baixo diz de quando é o número.
-          */}
-          {atualizando ? "● Chegou mensagem nova"
-            : tempoReal === "ligado" ? "● Conectado ao CRM"
-            : tempoReal === "caiu" ? "● Sem contato com o servidor"
-            : "● Conectando…"}
+        <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: idade ? idade.cor : "var(--muted)" }}>
+          {syncing ? "● Refazendo a conta…" : idade ? `● ${idade.texto}` : "● Carregando…"}
         </div>
         {/*
           O que o painel analisou, em números — e não a promessa de que analisa.
@@ -112,7 +127,7 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
             <>
               {mensagens.toLocaleString("pt-BR")} mensagens analisadas
               {semConversa > 0 && <> · {semConversa} lead{semConversa > 1 ? "s" : ""} sem conversa</>}
-              {calculadoEm && <><br />às {new Date(calculadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · refaz a conta a cada 10 min</>}
+              <br />Não atualiza sozinho — clique para refazer
             </>
           ) : "Lendo as conversas reais dos leads"}
         </div>

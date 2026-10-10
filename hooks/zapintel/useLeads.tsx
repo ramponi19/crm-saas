@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import type { Lead, DashboardStats, ManualSale } from "@/types/zapintel";
 import { parseCombinedCSV } from "@/lib/zapintel/parser/csvParser";
 import { parseInstagramFile } from "@/lib/zapintel/parser/instagramParser";
@@ -64,18 +64,16 @@ interface LeadStore {
   mensagens: number;
   /** Leads ativos sem nenhuma conversa. Ficam fora dos agregados, de propósito. */
   semConversa: number;
-  calculadoEm: string | null;
-  /** Está recalculando por conta de mensagem nova. */
-  atualizando: boolean;
   /**
-   * O servidor está respondendo ao pulso.
+   * Quando esta conta foi feita.
    *
-   * Existe para a tela poder DIZER quando não está: sem isto, "Conectado ao
-   * CRM" era texto fixo, e servidor mudo ficaria igual a loja parada — números
-   * velhos com aparência de números vivos, que é exatamente o problema que
-   * este trabalho veio consertar.
+   * Desde 09/10/2026 este campo é obrigação, não enfeite: o painel não se
+   * atualiza sozinho, então a tela PRECISA dizer de quando é o número. Sem
+   * isso, dado de ontem se apresenta como dado de agora — que é o defeito que
+   * este módulo já teve duas vezes (análise truncada em 23/09 e canal de tempo
+   * real que não recebia nada), as duas em silêncio.
    */
-  tempoReal: "conectando" | "ligado" | "caiu";
+  calculadoEm: string | null;
 
   loadSample: () => void;
   loadWhatsapp: (text: string, channel?: "whatsapp" | "instagram") => void;
@@ -110,36 +108,12 @@ interface LeadStore {
 
 const Ctx = createContext<LeadStore | null>(null);
 
-/**
- * De quanto em quanto tempo a tela pergunta ao servidor se chegou mensagem.
- *
- * Era 20 s. Virou 45 s em 09/10/2026, quando a Vercel avisou que a conta tinha
- * gasto 75% das 4 h de CPU que o plano free dá por mês — e estourar não cobra,
- * **pausa os projetos**. Cada batida custa ~97 ms de CPU somando o proxy e a
- * rota: a 20 s eram 1.800 batidas por dia de trabalho (42 min/mês por aba
- * aberta); a 45 s são 800 (18 min/mês). O que se perde é saber da mensagem
- * nova até 25 s depois, numa tela que mostra média de 60 dias.
- */
-const PULSO_MS = 45000;
-
-/**
- * Desencontro entre abas, em ms.
- *
- * Quando o servidor diz "aceito recalcular às 14h10", TODAS as abas abertas
- * marcam o mesmo horário. Sem isto elas pediriam juntas no mesmo segundo e
- * algumas pegariam o cache ainda velho, pedindo de novo logo depois. Um atraso
- * aleatório de até 10 s basta para a primeira chegar sozinha e as outras já
- * acharem o cálculo pronto.
- */
-const DESENCONTRO_MS = 10000;
 
 export function LeadProvider({ children }: { children: ReactNode }) {
   const [painel, setPainel] = useState<Painel | null>(null);
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [atualizando, setAtualizando] = useState(false);
-  const [tempoReal, setTempoReal] = useState<"conectando" | "ligado" | "caiu">("conectando");
 
   // Caminho legado: importação manual de CSV (/zapintel/import). Fora da
   // navegação hoje; quando usado, roda os motores aqui e produz exatamente a
@@ -167,114 +141,28 @@ export function LeadProvider({ children }: { children: ReactNode }) {
       // data do cálculo fica visível para quem olha.
     } finally {
       setLoading(false);
-      setAtualizando(false);
     }
   }, []);
 
   useEffect(() => { void buscar(); }, [buscar]);
 
-  // ── Tempo real ────────────────────────────────────────────────────────────
+  // ── Atualizar: só quando pedem ────────────────────────────────────────────
   //
-  // ── Atualizar sozinho ─────────────────────────────────────────────────────
+  // Não há relógio nenhum aqui. Houve, no mesmo dia 09/10/2026: primeiro uma
+  // assinatura de tempo real que não recebia nada (rodava no navegador sob o
+  // RLS do usuário, que para dono e admin enxerga só a loja selecionada — a
+  // tela mostrava duas lojas e reagia a uma), depois um pulso de 45 s com
+  // recálculo automático a cada 10 min.
   //
-  // Mensagem nova em qualquer conversa invalida os agregados — a média de
-  // inatividade, o funil, o sentimento. Recalcular a cada mensagem seria
-  // absurdo numa loja movimentada, então espera-se o silêncio (8 s) e respeita-
-  // se um piso de 1 min entre recálculos. Durante a espera a tela segue
-  // mostrando o número anterior, com `atualizando` ligado.
+  // O pulso funcionava. Saiu por preço: cada batida custava ~97 ms de CPU
+  // somando proxy e rota, e cada recálculo, 2,76 s — contra um teto de 4 h de
+  // Active CPU por mês para a conta inteira, que ao estourar PAUSA os
+  // projetos. Automatismo pago por tempo gasta igual com a loja cheia ou
+  // vazia, e ninguém vê a conta correr.
   //
-  // ══ POR QUE PERGUNTA EM VEZ DE ASSINAR ═══════════════════════════════════
-  //
-  // A primeira versão assinava `lead_mensagens` no Supabase. Não funcionava, e
-  // falhava calada: o canal roda AQUI, sob o RLS do usuário, que para dono e
-  // admin enxerga só a loja selecionada no CRM. O painel mostra a rede inteira.
-  // Com a conta parada em Jaguariúna, 100 mensagens entraram em Mogi e 1 em
-  // Jaguariúna em 45 minutos — a tela não reagia a 99% do movimento, e o canal
-  // respondia "SUBSCRIBED" o tempo todo, porque entrar no canal e estar
-  // autorizado a receber linha são coisas diferentes.
-  //
-  // O pulso pergunta ao servidor, que olha com os mesmos olhos do painel. Custa
-  // duas linhas a cada 45 s, e só com a aba à vista.
-  //
-  // ══ QUEM MARCA A HORA DO RECÁLCULO (mudou em 09/10/2026) ═════════════════
-  //
-  // Era esta aba: 8 s de silêncio, 1 min de piso. Cada aba com o seu relógio —
-  // cinco telas abertas na mesma empresa eram cinco recálculos iguais, e cada
-  // recálculo custa 2,76 s do CPU que a conta tem para o mês inteiro.
-  //
-  // Agora quem marca é o servidor, e ele diz a hora no pulso (`proximoEm`).
-  // Esta aba só obedece. O resultado é que cinco telas viram um recálculo, e
-  // que o número que aparece é o mesmo nas cinco.
-  const agendado = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const vistoAte = useRef(0);
-
-  useEffect(() => {
-    if (!painel) return;
-    // Âncora: a mensagem mais nova que ENTROU no cálculo que está na tela.
-    vistoAte.current = Math.max(vistoAte.current, painel.ultimaMensagem);
-  }, [painel]);
-
-  useEffect(() => {
-    let vivo = true;
-
-    const agendar = (daquiA: number) => {
-      if (agendado.current) return; // já há busca a caminho
-      setAtualizando(true);
-      // O desencontro só vale quando há espera: buscar um cálculo que o
-      // servidor JÁ tem é leitura de cache, e não há herd nenhum a evitar.
-      const espera = daquiA > 0 ? daquiA + Math.random() * DESENCONTRO_MS : 0;
-      agendado.current = setTimeout(() => {
-        agendado.current = null;
-        void buscar();
-      }, espera);
-    };
-
-    const bater = async () => {
-      if (!vivo || document.visibilityState !== "visible") return;
-      try {
-        const r = await fetch("/zapintel/api/pulso", { cache: "no-store" });
-        const d = (await r.json()) as {
-          ultima?: number; analisadoAte?: number; proximoEm?: number; erro?: string;
-        };
-        if (!vivo) return;
-        if (d?.erro || typeof d.ultima !== "number") { setTempoReal("caiu"); return; }
-        setTempoReal("ligado");
-        if (!vistoAte.current) return; // ainda sem painel na tela
-
-        const analisadoAte = d.analisadoAte ?? 0;
-
-        // 1. O servidor já contou mais do que esta tela mostra. Pegar é barato:
-        //    vem do cache, sem calcular nada.
-        if (analisadoAte > vistoAte.current) { agendar(0); return; }
-
-        // 2. Chegou mensagem que ninguém contou ainda. A tela diz que está
-        //    atualizando e espera a hora que o SERVIDOR marcou.
-        if (d.ultima > analisadoAte) {
-          agendar(Math.max(0, (d.proximoEm ?? Date.now()) - Date.now()));
-          return;
-        }
-
-        // 3. Nada pendente — e isso precisa desligar o aviso, senão "atualizando"
-        //    fica aceso para sempre depois de qualquer susto.
-        setAtualizando(false);
-      } catch {
-        if (vivo) setTempoReal("caiu");
-      }
-    };
-
-    void bater();
-    const relogio = setInterval(() => void bater(), PULSO_MS);
-    // Voltar para a aba vale como batida: quem reabre quer ver o de agora.
-    document.addEventListener("visibilitychange", bater);
-
-    return () => {
-      vivo = false;
-      clearInterval(relogio);
-      document.removeEventListener("visibilitychange", bater);
-      if (agendado.current) { clearTimeout(agendado.current); agendado.current = null; }
-    };
-  }, [buscar]);
-
+  // A troca foi essa: o número não se atualiza sozinho, e em compensação a
+  // tela DIZ de quando ele é. Quem quiser o de agora clica em "Sincronizar
+  // agora", e aí sim o servidor recalcula — ver lib/zapintel/cache.ts.
 
   // ── O recorte ativo ───────────────────────────────────────────────────────
   const chave = lojaAtiva == null ? "geral" : String(lojaAtiva);
@@ -367,10 +255,8 @@ export function LeadProvider({ children }: { children: ReactNode }) {
    * repetido (ver JANELA_FORCADO_MS em lib/zapintel/cache.ts).
    */
   const syncFromCRM = useCallback(() => {
-    if (agendado.current) { clearTimeout(agendado.current); agendado.current = null; }
     limparImportado();
     setSyncing(true);
-    setAtualizando(true);
     void buscar(true).finally(() => setSyncing(false));
   }, [limparImportado, buscar]);
 
@@ -422,8 +308,6 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     mensagens: painel?.mensagens ?? 0,
     semConversa: painel?.semConversa ?? 0,
     calculadoEm: painel?.calculadoEm ?? null,
-    atualizando,
-    tempoReal,
     loadSample, loadWhatsapp, loadInstagram,
     markSaleClosed, clearData,
     syncFromCRM, syncing,

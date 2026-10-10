@@ -13,100 +13,48 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *
  *     /zapintel/api/painel ....... 87 chamadas ....... 4 min de CPU
  *     /  (landing) ............... 742 chamadas ...... 56 s
- *     /zapintel/api/pulso ........ 410 chamadas ...... 19 s
  *
- * São **2,76 s de CPU por abertura de tela** — o maior consumidor do CRM
- * inteiro, sozinho quase metade do CPU de função do dia. O teto de 4 h dá
- * 5.217 aberturas no mês. Com a tela recalculando a cada mensagem nova, uma
- * única aba aberta 8 horas gastaria o mês em 11 dias.
+ * São **2,76 s de CPU por cálculo** — o maior consumidor do CRM inteiro. O teto
+ * de 4 h dá 5.217 cálculos no mês, para tudo.
  *
- * ══ O CONSERTO, EM DUAS PARTES ═════════════════════════════════════════════
+ * ══ A REGRA, E ELA É SIMPLES ═══════════════════════════════════════════════
  *
- * 1. **Abrir a tela não calcula nada.** O resultado fica guardado em
- *    `zapintel_painel`, um registro por empresa, e a rota devolve o texto como
- *    veio — sem `JSON.parse`, sem `JSON.stringify`. De 2,76 s para dezenas de
- *    milissegundos.
+ * **Abrir a tela nunca calcula. Só o botão calcula.**
  *
- * 2. **Quem decide recalcular é o servidor, não a aba.** Antes cada aba tinha
- *    seu próprio relógio: cinco telas abertas eram cinco recálculos da mesma
- *    empresa. Agora a janela mora aqui, e cinco telas são um recálculo só.
+ * Qualquer leitura devolve o que está guardado, tenha ele a idade que tiver.
+ * Quem decide pagar os 2,76 s é uma pessoa clicando em "Sincronizar agora" —
+ * e aí o cálculo acontece na hora, sem janela nenhuma para esperar.
  *
- * ══ POR QUE 10 MINUTOS, E NÃO "TEMPO REAL" ═════════════════════════════════
+ * Houve uma versão intermediária, no mesmo dia, com recálculo automático a
+ * cada 10 min. Funcionava, mas tinha o defeito de todo automatismo pago por
+ * tempo: gastava igual estando a loja movimentada ou parada, e ninguém via a
+ * conta correr. O Lucas preferiu trocar o automático por saber a data — e é
+ * por isso que `calculadoEm` agora aparece na tela em vez de ficar só no JSON.
  *
- * Porque o número cabe ou não cabe. Com recálculo a cada 10 min, 10 horas de
- * movimento dão 60 recálculos/dia = 166 s de CPU/dia ≈ 1,4 h/mês — dentro do
- * teto, com folga para o resto do CRM. A 1 minuto seriam 600/dia = 28 h/mês:
- * sete vezes o teto do time inteiro.
+ * ══ O QUE ISSO EXIGE DA TELA ═══════════════════════════════════════════════
  *
- * O que NÃO se perde: a tela continua sabendo na hora que chegou mensagem (o
- * pulso custa uma linha) e DIZ isso, em vez de mostrar número velho calado. E
- * quem não quer esperar clica em atualizar — pessoa clicando é raro,
- * cronômetro não é, e por isso só o clique fura a janela.
+ * Que ela DIGA de quando é o número, sempre e sem rodeio. Painel que pode ter
+ * dias de idade e se apresenta como "agora" é exatamente o defeito que este
+ * módulo inteiro veio consertar — antes por truncamento, depois por canal de
+ * tempo real que não recebia nada. A barra lateral mostra a data, e a cor dela
+ * envelhece junto.
  */
 
-/** Janela mínima entre dois recálculos da MESMA empresa. Ver o cabeçalho. */
-export const JANELA_MS = 10 * 60_000
-
 /**
- * Piso quando alguém pede "atualizar agora".
+ * Piso entre dois cálculos pedidos na mão.
  *
- * A janela existe contra cronômetro, não contra gente. Mas o clique também
- * repete — basta a mão insistir — então sobra um piso curto, que impede a
- * repetição sem fazer ninguém esperar de verdade.
+ * O botão não espera janela, mas o dedo repete — e dois cliques seguidos
+ * custariam 5,5 s de CPU para produzir o mesmo número. Um minuto resolve, e
+ * ninguém percebe.
  */
 export const JANELA_FORCADO_MS = 60_000
 
-/** O que a tela precisa saber sem baixar o painel inteiro. */
+/** O carimbo do cálculo guardado. */
 export interface Marca {
   /** Maior id de mensagem que entrou no cálculo guardado. */
   ultimaMensagem: number
   mensagens: number
   calculadoEm: string
-  /** Quando o servidor aceita recalcular de novo (epoch ms). */
-  proximoEm: number
-}
-
-const marcaDaLinha = (l: { ultima_mensagem: number; mensagens: number; calculado_em: string }): Marca => ({
-  ultimaMensagem: Number(l.ultima_mensagem) || 0,
-  mensagens: Number(l.mensagens) || 0,
-  calculadoEm: l.calculado_em,
-  proximoEm: new Date(l.calculado_em).getTime() + JANELA_MS,
-})
-
-/**
- * O maior id de mensagem da empresa.
- *
- * Sai pelo índice da chave primária em milissegundos. `count` exato custa 1,7 s
- * nesta tabela (medido) — mais que ler o painel inteiro — e cairia se uma
- * mensagem fosse apagada, fazendo um painel velho parecer em dia.
- */
-export async function ultimaMensagemDoBanco(db: SupabaseClient, empresaId: number): Promise<number> {
-  const { data, error } = await db
-    .from('lead_mensagens')
-    .select('id')
-    .eq('empresa_id', empresaId)
-    .order('id', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return (data?.id as number | undefined) ?? 0
-}
-
-/**
- * Só os carimbos do cache — **nunca** a coluna `painel`.
- *
- * O pulso chama isto a cada batida. Trazer o blob junto seria 1,75 MB a cada
- * 45 s por aba aberta: 2,8 GB por dia de trabalho, mais da metade do egress
- * mensal do plano free do Supabase, para responder "mudou?".
- */
-export async function marcaDoCache(db: SupabaseClient, empresaId: number): Promise<Marca | null> {
-  const { data, error } = await db
-    .from('zapintel_painel')
-    .select('ultima_mensagem, mensagens, calculado_em')
-    .eq('empresa_id', empresaId)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return data ? marcaDaLinha(data as never) : null
 }
 
 /** O painel guardado, como texto, pronto para virar corpo de resposta. */
@@ -121,7 +69,15 @@ export async function painelDoCache(
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) return null
-  return { texto: (data as { painel: string }).painel, marca: marcaDaLinha(data as never) }
+  const l = data as { painel: string; ultima_mensagem: number; mensagens: number; calculado_em: string }
+  return {
+    texto: l.painel,
+    marca: {
+      ultimaMensagem: Number(l.ultima_mensagem) || 0,
+      mensagens: Number(l.mensagens) || 0,
+      calculadoEm: l.calculado_em,
+    },
+  }
 }
 
 /** Guarda o painel recém-calculado. `upsert` porque recalcular é o caso normal. */
@@ -148,20 +104,15 @@ export async function guardarPainel(
 }
 
 /**
- * O cache serve, ou é hora de calcular de novo?
+ * O cache serve, ou é para calcular?
  *
- * Três motivos para servir o que já existe, e a ordem importa:
- *
- *  1. **Nada mudou.** Nenhuma mensagem entrou depois do cálculo guardado — o
- *     painel não seria diferente, só mais caro.
- *  2. **Mudou, mas faz pouco tempo.** É a janela: a tela mostra o número de
- *     alguns minutos atrás e DIZ que há mensagem nova esperando.
- *  3. **Pediram na mão, e já tinham pedido agora há pouco.** Ver
- *     `JANELA_FORCADO_MS`.
+ * Sem cache nenhum não há escolha: calcula (é a primeira vez da empresa).
+ * Com cache, serve SEMPRE — a idade não importa, porque quem decide atualizar
+ * é a pessoa, não o relógio. A única exceção é o clique, e mesmo ele respeita
+ * o piso de um minuto.
  */
-export function cacheServe(marca: Marca | null, ultimaNoBanco: number, forcado: boolean): boolean {
+export function cacheServe(marca: Marca | null, forcado: boolean): boolean {
   if (!marca) return false
-  if (marca.ultimaMensagem >= ultimaNoBanco) return true
-  const idade = Date.now() - new Date(marca.calculadoEm).getTime()
-  return idade < (forcado ? JANELA_FORCADO_MS : JANELA_MS)
+  if (!forcado) return true
+  return Date.now() - new Date(marca.calculadoEm).getTime() < JANELA_FORCADO_MS
 }
