@@ -141,6 +141,15 @@ n "telefone da loja nao esta no codigo" "lib/zapintel/montar.ts" "const STORE_PH
 v "o lado da mensagem vem da direcao" "lib/zapintel/montar.ts" "isStore: m.direcao"
 v "o lead carrega os fatos do CRM"   "lib/zapintel/montar.ts" "kanbanStatus: banco.kanban_status"
 v "vendedor: fato antes de deducao"  "lib/zapintel/montar.ts" "if (responsavel) return responsavel"
+# -- a ponte alcanca o Instagram (11/10/2026) ------------------------------
+# Lead de IG nao tem telefone (3 em 384). O numero vem do que o CLIENTE disse
+# na conversa, com tres filtros achados medindo: chave Pix/CPF repetida em 29
+# leads, o numero da loja do lado `enviada`, e formato (DDD + 9 + 8 digitos).
+v "ponte usa telefone do texto"      "lib/zapintel/ponte.ts" "chaveTelefone(l.telefone_no_texto)"
+n "origem_id nao vira chave"         "lib/zapintel/ponte.ts" "chaveTelefone(l.origem_id)"
+v "so a fala do cliente"             "supabase/funcoes/zapintel_leads_com_conversa.sql" "direcao = .recebida."
+v "numero repetido nao e de cliente" "supabase/funcoes/zapintel_leads_com_conversa.sql" "count(distinct id) > 2"
+v "exige formato de celular"         "supabase/funcoes/zapintel_leads_com_conversa.sql" "between 11 and 99"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"

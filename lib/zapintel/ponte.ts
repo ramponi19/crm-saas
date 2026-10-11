@@ -92,6 +92,16 @@ interface LeadComConversa {
   primeira: string
   ultima: string
   mensagens: number
+  /**
+   * O telefone que o CLIENTE disse na conversa.
+   *
+   * E o unico caminho ate o lead de Instagram, que nao tem telefone no
+   * cadastro (3 em 384): o `origem_id` dele e o id do Instagram. Vem filtrado
+   * contra chave Pix, CPF e o numero da propria loja — ver o cabecalho de
+   * `supabase/funcoes/zapintel_leads_com_conversa.sql`, onde as tres
+   * armadilhas estao documentadas com o numero de cada uma.
+   */
+  telefone_no_texto: string | null
 }
 
 const DIA_MS = 86_400_000
@@ -156,7 +166,19 @@ export async function montarPonte(db: SupabaseClient, empresaId: number): Promis
   // do duplicado some aqui, e é isso que desfaz a ambiguidade.
   const porChave = new Map<string, LeadComConversa[]>()
   for (const l of await leadsComConversa(db, empresaId)) {
-    const k = chaveTelefone(l.telefone ?? l.origem_id)
+    /**
+     * O cadastro primeiro; o que foi dito na conversa só quando não há
+     * cadastro. Fato antes de dedução, inclusive dentro da mesma ponte.
+     *
+     * ⚠ `origem_id` SAIU DAQUI, e era um risco silencioso: para Instagram ele
+     * é o id do perfil (`1000392312975947`, 16 dígitos), e pegar os 8 finais
+     * dele produzia uma chave que podia COLIDIR com o telefone de uma pessoa
+     * real — atribuindo a venda dela a uma conversa de outra. Não chegou a
+     * acontecer (nenhum lead de Instagram casou por essa via), mas só por
+     * sorte. Para WhatsApp ele é nulo em 1.687 de 1.687 leads, então não
+     * servia para nada mesmo.
+     */
+    const k = chaveTelefone(l.telefone) || chaveTelefone(l.telefone_no_texto)
     if (!k) continue
     const lista = porChave.get(k)
     if (lista) lista.push(l); else porChave.set(k, [l])

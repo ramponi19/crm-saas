@@ -75,7 +75,7 @@ export const JANELA_FORCADO_MS = 60_000
  *   v5  10/10/2026  taxa de fechamento medida ANTES do carimbo de cliente
  *   v6  10/10/2026  o canal (whatsapp/instagram) passa a vir do banco
  */
-export const VERSAO_DO_CALCULO = 'v8'
+export const VERSAO_DO_CALCULO = 'v9'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {
