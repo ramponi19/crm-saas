@@ -1,7 +1,7 @@
 import { carregarConversas, idDoLead } from '@/lib/zapintel/conversas'
 import { fatosDeVenda, type FatosDeVenda } from '@/lib/zapintel/vendas'
 import { computeStats, type FatosStats } from '@/lib/zapintel/insights/stats'
-import { computePerformance } from '@/lib/zapintel/insights/performance'
+import { computePerformance, type FatosDePerformance } from '@/lib/zapintel/insights/performance'
 import { computePerformance2 } from '@/lib/zapintel/insights/performance2'
 import { computeLinguagem } from '@/lib/zapintel/insights/linguagem'
 import { computeSilencio, type FraseAntesDoSilencio } from '@/lib/zapintel/insights/silencio'
@@ -249,11 +249,16 @@ function paraOMotor(f: FatosDeVenda | null, taxaHot: number, taxaWarm: number): 
   }
 }
 
-export function agregar(leads: Lead[], fatos: FatosStats | null = null): Agregados {
+export function agregar(
+  leads: Lead[],
+  fatos: FatosStats | null = null,
+  /** Ticket e taxas medidos, para a tela de Performance parar de inventar reais. */
+  desempenho: FatosDePerformance | null = null,
+): Agregados {
   return {
     stats: computeStats(leads, fatos),
     silencio: computeSilencio(leads, fatos ? fatos.comprou : () => false),
-    performance: computePerformance(leads),
+    performance: computePerformance(leads, desempenho),
     performance2: enxugar(computePerformance2(leads)),
     linguagem: computeLinguagem(leads),
   }
@@ -315,6 +320,19 @@ export async function montarPainel(
   const taxaHot = taxaPorClasse('hot')
   const taxaWarm = taxaPorClasse('warm')
 
+  // A tela de Performance precisa da taxa de TODAS as classes, nao so de duas:
+  // ela estima a perda por etapa do funil, e cada etapa corresponde a uma
+  // classificacao diferente.
+  const desempenho: FatosDePerformance | null = vendas
+    ? {
+        ticket: vendas.ticket,
+        taxaPorClasse: Object.fromEntries(
+          ['customer', 'hot', 'warm', 'followup', 'stalled', 'lost', 'unqualified']
+            .map((c) => [c, taxaPorClasse(c)]),
+        ),
+      }
+    : null
+
   const fatos = paraOMotor(vendas, taxaHot, taxaWarm)
 
   if (vendas) {
@@ -361,11 +379,11 @@ export async function montarPainel(
   // compradores dela. O ticket e o ciclo, sim, sao da empresa — a JM tem 55
   // vendas no total, e quebrar isso por loja daria um ticket de 4 vendas, que
   // seria ruido com cara de medida.
-  const agregados: Record<string, Agregados> = { geral: agregar(comConversa, fatos) }
+  const agregados: Record<string, Agregados> = { geral: agregar(comConversa, fatos, desempenho) }
   const lojas: Loja[] = [{ id: null, nome: 'Toda a rede', leads: comConversa.length }]
   for (const [filial, lista] of porFilial) {
     if (filial == null) continue
-    agregados[String(filial)] = agregar(lista, fatos)
+    agregados[String(filial)] = agregar(lista, fatos, desempenho)
     lojas.push({ id: filial, nome: nomeDaFilial.get(filial) ?? `Loja ${filial}`, leads: lista.length })
   }
   lojas.sort((a, b) => (a.id ?? -1) - (b.id ?? -1))

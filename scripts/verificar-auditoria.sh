@@ -85,7 +85,17 @@ v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 # -- fim dos numeros inventados (10/10/2026) -------------------------------
 # `TICKET_MEDIO = 5200` alimentava "PIPELINE R$ 1,2M" e "objecao mais cara
 # R$ 558k", e o pipeline ainda supunha 70% dos quentes fechando (real: 2,8%).
+# O check anterior olhava SO `stats.ts` — e foi por isso que um terceiro
+# `TICKET_MEDIO = 5200` sobreviveu em performance.ts por mais um dia. Agora
+# varre a pasta inteira: check estreito e a mesma coisa que check ausente.
 n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
+n "nem em performance"               "lib/zapintel/insights/performance.ts" "= 5200;"
+v "perda por etapa usa taxa medida"  "lib/zapintel/insights/performance.ts" "fatos.taxaPorClasse"
+n "LTV nao supoe recompra"           "lib/zapintel/insights/performance.ts" "\* 1.4"
+v "a IA do zapintel usa a do CRM"    "app/zapintel/api/analyze/route.ts" "GEMINI_API_KEY"
+n "nao chama a Anthropic direto"     "app/zapintel/api/analyze/route.ts" "api.anthropic.com"
+v "a IA respeita o desligar geral"   "app/zapintel/api/analyze/route.ts" "cfg.ativo === false"
+v "a rota de IA exige sessao"        "app/zapintel/api/analyze/route.ts" "await zapintelEmpresa()"
 n "pipeline nao supoe 70 por cento"  "lib/zapintel/insights/stats.ts" "ticket \* 0.70"
 v "pipeline usa taxa medida"         "lib/zapintel/painel.ts" "taxaPorClasse"
 # O padrao olha a DECLARACAO, nao a palavra: o arquivo cita `allText` no

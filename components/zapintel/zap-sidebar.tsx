@@ -1,20 +1,27 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, CalendarDays, BookOpen, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
   { href: "/zapintel", icon: LayoutDashboard, label: "Dashboard", exact: true },
   { href: "/zapintel/leads", icon: Users, label: "Leads" },
-  { href: "/zapintel/agenda", icon: CalendarDays, label: "Agenda" },
-  // "Contatos" saiu em 10/10/2026: era uma segunda lista dos MESMOS leads,
-  // com um botão de WhatsApp. O CRM já tem Leads e Clientes, e manter uma
-  // terceira lista da mesma coisa é convidar os três a divergirem.
+  // TRES TELAS SAIRAM DAQUI, e o motivo e o mesmo nas tres: duplicavam o CRM.
+  //
+  //   Contatos (10/10) .. segunda lista dos MESMOS leads, com botao de
+  //                       WhatsApp. O CRM ja tem Leads e Clientes.
+  //   Agenda (11/10) .... um SEGUNDO kanban, inteiro em `useState`: recarregou
+  //                       a pagina, perdeu os cartoes. O CRM tem kanban de
+  //                       verdade, com `kanban_status` gravado em 2.072 leads.
+  //   Scripts (11/10) ... modelos de mensagem, tambem so no navegador e tambem
+  //                       sem persistir. O CRM tem /modelos.
+  //
+  // Tres listas da mesma coisa so servem para divergir — e duas delas nem
+  // sobreviviam a um F5.
   { href: "/zapintel/insights", icon: Lightbulb, label: "Insights" },
   { href: "/zapintel/performance", icon: BarChart2, label: "Performance" },
   { href: "/zapintel/performance2", icon: Gauge, label: "Performance II" },
-  { href: "/zapintel/scripts", icon: BookOpen, label: "Scripts" },
   { href: "/zapintel/comparar", icon: GitCompare, label: "Comparar" },
   { href: "/zapintel/linguagem", icon: Languages, label: "Linguagem" },
   { href: "/zapintel/relatorio", icon: FileText, label: "Relatório" },

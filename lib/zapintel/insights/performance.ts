@@ -1,6 +1,30 @@
 import type { Lead, PerformanceStats } from "@/types/zapintel";
 
-const TICKET_MEDIO = 5200;
+/**
+ * ⚠ AQUI HAVIA O TERCEIRO `TICKET_MEDIO = 5200`, E ELE SOBREVIVEU A UM CONSERTO.
+ *
+ * Em 10/10/2026 o ticket inventado foi removido de `stats.ts` — e o check de
+ * auditoria que escrevi para impedir a volta olhava UM arquivo so. Este aqui
+ * seguiu vivo mais um dia, alimentando dois numeros em reais na tela de
+ * Performance:
+ *
+ *     "RECEITA PERDIDA POR ETAPA" ... leads x 5200 x 0,1 / 0,3 / 0,6 / 0,8
+ *     "LTV estimado" ................ clientes x 5200 x 1,4
+ *
+ * Os multiplicadores eram tao inventados quanto o ticket: 0,8 supunha que 80%
+ * dos leads estagnados teriam fechado, e 1,4 que 40% dos clientes voltam a
+ * comprar. Medido contra as vendas: lead `stalled` compra em 1,0% dos casos, e
+ * o retorno de cliente nao foi medido nenhuma vez.
+ *
+ * Agora o ticket vem MEDIDO, de fora (`FatosDePerformance`), e os numeros em
+ * reais somem quando nao ha venda registrada. Ver `lib/zapintel/vendas.ts`.
+ */
+export interface FatosDePerformance {
+  /** Ticket medido das vendas concluidas. */
+  ticket: number;
+  /** Taxa medida de fechamento, por classificacao, em fracao. */
+  taxaPorClasse: Record<string, number>;
+}
 const COMPETITOR_KW = ["mercado livre", "shopee", "olx", "americanas", "magazine", "magalu", "outro lugar", "achei mais barato", "encontrei por menos", "comprei em outro"];
 const AUDIO_TYPES = ["recorded audio", "audio", "ptt", "forwarded audio"];
 const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -19,7 +43,7 @@ function diffMinutes(a: Date, b: Date): number {
   return Math.abs((b.getTime() - a.getTime()) / 60000);
 }
 
-export function computePerformance(leads: Lead[]): PerformanceStats {
+export function computePerformance(leads: Lead[], fatos?: FatosDePerformance | null): PerformanceStats {
   const customers = leads.filter(l => l.classification === "customer");
   const engaged = leads.filter(l => !["unqualified"].includes(l.classification));
 
@@ -80,12 +104,18 @@ export function computePerformance(leads: Lead[]): PerformanceStats {
   const lostInProposal   = leads.filter(l => l.buySignals.length >= 1 && ["lost","stalled"].includes(l.classification)).length;
   const lostInClose      = leads.filter(l => l.classification === "stalled" && l.score >= 60).length;
 
+  // A perda de cada etapa usa a taxa MEDIDA da classificacao correspondente:
+  // o que se perdeu e o que aquele grupo de fato converteria, nao o que alguem
+  // imaginou que converteria. Sem venda registrada, o valor e zero e a tela diz.
+  const perda = (n: number, cls: string) =>
+    fatos ? Math.round(n * fatos.ticket * (fatos.taxaPorClasse[cls] ?? 0)) : 0;
+
   const revenueLostByStage = [
-    { stage: "Desistiram sem engajar", leads: total - engagedCount,  lost: (total - engagedCount) * TICKET_MEDIO * 0.1  },
-    { stage: "Engajaram mas sumiram",  leads: lostInEngagement,      lost: lostInEngagement * TICKET_MEDIO * 0.3        },
-    { stage: "Tiveram proposta e saíram", leads: lostInProposal,     lost: lostInProposal * TICKET_MEDIO * 0.6          },
-    { stage: "Quase fecharam (estagnados)", leads: lostInClose,      lost: lostInClose * TICKET_MEDIO * 0.8             },
-  ].map(s => ({ ...s, lost: Math.round(s.lost) }));
+    { stage: "Desistiram sem engajar",      leads: total - engagedCount, lost: perda(total - engagedCount, "unqualified") },
+    { stage: "Engajaram mas sumiram",       leads: lostInEngagement,     lost: perda(lostInEngagement, "lost") },
+    { stage: "Tiveram proposta e saíram",   leads: lostInProposal,       lost: perda(lostInProposal, "stalled") },
+    { stage: "Quase fecharam (estagnados)", leads: lostInClose,          lost: perda(lostInClose, "hot") },
+  ];
 
   // ── Win rate vs concorrente ───────────────────────────────────────────────
   const withCompetitor = leads.filter(l => {
@@ -169,7 +199,10 @@ export function computePerformance(leads: Lead[]): PerformanceStats {
     return l.classification === "customer" &&
       ["já comprei", "cliente antigo", "última vez", "comprei antes", "outro celular com vocês", "peguei com vocês"].some(k => txt.includes(k));
   }).length;
-  const estimatedLTV = Math.round(customers.length * TICKET_MEDIO * 1.4); // 40% chance segunda compra
+  // Era `clientes x 5200 x 1,4`, e o 1,4 supunha 40% de recompra — numero que
+  // ninguem mediu. O que da para afirmar e o faturamento dos clientes que
+  // temos, ao ticket medido. Recompra entra quando houver como medir.
+  const estimatedLTV = fatos ? Math.round(customers.length * fatos.ticket) : 0;
 
   // ── Áudio vs texto ────────────────────────────────────────────────────────
   let totalStoreMsgs = 0, audioStoreMsgs = 0, audioInClosed = 0;
