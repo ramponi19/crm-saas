@@ -221,3 +221,184 @@ fatiar('[24h] O CLIENTE DISSE O QUE QUERIA', [
   ['pediu modelo', (c) => c.inicio.procurou.length > 0],
   ['nao disse modelo', (c) => c.inicio.procurou.length === 0],
 ])
+
+// ════════════════════════════════════════════════════════════════════════════
+// A REGUA: um score so presta se puser quem comprou no topo
+// ════════════════════════════════════════════════════════════════════════════
+//
+// "O score melhorou" nao e opiniao — e uma medida. A pergunta que importa para
+// quem atende e: se eu trabalhar so os N primeiros da lista, quantos dos
+// compradores eu pego? Isso se chama RECALL NO TOPO, e e o unico jeito de
+// comparar dois scores sem discutir gosto.
+//
+// Com 33 compradores, o topo de 10% (208 leads) teria 3,3 deles por acaso. Um
+// score que nao chega perto disso nao esta ordenando — esta sorteando.
+
+const compradoresTotal = casos.filter((c) => c.comprou).length
+
+function regua(nome: string, pontos: (c: Caso) => number) {
+  const ordenado = [...casos].sort((a, b) => pontos(b) - pontos(a))
+  const linha = (pct: number) => {
+    const n = Math.max(1, Math.round(casos.length * pct))
+    const pegou = ordenado.slice(0, n).filter((c) => c.comprou).length
+    const acaso = compradoresTotal * pct
+    return `    top ${String(Math.round(pct * 100)).padStart(2)}% (${String(n).padStart(4)} leads): `
+      + `${String(pegou).padStart(2)} de ${compradoresTotal} compradores `
+      + `(${((pegou / compradoresTotal) * 100).toFixed(0).padStart(3)}%) — acaso daria ${acaso.toFixed(1)}`
+  }
+  console.log(`\n  ${nome}`)
+  for (const p of [0.05, 0.1, 0.2, 0.3]) console.log(linha(p))
+}
+
+console.log(`\n${'='.repeat(74)}\nQUEM PUXA COMPRADOR PARA O TOPO\n${'='.repeat(74)}`)
+
+regua('score de hoje (lib/zapintel/scoring/leadScore.ts)', (c) => c.lead.score)
+regua('so trocas de turno nas primeiras 24 h', (c) => c.inicio.trocasDeTurno)
+regua('so mensagens dele nas primeiras 24 h', (c) => c.inicio.mensagensLead)
+regua('so perguntas da loja nas primeiras 24 h', (c) => c.inicio.perguntasDaLoja)
+
+// ── O vazamento que sobrou: quem compra no MESMO dia ───────────────────────
+//
+// "Primeiras 24 h" protege contra o futuro vazando... exceto para quem fecha
+// dentro dessas 24 h. E a mediana do ciclo e 2 dias, com p25 em ZERO: muita
+// venda acontece no primeiro dia. Para esses, a janela inicial contem a propria
+// negociacao — mais mensagens porque comprou, nao antes de comprar.
+//
+// O teste honesto e refazer a regua so com quem demorou a comprar. Se o sinal
+// sobreviver ali, ele PREVE. Se sumir, ele so DETECTA o que ja aconteceu.
+const { data: ciclos } = await db
+  .from('zapintel_venda_lead').select('lead_id, dias_ate_venda')
+  .eq('empresa_id', EMPRESA).not('lead_id', 'is', null)
+const diasDoLead = new Map<number, number>()
+for (const c of ciclos ?? []) {
+  const d = (c.dias_ate_venda as number | null) ?? 999
+  const id = c.lead_id as number
+  diasDoLead.set(id, Math.min(diasDoLead.get(id) ?? 999, d))
+}
+
+const demorados = casos.filter((c) => {
+  if (!c.comprou) return true                      // nao-comprador fica
+  return (diasDoLead.get(c.ficha.leadId) ?? 999) >= 2   // comprador so se demorou
+})
+const nDemorados = demorados.filter((c) => c.comprou).length
+
+function reguaEm(lista: Caso[], total: number, nome: string, pontos: (c: Caso) => number) {
+  const ordenado = [...lista].sort((a, b) => pontos(b) - pontos(a))
+  console.log(`\n  ${nome}`)
+  for (const pct of [0.05, 0.1, 0.2, 0.3]) {
+    const n = Math.max(1, Math.round(lista.length * pct))
+    const pegou = ordenado.slice(0, n).filter((c) => c.comprou).length
+    console.log(`    top ${String(Math.round(pct * 100)).padStart(2)}%: ${String(pegou).padStart(2)} de ${total}`
+      + ` (${((pegou / total) * 100).toFixed(0).padStart(3)}%) — acaso daria ${(total * pct).toFixed(1)}`)
+  }
+}
+
+console.log(`\n${'='.repeat(74)}`)
+console.log(`SO QUEM DEMOROU 2+ DIAS PARA COMPRAR (${nDemorados} de ${compradoresTotal})`)
+console.log(`— aqui a janela de 24 h nao pode conter a venda`)
+console.log('='.repeat(74))
+reguaEm(demorados, nDemorados, 'score de hoje', (c) => c.lead.score)
+reguaEm(demorados, nDemorados, 'mensagens dele nas 1as 24 h', (c) => c.inicio.mensagensLead)
+reguaEm(demorados, nDemorados, 'trocas de turno nas 1as 24 h', (c) => c.inicio.trocasDeTurno)
+
+// ── Candidatos a score novo, medidos na base limpa ─────────────────────────
+//
+// Com 16 compradores "limpos" nao se ajusta peso: se escolhe entre poucas
+// formas simples e se mede qual ordena melhor. Mais fator que isso e decorar.
+const LIFT: Record<string, number> = {
+  'Perguntou sobre entrega': 32,
+  'Pediu chave Pix': 20,
+  'Pediu NF': 16,
+  'Mencionou cartão': 16,
+  'Confirmou (Combinado)': 15,
+  'Perguntou sobre garantia': 13,
+  'Pediu parcelamento': 13,
+  'Perguntou IMEI': 12,
+}
+const bonusDeSinais = (c: Caso) =>
+  (c.inicio.sinais ?? []).reduce((s, x) => s + (LIFT[x] ?? 0), 0)
+
+console.log(`\n${'='.repeat(74)}\nCANDIDATOS (base limpa: ${nDemorados} compradores)\n${'='.repeat(74)}`)
+reguaEm(demorados, nDemorados, 'A) mensagens dele (24h)', (c) => c.inicio.mensagensLead)
+reguaEm(demorados, nDemorados, 'B) mensagens dele + bonus de sinais',
+  (c) => c.inicio.mensagensLead * 3 + bonusDeSinais(c))
+reguaEm(demorados, nDemorados, 'C) so bonus de sinais', bonusDeSinais)
+reguaEm(demorados, nDemorados, 'D) mensagens dele x perguntas da loja',
+  (c) => c.inicio.mensagensLead * (1 + Math.min(c.inicio.perguntasDaLoja, 4)))
+
+// ── O VAZAMENTO QUE ESTAVA NO PROPRIO TESTE ────────────────────────────────
+//
+// `montarFicha(recortarInicio(a))` recorta as MENSAGENS, mas copia
+// `a.buySignals`, que o montador calculou sobre a conversa INTEIRA. Entao o
+// candidato "mensagens + sinais" estava sendo medido com sinais do futuro — e
+// so apareceu porque a implementacao honesta ficou pior que a medicao prometia.
+//
+// Aqui os sinais sao recalculados a partir do texto das primeiras 24 h.
+const SINAIS_KW: [string, string][] = [
+  ['entrega', 'Perguntou sobre entrega'], ['pix', 'Pediu chave Pix'],
+  ['nf', 'Pediu NF'], ['nota fiscal', 'Pediu NF'], ['cartão', 'Mencionou cartão'],
+  ['combinado', 'Confirmou (Combinado)'], ['garantia', 'Perguntou sobre garantia'],
+  ['parcel', 'Pediu parcelamento'], ['imei', 'Perguntou IMEI'],
+]
+function sinaisDeVerdadeNoInicio(c: Caso): string[] {
+  const t = (c.lead.messages ?? [])
+    .filter((m) => !m.isStore)
+    .filter((m) => {
+      const t0 = Date.parse(`${c.lead.messages[0]?.date}T${c.lead.messages[0]?.time || '00:00'}:00`)
+      const tm = Date.parse(`${m.date}T${m.time || '00:00'}:00`)
+      return !Number.isNaN(t0) && !Number.isNaN(tm) && tm - t0 <= 86_400_000
+    })
+    .map((m) => (m.body || '').toLowerCase()).join(' ')
+  return [...new Set(SINAIS_KW.filter(([kw]) => t.includes(kw)).map(([, l]) => l))]
+}
+const bonusHonesto = (c: Caso) =>
+  sinaisDeVerdadeNoInicio(c).reduce((s, x) => s + (LIFT[x] ?? 0), 0)
+
+console.log(`\n${'='.repeat(74)}\nSEM VAZAMENTO NENHUM (base limpa: ${nDemorados})\n${'='.repeat(74)}`)
+reguaEm(demorados, nDemorados, 'mensagens dele (24h)', (c) => c.inicio.mensagensLead)
+reguaEm(demorados, nDemorados, 'sinais REAIS das 24h', bonusHonesto)
+reguaEm(demorados, nDemorados, 'mensagens x3 + sinais REAIS',
+  (c) => c.inicio.mensagensLead * 3 + bonusHonesto(c))
+reguaEm(demorados, nDemorados, 'score novo, como esta no codigo', (c) => c.lead.score)
+
+// ── O teto destruiu o topo ─────────────────────────────────────────────────
+//
+// `Math.min(150, bruto)` e depois escala 0-100: todo lead com 50+ mensagens
+// vira 100, e o desempate vira sorteio justamente onde a ordem mais importa.
+// A alternativa e uma curva que nunca satura de verdade — so se aproxima.
+const expo = (msgs: number, k: number) => Math.round(100 * (1 - Math.exp(-msgs / k)))
+
+console.log(`\n${'='.repeat(74)}\nMAPEAR 0-100 SEM DESTRUIR A ORDEM (base limpa: ${nDemorados})\n${'='.repeat(74)}`)
+reguaEm(demorados, nDemorados, 'ordem crua (mensagens 24h)', (c) => c.inicio.mensagensLead)
+for (const k of [8, 12, 20]) {
+  reguaEm(demorados, nDemorados, `curva k=${k}`, (c) => expo(c.inicio.mensagensLead, k))
+}
+
+// ── TERCEIRO VAZAMENTO, E O PIOR: `recortarInicio` nao recortava a contagem ─
+//
+// Ele faz `{ ...a, messages: dentro }` — troca as mensagens, mas `leadMessages`
+// continua sendo o numero da conversa INTEIRA, copiado do original. Entao
+// `c.inicio.mensagensLead` nunca foi "mensagens nas 24h": era o total. Ou seja,
+// a variavel circular que eu tinha rejeitado logo no comeco, de volta por
+// descuido, medindo 63% e me convencendo a reescrever o score em cima dela.
+//
+// Aqui a contagem sai das mensagens recortadas, que e a unica fonte honesta.
+function mensagensDeleNoInicio(c: Caso): number {
+  const ms = c.lead.messages ?? []
+  if (!ms.length) return 0
+  const t0 = Date.parse(`${ms[0].date}T${ms[0].time || '00:00'}:00`)
+  if (Number.isNaN(t0)) return 0
+  return ms.filter((m) => {
+    if (m.isStore) return false
+    const t = Date.parse(`${m.date}T${m.time || '00:00'}:00`)
+    return !Number.isNaN(t) && t - t0 <= 86_400_000
+  }).length
+}
+
+console.log(`\n${'='.repeat(74)}\nDE VERDADE AGORA (base limpa: ${nDemorados})\n${'='.repeat(74)}`)
+reguaEm(demorados, nDemorados, 'mensagens dele nas 24h — contagem REAL', mensagensDeleNoInicio)
+reguaEm(demorados, nDemorados, 'o que o harness media (conversa inteira)', (c) => c.inicio.mensagensLead)
+reguaEm(demorados, nDemorados, 'score antigo, para comparar', (c) => c.lead.score)
+reguaEm(demorados, nDemorados, 'sinais REAIS das 24h', bonusHonesto)
+reguaEm(demorados, nDemorados, 'mensagens REAIS x3 + sinais REAIS',
+  (c) => mensagensDeleNoInicio(c) * 3 + bonusHonesto(c))
