@@ -151,6 +151,14 @@ v "so a fala do cliente"             "supabase/funcoes/zapintel_leads_com_conver
 v "numero repetido nao e de cliente" "supabase/funcoes/zapintel_leads_com_conversa.sql" "count(distinct id) > 2"
 v "exige formato de celular"         "supabase/funcoes/zapintel_leads_com_conversa.sql" "between 11 and 99"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
+# O matcher corta ANTES de acordar o proxy; SEM_SESSAO corta depois. Os dois
+# existem, nesta ordem. O terceiro check e o que mais importa: matcher montado
+# com `+` nao e constante, o Next IGNORA e o proxy volta a rodar em tudo — em
+# silencio, sem erro, sem aviso.
+v "matcher exclui o tunel do sentry"    "proxy.ts" "|monitoring|"
+v "matcher exclui webhook e cron"       "proxy.ts" "|api/webhook/|api/cron/|"
+v "matcher exclui arquivo publico"      "proxy.ts" "|i/|offline|sw"
+n "matcher nao e concatenacao"          "proxy.ts" "' +$"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

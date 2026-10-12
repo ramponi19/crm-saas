@@ -297,8 +297,48 @@ async function modulosHabilitados(
   }
 }
 
+/**
+ * O MATCHER: QUEM NEM CHEGA A ACORDAR ESTE ARQUIVO.
+ *
+ * ══ A DIFERENÇA ENTRE ESTA LISTA E `SEM_SESSAO` ════════════════════════════
+ *
+ * `SEM_SESSAO` corta a consulta de sessão — mas o proxy já ACORDOU, e na
+ * Vercel acordar já é Active CPU cobrado. O matcher corta antes: a requisição
+ * nem passa por aqui. É a diferença entre pagar barato e não pagar.
+ *
+ * Medido em 09/10/2026: o middleware era 1h04m dos 2h26m do projeto — 27% do
+ * teto de 4 h/mês que o plano free dá para TODOS os projetos juntos. Estourar
+ * o teto não cobra a mais: PAUSA os projetos.
+ *
+ * ══ O CRITÉRIO PARA ENTRAR AQUI ════════════════════════════════════════════
+ *
+ * Só entra caminho em que o proxy PROVADAMENTE não faz nada: ou está em
+ * `SEM_SESSAO` (sai no primeiro `if`), ou está em `isPublicRoute` e é arquivo
+ * servido igual para todo mundo. Nenhuma rota autenticada entra aqui — e
+ * nenhuma deve entrar sem que alguém releia os dois conjuntos.
+ *
+ * As quatro de `/api/` continuam em `SEM_SESSAO` de propósito: lista e regex
+ * podem divergir com o tempo, e a redundância custa um `startsWith`.
+ *
+ * ══ `/monitoring` NÃO É ECONOMIA, É CONSERTO ═══════════════════════════════
+ *
+ * É o túnel do Sentry (`tunnelRoute` em `next.config.ts`), por onde o
+ * navegador manda o erro. Ele NÃO estava em `isPublicRoute`: erro de quem não
+ * tinha sessão — exatamente quem está travado na tela de login — levava 401 do
+ * proxy e nunca chegava ao Sentry. O relatório que mais importa era o único
+ * que se perdia.
+ *
+ * ══ POR QUE UMA LINHA SÓ, FEIA, SEM QUEBRA ═════════════════════════════════
+ *
+ * Porque o Next exige: "The `matcher` values need to be constants so they can
+ * be statically analyzed at build-time. Dynamic values such as variables will
+ * be ignored" (`node_modules/next/dist/docs/01-app/03-api-reference/
+ * 03-file-conventions/proxy.md`). Concatenar com `+` para caber na tela é uma
+ * EXPRESSÃO, não uma constante: o matcher seria ignorado, o proxy voltaria a
+ * rodar em tudo e nada avisaria. A economia sumiria em silêncio.
+ */
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|monitoring|api/webhook/|api/cron/|api/rastreamento/|api/portais/|i/|offline|sw\\.js|track\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
 
 
