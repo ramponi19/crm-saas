@@ -43,6 +43,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 
 def _preparar_cuda() -> None:
@@ -172,12 +173,30 @@ def main() -> int:
               "&transcricao=is.null&midia_url=not.is.null&order=id.asc")
     if args.empresa:
         filtro += f"&empresa_id=eq.{args.empresa}"
-    filtro += f"&limit={args.limite or 100000}"
 
-    pendentes = rest("GET", filtro)
-    print(f"\naudios sem transcricao: {len(pendentes)}")
+    def buscar_pendentes(quantos: int):
+        """
+        ⚠ O POSTGREST CORTA EM 1000 LINHAS, EM SILÊNCIO.
+
+        Pedir `limit=100000` não dá erro: ele devolve 1000 e pronto. Na
+        primeira execução deste script isso fez o backfill "terminar" com 998
+        de 12.477 áudios — anunciando sucesso, com 92% do trabalho por fazer.
+
+        É a MESMA armadilha que já fez a análise do ZapIntel parar em 23/09 e
+        a tela de Leads dizer "1000 de 1843". Está documentada no cabeçalho de
+        `lib/zapintel/ponte.ts` desde 10/10, e eu caí nela de novo.
+
+        Por isso o laço volta a perguntar depois de cada leva: como a condição
+        é `transcricao is null`, cada rodada traz os próximos que faltam.
+        """
+        return rest("GET", filtro + f"&limit={min(quantos, 1000)}")
+
+    restam = args.limite or 10**9
+    pendentes = buscar_pendentes(restam)
     if not pendentes:
+        print("\nnenhum audio pendente.")
         return 0
+    print(f"\nprimeira leva: {len(pendentes)} (o PostgREST entrega 1000 por vez)")
 
     print(f"carregando {args.modelo} na GPU...")
     modelo = WhisperModel(args.modelo, device="cuda", compute_type="float16")
@@ -187,10 +206,30 @@ def main() -> int:
     t_inicio = time.time()
     tmp = tempfile.mkdtemp(prefix="transcr-")
 
-    for n, linha in enumerate(pendentes, 1):
+    # ══ O GARGALO ERA A REDE, NÃO A GPU ═══════════════════════════════════
+    #
+    # Medido em 13/10/2026: a GPU sozinha faz 24,1× tempo real, mas o laço
+    # inteiro fazia **8,8×** — baixar um arquivo por vez deixava a placa
+    # parada esperando a rede em mais da metade do tempo. Em 12.908 áudios
+    # isso é a diferença entre ~7 h e ~3 h de máquina ligada.
+    #
+    # Então o download corre à frente, numa fila de threads: enquanto a GPU
+    # transcreve o áudio N, os próximos já estão chegando. A ordem de
+    # processamento continua a mesma — `map` preserva a sequência —, o que
+    # mantém o progresso legível e a retomada previsível.
+    piscina = ThreadPoolExecutor(max_workers=6)
+
+    def pegar(linha):
         destino = os.path.join(tmp, f"a{linha['id']}")
+        baixar(linha["midia_url"], destino)
+        return linha, destino
+
+    n = 0
+    while pendentes:
+      for item in piscina.map(pegar, pendentes):
+        n += 1
         try:
-            baixar(linha["midia_url"], destino)
+            linha, destino = item
             audio = carregar(destino)
             seg_audio += len(audio) / TAXA
 
@@ -210,18 +249,25 @@ def main() -> int:
                 vazios += 1
         except Exception as e:
             falhas += 1
-            print(f"  [{linha['id']}] {type(e).__name__}: {str(e)[:70]}")
+            print(f"  [{item[0]['id'] if isinstance(item, tuple) else '?'}] "
+                  f"{type(e).__name__}: {str(e)[:70]}")
         finally:
-            for f in (destino, destino + ".wav"):
+            alvo = item[1] if isinstance(item, tuple) else None
+            for f in ([alvo, alvo + ".wav"] if alvo else []):
                 if os.path.exists(f):
                     os.unlink(f)
 
-        if n % 100 == 0 or n == len(pendentes):
+        if n % 200 == 0:
             gasto = time.time() - t_inicio
             vel = seg_audio / gasto if gasto else 0
-            resta = (len(pendentes) - n) * (gasto / n) / 60
-            print(f"  {n}/{len(pendentes)}  {feitos} com texto, {vazios} sem fala, "
-                  f"{falhas} falhas  ({vel:.1f}x tempo real, faltam ~{resta:.0f} min)")
+            print(f"  {n} feitos ({feitos} com texto, {vazios} sem fala, "
+                  f"{falhas} falhas) · {vel:.1f}x tempo real · {seg_audio/3600:.1f} h de audio")
+
+      # Acabou a leva: pergunta de novo. Ver `buscar_pendentes`.
+      restam -= len(pendentes)
+      pendentes = buscar_pendentes(restam) if restam > 0 else []
+      if pendentes:
+          print(f"  — proxima leva: {len(pendentes)}")
 
     gasto = time.time() - t_inicio
     print(f"\n{feitos} transcritos, {vazios} sem fala, {falhas} falhas")

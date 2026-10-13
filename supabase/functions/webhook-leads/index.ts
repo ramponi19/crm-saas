@@ -1169,7 +1169,32 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       let primeiraTexto = "";
       for (const m of (thread.messages as Record<string, unknown>[] ?? [])) {
         const tipoMsg = String(m.type ?? "text");
-        const doNegocio = !!m.to; // "to" presente = mensagem que o negócio enviou
+        /**
+         * ⚠ QUEM FALOU: `from`, NUNCA `to`.
+         *
+         * Era `const doNegocio = !!m.to`, com o comentário "to presente =
+         * mensagem que o negócio enviou". **`to` NUNCA vem no histórico.**
+         * Conferido em 13/10/2026 sobre os payloads guardados em
+         * `historico_bruto`: em 611 mensagens, `to` aparece em 0 e `from` em
+         * 596. A condição era sempre falsa, e **todo o histórico importado
+         * entrou como "recebida"** — inclusive o que a loja mandou.
+         *
+         * O preço: 1.217 mensagens em centenas de leads com a conversa toda do
+         * mesmo lado. Na amostra, 456 de 696 (65%) tinham `from` = o número da
+         * loja. O dono abriu um lead e viu a vendedora dizendo "Sou a Rayssa e
+         * darei continuidade ao seu atendimento" como se fosse o cliente.
+         *
+         * E não é dado parado: direção errada mente no talk ratio, no tempo de
+         * resposta, em "a loja nunca respondeu", no ponto de travamento e no
+         * classificador — que volta a ler fala da loja como se fosse do
+         * cliente, o mesmo erro que o ZapIntel passou a semana removendo.
+         *
+         * `display_phone_number` é o número do canal que está sincronizando;
+         * `from` igual a ele significa que a mensagem saiu daqui.
+         */
+        const numeroDaLoja = String(meta?.display_phone_number ?? "").replace(/\D/g, "");
+        const remetente = String(m.from ?? "").replace(/\D/g, "");
+        const doNegocio = !!numeroDaLoja && remetente === numeroDaLoja;
         // O histórico não traz arquivo (vem depois, por outro evento), mas o rótulo
         // precisa ser legível: `[${tipo}]` cru virava "[errors]" e "[edit]" no chat
         // — nome interno do payload da Meta na cara de quem atende.

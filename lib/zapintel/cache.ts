@@ -88,8 +88,13 @@ export const JANELA_FORCADO_MS = 60_000
  *                   fala e 9,4% do que o cliente fala fora de toda conta —
  *                   perguntas, ofertas com preco, objecoes e a frase antes do
  *                   silencio mediam dois tercos da conversa.
+ *   v13 13/10/2026  1.073 mensagens trocaram de lado. O importador de historico
+ *                   decidia a direcao por `!!m.to`, e `to` NUNCA vem no
+ *                   payload — tudo que a loja mandou entrou como "recebida".
+ *                   Mexe em talk ratio, tempo de resposta, monologo, frase
+ *                   antes do silencio, ponto de travamento e classificacao.
  */
-export const VERSAO_DO_CALCULO = 'v12'
+export const VERSAO_DO_CALCULO = 'v13'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {

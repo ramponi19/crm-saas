@@ -258,10 +258,34 @@ const NOME_MIDIA: Record<string, string> = {
   '[documento]': 'Documento', '[midia]': 'Anexo',
 }
 
+/**
+ * A mensagem diz que havia um anexo, e o arquivo não existe aqui.
+ *
+ * ══ POR QUE "PARA O CRM", E NÃO "NO CRM" ═══════════════════════════════════
+ *
+ * Era "arquivo não disponível NO CRM", e o Lucas apontou em 13/10/2026 que a
+ * preposição põe a culpa no lugar errado: "no CRM" soa como limitação nossa.
+ * Medido, não é — das 955 mensagens assim na JM:
+ *
+ *   632  a Meta mandou o histórico SEM a mídia. No sync ela entrega o arquivo
+ *        só das mensagens dos últimos 14 dias; o resto vem como
+ *        `media_placeholder`. A mais antiga é de 08/05, três meses antes de
+ *        este webhook existir.
+ *   259  anexo de Instagram cuja URL da Meta já tinha expirado quando fomos
+ *        buscar (fica registrado como `anexo_meta_sem_arquivo`).
+ *   178  resíduo do primeiro período de uso, todas até 12/08 — o dia em que o
+ *        eco do celular passou a baixar mídia. Não acontece mais.
+ *
+ * Em quase tudo, **queríamos ter e a origem não entregou**. "Indisponível para
+ * o CRM" diz isso; "não disponível no CRM" dizia o contrário.
+ *
+ * ⚠ Não confundir com "Foto enviada pelo celular", que é escolha nossa de não
+ * guardar o arquivo. Ali sabemos o que era e optamos por não ter.
+ */
 function MidiaAusente({ placeholder }: { placeholder: string }) {
   return (
     <span className="text-[13px] italic text-[#667781]">
-      {NOME_MIDIA[placeholder] ?? 'Anexo'} — arquivo não disponível no CRM
+      {NOME_MIDIA[placeholder] ?? 'Anexo'} — indisponível para o CRM
     </span>
   )
 }
