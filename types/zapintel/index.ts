@@ -34,6 +34,15 @@ export interface RawMessage {
   quotedMessage: string;
   isStore: boolean;
   /**
+   * `body` veio de TRANSCRIÇÃO de áudio, não do que a pessoa digitou.
+   *
+   * Os motores tratam os dois igual de propósito — fala é fala. Mas a TELA
+   * não pode: transcrição automática erra ("no prato" por "preto"), e mostrar
+   * isso como se fosse texto digitado seria pôr na boca de alguém o que a
+   * máquina entendeu. Requisito do Lucas em 13/10/2026.
+   */
+  transcrito?: boolean;
+  /**
    * De qual canal a mensagem veio, quando a conversa é fruto de FUSÃO.
    *
    * Escrito em `lib/zapintel/merge/matchEngine.ts`, ao juntar o histórico de

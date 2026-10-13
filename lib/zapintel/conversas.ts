@@ -43,6 +43,8 @@ export type MsgBanco = {
   lead_id: number
   direcao: string
   conteudo: string | null
+  /** O que foi dito no audio, transcrito pela maquina. Ver `montar.ts`. */
+  transcricao?: string | null
   tipo: string | null
   created_at: string
 }
@@ -220,7 +222,7 @@ export async function carregarConversas(
   const alvo = [...porId.keys()]
   const msgs = await buscarTudo<MsgBanco>((de, ate) => {
     let q = db.from('lead_mensagens')
-      .select('id, lead_id, direcao, conteudo, tipo, created_at')
+      .select('id, lead_id, direcao, conteudo, tipo, created_at, transcricao')
       .eq('empresa_id', empresaId)
     // Filtrar por id só quando o recorte é pequeno: um `in` com milhares de
     // itens vira uma URL que o servidor recusa. Na empresa inteira o filtro de

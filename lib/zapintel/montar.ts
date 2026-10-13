@@ -215,7 +215,28 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
       // `direcao`. Ver a armadilha multi-tenant no cabeçalho.
       phone: banco.telefone ?? banco.origem_id ?? '',
       name: m.direcao === 'enviada' ? 'Loja' : (banco.nome ?? ''),
-      body: m.conteudo ?? '',
+      /**
+       * ÁUDIO TRANSCRITO ENTRA COMO FALA.
+       *
+       * Medido em 13/10/2026: **35% do que a loja fala é áudio** (10.201 de
+       * 29.135 mensagens enviadas) e 9,4% do que o cliente fala. Enquanto o
+       * `conteudo` era só `[audio]`, todo motor daqui media dois terços da
+       * conversa e apresentava o resultado como se fosse a conversa inteira:
+       *
+       *   · `perguntasDaLoja` conta "?" no texto — áudio nunca teve "?"
+       *   · a frase antes do silêncio descartava áudio de propósito
+       *   · `ultimaOferta` procura R$ — oferta falada não entrava
+       *   · o vendedor virava "Loja" se ele se apresentou falando
+       *   · as objeções do cliente perdiam 9,4% das falas dele
+       *
+       * O marcador `[audio]` fica como `mediaType`, então quem precisa saber
+       * que a mensagem foi falada continua sabendo. O que muda é que agora há
+       * texto para ler.
+       */
+      body: (m.transcricao?.trim() || m.conteudo) ?? '',
+      // A tela precisa distinguir o que foi falado do que foi digitado; os
+      // motores, não. Ver `RawMessage.transcrito`.
+      transcrito: !!m.transcricao?.trim(),
       mediaType: m.tipo && m.tipo !== 'texto' ? m.tipo : '',
       mediaCaption: '',
       quotedMessage: '',

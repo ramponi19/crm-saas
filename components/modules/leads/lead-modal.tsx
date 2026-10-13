@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
@@ -97,6 +97,14 @@ interface ChatMsg {
   erro?: string | null
   /** id da Meta — é por ele que a confirmação de entrega encontra a bolha. */
   externalId?: string | null
+  /**
+   * O que foi DITO no áudio, transcrito pela máquina.
+   *
+   * Nunca se mistura com `text`: vai em tipografia própria e rotulada, porque
+   * transcrição automática erra ("no prato" por "preto", "a salva de bateria"
+   * por "a saúde") e ninguém pode confundi-la com o que a pessoa escreveu.
+   */
+  transcricao?: string | null
   /**
    * Quem atendeu, nas mensagens que saíram do CRM. Null = enviada pelo celular,
    * fora do CRM. Existe porque a assinatura vai só no texto que o CLIENTE
@@ -255,6 +263,43 @@ function MidiaAusente({ placeholder }: { placeholder: string }) {
     <span className="text-[13px] italic text-[#667781]">
       {NOME_MIDIA[placeholder] ?? 'Anexo'} — arquivo não disponível no CRM
     </span>
+  )
+}
+
+/**
+ * O QUE FOI DITO NO ÁUDIO — e por que não pode parecer texto digitado.
+ *
+ * Requisito do Lucas, em 13/10/2026: *"vc vai trazer com tipografia diferente
+ * e informação que trata-se de transcrição de áudio para não parecer que
+ * escreveu"*.
+ *
+ * Ele tem razão, e a medição dá o motivo: no teste com 10 áudios reais da loja
+ * a máquina escreveu "no prato" onde era "preto", "a salva de bateria" onde
+ * era "a saúde", e "Defesa do Pestruidor". Passável para entender a conversa,
+ * inaceitável como citação do que alguém disse.
+ *
+ * Daí as três marcas: fonte diferente da bolha, cor mais apagada e o rótulo
+ * fixo. Quem bate o olho sabe que é máquina falando, não a pessoa.
+ *
+ * ⚠ `audioGuardado` existe porque o arquivo não fica para sempre. Áudio é 48%
+ * do bucket, e o plano é guardá-lo por uma janela curta — 98,5% das conversas
+ * que voltam, voltam em até 7 dias. Passada a janela, o som some e **o texto
+ * fica**; a tela precisa dizer isso em vez de mostrar um player quebrado.
+ */
+function TranscricaoAudio({ texto, audioGuardado }: { texto: string; audioGuardado: boolean }) {
+  return (
+    <div className="mt-1 border-l-2 border-[#8696a0]/40 pl-2">
+      <div className="mb-0.5 flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-wide text-[#8696a0]">
+        <AudioLines size={11} strokeWidth={2} />
+        transcrição automática
+        {!audioGuardado && <span className="font-normal normal-case">· áudio não guardado</span>}
+      </div>
+      {/* Serifada e um pouco menor: nenhuma outra coisa na conversa é assim,
+          então a diferença se lê antes mesmo do rótulo. */}
+      <p className="font-serif text-[12.5px] italic leading-relaxed text-[#54656f]">
+        {texto}
+      </p>
+    </div>
   )
 }
 
@@ -544,7 +589,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id')
+        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
@@ -552,7 +597,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
         direcao: string | null; conteudo: string | null; created_at: string
         tipo: string | null; midia_url: string | null
         status_entrega: string | null; erro_envio: string | null; external_id: string | null
-        usuario_id: string | null
+        usuario_id: string | null; transcricao: string | null
       }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
@@ -560,6 +605,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
         tipo: m.tipo ?? 'texto',
         midiaUrl: m.midia_url,
+        transcricao: m.transcricao,
         status: m.status_entrega,
         erro: m.erro_envio,
         externalId: m.external_id,
@@ -1248,6 +1294,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                       )}
                       {m.midiaUrl && m.tipo === 'audio' && (
                         <AudioChat url={m.midiaUrl} />
+                      )}
+                      {/* O texto do áudio aparece com ou sem o arquivo: passada
+                          a janela de retenção o som some e a transcrição fica. */}
+                      {m.tipo === 'audio' && m.transcricao && (
+                        <TranscricaoAudio texto={m.transcricao} audioGuardado={!!m.midiaUrl} />
                       )}
                       {/* Documento (PDF de comprovante, nota, boleto): o valor está
                           no NOME e no download, não em prévia. */}

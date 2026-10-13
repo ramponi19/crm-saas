@@ -211,6 +211,22 @@ v "sugestao fala do produto real"    "lib/zapintel/travou.ts" "O que ele procuro
 # "Precedeu" nao e "causou" — a IA virou ordem o que era correlacao.
 v "briefing marca a correlacao"      "lib/zapintel/dia.ts" "correlação, não causa"
 v "prompt proibe virar ordem"        "lib/zapintel/dia.ts" "Não transforme correlação em ordem"
+
+echo "== audio transcrito (13/10) =="
+# 35% do que a loja fala e audio. Enquanto o conteudo era so "[audio]", todo
+# motor media dois tercos da conversa e apresentava como se fosse ela inteira.
+v "motor le a transcricao"           "lib/zapintel/montar.ts" "m.transcricao?.trim() || m.conteudo"
+v "conversa traz a transcricao"      "lib/zapintel/conversas.ts" "created_at, transcricao"
+v "versao subiu com a conta"         "lib/zapintel/cache.ts" "VERSAO_DO_CALCULO = .v12."
+# A tela NAO pode mostrar transcricao como texto digitado: a maquina escreveu
+# "no prato" onde era "preto". Requisito do Lucas.
+v "tela marca o que foi falado"      "lib/zapintel/montar.ts" "transcrito: !!m.transcricao"
+v "chat rotula a transcricao"        "components/modules/leads/lead-modal.tsx" "transcrição automática"
+v "chat usa tipografia propria"      "components/modules/leads/lead-modal.tsx" "font-serif text-\[12.5px\] italic"
+v "chat avisa se o audio saiu"       "components/modules/leads/lead-modal.tsx" "áudio não guardado"
+v "zapintel rotula tambem"           "app/zapintel/leads/[id]/page.tsx" "transcrição automática"
+# Vocabulario so com nome proprio: listar modelo fez a IA INVENTAR "o Pro Max".
+n "vocabulario sem modelo"           "scripts/transcrever-audios.py" "VOCABULARIO = ($|.*256GB)"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

@@ -39,6 +39,165 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_leads_dup_20261010: {
+        Row: {
+          _k: string | null
+          _msgs: number | null
+          anuncio: Json | null
+          ativo: boolean | null
+          convertido_em: number | null
+          created_at: string | null
+          data_transferencia_funil: string | null
+          devolucoes: number | null
+          devolvido_em: string | null
+          empresa_id: number | null
+          filial_id: number | null
+          foto_url: string | null
+          funil_id: number | null
+          id: number | null
+          instagram: string | null
+          interesse: Json | null
+          kanban_ordem: number | null
+          kanban_status: string | null
+          motivo_perda_id: number | null
+          msgs_nao_lidas: number | null
+          nome: string | null
+          observacoes: string | null
+          origem: string | null
+          origem_id: string | null
+          perdido_em: string | null
+          primeira_msg: string | null
+          produto_interessado: string | null
+          responsavel_desde: string | null
+          responsavel_id: string | null
+          telefone: string | null
+          ultima_enviada_at: string | null
+          ultima_mensagem_at: string | null
+          ultima_recebida_at: string | null
+          ultima_tratativa: string | null
+          valor_estimado: number | null
+        }
+        Insert: {
+          _k?: string | null
+          _msgs?: number | null
+          anuncio?: Json | null
+          ativo?: boolean | null
+          convertido_em?: number | null
+          created_at?: string | null
+          data_transferencia_funil?: string | null
+          devolucoes?: number | null
+          devolvido_em?: string | null
+          empresa_id?: number | null
+          filial_id?: number | null
+          foto_url?: string | null
+          funil_id?: number | null
+          id?: number | null
+          instagram?: string | null
+          interesse?: Json | null
+          kanban_ordem?: number | null
+          kanban_status?: string | null
+          motivo_perda_id?: number | null
+          msgs_nao_lidas?: number | null
+          nome?: string | null
+          observacoes?: string | null
+          origem?: string | null
+          origem_id?: string | null
+          perdido_em?: string | null
+          primeira_msg?: string | null
+          produto_interessado?: string | null
+          responsavel_desde?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          ultima_enviada_at?: string | null
+          ultima_mensagem_at?: string | null
+          ultima_recebida_at?: string | null
+          ultima_tratativa?: string | null
+          valor_estimado?: number | null
+        }
+        Update: {
+          _k?: string | null
+          _msgs?: number | null
+          anuncio?: Json | null
+          ativo?: boolean | null
+          convertido_em?: number | null
+          created_at?: string | null
+          data_transferencia_funil?: string | null
+          devolucoes?: number | null
+          devolvido_em?: string | null
+          empresa_id?: number | null
+          filial_id?: number | null
+          foto_url?: string | null
+          funil_id?: number | null
+          id?: number | null
+          instagram?: string | null
+          interesse?: Json | null
+          kanban_ordem?: number | null
+          kanban_status?: string | null
+          motivo_perda_id?: number | null
+          msgs_nao_lidas?: number | null
+          nome?: string | null
+          observacoes?: string | null
+          origem?: string | null
+          origem_id?: string | null
+          perdido_em?: string | null
+          primeira_msg?: string | null
+          produto_interessado?: string | null
+          responsavel_desde?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          ultima_enviada_at?: string | null
+          ultima_mensagem_at?: string | null
+          ultima_recebida_at?: string | null
+          ultima_tratativa?: string | null
+          valor_estimado?: number | null
+        }
+        Relationships: []
+      }
+      _backup_tarefas_dup_20261010: {
+        Row: {
+          concluida: boolean | null
+          concluida_em: string | null
+          created_at: string | null
+          descricao: string | null
+          empresa_id: number | null
+          filial_id: number | null
+          id: number | null
+          lead_id: number | null
+          responsavel_id: string | null
+          tipo: string | null
+          titulo: string | null
+          vencimento: string | null
+        }
+        Insert: {
+          concluida?: boolean | null
+          concluida_em?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: number | null
+          filial_id?: number | null
+          id?: number | null
+          lead_id?: number | null
+          responsavel_id?: string | null
+          tipo?: string | null
+          titulo?: string | null
+          vencimento?: string | null
+        }
+        Update: {
+          concluida?: boolean | null
+          concluida_em?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: number | null
+          filial_id?: number | null
+          id?: number | null
+          lead_id?: number | null
+          responsavel_id?: string | null
+          tipo?: string | null
+          titulo?: string | null
+          vencimento?: string | null
+        }
+        Relationships: []
+      }
       acessos: {
         Row: {
           created_at: string | null
@@ -3105,6 +3264,7 @@ export type Database = {
           status_em: string | null
           status_entrega: string | null
           tipo: string
+          transcricao: string | null
           usuario_id: string | null
         }
         Insert: {
@@ -3124,6 +3284,7 @@ export type Database = {
           status_em?: string | null
           status_entrega?: string | null
           tipo?: string
+          transcricao?: string | null
           usuario_id?: string | null
         }
         Update: {
@@ -3143,6 +3304,7 @@ export type Database = {
           status_em?: string | null
           status_entrega?: string | null
           tipo?: string
+          transcricao?: string | null
           usuario_id?: string | null
         }
         Relationships: [
@@ -6430,99 +6592,104 @@ export type Database = {
           },
         ]
       }
-      zapintel_analise: {
+      zapintel_painel: {
         Row: {
           calculado_em: string
-          canal: string | null
-          classificacao: string | null
-          dias_conversa: number | null
-          dias_inativo: number | null
           empresa_id: number
-          filial_id: number | null
-          insight: string | null
-          lead_id: number
-          mensagens_lead: number | null
-          mensagens_loja: number | null
-          objecoes: Json | null
-          perfil: string | null
-          primeira_em: string | null
-          proxima_acao: string | null
-          risco_perda: number | null
-          score: number | null
-          sinais_compra: Json | null
-          total_mensagens: number | null
-          ultima_em: string | null
-          urgencia: string | null
-          vendedor: string | null
+          mensagens: number
+          ms: number | null
+          painel: string
+          relato: string | null
+          relato_em: string | null
+          relato_marca: number | null
+          ultima_mensagem: number
+          versao: string
         }
         Insert: {
           calculado_em?: string
-          canal?: string | null
-          classificacao?: string | null
-          dias_conversa?: number | null
-          dias_inativo?: number | null
           empresa_id: number
-          filial_id?: number | null
-          insight?: string | null
-          lead_id: number
-          mensagens_lead?: number | null
-          mensagens_loja?: number | null
-          objecoes?: Json | null
-          perfil?: string | null
-          primeira_em?: string | null
-          proxima_acao?: string | null
-          risco_perda?: number | null
-          score?: number | null
-          sinais_compra?: Json | null
-          total_mensagens?: number | null
-          ultima_em?: string | null
-          urgencia?: string | null
-          vendedor?: string | null
+          mensagens?: number
+          ms?: number | null
+          painel: string
+          relato?: string | null
+          relato_em?: string | null
+          relato_marca?: number | null
+          ultima_mensagem?: number
+          versao?: string
         }
         Update: {
           calculado_em?: string
-          canal?: string | null
-          classificacao?: string | null
-          dias_conversa?: number | null
-          dias_inativo?: number | null
           empresa_id?: number
-          filial_id?: number | null
-          insight?: string | null
-          lead_id?: number
-          mensagens_lead?: number | null
-          mensagens_loja?: number | null
-          objecoes?: Json | null
-          perfil?: string | null
-          primeira_em?: string | null
-          proxima_acao?: string | null
-          risco_perda?: number | null
-          score?: number | null
-          sinais_compra?: Json | null
-          total_mensagens?: number | null
-          ultima_em?: string | null
-          urgencia?: string | null
-          vendedor?: string | null
+          mensagens?: number
+          ms?: number | null
+          painel?: string
+          relato?: string | null
+          relato_em?: string | null
+          relato_marca?: number | null
+          ultima_mensagem?: number
+          versao?: string
         }
         Relationships: [
           {
-            foreignKeyName: "zapintel_analise_empresa_id_fkey"
+            foreignKeyName: "zapintel_painel_empresa_id_fkey"
             columns: ["empresa_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "zapintel_analise_empresa_id_fkey"
+            foreignKeyName: "zapintel_painel_empresa_id_fkey"
             columns: ["empresa_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "v_empresas_plano"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      zapintel_venda_lead: {
+        Row: {
+          casado_em: string
+          cliente_id: number | null
+          como: string
+          confianca: string
+          dias_ate_venda: number | null
+          empresa_id: number
+          lead_id: number | null
+          venda_id: number
+        }
+        Insert: {
+          casado_em?: string
+          cliente_id?: number | null
+          como: string
+          confianca: string
+          dias_ate_venda?: number | null
+          empresa_id: number
+          lead_id?: number | null
+          venda_id: number
+        }
+        Update: {
+          casado_em?: string
+          cliente_id?: number | null
+          como?: string
+          confianca?: string
+          dias_ate_venda?: number | null
+          empresa_id?: number
+          lead_id?: number | null
+          venda_id?: number
+        }
+        Relationships: [
           {
-            foreignKeyName: "zapintel_analise_lead_id_fkey"
+            foreignKeyName: "zapintel_venda_lead_lead_id_fkey"
             columns: ["lead_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zapintel_venda_lead_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: true
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]
@@ -6623,6 +6790,16 @@ export type Database = {
           },
         ]
       }
+      v_orfaos_chat_midia: {
+        Row: {
+          bytes: number | null
+          created_at: string | null
+          id: string | null
+          mime: string | null
+          name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       chat_marcar_lido: { Args: { p_conversa: string }; Returns: undefined }
@@ -6664,6 +6841,31 @@ export type Database = {
       set_super_admin: {
         Args: { p_target: string; p_value: boolean }
         Returns: undefined
+      }
+      zapintel_conversas: {
+        Args: { p_empresa: number; p_por_lead?: number }
+        Returns: {
+          conteudo: string
+          created_at: string
+          direcao: string
+          lead_id: number
+          lead_nome: string
+          lead_origem_id: string
+          lead_telefone: string
+          tipo: string
+        }[]
+      }
+      zapintel_leads_com_conversa: {
+        Args: { p_empresa: number }
+        Returns: {
+          id: number
+          mensagens: number
+          origem_id: string
+          primeira: string
+          telefone: string
+          telefone_no_texto: string
+          ultima: string
+        }[]
       }
     }
     Enums: {

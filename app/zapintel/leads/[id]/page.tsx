@@ -843,7 +843,23 @@ export default function LeadDetailPage() {
                       {msg.isStore ? (lead.sellerName || storeName || "Loja") : lead.contact}
                     </span>
                   </div>
-                  <p style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                  {/* Transcricao nao pode passar por texto digitado: fonte
+                      serifada, cor apagada e rotulo. Ver `RawMessage.transcrito`. */}
+                  {msg.transcrito && (
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: .4,
+                      color: "var(--muted)", textTransform: "uppercase", marginBottom: 3,
+                    }}>
+                      ♪ transcrição automática
+                    </div>
+                  )}
+                  <p style={{
+                    fontSize: msg.transcrito ? 11.5 : 12,
+                    color: msg.transcrito ? "var(--muted)" : "var(--dim)",
+                    lineHeight: 1.6, whiteSpace: "pre-wrap",
+                    fontFamily: msg.transcrito ? "Georgia, 'Times New Roman', serif" : undefined,
+                    fontStyle: msg.transcrito ? "italic" : undefined,
+                  }}>
                     {msg.body || (msg.mediaType ? `[${msg.mediaType}]` : "")}
                     {msg.mediaCaption ? ` — ${msg.mediaCaption}` : ""}
                   </p>

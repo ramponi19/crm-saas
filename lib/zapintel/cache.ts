@@ -84,8 +84,12 @@ export const JANELA_FORCADO_MS = 60_000
  *                   maquina do Lucas, UTC na Vercel — e o painel guardado
  *                   mostrava pico as 14h quando o real e 11h. Mexe em toda
  *                   metrica por hora, por dia, e na hora de cada mensagem.
+ *   v12 13/10/2026  AUDIO TRANSCRITO entra como fala. Eram 35% do que a loja
+ *                   fala e 9,4% do que o cliente fala fora de toda conta —
+ *                   perguntas, ofertas com preco, objecoes e a frase antes do
+ *                   silencio mediam dois tercos da conversa.
  */
-export const VERSAO_DO_CALCULO = 'v11'
+export const VERSAO_DO_CALCULO = 'v12'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {
