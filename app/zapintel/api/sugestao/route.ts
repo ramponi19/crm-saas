@@ -97,9 +97,9 @@ export async function POST(req: Request) {
     empresaId,
     system,
     mensagens: [{ role: 'user', content: prompt }],
-    // Duas frases cabem de sobra. O teto baixo é o que impede a IA de
-    // devolver um e-mail quando pedimos um WhatsApp.
-    maxTokens: 300,
+    // Sem teto apertado: ele é cobrado do mesmo saldo que o pensamento do
+    // modelo e truncaria a mensagem no meio. Quem segura o tamanho é a regra
+    // das 2 frases no `system`. Ver `lib/zapintel/ia.ts`.
     origem: 'sugestao',
   })
 

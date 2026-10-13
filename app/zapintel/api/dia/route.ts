@@ -60,9 +60,10 @@ export async function GET() {
       empresaId,
       system: systemDoDia(getRole(painel.segmentId), seg.description),
       mensagens: [{ role: 'user', content: `Os números de hoje:\n\n${briefing}` }],
-      // Quatro frases cabem de sobra. O teto baixo é o que impede o modelo de
-      // devolver um relatório quando pedimos um parágrafo.
-      maxTokens: 400,
+      // Sem teto apertado: o pensamento do modelo sai deste mesmo saldo, e
+      // 400 tokens devolveram meia frase em inglês para a tela do Lucas. Quem
+      // segura o tamanho é a regra das 4 frases no `system`, que o modelo
+      // obedece. Ver o cabeçalho de `lib/zapintel/ia.ts`.
       origem: 'dia',
     })
 

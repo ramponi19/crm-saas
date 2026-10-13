@@ -190,6 +190,12 @@ v "relato velho e regerado"          "app/zapintel/api/dia/route.ts" "guardado.m
 # peakHours e histograma por hora, nao ranking: [0] e a hora mais cedo.
 v "pico ordenado por volume"         "lib/zapintel/dia.ts" "sort((a, b) => b.count - a.count)"
 v "briefing proibe inventar numero"  "lib/zapintel/dia.ts" "USE SOMENTE os números do briefing"
+# O teto de tokens e cobrado do PENSAMENTO do modelo tambem. Com 400, o
+# gemini-3.6-flash devolveu meia frase em ingles para a tela. Quem segura o
+# tamanho e a regra de frases no prompt, nunca o teto.
+v "teto de tokens e de seguranca"    "lib/zapintel/ia.ts" "TETO_DE_SEGURANCA = 8_000"
+n "dia nao aperta o teto"            "app/zapintel/api/dia/route.ts" "maxTokens: [0-9]"
+n "sugestao nao aperta o teto"       "app/zapintel/api/sugestao/route.ts" "maxTokens: [0-9]"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

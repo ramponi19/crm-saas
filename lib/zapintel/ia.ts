@@ -20,6 +20,34 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
  *   `mensagemDoProvedor()` ........ traduz o erro do provedor para o balcão
  *   `assistente_uso` .............. a contabilidade de tokens, por empresa
  *
+ * ══ O TETO DE TOKENS É DE SEGURANÇA, NUNCA DE FORMATAÇÃO ═══════════════════
+ *
+ * Este foi um erro meu, pego em produção em 13/10/2026. Pedi 4 frases e pus
+ * `maxOutputTokens: 400` achando que estava limitando o TAMANHO da resposta. O
+ * que voltou para a tela do Lucas foi isto:
+ *
+ *     Sales conversion: 32 (1.4%)
+ *         *
+ *
+ * Em inglês, truncado, com um asterisco solto. A documentação do Gemini
+ * explica por quê, e desaconselha exatamente o que eu fiz:
+ *
+ *   "max_output_tokens ... sets the maximum number of tokens a response can
+ *    generate, INCLUDING THOUGHT TOKENS. If the model hits this limit while
+ *    reasoning, it stops generating with status 'incomplete' and returns
+ *    truncated or empty output (while still billing for any thinking tokens
+ *    generated). To reduce cost or latency without truncating responses,
+ *    lower thinking_level instead of setting a small max_output_tokens."
+ *
+ * O modelo deste CRM é `gemini-3.6-flash` (escolhido em `assistente_config`),
+ * que pensa em nível `medium` por padrão. Os 400 tokens acabavam no meio do
+ * raciocínio e a resposta nascia pela metade.
+ *
+ * **O tamanho se controla pelo PROMPT** ("no máximo 4 frases"), que o modelo
+ * obedece. O teto aqui existe só para que um modelo em loop não prenda a
+ * função até o limite da plataforma. Medido com 8.000: as mesmas 4 frases, em
+ * português, só com os números do briefing.
+ *
  * ══ O ERRO NUNCA É SÓ `false` ══════════════════════════════════════════════
  *
  * Devolve `{ ok: false, status, erro }` com a mensagem JÁ traduzida, porque
@@ -28,6 +56,12 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
  * tela é texto que manda o lojista para a documentação de uma API que não é
  * dele.
  */
+
+/**
+ * Folga suficiente para o modelo pensar e ainda escrever. Não é o tamanho da
+ * resposta — esse se pede no `system`. Ver o cabeçalho.
+ */
+const TETO_DE_SEGURANCA = 8_000
 
 export interface MensagemIA { role: string; content: string }
 
@@ -39,6 +73,11 @@ export async function perguntarIA(opts: {
   empresaId: number
   system?: string
   mensagens: MensagemIA[]
+  /**
+   * Teto de SEGURANÇA, não de formatação. Ver o cabeçalho: o pensamento do
+   * modelo é cobrado deste mesmo saldo, e um teto apertado trunca a resposta
+   * no meio do raciocínio. Para encurtar a saída, peça isso no `system`.
+   */
   maxTokens?: number
   /** Aparece no log junto do erro cru, para saber QUEM chamou. */
   origem: string
@@ -75,7 +114,7 @@ export async function perguntarIA(opts: {
             role: m.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: m.content }],
           })),
-          generationConfig: { temperature: 0.5, maxOutputTokens: maxTokens ?? 1200 },
+          generationConfig: { temperature: 0.5, maxOutputTokens: maxTokens ?? TETO_DE_SEGURANCA },
         }),
         // Sem isto, provedor lento prende a função até o limite da plataforma e
         // o usuário fica olhando um botão girando sem saber se ainda há algo
