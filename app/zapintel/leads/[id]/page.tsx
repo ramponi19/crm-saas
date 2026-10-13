@@ -306,6 +306,168 @@ export default function LeadDetailPage() {
         <ArrowLeft size={14} /> Voltar
       </button>
 
+      {/* ── Header card ─────────────────────────────────────────────────── */}
+      <div className="card" style={{ padding: 24, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800 }}>{lead.contact}</h1>
+              {/* Source badges */}
+              {isMerged ? (
+                <div style={{ display: "flex", gap: 5 }}>
+                  <SourceBadge type="whatsapp" />
+                  <SourceBadge type="instagram" />
+                </div>
+              ) : (
+                <SourceBadge type={lead._channel === "instagram" ? "instagram" : "whatsapp"} />
+              )}
+            </div>
+            <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 10 }}>
+              {lead.phone || lead.filename} · {storeName || sellerName}
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Badge cls={lead.classification} />
+              {lead.phone && (() => {
+                const link = whatsappLink(lead.phone);
+                return link ? (
+                  <a href={link} target="_blank" rel="noopener noreferrer" style={{
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    background: "#075e54", borderRadius: 10,
+                    padding: "7px 16px", textDecoration: "none",
+                    transition: "all .2s", border: "none",
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#128c7e"}
+                    onMouseLeave={e => e.currentTarget.style.background = "#075e54"}
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Responder no WhatsApp</span>
+                  </a>
+                ) : null;
+              })()}
+            </div>
+          </div>
+          <ScoreRing score={lead.score} size={54} />
+        </div>
+
+        {/* Merged info banner */}
+        {isMerged && (
+          <div style={{
+            background: "rgba(124,92,252,.08)", border: "1px solid rgba(124,92,252,.3)",
+            borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+            display: "flex", alignItems: "center", gap: 10, fontSize: 12,
+          }}>
+            <span style={{ fontSize: 16 }}>🔗</span>
+            <div style={{ color: "var(--dim)" }}>
+              Perfil unificado —
+              <span style={{ color: "var(--green)", fontWeight: 700 }}> 💬 {waMessages.length} mensagens WhatsApp</span>
+              {" "}+
+              <span style={{ color: "#ec4899", fontWeight: 700 }}> 📸 {igMessages.length} mensagens Instagram</span>
+            </div>
+          </div>
+        )}
+
+        {/* Insight */}
+        <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 5 }}>ANÁLISE DE IA</div>
+          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>{lead.insight}</p>
+        </div>
+
+        {/* Meta cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 14 }}>
+          {[
+            { l: "Perfil", v: lead.buyerProfile, c: "var(--txt)" },
+            { l: "Duração da conversa", v: lead.conversationDays === 0 ? "1 dia" : `${lead.conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
+            { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
+            { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
+            { l: "Risco de perda", v: `${lead.lossRisk}%`, c: lead.lossRisk > 60 ? "var(--red)" : "var(--yellow)" },
+          ].map(({ l, v, c }) => (
+            <div key={l} className="card2" style={{ padding: "10px 12px" }}>
+              <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Buy signals */}
+        {lead.buySignals.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {lead.buySignals.map(s => (
+                <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Objections */}
+        {lead.objections.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {lead.objections.map(o => (
+                <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Next action */}
+        <div style={{ background: "var(--card2)", border: `1px solid ${urgCol}50`, borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: urgCol, letterSpacing: .7, marginBottom: 5 }}>
+            <UrgencyDot urgency={lead.urgency} />
+            PRÓXIMA AÇÃO · {lead.urgency.toUpperCase()}
+          </div>
+          <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{lead.nextAction}</p>
+        </div>
+      </div>
+
+      {/* ── Marcar Venda Fechada ───────────────────────────────────────────── */}
+      {lead.classification !== "customer" && (
+        <div className="card" style={{ padding: 18, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Venda fechada fora do chat?</div>
+              <div style={{ fontSize: 11, color: "var(--dim)" }}>Marque manualmente e o dashboard será atualizado.</div>
+            </div>
+            <button onClick={() => setShowSaleModal(true)} style={{
+              background: "var(--green)", border: "none", borderRadius: 10,
+              padding: "10px 18px", fontSize: 13, fontWeight: 700, color: "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
+              transition: "opacity .15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <CheckCircle2 size={15} /> Marcar como Venda Fechada
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual sale badge if already marked */}
+      {lead.classification === "customer" && lead.manualSale && (
+        <div style={{
+          background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
+          borderRadius: 12, padding: "12px 18px", marginBottom: 14,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <CheckCircle2 size={18} color="var(--green)" />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>
+              ✅ Venda fechada manualmente — {lead.manualSale.product}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--dim)" }}>
+              {lead.manualSale.value > 0 ? `R$ ${lead.manualSale.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · ` : ""}
+              {lead.manualSale.closedAt}
+              {lead.manualSale.notes ? ` · ${lead.manualSale.notes}` : ""}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/*
         A FICHA — o que aconteceu nesta conversa, antes de qualquer número.
 
@@ -314,10 +476,14 @@ export default function LeadDetailPage() {
         que as ferramentas do segmento chamam de revisar trechos em vez de
         médias — o número acha o momento, o trecho mostra o que fazer.
 
-        Fica ACIMA do score e da classificação de propósito: hoje sabemos que
-        a classificação quase não ordena nada fora de `customer` e `hot`
-        (medido em 10/10: `unqualified` converte a 1,2% e `followup` a 0,2%).
-        O relato diz mais do que o rótulo.
+        Em 13/10/2026 o Lucas pediu estes dois blocos — a ficha e o ponto de
+        travamento — **juntos, logo acima do Copiloto**, em vez de no topo
+        absoluto. A ordem passou a ser: quem é o lead, depois o que aconteceu
+        nele, depois o que fazer.
+
+        Faz sentido: os dois são leitura da conversa e alimentam exatamente a
+        decisão que o Copiloto propõe. Separados por 300px de cartões de
+        número, ninguém ligava um ao outro.
       */}
       {ficha && (
         <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: "3px solid var(--purple)" }}>
@@ -529,168 +695,6 @@ export default function LeadDetailPage() {
           </div>
         );
       })()}
-
-      {/* ── Header card ─────────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 24, marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800 }}>{lead.contact}</h1>
-              {/* Source badges */}
-              {isMerged ? (
-                <div style={{ display: "flex", gap: 5 }}>
-                  <SourceBadge type="whatsapp" />
-                  <SourceBadge type="instagram" />
-                </div>
-              ) : (
-                <SourceBadge type={lead._channel === "instagram" ? "instagram" : "whatsapp"} />
-              )}
-            </div>
-            <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 10 }}>
-              {lead.phone || lead.filename} · {storeName || sellerName}
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Badge cls={lead.classification} />
-              {lead.phone && (() => {
-                const link = whatsappLink(lead.phone);
-                return link ? (
-                  <a href={link} target="_blank" rel="noopener noreferrer" style={{
-                    display: "inline-flex", alignItems: "center", gap: 8,
-                    background: "#075e54", borderRadius: 10,
-                    padding: "7px 16px", textDecoration: "none",
-                    transition: "all .2s", border: "none",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#128c7e"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#075e54"}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                    </svg>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Responder no WhatsApp</span>
-                  </a>
-                ) : null;
-              })()}
-            </div>
-          </div>
-          <ScoreRing score={lead.score} size={54} />
-        </div>
-
-        {/* Merged info banner */}
-        {isMerged && (
-          <div style={{
-            background: "rgba(124,92,252,.08)", border: "1px solid rgba(124,92,252,.3)",
-            borderRadius: 10, padding: "10px 14px", marginBottom: 14,
-            display: "flex", alignItems: "center", gap: 10, fontSize: 12,
-          }}>
-            <span style={{ fontSize: 16 }}>🔗</span>
-            <div style={{ color: "var(--dim)" }}>
-              Perfil unificado —
-              <span style={{ color: "var(--green)", fontWeight: 700 }}> 💬 {waMessages.length} mensagens WhatsApp</span>
-              {" "}+
-              <span style={{ color: "#ec4899", fontWeight: 700 }}> 📸 {igMessages.length} mensagens Instagram</span>
-            </div>
-          </div>
-        )}
-
-        {/* Insight */}
-        <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 5 }}>ANÁLISE DE IA</div>
-          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>{lead.insight}</p>
-        </div>
-
-        {/* Meta cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 14 }}>
-          {[
-            { l: "Perfil", v: lead.buyerProfile, c: "var(--txt)" },
-            { l: "Duração da conversa", v: lead.conversationDays === 0 ? "1 dia" : `${lead.conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
-            { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
-            { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
-            { l: "Risco de perda", v: `${lead.lossRisk}%`, c: lead.lossRisk > 60 ? "var(--red)" : "var(--yellow)" },
-          ].map(({ l, v, c }) => (
-            <div key={l} className="card2" style={{ padding: "10px 12px" }}>
-              <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Buy signals */}
-        {lead.buySignals.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {lead.buySignals.map(s => (
-                <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Objections */}
-        {lead.objections.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {lead.objections.map(o => (
-                <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Next action */}
-        <div style={{ background: "var(--card2)", border: `1px solid ${urgCol}50`, borderRadius: 10, padding: "12px 16px" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: urgCol, letterSpacing: .7, marginBottom: 5 }}>
-            <UrgencyDot urgency={lead.urgency} />
-            PRÓXIMA AÇÃO · {lead.urgency.toUpperCase()}
-          </div>
-          <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{lead.nextAction}</p>
-        </div>
-      </div>
-
-      {/* ── Marcar Venda Fechada ───────────────────────────────────────────── */}
-      {lead.classification !== "customer" && (
-        <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Venda fechada fora do chat?</div>
-              <div style={{ fontSize: 11, color: "var(--dim)" }}>Marque manualmente e o dashboard será atualizado.</div>
-            </div>
-            <button onClick={() => setShowSaleModal(true)} style={{
-              background: "var(--green)", border: "none", borderRadius: 10,
-              padding: "10px 18px", fontSize: 13, fontWeight: 700, color: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
-              transition: "opacity .15s",
-            }}
-              onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              <CheckCircle2 size={15} /> Marcar como Venda Fechada
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Manual sale badge if already marked */}
-      {lead.classification === "customer" && lead.manualSale && (
-        <div style={{
-          background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
-          borderRadius: 12, padding: "12px 18px", marginBottom: 14,
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <CheckCircle2 size={18} color="var(--green)" />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>
-              ✅ Venda fechada manualmente — {lead.manualSale.product}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--dim)" }}>
-              {lead.manualSale.value > 0 ? `R$ ${lead.manualSale.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · ` : ""}
-              {lead.manualSale.closedAt}
-              {lead.manualSale.notes ? ` · ${lead.manualSale.notes}` : ""}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Copilot de Vendas ───────────────────────────────────────────── */}
       <SalesCopilot
