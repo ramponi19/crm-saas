@@ -90,7 +90,15 @@ const NIVEL_DE_RACIOCINIO = 'low'
 export interface MensagemIA { role: string; content: string }
 
 export type ResultadoIA =
-  | { ok: true; texto: string }
+  /**
+   * `modelo` volta junto porque quem GUARDA a resposta precisa registrar quem
+   * a escreveu. A ficha do lead (`lib/zapintel/perfil.ts`) fica meses no
+   * banco, e o superadmin pode trocar o modelo na tela a qualquer momento —
+   * sem este campo, uma ficha ruim não teria como ser atribuída ao modelo que
+   * a produziu, e a comparação entre dois modelos viraria memória de quem
+   * estava na sala.
+   */
+  | { ok: true; texto: string; modelo: string }
   | { ok: false; status: number; erro: string }
 
 export async function perguntarIA(opts: {
@@ -211,7 +219,7 @@ export async function perguntarIA(opts: {
       tokens_out: uso?.candidatesTokenCount ?? null,
     } as never)
 
-    return { ok: true, texto: texto.trim() }
+    return { ok: true, texto: texto.trim(), modelo }
   } catch (e) {
     console.error(`[zapintel/ia:${origem}]`, e)
     return {

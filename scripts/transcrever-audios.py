@@ -226,6 +226,18 @@ def main() -> int:
 
     n = 0
     while pendentes:
+      # ⚠ LEVA QUE NÃO GRAVA NADA É LAÇO INFINITO.
+      #
+      # A condição do filtro é `transcricao is null`, então um arquivo que
+      # falha continua pendente — e a próxima leva traz os mesmos. Com 13.044
+      # dos 13.046 áudios já feitos, sobraram dois arquivos de 0 byte
+      # (`a25460` e `a153566`, mídia que nunca baixou), e o script ficou
+      # girando neles a noite inteira, imprimindo o mesmo erro do ffmpeg.
+      #
+      # Marcá-los como "sem fala" seria mentir: vazio significa "ouvi e não
+      # havia voz". Então a saída é parar e dizer quais são — alguém decide o
+      # que fazer com dois arquivos quebrados, o laço não.
+      gravou_nesta_leva = 0
       for item in piscina.map(pegar, pendentes):
         n += 1
         try:
@@ -243,6 +255,7 @@ def main() -> int:
             # "ainda não tentei", e o script rodaria nele para sempre.
             rest("PATCH", f"lead_mensagens?id=eq.{linha['id']}",
                  {"transcricao": texto}, {"Prefer": "return=minimal"})
+            gravou_nesta_leva += 1
             if texto:
                 feitos += 1
             else:
@@ -262,6 +275,12 @@ def main() -> int:
             vel = seg_audio / gasto if gasto else 0
             print(f"  {n} feitos ({feitos} com texto, {vazios} sem fala, "
                   f"{falhas} falhas) · {vel:.1f}x tempo real · {seg_audio/3600:.1f} h de audio")
+
+      if gravou_nesta_leva == 0:
+          ids = ", ".join(str(p["id"]) for p in pendentes[:10])
+          print(f"\n  PAREI: a leva inteira falhou ({len(pendentes)} arquivos) e nenhum "
+                f"foi gravado.\n  Perguntar de novo traria os mesmos. Ids: {ids}")
+          break
 
       # Acabou a leva: pergunta de novo. Ver `buscar_pendentes`.
       restam -= len(pendentes)

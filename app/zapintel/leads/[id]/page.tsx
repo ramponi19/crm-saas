@@ -5,6 +5,7 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
 import type { Travou } from "@/lib/zapintel/travou";
+import type { PerfilIA } from "@/lib/zapintel/perfil";
 import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import { generateCopilot, type CopilotResult, type CopilotStrategy } from "@/lib/zapintel/insights/followUp";
 import { getProducts } from "@/lib/zapintel/segments/segments";
@@ -110,6 +111,51 @@ function SaleModal({ contact, products, onConfirm, onClose }: {
   );
 }
 
+/**
+ * O SELO DE ORIGEM — e por que ele mora AQUI FORA.
+ *
+ * Nasceu dentro do componente da página, onde ficava mais perto de quem o
+ * usa. O `react-hooks/static-components` reclamou, e com razão: um componente
+ * declarado dentro de outro é um TIPO novo a cada render, então o React
+ * desmonta e remonta a subárvore inteira em vez de atualizá-la — e aqui a
+ * subárvore inclui o ícone que gira enquanto a IA analisa, que recomeçaria a
+ * animação a cada tecla digitada em qualquer campo da tela.
+ *
+ * Quanto ao conteúdo: o rótulo precisa dizer de onde veio o texto, sempre.
+ * Esta tela chamou de "ANÁLISE DE IA" uma cadeia de `if` por meses. Enquanto
+ * os dois caminhos coexistirem, cada bloco diz qual dos dois escreveu aquilo.
+ */
+function SeloIA({ rotulo, ia, analisando }: { rotulo: string; ia: boolean; analisando: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: ia ? "var(--purple-l)" : "var(--muted)", letterSpacing: .7 }}>
+        {rotulo}
+      </span>
+      {ia ? <EtiquetaIA /> : (
+        <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: .3 }}>regra automática</span>
+      )}
+      {analisando && (
+        <span style={{ fontSize: 9, color: "var(--dim)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <RefreshCw size={9} className="spin" /> analisando a conversa…
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A etiqueta sozinha, para os blocos que já têm título próprio. */
+function EtiquetaIA() {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, fontWeight: 700,
+      background: "rgba(124,92,252,.12)", border: "1px solid rgba(124,92,252,.3)",
+      color: "var(--purple-l)", borderRadius: 20, padding: "1px 7px", letterSpacing: .3,
+    }}>
+      <Sparkles size={9} /> ESCRITO POR IA
+    </span>
+  );
+}
+
 function whatsappLink(phone: string) {
   const digits = (phone || "").replace(/[^0-9]/g, "");
   if (!digits) return null;
@@ -148,6 +194,30 @@ export default function LeadDetailPage() {
    * justamente o caso da frase de retomada. Ver `lib/zapintel/travou.ts`.
    */
   const [travou, setTravou] = useState<Travou | null>(null);
+
+  /**
+   * A FICHA ESCRITA POR IA — o que esta tela afirma, do Copiloto para cima.
+   *
+   * Chega em dois tempos, de propósito. `/zapintel/api/conversa` traz de
+   * graça a que já estava guardada (uma consulta por chave primária), e a
+   * tela a mostra na hora, mesmo que tenha sido escrita antes das últimas
+   * mensagens. Se não existir nenhuma, ou se a conversa andou desde que
+   * aquela foi escrita, a tela pede uma nova em `/zapintel/api/perfil`.
+   *
+   * O pedido é AUTOMÁTICO porque foi assim que o Lucas pediu em 13/10/2026:
+   * "o que for de IA sempre será automático". Ninguém clica em "analisar" —
+   * abrir o lead é o gesto.
+   *
+   * Enquanto a nova não chega, a antiga continua à vista com um aviso de
+   * desatualizada. Esvaziar a tela para depois preenchê-la seria perder
+   * informação boa em troca de um spinner.
+   */
+  const [perfilIA, setPerfilIA] = useState<PerfilIA | null>(null);
+  const [perfilAtual, setPerfilAtual] = useState(true);
+  const [perfilEm, setPerfilEm] = useState<string | null>(null);
+  const [analisando, setAnalisando] = useState(false);
+  const [erroPerfil, setErroPerfil] = useState("");
+
   const [sugestao, setSugestao] = useState<string>("");
   const [sugerindo, setSugerindo] = useState(false);
   const [erroSugestao, setErroSugestao] = useState("");
@@ -174,12 +244,48 @@ export default function LeadDetailPage() {
           setConversa(d.lead as Lead);
           setFicha((d.ficha as Ficha) ?? null);
           setTravou((d.travou as Travou) ?? null);
+          const g = d.perfil as { perfil: PerfilIA; atual: boolean; geradoEm: string } | null;
+          if (g?.perfil) {
+            setPerfilIA(g.perfil);
+            setPerfilAtual(g.atual);
+            setPerfilEm(g.geradoEm);
+          }
+          // Não há ficha, ou a conversa andou depois que ela foi escrita.
+          if (!g?.atual) pedirPerfil(false);
         }
         else setFalhouConversa(true);
       })
       .catch(() => { if (vivo) setFalhouConversa(true); });
     return () => { vivo = false; };
+    // `pedirPerfil` só depende de `resumo.leadId`, que já está nas dependências.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumo?.leadId]);
+
+  /**
+   * Pede a ficha nova. `forcar` é o botão "Refazer análise" — o único caminho
+   * que manda a IA reescrever uma ficha que o servidor considera atual.
+   */
+  async function pedirPerfil(forcar: boolean) {
+    if (!resumo?.leadId) return;
+    setAnalisando(true); setErroPerfil("");
+    try {
+      const r = await fetch("/zapintel/api/perfil", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead: resumo.leadId, forcar }),
+      });
+      const d = await r.json();
+      if (!r.ok) setErroPerfil(d?.erro || "Não consegui analisar agora.");
+      else if (d?.perfil) {
+        setPerfilIA(d.perfil as PerfilIA);
+        setPerfilAtual(true);
+        setPerfilEm(String(d.geradoEm || new Date().toISOString()));
+      }
+    } catch {
+      setErroPerfil("Não consegui analisar agora.");
+    }
+    setAnalisando(false);
+  }
 
   // Derivado, não guardado: "está carregando" é exatamente "tem o que buscar e
   // ainda não chegou". Um estado separado só poderia divergir disso.
@@ -292,10 +398,31 @@ export default function LeadDetailPage() {
     setRegenId(null);
   }
 
+  /**
+   * O QUE A TELA AFIRMA — IA quando existe, motor de regra quando não existe.
+   *
+   * Não é um "modo IA" opcional: é a mesma tela, com a origem melhor de cada
+   * campo. Enquanto a ficha não foi gerada (lead recém-chegado, IA desligada
+   * pelo superadmin, provedor fora do ar), os motores antigos continuam
+   * respondendo — uma tela vazia seria pior que um rótulo genérico.
+   *
+   * O que NÃO entra aqui é contagem: mensagens, dias de conversa e dias de
+   * silêncio são fatos medidos, e pedir a um modelo que os repita só criaria
+   * uma chance de ele errar um número que já estava certo.
+   */
+  const ia = perfilIA;
+  const vClass = ia?.classificacao ?? lead.classification;
+  const vScore = ia?.score ?? lead.score;
+  const vPerfil = ia?.perfil ?? lead.buyerProfile;
+  const vRisco = ia?.riscoPerda ?? lead.lossRisk;
+  const vUrgencia = ia?.urgencia ?? lead.urgency;
+  const vProxima = ia?.proximaAcao ?? lead.nextAction;
+
   const urgColors: Record<string, string> = {
     critical: "var(--red)", high: "var(--orange)", medium: "var(--yellow)", low: "var(--dim)",
   };
-  const urgCol = urgColors[lead.urgency] || "var(--dim)";
+  const urgCol = urgColors[vUrgencia] || "var(--dim)";
+
 
   return (
     <div style={{ maxWidth: 840, margin: "0 auto" }}>
@@ -326,7 +453,7 @@ export default function LeadDetailPage() {
               {lead.phone || lead.filename} · {storeName || sellerName}
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Badge cls={lead.classification} />
+              <Badge cls={vClass} />
               {lead.phone && (() => {
                 const link = whatsappLink(lead.phone);
                 return link ? (
@@ -348,7 +475,7 @@ export default function LeadDetailPage() {
               })()}
             </div>
           </div>
-          <ScoreRing score={lead.score} size={54} />
+          <ScoreRing score={vScore} size={54} />
         </div>
 
         {/* Merged info banner */}
@@ -368,20 +495,40 @@ export default function LeadDetailPage() {
           </div>
         )}
 
-        {/* Insight */}
+        {/*
+          ANÁLISE DE IA — e desde 13/10/2026 o rótulo é verdade.
+
+          Até aqui, este bloco mostrava `lead.insight`, que era uma cadeia de
+          `if` sobre a fala do cliente em `insights/followUp.ts`. No lead 439
+          (Carol Baldasso) ele dizia "Preocupação com saúde da bateria —
+          reforçar garantia de 6 meses" para uma cliente que havia comprado
+          52 dias antes, recebido em casa e mandado foto com o aparelho.
+        */}
         <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 5 }}>ANÁLISE DE IA</div>
-          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>{lead.insight}</p>
+          <SeloIA rotulo="ANÁLISE DE IA" ia={!!ia} analisando={analisando} />
+          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>
+            {ia?.diagnostico || lead.insight}
+          </p>
+          {erroPerfil && (
+            <p style={{ fontSize: 11, color: "var(--yellow)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <AlertTriangle size={12} /> {erroPerfil}
+            </p>
+          )}
+          {ia && !perfilAtual && !analisando && (
+            <p style={{ fontSize: 10, color: "var(--muted)", marginTop: 8 }}>
+              Escrita antes das últimas mensagens — atualizando.
+            </p>
+          )}
         </div>
 
         {/* Meta cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 14 }}>
           {[
-            { l: "Perfil", v: lead.buyerProfile, c: "var(--txt)" },
+            { l: "Perfil", v: vPerfil, c: "var(--txt)" },
             { l: "Duração da conversa", v: lead.conversationDays === 0 ? "1 dia" : `${lead.conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
             { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
             { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
-            { l: "Risco de perda", v: `${lead.lossRisk}%`, c: lead.lossRisk > 60 ? "var(--red)" : "var(--yellow)" },
+            { l: "Risco de perda", v: `${vRisco}%`, c: vRisco > 60 ? "var(--red)" : "var(--yellow)" },
           ].map(({ l, v, c }) => (
             <div key={l} className="card2" style={{ padding: "10px 12px" }}>
               <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
@@ -390,43 +537,234 @@ export default function LeadDetailPage() {
           ))}
         </div>
 
-        {/* Buy signals */}
-        {lead.buySignals.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {lead.buySignals.map(s => (
-                <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/*
+          SINAIS E OBJEÇÕES — AGORA COM A EVIDÊNCIA DO LADO.
 
-        {/* Objections */}
-        {lead.objections.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {lead.objections.map(o => (
-                <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
-              ))}
-            </div>
-          </div>
+          A evidência não é enfeite: é o que separa análise de invenção com
+          boa redação. Um texto bonito e errado é pior que um rótulo genérico,
+          porque o vendedor acredita nele e liga errado na frente de um
+          cliente de verdade. Com o trecho à vista, quem lê confere em dois
+          segundos.
+
+          E era preciso: os rótulos antigos vinham de `includes` em texto
+          corrido. Medido no lead 439 em 13/10/2026, dois dos seis sinais eram
+          falsos — `Pediu NF` saiu de "só me co-NF-irma se é esse valor", e
+          `Indecisão / Timing` saiu da palavra "depois" em "tenho que ir aí
+          pagar depois buscar?". Nenhum dos dois sobreviveria a ter de mostrar
+          de onde veio.
+        */}
+        {ia ? (
+          <>
+            {ia.sinais.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <SeloIA rotulo="SINAIS DE COMPRA" ia={!!ia} analisando={analisando} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {ia.sinais.map((s, i) => (
+                    <div key={`${s.rotulo}-${i}`} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                      <span style={{
+                        background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)",
+                        color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11,
+                        flexShrink: 0,
+                      }}>✓ {s.rotulo}</span>
+                      {s.evidencia && (
+                        <span style={{ fontSize: 11, color: "var(--dim)", fontStyle: "italic", lineHeight: 1.5 }}>
+                          “{s.evidencia}”
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {ia.objecoes.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <SeloIA rotulo="OBJEÇÕES" ia={!!ia} analisando={analisando} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  {ia.objecoes.map((o, i) => (
+                    <div key={`${o.rotulo}-${i}`}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                        <span style={{
+                          background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)",
+                          color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11,
+                          flexShrink: 0,
+                        }}>⚠ {o.rotulo}</span>
+                        {o.evidencia && (
+                          <span style={{ fontSize: 11, color: "var(--dim)", fontStyle: "italic", lineHeight: 1.5 }}>
+                            “{o.evidencia}”
+                          </span>
+                        )}
+                      </div>
+                      {o.desfecho && (
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3, paddingLeft: 12 }}>
+                          → {o.desfecho}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/*
+              PONTAS SOLTAS — o que foi combinado e ninguém retomou.
+
+              Nasceu do teste na Carol: o marido pagou o iPhone cheio e o
+              12 Pro Max dela nunca foi entregue na troca, embora o vendedor
+              tenha prometido, EM ÁUDIO, aceitá-lo como entrada. É um seminovo
+              de R$ 1.200 parado na gaveta de uma cliente que confia na loja,
+              e nenhum motor de palavra-chave chegaria perto disso.
+            */}
+            {ia.pontasSoltas.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <SeloIA rotulo="FICOU EM ABERTO" ia={!!ia} analisando={analisando} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {ia.pontasSoltas.map((p, i) => (
+                    <div key={i} style={{
+                      display: "flex", gap: 8, alignItems: "baseline",
+                      background: "rgba(56,189,248,.07)", border: "1px solid rgba(56,189,248,.22)",
+                      borderRadius: 9, padding: "8px 12px",
+                    }}>
+                      <span style={{ color: "var(--teal)", fontSize: 12, flexShrink: 0 }}>◆</span>
+                      <span style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6 }}>{p}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {lead.buySignals.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {lead.buySignals.map(s => (
+                    <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {lead.objections.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {lead.objections.map(o => (
+                    <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Next action */}
         <div style={{ background: "var(--card2)", border: `1px solid ${urgCol}50`, borderRadius: 10, padding: "12px 16px" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: urgCol, letterSpacing: .7, marginBottom: 5 }}>
-            <UrgencyDot urgency={lead.urgency} />
-            PRÓXIMA AÇÃO · {lead.urgency.toUpperCase()}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: urgCol, letterSpacing: .7 }}>
+              <UrgencyDot urgency={vUrgencia} />
+              PRÓXIMA AÇÃO · {vUrgencia.toUpperCase()}
+            </span>
+            {ia && <EtiquetaIA />}
           </div>
-          <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{lead.nextAction}</p>
+          <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{vProxima}</p>
+          {ia?.proximaAcaoPorque && (
+            <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, marginTop: 6 }}>
+              Por quê: {ia.proximaAcaoPorque}
+            </p>
+          )}
+
+          {/*
+            A MENSAGEM É RASCUNHO, E A TELA PRECISA DIZER ISSO.
+
+            Nada é enviado por aqui: o botão copia. O prompt proíbe prometer
+            preço, prazo ou condição que a loja não tenha oferecido nesta
+            conversa, mas a última conferência é de quem vai mandar.
+          */}
+          {ia?.mensagemSugerida && (
+            <div style={{ marginTop: 12, background: "var(--card)", border: "1px solid var(--brd2)", borderRadius: 9, padding: "10px 13px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
+                  RASCUNHO PARA MANDAR AGORA
+                </span>
+                <button
+                  onClick={() => copyMsg("perfil", ia.mensagemSugerida)}
+                  style={{
+                    background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
+                    padding: "3px 9px", fontSize: 10, color: "var(--dim)", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
+                  }}
+                >
+                  <Copy size={10} /> {copiedId === "perfil" ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--txt)", lineHeight: 1.65 }}>{ia.mensagemSugerida}</p>
+            </div>
+          )}
+
+          {/*
+            Quem lê precisa saber quando isto foi escrito e poder mandar
+            refazer. Sem a data, uma ficha de três semanas atrás se apresenta
+            com a mesma autoridade de uma escrita há um minuto.
+          */}
+          {ia && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9.5, color: "var(--muted)" }}>
+                {perfilEm ? `Análise de ${new Date(perfilEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : ""}
+                {!perfilAtual && " · a conversa andou desde então"}
+              </span>
+              <button
+                onClick={() => pedirPerfil(true)}
+                disabled={analisando}
+                style={{
+                  background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
+                  padding: "3px 9px", fontSize: 10, color: "var(--dim)",
+                  cursor: analisando ? "not-allowed" : "pointer", opacity: analisando ? .5 : 1,
+                  display: "flex", alignItems: "center", gap: 5,
+                }}
+              >
+                <RefreshCw size={10} className={analisando ? "spin" : undefined} />
+                {analisando ? "Analisando…" : "Refazer análise"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Marcar Venda Fechada ───────────────────────────────────────────── */}
+      {/*
+        ── Marcar Venda Fechada ─────────────────────────────────────────────
+
+        ⚠ A CONDIÇÃO AQUI É `lead.classification`, NÃO `vClass`, E ISSO É DE
+        PROPÓSITO.
+
+        `lead.classification` só diz "customer" quando existe venda ligada a
+        este lead na ponte `zapintel_venda_lead` — fato do CRM. A IA diz
+        "customer" quando LÊ na conversa que a pessoa comprou. Quando os dois
+        divergem, é justamente aí que este botão mais serve: a venda aconteceu
+        e o sistema não sabe.
+
+        Trocar por `vClass` esconderia o botão exatamente no caso que ele
+        existe para resolver. Medido no lead 439 em 13/10/2026: a Carol pagou
+        R$ 5.695 em 22/08, e não há nenhuma venda entre R$ 5.000 e R$ 6.500 na
+        empresa 1 em toda aquela semana.
+      */}
       {lead.classification !== "customer" && (
         <div className="card" style={{ padding: 18, marginBottom: 14 }}>
+          {ia?.classificacao === "customer" && (
+            <div style={{
+              background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
+              borderRadius: 9, padding: "10px 13px", marginBottom: 14,
+              display: "flex", gap: 9, alignItems: "flex-start",
+            }}>
+              <AlertTriangle size={14} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+              <div style={{ fontSize: 11.5, color: "var(--dim)", lineHeight: 1.6 }}>
+                <b style={{ color: "var(--green)" }}>A conversa diz que esta venda aconteceu</b>, mas não há
+                venda ligada a este lead no CRM. Se foi fechada mesmo, registre aqui — o faturamento, o
+                ticket médio e o ciclo de venda do painel só contam o que está registrado.
+              </div>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Venda fechada fora do chat?</div>
@@ -502,8 +840,11 @@ export default function LeadDetailPage() {
             display: "flex", alignItems: "baseline", justifyContent: "space-between",
             gap: 10, marginBottom: 8,
           }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
-              O QUE ACONTECEU
+            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
+                O QUE ACONTECEU
+              </span>
+              {ia?.relato && <EtiquetaIA />}
             </div>
             <div style={{ fontSize: 10, color: "var(--dim)" }}>
               analisado agora · conversa até{" "}
@@ -519,8 +860,25 @@ export default function LeadDetailPage() {
               )}
             </div>
           </div>
-          <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--txt)", marginBottom: 14 }}>
-            {ficha.relato}
+          {/*
+            O RELATO: a IA quando existe, o mecânico quando não.
+
+            O relato mecânico (`montarRelato`, em `lib/zapintel/ficha.ts`)
+            continua sendo gerado e continua certo — ele é fato costurado em
+            frase ("Procurou iPhone 16 Pro Max. Pediu 18x. Travou em: Depende
+            de terceiro."). O que ele não consegue é ligar os fatos: que o
+            crédito foi negado duas vezes, que ela mesma propôs o cartão do
+            irmão, que o aparelho só se revelou por encomenda no último dia.
+
+            Os parágrafos vêm separados por linha em branco e são renderizados
+            como parágrafos. Jogar o texto inteiro num bloco só desfaria a
+            divisão que o modelo fez e devolveria a parede de texto que a
+            ficha veio substituir.
+          */}
+          <div style={{ fontSize: 14, lineHeight: 1.75, color: "var(--txt)", marginBottom: 14 }}>
+            {(ia?.relato || ficha.relato).split(/\n{2,}/).map((p, i) => (
+              <p key={i} style={{ marginBottom: 10 }}>{p.trim()}</p>
+            ))}
           </div>
 
           {/*
@@ -1076,6 +1434,11 @@ function SalesCopilot({
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        /* O ícone que gira enquanto a IA lê a conversa. O keyframe já existia
+           aqui; faltava a classe, e sem ela o ícone ficava parado anunciando
+           trabalho em andamento. */
+        .spin { animation: spin 1s linear infinite; }
+        @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
       `}</style>
     </div>
   );

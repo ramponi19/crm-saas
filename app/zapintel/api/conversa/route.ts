@@ -4,6 +4,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
+import { lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
 
 /**
  * UMA conversa, inteira, mais a FICHA dela.
@@ -73,7 +74,22 @@ export async function GET(req: Request) {
     // em conversa que virou venda. Ver `lib/zapintel/travou.ts`.
     const travou = ondeTravou(lead, !!ponte)
 
-    return NextResponse.json({ lead, ficha, travou })
+    /**
+     * A FICHA DE IA VEM JUNTO — SE JÁ EXISTIR. Esta rota nunca gera.
+     *
+     * A tela do lead precisa abrir na hora. Gerar aqui faria toda primeira
+     * abertura esperar 8 segundos por um modelo, e seria pior ainda: a mesma
+     * espera voltaria em cada lead que alguém abrisse só para dar uma olhada.
+     *
+     * Então o que está guardado vem junto de graça (uma consulta por chave
+     * primária), com `atual` dizendo se foi escrito para a conversa como ela
+     * está agora. Quem decide pedir uma nova é a tela, chamando
+     * `/zapintel/api/perfil` — e enquanto a nova não chega, a antiga fica à
+     * vista, marcada como desatualizada, em vez de a tela ficar vazia.
+     */
+    const perfil = await lerPerfil(db, empresaId, id, marcaDaConversa(lead))
+
+    return NextResponse.json({ lead, ficha, travou, perfil })
   } catch (e) {
     console.error('zapintel/conversa:', (e as Error).message)
     return NextResponse.json({ erro: 'falha ao ler a conversa' }, { status: 500 })
