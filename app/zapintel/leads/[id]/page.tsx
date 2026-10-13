@@ -932,8 +932,26 @@ export default function LeadDetailPage() {
         Nada aparece aqui em conversa que virou venda: ali não travou nada, e
         pintar alerta sobre venda fechada é o sistema mentindo com cara de
         ajuda. Ver `lib/zapintel/travou.ts`.
+
+        ⚠ `ondeTravou` decide isso pela PONTE de vendas, que é fato do CRM — e
+        quando a venda não foi registrada, ele não tem como saber. Visto na
+        tela em 13/10/2026, no lead 439: o bloco anunciava
+
+            ONDE A VENDA TRAVOU · há 49 dias
+            "A loja disse isto e ele não respondeu mais:
+             Obrigadooo pelo feedback!!!!!"
+
+        numa conversa que terminou com a cliente mandando foto do aparelho que
+        acabara de comprar. A loja respondeu "obrigado pelo feedback" e, claro,
+        não houve mais nada a dizer — isso é uma conversa que ACABOU, não uma
+        que travou.
+
+        A IA sabe o que a ponte não sabe, porque leu a conversa. Então quando
+        ela diz que a pessoa comprou, o bloco some — mesmo sem venda
+        registrada. O caminho de corrigir o registro continua logo acima, no
+        aviso em cima de "Marcar Venda Fechada".
       */}
-      {travou && (() => {
+      {travou && ia?.classificacao !== "customer" && (() => {
         const msg = lead.messages[travou.indice];
         const grave = travou.tipo === "objecao_sem_resposta" || travou.tipo === "loja_deve_resposta";
         const cor = grave ? "var(--red)" : "var(--yellow)";
