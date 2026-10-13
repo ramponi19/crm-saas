@@ -1285,6 +1285,29 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
       const externalId = m.id as string | undefined;
       if (!tipoDb || !externalId) continue;
 
+      /**
+       * ⚠ A MENSAGEM PRIMEIRO, O ARQUIVO DEPOIS.
+       *
+       * Até 13/10/2026 esta função baixava a mídia e SÓ ENTÃO procurava a
+       * mensagem para anexá-la. Quando não achava, contava `semPlaceholder` e
+       * seguia — **deixando o arquivo no bucket, órfão para sempre**.
+       *
+       * É o mesmo bug nº 1 de 11/09 ("arquivo salvo antes da mensagem"), que
+       * foi corrigido no caminho normal e sobreviveu aqui. O preço medido: numa
+       * única sincronização, às 13:00 de 13/10, **540 arquivos e 40 MB** de
+       * lixo — mais de um terço de todo o lixo do bucket, numa hora.
+       *
+       * Nasce disso: o `history` traz até 6 meses de conversa, e o CRM só tem
+       * desde 31/07. Mídia de mensagem que nunca vai existir aqui era baixada
+       * do mesmo jeito.
+       *
+       * Conferir antes custa uma consulta por item e evita o download inteiro.
+       */
+      const { data: alvo } = await db.from("lead_mensagens")
+        .select("id").eq("empresa_id", canal.empresa_id).eq("external_id", externalId)
+        .limit(1).maybeSingle();
+      if (!alvo) { semPlaceholder++; continue; }
+
       const midia = m[tipoMsg] as Record<string, unknown> | undefined;
       const url = await salvarMidiaWhatsApp(canal, midia?.id as string | undefined);
       if (!url) continue;
@@ -1292,7 +1315,7 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
       const legenda = midia?.caption as string | undefined;
       const { data } = await db.from("lead_mensagens")
         .update({ tipo: tipoDb, midia_url: url, ...(legenda ? { conteudo: legenda } : {}) })
-        .eq("empresa_id", canal.empresa_id).eq("external_id", externalId)
+        .eq("id", alvo.id)
         .select("id");
       if (data?.length) enriquecidas++; else semPlaceholder++;
     } catch (e) { console.error("midia do histórico:", e); }
