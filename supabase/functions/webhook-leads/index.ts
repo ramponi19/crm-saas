@@ -1142,7 +1142,7 @@ async function guardarBruto(canal: Canal, tipo: string, value: unknown) {
 //      O lead criado recebe ultima_mensagem_at da última mensagem REAL, então
 //      conversa antiga afunda na lista e não atropela o atendimento do dia.
 async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]) {
-  let importadas = 0, criados = 0, reativados = 0, falhas = 0;
+  let importadas = 0, criados = 0, reativados = 0, falhas = 0, ignorados = 0;
   let progresso: number | null = null;
 
   for (const bloco of blocos) {
@@ -1262,6 +1262,29 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
         }
       }
 
+      /**
+       * ⚠ CONVERSA DE UMA MENSAGEM NÃO VIRA LEAD NOVO.
+       *
+       * O histórico que a Meta manda é RASO. Medido em 13/10/2026, somando
+       * todos os eventos de uma sincronização: **406 conversas e 613
+       * mensagens** — 1,5 por conversa. Ela não devolve o diálogo, devolve a
+       * última troca de cada um.
+       *
+       * Com isso, cada reconexão de número enchia o funil de casca. Na
+       * reconexão de Jaguariúna, às 10h de 13/10: **231 leads criados numa
+       * hora, 188 deles com uma mensagem só** — quase sempre o fecho educado
+       * de um atendimento de setembro ("Magina! 😊", "No que precisar estamos
+       * à disposição"). Entravam como "novo", de hoje, sem nada de novo.
+       *
+       * Resultado: 44% do funil de Jaguariúna era sobra de sync, contra 16%
+       * em Mogi — e qualquer número que a loja olhasse estava contaminado.
+       *
+       * Decisão do Lucas em 13/10: uma mensagem só não vira lead, sem olhar a
+       * idade. **Se o lead JÁ existe, a mensagem entra normalmente** — o que
+       * não acontece é nascer conversa do nada.
+       */
+      if (!leadId && linhas.length < 2) { ignorados++; continue; }
+
       if (!leadId) {
         const { data: novo, error } = await db.from("leads").insert([{
           empresa_id: canal.empresa_id, nome: fone, telefone: fone,
@@ -1293,7 +1316,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
   const patch: Record<string, unknown> = { sync_historico_em: new Date().toISOString() };
   if (progresso != null) patch.sync_historico_pct = progresso;
   await db.from("canais_conectados").update(patch).eq("id", canal.id);
-  console.log(`histórico: ${importadas} mensagens, ${criados} leads criados, ${reativados} reativados, ${falhas} falhas, progresso ${progresso ?? "?"}%`);
+  console.log(`histórico: ${importadas} mensagens, ${criados} leads criados, ${reativados} reativados, ${ignorados} conversas de 1 msg ignoradas, ${falhas} falhas, progresso ${progresso ?? "?"}%`);
 }
 
 // A mídia do histórico chega DEPOIS, num aviso separado que usa a chave "messages"

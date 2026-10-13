@@ -233,6 +233,10 @@ echo "== direcao do historico importado (13/10) =="
 n "nao decide direcao por to"        "supabase/functions/webhook-leads/index.ts" "doNegocio = !!m.to;"
 v "direcao vem do remetente"         "supabase/functions/webhook-leads/index.ts" "remetente === numeroDaLoja"
 v "versao subiu com a correcao"      "lib/zapintel/cache.ts" "VERSAO_DO_CALCULO = .v13."
+# O historico da Meta e RASO: 406 conversas, 613 mensagens (1,5 cada). Cada
+# reconexao enchia o funil de casca — 188 leads de 1 msg numa hora.
+v "conversa de 1 msg nao vira lead"  "supabase/functions/webhook-leads/index.ts" "linhas.length < 2"
+v "conta quantas foram ignoradas"    "supabase/functions/webhook-leads/index.ts" "conversas de 1 msg ignoradas"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"
