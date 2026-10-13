@@ -196,6 +196,12 @@ v "briefing proibe inventar numero"  "lib/zapintel/dia.ts" "USE SOMENTE os núme
 v "teto de tokens e de seguranca"    "lib/zapintel/ia.ts" "TETO_DE_SEGURANCA = 8_000"
 n "dia nao aperta o teto"            "app/zapintel/api/dia/route.ts" "maxTokens: [0-9]"
 n "sugestao nao aperta o teto"       "app/zapintel/api/sugestao/route.ts" "maxTokens: [0-9]"
+# O padrao do gemini-3.6-flash e pensar em `medium`, e isso estourou 20s de
+# timeout em producao com o briefing completo. Redacao nao precisa raciocinio.
+v "ia pede raciocinio baixo"         "lib/zapintel/ia.ts" "NIVEL_DE_RACIOCINIO = 'low'"
+# Modelo que nao conhecer o campo nao pode derrubar a IA inteira do CRM.
+v "modelo sem thinking tem volta"    "lib/zapintel/ia.ts" "repetindo sem ele"
+v "funcao vive mais que o fetch"     "app/zapintel/api/dia/route.ts" "maxDuration = 60"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

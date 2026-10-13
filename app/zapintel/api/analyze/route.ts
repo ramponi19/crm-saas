@@ -26,6 +26,17 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  */
 export const dynamic = 'force-dynamic'
 
+/**
+ * A função pode esperar até 45 s pelo provedor (ver `lib/zapintel/ia.ts`), e o
+ * padrão da plataforma é menor que isso — sem esta linha a função morreria
+ * antes do `fetch` desistir, e o log não diria por quê.
+ *
+ * Não ameaça o teto de CPU da conta: no modelo da Vercel, função PARADA
+ * esperando rede não é Active CPU. O que custa é processar, e aqui quem
+ * processa é o Google.
+ */
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   // A empresa vem da sessão. Além de identificar o tenant para a contabilidade,
   // é o que impede esta rota de virar um proxy de IA aberto para quem souber

@@ -63,6 +63,30 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
  */
 const TETO_DE_SEGURANCA = 8_000
 
+/**
+ * QUANTO O MODELO PENSA ANTES DE ESCREVER.
+ *
+ * Medido em produção em 13/10/2026: com o padrão (`medium` no
+ * `gemini-3.6-flash`), o resumo do dia **estourou 20 s de timeout** — duas
+ * vezes seguidas, com o briefing completo da JM. O log registrou
+ * `TimeoutError` e a tela mostrou "a IA está indisponível".
+ *
+ * A documentação do Gemini diz que é por aqui que se corta tempo e custo, e
+ * não pelo teto de saída:
+ *
+ *   "To reduce cost or latency without truncating responses, lower
+ *    thinking_level (low or medium) instead of setting a small
+ *    max_output_tokens."
+ *
+ * `low` é o certo para o que este módulo pede: escrever em frase números que
+ * já vêm calculados, e redigir uma mensagem de WhatsApp. Nenhuma das duas é
+ * tarefa de raciocínio — é redação. Raciocínio aqui é tempo e cota gastos
+ * para chegar na mesma frase.
+ *
+ * Níveis que o 3.6 aceita: minimal, low, medium, high.
+ */
+const NIVEL_DE_RACIOCINIO = 'low'
+
 export interface MensagemIA { role: string; content: string }
 
 export type ResultadoIA =
@@ -100,30 +124,56 @@ export async function perguntarIA(opts: {
   }
   const modelo = cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
 
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // O Gemini separa a instrução de sistema das mensagens, e chama
-          // "model" o que a Anthropic chama "assistant".
-          ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
-          contents: mensagens.map((m) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          })),
-          generationConfig: { temperature: 0.5, maxOutputTokens: maxTokens ?? TETO_DE_SEGURANCA },
-        }),
-        // Sem isto, provedor lento prende a função até o limite da plataforma e
-        // o usuário fica olhando um botão girando sem saber se ainda há algo
-        // acontecendo.
-        signal: AbortSignal.timeout(20_000),
-      },
-    )
+  const corpo = (comThinking: boolean) => JSON.stringify({
+    // O Gemini separa a instrução de sistema das mensagens, e chama
+    // "model" o que a Anthropic chama "assistant".
+    ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
+    contents: mensagens.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: {
+      temperature: 0.5,
+      maxOutputTokens: maxTokens ?? TETO_DE_SEGURANCA,
+      ...(comThinking ? { thinkingConfig: { thinkingLevel: NIVEL_DE_RACIOCINIO } } : {}),
+    },
+  })
 
-    const j = await r.json()
+  const chamar = (comThinking: boolean) => fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: corpo(comThinking),
+      // Provedor lento prende a função até o limite da plataforma e o usuário
+      // fica olhando um botão girar. 45 s porque 20 s não bastavam: ver
+      // NIVEL_DE_RACIOCINIO.
+      signal: AbortSignal.timeout(45_000),
+    },
+  )
+
+  try {
+    let r = await chamar(true)
+    let j = await r.json()
+
+    /**
+     * O MODELO PODE NÃO CONHECER `thinkingLevel` — e aí a culpa não é do pedido.
+     *
+     * `assistente_config.modelo` é escolhido pelo superadmin numa lista que vem
+     * da própria API do Google, então amanhã pode estar lá um modelo antigo que
+     * recusa o campo com 400. Sem esta volta, UMA escolha de modelo na tela de
+     * configuração derrubaria TODA a IA do CRM — assistente, copiloto, sugestão
+     * e resumo do dia — com um erro que não diz o que houve.
+     *
+     * Então: se o 400 fala do campo, repete sem ele. Uma vez só, e o log diz
+     * que aconteceu, para ninguém descobrir isso de novo do zero.
+     */
+    if (!r.ok && r.status === 400 && /thinking/i.test(String(j?.error?.message ?? ''))) {
+      console.warn(`[zapintel/ia:${origem}] ${modelo} recusou thinkingLevel; repetindo sem ele`)
+      r = await chamar(false)
+      j = await r.json()
+    }
+
     if (!r.ok) {
       const cru = (j?.error?.message as string) ?? `HTTP ${r.status}`
       console.error(`[zapintel/ia:${origem}] provedor recusou:`, r.status, modelo, cru)
