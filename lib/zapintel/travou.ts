@@ -1,6 +1,6 @@
 import type { Lead, RawMessage } from '@/types/zapintel'
 import { OBJECOES } from '@/lib/zapintel/montar'
-import { ehFala, indiceDaFalaQueEncerrou } from '@/lib/zapintel/ficha'
+import { ehFala, indiceDaFalaQueEncerrou, type Ficha } from '@/lib/zapintel/ficha'
 
 /**
  * ONDE A VENDA COMEÇOU A SE PERDER — o ponto exato, dentro da conversa.
@@ -273,11 +273,27 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
  * 40 mensagens e devolve genérico. O que decide a próxima mensagem é o que ele
  * pediu, o que a loja ofereceu, onde travou e há quanto tempo.
  */
-export function contextoDaSugestao(a: Lead, t: Travou): string {
+export function contextoDaSugestao(a: Lead, t: Travou, f?: Ficha): string {
   const m = (a.messages || [])[t.indice]
   const linhas = [
     `Cliente: ${a.contact}`,
     `Situação: ${t.rotulo} (${t.detalhe})`,
+    /**
+     * O QUE ELE PROCUROU — e por que esta linha vale mais que o ramo do
+     * segmento.
+     *
+     * Medido em produção em 13/10/2026: sem ela, a IA escrevia "ainda tenho
+     * suas PEÇAS separadinhas aqui" e "garantir aquele ITEM" para clientes que
+     * queriam iPhone. O prompt descrevia o negócio com
+     * `getSegment().followupContext`, e a JM cai em `ecommerce`, cujo texto é
+     * "Atendente de loja de moda/varejo".
+     *
+     * O ramo vinha de um mapa (`varejo` → `ecommerce`) que não distingue
+     * varejo de celular de varejo de roupa. O que o CLIENTE pediu, nesta
+     * conversa, é fato — e descreve o negócio melhor que qualquer rótulo.
+     */
+    f?.procurou.length ? `O que ele procurou: ${f.procurou.join(', ')}` : '',
+    f?.ultimaOferta ? `A última oferta da loja foi: "${f.ultimaOferta.slice(0, TAMANHO)}"` : '',
     m ? `A mensagem onde travou (${m.isStore ? 'loja' : 'cliente'}): "${corpo(m).slice(0, TAMANHO)}"` : '',
     a.buySignals?.length ? `Sinais de compra: ${a.buySignals.join(', ')}` : '',
     t.objecao ? `Objeção: ${t.objecao}` : '',

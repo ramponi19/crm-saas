@@ -3,7 +3,8 @@ import { zapintelEmpresa } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { ondeTravou, contextoDaSugestao } from '@/lib/zapintel/travou'
-import { getRole, getSegment } from '@/lib/zapintel/segments/segments'
+import { montarFicha } from '@/lib/zapintel/ficha'
+import { getRole } from '@/lib/zapintel/segments/segments'
 import { perguntarIA } from '@/lib/zapintel/ia'
 
 /**
@@ -79,12 +80,42 @@ export async function POST(req: Request) {
     )
   }
 
-  const seg = getSegment(segmentId)
   const papel = getRole(segmentId)
+
+  /**
+   * ⚠ O RAMO DO SEGMENTO SAIU DAQUI, e a razão está na tela.
+   *
+   * O prompt dizia `Sobre o negócio: ${getSegment(segmentId).followupContext}`.
+   * Medido em produção em 13/10/2026, foi isto que a IA escreveu para clientes
+   * que queriam iPhone:
+   *
+   *     "ainda tenho suas PEÇAS separadinhas aqui"
+   *     "garantir aquele ITEM com a gente"
+   *
+   * Vocabulário de loja de roupa. A JM tem `segmento = 'varejo'` no CRM, e
+   * `CRM_TO_ZAPINTEL` manda varejo → `ecommerce`, cujo `followupContext` é
+   * "Atendente de loja de moda/varejo". O mapa não distingue varejo de celular
+   * de varejo de roupa, e o ZapIntel tem um segmento `celulares` que ninguém
+   * alcança.
+   *
+   * O conserto não é corrigir o mapa aqui: é parar de deduzir o negócio.
+   * `contextoDaSugestao` passa o que o CLIENTE pediu NESTA conversa e a última
+   * oferta que a loja fez — fato, e descreve o negócio melhor que o rótulo.
+   *
+   * O `papel` fica: "Vendedor"/"Corretor"/"Atendente" erra bem menos, e é só
+   * uma palavra.
+   */
+  const ficha = montarFicha(lead, {
+    leadId: id,
+    filialId: lead.crm?.filialId ?? null,
+    canal: lead.crm?.canal ?? 'whatsapp',
+    comprou: !!ponte,
+    valorVenda: null,
+    diasAteVenda: null,
+  })
 
   const system = [
     `Você escreve a próxima mensagem de WhatsApp para ${papel.toLowerCase()} de ${nomeDaLoja}.`,
-    `Sobre o negócio: ${seg.followupContext}`,
     '',
     'REGRAS, todas obrigatórias:',
     '- Escreva em português brasileiro informal e caloroso, como gente de loja fala.',
@@ -93,6 +124,8 @@ export async function POST(req: Request) {
     '- NUNCA invente preço, desconto, parcela, prazo ou condição que não esteja',
     '  escrito no contexto. Prometer o que a loja não disse cria dívida que',
     '  alguém vai ter que honrar ou desdizer.',
+    '- Fale do produto pelo nome que aparece no contexto. Se não houver nenhum,',
+    '  não invente categoria ("suas peças", "aquele item"): fale do pedido dele.',
     '- Não se desculpe pela demora mais de uma vez, e não use "prezado",',
     '  "venho por meio desta" nem emoji em excesso (no máximo um).',
     '- Responda SOMENTE com o texto da mensagem, sem aspas e sem explicação.',
@@ -101,7 +134,7 @@ export async function POST(req: Request) {
   const prompt = [
     'Esta conversa travou. Escreva a mensagem que retoma dali.',
     '',
-    contextoDaSugestao(lead, travou),
+    contextoDaSugestao(lead, travou, ficha),
   ].join('\n')
 
   const r = await perguntarIA({

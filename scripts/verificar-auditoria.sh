@@ -202,6 +202,15 @@ v "ia pede raciocinio baixo"         "lib/zapintel/ia.ts" "NIVEL_DE_RACIOCINIO =
 # Modelo que nao conhecer o campo nao pode derrubar a IA inteira do CRM.
 v "modelo sem thinking tem volta"    "lib/zapintel/ia.ts" "repetindo sem ele"
 v "funcao vive mais que o fetch"     "app/zapintel/api/dia/route.ts" "maxDuration = 60"
+# 503 do Google e pico de demanda, e ele mesmo diz que passa.
+v "503 do provedor tem retentativa"  "lib/zapintel/ia.ts" "em alta demanda; tentando de novo"
+# A JM e `varejo` no CRM -> `ecommerce` no ZapIntel -> "loja de moda/varejo".
+# Com isso no prompt, a IA oferecia "suas pecas" para quem queria iPhone.
+v "sugestao importa so o papel"      "app/zapintel/api/sugestao/route.ts" "import { getRole } from"
+v "sugestao fala do produto real"    "lib/zapintel/travou.ts" "O que ele procurou"
+# "Precedeu" nao e "causou" — a IA virou ordem o que era correlacao.
+v "briefing marca a correlacao"      "lib/zapintel/dia.ts" "correlação, não causa"
+v "prompt proibe virar ordem"        "lib/zapintel/dia.ts" "Não transforme correlação em ordem"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

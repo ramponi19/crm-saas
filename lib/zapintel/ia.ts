@@ -174,6 +174,27 @@ export async function perguntarIA(opts: {
       j = await r.json()
     }
 
+    /**
+     * 503 DO GOOGLE É PICO DE DEMANDA, E ELE MESMO DIZ QUE PASSA.
+     *
+     *   "This model is currently experiencing high demand. Spikes in demand
+     *    are usually temporary. Please try again later."
+     *
+     * Visto várias vezes em 13/10/2026 no `gemini-3.6-flash`, intercalado com
+     * respostas boas — 6 de 6 numa medição, 2 recusas na seguinte. Desistir na
+     * primeira faz uma funcionalidade que funciona parecer quebrada.
+     *
+     * Uma tentativa, depois de dois segundos. Mais que isso vira espera longa
+     * para alguém que está olhando a tela, e o erro traduzido já diz o que
+     * fazer.
+     */
+    if (!r.ok && r.status === 503) {
+      console.warn(`[zapintel/ia:${origem}] ${modelo} em alta demanda; tentando de novo`)
+      await new Promise((ok) => setTimeout(ok, 2_000))
+      r = await chamar(true)
+      j = await r.json()
+    }
+
     if (!r.ok) {
       const cru = (j?.error?.message as string) ?? `HTTP ${r.status}`
       console.error(`[zapintel/ia:${origem}] provedor recusou:`, r.status, modelo, cru)

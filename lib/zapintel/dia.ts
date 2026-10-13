@@ -125,7 +125,19 @@ export function briefingDoDia(p: Painel): string {
   }
   if (g.silencio.length) {
     const top = g.silencio[0]
-    linhas.push(`A frase da loja que mais precedeu silêncio: "${top.frase}" (${top.vezes} conversas).`)
+    /**
+     * ⚠ "PRECEDEU" NÃO É "CAUSOU", E A FRASE PRECISA DIZER ISSO.
+     *
+     * Medido em produção em 13/10/2026: com a linha escrita sem a ressalva, a
+     * IA fechou o parágrafo com *"Oriente a equipe a trocar a frase 'O que
+     * você acha?'"* — virou ordem o que é só correlação. A própria tela avisa,
+     * logo abaixo do ranking: "indica onde olhar, não o que culpar".
+     *
+     * É exatamente o erro que esta reconstrução passou a semana removendo. Se
+     * o briefing não marca a diferença, o modelo não inventa a cautela.
+     */
+    linhas.push(`A frase da loja que mais apareceu ANTES de o cliente sumir: "${top.frase}"`
+      + ` (${top.vezes} conversas). Isso é correlação, não causa — não recomende trocá-la.`)
   }
 
   return linhas.join('\n')
@@ -152,6 +164,8 @@ export function systemDoDia(papel: string, ramo: string): string {
     '  estime e não arredonde para um número que não está escrito lá. Se um',
     '  dado não estiver no briefing, ele não existe.',
     '- Não dê bronca nem elogie. Diga o que está acontecendo e o que fazer.',
+    '- Não transforme correlação em ordem. Se o briefing diz que algo apenas',
+    '  APARECEU ANTES de um resultado, não mande mudar esse algo.',
     '- Responda só com o texto, sem título, sem lista e sem markdown.',
   ].join('\n')
 }
