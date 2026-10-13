@@ -1,10 +1,13 @@
 /**
  * A FICHA DE IA DE UM LEAD — montada aqui fora, para ser julgada antes de ir
- * para a tela.
+ * para a tela. E, com `--todos`, a base inteira de uma vez.
  *
  *     npx tsx scripts/perfil-zapintel.mts 439          (só o prompt)
  *     npx tsx scripts/perfil-zapintel.mts 439 --ia     (chama o modelo)
  *     npx tsx scripts/perfil-zapintel.mts 439 --ia --salvar
+ *
+ *     npx tsx scripts/perfil-zapintel.mts --todos 1 --limite 20   (prova)
+ *     npx tsx scripts/perfil-zapintel.mts --todos 1               (tudo)
  *
  * ══ POR QUE UM SCRIPT, E NÃO ABRIR A TELA ══════════════════════════════════
  *
@@ -28,8 +31,9 @@ import { carregarConversas } from '../lib/zapintel/conversas'
 import { montarFicha } from '../lib/zapintel/ficha'
 import { ondeTravou } from '../lib/zapintel/travou'
 import {
-  contextoDoPerfil, gerarPerfil, guardarPerfil, marcaDaConversa,
+  contextoDoPerfil, gerarPerfil, guardarPerfil, lerPerfil, marcaDaConversa,
 } from '../lib/zapintel/perfil'
+import type { RawMessage } from '../types/zapintel'
 
 const env = Object.fromEntries(
   fs.readFileSync('.env.local', 'utf8').split('\n')
@@ -42,11 +46,21 @@ for (const [k, v] of Object.entries(env)) if (!process.env[k]) process.env[k] = 
 
 const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 
-const LEAD = Number(process.argv[2])
 const COM_IA = process.argv.includes('--ia')
 const SALVAR = process.argv.includes('--salvar')
+const TODOS = process.argv.includes('--todos')
+const arg = (nome: string): number | null => {
+  const i = process.argv.indexOf(nome)
+  const v = i >= 0 ? Number(process.argv[i + 1]) : NaN
+  return Number.isFinite(v) ? v : null
+}
+
+if (TODOS) { await base(arg('--todos') ?? 1, arg('--limite')); process.exit(0) }
+
+const LEAD = Number(process.argv[2])
 if (!Number.isInteger(LEAD) || LEAD <= 0) {
   console.error('uso: npx tsx scripts/perfil-zapintel.mts <leadId> [--ia] [--salvar]')
+  console.error('     npx tsx scripts/perfil-zapintel.mts --todos <empresaId> [--limite N]')
   process.exit(1)
 }
 
@@ -136,4 +150,110 @@ if (SALVAR) {
   const { data: cfg } = await db.from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
   await guardarPerfil(db, EMPRESA, LEAD, marca, p, (cfg?.modelo as string) ?? null, r.ms)
   console.log(`guardado em zapintel_lead_perfil (lead ${LEAD}).\n`)
+}
+
+/**
+ * A BASE INTEIRA — a ficha de todo lead que tem conversa de verdade.
+ *
+ * ══ POR QUE EM LOTE, SE A TELA JÁ GERA SOZINHA ═════════════════════════════
+ *
+ * Porque sob demanda o primeiro a abrir cada lead espera o modelo, e porque o
+ * Lucas quer a base pronta: *"podemos ja realizar a construcao para todos"*.
+ * Medido em 13/10/2026 na empresa 1: 1.914 leads com conversa real, 30,3
+ * mensagens de média — cerca de R$ 5 com Haiku, R$ 24 com Gemini Flash pago.
+ *
+ * ══ QUEM FICA DE FORA, E POR QUÊ ═══════════════════════════════════════════
+ *
+ * Lead com menos de 2 mensagens, ou em que o cliente nunca falou. São 89 na
+ * empresa 1 — disparo, casca de sincronização, número errado. Pagar por uma
+ * ficha de uma conversa que não existiu produziria exatamente o texto vazio
+ * que este módulo veio eliminar.
+ *
+ * ══ AS TRÊS PROTEÇÕES ══════════════════════════════════════════════════════
+ *
+ * `LADO_A_LADO = 3` ... provedor tem limite por minuto, e estourá-lo faz o
+ *                      lote inteiro falhar em cascata com 429.
+ * `--limite N` ....... prova com 20 antes de gastar com 1.914.
+ * falhas seguidas .... 5 erros em sequência param tudo. Cota esgotada ou
+ *                      chave errada devolvem erro em TODO lead, e sem este
+ *                      corte o laço percorreria a base inteira gastando
+ *                      tempo para gravar nada.
+ */
+async function base(empresaId: number, limite: number | null): Promise<void> {
+  const t0 = Date.now()
+  console.log(`\nlendo as conversas da empresa ${empresaId}...`)
+  const { analisados, porId, nomeDaLoja } = await carregarConversas(db, empresaId)
+
+  const { data: ponteRaw } = await db
+    .from('zapintel_venda_lead').select('lead_id, venda_id, dias_ate_venda')
+    .eq('empresa_id', empresaId).not('lead_id', 'is', null)
+  const { data: vendasRaw } = await db
+    .from('vendas').select('id, valor_venda').eq('empresa_id', empresaId)
+  const valorDa = new Map((vendasRaw ?? []).map((v) => [v.id as number, Number(v.valor_venda ?? 0)]))
+  const compra = new Map<number, { valor: number | null; dias: number | null }>()
+  for (const p of ponteRaw ?? []) {
+    compra.set(p.lead_id as number, {
+      valor: valorDa.get(p.venda_id as number) ?? null,
+      dias: (p.dias_ate_venda as number | null) ?? null,
+    })
+  }
+
+  const { data: cfg } = await db.from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
+  const modelo = (cfg?.modelo as string) ?? null
+
+  // Só quem teve conversa. Ver o cabeçalho.
+  const alvos = analisados.filter((a) => {
+    const id = Number(String(a.id).replace('lead-', ''))
+    return porId.has(id) && a.messages.length >= 2 && a.messages.some((m: RawMessage) => !m.isStore)
+  })
+  const fila = limite ? alvos.slice(0, limite) : alvos
+  console.log(`${analisados.length} leads · ${alvos.length} com conversa real · vou fazer ${fila.length}\n`)
+
+  let feitos = 0, pulados = 0, falhas = 0, seguidas = 0
+  const LADO_A_LADO = 3
+
+  for (let i = 0; i < fila.length; i += LADO_A_LADO) {
+    if (seguidas >= 5) {
+      console.log(`\nPAREI: 5 falhas seguidas. Cota, chave ou provedor — nada a ganhar insistindo.\n`)
+      break
+    }
+    await Promise.all(fila.slice(i, i + LADO_A_LADO).map(async (a) => {
+      const id = Number(String(a.id).replace('lead-', ''))
+      const banco = porId.get(id)!
+      const marca = marcaDaConversa(a)
+
+      const guardado = await lerPerfil(db, empresaId, id, marca)
+      if (guardado?.atual) { pulados++; return }
+
+      const c = compra.get(id)
+      const ficha = montarFicha(a, {
+        leadId: id, filialId: banco.filial_id, canal: banco.origem ?? 'whatsapp',
+        comprou: !!c, valorVenda: c?.valor ?? null, diasAteVenda: c?.dias ?? null,
+      })
+      const r = await gerarPerfil({
+        empresaId, lead: a, ficha, travou: ondeTravou(a, !!c), nomeDaLoja,
+        kanban: banco.kanban_status, temVendaRegistrada: !!c,
+        valorVenda: c?.valor ?? null, diasAteVenda: c?.dias ?? null,
+      })
+      if (!r.ok) {
+        falhas++; seguidas++
+        if (falhas <= 3) console.log(`  [${id}] falhou: ${r.erro}`)
+        return
+      }
+      seguidas = 0
+      await guardarPerfil(db, empresaId, id, marca, r.perfil, modelo, r.ms)
+      feitos++
+    }))
+
+    const n = Math.min(i + LADO_A_LADO, fila.length)
+    if (n % 30 === 0 || n === fila.length) {
+      const min = (Date.now() - t0) / 60000
+      const resto = feitos ? ((fila.length - n) / (feitos / min)) : 0
+      console.log(`  ${n}/${fila.length} · ${feitos} escritas, ${pulados} ja estavam, ${falhas} falhas`
+        + (resto > 0.5 ? ` · faltam ~${Math.round(resto)} min` : ''))
+    }
+  }
+
+  console.log(`\n${feitos} fichas escritas, ${pulados} ja estavam atuais, ${falhas} falhas`)
+  console.log(`em ${((Date.now() - t0) / 60000).toFixed(1)} min\n`)
 }

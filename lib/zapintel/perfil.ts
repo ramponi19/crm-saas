@@ -60,8 +60,11 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  * não altere o que a IA vê. É o que faz as fichas antigas serem regeradas.
  *
  *   p1  13/10/2026  primeira versão
+ *   p2  13/10/2026  o GABARITO entrou no prompt: um exemplo de ficha pronta
+ *                   vale mais que instrução para ensinar o nível de detalhe,
+ *                   e pesa mais ainda num modelo barato. Ver `GABARITO`.
  */
-export const VERSAO_DO_PERFIL = 'p1'
+export const VERSAO_DO_PERFIL = 'p2'
 
 /**
  * Quanto da conversa cabe no prompt.
@@ -282,6 +285,77 @@ export function contextoDoPerfil(opts: {
 }
 
 /**
+ * O GABARITO — a ficha de um lead real, mostrada ao modelo como padrão.
+ *
+ * ══ DE ONDE VEIO ═══════════════════════════════════════════════════════════
+ *
+ * Do Lucas, em 13/10/2026, olhando a ficha da Carol que eu havia escrito a
+ * mão: *"nao podemos aplicar o seu modelo e caso faça a ligacao de uma ia e
+ * solicite a analise ela puxa conforme o modelo pronto?"*
+ *
+ * Ele tem razão na parte que importa. O que separa "Preocupação com saúde da
+ * bateria" de "ela checou se a bateria trocada daria problema na revenda, e a
+ * loja se comprometeu a aceitar o aparelho de volta" não é inteligência do
+ * modelo — é saber que nível de detalhe se espera. Um exemplo ensina isso em
+ * uma passada; vinte linhas de instrução não ensinam.
+ *
+ * É o que pesa mais num modelo barato, que é justamente onde este CRM vai
+ * rodar: dar o padrão pronto vale mais do que pagar por um modelo melhor.
+ *
+ * ══ O RISCO, E COMO ELE É CONTIDO ══════════════════════════════════════════
+ *
+ * Exemplo contamina. O modelo que vê "iPhone 12 Pro Max" e "carregador de
+ * R$ 199" aqui pode escrevê-los numa conversa onde ninguém os mencionou — e
+ * seria o mesmo defeito que o vocabulário do Whisper causou em 13/10, quando
+ * listar modelos fez a transcrição inventar "o Pro Max" num áudio que não
+ * dizia isso. Invenção induzida por exemplo é pior que texto genérico, porque
+ * vem bem escrita.
+ *
+ * Três contenções: o bloco se anuncia como de OUTRO cliente; a instrução
+ * logo abaixo proíbe reaproveitar qualquer fato dele; e a regra 1 ("não
+ * invente") continua valendo acima de tudo.
+ *
+ * ⚠ Mexer aqui é mexer em TODA ficha gerada daqui para frente. Suba
+ * `VERSAO_DO_PERFIL` junto, senão as fichas antigas continuam no banco
+ * passando por atuais.
+ */
+const GABARITO = `
+EXEMPLO — ficha de OUTRO cliente, de outra conversa. Serve só para mostrar o
+nível de detalhe, o tom e o formato esperados. NENHUM fato dele aparece na
+conversa que você vai ler agora; não reaproveite produto, preço, nome nem
+situação daqui.
+
+{
+  "classificacao": "customer",
+  "score": 78,
+  "riscoPerda": 15,
+  "perfil": "Cautelosa e decidida",
+  "diagnostico": "Comprou o aparelho por R$ 5.695 em 18x no dia 22/08, recebeu em casa no mesmo dia e mandou foto agradecendo. Não há nada a fechar aqui — o que existe é um cliente satisfeito com duas pontas soltas que valem dinheiro.",
+  "relato": "Conheceu a loja pessoalmente numa feira, onde ouviu o preço e a avaliação do aparelho dela na troca. Voltou pelo WhatsApp onze dias depois perguntando boleto e parcelamento.\\n\\nO primeiro travamento foi crédito: mandou dois CPFs e os dois foram negados. Reagiu com humor e propôs sozinha a saída — pedir o cartão do irmão. Pediu uma coisa específica, que a loja cumpriu: ser avisada se entrasse outro na cor certa. Foi esse aviso, sete dias depois, que reabriu a conversa.\\n\\nO atrito que quase custou a venda apareceu no último dia: só então o vendedor contou que o aparelho era de um parceiro de outra cidade, por encomenda, com 100% pago antes. Ela acabara de dizer que mora longe. O vendedor resolveu no mesmo minuto, com link de pagamento e entrega em casa.",
+  "sinais": [
+    { "rotulo": "Insistiu após o crédito negado", "evidencia": "vou pedir cartão pro meu irmão então rs" },
+    { "rotulo": "Mandou o marido à loja", "evidencia": "Meu marido tá indo aí. Vc consegue esperar ?" }
+  ],
+  "objecoes": [
+    { "rotulo": "Bateria substituída", "evidencia": "Mais da algum b.o? Pq caso eu tento vender depois", "desfecho": "A loja se comprometeu a aceitar de volta como entrada" },
+    { "rotulo": "Pagar antes de ver o aparelho", "evidencia": "Tenho que ir aí pagar depois buscar ? Kkk", "desfecho": "Resolvida com link de pagamento e entrega em casa" }
+  ],
+  "pontasSoltas": [
+    "O aparelho antigo dela continua com ela — o marido pagou cheio e a troca não aconteceu, embora o vendedor tenha prometido em áudio aceitá-lo como entrada."
+  ],
+  "proximaAcao": "Oferecer a compra do aparelho antigo dela — a loja já prometeu aceitá-lo e ele continua parado com ela.",
+  "proximaAcaoPorque": "Retoma uma promessa que a loja fez, não uma oferta nova, e não pede nada: oferece dinheiro por um seminovo que entraria no estoque por um canal que já confia na loja.",
+  "urgencia": "medium",
+  "mensagemSugerida": "Oi! Tudo bem? Me conta, como tá sendo o aparelho novo? 😄 Lembra que eu falei que a gente pegava o seu antigo como entrada? Seu marido acabou pagando tudo e ele ficou com você — se tiver só parado aí, a gente compra de você. Quer que eu faça uma avaliação?"
+}
+
+REPARE no exemplo: cada sinal cita o que a pessoa ESCREVEU; cada objeção diz
+como terminou; o relato conta uma história com causa e sequência, não uma
+lista de rótulos; e a próxima ação sai de algo que ficou em aberto na própria
+conversa, não de uma regra geral de vendas.
+`.trim()
+
+/**
  * AS REGRAS — e cada uma existe porque algo deu errado sem ela.
  *
  * O contexto do negócio NÃO é descrito aqui. Foi tentado e medido em
@@ -352,6 +426,8 @@ function regras(nomeDaLoja: string): string {
     '',
     'Listas vazias são respostas válidas. Conversa de três mensagens produz',
     'ficha de três linhas, e está certo.',
+    '',
+    GABARITO,
   ].join('\n')
 }
 
