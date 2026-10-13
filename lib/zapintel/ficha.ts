@@ -183,7 +183,7 @@ const texto = (m: RawMessage): string => (m.body || '').trim()
  * das duas é coisa que alguém falou — são o sistema descrevendo um anexo. Com
  * elas dentro, o ranking mede o que foi anexado, não o que foi dito.
  */
-function ehFala(m: RawMessage): boolean {
+export function ehFala(m: RawMessage): boolean {
   if (m.mediaType) return false
   const t = texto(m)
   if (t.length < 4) return false
@@ -290,13 +290,46 @@ function montarRelato(f: Omit<Ficha, 'relato'>): string {
  *    acabado. Esse corte derrubou a amostra de 740 para 418 conversas.
  */
 export function falaQueEncerrou(a: Lead): string | null {
-  const msgs = (a.messages || []).filter((m) => texto(m) || m.mediaType)
-  const ultimaDoCliente = [...msgs].reverse().find((m) => !m.isStore)
+  const i = indiceDaFalaQueEncerrou(a)
+  return i == null ? null : texto((a.messages || [])[i]).slice(0, TAMANHO_DA_FRASE)
+}
+
+/**
+ * A MESMA fala, pelo indice dela em `a.messages` — ou `null`.
+ *
+ * Existe porque a tela do lead precisa MARCAR essa mensagem dentro da conversa,
+ * e procurar a frase de volta por texto encontraria a errada quando a loja
+ * repete a mesma mensagem (que é o caso comum: a frase de retomada é sempre a
+ * mesma). O indice é sobre a lista CRUA, sem filtro, para casar com o que a
+ * tela renderiza.
+ *
+ * `falaQueEncerrou` passou a sair daqui: a regra das 24 h e o `ehFala` moram
+ * num lugar só, senão as duas versoes divergiriam na primeira mudanca.
+ */
+export function indiceDaFalaQueEncerrou(a: Lead): number | null {
+  const todas = a.messages || []
+  // O filtro de `montarFicha`, mas preservando o indice original.
+  const vistas = todas.map((m, i) => ({ m, i })).filter(({ m }) => texto(m) || m.mediaType)
+  const ultimaDoCliente = [...vistas].reverse().find(({ m }) => !m.isStore)
   if (!ultimaDoCliente) return null
-  const ultimaFala = [...msgs].reverse().find(ehFala)
-  if (!ultimaFala || !ultimaFala.isStore) return null
-  if (quando(ultimaFala) - quando(ultimaDoCliente) > 86_400_000) return null
-  return texto(ultimaFala).slice(0, TAMANHO_DA_FRASE)
+  const ultimaFala = [...vistas].reverse().find(({ m }) => ehFala(m))
+  if (!ultimaFala || !ultimaFala.m.isStore) return null
+  /**
+   * ⚠ DEPOIS NO FIO, não só depois no relógio.
+   *
+   * `ehFala` descarta áudio, mídia e mensagem de 3 letras — e é por isso que a
+   * comparação por HORA mentia: no lead 747 a loja disse "Posso te ligar?" às
+   * 16:47, ele respondeu "sim" no mesmo minuto (3 letras, descartada) e a loja
+   * mandou áudio depois (mídia, descartada). A conta dava zero minuto de
+   * diferença e o lead aparecia como "ele não respondeu mais" — com a resposta
+   * dele visível na linha de baixo.
+   *
+   * Comparar o ÍNDICE resolve a família inteira: a última fala só encerrou a
+   * conversa se nada dele veio depois, seja áudio, "sim" ou figurinha.
+   */
+  if (ultimaFala.i < ultimaDoCliente.i) return null
+  if (quando(ultimaFala.m) - quando(ultimaDoCliente.m) > 86_400_000) return null
+  return ultimaFala.i
 }
 
 export interface ContextoDaFicha {

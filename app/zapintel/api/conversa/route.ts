@@ -3,6 +3,7 @@ import { zapintelEmpresa } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
+import { ondeTravou } from '@/lib/zapintel/travou'
 
 /**
  * UMA conversa, inteira, mais a FICHA dela.
@@ -67,7 +68,12 @@ export async function GET(req: Request) {
       diasAteVenda: (ponte?.dias_ate_venda as number | null) ?? null,
     })
 
-    return NextResponse.json({ lead, ficha })
+    // Onde a conversa travou, pelo INDICE da mensagem — para a tela marcar o
+    // ponto em vez de obrigar a rolar 41 mensagens procurando. Nao marca nada
+    // em conversa que virou venda. Ver `lib/zapintel/travou.ts`.
+    const travou = ondeTravou(lead, !!ponte)
+
+    return NextResponse.json({ lead, ficha, travou })
   } catch (e) {
     console.error('zapintel/conversa:', (e as Error).message)
     return NextResponse.json({ erro: 'falha ao ler a conversa' }, { status: 500 })

@@ -1,6 +1,7 @@
 "use client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { SectionTitle, ScoreRing, Badge, UrgencyDot } from "@/components/zapintel/ui/atoms";
+import { ResumoDoDia } from "@/components/zapintel/resumo-do-dia";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, 
@@ -58,6 +59,14 @@ export default function DashboardPage() {
           {s.total} conversas · Score médio {s.avgScore}/100 · Inatividade média {s.avgDaysInactive}d
         </p>
       </div>
+
+      {/* ── O dia da loja ──────────────────────────────────────────────────── */}
+      {/*
+        Primeira coisa da tela, antes de qualquer cartão: um cartão escrito
+        "2.097 conversas" não diz a ninguém o que fazer hoje. Ver o cabeçalho
+        de `components/zapintel/resumo-do-dia.tsx`.
+      */}
+      <ResumoDoDia />
 
       {/* ── Alert bar ──────────────────────────────────────────────────────── */}
       {leads.filter(l => l.urgency === "critical").length > 0 && (

@@ -78,7 +78,15 @@ function sinaisDeCompra(leadText: string): string[] {
   )].slice(0, 6)
 }
 
-const OBJECOES: [Objection, string[]][] = [
+/**
+ * As palavras que denunciam cada objecao, na fala DELE.
+ *
+ * Exportada porque `lib/zapintel/travou.ts` precisa achar a MENSAGEM em que a
+ * objecao foi levantada, para marcar o ponto dentro da conversa. Duas tabelas
+ * divergiriam na primeira palavra nova, e a tela passaria a apontar para uma
+ * objecao que o painel nao conta (ou o contrario).
+ */
+export const OBJECOES: [Objection, string[]][] = [
   [{ type: 'price', label: 'Preço / Concorrência' },
     ['caro', 'salgado', 'mais barato', 'desconto', 'mercado livre', 'shopee', 'olx', 'concorrência', 'abaixa', 'menor valor']],
   [{ type: 'timing', label: 'Indecisão / Timing' },
@@ -137,11 +145,52 @@ const diasAte = (iso: string | null): number => {
   return Number.isNaN(t) ? 999 : Math.max(0, Math.floor((Date.now() - t) / DIA_MS))
 }
 
-/** `YYYY-MM-DD` e `HH:MM`, que é o formato que as telas e a ficha esperam. */
-const dia = (iso: string) => iso.slice(0, 10)
-const hora = (iso: string) => {
-  const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+/**
+ * O RELÓGIO DA LOJA — e por que isto não podia ficar como estava.
+ *
+ * ══ O BUG, MEDIDO EM 12/10/2026 ════════════════════════════════════════════
+ *
+ * `hora()` fazia `new Date(iso).getHours()`, que devolve a hora no fuso do
+ * PROCESSO. Na máquina do Lucas isso é São Paulo e sai certo; nas funções da
+ * Vercel é **UTC**, e sai três horas adiantado. Como o painel é calculado lá e
+ * guardado, a tela mostrava o relógio errado para todo mundo:
+ *
+ *     pico real (no banco, fuso de SP) ....... 11h (3.499 mensagens)
+ *     pico que o painel guardou .............. 14h (3.235)
+ *
+ * E não parava no gráfico: a hora de cada mensagem no histórico da conversa
+ * aparecia adiantada, e `dia()` — que era `iso.slice(0, 10)`, a data em UTC —
+ * jogava tudo que a loja falou depois das 21h para o dia seguinte.
+ *
+ * O defeito era invisível justamente onde se desenvolve: rodar local dava o
+ * número certo. É o mesmo formato das duas falhas mudas que este módulo já
+ * teve (análise truncada, canal de tempo real sem linha).
+ *
+ * ══ POR QUE UM FUSO FIXO, E NÃO UM POR EMPRESA ═════════════════════════════
+ *
+ * Porque não existe campo de fuso em `empresas`, e inventar um agora seria
+ * coluna sem quem a preencha. Os três tenants são do Brasil e o país não tem
+ * horário de verão desde 2019, então Brasília está certo para todos hoje. No
+ * dia em que entrar tenant de outro fuso, o lugar de consertar é aqui — uma
+ * linha — e não espalhado por quem formata data.
+ */
+const FUSO_DA_LOJA = 'America/Sao_Paulo'
+
+/**
+ * `sv-SE` porque é o locale que formata como `YYYY-MM-DD HH:MM` — o mesmo
+ * formato que as telas e a ficha já esperam. `h23` para meia-noite sair como
+ * `00` e não `24`.
+ */
+const RELOGIO = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: FUSO_DA_LOJA,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
+/** `YYYY-MM-DD` e `HH:MM` no fuso da loja, numa formatação só. */
+const dataEHora = (iso: string): [string, string] => {
+  const s = RELOGIO.format(new Date(iso))
+  return [s.slice(0, 10), s.slice(11, 16)]
 }
 
 /**
@@ -158,9 +207,10 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
     const banco = porId.get(m.lead_id)
     if (!banco) continue
     const lista = porLead.get(m.lead_id) ?? []
+    const [dataMsg, horaMsg] = dataEHora(m.created_at)
     lista.push({
-      date: dia(m.created_at),
-      time: hora(m.created_at),
+      date: dataMsg,
+      time: horaMsg,
       // O telefone na mensagem serve só para exibição; quem decide o lado é
       // `direcao`. Ver a armadilha multi-tenant no cabeçalho.
       phone: banco.telefone ?? banco.origem_id ?? '',

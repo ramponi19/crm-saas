@@ -74,8 +74,18 @@ export const JANELA_FORCADO_MS = 60_000
  *                   conversa funda no 1o dia vira `hot`
  *   v5  10/10/2026  taxa de fechamento medida ANTES do carimbo de cliente
  *   v6  10/10/2026  o canal (whatsapp/instagram) passa a vir do banco
+ *   v10 12/10/2026  a fala que encerrou a conversa passou a exigir vir DEPOIS
+ *                   no fio, nao so dentro de 24 h: `ehFala` descarta audio e
+ *                   mensagem de 3 letras, entao "a loja falou por ultimo"
+ *                   dava verdadeiro com a resposta dele visivel logo abaixo.
+ *                   Muda o ranking de frases antes do silencio.
+ *   v11 12/10/2026  o RELOGIO: data e hora passaram a ser formatadas no fuso
+ *                   da loja. `getHours()` devolvia a hora do PROCESSO — SP na
+ *                   maquina do Lucas, UTC na Vercel — e o painel guardado
+ *                   mostrava pico as 14h quando o real e 11h. Mexe em toda
+ *                   metrica por hora, por dia, e na hora de cada mensagem.
  */
-export const VERSAO_DO_CALCULO = 'v9'
+export const VERSAO_DO_CALCULO = 'v11'
 
 /** O carimbo do cálculo guardado. */
 export interface Marca {
@@ -134,6 +144,57 @@ export async function guardarPainel(
     },
     { onConflict: 'empresa_id' },
   )
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * O PARÁGRAFO DO DIA, guardado junto do painel que o gerou.
+ *
+ * Mora na mesma linha porque é 1:1 com ela. E guarda a MARCA do painel que o
+ * produziu — não a data: data sozinha deixaria o texto envelhecer calado,
+ * falando de um movimento que já passou, que é o modo de falha que este módulo
+ * já teve duas vezes.
+ *
+ * Fica caro se for feito errado: sem este cache, abrir a tela seria uma
+ * chamada de IA por visita.
+ */
+export interface RelatoGuardado {
+  texto: string
+  em: string
+  /** `ultimaMensagem` do painel que gerou o texto. Diferente = texto velho. */
+  marca: number
+}
+
+export async function relatoDoCache(
+  db: SupabaseClient,
+  empresaId: number,
+): Promise<RelatoGuardado | null> {
+  const { data, error } = await db
+    .from('zapintel_painel')
+    .select('relato, relato_em, relato_marca')
+    .eq('empresa_id', empresaId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  const l = data as { relato: string | null; relato_em: string | null; relato_marca: number | null } | null
+  if (!l?.relato) return null
+  return { texto: l.relato, em: l.relato_em ?? '', marca: Number(l.relato_marca) || 0 }
+}
+
+/**
+ * Grava o parágrafo. `update`, não `upsert`: a linha já existe (o painel foi
+ * lido antes), e um upsert aqui precisaria repetir `painel`, `ultima_mensagem`
+ * e `versao` — três chances de gravar por cima do cache com valor errado.
+ */
+export async function guardarRelato(
+  db: SupabaseClient,
+  empresaId: number,
+  texto: string,
+  marca: number,
+): Promise<void> {
+  const { error } = await db
+    .from('zapintel_painel')
+    .update({ relato: texto, relato_em: new Date().toISOString(), relato_marca: marca })
+    .eq('empresa_id', empresaId)
   if (error) throw new Error(error.message)
 }
 

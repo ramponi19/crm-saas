@@ -92,9 +92,9 @@ n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
 n "nem em performance"               "lib/zapintel/insights/performance.ts" "= 5200;"
 v "perda por etapa usa taxa medida"  "lib/zapintel/insights/performance.ts" "fatos.taxaPorClasse"
 n "LTV nao supoe recompra"           "lib/zapintel/insights/performance.ts" "\* 1.4"
-v "a IA do zapintel usa a do CRM"    "app/zapintel/api/analyze/route.ts" "GEMINI_API_KEY"
+v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
 n "nao chama a Anthropic direto"     "app/zapintel/api/analyze/route.ts" "api.anthropic.com"
-v "a IA respeita o desligar geral"   "app/zapintel/api/analyze/route.ts" "cfg.ativo === false"
+v "a IA respeita o desligar geral"   "lib/zapintel/ia.ts" "cfg.ativo === false"
 v "a rota de IA exige sessao"        "app/zapintel/api/analyze/route.ts" "await zapintelEmpresa()"
 n "pipeline nao supoe 70 por cento"  "lib/zapintel/insights/stats.ts" "ticket \* 0.70"
 v "pipeline usa taxa medida"         "lib/zapintel/painel.ts" "taxaPorClasse"
@@ -159,6 +159,37 @@ v "matcher exclui o tunel do sentry"    "proxy.ts" "|monitoring|"
 v "matcher exclui webhook e cron"       "proxy.ts" "|api/webhook/|api/cron/|"
 v "matcher exclui arquivo publico"      "proxy.ts" "|i/|offline|sw"
 n "matcher nao e concatenacao"          "proxy.ts" "' +$"
+
+echo "== o ponto onde a venda travou + o dia da loja (12/10) =="
+# O relogio: `getHours()` devolvia a hora do PROCESSO (UTC na Vercel), e o
+# painel guardado dizia pico as 14h quando o real e 11h.
+v "data e hora no fuso da loja"      "lib/zapintel/montar.ts" "FUSO_DA_LOJA = 'America/Sao_Paulo'"
+n "nao formata hora pelo processo"   "lib/zapintel/montar.ts" "d.getHours()"
+# A fala que encerrou tem que vir DEPOIS no fio: `ehFala` descarta audio e
+# mensagem de 3 letras, e comparar por HORA dava "ele sumiu" com a resposta
+# dele visivel na linha de baixo.
+v "fim da conversa compara indice"   "lib/zapintel/ficha.ts" "ultimaFala.i < ultimaDoCliente.i"
+v "travamento sai do indice"         "lib/zapintel/travou.ts" "indiceDaFalaQueEncerrou"
+n "venda fechada nao tem travamento" "lib/zapintel/travou.ts" "ondeTravou(a: Lead): "
+v "objecao so em fala de verdade"    "lib/zapintel/travou.ts" "if (!ehFala(m)) return null"
+# Audio e resposta. Com `ehFala` nesta linha, conversa respondida por audio
+# aparecia como "a loja nao voltou".
+v "audio conta como resposta"        "lib/zapintel/travou.ts" "if (!m.isStore) continue"
+v "tela marca por referencia"        "app/zapintel/leads/[id]/page.tsx" "lead.messages\[travou.indice\] === msg"
+# Uma porta de IA so: desligar no painel tem que calar as tres telas.
+v "ia do zapintel num lugar so"      "lib/zapintel/ia.ts" "assistente_config"
+v "analyze usa a porta unica"        "app/zapintel/api/analyze/route.ts" "perguntarIA"
+v "sugestao usa a porta unica"       "app/zapintel/api/sugestao/route.ts" "perguntarIA"
+v "dia usa a porta unica"            "app/zapintel/api/dia/route.ts" "perguntarIA"
+# O prompt nao pode ter o nome de um tenant escrito no codigo.
+v "sugestao pega o nome do banco"    "app/zapintel/api/sugestao/route.ts" "nomeDaLoja"
+v "prompt monta a loja em runtime"   "app/zapintel/api/sugestao/route.ts" "de \${nomeDaLoja}"
+# Uma chamada de IA por abertura de tela seria o erro do pulso de 20s.
+v "relato do dia e guardado"         "app/zapintel/api/dia/route.ts" "guardarRelato"
+v "relato velho e regerado"          "app/zapintel/api/dia/route.ts" "guardado.marca === cache.marca.ultimaMensagem"
+# peakHours e histograma por hora, nao ranking: [0] e a hora mais cedo.
+v "pico ordenado por volume"         "lib/zapintel/dia.ts" "sort((a, b) => b.count - a.count)"
+v "briefing proibe inventar numero"  "lib/zapintel/dia.ts" "USE SOMENTE os números do briefing"
 n "painel de responsavel sem copia"     "components/modules/leads/responsavel-panel.tsx" "setRespId"
 v "chat conta nao lidas por conversa"   "hooks/use-chat-nao-lidas.ts" "chat_nao_lidas_por_conversa"
 v "chat marca lido ao abrir"            "app/(dashboard)/chat/chat-view.tsx" "marcarConversaLida(conversaAtual)"

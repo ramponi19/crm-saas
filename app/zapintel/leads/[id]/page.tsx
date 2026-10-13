@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
+import type { Travou } from "@/lib/zapintel/travou";
 import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
 import { generateCopilot, type CopilotResult, type CopilotStrategy } from "@/lib/zapintel/insights/followUp";
 import { getProducts } from "@/lib/zapintel/segments/segments";
@@ -139,6 +140,19 @@ export default function LeadDetailPage() {
   const [conversa, setConversa] = useState<Lead | null>(null);
   const [ficha, setFicha] = useState<Ficha | null>(null);
   /**
+   * ONDE A CONVERSA TRAVOU — calculado no servidor, junto da ficha.
+   *
+   * Vem com o ÍNDICE da mensagem, e a marcação compara por referência
+   * (`lead.messages[indice] === msg`). Procurar a frase de volta por texto
+   * acharia a errada toda vez que a loja repete a mesma mensagem, que é
+   * justamente o caso da frase de retomada. Ver `lib/zapintel/travou.ts`.
+   */
+  const [travou, setTravou] = useState<Travou | null>(null);
+  const [sugestao, setSugestao] = useState<string>("");
+  const [sugerindo, setSugerindo] = useState(false);
+  const [erroSugestao, setErroSugestao] = useState("");
+  const [copiouSugestao, setCopiouSugestao] = useState(false);
+  /**
    * O histórico começa FECHADO.
    *
    * Era o padrão abrir, e com ele a ficha virou enfeite: continuava mais
@@ -156,7 +170,11 @@ export default function LeadDetailPage() {
       .then(r => r.json())
       .then(d => {
         if (!vivo) return;
-        if (d?.lead) { setConversa(d.lead as Lead); setFicha((d.ficha as Ficha) ?? null); }
+        if (d?.lead) {
+          setConversa(d.lead as Lead);
+          setFicha((d.ficha as Ficha) ?? null);
+          setTravou((d.travou as Travou) ?? null);
+        }
         else setFalhouConversa(true);
       })
       .catch(() => { if (vivo) setFalhouConversa(true); });
@@ -208,6 +226,34 @@ export default function LeadDetailPage() {
 
   const waMessages = isMerged ? lead.messages.filter((m) => m.source === "whatsapp") : lead.messages;
   const igMessages = isMerged ? lead.messages.filter((m) => m.source === "instagram") : [];
+
+  /**
+   * A mensagem que retoma dali. Rascunho — ninguém envia nada sozinho.
+   *
+   * O prompt é montado no SERVIDOR (`/zapintel/api/sugestao`), com o nome da
+   * loja e o ramo vindos do banco. Montá-lo aqui deixaria quem souber a URL
+   * escolher o que a IA do CRM responde, pagando com a chave do Lucas.
+   */
+  async function pedirSugestao() {
+    if (!resumo?.leadId || sugerindo) return;
+    setSugerindo(true); setErroSugestao(""); setSugestao("");
+    try {
+      const r = await fetch("/zapintel/api/sugestao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead: resumo.leadId }),
+      });
+      const d = await r.json();
+      if (!r.ok) setErroSugestao(d?.erro || "Não consegui gerar agora.");
+      else {
+        setSugestao(String(d?.mensagem || ""));
+        logAction("sugestao", "Mensagem de retomada sugerida pela IA");
+      }
+    } catch {
+      setErroSugestao("Não consegui gerar agora.");
+    }
+    setSugerindo(false);
+  }
 
   async function runCopilot() {
     if (!lead) return;
@@ -352,6 +398,137 @@ export default function LeadDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ── Onde a venda travou ──────────────────────────────────────────── */}
+      {/*
+        O ponto exato, não o diagnóstico em prosa. A ficha já conta o que
+        aconteceu; quem abre a conversa para conferir rolava 41 mensagens
+        procurando o momento — e o momento é sempre uma mensagem só.
+
+        Nada aparece aqui em conversa que virou venda: ali não travou nada, e
+        pintar alerta sobre venda fechada é o sistema mentindo com cara de
+        ajuda. Ver `lib/zapintel/travou.ts`.
+      */}
+      {travou && (() => {
+        const msg = lead.messages[travou.indice];
+        const grave = travou.tipo === "objecao_sem_resposta" || travou.tipo === "loja_deve_resposta";
+        const cor = grave ? "var(--red)" : "var(--yellow)";
+        return (
+          <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: `3px solid ${cor}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: cor, letterSpacing: .7 }}>
+                ONDE A VENDA TRAVOU
+              </span>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>{travou.detalhe}</span>
+            </div>
+
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--txt)", marginBottom: 10 }}>
+              {travou.rotulo}
+            </div>
+
+            {msg && (
+              <div style={{
+                background: "var(--card2)", border: "1px solid var(--brd2)",
+                borderLeft: `2px solid ${cor}`, borderRadius: 8,
+                padding: "10px 14px", marginBottom: 12,
+              }}>
+                <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, marginBottom: 4 }}>
+                  {travou.daLoja ? (lead.sellerName || storeName || "LOJA").toUpperCase() : lead.contact.toUpperCase()}
+                  {" · "}{msg.date} {msg.time}
+                </div>
+                <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                  {msg.body || (msg.mediaType ? `[${msg.mediaType}]` : "")}
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => {
+                  setVerConversa(true);
+                  // O próximo quadro: a conversa ainda não existe no DOM quando
+                  // este clique roda, e rolar para um elemento que não nasceu
+                  // não faz nada — sem erro nenhum, que é o pior tipo.
+                  setTimeout(() => {
+                    document.getElementById("msg-travou")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }, 60);
+                }}
+                style={{
+                  background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 9,
+                  padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "var(--txt)", cursor: "pointer",
+                }}
+              >
+                Ver na conversa
+              </button>
+
+              <button
+                onClick={pedirSugestao}
+                disabled={sugerindo}
+                style={{
+                  background: sugerindo ? "var(--card2)" : "var(--purple)", border: "none", borderRadius: 9,
+                  padding: "8px 14px", fontSize: 12, fontWeight: 700,
+                  color: sugerindo ? "var(--muted)" : "#fff",
+                  cursor: sugerindo ? "default" : "pointer",
+                }}
+              >
+                {sugerindo ? "Escrevendo…" : sugestao ? "Sugerir outra" : "Sugerir a mensagem"}
+              </button>
+            </div>
+
+            {erroSugestao && (
+              <p style={{ fontSize: 12, color: "var(--red)", marginTop: 10 }}>{erroSugestao}</p>
+            )}
+
+            {sugestao && (
+              <div style={{
+                background: "rgba(124,92,252,.07)", border: "1px solid rgba(124,92,252,.28)",
+                borderRadius: 10, padding: "12px 16px", marginTop: 12,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 6 }}>
+                  RASCUNHO DA IA · LEIA ANTES DE ENVIAR
+                </div>
+                <p style={{ fontSize: 13.5, color: "var(--txt)", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                  {sugestao}
+                </p>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(sugestao);
+                      setCopiouSugestao(true);
+                      setTimeout(() => setCopiouSugestao(false), 1800);
+                    }}
+                    style={{
+                      background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 9,
+                      padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "var(--txt)", cursor: "pointer",
+                    }}
+                  >
+                    {copiouSugestao ? "Copiado ✓" : "Copiar"}
+                  </button>
+                  {lead.phone && (() => {
+                    const base = whatsappLink(lead.phone);
+                    return base ? (
+                      <a
+                        href={`${base}?text=${encodeURIComponent(sugestao)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{
+                          background: "#075e54", borderRadius: 9, padding: "7px 13px",
+                          fontSize: 12, fontWeight: 700, color: "#fff", textDecoration: "none",
+                        }}
+                      >
+                        Abrir no WhatsApp
+                      </a>
+                    ) : null;
+                  })()}
+                </div>
+                <p style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 10, lineHeight: 1.5 }}>
+                  A IA não sabe o preço de hoje nem o que está em estoque. Confira
+                  qualquer número antes de mandar.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Header card ─────────────────────────────────────────────────── */}
       <div className="card" style={{ padding: 24, marginBottom: 14 }}>
@@ -609,8 +786,46 @@ export default function LeadDetailPage() {
         <div style={{ display: verConversa ? "flex" : "none", flexDirection: "column", gap: 9 }}>
           {displayMessages.map((msg, i) => {
             const msgSource: "whatsapp" | "instagram" = msg.source || "whatsapp";
+            /**
+             * ESTA é a mensagem onde travou?
+             *
+             * Comparação por REFERÊNCIA, não por índice: `displayMessages` é
+             * `lead.messages` filtrado por canal na conversa fundida, então os
+             * índices não batem — mas os objetos são os mesmos. E não por
+             * texto: a loja repete a mesma frase de retomada em dezenas de
+             * conversas, e a busca acharia a primeira, não a certa.
+             */
+            const ehOTravamento = !!travou && lead.messages[travou.indice] === msg;
+            const corTravamento = travou && (travou.tipo === "objecao_sem_resposta" || travou.tipo === "loja_deve_resposta")
+              ? "var(--red)" : "var(--yellow)";
             return (
-              <div key={i} style={{ display: "flex", justifyContent: msg.isStore ? "flex-end" : "flex-start" }}>
+              <div
+                key={i}
+                id={ehOTravamento ? "msg-travou" : undefined}
+                style={{
+                  display: "flex", flexDirection: "column",
+                  alignItems: msg.isStore ? "flex-end" : "flex-start",
+                  ...(ehOTravamento ? {
+                    background: "var(--card2)",
+                    border: `1px solid ${corTravamento}55`,
+                    borderRadius: 12, padding: 10, margin: "6px 0",
+                  } : null),
+                }}
+              >
+                {ehOTravamento && travou && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 7, marginBottom: 7,
+                    alignSelf: "flex-start", fontSize: 10.5, fontWeight: 800,
+                    color: corTravamento, letterSpacing: .5,
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: 999, background: corTravamento,
+                      display: "inline-block",
+                    }} />
+                    {travou.rotulo.toUpperCase()} · {travou.detalhe}
+                  </div>
+                )}
+              <div style={{ display: "flex", width: "100%", justifyContent: msg.isStore ? "flex-end" : "flex-start" }}>
                 <div style={{
                   maxWidth: "75%",
                   background: msg.isStore
@@ -636,6 +851,7 @@ export default function LeadDetailPage() {
                     {msg.date} {msg.time}
                   </div>
                 </div>
+              </div>
               </div>
             );
           })}
