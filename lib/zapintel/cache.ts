@@ -157,57 +157,6 @@ export async function guardarPainel(
 }
 
 /**
- * O PARÁGRAFO DO DIA, guardado junto do painel que o gerou.
- *
- * Mora na mesma linha porque é 1:1 com ela. E guarda a MARCA do painel que o
- * produziu — não a data: data sozinha deixaria o texto envelhecer calado,
- * falando de um movimento que já passou, que é o modo de falha que este módulo
- * já teve duas vezes.
- *
- * Fica caro se for feito errado: sem este cache, abrir a tela seria uma
- * chamada de IA por visita.
- */
-export interface RelatoGuardado {
-  texto: string
-  em: string
-  /** `ultimaMensagem` do painel que gerou o texto. Diferente = texto velho. */
-  marca: number
-}
-
-export async function relatoDoCache(
-  db: SupabaseClient,
-  empresaId: number,
-): Promise<RelatoGuardado | null> {
-  const { data, error } = await db
-    .from('zapintel_painel')
-    .select('relato, relato_em, relato_marca')
-    .eq('empresa_id', empresaId)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  const l = data as { relato: string | null; relato_em: string | null; relato_marca: number | null } | null
-  if (!l?.relato) return null
-  return { texto: l.relato, em: l.relato_em ?? '', marca: Number(l.relato_marca) || 0 }
-}
-
-/**
- * Grava o parágrafo. `update`, não `upsert`: a linha já existe (o painel foi
- * lido antes), e um upsert aqui precisaria repetir `painel`, `ultima_mensagem`
- * e `versao` — três chances de gravar por cima do cache com valor errado.
- */
-export async function guardarRelato(
-  db: SupabaseClient,
-  empresaId: number,
-  texto: string,
-  marca: number,
-): Promise<void> {
-  const { error } = await db
-    .from('zapintel_painel')
-    .update({ relato: texto, relato_em: new Date().toISOString(), relato_marca: marca })
-    .eq('empresa_id', empresaId)
-  if (error) throw new Error(error.message)
-}
-
-/**
  * O cache serve, ou é para calcular?
  *
  * Sem cache nenhum não há escolha: calcula (é a primeira vez da empresa).

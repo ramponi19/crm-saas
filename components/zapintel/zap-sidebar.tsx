@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
@@ -58,8 +59,35 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
   const path = usePathname();
   const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm } = useLeads();
   const idade = idadeDoCalculo(calculadoEm);
+  /**
+   * NO CELULAR A BARRA VIRA MENU. Antes ela ocupava 210 px fixos, metade de
+   * uma tela de 390 — o dashboard ao vivo, que o vendedor abre no balcão pelo
+   * celular, ficava espremido no resto. Abaixo de 860 px: botão no topo, barra
+   * por cima do conteúdo, e qualquer clique dentro dela fecha.
+   */
+  const [aberta, setAberta] = useState(false);
   return (
-    <aside style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
+    <>
+    <style>{`
+      .zi-side-botao { display: none; }
+      @media (max-width: 860px) {
+        .zi-side { position: fixed; inset: 0 auto 0 0; z-index: 960; transform: translateX(-105%); transition: transform .2s ease-out; box-shadow: 12px 0 40px rgba(21,24,28,.18); overflow-y: auto; }
+        .zi-side.aberta { transform: none; }
+        .zi-side-botao { display: grid; place-items: center; position: fixed; top: 12px; left: 12px; z-index: 955; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--brd); background: var(--card); color: var(--txt); box-shadow: 0 2px 8px rgba(21,24,28,.08); }
+        .zi-side-fundo { position: fixed; inset: 0; z-index: 958; background: rgba(21,24,28,.32); }
+      }
+      @media (prefers-reduced-motion: reduce) { .zi-side { transition: none; } }
+    `}</style>
+    <button className="zi-side-botao" onClick={() => setAberta(true)} aria-label="Abrir menu do ZapIntel"><Menu size={19} /></button>
+    {aberta && <div className="zi-side-fundo" onClick={() => setAberta(false)} />}
+    <aside className={`zi-side ${aberta ? "aberta" : ""}`} onClick={(e) => { if ((e.target as HTMLElement).closest("a, button")) setAberta(false); }}
+      style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
+      {aberta && (
+        <button onClick={() => setAberta(false)} aria-label="Fechar menu"
+          style={{ position: "absolute", top: 14, right: 12, background: "none", border: "none", color: "var(--dim)", cursor: "pointer" }}>
+          <X size={18} />
+        </button>
+      )}
       <div style={{ padding: "8px 8px 20px", borderBottom: "1px solid var(--brd)", marginBottom: 8 }}>
         <div style={{ width: 34, height: 34, borderRadius: 10, marginBottom: 10, background: "linear-gradient(135deg,#7c5cfc,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <MessageSquare size={17} color="#fff" />
@@ -159,5 +187,6 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
         <ArrowLeft size={15} /> Voltar ao CRM
       </Link>
     </aside>
+    </>
   );
 }

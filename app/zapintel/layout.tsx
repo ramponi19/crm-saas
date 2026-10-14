@@ -45,9 +45,9 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
 
   return (
     <div className="zi-root" style={{ display: 'flex', minHeight: '100dvh' }}>
-      <Providers>
+      <Providers empresaId={empresaId}>
         <ZapSidebar empresaNome={empresa?.nome ?? 'Minha empresa'} />
-        <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100dvh', padding: '28px 24px' }}>
+        <main className="zi-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100dvh', padding: '28px 24px' }}>
           {previewAtivo && <PreviewBanner empresaNome={empresa?.nome ?? 'empresa'} />}
           {children}
         </main>

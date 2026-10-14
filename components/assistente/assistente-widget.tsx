@@ -148,6 +148,26 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [msgs, loading, consultando])
 
+  // Outras telas pedem o assistente aberto (o rodapé do dashboard) ou já com
+  // uma pergunta feita (o "Resumo do dia" do dashboard). A pergunta vai pelo
+  // `enviar` da renderização mais recente, guardado num ref.
+  const enviarRef = useRef<(t: string) => void>(() => {})
+  useEffect(() => { enviarRef.current = enviar })
+  useEffect(() => {
+    const abrir = () => { setAberturas((n) => n + 1); setAberto(true) }
+    const perguntar = (e: Event) => {
+      abrir()
+      const texto = (e as CustomEvent<string>).detail
+      if (texto) enviarRef.current(texto)
+    }
+    window.addEventListener('assistente:abrir', abrir)
+    window.addEventListener('assistente:perguntar', perguntar)
+    return () => {
+      window.removeEventListener('assistente:abrir', abrir)
+      window.removeEventListener('assistente:perguntar', perguntar)
+    }
+  }, [])
+
   function alternar() {
     if (!aberto) setAberturas((n) => n + 1)
     setAberto(!aberto)

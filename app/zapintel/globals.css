@@ -37,3 +37,9 @@
 .zi-root ::-webkit-scrollbar-thumb:hover { background: #b6bcc4; }
 
 @keyframes zi-spin { to { transform: rotate(360deg); } }
+
+/* No celular a barra lateral vira menu (zap-sidebar.tsx) e o conteúdo usa a
+   largura toda, com espaço no topo para o botão do menu. */
+@media (max-width: 860px) {
+  .zi-root .zi-main { padding: 64px 14px 24px !important; }
+}
