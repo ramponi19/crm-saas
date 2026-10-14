@@ -6,7 +6,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import Providers from './providers'
 import { ZapSidebar } from '@/components/zapintel/zap-sidebar'
 import { PreviewBanner } from '@/components/zapintel/preview-banner'
-import { RoboAnalises } from '@/components/zapintel/robo-analises'
+import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 
 export const metadata = { title: 'ZapIntel' }
 
@@ -51,7 +51,8 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
           {previewAtivo && <PreviewBanner empresaNome={empresa?.nome ?? 'empresa'} />}
           {children}
         </main>
-        <RoboAnalises />
+        {/* O mesmo assistente do CRM, com as análises pendentes no topo. */}
+        <AssistenteWidget variante="zapintel" />
       </Providers>
     </div>
   )

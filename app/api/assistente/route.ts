@@ -3,6 +3,9 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 import { melhorModelo } from '@/lib/assistente-modelos'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { acessoDoUsuario } from '@/lib/assistente/acesso'
+import { respostaDoChat, MODELO_CHAT_PADRAO, type Turno } from '@/lib/assistente/chat-dados'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
@@ -38,13 +41,32 @@ Regras:
 
 interface Msg { role: 'user' | 'model'; text: string }
 
+/**
+ * A Anthropic exige conversa começando pelo usuário e alternando os lados. O
+ * histórico vem do navegador, que pode ter uma resposta de erro no começo ou
+ * duas mensagens seguidas do mesmo lado (um envio que falhou) — junta aqui.
+ */
+function alternados(msgs: Msg[]): Turno[] {
+  const fora: Turno[] = []
+  for (const m of msgs) {
+    if (!fora.length && m.role !== 'user') continue
+    const ultimo = fora[fora.length - 1]
+    if (ultimo && ultimo.role === m.role) ultimo.text += `\n\n${m.text}`
+    else fora.push({ role: m.role, text: m.text })
+  }
+  return fora
+}
+
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'Assistente ainda não configurado (defina GEMINI_API_KEY).' }, { status: 503 })
+  // Com a chave da Anthropic, o assistente LÊ O SISTEMA (relatórios, leads,
+  // conversas). Sem ela, segue o assistente de antes: só ajuda de uso.
+  const comDados = !!process.env.ANTHROPIC_API_KEY
+  if (!apiKey && !comDados) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
   const body = (await req.json().catch(() => ({}))) as { mensagens?: Msg[]; contexto?: string }
   const mensagens = (Array.isArray(body.mensagens) ? body.mensagens : [])
@@ -70,6 +92,40 @@ export async function POST(req: Request) {
   }
   const { data: uso } = await svc.from('assistente_uso').insert({ empresa_id: empresaId } as never).select('id').single()
   const usoId = (uso as { id?: number } | null)?.id ?? null
+
+  if (comDados) {
+    const [acesso, { data: empresa }, { data: visiveis }, { data: lojasRaw }] = await Promise.all([
+      acessoDoUsuario(supabase, empresaId, user.id),
+      supabase.from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle(),
+      supabase.rpc('filiais_visiveis'),
+      supabase.from('filiais').select('id, nome, cidade').eq('empresa_id', empresaId),
+    ])
+    // Só as lojas que a pessoa enxerga entram no prompt. Se a consulta falhar,
+    // nenhuma entra — citar a outra loja seria vazar o que a RLS esconde.
+    const pode = new Set(((visiveis ?? []) as number[]).map(Number))
+    const lojas = ((lojasRaw ?? []) as { id: number; nome: string; cidade: string | null }[])
+      .filter((f) => pode.has(Number(f.id)))
+      .map((f) => f.cidade?.trim() || f.nome.split('·')[1]?.trim() || f.nome)
+    const modelo = (cfg?.modelo as string | undefined)?.startsWith('claude-') ? (cfg!.modelo as string) : MODELO_CHAT_PADRAO
+    return respostaDoChat({
+      db: supabase as unknown as SupabaseClient,
+      svc: svc as unknown as SupabaseClient,
+      acesso,
+      turnos: alternados(mensagens),
+      modelo,
+      empresa: (empresa?.nome as string | undefined) ?? 'Empresa',
+      segmento: (empresa?.segmento as string | null | undefined) ?? null,
+      lojas,
+      tela: body.contexto ? String(body.contexto).slice(0, 60) : null,
+      extra: cfg?.system_extra ?? null,
+      registrar: async (tokIn, tokOut) => {
+        if (usoId && (tokIn || tokOut)) {
+          await svc.from('assistente_uso').update({ tokens_in: tokIn, tokens_out: tokOut } as never).eq('id', usoId)
+        }
+      },
+    })
+  }
+  if (!apiKey) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
   // Contexto do segmento p/ respostas mais úteis.
   const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
