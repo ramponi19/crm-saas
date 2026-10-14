@@ -115,10 +115,28 @@ async function conversas(empresaId: number, ids: number[]): Promise<void> {
       `[${m.date} ${m.time}] ${m.isStore ? 'LOJA' : 'CLIENTE'}${m.transcrito ? ' (audio)' : ''}: `
       + ((m.body || '').trim().replace(/\s+/g, ' ').slice(0, 400) || `[${m.mediaType || 'anexo'}]`)
 
-    if (ms.length <= 70) { ms.forEach((m) => console.log(linha(m))); continue }
-    ms.slice(0, 15).forEach((m) => console.log(linha(m)))
-    console.log(`\n[... ${ms.length - 70} mensagens do meio omitidas ...]\n`)
-    ms.slice(-55).forEach((m) => console.log(linha(m)))
+    if (ms.length <= 70) ms.forEach((m) => console.log(linha(m)))
+    else {
+      ms.slice(0, 15).forEach((m) => console.log(linha(m)))
+      console.log(`\n[... ${ms.length - 70} mensagens do meio omitidas ...]\n`)
+      ms.slice(-55).forEach((m) => console.log(linha(m)))
+    }
+
+    /**
+     * ⚠ A MARCA DE FIM — e por que ela existe.
+     *
+     * Em 14/10/2026, 4 das 20 primeiras fichas foram escritas sobre conversa
+     * CORTADA. Quem lê esta saída (eu) a passava por `head -N` para caber, e a
+     * última conversa de cada lote saía pela metade sem nada que denunciasse.
+     * Na da Alessandra (lead 3996), a ficha dizia "pagamento travado no 18x,
+     * crítico" — e a conversa real continuava: ela pagou, recebeu, e mandou
+     * três mensagens de pós-venda sem resposta.
+     *
+     * Esta linha é a prova de que a conversa chegou inteira. Sem ela visível,
+     * a leitura foi truncada e a ficha NÃO pode ser escrita.
+     */
+    const ult = ms[ms.length - 1]
+    console.log(`── FIM DO LEAD ${id} · ${ms.length} mensagens · ultima ${ult?.date ?? '?'} ${ult?.time ?? ''} ──`)
   }
   console.log()
 }
