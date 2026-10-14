@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/reter-audio",
       "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/ponte-vendas",
+      "schedule": "40 4 * * *"
     }
   ]
 }

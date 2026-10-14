@@ -7,6 +7,7 @@ import { reativarFrios } from '@/lib/reativacao'
 import { atualizarReferencia } from '@/lib/fipe'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { rodarRetencao } from '@/lib/storage/retencao'
+import { montarPonte, gravarPonte } from '@/lib/zapintel/ponte'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -14,7 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
 // Vercel Cron envia o header 'authorization: Bearer <CRON_SECRET>'.
 // Jobs: expirar-trials | arquivar-eventos | sync-stripe | gerar-followups
-//       sync-fipe | renovar-tokens | reter-audio
+//       sync-fipe | renovar-tokens | reter-audio | ponte-vendas
 // ============================================================
 
 type Embed<T> = T | T[] | null
@@ -58,13 +59,17 @@ export async function GET(
       }
 
       case 'arquivar-eventos': {
-        // Remove eventos Stripe com mais de 90 dias (já processados)
+        // Remove eventos Stripe com mais de 90 dias (já processados).
+        //
+        // Filtrava por `created_at`, coluna que `stripe_eventos` não tem — a
+        // data dela é `processado_em`. O job falhava todo dia desde setembro
+        // com "Erro no cron" no log, sem apagar nada (achado em 14/10/2026).
         const corte = new Date()
         corte.setDate(corte.getDate() - 90)
         const { data, error } = await supabase
           .from('stripe_eventos')
           .delete()
-          .lt('created_at', corte.toISOString())
+          .lt('processado_em', corte.toISOString())
           .select('id')
         if (error) throw error
         return NextResponse.json({ ok: true, job, removidos: data?.length ?? 0 })
@@ -373,6 +378,31 @@ export async function GET(
         const r = await rodarRetencao(supabase)
         if (r.falhas) console.error('[cron/reter-audio] falhas:', r.falhas)
         return NextResponse.json({ ok: true, job, ...r })
+      }
+
+      case 'ponte-vendas': {
+        /**
+         * A PONTE VENDA↔CONVERSA NÃO PODE DEPENDER DE ALGUÉM RODAR UM SCRIPT.
+         *
+         * Medido em 14/10/2026: a ponte tinha sido gravada pela última vez em
+         * 10/10, pelo script manual. Toda venda de 11 a 14/10 estava fora
+         * dela — e o dashboard do ZapIntel (conversão, "compraram e o CRM não
+         * tem a venda", ticket) tira tudo isso daqui. Rodado à mão naquele
+         * dia: 45 de 62 vendas ligadas a uma conversa, contra 33.
+         *
+         * Uma vez por dia (o limite do plano). `gravarPonte` só acrescenta ou
+         * atualiza, e nunca mexe numa ligação confirmada à mão.
+         */
+        const { data: ativas, error } = await supabase
+          .from('complementos_empresa').select('empresa_id').eq('zapintel_ativo', true)
+        if (error) throw error
+        const resultado: { empresa: number; vendas: number; gravadas: number }[] = []
+        for (const { empresa_id } of (ativas ?? []) as { empresa_id: number }[]) {
+          const linhas = await montarPonte(supabase as unknown as SupabaseClient, empresa_id)
+          const gravadas = await gravarPonte(supabase as unknown as SupabaseClient, linhas)
+          resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
+        }
+        return NextResponse.json({ ok: true, job, resultado })
       }
 
       default:
