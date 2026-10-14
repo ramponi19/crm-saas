@@ -29,6 +29,10 @@
 --   parado          hoje | 1-2 | 3-7 | 8-14 | 15-30 | 30+
 --   modelo          "17 Pro Max" (o cliente citou nos últimos 30 dias)
 --   busca           nome, telefone, interesse, o que foi dito, e a análise
+--   dias            conversa com mensagem nos últimos N dias
+--   funil           true = sem "fora do funil" e sem "sem análise"
+--   sinal_familia   família do sinal (zapintel_familia_sinal, em zapintel_insights.sql)
+--   fase            aberto = quente, morno, acompanhar ou parado
 -- p_ordem: prioridade (padrão) | recentes | parados | score | mensagens
 create or replace function public.zapintel_leads_lista(
   p_filtros jsonb default '{}'::jsonb,
@@ -138,6 +142,14 @@ begin
             where m.lead_id = X.id and m.direcao = 'recebida' and m.created_at >= v_agora - interval '30 days'
               and coalesce(nullif(trim(m.transcricao), ''), m.conteudo, '') ~*
                   ('iphone\s*' || replace(v_f->>'modelo', ' ', '\s*') || '(?![0-9a-z])')))
+      -- Os recortes da tela Insights (14/10/2026): "conversas com mensagem nos
+      -- últimos N dias", "só quem está no funil", a família do sinal e a fase
+      -- da pendência. Com eles o link de cada card abre a mesma contagem.
+      and (v_f->>'dias' is null or X.um >= v_agora - make_interval(days => (v_f->>'dias')::int))
+      and (coalesce((v_f->>'funil')::boolean, false) = false or X.cls not in ('unqualified', 'sem_analise'))
+      and (v_f->>'sinal_familia' is null or exists (select 1 from jsonb_array_elements(coalesce(X.si, '[]'::jsonb)) s
+                                                  where zapintel_familia_sinal(s->>'rotulo') = v_f->>'sinal_familia'))
+      and (v_f->>'fase' is null or (v_f->>'fase' = 'aberto' and X.cls in ('hot', 'warm', 'followup', 'stalled')))
       and (v_padrao is null
            or X.nome ilike v_padrao or X.telefone ilike v_padrao or X.produto_interessado ilike v_padrao
            or X.id in (select lead_id from ACHADOS))

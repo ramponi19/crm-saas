@@ -189,6 +189,11 @@ v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "a
 v "ficha nao e pedida ao abrir"      "app/zapintel/leads/[id]/page.tsx" "Não pede nada"
 # Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
 v "ao vivo tem teto de ritmo"        "hooks/zapintel/useRpcAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+# Insights (14/10/2026): das análises e das vendas, no banco; nada do motor de palavras.
+v "insights le do banco"             "app/zapintel/insights/page.tsx" "useRpcAoVivo<Insights>(\"zapintel_insights\""
+n "insights sem chamou pelo nome"    "app/zapintel/insights/page.tsx" "calledByName"
+n "insights sem atendente do texto"  "app/zapintel/insights/page.tsx" "sellerDistribution"
+v "insights fechado para anon"       "supabase/funcoes/zapintel_insights.sql" "revoke all on function public.zapintel_insights"
 v "lista de leads usa o ao vivo"     "app/zapintel/leads/page.tsx" "useRpcAoVivo<Lista>(\"zapintel_leads_lista\""
 v "aviso ao vivo nao derruba webhook" "supabase/funcoes/zapintel_ao_vivo.sql" "exception when others"
 v "conversas fechadas para anon"     "supabase/funcoes/seguranca_20261014.sql" "revoke all on function public.zapintel_conversas"

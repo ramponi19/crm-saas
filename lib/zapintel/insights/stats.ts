@@ -139,45 +139,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   const stalledFollowup = leads.filter(l => ["stalled","followup"].includes(l.classification));
   const reactivationRate = stalledFollowup.length > 0 ? Math.round((reactivated.length / stalledFollowup.length) * 100) : 0;
 
-  // ── Seller distribution ──────────────────────────────────────────────────────
-  const sellerCount: Record<string, number> = {};
-  for (const lead of leads) {
-    const seller = lead.sellerName || "Loja";
-    sellerCount[seller] = (sellerCount[seller] || 0) + 1;
-  }
-  const sellerDistribution = Object.entries(sellerCount)
-    .sort((a, b) => b[1] - a[1])
-    .map(([seller, count]) => ({ seller, count }));
-
-  // ── 11. Chamou pelo nome ─────────────────────────────────────────────────────
-  // Detect if seller used the contact's first name in any message
-  const calledByName = leads.filter(l => {
-    const firstName = l.contact.split(" ")[0].toLowerCase().trim();
-    if (firstName.length < 3) return false;
-    return l.messages.some(m => m.isStore && m.body.toLowerCase().includes(firstName));
-  }).length;
-
-  // ── 12. Pediu indicação ───────────────────────────────────────────────────────
-  const REFERRAL_ASK_KW = [
-    "indica", "indicação", "indicar", "me indica", "conhece alguém",
-    "tem alguém", "alguém que queira", "amigo que queira", "familiar",
-    "você conhece", "nos indica", "nos recomendar", "recomenda"
-  ];
-  const askedReferral = leads.filter(l =>
-    l.messages.some(m => m.isStore && REFERRAL_ASK_KW.some(kw => m.body.toLowerCase().includes(kw)))
-  ).length;
-
-  // ── 13. Última mensagem da loja ───────────────────────────────────────────────
-  // Conversations where the LAST message was from the store (good practice)
-  // vs last message was from the lead (store didn't close the conversation)
-  const lastMsgStore = leads.filter(l => {
-    const msgs = l.messages.filter(m => m.body && m.body.trim());
-    if (msgs.length === 0) return false;
-    return msgs[msgs.length - 1].isStore;
-  }).length;
-  const lastMsgLead = leads.length - lastMsgStore;
-  const lastMsgStorePct = leads.length > 0 ? Math.round((lastMsgStore / leads.length) * 100) : 0;
-
   return {
     total: leads.length,
     customer: count("customer"), hot: count("hot"), warm: count("warm"),
@@ -187,10 +148,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
     topObjections: Object.entries(objCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, count]) => ({ label, count })),
     conversionRate, pipelineValue, ghostRate,
     referralCount, topModels, reactivationRate,
-    sellerDistribution,
-    calledByName, calledByNamePct: leads.length > 0 ? Math.round((calledByName / leads.length) * 100) : 0,
-    askedReferral, askedReferralPct: leads.length > 0 ? Math.round((askedReferral / leads.length) * 100) : 0,
-    lastMsgStore, lastMsgLead, lastMsgStorePct,
     // Viajam juntos de proposito: valor sem origem e valor sem defesa.
     ticketMedido: fatos?.ticket ?? null,
     vendasNaConta: fatos?.vendas ?? 0,

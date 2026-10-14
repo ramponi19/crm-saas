@@ -156,14 +156,6 @@ export interface DashboardStats {
   referralCount: number;
   topModels: { model: string; count: number }[];
   reactivationRate: number;
-  calledByName: number;
-  calledByNamePct: number;
-  askedReferral: number;
-  askedReferralPct: number;
-  lastMsgStore: number;
-  lastMsgLead: number;
-  lastMsgStorePct: number;
-  sellerDistribution: { seller: string; count: number }[];
 
   // ── O que veio da ponte venda↔conversa (10/10/2026) ──────────────────────
   //
