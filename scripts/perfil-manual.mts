@@ -61,9 +61,16 @@ const arg = (nome: string): string | null => {
  */
 async function falta(empresaId: number): Promise<void> {
   const { analisados, porId } = await carregarConversas(db, empresaId)
-  const { data: jaTem } = await db
-    .from('zapintel_lead_perfil').select('lead_id').eq('empresa_id', empresaId)
-  const prontos = new Set((jaTem ?? []).map((r) => r.lead_id as number))
+  // Paginado: o PostgREST devolve no maximo 1000 linhas por consulta, e
+  // passado esse numero as fichas prontas voltavam para a fila.
+  const prontos = new Set<number>()
+  for (let de = 0; ; de += 1000) {
+    const { data: jaTem, error } = await db.from('zapintel_lead_perfil').select('lead_id')
+      .eq('empresa_id', empresaId).order('lead_id').range(de, de + 999)
+    if (error) throw error
+    for (const r of jaTem ?? []) prontos.add(r.lead_id as number)
+    if ((jaTem ?? []).length < 1000) break
+  }
 
   const linhas: { id: number; nome: string; msgs: number; devem: boolean; dias: number }[] = []
   for (const a of analisados) {
