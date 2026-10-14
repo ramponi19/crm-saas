@@ -149,20 +149,12 @@ export interface DashboardStats {
   avgScore: number;
   avgDaysInactive: number;
   topObjections: { label: string; count: number }[];
-  topBuySignals: { label: string; count: number }[];
-  profileDistribution: { profile: string; count: number }[];
-  inactivityRanges: { range: string; count: number }[];
   // New metrics
   conversionRate: number;
-  avgDaysToClose: number;
   pipelineValue: number;
   ghostRate: number;
-  inactivityTraffic: { range: string; count: number; color: string }[];
-  /** A objeção que trava mais negócio, e QUANTOS leads ela trava. Ver stats.ts. */
-  mostExpensiveObjection: { label: string; leads: number };
   referralCount: number;
   topModels: { model: string; count: number }[];
-  peakHours: { hour: string; count: number }[];
   reactivationRate: number;
   calledByName: number;
   calledByNamePct: number;
@@ -183,21 +175,6 @@ export interface DashboardStats {
   ticketMedido: number | null;
   /** De quantas vendas o ticket saiu. Poucas vendas = ticket frágil, e a tela diz. */
   vendasNaConta: number;
-  /** Fração das vendas que a ponte ligou a uma conversa (0 a 1). Na JM: 0,68. */
-  coberturaDaPonte: number;
-  /** Leads deste recorte com venda COMPROVADA (não "disse a palavra certa"). */
-  compradoresComprovados: number;
-  /**
-   * Sinais ordenados por quanto SEPARAM comprador de curioso, não por quanto
-   * aparecem. `null` quando não há venda ligada para comparar.
-   */
-  signalLift: {
-    label: string;
-    compradores: number;
-    pctCompradores: number;
-    pctDemais: number;
-    diferenca: number;
-  }[] | null;
   /**
    * Taxa MEDIDA de fechamento por classificação, em % (já corrigida pela
    * cobertura da ponte). A fórmula antiga do pipeline supunha 70% e 25%; o

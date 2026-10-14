@@ -4,7 +4,6 @@ import { computeStats, type FatosStats } from '@/lib/zapintel/insights/stats'
 import { computePerformance, type FatosDePerformance } from '@/lib/zapintel/insights/performance'
 import { computePerformance2 } from '@/lib/zapintel/insights/performance2'
 import { computeLinguagem } from '@/lib/zapintel/insights/linguagem'
-import { computeSilencio, type FraseAntesDoSilencio } from '@/lib/zapintel/insights/silencio'
 import type { Lead, DashboardStats, PerformanceStats } from '@/types/zapintel'
 import type { Performance2Stats } from '@/lib/zapintel/insights/performance2'
 import type { LinguagemStats } from '@/lib/zapintel/insights/linguagem'
@@ -63,15 +62,9 @@ export interface Agregados {
   performance: PerformanceStats
   performance2: Performance2Stats
   linguagem: LinguagemStats | null
-  /**
-   * O que a loja disse antes de o cliente sumir, agrupado.
-   *
-   * A única coisa nesta reconstrução que as ferramentas do segmento não têm:
-   * chamada gravada não tem "última mensagem antes de sumir". Ver
-   * `lib/zapintel/insights/silencio.ts` para as duas armadilhas que o cálculo
-   * precisa desviar.
-   */
-  silencio: FraseAntesDoSilencio[]
+  // "O que a loja disse antes de o cliente sumir" saiu daqui em 14/10/2026: o
+  // dashboard novo calcula no banco (`zapintel_dashboard`, bloco SIL), sem
+  // anexo, reação e vaga de emprego no meio. Ninguém mais lia este.
 }
 
 export interface Loja {
@@ -240,8 +233,6 @@ function paraOMotor(f: FatosDeVenda | null, taxaHot: number, taxaWarm: number): 
     taxaWarm,
     ticket: f.ticket,
     vendas: f.vendas,
-    cobertura: f.cobertura,
-    cicloMediano: f.cicloMediano,
     comprou: (l: Lead) => {
       const id = idDoLead(l)
       return id != null && f.compradores.has(id)
@@ -257,7 +248,6 @@ export function agregar(
 ): Agregados {
   return {
     stats: computeStats(leads, fatos),
-    silencio: computeSilencio(leads, fatos ? fatos.comprou : () => false),
     performance: computePerformance(leads, desempenho),
     performance2: enxugar(computePerformance2(leads)),
     linguagem: computeLinguagem(leads),

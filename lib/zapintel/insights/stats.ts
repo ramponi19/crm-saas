@@ -18,10 +18,6 @@ export interface FatosStats {
   ticket: number;
   /** De quantas vendas ele saiu — viaja junto para a tela poder relativizar. */
   vendas: number;
-  /** Fracao das vendas que a ponte ligou a uma conversa (0 a 1). */
-  cobertura: number;
-  /** Mediana de dias da primeira mensagem ate a venda. */
-  cicloMediano: number | null;
   /**
    * Taxa MEDIDA de fechamento de quente e morno, em fracao.
    *
@@ -62,21 +58,10 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   // Quem comprou, de verdade. Vazio quando nao ha ponte — e ai os numeros que
   // dependem disto saem zerados em vez de sairem errados.
   const compradores = fatos ? leads.filter(fatos.comprou) : [];
-  const ehComprador = new Set(compradores);
 
   const objCount: Record<string, number> = {};
-  const signalCount: Record<string, number> = {};
-  const profileCount: Record<string, number> = {};
-  /** Por sinal: em quantos compradores (c) e em quantos demais (n) ele aparece. */
-  const sinalPorGrupo: Record<string, { c: number; n: number }> = {};
   for (const lead of leads) {
     for (const obj of lead.objections) objCount[obj.label] = (objCount[obj.label] || 0) + 1;
-    for (const sig of lead.buySignals) {
-      signalCount[sig] = (signalCount[sig] || 0) + 1;
-      const d = sinalPorGrupo[sig] ?? (sinalPorGrupo[sig] = { c: 0, n: 0 });
-      if (ehComprador.has(lead)) d.c++; else d.n++;
-    }
-    profileCount[lead.buyerProfile] = (profileCount[lead.buyerProfile] || 0) + 1;
   }
 
   // 1. CONVERSAO — agora de venda registrada, nao de palavra na conversa.
@@ -88,17 +73,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   const conversionRate = leads.length > 0 && fatos
     ? Math.round((compradores.length / leads.length) * 1000) / 10
     : 0;
-
-  // 2. Tempo médio para fechar
-  const customers = leads.filter(l => l.classification === "customer");
-  const avgDaysToClose = fatos?.cicloMediano != null ? fatos.cicloMediano
-    : customers.length > 0
-    ? Math.round(customers.reduce((a, l) => {
-        const start = l.firstDate ? new Date(l.firstDate).getTime() : 0;
-        const end = l.lastDate ? new Date(l.lastDate).getTime() : 0;
-        return a + (start && end ? Math.max(0, Math.round((end - start) / 86400000)) : 3);
-      }, 0) / customers.length)
-    : 3;
 
   // 3. Pipeline
   const hotLeads = leads.filter(l => l.classification === "hot");
@@ -132,37 +106,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   });
   const ghostRate = leads.length > 0 ? Math.round((ghostLeads.length / leads.length) * 100) : 0;
 
-  // 5. Semáforo
-  const inactivityTraffic = [
-    { range: "Hoje",  count: leads.filter(l => l.daysInactive === 0).length,                          color: "#22c55e" },
-    { range: "1–2d",  count: leads.filter(l => l.daysInactive >= 1 && l.daysInactive <= 2).length,   color: "#4ade80" },
-    { range: "3–7d",  count: leads.filter(l => l.daysInactive >= 3 && l.daysInactive <= 7).length,   color: "#eab308" },
-    { range: "8–14d", count: leads.filter(l => l.daysInactive >= 8 && l.daysInactive <= 14).length,  color: "#f97316" },
-    { range: "15–30d",count: leads.filter(l => l.daysInactive >= 15 && l.daysInactive <= 30).length, color: "#ef4444" },
-    { range: "30d+",  count: leads.filter(l => l.daysInactive > 30).length,                          color: "#7f1d1d" },
-  ];
-
-  // 6. Objeção mais cara
-  const lostStalled = leads.filter(l => ["lost","stalled"].includes(l.classification));
-  const expObjCount: Record<string, number> = {};
-  for (const lead of lostStalled) for (const obj of lead.objections) expObjCount[obj.label] = (expObjCount[obj.label] || 0) + 1;
-  const mostExpEntry = Object.entries(expObjCount).sort((a, b) => b[1] - a[1])[0];
-  const mostExpensiveObjection = mostExpEntry
-    // ── POR QUE ISTO DEIXOU DE SER UM VALOR EM REAIS ───────────────────────
-    //
-    // Era `contagem x TICKET_MEDIO x 0,6` — e os tres fatores eram problema. O
-    // ticket agora e medido, mas o 0,6 supunha que 60% dos leads travados por
-    // aquela objecao teriam comprado. Medido em 10/10/2026: lead `stalled`
-    // compra em 1,0% dos casos e `lost` em 0,0%. Nao em 60%.
-    //
-    // E nao ha como medir o contrafactual: ninguem sabe quantos COMPRARIAM se
-    // a objecao fosse resolvida. Entao o cartao passa a responder a pergunta
-    // que TEM resposta — qual objecao trava mais negocio — e responde com a
-    // contagem, que e fato. Valor em reais aqui so poderia ser chute com cara
-    // de medida, que e o defeito que este arquivo inteiro veio corrigir.
-    ? { label: mostExpEntry[0], leads: mostExpEntry[1] }
-    : { label: "Nenhuma detectada", leads: 0 };
-
   // 7. Indicações
   const referralCount = leads.filter(l => {
     const allText = l.messages.map(m => m.body).join(" ").toLowerCase();
@@ -182,20 +125,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
     }
   }
   const topModels = Object.entries(modelCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([model, count]) => ({ model, count }));
-
-  // 9. Horário de pico
-  const hourCount: Record<string, number> = {};
-  for (const lead of leads) {
-    for (const msg of lead.messages) {
-      if (!msg.isStore && msg.time) {
-        const hour = msg.time.split(":")[0];
-        if (hour) hourCount[hour] = (hourCount[hour] || 0) + 1;
-      }
-    }
-  }
-  const peakHours = Object.entries(hourCount)
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([hour, count]) => ({ hour: `${hour}h`, count }));
 
   // 10. Taxa de reativação
   const reactivated = leads.filter(l => {
@@ -249,29 +178,6 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
   const lastMsgLead = leads.length - lastMsgStore;
   const lastMsgStorePct = leads.length > 0 ? Math.round((lastMsgStore / leads.length) * 100) : 0;
 
-  // ── Qual sinal PREVE, e nao apenas aparece ───────────────────────────────
-  //
-  // A lista `topBuySignals` ordena por frequencia, e frequencia engana: "Pediu
-  // 18x" e o 3o mais contado (396 leads) e aparece em 21% de quem comprou
-  // contra 19% de quem nao comprou — nao separa nada. "Perguntou sobre
-  // entrega" aparece em 39% contra 7%: e o mais forte, e estava enterrado na
-  // lista por ser menos comum.
-  //
-  // `diferenca` e correlacao, nao causa. Serve para PRIORIZAR atendimento,
-  // nunca para afirmar que perguntar de entrega faz comprar.
-  const nDemais = leads.length - compradores.length;
-  const signalLift = fatos && compradores.length > 0
-    ? Object.entries(sinalPorGrupo)
-        .filter(([, d]) => d.c + d.n >= 25)
-        .map(([label, d]) => {
-          const pctCompradores = Math.round((d.c / compradores.length) * 100);
-          const pctDemais = nDemais > 0 ? Math.round((d.n / nDemais) * 100) : 0;
-          return { label, compradores: d.c, pctCompradores, pctDemais, diferenca: pctCompradores - pctDemais };
-        })
-        .sort((a, b) => b.diferenca - a.diferenca)
-        .slice(0, 8)
-    : null;
-
   return {
     total: leads.length,
     customer: count("customer"), hot: count("hot"), warm: count("warm"),
@@ -279,21 +185,15 @@ export function computeStats(leads: Lead[], fatos?: FatosStats | null): Dashboar
     avgScore: leads.length > 0 ? Math.round(leads.reduce((a, l) => a + l.score, 0) / leads.length) : 0,
     avgDaysInactive: leads.length > 0 ? Math.round(leads.reduce((a, l) => a + l.daysInactive, 0) / leads.length) : 0,
     topObjections: Object.entries(objCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, count]) => ({ label, count })),
-    topBuySignals: Object.entries(signalCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, count]) => ({ label, count })),
-    profileDistribution: Object.entries(profileCount).sort((a, b) => b[1] - a[1]).map(([profile, count]) => ({ profile, count })),
-    inactivityRanges: inactivityTraffic.map(({ range, count }) => ({ range, count })),
-    conversionRate, avgDaysToClose, pipelineValue, ghostRate,
-    inactivityTraffic, mostExpensiveObjection, referralCount, topModels, peakHours, reactivationRate,
+    conversionRate, pipelineValue, ghostRate,
+    referralCount, topModels, reactivationRate,
     sellerDistribution,
     calledByName, calledByNamePct: leads.length > 0 ? Math.round((calledByName / leads.length) * 100) : 0,
     askedReferral, askedReferralPct: leads.length > 0 ? Math.round((askedReferral / leads.length) * 100) : 0,
     lastMsgStore, lastMsgLead, lastMsgStorePct,
-    // Os tres viajam juntos de proposito: valor sem origem e valor sem defesa.
+    // Viajam juntos de proposito: valor sem origem e valor sem defesa.
     ticketMedido: fatos?.ticket ?? null,
     vendasNaConta: fatos?.vendas ?? 0,
-    coberturaDaPonte: fatos?.cobertura ?? 0,
-    compradoresComprovados: compradores.length,
-    signalLift,
     // As taxas viajam para a tela poder MOSTRAR de onde o pipeline saiu. Numero
     // em reais sem a taxa ao lado e exatamente o que estava errado antes.
     taxaFechamentoHot: Math.round(taxaHot * 1000) / 10,
