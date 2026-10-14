@@ -31,6 +31,24 @@ type Pendente = {
   lojaDeve: boolean;
 };
 
+type Contagem = { desatualizadas: Pendente[]; semAnalise: Pendente[]; iaDisponivel: boolean };
+
+/** Pergunta ao servidor; `null` quando não deu para contar. Não mexe em estado. */
+async function buscarContagem(): Promise<Contagem | null> {
+  try {
+    const r = await fetch("/zapintel/api/perfil/pendentes", { cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) return null;
+    return {
+      desatualizadas: d.desatualizadas as Pendente[],
+      semAnalise: d.semAnalise as Pendente[],
+      iaDisponivel: !!d.iaDisponivel,
+    };
+  } catch {
+    return null;
+  }
+}
+
 const dataCurta = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }) : "";
 
@@ -45,23 +63,25 @@ export function RoboAnalises() {
   const [erroLote, setErroLote] = useState("");
   const parar = useRef(false);
 
-  const contar = useCallback(async () => {
-    try {
-      const r = await fetch("/zapintel/api/perfil/pendentes", { cache: "no-store" });
-      const d = await r.json();
-      if (!r.ok) throw new Error();
-      setDesatualizadas(d.desatualizadas as Pendente[]);
-      setSemAnalise(d.semAnalise as Pendente[]);
-      setIaDisponivel(!!d.iaDisponivel);
-      setFalhou(false);
-    } catch {
-      setFalhou(true);
-    }
+  const aplicar = useCallback((d: Contagem | null) => {
+    if (!d) { setFalhou(true); return; }
+    setDesatualizadas(d.desatualizadas);
+    setSemAnalise(d.semAnalise);
+    setIaDisponivel(d.iaDisponivel);
+    setFalhou(false);
   }, []);
+
+  const contar = useCallback(() => { buscarContagem().then(aplicar); }, [aplicar]);
 
   // Uma contagem ao entrar no ZapIntel, outra a cada vez que o painel abre.
   // O layout não remonta entre as telas, então navegar não reconta à toa.
-  useEffect(() => { contar(); }, [contar]);
+  // O estado só muda na resposta, dentro do `then` — e só se o robô ainda
+  // estiver na tela.
+  useEffect(() => {
+    let vivo = true;
+    buscarContagem().then((d) => { if (vivo) aplicar(d); });
+    return () => { vivo = false; };
+  }, [aplicar]);
 
   // A tela do lead avisa quando gerou uma ficha: ele sai da lista na hora.
   useEffect(() => {
