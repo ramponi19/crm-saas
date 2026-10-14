@@ -6,6 +6,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import Providers from './providers'
 import { ZapSidebar } from '@/components/zapintel/zap-sidebar'
 import { PreviewBanner } from '@/components/zapintel/preview-banner'
+import { RoboAnalises } from '@/components/zapintel/robo-analises'
 
 export const metadata = { title: 'ZapIntel' }
 
@@ -50,6 +51,7 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
           {previewAtivo && <PreviewBanner empresaNome={empresa?.nome ?? 'empresa'} />}
           {children}
         </main>
+        <RoboAnalises />
       </Providers>
     </div>
   )

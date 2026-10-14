@@ -198,23 +198,27 @@ export default function LeadDetailPage() {
   /**
    * A FICHA ESCRITA POR IA — o que esta tela afirma, do Copiloto para cima.
    *
-   * Chega em dois tempos, de propósito. `/zapintel/api/conversa` traz de
-   * graça a que já estava guardada (uma consulta por chave primária), e a
-   * tela a mostra na hora, mesmo que tenha sido escrita antes das últimas
-   * mensagens. Se não existir nenhuma, ou se a conversa andou desde que
-   * aquela foi escrita, a tela pede uma nova em `/zapintel/api/perfil`.
+   * `/zapintel/api/conversa` traz de graça a que já estava guardada (uma
+   * consulta por chave primária), e a tela a mostra na hora, mesmo que tenha
+   * sido escrita antes das últimas mensagens.
    *
-   * O pedido é AUTOMÁTICO porque foi assim que o Lucas pediu em 13/10/2026:
-   * "o que for de IA sempre será automático". Ninguém clica em "analisar" —
-   * abrir o lead é o gesto.
+   * ⚠ A TELA NUNCA PEDE UMA NOVA SOZINHA — DESDE 14/10/2026.
    *
-   * Enquanto a nova não chega, a antiga continua à vista com um aviso de
-   * desatualizada. Esvaziar a tela para depois preenchê-la seria perder
-   * informação boa em troca de um spinner.
+   * Até ali, abrir um lead com conversa nova disparava a IA na hora ("o que
+   * for de IA sempre será automático", 13/10). O Lucas reviu no dia seguinte:
+   * *"se nao toda vez que abrir o zapintel a ia vai analisar tudo consumindo
+   * token sem precisar. Ai se sofreu alteracao coloca um aviso, nova analise
+   * disponivel"*. Abrir para dar uma olhada não pode custar uma chamada.
+   *
+   * Agora a ficha guardada aparece com o aviso de que a conversa andou, e a
+   * IA só escreve quando alguém aperta "Gerar nova análise" — aqui ou no robô
+   * do canto da tela, que mostra todos os leads nessa situação.
    */
   const [perfilIA, setPerfilIA] = useState<PerfilIA | null>(null);
   const [perfilAtual, setPerfilAtual] = useState(true);
   const [perfilEm, setPerfilEm] = useState<string | null>(null);
+  /** Mensagens que chegaram depois da ficha guardada — o "quanto mudou". */
+  const [novasDesde, setNovasDesde] = useState(0);
   const [analisando, setAnalisando] = useState(false);
   const [erroPerfil, setErroPerfil] = useState("");
   /**
@@ -252,23 +256,21 @@ export default function LeadDetailPage() {
           setConversa(d.lead as Lead);
           setFicha((d.ficha as Ficha) ?? null);
           setTravou((d.travou as Travou) ?? null);
-          const g = d.perfil as { perfil: PerfilIA; atual: boolean; geradoEm: string } | null;
+          const g = d.perfil as { perfil: PerfilIA; atual: boolean; geradoEm: string; mensagensNaFicha?: number } | null;
           if (g?.perfil) {
             setPerfilIA(g.perfil);
             setPerfilAtual(g.atual);
             setPerfilEm(g.geradoEm);
+            const total = (d.lead as Lead).messages?.length ?? 0;
+            setNovasDesde(Math.max(0, total - (g.mensagensNaFicha ?? total)));
           }
-          // Não há ficha, ou a conversa andou depois que ela foi escrita.
-          // Só pede se a IA puder responder: ver `iaDisponivel` na rota.
+          // Não pede nada: ver "A TELA NUNCA PEDE UMA NOVA SOZINHA" acima.
           setIaLigada(d.iaDisponivel !== false);
-          if (!g?.atual && d.iaDisponivel !== false) pedirPerfil(false);
         }
         else setFalhouConversa(true);
       })
       .catch(() => { if (vivo) setFalhouConversa(true); });
     return () => { vivo = false; };
-    // `pedirPerfil` só depende de `resumo.leadId`, que já está nas dependências.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumo?.leadId]);
 
   /**
@@ -289,7 +291,10 @@ export default function LeadDetailPage() {
       else if (d?.perfil) {
         setPerfilIA(d.perfil as PerfilIA);
         setPerfilAtual(true);
+        setNovasDesde(0);
         setPerfilEm(String(d.geradoEm || new Date().toISOString()));
+        // O robô do canto conta os leads pendentes; este acabou de sair da lista.
+        window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: resumo.leadId }));
       }
     } catch {
       setErroPerfil("Não consegui analisar agora.");
@@ -524,10 +529,40 @@ export default function LeadDetailPage() {
               <AlertTriangle size={12} /> {erroPerfil}
             </p>
           )}
-          {ia && !perfilAtual && !analisando && (
-            <p style={{ fontSize: 10, color: "var(--muted)", marginTop: 8 }}>
-              Escrita antes das últimas mensagens — atualizando.
-            </p>
+          {/*
+            NOVA ANÁLISE DISPONÍVEL — o aviso no lugar do pedido automático.
+            A ficha antiga continua à vista: ela ainda é a melhor leitura que
+            existe até alguém decidir pagar por uma nova.
+          */}
+          {!analisando && (!ia || !perfilAtual) && !carregandoConversa && !falhouConversa && (
+            <div style={{
+              marginTop: 10, padding: "8px 10px", borderRadius: 8,
+              background: "rgba(124,92,252,.08)", border: "1px solid rgba(124,92,252,.28)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: 11, color: "var(--txt)", display: "flex", alignItems: "center", gap: 6 }}>
+                <Sparkles size={12} style={{ color: "var(--purple-l)" }} />
+                {ia
+                  ? <><b>Nova análise disponível</b>{novasDesde > 0
+                      ? ` · ${novasDesde} ${novasDesde === 1 ? "mensagem nova" : "mensagens novas"} desde esta análise`
+                      : " · a conversa mudou desde esta análise"}</>
+                  : <><b>Este lead ainda não tem análise de IA</b></>}
+              </span>
+              {iaLigada ? (
+                <button
+                  onClick={() => pedirPerfil(false)}
+                  style={{
+                    background: "var(--purple)", color: "#fff", border: "none", borderRadius: 7,
+                    padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}
+                >
+                  <Bot size={12} /> {ia ? "Gerar nova análise" : "Gerar análise"}
+                </button>
+              ) : (
+                <span style={{ fontSize: 10, color: "var(--muted)" }}>A IA do CRM está desligada</span>
+              )}
+            </div>
           )}
         </div>
 

@@ -120,8 +120,21 @@ export interface MarcaDaConversa {
   transcritos: number
 }
 
+/**
+ * ⚠ O `-03:00` NÃO É ENFEITE — SEM ELE A MARCA DEPENDE DE ONDE O CÓDIGO RODA.
+ *
+ * `date`/`time` são o relógio da LOJA (`montar.ts`). Sem fuso explícito,
+ * `Date.parse` lê esse texto no fuso da MÁQUINA: no computador do Lucas
+ * (São Paulo) sai o instante certo; na Vercel (UTC) sai 3 horas antes.
+ * Medido em 14/10/2026: as 1.813 fichas escritas fora do servidor guardaram
+ * a marca certa, e a produção calcularia outra para a mesma conversa —
+ * todas pareceriam desatualizadas e cada lead aberto pediria IA de novo.
+ *
+ * O Brasil não tem horário de verão desde 2019, então o fuso da loja é fixo.
+ * E é a mesma conta que `zapintel_analises_pendentes` faz no banco.
+ */
 const instante = (m: RawMessage): number => {
-  const t = Date.parse(`${m.date}T${(m.time || '00:00')}:00`)
+  const t = Date.parse(`${m.date}T${(m.time || '00:00')}:00-03:00`)
   return Number.isNaN(t) ? 0 : t
 }
 
@@ -558,6 +571,8 @@ export interface PerfilGuardado {
   modelo: string | null
   /** A ficha foi escrita para a conversa como ela está AGORA? */
   atual: boolean
+  /** Quantas mensagens a conversa tinha quando a ficha foi escrita. */
+  mensagensNaFicha: number
 }
 
 /**
@@ -596,6 +611,7 @@ export async function lerPerfil(
       && Number(linha.marca) === marca.marca
       && linha.mensagens === marca.mensagens
       && linha.transcritos === marca.transcritos,
+    mensagensNaFicha: linha.mensagens,
   }
 }
 

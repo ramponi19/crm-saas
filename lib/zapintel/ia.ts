@@ -269,6 +269,18 @@ export function iaConfigurada(modelo: string): boolean {
 }
 
 /**
+ * A IA do CRM vai responder? Chave do provedor do modelo CONFIGURADO e a
+ * chave-geral do superadmin — as mesmas duas condições que `perguntarIA`
+ * checa, perguntadas antes, numa consulta, em vez de descobertas lead a lead
+ * por uma função inteira que já nasce morta.
+ */
+export async function iaDoCrmLigada(): Promise<boolean> {
+  const { data: cfg } = await createServiceClient()
+    .from('assistente_config').select('ativo, modelo').eq('id', 1).maybeSingle()
+  return iaConfigurada((cfg?.modelo as string) || MODELO_PADRAO) && cfg?.ativo !== false
+}
+
+/**
  * O MESMO CONTRATO, PELA ANTHROPIC.
  *
  * ══ POR QUE EXISTE ═════════════════════════════════════════════════════════

@@ -5,8 +5,7 @@ import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
 import { lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
-import { iaConfigurada } from '@/lib/zapintel/ia'
-import { MODELO_PADRAO } from '@/lib/assistente-erros'
+import { iaDoCrmLigada } from '@/lib/zapintel/ia'
 
 /**
  * UMA conversa, inteira, mais a FICHA dela.
@@ -109,11 +108,9 @@ export async function GET(req: Request) {
      * chave-geral do superadmin. Checá-las aqui custa a consulta que já
      * aconteceria de qualquer jeito, uma vez, em vez de uma função inteira.
      */
-    const { data: cfg } = await db
-      .from('assistente_config').select('ativo, modelo').eq('id', 1).maybeSingle()
     // A chave que importa é a do provedor do modelo CONFIGURADO: com um
     // modelo `claude-` e só a chave do Google, a IA não responde nada.
-    const iaDisponivel = iaConfigurada((cfg?.modelo as string) || MODELO_PADRAO) && cfg?.ativo !== false
+    const iaDisponivel = await iaDoCrmLigada()
 
     return NextResponse.json({ lead, ficha, travou, perfil, iaDisponivel })
   } catch (e) {
