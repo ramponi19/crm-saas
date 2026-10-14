@@ -6671,9 +6671,6 @@ export type Database = {
           mensagens: number
           ms: number | null
           painel: string
-          relato: string | null
-          relato_em: string | null
-          relato_marca: number | null
           ultima_mensagem: number
           versao: string
         }
@@ -6683,9 +6680,6 @@ export type Database = {
           mensagens?: number
           ms?: number | null
           painel: string
-          relato?: string | null
-          relato_em?: string | null
-          relato_marca?: number | null
           ultima_mensagem?: number
           versao?: string
         }
@@ -6695,9 +6689,6 @@ export type Database = {
           mensagens?: number
           ms?: number | null
           painel?: string
-          relato?: string | null
-          relato_em?: string | null
-          relato_marca?: number | null
           ultima_mensagem?: number
           versao?: string
         }
