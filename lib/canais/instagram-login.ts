@@ -208,19 +208,5 @@ export async function assinarWebhook(token: string): Promise<true | Erro> {
   }
 }
 
-/** Cancela a assinatura. Usado ao desconectar. */
-export async function cancelarWebhook(token: string): Promise<true | Erro> {
-  try {
-    const r = await fetch(`${GRAPH}/me/subscribed_apps?access_token=${encodeURIComponent(token)}`, {
-      method: 'DELETE',
-      signal: AbortSignal.timeout(15000),
-    })
-    if (!r.ok) return { erro: mensagemDeErro(await json(r), 'Não foi possível cancelar o recebimento.') }
-    return true
-  } catch (e) {
-    return { erro: e instanceof Error ? e.message : 'falha de rede ao cancelar o webhook' }
-  }
-}
-
 /** Cifra no mesmo cofre dos outros canais — o token não fica em claro no banco. */
 export const cifrar = (token: string) => cifrarToken(token)

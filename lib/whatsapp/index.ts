@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { OfficialConfig, SendMessageParams, SendMessageResult, WhatsAppProvider } from './types'
+import type { OfficialConfig, SendMessageParams, SendMessageResult } from './types'
 import { sendViaOfficial } from './official'
 
 async function getConfig<T>(chave: string, empresaId: number): Promise<T | null> {
@@ -11,11 +11,6 @@ async function getConfig<T>(chave: string, empresaId: number): Promise<T | null>
     .eq('empresa_id', empresaId)
     .single()
   return (data?.valor ?? null) as T | null
-}
-
-export async function getActiveProvider(empresaId: number): Promise<WhatsAppProvider | null> {
-  const official = await getConfig<OfficialConfig>('whatsapp_official', empresaId)
-  return official?.ativo ? 'official' : null
 }
 
 export async function sendWhatsApp(params: SendMessageParams & { empresaId: number }): Promise<SendMessageResult> {

@@ -91,11 +91,3 @@ export function minutosUteis(de: Date, ate: Date, horario: HorarioLoja): number 
   return total
 }
 
-/** A loja está aberta neste instante? */
-export function lojaAberta(quando: Date, horario: HorarioLoja): boolean {
-  const abre = minutosDoDia(horario.inicio)
-  const fecha = minutosDoDia(horario.fim)
-  if (abre == null || fecha == null) return true
-  const { diaSemana, minutos } = partesLocais(quando)
-  return (horario.dias ?? []).includes(diaSemana) && minutos >= abre && minutos < fecha
-}

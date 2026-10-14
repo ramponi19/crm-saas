@@ -451,10 +451,6 @@ export function getSegment(id: string): SegmentConfig {
 
 export const DEFAULT_SEGMENT_ID = "celulares";
 
-export function isValidSegment(id: string | null | undefined): boolean {
-  return !!id && id in SEGMENT_MAP;
-}
-
 // Mapeia o segmento do CRM (empresas.segmento) para o segmento do ZapIntel.
 // É só o PADRÃO — o usuário pode sobrescrever (guardado em complementos_empresa).
 export const CRM_TO_ZAPINTEL: Record<string, string> = {
@@ -525,26 +521,3 @@ export function getCrossSell(id: string): Record<string, { product: string; reas
   return SEGMENT_CROSSSELL[id] || null;
 }
 
-// Guia de exportação de conversas do Instagram (usado na tela de Importar).
-export const INSTAGRAM_EXPORT_GUIDE: { method: string; time: string; steps: string[] }[] = [
-  {
-    method: "Baixar suas informações (recomendado)",
-    time: "~5–15 min",
-    steps: [
-      "No Instagram, vá em Configurações → Central de Contas → Suas informações e permissões.",
-      "Toque em \"Baixar suas informações\" e escolha a conta.",
-      "Selecione apenas \"Mensagens\", formato JSON e intervalo de datas desejado.",
-      "Confirme o pedido — o Instagram prepara o arquivo e envia por e-mail.",
-      "Baixe o .zip, extraia e envie aqui o arquivo .json das mensagens.",
-    ],
-  },
-  {
-    method: "Exportação rápida por conversa",
-    time: "~2 min",
-    steps: [
-      "Abra a conversa desejada no Instagram Direct.",
-      "Copie o histórico visível ou exporte pela ferramenta do seu dispositivo.",
-      "Cole/importe aqui como .csv ou .json.",
-    ],
-  },
-];

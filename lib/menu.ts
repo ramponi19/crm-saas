@@ -60,11 +60,6 @@ export interface MenuItem extends MenuItemBase {
 /** Status efetivo: item sem status declarado está em produção. */
 export const statusDo = (i: MenuItemBase): StatusModulo => i.status ?? 'producao'
 
-/** Todos os itens do catálogo, achatados — usado pelo laboratório do superadmin. */
-export function todosOsItens(): MenuItemBase[] {
-  return CATALOGO.flatMap((g) => g.items)
-}
-
 export interface MenuGroup {
   label: string
   items: MenuItem[]

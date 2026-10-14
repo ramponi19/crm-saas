@@ -46,20 +46,6 @@ export function UrgencyDot({ urgency }: { urgency: string }) {
   );
 }
 
-export function Stat({ label, value, sub, color = "var(--txt)" }: {
-  label: string; value: number | string; sub?: string; color?: string;
-}) {
-  return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .7, marginBottom: 6 }}>
-        {label.toUpperCase()}
-      </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: -1, marginBottom: 2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: "var(--muted)" }}>{sub}</div>}
-    </div>
-  );
-}
-
 export function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: .7, marginBottom: 12 }}>

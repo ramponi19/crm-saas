@@ -75,9 +75,3 @@ export function formatarImei(bruto: string): string {
   return partes.join(' ')
 }
 
-/**
- * Os 8 primeiros dígitos (TAC) identificam o modelo numa base internacional que
- * não temos aqui. Guardar isso à parte deixa claro o que dá e o que não dá:
- * conseguimos separar aparelhos do mesmo modelo, não dizer QUAL é o modelo.
- */
-export const tac = (imei: string) => soDigitos(imei).slice(0, 8)

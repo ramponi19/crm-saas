@@ -92,8 +92,3 @@ export function calcularScore(l: LeadScoreInput, cfg: ScoreConfig = DEFAULT_SCOR
   return { score, tier }
 }
 
-export const TIER_INFO: Record<LeadTier, { label: string; tone: 'acc' | 'warn' | 'neutro' }> = {
-  quente: { label: 'Quente', tone: 'acc' },
-  morno: { label: 'Morno', tone: 'warn' },
-  frio: { label: 'Frio', tone: 'neutro' },
-}

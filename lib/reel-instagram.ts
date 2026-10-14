@@ -35,41 +35,6 @@ export interface ReelCard {
 }
 
 /** Entidades HTML que aparecem em og:title/og:description da Meta. */
-function desescapar(s: string): string {
-  return s
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
-    .replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'")
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-}
-
-function meta(html: string, prop: string): string | null {
-  const re = new RegExp(`property="${prop}"\\s+content="([^"]*)"`, 'i')
-  return re.exec(html)?.[1] ? desescapar(re.exec(html)![1]) : null
-}
-
-/**
- * Lê o cartão da página de um reel. Null quando o HTML não é de um post
- * (página de erro, login, qualquer outra coisa) — quem chama decide o que fazer.
- */
-export function extrairReel(html: string): ReelCard | null {
-  const url = meta(html, 'og:url')
-  if (!url) return null
-
-  // .../<autor>/reel/<codigo>/ ou .../reel|p|tv/<codigo>/
-  const m = /instagram\.com\/(?:([^/]+)\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/.exec(url)
-  if (!m) return null
-  const [, autorNaUrl, shortcode] = m
-
-  const titulo = meta(html, 'og:title') ?? ''
-  // og:title vem como: `Fulano on Instagram: "a legenda aqui"`
-  const t = /^(.*?)\s+on Instagram:\s*"?([\s\S]*?)"?$/.exec(titulo)
-  const autor = t?.[1]?.trim() || autorNaUrl || null
-  const legenda = (t?.[2] ?? meta(html, 'og:description') ?? '').trim() || null
-
-  return { shortcode, autor, legenda, url: `https://www.instagram.com/reel/${shortcode}/` }
-}
 
 /** O embed oficial: público, sem token, e traz capa e vídeo na hora. */
 export function urlEmbed(shortcode: string): string {

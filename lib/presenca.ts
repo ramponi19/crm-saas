@@ -58,7 +58,3 @@ export async function sinaisDePresenca(
   return sinais
 }
 
-/** Ids de quem está online agora — a leitura já filtrada pela janela. */
-export async function usuariosOnline(supabase: Client, empresaId: number): Promise<string[]> {
-  return Object.keys(await sinaisDePresenca(supabase, empresaId))
-}

@@ -51,24 +51,6 @@ export async function requireSuperAdminApi(): Promise<
 }
 
 /**
- * Verifica sem redirecionar se o usuário atual é super admin.
- * Útil em layouts/sidebars do tenant para exibir o link de acesso ao painel.
- */
-export async function isSuperAdmin(): Promise<boolean> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  return usuario?.is_super_admin ?? false
-}
-
-/**
  * Registra uma ação administrativa no log de auditoria.
  * Usa service client (bypassa RLS) para garantir que o insert sempre ocorre.
  * Falhas de log nunca devem quebrar a operação principal, mas são registradas

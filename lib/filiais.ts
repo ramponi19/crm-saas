@@ -43,16 +43,6 @@ export const CAMPOS_FILIAL: (keyof FilialForm)[] = [
 ]
 
 /**
- * Sentinela de "registro sem loja definida", espelhando `filiais_visiveis()`.
- *
- * Um registro órfão (importação antiga, gravação por caminho que ninguém previu)
- * aparece só para dono e admin — quem pode corrigir. Fazer o contrário e esconder
- * de todos transformaria o bug em lead perdido, que é pior do que lead no lugar
- * errado.
- */
-export const SEM_LOJA = 0
-
-/**
  * A separação só existe com DUAS lojas ativas.
  *
  * É o que torna esta mudança inerte: enquanto o dono não cadastrar a segunda loja,
@@ -71,23 +61,3 @@ export function rotuloDaFilial(f: Pick<Filial, 'nome' | 'cidade'>): string {
     : f.nome
 }
 
-/**
- * Dados jurídicos que valem para um documento emitido por esta loja.
- *
- * As lojas da JM têm CNPJ diferente, e o contrato de compra e venda lê
- * `{{loja.cnpj}}`, `{{loja.endereco}}` e `{{loja.representante}}`. O que a filial
- * não preencher cai para o cadastro da empresa — assim uma loja recém-criada emite
- * documento válido antes de o dono terminar de preencher a ficha dela.
- */
-export function dadosJuridicos<T extends Record<string, string | null | undefined>>(
-  filial: T | null,
-  empresa: T,
-): T {
-  if (!filial) return empresa
-  const saida = { ...empresa }
-  for (const chave of Object.keys(empresa) as (keyof T)[]) {
-    const v = filial[chave]
-    if (typeof v === 'string' && v.trim()) saida[chave] = v
-  }
-  return saida
-}

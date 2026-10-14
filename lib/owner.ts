@@ -99,10 +99,6 @@ export async function requireEmpresaRoleApi(
   return { userId: user.id, empresaId, role, supabase }
 }
 
-/** Atalhos comuns. */
-export const requireOwner = () => requireEmpresaRole(['owner'])
-export const requireOwnerOrAdmin = () => requireEmpresaRole(['owner', 'admin'])
-export const requireOwnerApi = () => requireEmpresaRoleApi(['owner'])
 export const requireOwnerOrAdminApi = () => requireEmpresaRoleApi(['owner', 'admin'])
 
 /**

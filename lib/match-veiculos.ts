@@ -100,8 +100,3 @@ export function ranquearVeiculos(interesse: InteresseVeiculo, veiculos: VeiculoM
   return out.sort((a, b) => b.score - a.score)
 }
 
-/** true se o interesse tem ao menos um critério preenchido. */
-export function interesseVeiculoPreenchido(i: InteresseVeiculo): boolean {
-  return !!(low(i.categoria) || low(i.marca) || low(i.modelo) ||
-    i.ano_min != null || i.ano_max != null || i.preco_max != null || i.km_max != null)
-}

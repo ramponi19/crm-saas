@@ -168,16 +168,4 @@ export function useLeads() {
   return ctx;
 }
 
-/**
- * De qual canal veio o lead.
- *
- * Era adivinhação pelo formato do telefone e pelo nome do arquivo — herança da
- * importação manual. Hoje `_channel` é preenchido em `aliviar()` com
- * `leads.origem`, que o CRM grava. A função fica como leitura única do campo,
- * para nenhuma tela voltar a inventar regra própria.
- */
-export function detectLeadOrigin(lead: { _channel?: string }): "whatsapp" | "instagram" {
-  return lead._channel === "instagram" ? "instagram" : "whatsapp";
-}
-
 export type { Lead };

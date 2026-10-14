@@ -177,12 +177,6 @@ export const MODULES: ModuleCard[] = [
 /* ------------------------------------------------------------------ */
 
 export type Stat = { value: number; format: (n: number) => string; label: string; sub: string }
-export const STATS: Stat[] = [
-  { value: 247, format: (n) => String(Math.round(n)), label: 'empresas ativas', sub: 'em 6 segmentos' },
-  { value: 31, format: (n) => `${Math.round(n)} mil`, label: 'leads atendidos', sub: 'WhatsApp, Instagram e portais' },
-  { value: 4.8, format: (n) => `R$ ${n.toFixed(1).replace('.', ',')} mi`, label: 'vendidos por mês', sub: 'registrados na plataforma' },
-  { value: 112, format: (n) => `${Math.round(n)}s`, label: 'tempo médio de resposta', sub: 'com SLA cronometrado', },
-]
 
 /* ------------------------------------------------------------------ */
 /*  Comparativo honesto                                                */

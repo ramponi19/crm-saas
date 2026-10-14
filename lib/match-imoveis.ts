@@ -95,8 +95,3 @@ export function ranquear(perfil: PerfilBusca, imoveis: ImovelMatchInput[]): Matc
   return out.sort((a, b) => b.score - a.score)
 }
 
-/** true se o perfil tem ao menos um critério preenchido. */
-export function perfilPreenchido(p: PerfilBusca): boolean {
-  return p.tipos.length > 0 || p.cidades.length > 0 || p.bairros.length > 0 ||
-    p.preco_min != null || p.preco_max != null || p.quartos_min != null || p.vagas_min != null
-}

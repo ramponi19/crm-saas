@@ -102,9 +102,7 @@ v "pipeline usa taxa medida"         "lib/zapintel/painel.ts" "taxaPorClasse"
 # comentario que explica por que o campo saiu, e o aviso deve continuar la.
 n "classificacao nao le a fala da loja" "lib/zapintel/classification/engine.ts" "allText: string"
 v "conversao vem de venda ligada"    "lib/zapintel/insights/stats.ts" "compradores.length / leads.length"
-v "ciclo vem da ponte"               "lib/zapintel/insights/stats.ts" "fatos?.cicloMediano != null"
-v "sem venda a tela nao inventa"     "app/zapintel/page.tsx" "s.ticketMedido == null"
-v "sinal ordenado por diferenca"     "lib/zapintel/insights/stats.ts" "b.diferenca - a.diferenca"
+v "sem venda a tela nao inventa"     "components/zapintel/painel-ao-vivo.tsx" "sem venda registrada para estimar o ticket"
 v "cache invalida por versao"        "lib/zapintel/cache.ts" "marca.versao !== VERSAO_DO_CALCULO"
 # -- ficha por lead e frase antes do silencio (10/10/2026) -----------------
 # O corte de 24h e a regra que torna o ranking honesto: sem ele o topo vira a
@@ -114,8 +112,8 @@ v "cache invalida por versao"        "lib/zapintel/cache.ts" "marca.versao !== V
 v "ficha relata, nao escolhe frase"   "lib/zapintel/ficha.ts" "montarRelato"
 v "silencio exige conversa viva"      "lib/zapintel/ficha.ts" "> 86_400_000) return null"
 v "midia nao conta como fala"         "lib/zapintel/ficha.ts" "function ehFala"
-v "uma regra so para o silencio"      "lib/zapintel/insights/silencio.ts" "falaQueEncerrou"
-v "a tela diz precedeu, nao causou"   "app/zapintel/page.tsx" "Indica onde olhar, não o que culpar"
+v "retomada nao conta como sumico"    "supabase/funcoes/zapintel_dashboard.sql" "interval '20 hours'"
+v "a tela diz precedeu, nao causou"   "components/zapintel/painel-ao-vivo.tsx" "Mostra onde olhar, não o que culpar"
 v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "montarFicha"
 # -- recalibracao da classificacao (10/10/2026) ----------------------------
 # 133 leads eram marcados "cliente" por palavra; 33 compraram. E a conversa
@@ -180,37 +178,35 @@ v "tela marca por referencia"        "app/zapintel/leads/[id]/page.tsx" "lead.me
 v "ia do zapintel num lugar so"      "lib/zapintel/ia.ts" "assistente_config"
 v "analyze usa a porta unica"        "app/zapintel/api/analyze/route.ts" "perguntarIA"
 v "sugestao usa a porta unica"       "app/zapintel/api/sugestao/route.ts" "perguntarIA"
-v "dia usa a porta unica"            "app/zapintel/api/dia/route.ts" "perguntarIA"
 # O prompt nao pode ter o nome de um tenant escrito no codigo.
 v "sugestao pega o nome do banco"    "app/zapintel/api/sugestao/route.ts" "nomeDaLoja"
 v "prompt monta a loja em runtime"   "app/zapintel/api/sugestao/route.ts" "de \${nomeDaLoja}"
-# Uma chamada de IA por abertura de tela seria o erro do pulso de 20s.
-v "relato do dia e guardado"         "app/zapintel/api/dia/route.ts" "guardarRelato"
-v "relato velho e regerado"          "app/zapintel/api/dia/route.ts" "guardado.marca === cache.marca.ultimaMensagem"
-# peakHours e histograma por hora, nao ranking: [0] e a hora mais cedo.
-v "pico ordenado por volume"         "lib/zapintel/dia.ts" "sort((a, b) => b.count - a.count)"
-v "briefing proibe inventar numero"  "lib/zapintel/dia.ts" "USE SOMENTE os números do briefing"
+# Uma chamada de IA por abertura de tela seria o erro do pulso de 20s. Desde
+# 14/10/2026 o resumo do dia so existe quando alguem pede (botao -> assistente),
+# e nenhuma tela pede analise sozinha.
+n "dashboard nao chama IA sozinho"   "components/zapintel/painel-ao-vivo.tsx" "zapintel/api/dia"
+v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "assistente:perguntar"
+v "ficha nao e pedida ao abrir"      "app/zapintel/leads/[id]/page.tsx" "Não pede nada"
+# Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
+v "ao vivo tem teto de ritmo"        "hooks/zapintel/useDashboardAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+v "aviso ao vivo nao derruba webhook" "supabase/funcoes/zapintel_ao_vivo.sql" "exception when others"
+v "conversas fechadas para anon"     "supabase/funcoes/seguranca_20261014.sql" "revoke all on function public.zapintel_conversas"
 # O teto de tokens e cobrado do PENSAMENTO do modelo tambem. Com 400, o
 # gemini-3.6-flash devolveu meia frase em ingles para a tela. Quem segura o
 # tamanho e a regra de frases no prompt, nunca o teto.
 v "teto de tokens e de seguranca"    "lib/zapintel/ia.ts" "TETO_DE_SEGURANCA = 8_000"
-n "dia nao aperta o teto"            "app/zapintel/api/dia/route.ts" "maxTokens: [0-9]"
 n "sugestao nao aperta o teto"       "app/zapintel/api/sugestao/route.ts" "maxTokens: [0-9]"
 # O padrao do gemini-3.6-flash e pensar em `medium`, e isso estourou 20s de
 # timeout em producao com o briefing completo. Redacao nao precisa raciocinio.
 v "ia pede raciocinio baixo"         "lib/zapintel/ia.ts" "NIVEL_DE_RACIOCINIO = 'low'"
 # Modelo que nao conhecer o campo nao pode derrubar a IA inteira do CRM.
 v "modelo sem thinking tem volta"    "lib/zapintel/ia.ts" "repetindo sem ele"
-v "funcao vive mais que o fetch"     "app/zapintel/api/dia/route.ts" "maxDuration = 60"
 # 503 do Google e pico de demanda, e ele mesmo diz que passa.
 v "503 do provedor tem retentativa"  "lib/zapintel/ia.ts" "em alta demanda; tentando de novo"
 # A JM e `varejo` no CRM -> `ecommerce` no ZapIntel -> "loja de moda/varejo".
 # Com isso no prompt, a IA oferecia "suas pecas" para quem queria iPhone.
 v "sugestao importa so o papel"      "app/zapintel/api/sugestao/route.ts" "import { getRole } from"
 v "sugestao fala do produto real"    "lib/zapintel/travou.ts" "O que ele procurou"
-# "Precedeu" nao e "causou" — a IA virou ordem o que era correlacao.
-v "briefing marca a correlacao"      "lib/zapintel/dia.ts" "correlação, não causa"
-v "prompt proibe virar ordem"        "lib/zapintel/dia.ts" "Não transforme correlação em ordem"
 
 echo "== audio transcrito (13/10) =="
 # 35% do que a loja fala e audio. Enquanto o conteudo era so "[audio]", todo
