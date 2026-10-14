@@ -201,11 +201,37 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
   const { data: cfg } = await db.from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
   const modelo = (cfg?.modelo as string) ?? null
 
+  /**
+   * Quem NÃO recebe ficha, por id, passado na linha de comando.
+   *
+   * Existe para as conversas internas que o CRM guarda como lead — a loja de
+   * Jaguariúna falando com a de Mogi, o dono da loja com 1.641 mensagens com
+   * o vendedor. Ficha disso é texto sem sentido pago à IA. Por argumento, e
+   * não numa lista no código, porque quais são os números internos é dado de
+   * cada empresa, e o código não pode saber o telefone de nenhuma delas.
+   */
+  const pular = new Set(
+    (process.argv.includes('--pular') ? process.argv[process.argv.indexOf('--pular') + 1] : '')
+      .split(',').map(Number).filter(Boolean),
+  )
+
   // Só quem teve conversa. Ver o cabeçalho.
   const alvos = analisados.filter((a) => {
     const id = Number(String(a.id).replace('lead-', ''))
-    return porId.has(id) && a.messages.length >= 2 && a.messages.some((m: RawMessage) => !m.isStore)
+    return porId.has(id) && !pular.has(id)
+      && a.messages.length >= 2 && a.messages.some((m: RawMessage) => !m.isStore)
   })
+
+  /**
+   * A ORDEM É A DO PLANO DE AÇÃO: primeiro quem está esperando a loja.
+   *
+   * Se o lote parar no meio — cota do dia, provedor fora —, o que já foi
+   * feito tem de ser o que mais vale amanhã de manhã: as conversas em que o
+   * CLIENTE falou por último. Dentro de cada grupo, a mais recente primeiro.
+   */
+  const lojaDeve = (a: (typeof alvos)[number]) => !a.messages[a.messages.length - 1]?.isStore
+  alvos.sort((x, y) => (Number(lojaDeve(y)) - Number(lojaDeve(x))) || (x.daysInactive - y.daysInactive))
+
   const fila = limite ? alvos.slice(0, limite) : alvos
   console.log(`${analisados.length} leads · ${alvos.length} com conversa real · vou fazer ${fila.length}\n`)
 
@@ -230,11 +256,27 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
         leadId: id, filialId: banco.filial_id, canal: banco.origem ?? 'whatsapp',
         comprou: !!c, valorVenda: c?.valor ?? null, diasAteVenda: c?.dias ?? null,
       })
-      const r = await gerarPerfil({
+      /**
+       * ATÉ TRÊS TENTATIVAS, COM ESPERA CRESCENTE.
+       *
+       * No teste de 14/10, 2 de 3 chamadas pegaram "alta demanda" do Google
+       * (503). `perguntarIA` já tenta uma segunda vez após 2 s; num lote de
+       * quase duas mil chamadas isso não basta, e 5 falhas seguidas parariam
+       * tudo por um pico que passa em segundos. 8 s e depois 25 s cobrem o
+       * pico sem mascarar o que é permanente — cota esgotada ou chave
+       * recusada continuam falhando, e aí o corte das 5 seguidas age.
+       */
+      const pedido = {
         empresaId, lead: a, ficha, travou: ondeTravou(a, !!c), nomeDaLoja,
         kanban: banco.kanban_status, temVendaRegistrada: !!c,
         valorVenda: c?.valor ?? null, diasAteVenda: c?.dias ?? null,
-      })
+      }
+      let r = await gerarPerfil(pedido)
+      for (const espera of [8_000, 25_000]) {
+        if (r.ok || r.status === 400 || r.status === 404) break
+        await new Promise((ok) => setTimeout(ok, espera))
+        r = await gerarPerfil(pedido)
+      }
       if (!r.ok) {
         falhas++; seguidas++
         if (falhas <= 3) console.log(`  [${id}] falhou: ${r.erro}`)
