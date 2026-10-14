@@ -104,14 +104,14 @@ export async function POST(req: Request) {
 
   if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
 
-  const { data: cfg } = await db
-    .from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
-  await guardarPerfil(db, empresaId, id, marca, r.perfil, (cfg?.modelo as string) ?? null, r.ms)
+  // O modelo que ESCREVEU, devolvido pela chamada — não o configurado, que
+  // pode ter mudado entre um e outro.
+  await guardarPerfil(db, empresaId, id, marca, r.perfil, r.modelo, r.ms)
 
   return NextResponse.json({
     perfil: r.perfil,
     geradoEm: new Date().toISOString(),
-    modelo: (cfg?.modelo as string) ?? null,
+    modelo: r.modelo,
     atual: true,
     doCache: false,
   })

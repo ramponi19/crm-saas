@@ -49,6 +49,12 @@ const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE
 const COM_IA = process.argv.includes('--ia')
 const SALVAR = process.argv.includes('--salvar')
 const TODOS = process.argv.includes('--todos')
+/**
+ * O modelo DESTA rodada, por cima do configurado no CRM. Ver `perguntarIA`:
+ * a produção continua no modelo de `assistente_config`, e o lote pode rodar
+ * em outro provedor na máquina do Lucas sem derrubar a IA de ninguém.
+ */
+const MODELO = process.argv.includes('--modelo') ? process.argv[process.argv.indexOf('--modelo') + 1] : undefined
 const arg = (nome: string): number | null => {
   const i = process.argv.indexOf(nome)
   const v = i >= 0 ? Number(process.argv[i + 1]) : NaN
@@ -123,6 +129,7 @@ const r = await gerarPerfil({
   temVendaRegistrada: !!ponte,
   valorVenda,
   diasAteVenda: (ponte?.dias_ate_venda as number | null) ?? null,
+  modelo: MODELO,
 })
 
 if (!r.ok) { console.error(`\nFALHOU (${r.status}): ${r.erro}\n`); process.exit(1) }
@@ -148,7 +155,8 @@ console.log(`\nRASCUNHO PARA MANDAR\n  ${p.mensagemSugerida}\n`)
 
 if (SALVAR) {
   const { data: cfg } = await db.from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
-  await guardarPerfil(db, EMPRESA, LEAD, marca, p, (cfg?.modelo as string) ?? null, r.ms)
+  void cfg
+  await guardarPerfil(db, EMPRESA, LEAD, marca, p, r.modelo, r.ms)
   console.log(`guardado em zapintel_lead_perfil (lead ${LEAD}).\n`)
 }
 
@@ -197,9 +205,6 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
       dias: (p.dias_ate_venda as number | null) ?? null,
     })
   }
-
-  const { data: cfg } = await db.from('assistente_config').select('modelo').eq('id', 1).maybeSingle()
-  const modelo = (cfg?.modelo as string) ?? null
 
   /**
    * Quem NÃO recebe ficha, por id, passado na linha de comando.
@@ -270,6 +275,7 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
         empresaId, lead: a, ficha, travou: ondeTravou(a, !!c), nomeDaLoja,
         kanban: banco.kanban_status, temVendaRegistrada: !!c,
         valorVenda: c?.valor ?? null, diasAteVenda: c?.dias ?? null,
+        modelo: MODELO,
       }
       let r = await gerarPerfil(pedido)
       for (const espera of [8_000, 25_000]) {
@@ -283,7 +289,7 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
         return
       }
       seguidas = 0
-      await guardarPerfil(db, empresaId, id, marca, r.perfil, modelo, r.ms)
+      await guardarPerfil(db, empresaId, id, marca, r.perfil, r.modelo, r.ms)
       feitos++
     }))
 

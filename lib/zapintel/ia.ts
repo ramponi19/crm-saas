@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/service'
 import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 
@@ -113,13 +114,19 @@ export async function perguntarIA(opts: {
   maxTokens?: number
   /** Aparece no log junto do erro cru, para saber QUEM chamou. */
   origem: string
+  /**
+   * Modelo a usar NESTA chamada, por cima do que o superadmin configurou.
+   *
+   * Existe para o lote de fichas (`scripts/perfil-zapintel.mts --modelo`):
+   * ele roda na máquina do Lucas com outro provedor enquanto a produção
+   * continua no modelo configurado. Trocar `assistente_config.modelo` para
+   * isso derrubaria toda a IA do CRM em produção, que não tem a chave do
+   * outro provedor. Nenhuma rota do CRM passa este campo.
+   */
+  modelo?: string
 }): Promise<ResultadoIA> {
   const { empresaId, system, mensagens, maxTokens, origem } = opts
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return { ok: false, status: 503, erro: 'A IA ainda não foi configurada neste CRM. Avise o responsável.' }
-  }
   if (!mensagens.length) {
     return { ok: false, status: 400, erro: 'Nada a analisar.' }
   }
@@ -130,7 +137,16 @@ export async function perguntarIA(opts: {
   if (cfg && cfg.ativo === false) {
     return { ok: false, status: 503, erro: 'A IA está temporariamente desativada.' }
   }
-  const modelo = cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
+  const modelo = opts.modelo || cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
+
+  if (provedorDo(modelo) === 'anthropic') {
+    return perguntarAnthropic({ svc, empresaId, system, mensagens, maxTokens, origem, modelo })
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    return { ok: false, status: 503, erro: 'A IA ainda não foi configurada neste CRM. Avise o responsável.' }
+  }
 
   const corpo = (comThinking: boolean) => JSON.stringify({
     // O Gemini separa a instrução de sistema das mensagens, e chama
@@ -222,6 +238,121 @@ export async function perguntarIA(opts: {
     return { ok: true, texto: texto.trim(), modelo }
   } catch (e) {
     console.error(`[zapintel/ia:${origem}]`, e)
+    return {
+      ok: false,
+      status: 500,
+      erro: 'A IA está indisponível neste momento. Tente de novo em alguns minutos.',
+    }
+  }
+}
+
+/**
+ * DE QUEM É O MODELO — decidido pelo nome, não por configuração à parte.
+ *
+ * Um campo "provedor" separado de "modelo" seria duas coisas para manter de
+ * acordo, e a primeira vez que alguém trocasse uma sem a outra o CRM mandaria
+ * um nome de modelo do Google para a Anthropic. O nome já diz: os da
+ * Anthropic começam com `claude-`.
+ */
+export function provedorDo(modelo: string): 'anthropic' | 'gemini' {
+  return modelo.startsWith('claude-') ? 'anthropic' : 'gemini'
+}
+
+/**
+ * Existe chave para o provedor deste modelo? É o que a tela pergunta antes de
+ * pedir uma ficha — ver `iaDisponivel` em `/zapintel/api/conversa`.
+ */
+export function iaConfigurada(modelo: string): boolean {
+  return provedorDo(modelo) === 'anthropic'
+    ? !!process.env.ANTHROPIC_API_KEY
+    : !!process.env.GEMINI_API_KEY
+}
+
+/**
+ * O MESMO CONTRATO, PELA ANTHROPIC.
+ *
+ * ══ POR QUE EXISTE ═════════════════════════════════════════════════════════
+ *
+ * Medido em 14/10/2026: a chave do Gemini deste projeto é do plano GRATUITO,
+ * com limite de **20 chamadas por dia** no `gemini-3.6-flash`. O lote de
+ * ~1.800 fichas parou na sexta chamada com "Quota exceeded ... limit: 20".
+ * Além do limite, o gratuito do Google usa os dados para treinar — e estas
+ * conversas têm CPF, endereço e e-mail de cliente.
+ *
+ * O Lucas já tinha decidido o caminho: *"se o free do gemini nao for
+ * suficiente irei de anthropic mesmo"*.
+ *
+ * ══ AS DIFERENÇAS QUE IMPORTAM ═════════════════════════════════════════════
+ *
+ * - **Sem `temperature`.** No Claude Haiku 5.5 um valor diferente do padrão
+ *   é recusado com 400 — copiar o corpo do Gemini quebraria toda chamada.
+ * - **`effort: 'low'`** no lugar do `thinkingLevel` do Gemini, pelo mesmo
+ *   motivo de lá: o trabalho aqui é redação sobre fatos já separados, não
+ *   raciocínio. O padrão do Haiku 5.5 é `medium`, e por isso vai explícito.
+ * - **O `system` vai com `cache_control`.** Regras + gabarito são idênticos
+ *   em toda ficha; a partir da segunda chamada a Anthropic cobra ~10% por
+ *   esse trecho. Abaixo do mínimo cacheável do modelo ele simplesmente não
+ *   cacheia — não há erro, só não há desconto.
+ * - **Repetição já vem do SDK** para 429, 529 (sobrecarga) e 5xx. Aqui fica
+ *   só a tradução do erro para quem está no balcão.
+ */
+async function perguntarAnthropic(o: {
+  svc: ReturnType<typeof createServiceClient>
+  empresaId: number
+  system?: string
+  mensagens: MensagemIA[]
+  maxTokens?: number
+  origem: string
+  modelo: string
+}): Promise<ResultadoIA> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return { ok: false, status: 503, erro: 'A IA ainda não foi configurada neste CRM. Avise o responsável.' }
+  }
+
+  const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 3 })
+
+  try {
+    const r = await client.messages.create({
+      model: o.modelo,
+      // Teto de SEGURANÇA, como no Gemini: o pensamento sai deste saldo.
+      // O tamanho da resposta se pede no `system`.
+      max_tokens: o.maxTokens ?? 16_000,
+      ...(o.system
+        ? { system: [{ type: 'text' as const, text: o.system, cache_control: { type: 'ephemeral' as const } }] }
+        : {}),
+      messages: o.mensagens.map((m) => ({
+        role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: m.content,
+      })),
+      output_config: { effort: 'low' },
+    })
+
+    if (r.stop_reason === 'refusal') {
+      console.error(`[zapintel/ia:${o.origem}] ${o.modelo} recusou:`, r.stop_details?.category ?? '?')
+      return { ok: false, status: 502, erro: 'A IA não conseguiu analisar esta conversa.' }
+    }
+
+    const texto = r.content
+      .map((b) => (b.type === 'text' ? b.text : ''))
+      .join('')
+
+    const u = r.usage
+    await o.svc.from('assistente_uso').insert({
+      empresa_id: o.empresaId,
+      tokens_in: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
+      tokens_out: u.output_tokens ?? null,
+    } as never)
+
+    return { ok: true, texto: texto.trim(), modelo: o.modelo }
+  } catch (e) {
+    // Do mais específico para o mais geral. `APIError` carrega o status HTTP,
+    // que é o que `mensagemDoProvedor` usa para escolher a frase.
+    if (e instanceof Anthropic.APIError) {
+      console.error(`[zapintel/ia:${o.origem}] provedor recusou:`, e.status, o.modelo, e.message)
+      return { ok: false, status: 502, erro: mensagemDoProvedor(e.status ?? 500, e.message) }
+    }
+    console.error(`[zapintel/ia:${o.origem}]`, e)
     return {
       ok: false,
       status: 500,

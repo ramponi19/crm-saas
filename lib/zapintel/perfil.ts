@@ -517,7 +517,7 @@ function validar(bruto: unknown): PerfilIA | null {
 }
 
 export type ResultadoPerfil =
-  | { ok: true; perfil: PerfilIA; ms: number }
+  | { ok: true; perfil: PerfilIA; ms: number; modelo: string }
   | { ok: false; status: number; erro: string }
 
 /** Gera a ficha. NÃO grava — quem chama decide isso. */
@@ -531,6 +531,8 @@ export async function gerarPerfil(opts: {
   temVendaRegistrada: boolean
   valorVenda: number | null
   diasAteVenda: number | null
+  /** Modelo desta chamada por cima do configurado. Ver `perguntarIA`. */
+  modelo?: string
 }): Promise<ResultadoPerfil> {
   const t0 = Date.now()
   const r = await perguntarIA({
@@ -538,6 +540,7 @@ export async function gerarPerfil(opts: {
     system: regras(opts.nomeDaLoja),
     mensagens: [{ role: 'user', content: contextoDoPerfil(opts) }],
     origem: 'perfil',
+    modelo: opts.modelo,
   })
   if (!r.ok) return { ok: false, status: r.status, erro: r.erro }
 
@@ -546,7 +549,7 @@ export async function gerarPerfil(opts: {
     console.error('[zapintel/perfil] resposta fora do formato:', r.texto.slice(0, 400))
     return { ok: false, status: 502, erro: 'A IA respondeu fora do formato. Tente de novo.' }
   }
-  return { ok: true, perfil, ms: Date.now() - t0 }
+  return { ok: true, perfil, ms: Date.now() - t0, modelo: r.modelo }
 }
 
 export interface PerfilGuardado {
