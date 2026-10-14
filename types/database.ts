@@ -3259,6 +3259,7 @@ export type Database = {
           id: number
           lead_id: number | null
           lida: boolean | null
+          midia_retida_em: string | null
           midia_url: string | null
           origem: string | null
           status_em: string | null
@@ -3279,6 +3280,7 @@ export type Database = {
           id?: never
           lead_id?: number | null
           lida?: boolean | null
+          midia_retida_em?: string | null
           midia_url?: string | null
           origem?: string | null
           status_em?: string | null
@@ -3299,6 +3301,7 @@ export type Database = {
           id?: never
           lead_id?: number | null
           lida?: boolean | null
+          midia_retida_em?: string | null
           midia_url?: string | null
           origem?: string | null
           status_em?: string | null
@@ -6591,6 +6594,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      zapintel_lead_perfil: {
+        Row: {
+          empresa_id: number
+          gerado_em: string
+          lead_id: number
+          marca: number
+          mensagens: number
+          modelo: string | null
+          ms: number | null
+          perfil: Json
+          transcritos: number
+          versao: string
+        }
+        Insert: {
+          empresa_id: number
+          gerado_em?: string
+          lead_id: number
+          marca: number
+          mensagens: number
+          modelo?: string | null
+          ms?: number | null
+          perfil: Json
+          transcritos?: number
+          versao: string
+        }
+        Update: {
+          empresa_id?: number
+          gerado_em?: string
+          lead_id?: number
+          marca?: number
+          mensagens?: number
+          modelo?: string | null
+          ms?: number | null
+          perfil?: Json
+          transcritos?: number
+          versao?: string
+        }
+        Relationships: []
+      }
+      zapintel_midia_retida: {
+        Row: {
+          arquivo: string
+          dias_janela: number
+          id: number
+          mensagem_id: number
+          retirado_em: string
+          tipo: string
+          url_antiga: string
+        }
+        Insert: {
+          arquivo: string
+          dias_janela: number
+          id?: number
+          mensagem_id: number
+          retirado_em?: string
+          tipo?: string
+          url_antiga: string
+        }
+        Update: {
+          arquivo?: string
+          dias_janela?: number
+          id?: number
+          mensagem_id?: number
+          retirado_em?: string
+          tipo?: string
+          url_antiga?: string
+        }
+        Relationships: []
       }
       zapintel_painel: {
         Row: {

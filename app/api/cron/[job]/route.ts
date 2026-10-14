@@ -6,7 +6,7 @@ import { reavaliarScores } from '@/lib/scoring-server'
 import { reativarFrios } from '@/lib/reativacao'
 import { atualizarReferencia } from '@/lib/fipe'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
-import { rodarRetencao } from '@/lib/storage/retencao-audio'
+import { rodarRetencao } from '@/lib/storage/retencao'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -367,7 +367,7 @@ export async function GET(
          * dia ele tira o que completou a janela, e o bucket fica estavel.
          *
          * Nada sai sem transcricao e nada sai sem registro — ver
-         * `lib/storage/retencao-audio.ts`, que o script manual usa tambem.
+         * `lib/storage/retencao.ts`, que o script manual usa tambem.
          * Um caminho so.
          */
         const r = await rodarRetencao(supabase)

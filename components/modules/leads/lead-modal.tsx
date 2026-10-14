@@ -90,6 +90,15 @@ async function entregarViaEdge(
 
 interface ChatMsg {
   from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null
+  /**
+   * Quando a RETENCAO retirou o arquivo desta mensagem.
+   *
+   * Sem isto, `midiaUrl` nulo significa duas coisas opostas: "nunca chegou"
+   * (a Meta nao entregou) e "chegou, ficou a janela inteira e saiu porque o
+   * bucket tem 1 GB". A tela precisa dizer qual das duas — senao chama de
+   * indisponivel o arquivo que a propria loja decidiu nao guardar.
+   */
+  retidaEm?: string | null
   /** Marca de tempo crua — usada para calcular a janela de 24h. */
   iso?: string
   /** Confirmação da Meta (só em mensagem enviada): enviada | entregue | lida | falhou. */
@@ -282,7 +291,27 @@ const NOME_MIDIA: Record<string, string> = {
  * ⚠ Não confundir com "Foto enviada pelo celular", que é escolha nossa de não
  * guardar o arquivo. Ali sabemos o que era e optamos por não ter.
  */
-function MidiaAusente({ placeholder }: { placeholder: string }) {
+function MidiaAusente({ placeholder, retidaEm }: { placeholder: string; retidaEm?: string | null }) {
+  /**
+   * DUAS AUSENCIAS QUE PARECEM A MESMA, E NAO SAO.
+   *
+   * Sem arquivo, a tela dizia sempre "indisponivel para o CRM". Isso e
+   * verdade quando a Meta nunca entregou a midia ou o download falhou — e e
+   * MENTIRA quando o arquivo chegou, ficou a janela inteira e saiu pela
+   * retencao: ali ele esteve disponivel, e a loja decidiu nao guardar.
+   *
+   * A diferenca importa para quem abre a conversa meses depois procurando a
+   * foto do comprovante: "nunca chegou" manda a pessoa cobrar o cliente de
+   * novo; "guardamos 7 dias" explica o que houve.
+   */
+  if (retidaEm) {
+    const dia = new Date(retidaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    return (
+      <span className="text-[13px] italic text-[#667781]">
+        {NOME_MIDIA[placeholder] ?? 'Anexo'} — não guardado (retirado em {dia})
+      </span>
+    )
+  }
   return (
     <span className="text-[13px] italic text-[#667781]">
       {NOME_MIDIA[placeholder] ?? 'Anexo'} — indisponível para o CRM
@@ -613,7 +642,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao')
+        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
@@ -622,6 +651,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
         tipo: string | null; midia_url: string | null
         status_entrega: string | null; erro_envio: string | null; external_id: string | null
         usuario_id: string | null; transcricao: string | null
+        midia_retida_em: string | null
       }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
@@ -629,6 +659,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
         tipo: m.tipo ?? 'texto',
         midiaUrl: m.midia_url,
+        retidaEm: m.midia_retida_em,
         transcricao: m.transcricao,
         status: m.status_entrega,
         erro: m.erro_envio,
@@ -1319,6 +1350,16 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                       {m.midiaUrl && m.tipo === 'audio' && (
                         <AudioChat url={m.midiaUrl} />
                       )}
+                      {/* Midia retirada pela retencao numa mensagem que TEM
+                          legenda: o ramo do placeholder la embaixo so cobre a
+                          bolha sem texto, e sem isto o anexo sumiria sem
+                          deixar rastro no meio da conversa. */}
+                      {!m.midiaUrl && m.retidaEm && !ehPlaceholderMidia(m.text)
+                        && (m.tipo === 'imagem' || m.tipo === 'video') && (
+                        <div className="mb-1">
+                          <MidiaAusente placeholder={`[${m.tipo}]`} retidaEm={m.retidaEm} />
+                        </div>
+                      )}
                       {/* O texto do áudio aparece com ou sem o arquivo: passada
                           a janela de retenção o som some e a transcrição fica. */}
                       {m.tipo === 'audio' && m.transcricao && (
@@ -1344,7 +1385,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                         // Placeholder SEM arquivo: até 12/08/2026 o eco do celular
                         // não baixava a mídia, e a bolha exibia o texto cru
                         // "[audio]" — que não diz nada a quem lê a conversa.
-                        ? (!m.midiaUrl && <MidiaAusente placeholder={m.text} />)
+                        ? (!m.midiaUrl && <MidiaAusente placeholder={m.text} retidaEm={m.retidaEm} />)
                         : formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[9.5px] text-[#667781]">
