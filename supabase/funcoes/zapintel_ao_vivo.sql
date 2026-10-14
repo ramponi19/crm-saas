@@ -129,3 +129,9 @@ create policy "zapintel ao vivo: ouvir a propria empresa"
           and exists (select 1 from public.usuarios u where u.id = auth.uid() and u.is_super_admin))
     )
   );
+
+-- Funções de gatilho não são para ser chamadas por RPC (verificador do
+-- Supabase, 14/10/2026).
+revoke all on function public.tg_zapintel_mensagens_ao_vivo() from public, anon, authenticated;
+revoke all on function public.tg_zapintel_ficha_ao_vivo() from public, anon, authenticated;
+revoke all on function public.tg_zapintel_vendas_ao_vivo() from public, anon, authenticated;

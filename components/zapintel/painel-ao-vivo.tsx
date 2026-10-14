@@ -68,6 +68,16 @@ function ha(iso: string | null, agora: number): string {
   return `há ${d} ${d === 1 ? "dia" : "dias"}`;
 }
 
+/**
+ * "há 12 s" que anda de segundo em segundo. Componente próprio de propósito:
+ * só ESTE texto re-renderiza a cada segundo, não o painel inteiro. Não
+ * consulta nada — é o relógio do navegador.
+ */
+function RelogioVivo({ iso }: { iso: string | null }) {
+  const agora = useRelogio(1000);
+  return <>{ha(iso, agora)}</>;
+}
+
 /** Relógio da tela: só re-renderiza, não consulta nada. */
 function useRelogio(ms = 15_000) {
   const [agora, setAgora] = useState(() => Date.now());
@@ -83,7 +93,7 @@ type Gaveta = { titulo: string; tipo: string; valor?: string | null; explica?: s
 export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
   filial: number | null; nomeDoRecorte: string; empresa: number | null;
 }) {
-  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista } = useDashboardAoVivo(filial, empresa);
+  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem } = useDashboardAoVivo(filial, empresa);
   const agora = useRelogio();
   const [gaveta, setGaveta] = useState<Gaveta>(null);
   const abrir = (g: NonNullable<Gaveta>) => setGaveta(g);
@@ -132,7 +142,7 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
             {aoVivo ? "Ao vivo" : "Reconectando…"}
           </span>
           <span className="pv-sep">·</span>
-          <span>última mensagem {ha(d.ultimaMensagem, agora)}</span>
+          <span>última mensagem <RelogioVivo iso={ultimaMensagem} /></span>
           {atualizando && <span className="pv-sep">· atualizando</span>}
         </div>
         </div>

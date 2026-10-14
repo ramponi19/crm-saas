@@ -405,3 +405,14 @@ grant execute on function public.zapintel_dashboard(bigint, bigint, text) to aut
 
 comment on function public.zapintel_dashboard(bigint, bigint, text) is
   'Dashboard do ZapIntel inteiro em um JSON, calculado das fichas de IA, mensagens e vendas, no escopo de empresa/loja de quem chama (zapintel_escopo). Chamado direto do navegador.';
+
+-- ══ ÍNDICES (14/10/2026) ════════════════════════════════════════════════════
+-- O dashboard agrega lead_mensagens várias vezes por consulta. Sem estes
+-- índices cada agregação lia a tabela inteira (64 MB, quase tudo texto e
+-- transcrição) — medido: a mesma leitura variou de 80 ms a 1,9 s conforme o
+-- cache do banco. Com eles a conta sai do índice (index-only scan): 0,27 s a
+-- rede inteira, 0,1 s uma loja.
+create index if not exists lead_mensagens_dash_por_lead
+  on public.lead_mensagens (empresa_id, lead_id) include (direcao, created_at);
+create index if not exists lead_mensagens_dash_por_data
+  on public.lead_mensagens (empresa_id, created_at) include (direcao, filial_id, lead_id);

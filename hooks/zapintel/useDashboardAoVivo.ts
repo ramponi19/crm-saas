@@ -22,9 +22,15 @@ import { createClient } from "@/lib/supabase/client";
  *
  * ══ O RITMO ═════════════════════════════════════════════════════════════════
  *
- * Aviso não recalcula na hora: espera `RESPIRO` sem aviso novo. Uma rajada de
- * 12 mensagens vira UMA consulta, não 12. E com a aba escondida não consulta
- * nada — só marca que ficou para trás, e recalcula quando a aba volta.
+ * Aviso não recalcula na hora: espera `RESPIRO` sem aviso novo — uma rajada
+ * de 12 mensagens vira UMA consulta. E nunca consulta mais de uma vez a cada
+ * `INTERVALO_MINIMO`: medido em 14/10/2026, a loja recebe ~240 mensagens por
+ * hora (214 avisos), e sem esse teto cada tela aberta pediria o painel quase a
+ * cada aviso — 0,3 s de banco cada, multiplicado pelas telas abertas no
+ * balcão. Com aba escondida não consulta nada; recalcula quando a aba volta.
+ *
+ * O "última mensagem há X s" NÃO espera a consulta: o próprio aviso já diz
+ * que chegou mensagem, e a tela marca a hora na mesma hora.
  */
 
 export type Classe = "customer" | "hot" | "warm" | "followup" | "stalled" | "lost" | "unqualified" | "sem_analise";
@@ -74,6 +80,7 @@ export interface LeadDaLista {
 }
 
 const RESPIRO = 2500;
+const INTERVALO_MINIMO = 20_000;
 
 export function useDashboardAoVivo(filial: number | null, empresa: number | null) {
   const [dados, setDados] = useState<Dashboard | null>(null);
@@ -84,11 +91,16 @@ export function useDashboardAoVivo(filial: number | null, empresa: number | null
   const [atualizando, setAtualizando] = useState(false);
   const [supabase] = useState(() => createClient());
   const atrasado = useRef(false);
+  /** Quando a última consulta começou — o teto de ritmo conta a partir daqui. */
+  const ultimaConsulta = useRef(0);
+  /** Última mensagem que o AVISO anunciou (sem esperar a consulta). */
+  const [mensagemAvisada, setMensagemAvisada] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const buscar = useCallback(async () => {
     if (typeof document !== "undefined" && document.hidden) { atrasado.current = true; return; }
     atrasado.current = false;
+    ultimaConsulta.current = Date.now();
     setAtualizando(true);
     const { data, error } = await supabase.rpc("zapintel_dashboard" as never, {
       p_filial: filial, p_empresa: empresa,
@@ -125,10 +137,14 @@ export function useDashboardAoVivo(filial: number | null, empresa: number | null
   useEffect(() => {
     if (!empresaDoCanal) return;
     let ativo = true;
-    const agendar = () => {
-      setUltimoAviso(Date.now());
+    const agendar = (evento: { event?: string }) => {
+      const agora = Date.now();
+      setUltimoAviso(agora);
+      if (evento?.event === "mensagens") setMensagemAvisada(agora);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => { if (ativo) buscar(); }, RESPIRO);
+      // O que vier por último: o respiro da rajada, ou o fim do intervalo mínimo.
+      const espera = Math.max(RESPIRO, ultimaConsulta.current + INTERVALO_MINIMO - agora);
+      timer.current = setTimeout(() => { if (ativo) buscar(); }, espera);
     };
     const canal = supabase
       .channel(`zapintel:${empresaDoCanal}`, { config: { private: true } })
@@ -163,5 +179,10 @@ export function useDashboardAoVivo(filial: number | null, empresa: number | null
     return data as unknown as { total: number; leads: LeadDaLista[] };
   }, [supabase, filial, empresa]);
 
-  return { dados, erro, aoVivo, ultimoAviso, atualizando, lista };
+  // A mais recente entre a que o banco contou e a que o aviso anunciou.
+  const doBanco = dados?.ultimaMensagem ? new Date(dados.ultimaMensagem).getTime() : 0;
+  const maior = Math.max(doBanco, mensagemAvisada ?? 0);
+  const ultimaMensagem = maior ? new Date(maior).toISOString() : null;
+
+  return { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem };
 }
