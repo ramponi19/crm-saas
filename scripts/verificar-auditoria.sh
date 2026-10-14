@@ -188,7 +188,8 @@ n "dashboard nao chama IA sozinho"   "components/zapintel/painel-ao-vivo.tsx" "z
 v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "assistente:perguntar"
 v "ficha nao e pedida ao abrir"      "app/zapintel/leads/[id]/page.tsx" "Não pede nada"
 # Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
-v "ao vivo tem teto de ritmo"        "hooks/zapintel/useDashboardAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+v "ao vivo tem teto de ritmo"        "hooks/zapintel/useRpcAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+v "lista de leads usa o ao vivo"     "app/zapintel/leads/page.tsx" "useRpcAoVivo<Lista>(\"zapintel_leads_lista\""
 v "aviso ao vivo nao derruba webhook" "supabase/funcoes/zapintel_ao_vivo.sql" "exception when others"
 v "conversas fechadas para anon"     "supabase/funcoes/seguranca_20261014.sql" "revoke all on function public.zapintel_conversas"
 # O teto de tokens e cobrado do PENSAMENTO do modelo tambem. Com 400, o

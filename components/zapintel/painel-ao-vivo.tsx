@@ -5,8 +5,9 @@ import {
   Copy, Check, ArrowRight, MessageCircle, Clock, Inbox, Sparkles, AlertTriangle, X, Bot,
 } from "lucide-react";
 import {
-  useDashboardAoVivo, type Classe, type Dashboard, type ItemFila, type LeadDaLista, type Urgencia,
+  useDashboardAoVivo, type Dashboard, type ItemFila, type LeadDaLista,
 } from "@/hooks/zapintel/useDashboardAoVivo";
+import { CLASSE, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 
 /**
  * O DASHBOARD DO ZAPINTEL — RECONSTRUÍDO EM 14/10/2026 SOBRE AS ANÁLISES.
@@ -29,23 +30,6 @@ import {
  *     contas do motor de palavra-chave, desmentidas pelas fichas.
  */
 
-const CLASSE: Record<Classe, { nome: string; cor: string }> = {
-  hot:         { nome: "Quente",        cor: "#dc2626" },
-  warm:        { nome: "Morno",         cor: "#ea580c" },
-  customer:    { nome: "Cliente",       cor: "#16a34a" },
-  followup:    { nome: "Acompanhar",    cor: "#2563eb" },
-  stalled:     { nome: "Parado",        cor: "#7c5cfc" },
-  lost:        { nome: "Perdido",       cor: "#6b7280" },
-  unqualified: { nome: "Fora do funil", cor: "#a1a8b3" },
-  sem_analise: { nome: "Sem análise",   cor: "#c4c9d1" },
-};
-const ORDEM_FUNIL: Classe[] = ["customer", "hot", "warm", "followup", "stalled", "lost", "unqualified", "sem_analise"];
-const URG: Record<Urgencia, { nome: string; cor: string }> = {
-  critical: { nome: "Crítico", cor: "#dc2626" },
-  high:     { nome: "Alta",    cor: "#ea580c" },
-  medium:   { nome: "Média",   cor: "#ca8a04" },
-  low:      { nome: "Baixa",   cor: "#9199a3" },
-};
 const DIAS = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -53,20 +37,6 @@ const brlCurto = (v: number) =>
   v >= 1_000_000 ? `R$ ${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`
     : v >= 10_000 ? `R$ ${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`
     : brl(v);
-const num = (v: number) => v.toLocaleString("pt-BR");
-
-/** "há 3 min", "há 1 h 12 min", "há 2 dias" — a partir de um relógio que anda. */
-function ha(iso: string | null, agora: number): string {
-  if (!iso) return "—";
-  const s = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 1000));
-  if (s < 60) return `há ${s} s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `há ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `há ${h} h${m % 60 ? ` ${m % 60} min` : ""}`;
-  const d = Math.floor(h / 24);
-  return `há ${d} ${d === 1 ? "dia" : "dias"}`;
-}
 
 /**
  * "há 12 s" que anda de segundo em segundo. Componente próprio de propósito:
@@ -223,7 +193,7 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
         </Bloco>
         <Bloco titulo="Sem conversa há…" nota="leads ainda em negociação, pela última mensagem">
           <Barras
-            itens={d.inatividade.map((i) => ({ nome: FAIXA[i.faixa] ?? i.faixa, n: i.leads, chave: i.faixa }))}
+            itens={d.inatividade.map((i) => ({ nome: FAIXA_PARADO[i.faixa] ?? i.faixa, n: i.leads, chave: i.faixa }))}
             cor="var(--orange)"
             onClick={(nome, chave) => abrir({ titulo: `Sem conversa: ${nome}`, tipo: "inatividade", valor: chave })} />
         </Bloco>
@@ -266,8 +236,6 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
     </div>
   );
 }
-
-const FAIXA: Record<string, string> = { hoje: "Hoje", "1-2": "1 a 2 dias", "3-7": "3 a 7 dias", "8-14": "8 a 14 dias", "15-30": "15 a 30 dias", "30+": "Mais de 30 dias" };
 
 // ── Peças ────────────────────────────────────────────────────────────────────
 
@@ -587,6 +555,19 @@ function Lojas({ d }: { d: Dashboard }) {
   );
 }
 
+/**
+ * A mesma pergunta da gaveta, na lista de leads — onde dá para cruzar com
+ * outros filtros, buscar e ver todos, não só os primeiros. Cada tipo da gaveta
+ * tem o filtro de mesmo recorte em `zapintel_leads_lista` (conferido em
+ * 14/10/2026: esperando 45 = 45).
+ */
+function linkDaLista(g: NonNullable<Gaveta>) {
+  const p = new URLSearchParams();
+  if (["esperando", "sem_registro", "desatualizadas", "pendencias"].includes(g.tipo)) p.set(g.tipo, "1");
+  else if (g.valor) p.set(g.tipo === "inatividade" ? "parado" : g.tipo, g.valor);
+  return `/zapintel/leads${p.toString() ? `?${p}` : ""}`;
+}
+
 function GavetaLeads({ g, lista, agora, fechar }: {
   g: NonNullable<Gaveta>; agora: number; fechar: () => void;
   lista: (tipo: string, valor?: string | null) => Promise<{ total: number; leads: LeadDaLista[] }>;
@@ -615,6 +596,9 @@ function GavetaLeads({ g, lista, agora, fechar }: {
           <button onClick={fechar} aria-label="Fechar"><X size={18} /></button>
         </div>
         {g.explica && <p className="pv-gaveta-explica">{g.explica}</p>}
+        <Link href={linkDaLista(g)} className="pv-gaveta-lista-link" onClick={fechar}>
+          Abrir na lista de leads <ArrowRight size={12} />
+        </Link>
         {erro && <p className="pv-vazio">{erro}</p>}
         <ul className="pv-gaveta-lista">
           {res?.leads.map((l) => (
@@ -781,6 +765,8 @@ const CSS = `
 .pv-gaveta-topo p { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .pv-gaveta-topo button { background: none; border: none; color: var(--dim); cursor: pointer; }
 .pv-gaveta-explica { font-size: 12px; color: var(--dim); padding: 10px 18px; background: var(--card2); border-bottom: 1px solid var(--brd); line-height: 1.5; }
+.pv-gaveta-lista-link { display: flex; align-items: center; gap: 5px; padding: 9px 18px; font-size: 12px; font-weight: 700; color: var(--purple-l); text-decoration: none; border-bottom: 1px solid var(--brd); background: var(--card); }
+.pv-gaveta-lista-link:hover { background: var(--card2); }
 .pv-gaveta-lista { list-style: none; overflow-y: auto; padding: 10px 12px 24px; display: flex; flex-direction: column; gap: 8px; }
 .pv-gaveta-lista a { display: block; background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 10px 12px; text-decoration: none; color: inherit; }
 .pv-gaveta-lista a:hover { border-color: var(--purple); }

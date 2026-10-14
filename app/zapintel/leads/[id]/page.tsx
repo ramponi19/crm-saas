@@ -143,6 +143,15 @@ function SeloIA({ rotulo, ia, analisando }: { rotulo: string; ia: boolean; anali
   );
 }
 
+/**
+ * Sem análise, sinais, objeções e próxima ação vêm da regra por palavras do
+ * motor antigo — que errou 2 de 6 sinais no lead 439. A tela diz de onde veio
+ * para ninguém tratar palpite de regra como leitura da conversa.
+ */
+function RegraAutomatica() {
+  return <span style={{ fontSize: 9, fontWeight: 400, color: "var(--muted)", letterSpacing: .3, marginLeft: 6 }}>· regra automática</span>;
+}
+
 /** A etiqueta sozinha, para os blocos que já têm título próprio. */
 function EtiquetaIA() {
   return (
@@ -171,6 +180,13 @@ export default function LeadDetailPage() {
   const { leads, markSaleClosed, storeName, sellerName, segment, calculadoEm } = useLeads();
   const saleProducts = [...getProducts(segment.id), "Outro"];
   const resumo = leads.find(l => l.id === id);
+  /**
+   * O número do lead sai da URL (`lead-5760`), não do painel: o painel é
+   * calculado de tempos em tempos, e um lead que chegou depois do último
+   * cálculo não está nele — a ficha dizia "Lead não encontrado" para quem a
+   * lista nova (que lê o banco ao vivo) acabou de mostrar. Medido em 14/10.
+   */
+  const leadNum = resumo?.leadId ?? (Number(String(id ?? "").replace(/^lead-/, "")) || null);
 
   /**
    * A CONVERSA NÃO VEM NA LISTA — É BUSCADA AQUI.
@@ -246,9 +262,9 @@ export default function LeadDetailPage() {
   const [falhouConversa, setFalhouConversa] = useState(false);
 
   useEffect(() => {
-    if (!resumo?.leadId) return;
+    if (!leadNum) return;
     let vivo = true;
-    fetch(`/zapintel/api/conversa?lead=${resumo.leadId}`, { cache: "no-store" })
+    fetch(`/zapintel/api/conversa?lead=${leadNum}`, { cache: "no-store" })
       .then(r => r.json())
       .then(d => {
         if (!vivo) return;
@@ -271,20 +287,20 @@ export default function LeadDetailPage() {
       })
       .catch(() => { if (vivo) setFalhouConversa(true); });
     return () => { vivo = false; };
-  }, [resumo?.leadId]);
+  }, [leadNum]);
 
   /**
    * Pede a ficha nova. `forcar` é o botão "Refazer análise" — o único caminho
    * que manda a IA reescrever uma ficha que o servidor considera atual.
    */
   async function pedirPerfil(forcar: boolean) {
-    if (!resumo?.leadId) return;
+    if (!leadNum) return;
     setAnalisando(true); setErroPerfil("");
     try {
       const r = await fetch("/zapintel/api/perfil", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lead: resumo.leadId, forcar }),
+        body: JSON.stringify({ lead: leadNum, forcar }),
       });
       const d = await r.json();
       if (!r.ok) setErroPerfil(d?.erro || "Não consegui analisar agora.");
@@ -294,7 +310,7 @@ export default function LeadDetailPage() {
         setNovasDesde(0);
         setPerfilEm(String(d.geradoEm || new Date().toISOString()));
         // O robô do canto conta os leads pendentes; este acabou de sair da lista.
-        window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: resumo.leadId }));
+        window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: leadNum }));
       }
     } catch {
       setErroPerfil("Não consegui analisar agora.");
@@ -304,14 +320,15 @@ export default function LeadDetailPage() {
 
   // Derivado, não guardado: "está carregando" é exatamente "tem o que buscar e
   // ainda não chegou". Um estado separado só poderia divergir disso.
-  const carregandoConversa = !!resumo?.leadId && !conversa && !falhouConversa;
+  const carregandoConversa = !!leadNum && !conversa && !falhouConversa;
 
   // O resumo (score, classificação, perfil) vem da lista e aparece na hora; as
   // mensagens chegam depois. Enquanto não chegam, a conversa fica vazia — e a
   // tela diz que está carregando, em vez de afirmar que não há nada.
+  // Fora do painel, o lead inteiro vem da conversa — o mesmo cálculo.
   const lead: Lead | null = (resumo
     ? { ...(resumo as unknown as Lead), messages: conversa?.messages ?? [] }
-    : null);
+    : conversa);
 
   const [tab, setTab] = useState<Tab>("all");
   const [showSaleModal, setShowSaleModal] = useState(false);
@@ -328,7 +345,7 @@ export default function LeadDetailPage() {
 
   if (!lead) return (
     <div style={{ textAlign: "center", paddingTop: 80, color: "var(--dim)" }}>
-      Lead não encontrado.{" "}
+      {carregandoConversa ? "Carregando a conversa…" : "Lead não encontrado."}{" "}
       <button onClick={() => router.back()} style={{ color: "var(--purple-l)", background: "none", border: "none", cursor: "pointer" }}>
         Voltar
       </button>
@@ -356,13 +373,13 @@ export default function LeadDetailPage() {
    * escolher o que a IA do CRM responde, pagando com a chave do Lucas.
    */
   async function pedirSugestao() {
-    if (!resumo?.leadId || sugerindo) return;
+    if (!leadNum || sugerindo) return;
     setSugerindo(true); setErroSugestao(""); setSugestao("");
     try {
       const r = await fetch("/zapintel/api/sugestao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lead: resumo.leadId }),
+        body: JSON.stringify({ lead: leadNum }),
       });
       const d = await r.json();
       if (!r.ok) setErroSugestao(d?.erro || "Não consegui gerar agora.");
@@ -520,7 +537,7 @@ export default function LeadDetailPage() {
           52 dias antes, recebido em casa e mandado foto com o aparelho.
         */}
         <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
-          <SeloIA rotulo="ANÁLISE DE IA" ia={!!ia} analisando={analisando} />
+          <SeloIA rotulo={ia ? "ANÁLISE DE IA" : "LEITURA AUTOMÁTICA"} ia={!!ia} analisando={analisando} />
           <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>
             {ia?.diagnostico || lead.insight}
           </p>
@@ -682,7 +699,7 @@ export default function LeadDetailPage() {
           <>
             {lead.buySignals.length > 0 && (
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA <RegraAutomatica /></div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {lead.buySignals.map(s => (
                     <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
@@ -693,7 +710,7 @@ export default function LeadDetailPage() {
 
             {lead.objections.length > 0 && (
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES <RegraAutomatica /></div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {lead.objections.map(o => (
                     <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
@@ -711,7 +728,7 @@ export default function LeadDetailPage() {
               <UrgencyDot urgency={vUrgencia} />
               PRÓXIMA AÇÃO · {vUrgencia.toUpperCase()}
             </span>
-            {ia && <EtiquetaIA />}
+            {ia ? <EtiquetaIA /> : <RegraAutomatica />}
           </div>
           <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{vProxima}</p>
           {ia?.proximaAcaoPorque && (

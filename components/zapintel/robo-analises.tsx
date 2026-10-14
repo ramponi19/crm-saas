@@ -226,6 +226,10 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
               )}
             </Link>
           ))}
+          <Link href="/zapintel/leads?desatualizadas=1" onClick={() => onAbrirLead?.()}
+            style={{ display: "block", padding: "8px 14px", fontSize: 11.5, fontWeight: 700, color: "var(--purple-l)", textDecoration: "none", borderBottom: "1px solid var(--brd)" }}>
+            Ver todos na lista de leads →
+          </Link>
           {semAnalise.length > 0 && (
             <p style={{ fontSize: 10.5, color: "var(--muted)", padding: "8px 14px" }}>
               {semAnalise.length} {semAnalise.length === 1 ? "conversa está" : "conversas estão"} sem análise
