@@ -1,5 +1,7 @@
 {
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "crons": [
     {
       "path": "/api/cron/expirar-trials",
@@ -24,6 +26,10 @@
     {
       "path": "/api/cron/renovar-tokens",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/reter-audio",
+      "schedule": "20 4 * * *"
     }
   ]
 }

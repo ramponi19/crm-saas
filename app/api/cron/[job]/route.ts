@@ -6,6 +6,7 @@ import { reavaliarScores } from '@/lib/scoring-server'
 import { reativarFrios } from '@/lib/reativacao'
 import { atualizarReferencia } from '@/lib/fipe'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
+import { rodarRetencao } from '@/lib/storage/retencao-audio'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -13,7 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
 // Vercel Cron envia o header 'authorization: Bearer <CRON_SECRET>'.
 // Jobs: expirar-trials | arquivar-eventos | sync-stripe | gerar-followups
-//       sync-fipe | renovar-tokens
+//       sync-fipe | renovar-tokens | reter-audio
 // ============================================================
 
 type Embed<T> = T | T[] | null
@@ -350,6 +351,27 @@ export async function GET(
          */
         const r = await renovarTokensInstagram(supabase)
         if (r.falhas.length) console.error('[cron/renovar-tokens] falhas:', JSON.stringify(r.falhas))
+        return NextResponse.json({ ok: true, job, ...r })
+      }
+
+      case 'reter-audio': {
+        /**
+         * O SOM SAI, O TEXTO FICA.
+         *
+         * O bucket `chat-midia` chegou a 940,9 MB de 1.024 em 14/10/2026 —
+         * quatro dias do teto. Audio era 475,5 MB, e tudo ja estava
+         * transcrito: 475 MB de som equivalem a 2,4 MB de texto no banco.
+         *
+         * A primeira limpeza foi manual e tirou 412,9 MB de uma vez. Este job
+         * existe para que isso nao precise acontecer de novo em pânico: todo
+         * dia ele tira o que completou a janela, e o bucket fica estavel.
+         *
+         * Nada sai sem transcricao e nada sai sem registro — ver
+         * `lib/storage/retencao-audio.ts`, que o script manual usa tambem.
+         * Um caminho so.
+         */
+        const r = await rodarRetencao(supabase)
+        if (r.falhas) console.error('[cron/reter-audio] falhas:', r.falhas)
         return NextResponse.json({ ok: true, job, ...r })
       }
 
