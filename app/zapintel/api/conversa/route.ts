@@ -89,7 +89,29 @@ export async function GET(req: Request) {
      */
     const perfil = await lerPerfil(db, empresaId, id, marcaDaConversa(lead))
 
-    return NextResponse.json({ lead, ficha, travou, perfil })
+    /**
+     * A IA ESTÁ LIGADA? A TELA PRECISA SABER ANTES DE PEDIR.
+     *
+     * Sem isto, abrir qualquer um dos 1.793 leads que ainda não têm ficha
+     * dispararia uma chamada a `/zapintel/api/perfil` que já nasce morta — e
+     * o vendedor veria "A IA ainda não foi configurada neste CRM" num aviso
+     * amarelo em todo lead que abrisse.
+     *
+     * Pior que o aviso é a conta: cada disparo acorda uma função na Vercel,
+     * e o teto de Active CPU do plano free já está em 80%. Pagar CPU para
+     * descobrir, lead a lead, uma coisa que o servidor sabia de antemão é
+     * exatamente o tipo de desperdício que o matcher do `proxy.ts` passou a
+     * semana removendo.
+     *
+     * São as duas mesmas condições que `perguntarIA` checa — a chave e a
+     * chave-geral do superadmin. Checá-las aqui custa a consulta que já
+     * aconteceria de qualquer jeito, uma vez, em vez de uma função inteira.
+     */
+    const { data: cfg } = await db
+      .from('assistente_config').select('ativo').eq('id', 1).maybeSingle()
+    const iaDisponivel = !!process.env.GEMINI_API_KEY && cfg?.ativo !== false
+
+    return NextResponse.json({ lead, ficha, travou, perfil, iaDisponivel })
   } catch (e) {
     console.error('zapintel/conversa:', (e as Error).message)
     return NextResponse.json({ erro: 'falha ao ler a conversa' }, { status: 500 })

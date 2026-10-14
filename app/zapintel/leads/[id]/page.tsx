@@ -217,6 +217,14 @@ export default function LeadDetailPage() {
   const [perfilEm, setPerfilEm] = useState<string | null>(null);
   const [analisando, setAnalisando] = useState(false);
   const [erroPerfil, setErroPerfil] = useState("");
+  /**
+   * A IA do CRM está configurada e ligada? Vem do servidor, não daqui.
+   *
+   * Enquanto não estiver, a tela não pede análise nenhuma — nem automática
+   * nem por botão. As fichas que já existem continuam aparecendo normalmente;
+   * o que some é a promessa de gerar o que não dá para gerar.
+   */
+  const [iaLigada, setIaLigada] = useState(true);
 
   const [sugestao, setSugestao] = useState<string>("");
   const [sugerindo, setSugerindo] = useState(false);
@@ -251,7 +259,9 @@ export default function LeadDetailPage() {
             setPerfilEm(g.geradoEm);
           }
           // Não há ficha, ou a conversa andou depois que ela foi escrita.
-          if (!g?.atual) pedirPerfil(false);
+          // Só pede se a IA puder responder: ver `iaDisponivel` na rota.
+          setIaLigada(d.iaDisponivel !== false);
+          if (!g?.atual && d.iaDisponivel !== false) pedirPerfil(false);
         }
         else setFalhouConversa(true);
       })
@@ -714,19 +724,23 @@ export default function LeadDetailPage() {
                 {perfilEm ? `Análise de ${new Date(perfilEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : ""}
                 {!perfilAtual && " · a conversa andou desde então"}
               </span>
-              <button
-                onClick={() => pedirPerfil(true)}
-                disabled={analisando}
-                style={{
-                  background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
-                  padding: "3px 9px", fontSize: 10, color: "var(--dim)",
-                  cursor: analisando ? "not-allowed" : "pointer", opacity: analisando ? .5 : 1,
-                  display: "flex", alignItems: "center", gap: 5,
-                }}
-              >
-                <RefreshCw size={10} className={analisando ? "spin" : undefined} />
-                {analisando ? "Analisando…" : "Refazer análise"}
-              </button>
+              {/* Sem IA configurada não há o que refazer — e um botão que só
+                  sabe dar erro é pior que botão nenhum. */}
+              {iaLigada && (
+                <button
+                  onClick={() => pedirPerfil(true)}
+                  disabled={analisando}
+                  style={{
+                    background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
+                    padding: "3px 9px", fontSize: 10, color: "var(--dim)",
+                    cursor: analisando ? "not-allowed" : "pointer", opacity: analisando ? .5 : 1,
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}
+                >
+                  <RefreshCw size={10} className={analisando ? "spin" : undefined} />
+                  {analisando ? "Analisando…" : "Refazer análise"}
+                </button>
+              )}
             </div>
           )}
         </div>
