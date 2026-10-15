@@ -13,12 +13,13 @@ interface KanbanColumnProps {
   isDragging: boolean
   onLeadClick: (lead: Lead) => void
   sla?: { verde: number; amarelo: number; vermelho: number }
+  agora?: number
 }
 
 const fmtK = (v: number) =>
   v >= 1000 ? `R$ ${(v / 1000).toFixed(1).replace('.', ',')} mil` : `R$ ${v}`
 
-export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla }: KanbanColumnProps) {
+export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla, agora }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}`, data: { status: column.id } })
 
   /**
@@ -91,7 +92,7 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
       >
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} usuarios={usuarios} onClick={() => onLeadClick(lead)} barColor={column.color} sla={sla} />
+            <LeadCard key={lead.id} lead={lead} usuarios={usuarios} onClick={() => onLeadClick(lead)} barColor={column.color} sla={sla} agora={agora} />
           ))}
         </SortableContext>
 

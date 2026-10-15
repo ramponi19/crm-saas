@@ -41,6 +41,8 @@ interface LeadsViewProps {
    * caminho que o Ranking já usa.
    */
   equipeLabel?: string
+  /** Instante (ms) em que o servidor desenhou: base dos tempos relativos no 1º desenho. */
+  agora: number
 }
 
 /**
@@ -56,7 +58,7 @@ function porMensagemRecente(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => quando(b) - quando(a))
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor' }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -361,6 +363,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           onLeadUpdate={handleLeadUpdate}
           sla={sla}
           motivos={motivos}
+          agora={agora}
         />
       </div>
 

@@ -23,6 +23,8 @@ interface LeadCardProps {
   /** Cor (hex) da etapa — usada só como dado, no dot da coluna. */
   barColor?: string
   sla?: { verde: number; amarelo: number; vermelho: number }
+  /** Instante do 1º desenho (o mesmo no servidor e no navegador). Sem ele, o relógio do navegador. */
+  agora?: number
 }
 
 // Ícones de origem coloridos (marca original de WhatsApp/Instagram/Messenger).
@@ -61,9 +63,9 @@ const CANAL_FALLBACK: Record<string, string> = {
 const DEFAULT_SLA = { verde: 15, amarelo: 30, vermelho: 60 }
 type SlaTone = 'ok' | 'warn' | 'bad' | 'neutro'
 
-function getSlaTone(date: string | null, sla = DEFAULT_SLA): SlaTone {
+function getSlaTone(date: string | null, agora: number, sla = DEFAULT_SLA): SlaTone {
   if (!date) return 'neutro'
-  const min = (Date.now() - new Date(date).getTime()) / 60_000
+  const min = (agora - new Date(date).getTime()) / 60_000
   if (min < sla.verde) return 'ok'
   if (min < sla.amarelo) return 'warn'
   return 'bad' // lead esfriando
@@ -84,9 +86,9 @@ function aguardandoDesde(lead: { ultima_recebida_at?: string | null; ultima_envi
   return aguardandoResposta(lead) ? lead.ultima_recebida_at ?? null : null
 }
 
-function humanElapsed(date: string | null): string {
+function humanElapsed(date: string | null, agora: number): string {
   if (!date) return ''
-  const min = Math.floor((Date.now() - new Date(date).getTime()) / 60_000)
+  const min = Math.floor((agora - new Date(date).getTime()) / 60_000)
   if (min < 1) return 'agora'
   if (min < 60) return `há ${min} min`
   const h = Math.floor(min / 60)
@@ -95,7 +97,7 @@ function humanElapsed(date: string | null): string {
   return `parado há ${d} ${d > 1 ? 'dias' : 'dia'}`
 }
 
-export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: LeadCardProps) {
+export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, agora: agoraInicial }: LeadCardProps) {
   const {
     attributes, listeners, setNodeRef, transform, transition,
     isDragging: isSortableDragging,
@@ -103,19 +105,20 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
 
   const style = { transform: CSS.Transform.toString(transform), transition }
 
-  // Relógio de SLA anda sozinho (re-render por minuto basta).
-  const [, setTick] = useState(0)
+  // Relógio do cartão: começa no instante do servidor (o 1º desenho tem de sair
+  // igual nos dois lados) e depois anda pelo relógio do navegador a cada 30 s.
+  const [agora, setAgora] = useState(() => agoraInicial ?? Date.now())
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => (t + 1) % 3600), 30_000)
+    const id = setInterval(() => setAgora(Date.now()), 30_000)
     return () => clearInterval(id)
   }, [])
 
   const responsavel = usuarios.find((u) => u.id === lead.responsavel_id)
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
   const esperandoDesde = aguardandoDesde(lead)
-  const slaTone = getSlaTone(esperandoDesde, sla)
+  const slaTone = getSlaTone(esperandoDesde, agora, sla)
   const scoreCfg = useScoreConfig()
-  const { score, tier } = calcularScore(lead, scoreCfg)
+  const { score, tier } = calcularScore(lead, scoreCfg, agora)
   const chip = TIER_CHIP[tier]
 
   return (
@@ -163,7 +166,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla }: L
                 title="Cliente esperando resposta"
                 className={`whitespace-nowrap text-[10px] font-semibold ${SLA_CLASS[slaTone]}`}
               >
-                {humanElapsed(esperandoDesde)}
+                {humanElapsed(esperandoDesde, agora)}
               </span>
             )}
           </div>

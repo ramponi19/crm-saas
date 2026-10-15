@@ -157,8 +157,23 @@ export default async function LeadsPage() {
     .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle()
   const scoreConfig = mergeScoreConfig((scoringRow?.valor ?? null) as Partial<ScoreConfig> | null)
 
+  /**
+   * Instante de referência dos tempos relativos ("há 5 min") e do score.
+   *
+   * O servidor desenha com ele e o navegador hidrata com o MESMO valor. Se cada
+   * lado usasse o próprio relógio, bastava o minuto virar entre os dois desenhos
+   * para o React acusar erro de hidratação (#418). Depois de montado, o cartão
+   * passa a contar pelo relógio do navegador.
+   *
+   * Server Component: roda uma vez por requisição e não re-renderiza — a regra
+   * de pureza não se aplica aqui (mesmo caso de gestao-leads/page.tsx).
+   */
+  // eslint-disable-next-line react-hooks/purity
+  const agora = Date.now()
+
   return (
     <LeadsView
+      agora={agora}
       initialLeads={leadsVisiveis}
       usuarios={usuariosMapped}
       empresaId={empresaId}

@@ -19,9 +19,11 @@ interface KanbanBoardProps {
   onLeadUpdate: (lead: Lead) => void
   sla?: { verde: number; amarelo: number; vermelho: number }
   motivos?: Motivo[]
+  /** Instante do 1º desenho, igual no servidor e no navegador (ver leads/page.tsx). */
+  agora?: number
 }
 
-export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [] }: KanbanBoardProps) {
+export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [], agora }: KanbanBoardProps) {
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
   const [pendingPerda, setPendingPerda] = useState<Lead | null>(null)
@@ -150,7 +152,11 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners}
+    // `id` fixo: sem ele o @dnd-kit numera o aria-describedby com um contador que
+    // nunca zera no servidor (DndDescribedBy-0, -1, -2… a cada requisição), e o
+    // navegador começa do 0. O cartão apontava para uma descrição inexistente e
+    // o leitor de tela perdia as instruções de arrastar.
+    <DndContext id="leads-kanban" sensors={sensors} collisionDetection={closestCorners}
       onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="flex h-full snap-x snap-mandatory gap-3 overflow-x-auto px-6 py-4 pb-6 sm:snap-none">
         {columns.map(col => (
@@ -161,6 +167,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
             isDragging={activeId !== null}
             onLeadClick={onLeadClick}
             sla={sla}
+            agora={agora}
           />
         ))}
       </div>

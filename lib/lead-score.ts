@@ -60,12 +60,17 @@ export function mergeScoreConfig(partial?: Partial<ScoreConfig> | null): ScoreCo
   }
 }
 
-export function calcularScore(l: LeadScoreInput, cfg: ScoreConfig = DEFAULT_SCORE_CONFIG): LeadScore {
+/**
+ * `agora`: instante de referência da recência. O cartão do /leads passa o mesmo
+ * valor no servidor e no navegador (o rótulo Quente/Morno/Frio não pode mudar
+ * entre os dois desenhos); os demais chamadores usam o relógio do momento.
+ */
+export function calcularScore(l: LeadScoreInput, cfg: ScoreConfig = DEFAULT_SCORE_CONFIG, agora: number = Date.now()): LeadScore {
   let s = 0
 
   // Recência: quanto mais recente o último contato, mais quente.
   const ref = l.ultima_mensagem_at ?? l.ultima_tratativa ?? l.created_at ?? null
-  const dias = ref ? (Date.now() - new Date(ref).getTime()) / 86400000 : 999
+  const dias = ref ? (agora - new Date(ref).getTime()) / 86400000 : 999
   const rb = [...cfg.recencia].sort((a, b) => a.ate_dias - b.ate_dias).find((b) => dias <= b.ate_dias)
   if (rb) s += rb.pts
 
