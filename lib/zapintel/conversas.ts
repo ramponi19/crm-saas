@@ -1,5 +1,4 @@
 import { montarLeads } from '@/lib/zapintel/montar'
-import { mapCrmSegmento } from '@/lib/zapintel/segments/segments'
 import type { Lead } from '@/types/zapintel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -136,7 +135,8 @@ export interface Conversas {
   /** Os leads como estão no CRM, por id — é daqui que sai a loja de cada um. */
   porId: Map<number, LeadBanco>
   nomeDaLoja: string
-  segmentId: string
+  /** O segmento da empresa no CRM (`empresas.segmento`), cru. Ver `papel.ts`. */
+  segmento: string | null
   totalMensagens: number
   /**
    * O id da mensagem mais recente que ENTROU nesta análise.
@@ -164,7 +164,7 @@ export async function carregarConversas(
     .from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle()
 
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
-  const segmentId = mapCrmSegmento((empresa as { segmento?: string } | null)?.segmento)
+  const segmento = (empresa as { segmento?: string | null } | null)?.segmento ?? null
 
   const t0 = Date.now()
   const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
@@ -214,7 +214,7 @@ export async function carregarConversas(
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
   if (!porId.size) {
     return {
-      analisados: [], porId, nomeDaLoja, segmentId, totalMensagens: 0, ultimaMensagem: 0,
+      analisados: [], porId, nomeDaLoja, segmento, totalMensagens: 0, ultimaMensagem: 0,
       tempos: { leads: t1 - t0, mensagens: 0, motor: 0 },
     }
   }
@@ -250,7 +250,7 @@ export async function carregarConversas(
   for (const m of msgs) if (m.id > ultimaMensagem) ultimaMensagem = m.id
 
   return {
-    analisados, porId, nomeDaLoja, segmentId, totalMensagens: msgs.length, ultimaMensagem,
+    analisados, porId, nomeDaLoja, segmento, totalMensagens: msgs.length, ultimaMensagem,
     tempos: { leads: t1 - t0, mensagens: t2 - t1, motor: t3 - t2 },
   }
 }

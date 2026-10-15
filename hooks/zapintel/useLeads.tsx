@@ -1,7 +1,6 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { getSegment, getRole, mapCrmSegmento, DEFAULT_SEGMENT_ID } from "@/lib/zapintel/segments/segments";
-import type { SegmentConfig } from "@/lib/zapintel/segments/segments";
+import { papelDoSegmento } from "@/lib/zapintel/papel";
 import { useRpcAoVivo } from "./useRpcAoVivo";
 
 /**
@@ -31,7 +30,6 @@ export interface Loja {
 }
 
 interface Contexto {
-  segment: SegmentConfig;
   /** As lojas, ao vivo. A primeira é sempre "toda a rede" (`id: null`). */
   lojas: Loja[];
   lojaAtiva: number | null;
@@ -61,10 +59,8 @@ interface Resumo {
 export function LeadProvider({ children, empresa }: { children: ReactNode; empresa: number | null }) {
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
   const { dados: resumo, aoVivo } = useRpcAoVivo<Resumo>("zapintel_resumo", { p_empresa: empresa }, empresa);
-  const segmentId = resumo ? mapCrmSegmento(resumo.segmento) : DEFAULT_SEGMENT_ID;
 
   const valor: Contexto = {
-    segment: getSegment(segmentId),
     lojas: resumo?.lojas ?? [],
     lojaAtiva,
     setLojaAtiva,
@@ -74,7 +70,7 @@ export function LeadProvider({ children, empresa }: { children: ReactNode; empre
     ultimaMensagem: resumo?.ultimaMensagem ?? null,
     aoVivo,
     storeName: resumo?.empresaNome ?? "",
-    sellerName: getRole(segmentId),
+    sellerName: papelDoSegmento(resumo?.segmento),
   };
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

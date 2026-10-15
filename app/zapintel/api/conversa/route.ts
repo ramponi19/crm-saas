@@ -112,7 +112,28 @@ export async function GET(req: Request) {
     // modelo `claude-` e só a chave do Google, a IA não responde nada.
     const iaDisponivel = await iaDoCrmLigada()
 
-    return NextResponse.json({ lead, ficha, travou, perfil, iaDisponivel })
+    /**
+     * A CONVERSA NÃO VIAJA MAIS — DESDE 15/10/2026.
+     *
+     * A ficha mostrava o histórico inteiro (130, 400 mensagens) e era o que
+     * pesava ao abrir. O Lucas: *"com a analise feita pela ia ja é o
+     * suficiente, se eu quiser ver a conversa ... um botao para abrir direto
+     * o chat do lead em outra aba"*. O servidor continua lendo a conversa
+     * inteira (a ficha, o travamento e a marca da análise dependem dela); para
+     * a tela vão só as contas e a mensagem onde travou.
+     */
+    const m = travou ? lead.messages[travou.indice] : null
+    const trecho = m ? {
+      texto: m.body || (m.mediaType ? `[${m.mediaType}]` : ''),
+      data: m.date, hora: m.time, transcrito: !!m.transcrito,
+    } : null
+    return NextResponse.json({
+      lead: { ...lead, messages: [] },
+      ficha,
+      travou: travou ? { ...travou, trecho } : null,
+      perfil,
+      iaDisponivel,
+    })
   } catch (e) {
     console.error('zapintel/conversa:', (e as Error).message)
     return NextResponse.json({ erro: 'falha ao ler a conversa' }, { status: 500 })

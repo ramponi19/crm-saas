@@ -1,192 +1,78 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Copy, Check, RefreshCw, Sparkles, AlertTriangle, ExternalLink, MessageSquareText, Clock, Bot } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../../providers";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "@/hooks/zapintel/canalZapintel";
+import { CLASSE, URG, num } from "@/components/zapintel/rotulos";
+import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
 import type { Travou } from "@/lib/zapintel/travou";
 import type { PerfilIA } from "@/lib/zapintel/perfil";
-import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
-import { ArrowLeft, Copy, RefreshCw, Sparkles, Bot, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
 /**
- * O SELO DE ORIGEM — e por que ele mora AQUI FORA.
+ * A FICHA DO LEAD — REESCRITA DO ZERO EM 15/10/2026.
  *
- * Nasceu dentro do componente da página, onde ficava mais perto de quem o
- * usa. O `react-hooks/static-components` reclamou, e com razão: um componente
- * declarado dentro de outro é um TIPO novo a cada render, então o React
- * desmonta e remonta a subárvore inteira em vez de atualizá-la — e aqui a
- * subárvore inclui o ícone que gira enquanto a IA analisa, que recomeçaria a
- * animação a cada tecla digitada em qualquer campo da tela.
+ * A anterior era o arquivo de agosto, reformado em camadas: 1.145 linhas com o
+ * motor de palavras como "plano B" (classificação, score, sinais e objeções
+ * por palavra-chave, "LEITURA AUTOMÁTICA"), o histórico inteiro da conversa
+ * (130, 400 mensagens baixadas a cada abertura), abas de "perfil unificado" de
+ * uma importação que não existe mais e o botão "Responder no WhatsApp".
  *
- * Quanto ao conteúdo: o rótulo precisa dizer de onde veio o texto, sempre.
- * Esta tela chamou de "ANÁLISE DE IA" uma cadeia de `if` por meses. Enquanto
- * os dois caminhos coexistirem, cada bloco diz qual dos dois escreveu aquilo.
+ * Pedido do Lucas: *"Ficha entra limpa dentro do modelo mas sem dados
+ * analisados por ia até que a mesma seja efetuada"* e *"com a analise feita
+ * pela ia ja é o suficiente, se eu quiser ver a conversa ... um botao para
+ * abrir direto o chat do lead em outra aba"*.
+ *
+ * Então: o que a conversa MEDE aparece sempre (mensagens, dias, quem falou por
+ * último, onde travou). O que se AFIRMA sobre o lead — classe, score, sinais,
+ * objeções, próxima ação — só existe se a análise de IA existir; sem ela, a
+ * ficha diz isso e oferece gerar. A conversa abre no CRM, em outra aba.
+ *
+ * Dados: `/zapintel/api/conversa` (calculado na hora) e, ao vivo, recarrega
+ * sozinha só quando chega mensagem DESTE lead (`canalZapintel.ts`).
  */
-function SeloIA({ rotulo, ia, analisando }: { rotulo: string; ia: boolean; analisando: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 10, fontWeight: 700, color: ia ? "var(--purple-l)" : "var(--muted)", letterSpacing: .7 }}>
-        {rotulo}
-      </span>
-      {ia ? <EtiquetaIA /> : (
-        <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: .3 }}>regra automática</span>
-      )}
-      {analisando && (
-        <span style={{ fontSize: 9, color: "var(--dim)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <RefreshCw size={9} className="spin" /> analisando a conversa…
-        </span>
-      )}
-    </div>
-  );
-}
 
-/**
- * Sem análise, sinais, objeções e próxima ação vêm da regra por palavras do
- * motor antigo — que errou 2 de 6 sinais no lead 439. A tela diz de onde veio
- * para ninguém tratar palpite de regra como leitura da conversa.
- */
-function RegraAutomatica() {
-  return <span style={{ fontSize: 9, fontWeight: 400, color: "var(--muted)", letterSpacing: .3, marginLeft: 6 }}>· regra automática</span>;
-}
+type TravouComTrecho = Travou & { trecho: { texto: string; data: string; hora: string; transcrito: boolean } | null };
+interface Guardado { perfil: PerfilIA; atual: boolean; geradoEm: string; mensagensNaFicha?: number }
 
-/** A etiqueta sozinha, para os blocos que já têm título próprio. */
-function EtiquetaIA() {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, fontWeight: 700,
-      background: "rgba(124,92,252,.12)", border: "1px solid rgba(124,92,252,.3)",
-      color: "var(--purple-l)", borderRadius: 20, padding: "1px 7px", letterSpacing: .3,
-    }}>
-      <Sparkles size={9} /> ESCRITO POR IA
-    </span>
-  );
-}
-
-function whatsappLink(phone: string) {
-  const digits = (phone || "").replace(/[^0-9]/g, "");
-  if (!digits) return null;
-  const num = digits.startsWith("55") ? digits : `55${digits}`;
-  return `https://wa.me/${num}`;
-}
-
-type Tab = "whatsapp" | "instagram" | "all";
-
-export default function LeadDetailPage() {
+export default function FichaDoLead() {
   const { id } = useParams();
   const router = useRouter();
-  const { storeName, sellerName } = useLeads();
+  const { lojas, storeName, sellerName } = useLeads();
   const empresa = useEmpresaZapintel();
-  /**
-   * A FICHA NÃO LÊ MAIS O PAINEL ANTIGO — DESDE 15/10/2026.
-   *
-   * O número do lead sai da URL (`lead-5760`) e o lead inteiro vem de
-   * `/zapintel/api/conversa`, calculado na hora. Antes o topo vinha do painel
-   * (calculado de tempos em tempos): o lead 1196 mostrava "Inativo há 7d" e
-   * "152 mensagens" com o cliente tendo falado naquele dia, na mensagem 153.
-   */
   const leadNum = Number(String(id ?? "").replace(/^lead-/, "")) || null;
 
-  /**
-   * A CONVERSA NÃO VEM NA LISTA — É BUSCADA AQUI.
-   *
-   * O painel manda 2.039 leads sem o texto das conversas; mandá-lo todo seria
-   * 4 MB e foi o que obrigava a truncar a análise. Esta tela é a única que
-   * precisa das mensagens de verdade, então pede exatamente uma conversa.
-   *
-   * Caminho único desde 10/10/2026: a importação manual saiu do produto, e com
-   * ela o segundo caminho que existia aqui (texto já no navegador, sem a quem
-   * pedir). Um caminho só é um resultado só.
-   */
-  const [conversa, setConversa] = useState<Lead | null>(null);
+  const [lead, setLead] = useState<Lead | null>(null);
   const [ficha, setFicha] = useState<Ficha | null>(null);
-  /**
-   * ONDE A CONVERSA TRAVOU — calculado no servidor, junto da ficha.
-   *
-   * Vem com o ÍNDICE da mensagem, e a marcação compara por referência
-   * (`lead.messages[indice] === msg`). Procurar a frase de volta por texto
-   * acharia a errada toda vez que a loja repete a mesma mensagem, que é
-   * justamente o caso da frase de retomada. Ver `lib/zapintel/travou.ts`.
-   */
-  const [travou, setTravou] = useState<Travou | null>(null);
-
-  /**
-   * A FICHA ESCRITA POR IA — o que esta tela afirma, do Copiloto para cima.
-   *
-   * `/zapintel/api/conversa` traz de graça a que já estava guardada (uma
-   * consulta por chave primária), e a tela a mostra na hora, mesmo que tenha
-   * sido escrita antes das últimas mensagens.
-   *
-   * ⚠ A TELA NUNCA PEDE UMA NOVA SOZINHA — DESDE 14/10/2026.
-   *
-   * Até ali, abrir um lead com conversa nova disparava a IA na hora ("o que
-   * for de IA sempre será automático", 13/10). O Lucas reviu no dia seguinte:
-   * *"se nao toda vez que abrir o zapintel a ia vai analisar tudo consumindo
-   * token sem precisar. Ai se sofreu alteracao coloca um aviso, nova analise
-   * disponivel"*. Abrir para dar uma olhada não pode custar uma chamada.
-   *
-   * Agora a ficha guardada aparece com o aviso de que a conversa andou, e a
-   * IA só escreve quando alguém aperta "Gerar nova análise" — aqui ou no robô
-   * do canto da tela, que mostra todos os leads nessa situação.
-   */
-  const [perfilIA, setPerfilIA] = useState<PerfilIA | null>(null);
-  const [perfilAtual, setPerfilAtual] = useState(true);
-  const [perfilEm, setPerfilEm] = useState<string | null>(null);
-  /** Mensagens que chegaram depois da ficha guardada — o "quanto mudou". */
-  const [novasDesde, setNovasDesde] = useState(0);
-  const [analisando, setAnalisando] = useState(false);
-  const [erroPerfil, setErroPerfil] = useState("");
-  /**
-   * A IA do CRM está configurada e ligada? Vem do servidor, não daqui.
-   *
-   * Enquanto não estiver, a tela não pede análise nenhuma — nem automática
-   * nem por botão. As fichas que já existem continuam aparecendo normalmente;
-   * o que some é a promessa de gerar o que não dá para gerar.
-   */
+  const [travou, setTravou] = useState<TravouComTrecho | null>(null);
+  const [guardado, setGuardado] = useState<Guardado | null>(null);
   const [iaLigada, setIaLigada] = useState(true);
+  const [falhou, setFalhou] = useState(false);
 
-  const [sugestao, setSugestao] = useState<string>("");
+  const [analisando, setAnalisando] = useState(false);
+  const [erroIA, setErroIA] = useState("");
+  const [sugestao, setSugestao] = useState("");
   const [sugerindo, setSugerindo] = useState(false);
   const [erroSugestao, setErroSugestao] = useState("");
-  const [copiouSugestao, setCopiouSugestao] = useState(false);
-  /**
-   * O histórico começa FECHADO.
-   *
-   * Era o padrão abrir, e com ele a ficha virou enfeite: continuava mais
-   * rápido rolar 41 mensagens do que confiar no resumo. Fechado, a ficha
-   * precisa se bastar — e quando não bastar, a conversa está a um clique,
-   * porque esconder a fonte é como se perde confiança no número.
-   */
-  const [verConversa, setVerConversa] = useState(false);
-  const [falhouConversa, setFalhouConversa] = useState(false);
 
   const carregar = useCallback((vivo: () => boolean) => {
     if (!leadNum) return;
     fetch(`/zapintel/api/conversa?lead=${leadNum}`, { cache: "no-store" })
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         if (!vivo()) return;
-        if (d?.lead) {
-          setConversa(d.lead as Lead);
-          setFicha((d.ficha as Ficha) ?? null);
-          setTravou((d.travou as Travou) ?? null);
-          const g = d.perfil as { perfil: PerfilIA; atual: boolean; geradoEm: string; mensagensNaFicha?: number } | null;
-          if (g?.perfil) {
-            setPerfilIA(g.perfil);
-            setPerfilAtual(g.atual);
-            setPerfilEm(g.geradoEm);
-            const total = (d.lead as Lead).messages?.length ?? 0;
-            setNovasDesde(Math.max(0, total - (g.mensagensNaFicha ?? total)));
-          }
-          // Não pede nada: ver "A TELA NUNCA PEDE UMA NOVA SOZINHA" acima.
-          setIaLigada(d.iaDisponivel !== false);
-        }
-        else setFalhouConversa(true);
+        if (!d?.lead) { setFalhou(true); return; }
+        setLead(d.lead as Lead);
+        setFicha((d.ficha as Ficha) ?? null);
+        setTravou((d.travou as TravouComTrecho) ?? null);
+        setGuardado((d.perfil as Guardado) ?? null);
+        setIaLigada(d.iaDisponivel !== false);
       })
-      .catch(() => { if (vivo()) setFalhouConversa(true); });
+      .catch(() => { if (vivo()) setFalhou(true); });
   }, [leadNum]);
 
   useEffect(() => {
@@ -195,12 +81,9 @@ export default function LeadDetailPage() {
     return () => { vivo = false; };
   }, [carregar]);
 
-  /**
-   * AO VIVO: quando chega mensagem DESTE lead (o aviso do banco diz quais
-   * leads mudaram — `zapintel_ao_vivo.sql`) ou a análise dele é refeita, a
-   * ficha se recarrega sozinha. Só este lead: a loja recebe ~240 mensagens por
-   * hora, e recarregar a cada uma seria uma chamada à Vercel por mensagem.
-   */
+  // Ao vivo: só quando o aviso do banco traz ESTE lead (mensagem nova ou
+  // análise refeita). A loja recebe ~240 mensagens por hora; recarregar a cada
+  // uma seria uma chamada à Vercel por mensagem.
   const [supabase] = useState(() => createClient());
   useEffect(() => {
     if (!empresa || !leadNum) return;
@@ -219,927 +102,357 @@ export default function LeadDetailPage() {
     return () => { vivo = false; if (espera) clearTimeout(espera); sair(); };
   }, [supabase, empresa, leadNum, carregar]);
 
-
-  /**
-   * Pede a ficha nova. `forcar` é o botão "Refazer análise" — o único caminho
-   * que manda a IA reescrever uma ficha que o servidor considera atual.
-   */
-  async function pedirPerfil(forcar: boolean) {
-    if (!leadNum) return;
-    setAnalisando(true); setErroPerfil("");
+  /** A IA só escreve quando alguém pede — aqui ou no robô (regra de 14/10). */
+  async function analisar(forcar: boolean) {
+    if (!leadNum || analisando) return;
+    setAnalisando(true); setErroIA("");
     try {
       const r = await fetch("/zapintel/api/perfil", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead: leadNum, forcar }),
       });
       const d = await r.json();
-      if (!r.ok) setErroPerfil(d?.erro || "Não consegui analisar agora.");
+      if (!r.ok) setErroIA(d?.erro || "Não consegui analisar agora.");
       else if (d?.perfil) {
-        setPerfilIA(d.perfil as PerfilIA);
-        setPerfilAtual(true);
-        setNovasDesde(0);
-        setPerfilEm(String(d.geradoEm || new Date().toISOString()));
-        // O robô do canto conta os leads pendentes; este acabou de sair da lista.
+        setGuardado({ perfil: d.perfil as PerfilIA, atual: true, geradoEm: String(d.geradoEm || new Date().toISOString()), mensagensNaFicha: lead?.totalMessages });
         window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: leadNum }));
       }
-    } catch {
-      setErroPerfil("Não consegui analisar agora.");
-    }
+    } catch { setErroIA("Não consegui analisar agora."); }
     setAnalisando(false);
   }
 
-  // Derivado, não guardado: "está carregando" é exatamente "tem o que buscar e
-  // ainda não chegou". Um estado separado só poderia divergir disso.
-  const carregandoConversa = !!leadNum && !conversa && !falhouConversa;
-
-  const lead: Lead | null = conversa;
-
-  const [tab, setTab] = useState<Tab>("all");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-
-  if (!lead) return (
-    <div style={{ textAlign: "center", paddingTop: 80, color: "var(--dim)" }}>
-      {carregandoConversa ? "Carregando a conversa…" : "Lead não encontrado."}{" "}
-      <button onClick={() => router.back()} style={{ color: "var(--purple-l)", background: "none", border: "none", cursor: "pointer" }}>
-        Voltar
-      </button>
-    </div>
-  );
-
-  // Detect if this lead has both sources
-  const sources = (lead as Lead)._sources;
-  const isMerged = !!sources;
-
-  // Filter messages by tab
-  const displayMessages = (() => {
-    if (!isMerged || tab === "all") return lead.messages;
-    return lead.messages.filter((m) => (m.source ?? "whatsapp") === tab);
-  })();
-
-  const waMessages = isMerged ? lead.messages.filter((m) => m.source === "whatsapp") : lead.messages;
-  const igMessages = isMerged ? lead.messages.filter((m) => m.source === "instagram") : [];
-
-  /**
-   * A mensagem que retoma dali. Rascunho — ninguém envia nada sozinho.
-   *
-   * O prompt é montado no SERVIDOR (`/zapintel/api/sugestao`), com o nome da
-   * loja e o ramo vindos do banco. Montá-lo aqui deixaria quem souber a URL
-   * escolher o que a IA do CRM responde, pagando com a chave do Lucas.
-   */
-  async function pedirSugestao() {
+  async function sugerir() {
     if (!leadNum || sugerindo) return;
     setSugerindo(true); setErroSugestao(""); setSugestao("");
     try {
       const r = await fetch("/zapintel/api/sugestao", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead: leadNum }),
       });
       const d = await r.json();
-      if (!r.ok) setErroSugestao(d?.erro || "Não consegui gerar agora.");
+      if (!r.ok) setErroSugestao(d?.erro || "Não consegui escrever agora.");
       else setSugestao(String(d?.mensagem || ""));
-    } catch {
-      setErroSugestao("Não consegui gerar agora.");
-    }
+    } catch { setErroSugestao("Não consegui escrever agora."); }
     setSugerindo(false);
   }
 
-  async function copyMsg(id: string, text: string) {
-    await navigator.clipboard.writeText(text);
+  const abrirNoCRM = leadNum ? `/leads?lead=${leadNum}` : null;
 
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  if (!lead) {
+    return (
+      <div className="fc">
+        <style>{CSS}</style>
+        <button className="fc-voltar" onClick={() => router.back()}><ArrowLeft size={14} /> Voltar</button>
+        {falhou || !leadNum
+          ? <div className="card fc-vazio">Lead não encontrado — ou ele não tem conversa.</div>
+          : <div className="card fc-osso" style={{ height: 420 }} />}
+      </div>
+    );
   }
 
-  /**
-   * O QUE A TELA AFIRMA — IA quando existe, motor de regra quando não existe.
-   *
-   * Não é um "modo IA" opcional: é a mesma tela, com a origem melhor de cada
-   * campo. Enquanto a ficha não foi gerada (lead recém-chegado, IA desligada
-   * pelo superadmin, provedor fora do ar), os motores antigos continuam
-   * respondendo — uma tela vazia seria pior que um rótulo genérico.
-   *
-   * O que NÃO entra aqui é contagem: mensagens, dias de conversa e dias de
-   * silêncio são fatos medidos, e pedir a um modelo que os repita só criaria
-   * uma chance de ele errar um número que já estava certo.
-   */
-  const ia = perfilIA;
-  const vClass = ia?.classificacao ?? lead.classification;
-  const vScore = ia?.score ?? lead.score;
-  const vPerfil = ia?.perfil ?? lead.buyerProfile;
-  const vRisco = ia?.riscoPerda ?? lead.lossRisk;
-  const vUrgencia = ia?.urgencia ?? lead.urgency;
-  const vProxima = ia?.proximaAcao ?? lead.nextAction;
-
-  const urgColors: Record<string, string> = {
-    critical: "var(--red)", high: "var(--orange)", medium: "var(--yellow)", low: "var(--dim)",
-  };
-  const urgCol = urgColors[vUrgencia] || "var(--dim)";
-
+  const ia = guardado?.perfil ?? null;
+  const novas = ia && guardado ? Math.max(0, lead.totalMessages - (guardado.mensagensNaFicha ?? lead.totalMessages)) : 0;
+  const loja = lojas.find((l) => l.id === lead.crm?.filialId)?.nome ?? null;
+  const classe = ia ? (CLASSE[ia.classificacao as Classe] ?? null) : null;
+  const urg = ia ? (URG[ia.urgencia as Urgencia] ?? URG.low) : null;
+  const mostrarTravou = !!travou && ia?.classificacao !== "customer";
+  const quemDaLoja = lead.sellerName || storeName || sellerName;
 
   return (
-    <div style={{ maxWidth: 840, margin: "0 auto" }}>
-      <button onClick={() => router.back()} style={{
-        display: "flex", alignItems: "center", gap: 5, background: "none", border: "none",
-        color: "var(--dim)", cursor: "pointer", fontSize: 13, marginBottom: 16,
-      }}>
-        <ArrowLeft size={14} /> Voltar
-      </button>
+    <div className="fc">
+      <style>{CSS}</style>
 
-      {/* ── Header card ─────────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 24, marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800 }}>{lead.contact}</h1>
-              {/* Source badges */}
-              {isMerged ? (
-                <div style={{ display: "flex", gap: 5 }}>
-                  <SourceBadge type="whatsapp" />
-                  <SourceBadge type="instagram" />
-                </div>
-              ) : (
-                <SourceBadge type={lead._channel === "instagram" ? "instagram" : "whatsapp"} />
-              )}
-            </div>
-            <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 10 }}>
-              {lead.phone || lead.filename} · {storeName || sellerName}
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Badge cls={vClass} />
-              {lead.phone && (() => {
-                const link = whatsappLink(lead.phone);
-                return link ? (
-                  <a href={link} target="_blank" rel="noopener noreferrer" style={{
-                    display: "inline-flex", alignItems: "center", gap: 8,
-                    background: "#075e54", borderRadius: 10,
-                    padding: "7px 16px", textDecoration: "none",
-                    transition: "all .2s", border: "none",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#128c7e"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#075e54"}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                    </svg>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Responder no WhatsApp</span>
-                  </a>
-                ) : null;
-              })()}
-            </div>
+      <div className="fc-barra">
+        <button className="fc-voltar" onClick={() => router.back()}><ArrowLeft size={14} /> Voltar</button>
+        {abrirNoCRM && (
+          <a className="fc-botao leve" href={abrirNoCRM} target="_blank" rel="noopener noreferrer">
+            <MessageSquareText size={14} /> Abrir conversa no CRM <ExternalLink size={12} />
+          </a>
+        )}
+      </div>
+
+      {/* ── Quem é ─────────────────────────────────────────────────────── */}
+      <section className="card fc-topo">
+        <div className="fc-quem">
+          <h1>{lead.contact}</h1>
+          <div className="fc-meta">
+            <span className={`fc-canal ${lead._channel === "instagram" ? "ig" : "wa"}`}>{lead._channel === "instagram" ? "Instagram" : "WhatsApp"}</span>
+            {lead.phone && <span>{lead.phone}</span>}
+            {loja && <span>{loja}</span>}
+            {lead.sellerName && <span>responsável: {lead.sellerName}</span>}
           </div>
-          <ScoreRing score={vScore} size={54} />
-        </div>
-
-        {/* Merged info banner */}
-        {isMerged && (
-          <div style={{
-            background: "rgba(124,92,252,.08)", border: "1px solid rgba(124,92,252,.3)",
-            borderRadius: 10, padding: "10px 14px", marginBottom: 14,
-            display: "flex", alignItems: "center", gap: 10, fontSize: 12,
-          }}>
-            <span style={{ fontSize: 16 }}>🔗</span>
-            <div style={{ color: "var(--dim)" }}>
-              Perfil unificado —
-              <span style={{ color: "var(--green)", fontWeight: 700 }}> 💬 {waMessages.length} mensagens WhatsApp</span>
-              {" "}+
-              <span style={{ color: "#ec4899", fontWeight: 700 }}> 📸 {igMessages.length} mensagens Instagram</span>
+          {ia && classe && urg && (
+            <div className="fc-selos">
+              <span className="fc-tag" style={{ color: classe.cor, borderColor: classe.cor }}>{classe.nome}</span>
+              <span className="fc-urg" style={{ color: urg.cor }}><span style={{ background: urg.cor }} /> urgência {urg.nome.toLowerCase()}</span>
+              {ia.perfil && <span className="fc-perfil">{ia.perfil}</span>}
             </div>
+          )}
+        </div>
+        {ia && (
+          <div className="fc-score" title="Score da análise de IA">
+            <b style={{ color: ia.score >= 70 ? "var(--green)" : ia.score >= 40 ? "var(--orange)" : "var(--dim)" }}>{ia.score}</b>
+            <span>score</span>
           </div>
         )}
+      </section>
 
-        {/*
-          ANÁLISE DE IA — e desde 13/10/2026 o rótulo é verdade.
+      {/* ── O que a conversa mede (sempre) ─────────────────────────────── */}
+      <div className="fc-fatos">
+        <Fato rotulo="Última mensagem" valor={lead.daysInactive === 0 ? "hoje" : `há ${lead.daysInactive} ${lead.daysInactive === 1 ? "dia" : "dias"}`}
+          cor={lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--orange)" : "var(--red)"} />
+        <Fato rotulo="Mensagens" valor={num(lead.totalMessages)} sub={ficha ? `${num(ficha.mensagensLead)} dele · ${num(ficha.mensagensLoja)} da loja` : undefined} />
+        <Fato rotulo="Duração" valor={lead.conversationDays <= 1 ? "1 dia" : `${lead.conversationDays} dias`} />
+        {ficha?.respostaMedianaMin != null && (
+          <Fato rotulo="A loja responde em" valor={ficha.respostaMedianaMin < 60 ? `${ficha.respostaMedianaMin} min` : `${Math.round(ficha.respostaMedianaMin / 60)} h`}
+            cor={ficha.respostaMedianaMin > 60 ? "var(--orange)" : undefined} />
+        )}
+        {ia && <Fato rotulo="Risco de perda" valor={`${ia.riscoPerda}%`} cor={ia.riscoPerda > 60 ? "var(--red)" : ia.riscoPerda > 30 ? "var(--orange)" : "var(--green)"} />}
+      </div>
 
-          Até aqui, este bloco mostrava `lead.insight`, que era uma cadeia de
-          `if` sobre a fala do cliente em `insights/followUp.ts`. No lead 439
-          (Carol Baldasso) ele dizia "Preocupação com saúde da bateria —
-          reforçar garantia de 6 meses" para uma cliente que havia comprado
-          52 dias antes, recebido em casa e mandado foto com o aparelho.
-        */}
-        <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
-          <SeloIA rotulo={ia ? "ANÁLISE DE IA" : "LEITURA AUTOMÁTICA"} ia={!!ia} analisando={analisando} />
-          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7 }}>
-            {ia?.diagnostico || lead.insight}
-          </p>
-          {erroPerfil && (
-            <p style={{ fontSize: 11, color: "var(--yellow)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <AlertTriangle size={12} /> {erroPerfil}
-            </p>
-          )}
-          {/*
-            NOVA ANÁLISE DISPONÍVEL — o aviso no lugar do pedido automático.
-            A ficha antiga continua à vista: ela ainda é a melhor leitura que
-            existe até alguém decidir pagar por uma nova.
-          */}
-          {!analisando && (!ia || !perfilAtual) && !carregandoConversa && !falhouConversa && (
-            <div style={{
-              marginTop: 10, padding: "8px 10px", borderRadius: 8,
-              background: "rgba(124,92,252,.08)", border: "1px solid rgba(124,92,252,.28)",
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
-            }}>
-              <span style={{ fontSize: 11, color: "var(--txt)", display: "flex", alignItems: "center", gap: 6 }}>
-                <Sparkles size={12} style={{ color: "var(--purple-l)" }} />
-                {ia
-                  ? <><b>Nova análise disponível</b>{novasDesde > 0
-                      ? ` · ${novasDesde} ${novasDesde === 1 ? "mensagem nova" : "mensagens novas"} desde esta análise`
-                      : " · a conversa mudou desde esta análise"}</>
-                  : <><b>Este lead ainda não tem análise de IA</b></>}
-              </span>
-              {iaLigada ? (
-                <button
-                  onClick={() => pedirPerfil(false)}
-                  style={{
-                    background: "var(--purple)", color: "#fff", border: "none", borderRadius: 7,
-                    padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 5,
-                  }}
-                >
-                  <Bot size={12} /> {ia ? "Gerar nova análise" : "Gerar análise"}
-                </button>
-              ) : (
-                <span style={{ fontSize: 10, color: "var(--muted)" }}>A IA do CRM está desligada</span>
-              )}
-            </div>
-          )}
+      {/* ── A análise de IA ────────────────────────────────────────────── */}
+      <section className={`card fc-analise ${ia ? "" : "vazia"}`}>
+        <div className="fc-cab">
+          <h2><Sparkles size={14} /> Análise de IA</h2>
+          {analisando && <span className="fc-andando"><RefreshCw size={12} className="spin" /> lendo a conversa…</span>}
         </div>
-
-        {/* Meta cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginBottom: 14 }}>
-          {[
-            { l: "Perfil", v: vPerfil, c: "var(--txt)" },
-            { l: "Duração da conversa", v: lead.conversationDays === 0 ? "1 dia" : `${lead.conversationDays}d`, c: "var(--teal)", tip: "dias entre 1ª e última mensagem" },
-            { l: "Inativo há", v: lead.daysInactive === 0 ? "Hoje" : `${lead.daysInactive}d`, c: lead.daysInactive <= 2 ? "var(--green)" : lead.daysInactive <= 7 ? "var(--yellow)" : "var(--red)" },
-            { l: "Mensagens", v: String(lead.totalMessages), c: "var(--blue)" },
-            { l: "Risco de perda", v: `${vRisco}%`, c: vRisco > 60 ? "var(--red)" : "var(--yellow)" },
-          ].map(({ l, v, c }) => (
-            <div key={l} className="card2" style={{ padding: "10px 12px" }}>
-              <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5, marginBottom: 3 }}>{l.toUpperCase()}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/*
-          SINAIS E OBJEÇÕES — AGORA COM A EVIDÊNCIA DO LADO.
-
-          A evidência não é enfeite: é o que separa análise de invenção com
-          boa redação. Um texto bonito e errado é pior que um rótulo genérico,
-          porque o vendedor acredita nele e liga errado na frente de um
-          cliente de verdade. Com o trecho à vista, quem lê confere em dois
-          segundos.
-
-          E era preciso: os rótulos antigos vinham de `includes` em texto
-          corrido. Medido no lead 439 em 13/10/2026, dois dos seis sinais eram
-          falsos — `Pediu NF` saiu de "só me co-NF-irma se é esse valor", e
-          `Indecisão / Timing` saiu da palavra "depois" em "tenho que ir aí
-          pagar depois buscar?". Nenhum dos dois sobreviveria a ter de mostrar
-          de onde veio.
-        */}
         {ia ? (
           <>
-            {ia.sinais.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <SeloIA rotulo="SINAIS DE COMPRA" ia={!!ia} analisando={analisando} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {ia.sinais.map((s, i) => (
-                    <div key={`${s.rotulo}-${i}`} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                      <span style={{
-                        background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)",
-                        color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11,
-                        flexShrink: 0,
-                      }}>✓ {s.rotulo}</span>
-                      {s.evidencia && (
-                        <span style={{ fontSize: 11, color: "var(--dim)", fontStyle: "italic", lineHeight: 1.5 }}>
-                          “{s.evidencia}”
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <p className="fc-diag">{ia.diagnostico}</p>
+            {!guardado?.atual && !analisando && (
+              <div className="fc-aviso">
+                <span><b>Nova análise disponível</b> · {novas > 0 ? `${novas} ${novas === 1 ? "mensagem nova" : "mensagens novas"} desde esta análise` : "a conversa mudou desde esta análise"}</span>
+                {iaLigada && <button className="fc-botao" onClick={() => analisar(false)}><Bot size={13} /> Gerar nova análise</button>}
               </div>
             )}
-
-            {ia.objecoes.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <SeloIA rotulo="OBJEÇÕES" ia={!!ia} analisando={analisando} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                  {ia.objecoes.map((o, i) => (
-                    <div key={`${o.rotulo}-${i}`}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                        <span style={{
-                          background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)",
-                          color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11,
-                          flexShrink: 0,
-                        }}>⚠ {o.rotulo}</span>
-                        {o.evidencia && (
-                          <span style={{ fontSize: 11, color: "var(--dim)", fontStyle: "italic", lineHeight: 1.5 }}>
-                            “{o.evidencia}”
-                          </span>
-                        )}
-                      </div>
-                      {o.desfecho && (
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3, paddingLeft: 12 }}>
-                          → {o.desfecho}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/*
-              PONTAS SOLTAS — o que foi combinado e ninguém retomou.
-
-              Nasceu do teste na Carol: o marido pagou o iPhone cheio e o
-              12 Pro Max dela nunca foi entregue na troca, embora o vendedor
-              tenha prometido, EM ÁUDIO, aceitá-lo como entrada. É um seminovo
-              de R$ 1.200 parado na gaveta de uma cliente que confia na loja,
-              e nenhum motor de palavra-chave chegaria perto disso.
-            */}
-            {ia.pontasSoltas.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <SeloIA rotulo="FICOU EM ABERTO" ia={!!ia} analisando={analisando} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {ia.pontasSoltas.map((p, i) => (
-                    <div key={i} style={{
-                      display: "flex", gap: 8, alignItems: "baseline",
-                      background: "rgba(56,189,248,.07)", border: "1px solid rgba(56,189,248,.22)",
-                      borderRadius: 9, padding: "8px 12px",
-                    }}>
-                      <span style={{ color: "var(--teal)", fontSize: 12, flexShrink: 0 }}>◆</span>
-                      <span style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6 }}>{p}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="fc-rodape">
+              <span>Análise de {new Date(guardado!.geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+              {iaLigada && guardado?.atual && (
+                <button className="fc-link" onClick={() => analisar(true)} disabled={analisando}><RefreshCw size={11} /> Refazer análise</button>
+              )}
+            </div>
           </>
         ) : (
-          <>
-            {lead.buySignals.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>SINAIS DE COMPRA <RegraAutomatica /></div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {lead.buySignals.map(s => (
-                    <span key={s} style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>✓ {s}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {lead.objections.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 8 }}>OBJEÇÕES <RegraAutomatica /></div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {lead.objections.map(o => (
-                    <span key={o.label} style={{ background: "rgba(234,179,8,.1)", border: "1px solid rgba(234,179,8,.3)", color: "var(--yellow)", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>⚠ {o.label}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+          <div className="fc-sem">
+            <p>Este lead ainda não tem análise de IA. Ela lê a conversa inteira — inclusive os áudios transcritos — e escreve o diagnóstico, os sinais, as objeções e a próxima ação, com a frase do cliente como prova.</p>
+            {iaLigada
+              ? <button className="fc-botao" onClick={() => analisar(false)} disabled={analisando}><Bot size={13} /> {analisando ? "Analisando…" : "Gerar análise"}</button>
+              : <span className="fc-mudo">A IA do CRM está desligada.</span>}
+          </div>
         )}
+        {erroIA && <p className="fc-erro"><AlertTriangle size={12} /> {erroIA}</p>}
+      </section>
 
-        {/* Next action */}
-        <div style={{ background: "var(--card2)", border: `1px solid ${urgCol}50`, borderRadius: 10, padding: "12px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: urgCol, letterSpacing: .7 }}>
-              <UrgencyDot urgency={vUrgencia} />
-              PRÓXIMA AÇÃO · {vUrgencia.toUpperCase()}
-            </span>
-            {ia ? <EtiquetaIA /> : <RegraAutomatica />}
-          </div>
-          <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.6 }}>{vProxima}</p>
-          {ia?.proximaAcaoPorque && (
-            <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, marginTop: 6 }}>
-              Por quê: {ia.proximaAcaoPorque}
-            </p>
+      {ia && (
+        <>
+          {/* ── O que fazer ─────────────────────────────────────────────── */}
+          <section className="card fc-acao" style={{ borderLeftColor: urg?.cor }}>
+            <div className="fc-cab"><h2>Próxima ação</h2>{urg && <span className="fc-urg" style={{ color: urg.cor }}><span style={{ background: urg.cor }} /> {urg.nome}</span>}</div>
+            <p className="fc-acao-texto">{ia.proximaAcao}</p>
+            {ia.proximaAcaoPorque && <p className="fc-porque">Por quê: {ia.proximaAcaoPorque}</p>}
+            {ia.mensagemSugerida && <Rascunho rotulo="Rascunho para mandar agora" texto={ia.mensagemSugerida} />}
+          </section>
+
+          {(ia.sinais.length > 0 || ia.objecoes.length > 0) && (
+            <section className="card fc-duplo">
+              {ia.sinais.length > 0 && (
+                <div>
+                  <h3>Sinais de compra</h3>
+                  <ul className="fc-evid">
+                    {ia.sinais.map((s, i) => (
+                      <li key={i}><span className="fc-chip ok">✓ {s.rotulo}</span>{s.evidencia && <q>{s.evidencia}</q>}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {ia.objecoes.length > 0 && (
+                <div>
+                  <h3>Objeções</h3>
+                  <ul className="fc-evid">
+                    {ia.objecoes.map((o, i) => (
+                      <li key={i}>
+                        <span className="fc-chip alerta">⚠ {o.rotulo}</span>{o.evidencia && <q>{o.evidencia}</q>}
+                        {o.desfecho && <span className="fc-desfecho">→ {o.desfecho}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
           )}
 
-          {/*
-            A MENSAGEM É RASCUNHO, E A TELA PRECISA DIZER ISSO.
-
-            Nada é enviado por aqui: o botão copia. O prompt proíbe prometer
-            preço, prazo ou condição que a loja não tenha oferecido nesta
-            conversa, mas a última conferência é de quem vai mandar.
-          */}
-          {ia?.mensagemSugerida && (
-            <div style={{ marginTop: 12, background: "var(--card)", border: "1px solid var(--brd2)", borderRadius: 9, padding: "10px 13px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
-                  RASCUNHO PARA MANDAR AGORA
-                </span>
-                <button
-                  onClick={() => copyMsg("perfil", ia.mensagemSugerida)}
-                  style={{
-                    background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
-                    padding: "3px 9px", fontSize: 10, color: "var(--dim)", cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
-                  }}
-                >
-                  <Copy size={10} /> {copiedId === "perfil" ? "Copiado!" : "Copiar"}
-                </button>
-              </div>
-              <p style={{ fontSize: 12.5, color: "var(--txt)", lineHeight: 1.65 }}>{ia.mensagemSugerida}</p>
-            </div>
+          {ia.pontasSoltas.length > 0 && (
+            <section className="card">
+              <h3 className="fc-h3">Ficou em aberto</h3>
+              <ul className="fc-pontas">
+                {ia.pontasSoltas.map((p, i) => <li key={i} className={p.startsWith("⚠") ? "grave" : ""}>{p.replace(/^⚠\s*/, "")}</li>)}
+              </ul>
+            </section>
           )}
-
-          {/*
-            Quem lê precisa saber quando isto foi escrito e poder mandar
-            refazer. Sem a data, uma ficha de três semanas atrás se apresenta
-            com a mesma autoridade de uma escrita há um minuto.
-          */}
-          {ia && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 9.5, color: "var(--muted)" }}>
-                {perfilEm ? `Análise de ${new Date(perfilEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : ""}
-                {!perfilAtual && " · a conversa andou desde então"}
-              </span>
-              {/* Sem IA configurada não há o que refazer — e um botão que só
-                  sabe dar erro é pior que botão nenhum. */}
-              {iaLigada && (
-                <button
-                  onClick={() => pedirPerfil(true)}
-                  disabled={analisando}
-                  style={{
-                    background: "none", border: "1px solid var(--brd2)", borderRadius: 7,
-                    padding: "3px 9px", fontSize: 10, color: "var(--dim)",
-                    cursor: analisando ? "not-allowed" : "pointer", opacity: analisando ? .5 : 1,
-                    display: "flex", alignItems: "center", gap: 5,
-                  }}
-                >
-                  <RefreshCw size={10} className={analisando ? "spin" : undefined} />
-                  {analisando ? "Analisando…" : "Refazer análise"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/*
-        A FICHA — o que aconteceu nesta conversa, antes de qualquer número.
-
-        Pedida pelo Lucas em 10/10/2026: "ao invés de trazer o histórico de
-        chats, trazer como foi ou está sendo a conversa". É o mesmo princípio
-        que as ferramentas do segmento chamam de revisar trechos em vez de
-        médias — o número acha o momento, o trecho mostra o que fazer.
-
-        Em 13/10/2026 o Lucas pediu estes dois blocos — a ficha e o ponto de
-        travamento — **juntos, logo acima do Copiloto**, em vez de no topo
-        absoluto. A ordem passou a ser: quem é o lead, depois o que aconteceu
-        nele, depois o que fazer.
-
-        Faz sentido: os dois são leitura da conversa e alimentam a decisão do
-        que fazer. Separados por 300px de cartões de número, ninguém ligava um
-        ao outro. (O "Copilot de Vendas" que vinha embaixo saiu em 15/10/2026:
-        tinha "JM Store, vendedor Pedro" fixo no prompt e repetia a análise.)
-      */}
-      {ficha && (
-        <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: "3px solid var(--purple)" }}>
-          {/*
-            A DATA AO LADO DO TÍTULO, e não escondida no rodapé.
-
-            Esta tela mistura duas idades sem avisar: o cabeçalho (score,
-            classificação, dias inativo) vem do painel em cache, que só é
-            refeito quando alguém clica em "Sincronizar agora"; a ficha é
-            calculada AGORA, a cada abertura, direto da conversa. Duas verdades
-            na mesma tela, com aparências idênticas — que é exatamente o modo
-            de falha deste módulo. Enquanto as duas não vierem do mesmo lugar,
-            cada uma diz de quando é.
-          */}
-          <div style={{
-            display: "flex", alignItems: "baseline", justifyContent: "space-between",
-            gap: 10, marginBottom: 8,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: .5 }}>
-                O QUE ACONTECEU
-              </span>
-              {ia?.relato && <EtiquetaIA />}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--dim)" }}>
-              analisado agora · conversa até{" "}
-              {ficha.ultimaEm
-                ? new Date(`${ficha.ultimaEm}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-                : "—"}
-            </div>
-          </div>
-          {/*
-            O RELATO: a IA quando existe, o mecânico quando não.
-
-            O relato mecânico (`montarRelato`, em `lib/zapintel/ficha.ts`)
-            continua sendo gerado e continua certo — ele é fato costurado em
-            frase ("Procurou iPhone 16 Pro Max. Pediu 18x. Travou em: Depende
-            de terceiro."). O que ele não consegue é ligar os fatos: que o
-            crédito foi negado duas vezes, que ela mesma propôs o cartão do
-            irmão, que o aparelho só se revelou por encomenda no último dia.
-
-            Os parágrafos vêm separados por linha em branco e são renderizados
-            como parágrafos. Jogar o texto inteiro num bloco só desfaria a
-            divisão que o modelo fez e devolveria a parede de texto que a
-            ficha veio substituir.
-          */}
-          <div style={{ fontSize: 14, lineHeight: 1.75, color: "var(--txt)", marginBottom: 14 }}>
-            {(ia?.relato || ficha.relato).split(/\n{2,}/).map((p, i) => (
-              <p key={i} style={{ marginBottom: 10 }}>{p.trim()}</p>
-            ))}
-          </div>
-
-          {/*
-            OS TRÊS MOMENTOS. É o que alguém procuraria rolando a conversa:
-            o que ele pediu, o que foi oferecido, e como ficou. Sem eles a
-            ficha é resumo — e resumo obriga a abrir as duas coisas.
-          */}
-          {(ficha.primeiraFalaDoCliente || ficha.ultimaOferta || ficha.fraseAntesDoSilencio) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-              {ficha.primeiraFalaDoCliente && (
-                <Momento rotulo="Ele abriu com" texto={ficha.primeiraFalaDoCliente} cor="var(--blue)" />
-              )}
-              {ficha.ultimaOferta && (
-                <Momento rotulo="A loja ofereceu" texto={ficha.ultimaOferta} cor="var(--yellow)" />
-              )}
-              {ficha.fraseAntesDoSilencio && (
-                <Momento rotulo="Última coisa dita" texto={ficha.fraseAntesDoSilencio} cor="var(--orange)" />
-              )}
-              {ficha.aguardandoLoja && (
-                <Momento rotulo="Parou em" texto="a última fala foi dele — a loja deve resposta" cor="var(--red)" />
-              )}
-            </div>
-          )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 11, color: "var(--muted)" }}>
-            <span><b style={{ color: "var(--txt)" }}>{ficha.mensagensLead}</b> dele · <b style={{ color: "var(--txt)" }}>{ficha.mensagensLoja}</b> da loja</span>
-            <span><b style={{ color: "var(--txt)" }}>{ficha.trocasDeTurno}</b> trocas de turno</span>
-            {ficha.respostaMedianaMin != null && (
-              <span>responde em <b style={{ color: ficha.respostaMedianaMin > 60 ? "var(--orange)" : "var(--txt)" }}>
-                {ficha.respostaMedianaMin < 60 ? `${ficha.respostaMedianaMin} min` : `${Math.round(ficha.respostaMedianaMin / 60)}h`}
-              </b></span>
-            )}
-            {/* Monólogo: o equivalente em texto do "longest monologue" que o
-                Gong mede em chamada. Acima de 3 já é apresentação, não conversa. */}
-            {ficha.monologoLoja >= 3 && (
-              <span>maior sequência da loja sem resposta: <b style={{ color: "var(--orange)" }}>{ficha.monologoLoja}</b></span>
-            )}
-            <span><b style={{ color: ficha.perguntasDaLoja === 0 ? "var(--red)" : "var(--txt)" }}>{ficha.perguntasDaLoja}</b> perguntas da loja</span>
-            {ficha.tentativasDeRetomada > 0 && (
-              <span><b style={{ color: "var(--txt)" }}>{ficha.tentativasDeRetomada}</b> tentativas de retomada</span>
-            )}
-          </div>
-        </div>
+        </>
       )}
 
-      {/* ── Onde a venda travou ──────────────────────────────────────────── */}
-      {/*
-        O ponto exato, não o diagnóstico em prosa. A ficha já conta o que
-        aconteceu; quem abre a conversa para conferir rolava 41 mensagens
-        procurando o momento — e o momento é sempre uma mensagem só.
-
-        Nada aparece aqui em conversa que virou venda: ali não travou nada, e
-        pintar alerta sobre venda fechada é o sistema mentindo com cara de
-        ajuda. Ver `lib/zapintel/travou.ts`.
-
-        ⚠ `ondeTravou` decide isso pela PONTE de vendas, que é fato do CRM — e
-        quando a venda não foi registrada, ele não tem como saber. Visto na
-        tela em 13/10/2026, no lead 439: o bloco anunciava
-
-            ONDE A VENDA TRAVOU · há 49 dias
-            "A loja disse isto e ele não respondeu mais:
-             Obrigadooo pelo feedback!!!!!"
-
-        numa conversa que terminou com a cliente mandando foto do aparelho que
-        acabara de comprar. A loja respondeu "obrigado pelo feedback" e, claro,
-        não houve mais nada a dizer — isso é uma conversa que ACABOU, não uma
-        que travou.
-
-        A IA sabe o que a ponte não sabe, porque leu a conversa. Então quando
-        ela diz que a pessoa comprou, o bloco some — mesmo sem venda
-        registrada. O caminho de corrigir o registro continua logo acima, no
-        aviso em cima de "Marcar Venda Fechada".
-      */}
-      {travou && ia?.classificacao !== "customer" && (() => {
-        const msg = lead.messages[travou.indice];
-        const grave = travou.tipo === "objecao_sem_resposta" || travou.tipo === "loja_deve_resposta";
-        const cor = grave ? "var(--red)" : "var(--yellow)";
-        return (
-          <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: `3px solid ${cor}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: cor, letterSpacing: .7 }}>
-                ONDE A VENDA TRAVOU
-              </span>
-              <span style={{ fontSize: 11, color: "var(--muted)" }}>{travou.detalhe}</span>
-            </div>
-
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--txt)", marginBottom: 10 }}>
-              {travou.rotulo}
-            </div>
-
-            {msg && (
-              <div style={{
-                background: "var(--card2)", border: "1px solid var(--brd2)",
-                borderLeft: `2px solid ${cor}`, borderRadius: 8,
-                padding: "10px 14px", marginBottom: 12,
-              }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, marginBottom: 4 }}>
-                  {travou.daLoja ? (lead.sellerName || storeName || "LOJA").toUpperCase() : lead.contact.toUpperCase()}
-                  {" · "}{msg.date} {msg.time}
-                </div>
-                <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                  {msg.body || (msg.mediaType ? `[${msg.mediaType}]` : "")}
-                </p>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => {
-                  setVerConversa(true);
-                  // O próximo quadro: a conversa ainda não existe no DOM quando
-                  // este clique roda, e rolar para um elemento que não nasceu
-                  // não faz nada — sem erro nenhum, que é o pior tipo.
-                  setTimeout(() => {
-                    document.getElementById("msg-travou")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }, 60);
-                }}
-                style={{
-                  background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 9,
-                  padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "var(--txt)", cursor: "pointer",
-                }}
-              >
-                Ver na conversa
-              </button>
-
-              <button
-                onClick={pedirSugestao}
-                disabled={sugerindo}
-                style={{
-                  background: sugerindo ? "var(--card2)" : "var(--purple)", border: "none", borderRadius: 9,
-                  padding: "8px 14px", fontSize: 12, fontWeight: 700,
-                  color: sugerindo ? "var(--muted)" : "#fff",
-                  cursor: sugerindo ? "default" : "pointer",
-                }}
-              >
-                {sugerindo ? "Escrevendo…" : sugestao ? "Sugerir outra" : "Sugerir a mensagem"}
-              </button>
-            </div>
-
-            {erroSugestao && (
-              <p style={{ fontSize: 12, color: "var(--red)", marginTop: 10 }}>{erroSugestao}</p>
-            )}
-
-            {sugestao && (
-              <div style={{
-                background: "rgba(124,92,252,.07)", border: "1px solid rgba(124,92,252,.28)",
-                borderRadius: 10, padding: "12px 16px", marginTop: 12,
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 6 }}>
-                  RASCUNHO DA IA · LEIA ANTES DE ENVIAR
-                </div>
-                <p style={{ fontSize: 13.5, color: "var(--txt)", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
-                  {sugestao}
-                </p>
-                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard?.writeText(sugestao);
-                      setCopiouSugestao(true);
-                      setTimeout(() => setCopiouSugestao(false), 1800);
-                    }}
-                    style={{
-                      background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 9,
-                      padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "var(--txt)", cursor: "pointer",
-                    }}
-                  >
-                    {copiouSugestao ? "Copiado ✓" : "Copiar"}
-                  </button>
-                  {lead.phone && (() => {
-                    const base = whatsappLink(lead.phone);
-                    return base ? (
-                      <a
-                        href={`${base}?text=${encodeURIComponent(sugestao)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{
-                          background: "#075e54", borderRadius: 9, padding: "7px 13px",
-                          fontSize: 12, fontWeight: 700, color: "#fff", textDecoration: "none",
-                        }}
-                      >
-                        Abrir no WhatsApp
-                      </a>
-                    ) : null;
-                  })()}
-                </div>
-                <p style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 10, lineHeight: 1.5 }}>
-                  A IA não sabe o preço de hoje nem o que está em estoque. Confira
-                  qualquer número antes de mandar.
-                </p>
-              </div>
-            )}
+      {/* ── O que aconteceu ───────────────────────────────────────────── */}
+      {ficha && (
+        <section className="card fc-relato">
+          <div className="fc-cab">
+            <h2>O que aconteceu</h2>
+            <span className="fc-mudo">{ia?.relato ? "escrito pela análise" : "fatos da conversa"} · conversa até {new Date(`${ficha.ultimaEm}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
           </div>
-        );
-      })()}
-
-      {/* ── Conversation history with tabs ──────────────────────────────── */}
-      <div className="card" style={{ padding: 22 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          {/*
-            Vira botão: a conversa é a FONTE, não a tela. Quem confia na ficha
-            não abre; quem quiser conferir, confere.
-          */}
-          <button
-            onClick={() => setVerConversa(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 7, background: "none",
-              border: "none", padding: 0, cursor: "pointer", color: "var(--txt)",
-              fontSize: 14, fontWeight: 700,
-            }}
-          >
-            {verConversa ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            {verConversa ? "Esconder a conversa" : "Ver a conversa"}
-            {!carregandoConversa && lead.messages.length > 0 && (
-              <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted)" }}>
-                {lead.messages.length} mensagens
-              </span>
-            )}
-          </button>
-
-          {/* Tabs — only show if merged */}
-          {isMerged && verConversa && (
-            <div style={{ display: "flex", gap: 4, background: "var(--card2)", borderRadius: 10, padding: 4 }}>
-              {([
-                { key: "all", label: "Tudo", count: lead.messages.length },
-                { key: "whatsapp", label: "💬 WhatsApp", count: waMessages.length },
-                { key: "instagram", label: "📸 Instagram", count: igMessages.length },
-              ] as { key: Tab; label: string; count: number }[]).map(t => (
-                <button key={t.key} onClick={() => setTab(t.key)} style={{
-                  background: tab === t.key ? "var(--card)" : "transparent",
-                  border: tab === t.key ? "1px solid var(--brd)" : "1px solid transparent",
-                  borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: tab === t.key ? 700 : 400,
-                  color: tab === t.key ? "var(--txt)" : "var(--muted)", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 5,
-                }}>
-                  {t.label}
-                  <span style={{ fontSize: 10, color: "var(--muted)" }}>({t.count})</span>
-                </button>
-              ))}
-            </div>
+          {(ia?.relato || ficha.relato) && (
+            <div className="fc-texto">{(ia?.relato || ficha.relato).split(/\n{2,}/).map((p, i) => <p key={i}>{p.trim()}</p>)}</div>
           )}
-        </div>
-
-        {/*
-          A conversa chega depois do resumo: a lista de leads vem sem o texto
-          das mensagens, e esta tela pede a dela. Dizer "carregando" é o que
-          impede a tela de afirmar que a conversa está vazia enquanto ela vem.
-        */}
-        {carregandoConversa && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {[70, 48, 62].map((largura, i) => (
-              <div key={i} style={{
-                alignSelf: i % 2 ? "flex-end" : "flex-start",
-                width: `${largura}%`, height: 44, borderRadius: 13,
-                background: "linear-gradient(90deg, var(--card2) 0%, var(--brd) 50%, var(--card2) 100%)",
-                backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite",
-              }} />
-            ))}
-            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-              Buscando a conversa…
-            </div>
+          <div className="fc-momentos">
+            {ficha.primeiraFalaDoCliente && <Momento rotulo="Ele abriu com" texto={ficha.primeiraFalaDoCliente} cor="var(--blue)" />}
+            {ficha.ultimaOferta && <Momento rotulo="A loja ofereceu" texto={ficha.ultimaOferta} cor="var(--orange)" />}
+            {ficha.fraseAntesDoSilencio && <Momento rotulo="Última coisa dita" texto={ficha.fraseAntesDoSilencio} cor="var(--purple-l)" />}
+            {ficha.aguardandoLoja && <Momento rotulo="Parou em" texto="a última fala foi dele — a loja deve resposta" cor="var(--red)" />}
           </div>
-        )}
-
-        {falhouConversa && (
-          <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", padding: "18px 0" }}>
-            Não consegui carregar a conversa agora.
+          <div className="fc-numeros">
+            <span><b>{ficha.trocasDeTurno}</b> trocas de turno</span>
+            <span><b className={ficha.perguntasDaLoja === 0 ? "ruim" : ""}>{ficha.perguntasDaLoja}</b> perguntas da loja</span>
+            {ficha.monologoLoja >= 3 && <span>maior sequência da loja sem resposta: <b className="ruim">{ficha.monologoLoja}</b></span>}
+            {ficha.tentativasDeRetomada > 0 && <span><b>{ficha.tentativasDeRetomada}</b> tentativas de retomada</span>}
           </div>
-        )}
+        </section>
+      )}
 
-        {/* Messages */}
-        <div style={{ display: verConversa ? "flex" : "none", flexDirection: "column", gap: 9 }}>
-          {displayMessages.map((msg, i) => {
-            const msgSource: "whatsapp" | "instagram" = msg.source || "whatsapp";
-            /**
-             * ESTA é a mensagem onde travou?
-             *
-             * Comparação por REFERÊNCIA, não por índice: `displayMessages` é
-             * `lead.messages` filtrado por canal na conversa fundida, então os
-             * índices não batem — mas os objetos são os mesmos. E não por
-             * texto: a loja repete a mesma frase de retomada em dezenas de
-             * conversas, e a busca acharia a primeira, não a certa.
-             */
-            const ehOTravamento = !!travou && lead.messages[travou.indice] === msg;
-            const corTravamento = travou && (travou.tipo === "objecao_sem_resposta" || travou.tipo === "loja_deve_resposta")
-              ? "var(--red)" : "var(--yellow)";
-            return (
-              <div
-                key={i}
-                id={ehOTravamento ? "msg-travou" : undefined}
-                style={{
-                  display: "flex", flexDirection: "column",
-                  alignItems: msg.isStore ? "flex-end" : "flex-start",
-                  ...(ehOTravamento ? {
-                    background: "var(--card2)",
-                    border: `1px solid ${corTravamento}55`,
-                    borderRadius: 12, padding: 10, margin: "6px 0",
-                  } : null),
-                }}
-              >
-                {ehOTravamento && travou && (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 7, marginBottom: 7,
-                    alignSelf: "flex-start", fontSize: 10.5, fontWeight: 800,
-                    color: corTravamento, letterSpacing: .5,
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: 999, background: corTravamento,
-                      display: "inline-block",
-                    }} />
-                    {travou.rotulo.toUpperCase()} · {travou.detalhe}
-                  </div>
-                )}
-              <div style={{ display: "flex", width: "100%", justifyContent: msg.isStore ? "flex-end" : "flex-start" }}>
-                <div style={{
-                  maxWidth: "75%",
-                  background: msg.isStore
-                    ? (msgSource === "instagram" ? "#fce4f0" : "#dcf8c6")
-                    : (msgSource === "instagram" ? "#f3eefb" : "#eef1f5"),
-                  border: `1px solid ${msg.isStore
-                    ? (msgSource === "instagram" ? "rgba(236,72,153,.25)" : "rgba(34,197,94,.2)")
-                    : (msgSource === "instagram" ? "rgba(236,72,153,.15)" : "var(--brd2)")}`,
-                  borderRadius: msg.isStore ? "13px 4px 13px 13px" : "4px 13px 13px 13px",
-                  padding: "9px 14px",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 9 }}>{msgSource === "instagram" ? "📸" : "💬"}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: msg.isStore ? (msgSource === "instagram" ? "#ec4899" : "var(--green)") : (msgSource === "instagram" ? "#ec4899" : "var(--purple-l)") }}>
-                      {msg.isStore ? (lead.sellerName || storeName || "Loja") : lead.contact}
-                    </span>
-                  </div>
-                  {/* Transcricao nao pode passar por texto digitado: fonte
-                      serifada, cor apagada e rotulo. Ver `RawMessage.transcrito`. */}
-                  {msg.transcrito && (
-                    <div style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: .4,
-                      color: "var(--muted)", textTransform: "uppercase", marginBottom: 3,
-                    }}>
-                      ♪ transcrição automática
-                    </div>
-                  )}
-                  <p style={{
-                    fontSize: msg.transcrito ? 11.5 : 12,
-                    color: msg.transcrito ? "var(--muted)" : "var(--dim)",
-                    lineHeight: 1.6, whiteSpace: "pre-wrap",
-                    fontFamily: msg.transcrito ? "Georgia, 'Times New Roman', serif" : undefined,
-                    fontStyle: msg.transcrito ? "italic" : undefined,
-                  }}>
-                    {msg.body || (msg.mediaType ? `[${msg.mediaType}]` : "")}
-                    {msg.mediaCaption ? ` — ${msg.mediaCaption}` : ""}
-                  </p>
-                  <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
-                    {msg.date} {msg.time}
-                  </div>
-                </div>
-              </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* ── Onde travou (fato) + a mensagem que retoma (sugestão) ─────── */}
+      {mostrarTravou && travou && (
+        <section className="card fc-travou">
+          <div className="fc-cab"><h2><Clock size={14} /> Onde a conversa parou</h2><span className="fc-mudo">{travou.detalhe}</span></div>
+          <p className="fc-travou-rotulo">{travou.rotulo}</p>
+          {travou.trecho && (
+            <blockquote>
+              <span>{travou.daLoja ? quemDaLoja : lead.contact} · {travou.trecho.data.split("-").reverse().join("/")} {travou.trecho.hora}{travou.trecho.transcrito ? " · áudio transcrito" : ""}</span>
+              {travou.trecho.texto}
+            </blockquote>
+          )}
+          <div className="fc-botoes">
+            <button className="fc-botao" onClick={sugerir} disabled={sugerindo}>{sugerindo ? "Escrevendo…" : sugestao ? "Sugerir outra" : "Sugerir a mensagem"}</button>
+            {abrirNoCRM && <a className="fc-botao leve" href={abrirNoCRM} target="_blank" rel="noopener noreferrer">Ver na conversa <ExternalLink size={12} /></a>}
+          </div>
+          {erroSugestao && <p className="fc-erro"><AlertTriangle size={12} /> {erroSugestao}</p>}
+          {sugestao && <Rascunho rotulo="Rascunho da IA · leia antes de enviar" texto={sugestao} nota="A IA não sabe o preço de hoje nem o que está em estoque. Confira qualquer número antes de mandar." />}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Fato({ rotulo, valor, sub, cor }: { rotulo: string; valor: string; sub?: string; cor?: string }) {
+  return (
+    <div className="fc-fato">
+      <span>{rotulo}</span>
+      <b style={cor ? { color: cor } : undefined}>{valor}</b>
+      {sub && <small>{sub}</small>}
     </div>
   );
 }
 
 function Momento({ rotulo, texto, cor }: { rotulo: string; texto: string; cor: string }) {
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-      <span style={{
-        fontSize: 9.5, fontWeight: 700, color: cor, letterSpacing: .4,
-        minWidth: 92, textAlign: "right", paddingTop: 3, textTransform: "uppercase",
-      }}>
-        {rotulo}
-      </span>
-      <span style={{
-        fontSize: 12.5, color: "var(--dim)", lineHeight: 1.5, flex: 1,
-        borderLeft: `2px solid ${cor}`, paddingLeft: 10,
-      }}>
-        {texto}
-      </span>
+    <div className="fc-momento" style={{ borderLeftColor: cor }}>
+      <span style={{ color: cor }}>{rotulo}</span>
+      <p>{texto}</p>
     </div>
   );
 }
 
-function SourceBadge({ type }: { type: "whatsapp" | "instagram" }) {
-  const isIG = type === "instagram";
+function Rascunho({ rotulo, texto, nota }: { rotulo: string; texto: string; nota?: ReactNode }) {
+  const [copiado, setCopiado] = useState(false);
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      background: isIG ? "rgba(236,72,153,.12)" : "rgba(34,197,94,.12)",
-      border: `1px solid ${isIG ? "rgba(236,72,153,.35)" : "rgba(34,197,94,.35)"}`,
-      color: isIG ? "#ec4899" : "var(--green)",
-      borderRadius: 20, padding: "2px 9px", fontSize: 10, fontWeight: 700,
-    }}>
-      {isIG ? "📸 Instagram" : "💬 WhatsApp"}
-    </span>
+    <div className="fc-rascunho">
+      <div className="fc-cab">
+        <span className="fc-rotulo">{rotulo}</span>
+        <button className="fc-link" onClick={async () => { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 1800); }}>
+          {copiado ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+        </button>
+      </div>
+      <p>{texto}</p>
+      {nota && <small>{nota}</small>}
+    </div>
   );
 }
+
+const CSS = `
+.fc { display: flex; flex-direction: column; gap: 12px; max-width: 880px; margin: 0 auto; font-variant-numeric: tabular-nums; }
+.fc-barra { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fc-voltar { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
+.fc-botao { display: inline-flex; align-items: center; gap: 6px; background: var(--purple); color: #fff; border: none; border-radius: 9px; padding: 7px 13px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.fc-botao:disabled { opacity: .55; cursor: default; }
+.fc-botao.leve { background: var(--card); color: var(--txt); border: 1px solid var(--brd); }
+.fc-botao.leve:hover { border-color: var(--purple); }
+.fc-link { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--purple-l); font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; padding: 0; }
+.fc-topo { padding: 20px; display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.fc-quem { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fc-quem h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.fc-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.fc-canal { font-weight: 700; }
+.fc-canal.wa { color: #16a34a; }
+.fc-canal.ig { color: #db2777; }
+.fc-selos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
+.fc-tag { font-size: 10.5px; font-weight: 700; border: 1px solid; border-radius: 999px; padding: 1px 9px; text-transform: uppercase; letter-spacing: .4px; }
+.fc-urg { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; }
+.fc-urg span { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.fc-perfil { font-size: 12px; color: var(--txt); background: var(--card2); border: 1px solid var(--brd2); border-radius: 999px; padding: 1px 9px; }
+.fc-score { display: flex; flex-direction: column; align-items: center; flex: none; }
+.fc-score b { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+.fc-score span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.fc-fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.fc-fato { background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.fc-fato span { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.fc-fato b { font-size: 17px; font-weight: 800; color: var(--txt); }
+.fc-fato small { font-size: 11px; color: var(--muted); }
+.card.fc-analise, .card.fc-acao, .card.fc-duplo, .card.fc-relato, .card.fc-travou, section.card { padding: 16px 18px; }
+.fc-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.fc-cab h2 { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.fc-h3, .fc-duplo h3 { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.fc-andando { font-size: 11.5px; color: var(--purple-l); display: inline-flex; align-items: center; gap: 5px; }
+.fc-diag { font-size: 14px; line-height: 1.65; color: var(--txt); }
+.fc-aviso { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: rgba(124,92,252,.07); border: 1px solid rgba(124,92,252,.28); border-radius: 10px; padding: 8px 11px; font-size: 12px; color: var(--txt); }
+.fc-rodape { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.fc-analise.vazia { border-style: dashed; }
+.fc-sem { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.fc-sem p { font-size: 13px; color: var(--dim); line-height: 1.6; }
+.fc-mudo { font-size: 11px; color: var(--muted); }
+.fc-erro { font-size: 12px; color: var(--orange); margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+.fc-acao { border-left: 3px solid var(--purple); }
+.fc-acao-texto { font-size: 14px; font-weight: 600; color: var(--txt); line-height: 1.55; }
+.fc-porque { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.fc-rascunho { margin-top: 12px; background: var(--card2); border: 1px solid var(--brd2); border-radius: 10px; padding: 10px 12px; }
+.fc-rascunho .fc-cab { margin-bottom: 4px; }
+.fc-rotulo { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--purple-l); }
+.fc-rascunho p { font-size: 13px; color: var(--txt); line-height: 1.6; white-space: pre-wrap; }
+.fc-rascunho small { display: block; font-size: 11px; color: var(--muted); margin-top: 8px; }
+.fc-duplo { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.fc-evid { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.fc-evid li { display: flex; flex-direction: column; gap: 3px; }
+.fc-chip { align-self: flex-start; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px; }
+.fc-chip.ok { color: var(--green); background: rgba(22,163,74,.08); border: 1px solid rgba(22,163,74,.3); }
+.fc-chip.alerta { color: #b45309; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.35); }
+.fc-evid q { font-size: 12px; color: var(--dim); font-style: italic; line-height: 1.45; }
+.fc-desfecho { font-size: 11.5px; color: var(--muted); }
+.fc-pontas { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.fc-pontas li { font-size: 12.5px; color: var(--txt); line-height: 1.5; background: var(--card2); border: 1px solid var(--brd2); border-radius: 9px; padding: 7px 10px; }
+.fc-pontas li.grave { background: rgba(234,88,12,.06); border-color: rgba(234,88,12,.3); }
+.fc-texto p { font-size: 14px; line-height: 1.7; color: var(--txt); margin-bottom: 10px; }
+.fc-momentos { display: flex; flex-direction: column; gap: 7px; margin: 4px 0 10px; }
+.fc-momento { border-left: 2px solid; padding-left: 10px; }
+.fc-momento span { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.fc-momento p { font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+.fc-numeros { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: var(--muted); }
+.fc-numeros b { color: var(--txt); }
+.fc-numeros b.ruim { color: var(--orange); }
+.fc-travou { border-left: 3px solid var(--orange); }
+.fc-travou-rotulo { font-size: 14px; font-weight: 700; color: var(--txt); margin-bottom: 8px; }
+.fc-travou blockquote { background: var(--card2); border: 1px solid var(--brd2); border-radius: 9px; padding: 9px 12px; font-size: 13px; color: var(--dim); line-height: 1.55; white-space: pre-wrap; margin-bottom: 10px; }
+.fc-travou blockquote span { display: block; font-size: 10.5px; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+.fc-botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.fc-vazio { padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
+.fc-osso { background: linear-gradient(90deg, var(--card2), #eceef2, var(--card2)); background-size: 200% 100%; animation: fc-osso 1.2s linear infinite; }
+@keyframes fc-osso { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.fc button:focus-visible, .fc a:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+@media (max-width: 560px) { .fc-topo { flex-direction: column; } .fc-score { flex-direction: row; gap: 6px; align-items: baseline; } .fc-quem h1 { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .fc-osso { animation: none; } }
+`;

@@ -1,8 +1,4 @@
-import type { Lead, RawMessage, Objection } from '@/types/zapintel'
-import { classifyLead } from '@/lib/zapintel/classification/engine'
-import { scoreLead } from '@/lib/zapintel/scoring/leadScore'
-import { inferProfile } from '@/lib/zapintel/insights/profile'
-import { generateNextAction } from '@/lib/zapintel/insights/followUp'
+import type { Lead, RawMessage } from '@/types/zapintel'
 import type { LeadBanco, MsgBanco } from '@/lib/zapintel/conversas'
 
 /**
@@ -46,104 +42,15 @@ import type { LeadBanco, MsgBanco } from '@/lib/zapintel/conversas'
 
 const DIA_MS = 86_400_000
 
-const BUY_SIGNALS_MAP: Record<string, string> = {
-  'pix': 'Pediu chave Pix',
-  'cartão': 'Mencionou cartão',
-  'parcel': 'Pediu parcelamento',
-  '18x': 'Pediu 18x',
-  '12x': 'Pediu 12x',
-  'reserva': 'Pediu reserva',
-  'nota fiscal': 'Pediu NF',
-  'nf': 'Pediu NF',
-  'garantia': 'Perguntou sobre garantia',
-  'entrega': 'Perguntou sobre entrega',
-  'fechar': 'Sinalizou fechamento',
-  'blz': 'Concordou (Blz)',
-  'combinado': 'Confirmou (Combinado)',
-  'confirmado': 'Confirmou compra',
-  'paguei': 'Disse que pagou',
-  'transferi': 'Confirmou transferência',
-  'quero esse': 'Declarou interesse direto',
-  'pode separar': 'Pediu para separar',
-  'saúde da bateria': 'Pediu saúde da bateria',
-  'imei': 'Perguntou IMEI',
-  'disponível': 'Verificou disponibilidade',
-}
-
-function sinaisDeCompra(leadText: string): string[] {
-  // `new Set` porque "nota fiscal" e "nf" dão o mesmo rótulo: a ficha saía com
-  // "Pediu NF, Pediu NF" antes de alguém reparar.
-  return [...new Set(
-    Object.entries(BUY_SIGNALS_MAP).filter(([kw]) => leadText.includes(kw)).map(([, label]) => label),
-  )].slice(0, 6)
-}
-
-/**
- * As palavras que denunciam cada objecao, na fala DELE.
- *
- * Exportada porque `lib/zapintel/travou.ts` precisa achar a MENSAGEM em que a
- * objecao foi levantada, para marcar o ponto dentro da conversa. Duas tabelas
- * divergiriam na primeira palavra nova, e a tela passaria a apontar para uma
- * objecao que o painel nao conta (ou o contrario).
+/*
+ * O MOTOR DE AGOSTO SAIU DAQUI EM 15/10/2026: sinais e objeções por palavra
+ * ("nf" casava com "co-NF-irma"), classificação, score, perfil, próxima ação e
+ * o vendedor deduzido do texto ("Pedroe", "hoje"). O que o lead É agora vem da
+ * análise de IA (`perfil.ts`); daqui sai só o que a conversa mede: quantas
+ * mensagens, de quem, quando. O vendedor é o responsável do CRM — fato — ou
+ * nenhum.
  */
-export const OBJECOES: [Objection, string[]][] = [
-  [{ type: 'price', label: 'Preço / Concorrência' },
-    ['caro', 'salgado', 'mais barato', 'desconto', 'mercado livre', 'shopee', 'olx', 'concorrência', 'abaixa', 'menor valor']],
-  [{ type: 'timing', label: 'Indecisão / Timing' },
-    ['vou pensar', 'deixa eu ver', 'vou ver', 'mais tarde', 'depois', 'não decidi', 'vou pesquisar', 'vou analisar', 'vou estudar', 'por enquanto']],
-  [{ type: 'authority', label: 'Depende de terceiro' },
-    ['minha esposa', 'meu marido', 'meu pai', 'minha mãe', 'patroa', 'preciso ver com', 'vou ver com']],
-  [{ type: 'trust', label: 'Dúvida sobre produto' },
-    ['seminovo', 'usado', 'original', 'procedência', 'garantia', 'seguro', 'confiável']],
-  [{ type: 'competitor', label: 'Concorrente' },
-    ['mercado livre', 'shopee', 'olx', 'comprei em outro', 'achei mais barato']],
-]
 
-const objecoesDeduzidas = (leadText: string): Objection[] =>
-  OBJECOES.filter(([, kws]) => kws.some((k) => leadText.includes(k))).map(([o]) => o)
-
-/**
- * QUEM ATENDEU — fato antes de dedução, e sem lista de nomes no código.
- *
- * O parser tinha três regras, e a do meio varria uma lista fixa de primeiros
- * nomes (`["pedro","matheus","ana","joão",…]`) procurando QUALQUER ocorrência
- * em QUALQUER mensagem da loja. Dois problemas: a lista é dos vendedores da
- * JM, escrita no código (nenhum outro tenant teria vendedor nenhum); e casar
- * em qualquer posição confunde menção com autoria — "o Pedro te atende
- * amanhã" marcava Pedro como o vendedor daquela conversa.
- *
- * O resultado estava na tela: 73% "Loja", e entre os identificados apareciam
- * **"hoje"**, **"Pedroe"** e **"Pedreo"** como pessoas, com o mesmo Pedro
- * dividido em três grafias.
- *
- * Agora: `responsavel_id` do CRM quando existe (fato), senão a
- * auto-apresentação explícita, senão "Loja" — que é a resposta honesta para
- * conversa em que ninguém se apresentou.
- */
-const APRESENTACAO = [
-  /me chamo\s+([A-ZÀ-Ú][a-zà-ú]{2,})/,
-  /meu nome é\s+([A-ZÀ-Ú][a-zà-ú]{2,})/i,
-  /aqui é (?:o|a)\s+([A-ZÀ-Ú][a-zà-ú]{2,})/i,
-  /sou (?:o|a)\s+([A-ZÀ-Ú][a-zà-ú]{2,})/i,
-]
-
-function quemAtendeu(responsavel: string | null | undefined, mensagens: RawMessage[]): string {
-  if (responsavel) return responsavel
-  for (const m of mensagens) {
-    if (!m.isStore) continue
-    for (const re of APRESENTACAO) {
-      const achou = (m.body || '').match(re)
-      if (achou?.[1]) return achou[1]
-    }
-  }
-  return 'Loja'
-}
-
-const diasAte = (iso: string | null): number => {
-  if (!iso) return 999
-  const t = Date.parse(iso)
-  return Number.isNaN(t) ? 999 : Math.max(0, Math.floor((Date.now() - t) / DIA_MS))
-}
 
 /**
  * O RELÓGIO DA LOJA — e por que isto não podia ficar como estava.
@@ -191,6 +98,17 @@ const RELOGIO = new Intl.DateTimeFormat('sv-SE', {
 const dataEHora = (iso: string): [string, string] => {
   const s = RELOGIO.format(new Date(iso))
   return [s.slice(0, 10), s.slice(11, 16)]
+}
+
+/**
+ * Dias de CALENDÁRIO, no fuso da loja, entre a mensagem e hoje. Era em blocos
+ * de 24 h, e a ficha dizia "última mensagem: hoje" para quem falou às 18h34
+ * de ontem (lead 5784, 15/10).
+ */
+const diasAte = (iso: string | null): number => {
+  if (!iso || Number.isNaN(Date.parse(iso))) return 999
+  const dia = (d: Date) => Date.parse(`${RELOGIO.format(d).slice(0, 10)}T12:00:00Z`)
+  return Math.max(0, Math.round((dia(new Date()) - dia(new Date(iso))) / DIA_MS))
 }
 
 /**
@@ -262,30 +180,8 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
       ? Math.max(0, Math.round((Date.parse(`${lastDate}T12:00:00`) - Date.parse(`${firstDate}T12:00:00`)) / DIA_MS))
       : 0
 
-    const allText = mensagens.map((m) => m.body).join(' ').toLowerCase()
-    const leadText = doLead.map((m) => m.body).join(' ').toLowerCase()
 
-    // Trocas de turno nas primeiras 24 h — o preditor que a calibração achou.
-    // Medido só no começo da conversa, antes de qualquer desfecho: sobre a
-    // conversa inteira o número seria maior e circular, porque quem compra
-    // conversa muito POR TER comprado.
-    const t0 = Date.parse(`${firstDate}T${primeira?.time || '00:00'}:00`)
-    const inicio = Number.isNaN(t0) ? [] : mensagens.filter((m) => {
-      const t = Date.parse(`${m.date}T${m.time || '00:00'}:00`)
-      return !Number.isNaN(t) && t - t0 <= DIA_MS
-    })
-    const trocasInicio = inicio.reduce(
-      (n, m, i) => (i > 0 && m.isStore !== inicio[i - 1].isStore ? n + 1 : n), 0,
-    )
-
-    const classification = classifyLead({
-      leadText, leadMsgs: doLead.length, storeMsgs: daLoja.length,
-      daysInactive, messages: mensagens, trocasInicio,
-    })
-    const score = scoreLead({ classification, leadText, allText, leadMsgs: doLead.length, daysInactive })
     const contact = banco.nome || banco.telefone || banco.origem_id || `Lead ${leadId}`
-    const { nextAction, urgency, insight, lossRisk } =
-      generateNextAction({ classification, score, daysInactive, leadText, allText, contact })
 
     fora.push({
       // O id É o id do CRM. Antes era um contador do parser (`lead-0`,
@@ -295,13 +191,8 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
       filename: `lead-${leadId}`,
       contact,
       phone: banco.telefone ?? banco.origem_id ?? '',
-      sellerName: quemAtendeu(banco.responsavel_nome, mensagens),
+      sellerName: banco.responsavel_nome ?? null,
       messages: mensagens,
-      classification,
-      score,
-      buyerProfile: inferProfile(leadText, allText),
-      buySignals: sinaisDeCompra(leadText),
-      objections: objecoesDeduzidas(leadText),
       daysInactive,
       conversationDays,
       firstDate,
@@ -309,10 +200,6 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
       totalMessages: mensagens.length,
       leadMessages: doLead.length,
       storeMessages: daLoja.length,
-      nextAction,
-      urgency,
-      insight,
-      lossRisk,
       _channel: banco.origem === 'instagram' ? 'instagram' : 'whatsapp',
       crm: {
         leadId,
@@ -330,5 +217,5 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
     })
   }
 
-  return fora.sort((a, b) => b.score - a.score)
+  return fora
 }

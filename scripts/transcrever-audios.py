@@ -38,6 +38,7 @@ como `video/mp4`). Basta um ffmpeg avulso no PATH.
 """
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -288,6 +289,10 @@ def main() -> int:
       if pendentes:
           print(f"  — proxima leva: {len(pendentes)}")
 
+    # Nada de áudio de cliente fica no computador: cada arquivo já sai logo
+    # depois de transcrito, e a pasta temporária sai aqui (15/10/2026: oito
+    # pastas vazias tinham ficado para trás, uma com um arquivo de 99 bytes).
+    shutil.rmtree(tmp, ignore_errors=True)
     gasto = time.time() - t_inicio
     print(f"\n{feitos} transcritos, {vazios} sem fala, {falhas} falhas")
     print(f"{seg_audio/3600:.1f} h de audio em {gasto/60:.0f} min "

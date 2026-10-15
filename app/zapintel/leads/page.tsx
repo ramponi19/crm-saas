@@ -60,12 +60,6 @@ const ORDENS: [string, string][] = [
   ["parados", "Parados há mais tempo"], ["score", "Maior score"], ["mensagens", "Mais mensagens"],
 ];
 
-function linkWhatsApp(telefone: string | null) {
-  const d = (telefone || "").replace(/\D/g, "");
-  if (d.length < 10) return null;
-  return `https://wa.me/${d.startsWith("55") ? d : `55${d}`}`;
-}
-
 function useRelogio(ms = 30_000) {
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setAgora(Date.now()), ms); return () => clearInterval(t); }, [ms]);
@@ -258,7 +252,6 @@ function Seletor({ valor, vazio, opcoes, onChange }: {
 function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
   const router = useRouter();
   const href = `/zapintel/leads/lead-${l.leadId}`;
-  const wa = linkWhatsApp(l.telefone);
   const cls = CLASSE[l.classificacao];
   const espera = l.esperando && l.ultimaDoCliente ? agora - new Date(l.ultimaDoCliente).getTime() : 0;
   return (
@@ -271,7 +264,7 @@ function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
             <div className="lv-meta">
               <span className={`lv-canal ${l.origem === "instagram" ? "ig" : "wa"}`}>{l.origem === "instagram" ? "Instagram" : "WhatsApp"}</span>
               {l.loja && <span>{l.loja}</span>}
-              {wa && <a href={wa} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="lv-wa">abrir no WhatsApp</a>}
+              <a href={`/leads?lead=${l.leadId}`} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="lv-wa">abrir conversa no CRM</a>
             </div>
           </div>
         </div>
@@ -350,7 +343,7 @@ const CSS = `
 .lv-canal.wa { color: #16a34a; }
 .lv-canal.ig { color: #db2777; }
 .lv-wa { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.lv-wa:hover { color: #16a34a; }
+.lv-wa:hover { color: var(--purple); }
 .lv-tag { font-size: 10px; font-weight: 700; border: 1px solid; border-radius: 999px; padding: 1px 8px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
 .lv-selos { display: flex; flex-direction: column; gap: 2px; margin-top: 5px; }
 .lv-selo { font-size: 10.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }

@@ -72,7 +72,22 @@ n "ficha nao le o painel"           "app/zapintel/leads/[id]/page.tsx" "usePaine
 n "ficha sem venda que nao grava"   "app/zapintel/leads/[id]/page.tsx" "markSaleClosed"
 v "ficha ao vivo so do lead dela"   "app/zapintel/leads/[id]/page.tsx" "ouvirZapintel(supabase"
 v "aviso do banco lista os leads"   "supabase/funcoes/zapintel_ao_vivo.sql" "'leads', to_jsonb(r.leads)"
-n "sem copilot com loja fixa"       "lib/zapintel/insights/followUp.ts" "Vendedor: Pedro"
+# 15/10/2026: o motor de agosto saiu inteiro e a ficha foi reescrita do zero.
+n "montar sem o motor de agosto"    "lib/zapintel/montar.ts" "classifyLead"
+n "vendedor nao sai do texto"       "lib/zapintel/montar.ts" "quemAtendeu("
+n "travamento sem objecao por palavra" "lib/zapintel/travou.ts" "OBJECOES"
+v "sugestao usa o papel do segmento" "app/zapintel/api/sugestao/route.ts" "papelDoSegmento(segmento)"
+v "conversa nao viaja para a tela"  "app/zapintel/api/conversa/route.ts" "messages: \[\]"
+v "ficha abre a conversa no CRM"    "app/zapintel/leads/[id]/page.tsx" "/leads?lead="
+n "ficha sem leitura automatica"    "app/zapintel/leads/[id]/page.tsx" "RegraAutomatica"
+v "ficha so analisa no clique"      "app/zapintel/leads/[id]/page.tsx" "onClick={() => analisar(false)}"
+v "ficha rotula audio transcrito"   "app/zapintel/leads/[id]/page.tsx" "áudio transcrito"
+n "lista nao manda pro wa.me"       "app/zapintel/leads/page.tsx" "https://wa.me/"
+n "posvenda nao manda pro wa.me"    "app/zapintel/posvenda/page.tsx" "https://wa.me/"
+v "lista abre a conversa no CRM"    "app/zapintel/leads/page.tsx" "abrir conversa no CRM</a>"
+v "lead de outra loja avisa"        "components/modules/leads/leads-view.tsx" "setForaDaLoja(leadNaUrl)"
+v "dias contam o calendario da loja" "lib/zapintel/montar.ts" "RELOGIO.format(d).slice(0, 10)"
+n "ficha sem ha 0 dias"             "lib/zapintel/ficha.ts" "não voltou — há "
 v "posvenda le do banco"            "app/zapintel/posvenda/page.tsx" "useRpcAoVivo<PosVenda>(\"zapintel_posvenda\""
 n "posvenda sem promessa de brinde" "app/zapintel/posvenda/page.tsx" "ganha um brinde"
 v "funil interno fora do zapintel"  "supabase/funcoes/zapintel_turnos.sql" "zapintel_funil_interno(l.funil_id)"
@@ -113,7 +128,6 @@ v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
 v "a IA respeita o desligar geral"   "lib/zapintel/ia.ts" "cfg.ativo === false"
 # O padrao olha a DECLARACAO, nao a palavra: o arquivo cita `allText` no
 # comentario que explica por que o campo saiu, e o aviso deve continuar la.
-n "classificacao nao le a fala da loja" "lib/zapintel/classification/engine.ts" "allText: string"
 v "sem venda a tela nao inventa"     "components/zapintel/painel-ao-vivo.tsx" "sem venda registrada para estimar o ticket"
 # -- ficha por lead e frase antes do silencio (10/10/2026) -----------------
 # O corte de 24h e a regra que torna o ranking honesto: sem ele o topo vira a
@@ -129,11 +143,6 @@ v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "mont
 # -- recalibracao da classificacao (10/10/2026) ----------------------------
 # 133 leads eram marcados "cliente" por palavra; 33 compraram. E a conversa
 # funda no 1o dia prediz (7,65x) enquanto "Pediu 18x" nao prediz nada (+2pp).
-n "cliente nao sai de palavra-chave"  "lib/zapintel/classification/engine.ts" "CUSTOMER_KW ="
-v "conversa funda no 1o dia e quente" "lib/zapintel/classification/engine.ts" "trocasInicio >= 15"
-v "trocas medidas so nas 24h"        "lib/zapintel/montar.ts" "t - t0 <= DIA_MS"
-v "o historico comeca fechado"       "app/zapintel/leads/[id]/page.tsx" "useState(false)"
-v "a conversa fica a um clique"      "app/zapintel/leads/[id]/page.tsx" "Ver a conversa"
 v "a ficha traz os tres momentos"    "lib/zapintel/ficha.ts" "primeiraFalaDoCliente"
 v "saudacao nao conta como pedido"   "lib/zapintel/ficha.ts" "SAUDACAO.test(soLetras"
 # -- o caminho de importacao manual saiu em 10/10/2026 --------------------
@@ -146,7 +155,6 @@ n "nao existe mais parser de CSV"    "lib/zapintel/conversas.ts" "parseCombinedC
 n "telefone da loja nao esta no codigo" "lib/zapintel/montar.ts" "const STORE_PHONE"
 v "o lado da mensagem vem da direcao" "lib/zapintel/montar.ts" "isStore: m.direcao"
 v "o lead carrega os fatos do CRM"   "lib/zapintel/montar.ts" "kanbanStatus: banco.kanban_status"
-v "vendedor: fato antes de deducao"  "lib/zapintel/montar.ts" "if (responsavel) return responsavel"
 # -- a ponte alcanca o Instagram (11/10/2026) ------------------------------
 # Lead de IG nao tem telefone (3 em 384). O numero vem do que o CLIENTE disse
 # na conversa, com tres filtros achados medindo: chave Pix/CPF repetida em 29
@@ -177,11 +185,9 @@ n "nao formata hora pelo processo"   "lib/zapintel/montar.ts" "d.getHours()"
 v "fim da conversa compara indice"   "lib/zapintel/ficha.ts" "ultimaFala.i < ultimaDoCliente.i"
 v "travamento sai do indice"         "lib/zapintel/travou.ts" "indiceDaFalaQueEncerrou"
 n "venda fechada nao tem travamento" "lib/zapintel/travou.ts" "ondeTravou(a: Lead): "
-v "objecao so em fala de verdade"    "lib/zapintel/travou.ts" "if (!ehFala(m)) return null"
 # Audio e resposta. Com `ehFala` nesta linha, conversa respondida por audio
 # aparecia como "a loja nao voltou".
 v "audio conta como resposta"        "lib/zapintel/travou.ts" "if (!m.isStore) continue"
-v "tela marca por referencia"        "app/zapintel/leads/[id]/page.tsx" "lead.messages\[travou.indice\] === msg"
 # Uma porta de IA so: desligar no painel tem que calar as tres telas.
 v "ia do zapintel num lugar so"      "lib/zapintel/ia.ts" "assistente_config"
 v "sugestao usa a porta unica"       "app/zapintel/api/sugestao/route.ts" "perguntarIA"
@@ -193,7 +199,6 @@ v "prompt monta a loja em runtime"   "app/zapintel/api/sugestao/route.ts" "de \$
 # e nenhuma tela pede analise sozinha.
 n "dashboard nao chama IA sozinho"   "components/zapintel/painel-ao-vivo.tsx" "zapintel/api/dia"
 v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "assistente:perguntar"
-v "ficha nao e pedida ao abrir"      "app/zapintel/leads/[id]/page.tsx" "Não pede nada"
 # Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
 v "ao vivo tem teto de ritmo"        "hooks/zapintel/useRpcAoVivo.ts" "INTERVALO_MINIMO = 20_000"
 # Insights (14/10/2026): das análises e das vendas, no banco; nada do motor de palavras.
@@ -218,7 +223,6 @@ v "modelo sem thinking tem volta"    "lib/zapintel/ia.ts" "repetindo sem ele"
 v "503 do provedor tem retentativa"  "lib/zapintel/ia.ts" "em alta demanda; tentando de novo"
 # A JM e `varejo` no CRM -> `ecommerce` no ZapIntel -> "loja de moda/varejo".
 # Com isso no prompt, a IA oferecia "suas pecas" para quem queria iPhone.
-v "sugestao importa so o papel"      "app/zapintel/api/sugestao/route.ts" "import { getRole } from"
 v "sugestao fala do produto real"    "lib/zapintel/travou.ts" "O que ele procurou"
 
 echo "== audio transcrito (13/10) =="
@@ -232,7 +236,6 @@ v "tela marca o que foi falado"      "lib/zapintel/montar.ts" "transcrito: !!m.t
 v "chat rotula a transcricao"        "components/modules/leads/lead-modal.tsx" "transcrição automática"
 v "chat usa tipografia propria"      "components/modules/leads/lead-modal.tsx" "font-serif text-\[12.5px\] italic"
 v "chat avisa se o audio saiu"       "components/modules/leads/lead-modal.tsx" "áudio não guardado"
-v "zapintel rotula tambem"           "app/zapintel/leads/[id]/page.tsx" "transcrição automática"
 # Vocabulario so com nome proprio: listar modelo fez a IA INVENTAR "o Pro Max".
 n "vocabulario sem modelo"           "scripts/transcrever-audios.py" "VOCABULARIO = ($|.*256GB)"
 

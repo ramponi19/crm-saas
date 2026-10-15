@@ -38,12 +38,6 @@ const SESSENTA_DIAS = 60 * 86_400_000;
 const POR_VEZ = 30;
 const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-function linkWhatsApp(telefone: string | null) {
-  const d = (telefone || "").replace(/\D/g, "");
-  if (d.length < 10) return null;
-  return `https://wa.me/${d.startsWith("55") ? d : `55${d}`}`;
-}
-
 export default function PosVendaPage() {
   const { lojas, lojaAtiva, storeName } = useLeads();
   const empresa = useEmpresaZapintel();
@@ -133,7 +127,7 @@ export default function PosVendaPage() {
 
 function Cartao({ c, agora }: { c: Cliente; agora: number }) {
   const [copiado, setCopiado] = useState(false);
-  const wa = linkWhatsApp(c.telefone);
+  const crm = `/leads?lead=${c.leadId}`;
   async function copiar() {
     if (!c.mensagem) return;
     await navigator.clipboard.writeText(c.mensagem);
@@ -165,12 +159,12 @@ function Cartao({ c, agora }: { c: Cliente; agora: number }) {
           <p>{c.mensagem}</p>
           <div className="pv2-acoes">
             <button onClick={copiar}>{copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}</button>
-            {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={12} /> Abrir no WhatsApp</a>}
+            <a href={crm} target="_blank" rel="noopener"><MessageCircle size={12} /> Abrir conversa no CRM</a>
           </div>
         </div>
       )}
-      {!c.mensagem && wa && (
-        <div className="pv2-acoes"><a href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={12} /> Abrir no WhatsApp</a></div>
+      {!c.mensagem && (
+        <div className="pv2-acoes"><a href={crm} target="_blank" rel="noopener"><MessageCircle size={12} /> Abrir conversa no CRM</a></div>
       )}
     </li>
   );

@@ -1,5 +1,4 @@
 import type { Lead, RawMessage } from '@/types/zapintel'
-import { OBJECOES } from '@/lib/zapintel/montar'
 import { ehFala, indiceDaFalaQueEncerrou, type Ficha } from '@/lib/zapintel/ficha'
 
 /**
@@ -13,8 +12,7 @@ import { ehFala, indiceDaFalaQueEncerrou, type Ficha } from '@/lib/zapintel/fich
  * e "foi aqui, nesta frase, e faz 6 dias".
  *
  * É o que as ferramentas do segmento mostram na vitrine delas, e nós temos a
- * matéria-prima inteira: `OBJECOES` (as palavras), `indiceDaFalaQueEncerrou`
- * (a regra das 24 h) e as datas.
+ * matéria-prima: `indiceDaFalaQueEncerrou` (a regra das 24 h) e as datas.
  *
  * ══ O QUE ESTE MÓDULO NÃO FAZ ══════════════════════════════════════════════
  *
@@ -33,13 +31,15 @@ const TAMANHO = 120
 /** A janela que separa resposta de retomada. A mesma de `ficha.ts`. */
 const UM_DIA = 86_400_000
 
+/*
+ * Os dois tipos de "objeção" saíram em 15/10/2026: a objeção era achada por
+ * palavra-chave do motor de agosto ("garantia" virava "Dúvida sobre produto").
+ * As objeções agora vêm da análise de IA, com a frase do cliente e o desfecho.
+ * Aqui fica só o que é fato verificável na ordem das mensagens.
+ */
 export type TipoDeTravamento =
-  /** Ele levantou uma objeção e ninguém respondeu. O caso mais acionável. */
-  | 'objecao_sem_resposta'
   /** A última fala foi dele. A loja simplesmente deve resposta. */
   | 'loja_deve_resposta'
-  /** A loja respondeu a objeção dele, e mesmo assim ele não voltou. */
-  | 'objecao_respondida_e_sumiu'
   /** A loja falou por último, dentro da conversa, e ele sumiu. */
   | 'ele_sumiu'
 
@@ -60,8 +60,6 @@ export interface Travou {
   detalhe: string
   /** De quem é a mensagem marcada. A tela pinta diferente. */
   daLoja: boolean
-  /** A objeção, quando houver. Alimenta a sugestão de resposta. */
-  objecao: string | null
 }
 
 const corpo = (m: RawMessage): string => (m.body || '').trim()
@@ -74,31 +72,6 @@ const instante = (m: RawMessage): number => {
 const faz = (dias: number): string =>
   dias <= 0 ? 'hoje' : dias === 1 ? 'há 1 dia' : `há ${dias} dias`
 
-/**
- * A objeção levantada nesta mensagem, se houver.
- *
- * Só a fala DELE entra: a loja diz "fica caro se você levar dois" o tempo
- * todo, e marcar isso como objeção do cliente inverteria quem disse o quê —
- * o mesmo erro que o classificador cometia ao ler `allText`.
- */
-function objecaoDaMensagem(m: RawMessage): string | null {
-  if (m.isStore) return null
-  /**
-   * ⚠ E PRECISA SER FALA. Medido em 12/10: sem `ehFala`, o lead 430 era
-   * marcado num card de anúncio que o cliente encaminhou —
-   * `{"titulo":"Assistência Especializada em iPhone","corpo":"Quebrou seu
-   * iPhone? ... bateria descarregada..."}` — cujo texto casa com as palavras
-   * de "Dúvida sobre produto". O cliente não levantou objeção nenhuma: ele
-   * colou um anúncio. Marcar isso é apontar o dedo para o lugar errado.
-   */
-  if (!ehFala(m)) return null
-  const t = corpo(m).toLowerCase()
-  if (!t) return null
-  for (const [obj, kws] of OBJECOES) {
-    if (kws.some((k) => t.includes(k))) return obj.label
-  }
-  return null
-}
 
 /**
  * Acha o ponto em que a conversa travou. `null` quando não travou.
@@ -123,50 +96,6 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
     if (!msgs[i].isStore) { iUltimaDele = i; break }
   }
 
-  // ── 1. A última objeção dele, e o que veio depois ────────────────────────
-  let iObjecao = -1
-  let objecao: string | null = null
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const o = objecaoDaMensagem(msgs[i])
-    if (o) { iObjecao = i; objecao = o; break }
-  }
-
-  if (iObjecao >= 0 && objecao) {
-    const depois = msgs.slice(iObjecao + 1)
-    const respostaDaLoja = depois.find((m) => m.isStore && corpo(m))
-
-    if (!respostaDaLoja) {
-      return {
-        indice: iObjecao,
-        tipo: 'objecao_sem_resposta',
-        rotulo: `${objecao} — sem resposta`,
-        detalhe: faz(dias),
-        daLoja: false,
-        objecao,
-      }
-    }
-
-    /**
-     * A loja respondeu. Ele voltou depois disso?
-     *
-     * Pelo ÍNDICE, não pelo relógio: WhatsApp entrega várias mensagens no
-     * mesmo minuto, e `instante()` tem resolução de minuto. Comparando hora, o
-     * lead 430 dava "não voltou" com duas falas dele logo abaixo.
-     */
-    const iResposta = msgs.indexOf(respostaDaLoja)
-    const voltou = msgs.slice(iResposta + 1).some((m) => !m.isStore)
-    if (!voltou) {
-      return {
-        indice: iObjecao,
-        tipo: 'objecao_respondida_e_sumiu',
-        rotulo: `${objecao} — respondida, e ele não voltou`,
-        detalhe: faz(dias),
-        daLoja: false,
-        objecao,
-      }
-    }
-  }
-
   // ── 2. A última fala foi dele: a loja deve resposta ──────────────────────
   if (!ultima.isStore) {
     const i = msgs.lastIndexOf(ultima)
@@ -176,7 +105,6 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
       rotulo: 'Ele falou por último — a loja não voltou',
       detalhe: faz(dias),
       daLoja: false,
-      objecao: null,
     }
   }
 
@@ -207,7 +135,6 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
       rotulo: 'A loja disse isto e ele não respondeu mais',
       detalhe: comRetomada,
       daLoja: true,
-      objecao: null,
     }
   }
 
@@ -244,7 +171,6 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
           : 'A loja respondeu aqui, e ele não voltou',
         detalhe: comRetomada,
         daLoja: true,
-        objecao: null,
       }
     }
 
@@ -258,7 +184,6 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
         : 'Ele falou por último — a loja não voltou',
       detalhe: comRetomada,
       daLoja: false,
-      objecao: null,
     }
   }
 
@@ -295,8 +220,6 @@ export function contextoDaSugestao(a: Lead, t: Travou, f?: Ficha): string {
     f?.procurou.length ? `O que ele procurou: ${f.procurou.join(', ')}` : '',
     f?.ultimaOferta ? `A última oferta da loja foi: "${f.ultimaOferta.slice(0, TAMANHO)}"` : '',
     m ? `A mensagem onde travou (${m.isStore ? 'loja' : 'cliente'}): "${corpo(m).slice(0, TAMANHO)}"` : '',
-    a.buySignals?.length ? `Sinais de compra: ${a.buySignals.join(', ')}` : '',
-    t.objecao ? `Objeção: ${t.objecao}` : '',
     `Inativo há ${a.daysInactive} dia(s).`,
   ]
   return linhas.filter(Boolean).join('\n')

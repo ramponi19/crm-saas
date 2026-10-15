@@ -8,15 +8,6 @@ export type Classification =
   | "lost"
   | "unqualified";
 
-export type BuyerProfile =
-  | "Decidido"
-  | "Sensível ao Preço"
-  | "Analítico"
-  | "Dependente de Aprovação"
-  | "Urgente"
-  | "Explorador"
-  | "Sem Engajamento";
-
 export interface RawMessage {
   date: string;
   time: string;
@@ -81,11 +72,6 @@ export interface Lead {
   phone: string;
   filename: string;
   messages: RawMessage[];
-  classification: Classification;
-  score: number;
-  buyerProfile: BuyerProfile;
-  buySignals: string[];
-  objections: Objection[];
   daysInactive: number;
   conversationDays: number; // dias entre primeira e última mensagem
   firstDate: string;
@@ -93,55 +79,18 @@ export interface Lead {
   totalMessages: number;
   leadMessages: number;
   storeMessages: number;
-  nextAction: string;
-  urgency: "critical" | "high" | "medium" | "low";
-  insight: string;
-  lossRisk: number;
-  sellerName: string;
-  /**
-   * Canal de origem, gravado na IMPORTAÇÃO (`hooks/zapintel/useLeads.tsx`).
-   *
-   * Existia em tempo de execução sem estar declarado aqui, e o resultado foram
-   * 47 `as any` espalhados pelo módulo — cada um um ponto onde o compilador
-   * parava de proteger o objeto INTEIRO, não só este campo.
-   */
+  /** O responsável do CRM (`leads.responsavel_id`). Fato, nunca dedução do texto. */
+  sellerName: string | null;
+  /** Canal de origem do lead (`leads.origem`). */
   _channel?: "whatsapp" | "instagram";
-  /**
-   * As duas conversas originais, quando este lead é fruto de FUSÃO.
-   *
-   * Presença de `_sources` é o que significa "veio dos dois canais" — é assim
-   * que as telas decidem mostrar a etiqueta "both". Escrito em
-   * `lib/zapintel/merge/matchEngine.ts`.
-   */
-  _sources?: { whatsapp: Lead; instagram: Lead };
 
   /**
    * O que o CRM já registra sobre este lead. Ver `FatosDoCrm`.
    *
-   * Opcional só porque o caminho de importação manual não tem CRM por trás —
-   * e esse caminho está saindo. Quando sair, isto vira obrigatório e o
-   * compilador passa a garantir que nenhuma tela leia dedução onde existe fato.
+   * Opcional por herança do caminho de importação manual, que saiu em 10/10.
    */
   crm?: FatosDoCrm;
 }
-
-export interface Objection {
-  type: "price" | "timing" | "authority" | "product" | "competitor" | "trust";
-  label: string;
-}
-
-export const STATUS_META: Record<
-  Classification,
-  { label: string; color: string; bg: string; border: string }
-> = {
-  customer:    { label: "Cliente ✅",         color: "#4ade80", bg: "rgba(34,197,94,.12)",  border: "rgba(34,197,94,.35)"  },
-  hot:         { label: "Lead Quente 🔥",     color: "#f87171", bg: "rgba(239,68,68,.12)",  border: "rgba(239,68,68,.35)"  },
-  warm:        { label: "Lead Morno",         color: "#facc15", bg: "rgba(234,179,8,.12)",  border: "rgba(234,179,8,.35)"  },
-  followup:    { label: "Follow-up ⚡",       color: "#fb923c", bg: "rgba(249,115,22,.12)", border: "rgba(249,115,22,.35)" },
-  stalled:     { label: "Estagnado",          color: "#c084fc", bg: "rgba(124,92,252,.12)", border: "rgba(124,92,252,.35)" },
-  lost:        { label: "Perdido",            color: "#9ca3af", bg: "rgba(107,114,128,.1)", border: "rgba(107,114,128,.3)" },
-  unqualified: { label: "Sem Engajamento",    color: "#64748b", bg: "rgba(51,65,85,.12)",   border: "rgba(51,65,85,.35)"   },
-};
 
 // ── Performance Stats ─────────────────────────────────────────────────────
 

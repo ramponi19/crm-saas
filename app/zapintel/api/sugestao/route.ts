@@ -4,7 +4,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { ondeTravou, contextoDaSugestao } from '@/lib/zapintel/travou'
 import { montarFicha } from '@/lib/zapintel/ficha'
-import { getRole } from '@/lib/zapintel/segments/segments'
+import { papelDoSegmento } from '@/lib/zapintel/papel'
 import { perguntarIA } from '@/lib/zapintel/ia'
 
 /**
@@ -29,8 +29,7 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  * já morreram em 10/10. Aqui o contexto vem de onde ele mora:
  *
  *     nome da loja ..... `carregarConversas` (tabela `empresas`)
- *     papel ............ `getRole(segmentId)`: Vendedor, Corretor, Atendente…
- *     o negócio ........ `getSegment(segmentId).followupContext`
+ *     papel ............ `papelDoSegmento(segmento)`: Vendedor, Corretor…
  *
  * ══ POR QUE A IA NÃO PODE INVENTAR NÚMERO ══════════════════════════════════
  *
@@ -64,7 +63,7 @@ export async function POST(req: Request) {
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a conversa de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, nomeDaLoja, segmentId } = await carregarConversas(db, empresaId, [id])
+  const { analisados, nomeDaLoja, segmento } = await carregarConversas(db, empresaId, [id])
   const lead = analisados[0]
   if (!lead) return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
 
@@ -80,7 +79,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const papel = getRole(segmentId)
+  const papel = papelDoSegmento(segmento)
 
   /**
    * ⚠ O RAMO DO SEGMENTO SAIU DAQUI, e a razão está na tela.

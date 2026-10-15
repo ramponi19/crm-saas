@@ -84,14 +84,37 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   /** '' = toda a equipe. Filtro de quem gerencia a equipe. */
   const [responsavelId, setResponsavelId] = useState('')
 
+  /**
+   * O lead do endereço que esta tela não carregou. Antes a URL era limpa em
+   * silêncio — e o "abrir conversa no CRM" do ZapIntel, que lista a rede
+   * inteira, abria a tela e não abria nada quando o lead era da outra loja
+   * (lead 1710, de Mogi, com o CRM em Jaguariúna; 15/10/2026).
+   */
+  const [foraDaLoja, setForaDaLoja] = useState<string | null>(null)
+  const [trocandoLoja, setTrocandoLoja] = useState<'' | 'indo' | 'negado'>('')
+
   useEffect(() => {
     if (!leadNaUrl) return
     const alvo = leads.find(l => String(l.id) === leadNaUrl)
-    // Lead que a RLS não devolve (outra loja, arquivado) simplesmente não abre —
-    // e o endereço é limpo, para não ficar um parâmetro morto pendurado na URL.
-    if (alvo) setSelectedLead(alvo)
-    else router.replace('/leads')
+    // Lead que a RLS não devolve (outra loja, arquivado) não abre — o endereço
+    // é limpo, para não ficar um parâmetro morto pendurado na URL, e a tela diz
+    // por quê.
+    if (alvo) { setSelectedLead(alvo); setForaDaLoja(null) }
+    else { setForaDaLoja(leadNaUrl); router.replace('/leads') }
   }, [leadNaUrl, leads, router])
+
+  /** Passa o CRM para "Rede (todas as lojas)" e abre o lead lá. Só dono e admin. */
+  async function abrirNaRede() {
+    if (!foraDaLoja) return
+    setTrocandoLoja('indo')
+    const r = await fetch('/api/filial/selecionar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filialId: null }),
+    })
+    if (!r.ok) { setTrocandoLoja('negado'); return }
+    // Recarga inteira, como o seletor do topo: a loja é lida pela RLS.
+    window.location.assign(new URL(`/leads?lead=${foraDaLoja}`, window.location.origin))
+  }
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
@@ -312,6 +335,21 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           Novo lead
         </Button>
       </div>
+
+      {foraDaLoja && (
+        <div className="mx-6 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-warn/30 bg-warn-soft px-3 py-2 text-[12.5px] text-ink-2">
+          <span className="flex-1 min-w-[220px]">
+            O lead #{foraDaLoja} não está na loja selecionada no topo — ou foi arquivado.
+            {trocandoLoja === 'negado' && <strong className="text-ink"> Só o dono ou um admin troca de loja.</strong>}
+          </span>
+          {trocandoLoja !== 'negado' && (
+            <Button size="sm" variant="outline" loading={trocandoLoja === 'indo'} onClick={abrirNaRede}>
+              {trocandoLoja === 'indo' ? 'Abrindo…' : 'Abrir na Rede (todas as lojas)'}
+            </Button>
+          )}
+          <button className="text-ink-3 hover:text-ink" onClick={() => { setForaDaLoja(null); setTrocandoLoja('') }}>Fechar</button>
+        </div>
+      )}
 
       {/* Kanban */}
       <div className="flex-1 min-h-0 overflow-hidden">

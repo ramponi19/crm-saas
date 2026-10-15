@@ -113,8 +113,6 @@ export interface Ficha {
   // ── Conteúdo ────────────────────────────────────────────────────────────
   /** O que o CLIENTE pediu, nas palavras dele. */
   procurou: string[]
-  sinais: string[]
-  objecoes: string[]
 
   // ── Resultado ───────────────────────────────────────────────────────────
   comprou: boolean
@@ -131,16 +129,6 @@ const MODELOS: [string, string][] = [
   ['iphone 11', 'iPhone 11'], ['macbook', 'MacBook'], ['ipad', 'iPad'],
   ['apple watch', 'Apple Watch'], ['airpod', 'AirPods'], ['212 vip', 'Perfume 212 VIP'],
 ]
-
-/**
- * Sinais que dizem a mesma coisa com nomes diferentes.
- *
- * O motor emite "Pediu nota fiscal" e "Pediu NF" para a mesma frase, e a ficha
- * saía com os dois lado a lado, o que faz o relato parecer máquina. Some um.
- */
-const SINAL_REPETIDO: Record<string, string> = {
-  'Pediu nota fiscal': 'Pediu NF',
-}
 
 const PALAVRAS_DE_TROCA = ['troca', 'na troca', 'dou o meu', 'entrada o meu', 'meu aparelho']
 
@@ -190,6 +178,12 @@ export function ehFala(m: RawMessage): boolean {
   return !/^(\[|\{)|enviad[ao] pelo celular$|^mensagem com bot/i.test(t)
 }
 
+/** "hoje", "há 1 dia", "há 5 dias" — "há 0 dias" saía na ficha de quem falou hoje. */
+function haQuanto(dias: number): string {
+  if (dias <= 0) return 'hoje'
+  return `há ${dias} dia${dias === 1 ? '' : 's'}`
+}
+
 /** Minutos que a loja levou para responder, cada vez que respondeu. */
 function esperas(msgs: RawMessage[]): number[] {
   const fora: number[] = []
@@ -236,12 +230,10 @@ function montarRelato(f: Omit<Ficha, 'relato'>): string {
   if (f.procurou.length) {
     partes.push(`Procurou ${f.procurou.slice(0, 3).join(', ')}.`)
   }
-  if (f.sinais.length) {
-    partes.push(`${f.sinais.slice(0, 4).join(', ')}.`)
-  }
-  if (f.objecoes.length) {
-    partes.push(`Travou em: ${f.objecoes.join(', ')}.`)
-  }
+  // Sinais e objeções saíram em 15/10/2026: vinham do motor de palavras
+  // ("Travou em: Dúvida sobre produto" por causa da palavra "garantia"). Com
+  // análise de IA eles aparecem com a frase do cliente como evidência; sem,
+  // a ficha fica só com o que a conversa mede.
 
   // A mecânica só vira frase quando diz algo. Monólogo de 2 é conversa normal.
   const mec: string[] = []
@@ -266,9 +258,9 @@ function montarRelato(f: Omit<Ficha, 'relato'>): string {
     const d = f.diasAteVenda != null ? ` ${f.diasAteVenda} dia${f.diasAteVenda === 1 ? '' : 's'} depois do primeiro contato` : ''
     partes.push(`Comprou${v}${d}.`)
   } else if (f.aguardandoLoja) {
-    partes.push(`Ele falou por último e a loja não voltou — há ${f.diasInativo} dia${f.diasInativo === 1 ? '' : 's'}.`)
+    partes.push(`Ele falou por último e a loja não voltou — ${haQuanto(f.diasInativo)}.`)
   } else if (f.fraseAntesDoSilencio) {
-    partes.push(`A loja disse "${f.fraseAntesDoSilencio}" e ele não respondeu mais — há ${f.diasInativo} dia${f.diasInativo === 1 ? '' : 's'}.`)
+    partes.push(`A loja disse "${f.fraseAntesDoSilencio}" e ele não respondeu mais — ${haQuanto(f.diasInativo)}.`)
   }
 
   return partes.join(' ') || 'Conversa sem conteúdo suficiente para relatar.'
@@ -407,8 +399,6 @@ export function montarFicha(a: Lead, ctx: ContextoDaFicha): Ficha {
     })(),
 
     procurou,
-    sinais: [...new Set((a.buySignals ?? []).map((x) => SINAL_REPETIDO[x] ?? x))],
-    objecoes: (a.objections ?? []).map((o) => o.label),
 
     comprou: ctx.comprou,
     valorVenda: ctx.valorVenda,
