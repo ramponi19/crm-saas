@@ -232,6 +232,10 @@ export default function FichaDoLead() {
               )}
             </div>
           </>
+        ) : lead.leadMessages === 0 ? (
+          <div className="fc-sem">
+            <p>Sem resposta do cliente: só a loja escreveu até agora ({lead.storeMessages} {lead.storeMessages === 1 ? "mensagem" : "mensagens"}). A análise fica disponível quando o cliente responder.</p>
+          </div>
         ) : (
           <div className="fc-sem">
             <p>Este lead ainda não tem análise de IA. Ela lê a conversa inteira — inclusive os áudios transcritos — e escreve o diagnóstico, os sinais, as objeções e a próxima ação, com a frase do cliente como prova.</p>

@@ -10,7 +10,7 @@
 -- mesmo escopo (`zapintel_escopo`), para o número e a lista nunca divergirem.
 --
 -- p_tipo / p_valor:
---   classe        customer | hot | warm | followup | stalled | lost | unqualified | sem_analise
+--   classe        customer | hot | warm | followup | stalled | lost | unqualified | sem_analise | sem_resposta
 --   esperando     (sem valor) quem a loja deve resposta, últimas 72 h
 --   sem_registro  (sem valor) a conversa mostra compra, o CRM não tem a venda
 --   pendencias    (sem valor) leads com alerta ⚠ da análise
@@ -63,7 +63,7 @@ begin
   X as materialized (
     select L.*, M.n, M.ur, M.ue, M.um, F.fm, F.versao, F.gerado_em, F.score, F.rotulo, F.acao, F.obj, F.ps, F.si,
            (F.lead_id is not null) tem_ficha,
-           coalesce(F.cls0, 'sem_analise') cls, coalesce(F.urg0, 'low') urg,
+           coalesce(F.cls0, case when M.ur is null then 'sem_resposta' else 'sem_analise' end) cls, coalesce(F.urg0, 'low') urg,
            (B.lead_id is not null) comprou,
            (M.ur is not null and (M.ue is null or M.ur > M.ue)) esperando
     from L join M on M.lead_id = L.id

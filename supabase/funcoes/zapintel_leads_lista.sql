@@ -16,7 +16,7 @@
 -- contagem desta lista são a mesma conta.
 --
 -- p_filtros (jsonb, tudo opcional):
---   classe          customer|hot|warm|followup|stalled|lost|unqualified|sem_analise
+--   classe          customer|hot|warm|followup|stalled|lost|unqualified|sem_analise|sem_resposta
 --   urgencia        critical|high|medium|low
 --   canal           whatsapp|instagram
 --   esperando       true = a loja deve resposta (últimas 72 h, sem fora-do-funil)
@@ -30,7 +30,7 @@
 --   modelo          "17 Pro Max" (o cliente citou nos últimos 30 dias)
 --   busca           nome, telefone, interesse, o que foi dito, e a análise
 --   dias            conversa com mensagem nos últimos N dias
---   funil           true = sem "fora do funil" e sem "sem análise"
+--   funil           true = sem "fora do funil", "sem análise" e "sem resposta do cliente"
 --   sinal_familia   família do sinal (zapintel_familia_sinal, em zapintel_insights.sql)
 --   fase            aberto = quente, morno, acompanhar ou parado
 --   largada         true = em aberto, 3+ dias parada, o cliente falou por último
@@ -104,7 +104,7 @@ begin
     select L.*, M.n, M.ur, M.ue, M.um, M.pm,
            F.fm, F.versao, F.score, F.rotulo, F.acao, F.obj, F.ps, F.si,
            (F.lead_id is not null) tem_ficha,
-           coalesce(F.cls0, 'sem_analise') cls,
+           coalesce(F.cls0, case when M.ur is null then 'sem_resposta' else 'sem_analise' end) cls,
            coalesce(F.urg0, 'low') urg,
            (B.lead_id is not null) comprou,
            (M.ur is not null and (M.ue is null or M.ur > M.ue)) esperando
@@ -148,7 +148,7 @@ begin
       -- últimos N dias", "só quem está no funil", a família do sinal e a fase
       -- da pendência. Com eles o link de cada card abre a mesma contagem.
       and (v_f->>'dias' is null or X.um >= v_agora - make_interval(days => (v_f->>'dias')::int))
-      and (coalesce((v_f->>'funil')::boolean, false) = false or X.cls not in ('unqualified', 'sem_analise'))
+      and (coalesce((v_f->>'funil')::boolean, false) = false or X.cls not in ('unqualified', 'sem_analise', 'sem_resposta'))
       and (v_f->>'sinal_familia' is null or exists (select 1 from jsonb_array_elements(coalesce(X.si, '[]'::jsonb)) s
                                                   where zapintel_familia_sinal(s->>'rotulo') = v_f->>'sinal_familia'))
       and (v_f->>'fase' is null or (v_f->>'fase' = 'aberto' and X.cls in ('hot', 'warm', 'followup', 'stalled')))

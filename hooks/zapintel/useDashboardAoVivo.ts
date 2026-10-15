@@ -11,7 +11,7 @@ import { useRpcAoVivo } from "./useRpcAoVivo";
  * 20 s, aba escondida) mora em `useRpcAoVivo`, o mesmo da lista de leads.
  */
 
-export type Classe = "customer" | "hot" | "warm" | "followup" | "stalled" | "lost" | "unqualified" | "sem_analise";
+export type Classe = "customer" | "hot" | "warm" | "followup" | "stalled" | "lost" | "unqualified" | "sem_analise" | "sem_resposta";
 export type Urgencia = "critical" | "high" | "medium" | "low";
 
 export interface ItemFila {
@@ -51,7 +51,7 @@ export interface Dashboard {
   calor: [number, number, number][];
   modelos: { modelo: string; leads: number }[];
   silencio: { frase: string; vezes: number; venderam: number }[];
-  analises: { comAnalise: number; desatualizadas: number; semAnalise: number };
+  analises: { comAnalise: number; desatualizadas: number; semAnalise: number; semResposta: number };
   porLoja: { id: number; nome: string; ativos7d: number; esperando: number; quentes: number; vendasMes: number; respostaMin: number | null }[];
 }
 

@@ -18,7 +18,7 @@ import { RefreshCw, Sparkles, MessageCircle, ChevronDown, ChevronUp } from "luci
  * provedor; insistir nos outros 40 seria colecionar o mesmo erro 40 vezes.
  *
  * O número do robô conta as fichas DESATUALIZADAS e as conversas NOVAS SEM
- * ANÁLISE (cliente falou, 2+ mensagens). Até 15/10/2026 contava só as
+ * ANÁLISE (o cliente falou — mesma regra do dashboard). Até 15/10/2026 contava só as
  * primeiras: as sem análise eram tratadas como "conversas internas" — verdade
  * no dia do lote, e falso para todo lead que chegou depois, que ficava
  * invisível (eram 30 clientes em 15/10). As internas de verdade agora saem por

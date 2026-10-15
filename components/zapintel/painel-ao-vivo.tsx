@@ -229,7 +229,14 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
           <button className="pv-link" onClick={() => abrir({ titulo: "Conversa andou depois da análise", tipo: "desatualizadas" })}>
             {num(d.analises.desatualizadas)} com conversa nova
           </button>{" "}
-          · {num(d.analises.semAnalise)} ainda sem análise
+          ·{" "}
+          <button className="pv-link" onClick={() => abrir({ titulo: "Sem análise", tipo: "classe", valor: "sem_analise" })}>
+            {num(d.analises.semAnalise)} ainda sem análise
+          </button>{" "}
+          ·{" "}
+          <button className="pv-link" onClick={() => abrir({ titulo: "Sem resposta do cliente", tipo: "classe", valor: "sem_resposta" })}>
+            {num(d.analises.semResposta ?? 0)} sem resposta do cliente
+          </button>
         </span>
         <button className="pv-botao" onClick={() => window.dispatchEvent(new Event("assistente:abrir"))}>
           <Bot size={13} /> Atualizar pelo assistente
@@ -363,7 +370,7 @@ function Fila({ itens, total, antigos, agora, verTodos }: {
 function ItemDaFila({ i, agora, novo }: { i: ItemFila; agora: number; novo: boolean }) {
   const [copiou, setCopiou] = useState(false);
   const espera = agora - new Date(i.desde).getTime();
-  const cls = CLASSE[i.classificacao];
+  const cls = CLASSE[i.classificacao] ?? CLASSE.sem_analise;
   const urg = URG[i.urgencia];
   async function copiar() {
     if (!i.mensagemSugerida) return;
@@ -623,7 +630,7 @@ function GavetaLeads({ g, lista, agora, fechar }: {
                 <div className="pv-item-topo">
                   <span className="pv-urg" style={{ background: URG[l.urgencia].cor }} />
                   <span className="pv-nome">{l.nome || "Sem nome"}</span>
-                  <span className="pv-tag" style={{ color: CLASSE[l.classificacao].cor, borderColor: CLASSE[l.classificacao].cor }}>{CLASSE[l.classificacao].nome}</span>
+                  <span className="pv-tag" style={{ color: (CLASSE[l.classificacao] ?? CLASSE.sem_analise).cor, borderColor: (CLASSE[l.classificacao] ?? CLASSE.sem_analise).cor }}>{(CLASSE[l.classificacao] ?? CLASSE.sem_analise).nome}</span>
                   {l.loja && <span className="pv-loja">{l.loja}</span>}
                   <span className="pv-espera">{ha(l.ultimaMensagem, agora)}</span>
                 </div>

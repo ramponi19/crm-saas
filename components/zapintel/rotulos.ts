@@ -13,9 +13,12 @@ export const CLASSE: Record<Classe, { nome: string; cor: string }> = {
   lost:        { nome: "Perdido",       cor: "#6b7280" },
   unqualified: { nome: "Fora do funil", cor: "#a1a8b3" },
   sem_analise: { nome: "Sem análise",   cor: "#c4c9d1" },
+  // Sem análise = o cliente falou e ninguém pediu a análise ainda (o robô
+  // oferece). Sem resposta = só a loja escreveu: não há o que analisar.
+  sem_resposta: { nome: "Sem resposta do cliente", cor: "#e2e5ea" },
 };
 
-export const ORDEM_FUNIL: Classe[] = ["customer", "hot", "warm", "followup", "stalled", "lost", "unqualified", "sem_analise"];
+export const ORDEM_FUNIL: Classe[] = ["customer", "hot", "warm", "followup", "stalled", "lost", "unqualified", "sem_analise", "sem_resposta"];
 
 export const URG: Record<Urgencia, { nome: string; cor: string }> = {
   critical: { nome: "Crítico", cor: "#dc2626" },

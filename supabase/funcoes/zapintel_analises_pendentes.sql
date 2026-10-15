@@ -86,7 +86,10 @@ as $$
     and l.ativo
     and not zapintel_funil_interno(l.funil_id)
     and (
-      (p.lead_id is null and a.n >= 2 and a.cliente_falou)
+      -- Sem análise = o cliente falou (15/10/2026: era "e 2+ mensagens", e os
+      -- 10 leads com 1 mensagem do cliente não eram de ninguém — nem do robô,
+      -- nem do "sem resposta do cliente" do dashboard).
+      (p.lead_id is null and a.cliente_falou)
       or (p.lead_id is not null and (
             p.versao is distinct from p_versao
          or p.marca is distinct from a.marca

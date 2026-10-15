@@ -154,7 +154,7 @@ begin
     select L.*, M.n, M.ur, M.ue, M.um,
            F.fm, F.versao, F.gerado_em, F.score, F.rotulo, F.obj, F.ps, F.si,
            (F.lead_id is not null) tem_ficha,
-           coalesce(F.cls0, 'sem_analise') cls,
+           coalesce(F.cls0, case when M.ur is null then 'sem_resposta' else 'sem_analise' end) cls,
            coalesce(F.urg0, 'low') urg,
            (B.lead_id is not null) comprou,
            (M.ur is not null and (M.ue is null or M.ur > M.ue)) esperando
@@ -368,7 +368,10 @@ begin
     'analises', jsonb_build_object(
         'comAnalise', (select count(*) from X where tem_ficha),
         'desatualizadas', (select count(*) from X where tem_ficha and (fm <> n or versao is distinct from p_versao)),
-        'semAnalise', (select count(*) from X where not tem_ficha and n >= 2)
+        -- Regra única (15/10/2026), a mesma do robô e da lista: sem análise =
+        -- o cliente falou e não há ficha; sem resposta = só a loja escreveu.
+        'semAnalise', (select count(*) from X where cls = 'sem_analise'),
+        'semResposta', (select count(*) from X where cls = 'sem_resposta')
       ),
 
     'silencio', (select coalesce(jsonb_agg(si order by si.vezes desc), '[]') from (

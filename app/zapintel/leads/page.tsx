@@ -252,7 +252,7 @@ function Seletor({ valor, vazio, opcoes, onChange }: {
 function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
   const router = useRouter();
   const href = `/zapintel/leads/lead-${l.leadId}`;
-  const cls = CLASSE[l.classificacao];
+  const cls = CLASSE[l.classificacao] ?? CLASSE.sem_analise;
   const espera = l.esperando && l.ultimaDoCliente ? agora - new Date(l.ultimaDoCliente).getTime() : 0;
   return (
     <tr onClick={() => router.push(href)}>
@@ -276,7 +276,7 @@ function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
           {l.comprou && <Selo cor="var(--green)">venda registrada</Selo>}
           {l.alertas > 0 && <Selo cor="var(--yellow)"><AlertTriangle size={10} /> {l.alertas} {l.alertas === 1 ? "pendência" : "pendências"}</Selo>}
           {l.desatualizada && <Selo cor="var(--muted)">conversa andou</Selo>}
-          {!l.temAnalise && <Selo cor="var(--purple-l)"><Sparkles size={10} /> sem análise</Selo>}
+          {!l.temAnalise && l.classificacao !== "sem_resposta" && <Selo cor="var(--purple-l)"><Sparkles size={10} /> sem análise</Selo>}
         </div>
       </td>
       <td className="lv-num">
