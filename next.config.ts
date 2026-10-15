@@ -19,6 +19,18 @@ import { withSentryConfig } from '@sentry/nextjs/config'
  */
 const nextConfig: NextConfig = {
   // Type-check e ESLint reativados — build falha se houver erro de tipo
+
+  /**
+   * Performance I e II viraram uma tela só, Atendimento (15/10/2026). O
+   * redirecionamento roda antes do proxy.ts: endereço salvo não vira 404 e não
+   * custa CPU de função. Temporário (307) para o navegador não gravar para sempre.
+   */
+  async redirects() {
+    return [
+      { source: '/zapintel/performance', destination: '/zapintel/atendimento', permanent: false },
+      { source: '/zapintel/performance2', destination: '/zapintel/atendimento', permanent: false },
+    ]
+  },
 }
 
 /**

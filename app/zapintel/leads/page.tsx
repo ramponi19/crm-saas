@@ -41,7 +41,7 @@ interface Lista {
 const BOOLEANOS = ["esperando", "sem_registro", "desatualizadas", "pendencias"] as const;
 const TEXTOS = ["classe", "urgencia", "perfil", "sinal", "objecao", "parado", "modelo", "canal", "dias", "sinal_familia", "fase"] as const;
 /**
- * Os recortes que só chegam por link da tela Insights — sem controle próprio
+ * Os recortes que só chegam por link das telas Insights e Atendimento — sem controle próprio
  * aqui, aparecem como etiqueta removível. Sem eles a lista abria com outra
  * contagem que o card (Concorrência: 29 perdidos no card, 56 na lista).
  */
@@ -49,6 +49,7 @@ const ETIQUETAS: [string, (v: string) => string][] = [
   ["perfil", (v) => `Perfil: ${v}`], ["sinal", (v) => `Sinal: ${v}`], ["modelo", (v) => `Pediu iPhone ${v}`],
   ["sinal_familia", (v) => `Sinal: ${v}`], ["fase", () => "Ainda em aberto"],
   ["dias", (v) => `Conversa nos últimos ${v} dias`], ["funil", () => "Só quem está no funil"],
+  ["largada", () => "Cliente sem resposta há 3+ dias"], ["retomar", () => "Cliente sumiu — retomar"],
 ];
 const NOME_BOOLEANO: Record<(typeof BOOLEANOS)[number], string> = {
   esperando: "Esperando a loja", sem_registro: "Compraram sem registro",
@@ -83,7 +84,7 @@ export default function LeadsPage() {
   const filtros: Record<string, string | boolean> = {};
   for (const k of TEXTOS) { const v = busca.get(k); if (v) filtros[k] = v; }
   for (const k of BOOLEANOS) if (busca.get(k) === "1") filtros[k] = true;
-  if (busca.get("funil") === "1") filtros.funil = true;
+  for (const k of ["funil", "largada", "retomar"]) if (busca.get(k) === "1") filtros[k] = true;
   const q = busca.get("q") ?? "";
   if (q) filtros.busca = q;
   const ordem = busca.get("ordem") ?? "prioridade";

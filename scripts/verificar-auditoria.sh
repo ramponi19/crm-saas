@@ -59,7 +59,7 @@ v "painel do zapintel no servidor"     "lib/zapintel/painel.ts" "montarPainel"
 v "conversas lidas em paralelo"        "lib/zapintel/conversas.ts" "Promise.all"
 v "paginacao paralela ordena por id"   "lib/zapintel/conversas.ts" "order(.id., { ascending"
 v "lead leve nao leva a conversa"      "lib/zapintel/painel.ts" "messages: \[\]"
-n "performance nao calcula no cliente" "app/zapintel/performance2/page.tsx" "computePerformance2("
+n "painel sem a performance antiga"   "lib/zapintel/painel.ts" "computePerformance"
 n "linguagem nao calcula no cliente"   "app/zapintel/linguagem/page.tsx" "POWER_WORDS"
 n "zapintel nao assina sob RLS"        "hooks/zapintel/useLeads.tsx" "postgres_changes"
 # ── o teto de 4h de Active CPU da Vercel (09/10/2026) ──────────────────────
@@ -89,9 +89,12 @@ v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 # `TICKET_MEDIO = 5200` sobreviveu em performance.ts por mais um dia. Agora
 # varre a pasta inteira: check estreito e a mesma coisa que check ausente.
 n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
-n "nem em performance"               "lib/zapintel/insights/performance.ts" "= 5200;"
-v "perda por etapa usa taxa medida"  "lib/zapintel/insights/performance.ts" "fatos.taxaPorClasse"
-n "LTV nao supoe recompra"           "lib/zapintel/insights/performance.ts" "\* 1.4"
+# Performance I e II viraram Atendimento (15/10/2026), calculado no banco. O
+# `5200 * 0.3` da ação #02 morava no page.tsx da tela antiga — fora de lib/.
+n "atendimento sem ticket inventado" "app/zapintel/atendimento/page.tsx" "5200"
+v "atendimento le do banco"          "app/zapintel/atendimento/page.tsx" "useRpcAoVivo<Atendimento>(\"zapintel_atendimento\""
+v "atendimento fechado para anon"    "supabase/funcoes/zapintel_atendimento.sql" "revoke all on function public.zapintel_atendimento"
+v "endereco antigo redireciona"      "next.config.ts" "destination: '/zapintel/atendimento'"
 v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
 n "nao chama a Anthropic direto"     "app/zapintel/api/analyze/route.ts" "api.anthropic.com"
 v "a IA respeita o desligar geral"   "lib/zapintel/ia.ts" "cfg.ativo === false"

@@ -33,6 +33,8 @@
 --   funil           true = sem "fora do funil" e sem "sem análise"
 --   sinal_familia   família do sinal (zapintel_familia_sinal, em zapintel_insights.sql)
 --   fase            aberto = quente, morno, acompanhar ou parado
+--   largada         true = em aberto, 3+ dias parada, o cliente falou por último
+--   retomar         true = em aberto, 3+ dias parada, a loja falou por último
 -- p_ordem: prioridade (padrão) | recentes | parados | score | mensagens
 create or replace function public.zapintel_leads_lista(
   p_filtros jsonb default '{}'::jsonb,
@@ -150,6 +152,14 @@ begin
       and (v_f->>'sinal_familia' is null or exists (select 1 from jsonb_array_elements(coalesce(X.si, '[]'::jsonb)) s
                                                   where zapintel_familia_sinal(s->>'rotulo') = v_f->>'sinal_familia'))
       and (v_f->>'fase' is null or (v_f->>'fase' = 'aberto' and X.cls in ('hot', 'warm', 'followup', 'stalled')))
+      -- Os recortes da tela Atendimento (15/10/2026): conversa em aberto, parada
+      -- há 3 dias ou mais, com o cliente por último (a loja largou) ou com a
+      -- loja por último (o cliente sumiu — fila de retomada).
+      and (coalesce((v_f->>'largada')::boolean, false) = false
+           or (X.cls in ('hot', 'warm', 'followup', 'stalled') and X.um < v_agora - interval '72 hours' and X.esperando))
+      and (coalesce((v_f->>'retomar')::boolean, false) = false
+           or (X.cls in ('hot', 'warm', 'followup', 'stalled') and X.um < v_agora - interval '72 hours'
+               and X.ue is not null and not X.esperando))
       and (v_padrao is null
            or X.nome ilike v_padrao or X.telefone ilike v_padrao or X.produto_interessado ilike v_padrao
            or X.id in (select lead_id from ACHADOS))

@@ -1,11 +1,8 @@
 import { carregarConversas, idDoLead } from '@/lib/zapintel/conversas'
 import { fatosDeVenda, type FatosDeVenda } from '@/lib/zapintel/vendas'
 import { computeStats, type FatosStats } from '@/lib/zapintel/insights/stats'
-import { computePerformance, type FatosDePerformance } from '@/lib/zapintel/insights/performance'
-import { computePerformance2 } from '@/lib/zapintel/insights/performance2'
 import { computeLinguagem } from '@/lib/zapintel/insights/linguagem'
-import type { Lead, DashboardStats, PerformanceStats } from '@/types/zapintel'
-import type { Performance2Stats } from '@/lib/zapintel/insights/performance2'
+import type { Lead, DashboardStats } from '@/types/zapintel'
 import type { LinguagemStats } from '@/lib/zapintel/insights/linguagem'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -59,9 +56,10 @@ export interface LeadLeve extends Omit<Lead, 'messages' | '_sources'> {
 
 export interface Agregados {
   stats: DashboardStats
-  performance: PerformanceStats
-  performance2: Performance2Stats
   linguagem: LinguagemStats | null
+  // Performance I e II saíram daqui em 15/10/2026: a tela Atendimento calcula
+  // no banco (`zapintel_atendimento`). Eram os dois cálculos mais caros do
+  // recálculo — e os números deles se contradiziam.
   // "O que a loja disse antes de o cliente sumir" saiu daqui em 14/10/2026: o
   // dashboard novo calcula no banco (`zapintel_dashboard`, bloco SIL), sem
   // anexo, reação e vaga de emprego no meio. Ninguém mais lia este.
@@ -173,53 +171,6 @@ export function aliviar(a: Lead, filialId: number | null, canal?: string | null)
 }
 
 /**
- * Quantas linhas de cada lista chegam à tela.
- *
- * A maior lista que `/zapintel/performance2` exibe tem 20 itens. Quarenta dá
- * folga para a tela crescer sem obrigar a mexer aqui.
- */
-const LINHAS_POR_LISTA = 40
-
-/**
- * Corta as listas POR LEAD de `performance2` ao que a tela mostra.
- *
- * Eram seis listas com os 2.039 leads cada — 1,6 MB por loja, 4,8 MB no total,
- * acima do teto de 4,5 MB de uma resposta. E a tela exibe no máximo 20 de cada.
- *
- * Cortar aqui, e não dentro do motor, é de propósito: nenhum resumo depende
- * do corte (médias, contagens e distribuições são calculados sobre a lista
- * inteira, antes), então `computePerformance2` continua devolvendo a verdade
- * completa e quem corta é quem tem o problema de transporte.
- *
- * Cada corte preserva o RECORTE que a tela pede, não os primeiros N: a tela de
- * velocidade só mostra os lentos, e cortar pelo topo da lista deixaria
- * justamente eles de fora.
- */
-function enxugar(p: Performance2Stats): Performance2Stats {
-  const n = LINHAS_POR_LISTA
-  const sentimento = p.sentimentByLead
-  return {
-    ...p,
-    // A tela lista apenas os lentos (e checa se há algum).
-    sellerSpeedByLead: p.sellerSpeedByLead
-      .filter((s) => s.rating === 'slow' || s.rating === 'very_slow').slice(0, n),
-    leadResponseByLead: p.leadResponseByLead.slice(0, n),
-    // Duas colunas: os mais positivos e os que esfriaram.
-    sentimentByLead: [
-      ...sentimento.filter((s) => s.sentimentScore > 0).slice(0, n / 2),
-      ...sentimento.filter((s) => s.arc === 'cooling' || s.arc === 'stable_negative').slice(0, n / 2),
-    ],
-    dynamicScores: p.dynamicScores.slice(0, n),
-    talkRatios: p.talkRatios.slice(0, n),
-    // A tela ordena do mais rápido para o mais lento; ordenar aqui garante que
-    // o corte guarde os que ela mostraria.
-    priceResponseByLead: [...p.priceResponseByLead]
-      .sort((a, b) => a.minutesToRespond - b.minutesToRespond).slice(0, n),
-    exitIntentAlerts: p.exitIntentAlerts.slice(0, n),
-  }
-}
-
-/**
  * Converte os fatos de venda no contrato que o motor entende.
  *
  * O `comprou` mora aqui, e nao dentro do motor, porque so este arquivo sabe
@@ -243,13 +194,9 @@ function paraOMotor(f: FatosDeVenda | null, taxaHot: number, taxaWarm: number): 
 export function agregar(
   leads: Lead[],
   fatos: FatosStats | null = null,
-  /** Ticket e taxas medidos, para a tela de Performance parar de inventar reais. */
-  desempenho: FatosDePerformance | null = null,
 ): Agregados {
   return {
     stats: computeStats(leads, fatos),
-    performance: computePerformance(leads, desempenho),
-    performance2: enxugar(computePerformance2(leads)),
     linguagem: computeLinguagem(leads),
   }
 }
@@ -310,19 +257,6 @@ export async function montarPainel(
   const taxaHot = taxaPorClasse('hot')
   const taxaWarm = taxaPorClasse('warm')
 
-  // A tela de Performance precisa da taxa de TODAS as classes, nao so de duas:
-  // ela estima a perda por etapa do funil, e cada etapa corresponde a uma
-  // classificacao diferente.
-  const desempenho: FatosDePerformance | null = vendas
-    ? {
-        ticket: vendas.ticket,
-        taxaPorClasse: Object.fromEntries(
-          ['customer', 'hot', 'warm', 'followup', 'stalled', 'lost', 'unqualified']
-            .map((c) => [c, taxaPorClasse(c)]),
-        ),
-      }
-    : null
-
   const fatos = paraOMotor(vendas, taxaHot, taxaWarm)
 
   if (vendas) {
@@ -369,11 +303,11 @@ export async function montarPainel(
   // compradores dela. O ticket e o ciclo, sim, sao da empresa — a JM tem 55
   // vendas no total, e quebrar isso por loja daria um ticket de 4 vendas, que
   // seria ruido com cara de medida.
-  const agregados: Record<string, Agregados> = { geral: agregar(comConversa, fatos, desempenho) }
+  const agregados: Record<string, Agregados> = { geral: agregar(comConversa, fatos) }
   const lojas: Loja[] = [{ id: null, nome: 'Toda a rede', leads: comConversa.length }]
   for (const [filial, lista] of porFilial) {
     if (filial == null) continue
-    agregados[String(filial)] = agregar(lista, fatos, desempenho)
+    agregados[String(filial)] = agregar(lista, fatos)
     lojas.push({ id: filial, nome: nomeDaFilial.get(filial) ?? `Loja ${filial}`, leads: lista.length })
   }
   lojas.sort((a, b) => (a.id ?? -1) - (b.id ?? -1))

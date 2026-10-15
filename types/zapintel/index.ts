@@ -190,53 +190,6 @@ export const STATUS_META: Record<
 };
 
 // ── Performance Stats ─────────────────────────────────────────────────────
-export interface PerformanceStats {
-  // Speed to Lead
-  avgSpeedToLead: number;        // minutos
-  speedToLeadDistribution: { range: string; count: number; color: string }[];
-  pctRespondedUnder5min: number;
-  pctRespondedUnder1h: number;
-
-  // Funil por etapa
-  funnelStages: { stage: string; count: number; pct: number; dropPct: number }[];
-
-  // Receita perdida por etapa
-  revenueLostByStage: { stage: string; lost: number; leads: number }[];
-
-  // Win rate vs concorrente
-  winRateGeneral: number;
-  winRateVsCompetitor: number;
-  competitorMentions: number;
-
-  // Rapport Score
-  avgRapportScore: number;
-  rapportVsConversion: { profile: string; avgRapport: number; convRate: number }[];
-
-  // Taxa de follow-up executado
-  followupExecuted: number;
-  followupTotal: number;
-  followupRate: number;
-
-  // Ticket médio por perfil
-  ticketByProfile: { profile: string; avgTicket: number; count: number }[];
-
-  // LTV / recorrentes
-  returningCustomers: number;
-  estimatedLTV: number;
-
-  // Áudio vs texto
-  audioPct: number;
-  textPct: number;
-  audioInClosedDeals: number;
-
-  // Tempo de resposta Pedro
-  avgResponseTime: number;      // minutos
-  responseTimeByHour: { hour: string; avgMin: number }[];
-
-  // Carga de pipeline
-  activePipelineLoad: number;
-  convByDayOfWeek: { day: string; conv: number; leads: number }[];
-}
 
 // ── Agenda ────────────────────────────────────────────────────────────────────
 export interface FollowUpTask {

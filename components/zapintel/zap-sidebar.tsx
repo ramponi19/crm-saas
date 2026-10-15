@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, BarChart2, ShoppingBag, GitCompare, Languages, FileText, Gauge, ArrowLeft, RefreshCw, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, GitCompare, Languages, FileText, Headset, ArrowLeft, RefreshCw, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
@@ -21,8 +21,7 @@ const NAV = [
   // Tres listas da mesma coisa so servem para divergir — e duas delas nem
   // sobreviviam a um F5.
   { href: "/zapintel/insights", icon: Lightbulb, label: "Insights" },
-  { href: "/zapintel/performance", icon: BarChart2, label: "Performance" },
-  { href: "/zapintel/performance2", icon: Gauge, label: "Performance II" },
+  { href: "/zapintel/atendimento", icon: Headset, label: "Atendimento" },
   { href: "/zapintel/comparar", icon: GitCompare, label: "Comparar" },
   { href: "/zapintel/linguagem", icon: Languages, label: "Linguagem" },
   { href: "/zapintel/relatorio", icon: FileText, label: "Relatório" },
