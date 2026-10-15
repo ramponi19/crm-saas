@@ -59,31 +59,33 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
     const supabase = createClient()
     async function load() {
       /**
-       * A CONTA É FEITA NO BANCO — uma linha por lead, não por mensagem.
+       * LÊ O CONTADOR DO LEAD — `leads.msgs_nao_lidas`, mantido por gatilho
+       * (`sincronizar_nao_lidas`) a cada mensagem nova ou lida. Desde 15/10/2026.
        *
-       * A versão anterior trazia até 500 linhas de mensagem e agrupava aqui.
-       * Com 1.437 não lidas só na JM, a janela nunca alcançava a base inteira:
-       * o sino mostrava uma amostra e o dono lia como se fosse o total. Não
-       * existe limite que resolva isso, porque o número de mensagens cresce
-       * sozinho — o que precisa mudar é O QUE se pede ao banco.
-       *
-       * A view já exclui lead arquivado e respeita a loja selecionada no topo.
+       * Antes: a view `v_leads_nao_lidas` agrupava as mensagens a cada recarga
+       * (média de 482 ms, 86 mil chamadas — o maior gasto de CPU do banco feito
+       * pelo app) e depois uma 2ª consulta trazia os nomes. E sem paginação: a API
+       * corta em 1.000 linhas, e o admin da JM tinha 1.109 leads com não lidas —
+       * o sino mostrava menos do que havia. Conferido no mesmo instante, para
+       * dono, admin, vendedor, outra empresa e prévia: contador e view dão o mesmo
+       * resultado, lead a lead (0 divergências em 11.613 não lidas). A RLS de
+       * `leads` já respeita empresa e loja selecionada.
        */
-      const { data: linhas } = await supabase
-        .from('v_leads_nao_lidas').select('lead_id, nao_lidas')
-      if (!linhas) return
-      const contagem: Record<number, number> = {}
-      for (const r of linhas as Array<{ lead_id: number | null; nao_lidas: number | null }>) {
-        if (r.lead_id != null) contagem[r.lead_id] = r.nao_lidas ?? 0
+      const linhas: NotifLead[] = []
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from('leads').select('id, nome, produto_interessado, origem, msgs_nao_lidas')
+          .eq('ativo', true).gt('msgs_nao_lidas', 0)
+          .order('msgs_nao_lidas', { ascending: false }).order('id', { ascending: true })
+          .range(de, de + 999)
+        if (error || !data) return
+        type Linha = { id: number; nome: string | null; produto_interessado: string | null; origem: string | null; msgs_nao_lidas: number | null }
+        for (const l of data as Linha[]) {
+          linhas.push({ id: l.id, nome: l.nome, produto_interessado: l.produto_interessado, origem: l.origem, nao_lidas: l.msgs_nao_lidas ?? 0 })
+        }
+        if (data.length < 1000) break
       }
-      const ids = Object.keys(contagem).map(Number)
-      if (ids.length === 0) { setNotifs([]); return }
-      const { data: leads } = await supabase
-        .from('leads').select('id, nome, produto_interessado, origem').in('id', ids).eq('ativo', true)
-      type LeadNotifRow = { id: number; nome: string | null; produto_interessado: string | null; origem: string | null }
-      setNotifs(((leads ?? []) as LeadNotifRow[]).map((l) => ({
-        id: l.id, nome: l.nome, produto_interessado: l.produto_interessado, origem: l.origem, nao_lidas: contagem[l.id] ?? 0,
-      })).sort((a, b) => b.nao_lidas - a.nao_lidas))
+      setNotifs(linhas)
     }
     load()
 
@@ -92,9 +94,24 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
     let debounceT: ReturnType<typeof setTimeout> | null = null
     const scheduleLoad = () => { if (debounceT) clearTimeout(debounceT); debounceT = setTimeout(load, 800) }
 
+    /**
+     * SÓ O QUE MUDA O SINO. O sino conta mensagens RECEBIDAS não lidas. A
+     * assinatura antiga escutava `lead_mensagens` inteira ('*'): cada recibo de
+     * entrega da loja ("enviada → entregue → lida") recarregava a contagem em
+     * toda aba aberta — e há mais atualizações (87 mil) que inclusões (70 mil)
+     * nessa tabela, quase todas de status de mensagem ENVIADA.
+     *
+     * Agora: inclusão e atualização filtradas por `direcao=eq.recebida` (nova
+     * mensagem; lida/não lida), e exclusão sem filtro (rara; o Realtime não
+     * filtra DELETE). O filtro corre no servidor do Realtime, antes da RLS.
+     */
+    type Mudanca = RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; conteudo: string | null }>
+    let caiu = false
     const channel = supabase
       .channel(`topbar_notifs_${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_mensagens' }, async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; conteudo: string | null }>) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_mensagens', filter: 'direcao=eq.recebida' }, () => scheduleLoad())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lead_mensagens' }, () => scheduleLoad())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: 'direcao=eq.recebida' }, async (payload: Mudanca) => {
         scheduleLoad()
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -134,7 +151,11 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
           }
         }
       })
-      .subscribe()
+      // Caiu e voltou: o que chegou no meio não avisou — recarrega a contagem.
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') { if (caiu) { caiu = false; scheduleLoad() } }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') caiu = true
+      })
     return () => { if (debounceT) clearTimeout(debounceT); supabase.removeChannel(channel) }
   }, [router])
 

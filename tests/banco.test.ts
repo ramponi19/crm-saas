@@ -58,6 +58,16 @@ describe('banco (BANCO=1)', { skip: !ligado && 'defina BANCO=1 para rodar' }, ()
     }
   })
 
+  test('contratos: anônimo não lista o bucket, mas a URL pública do fundo continua servindo (só cabeçalho, sem baixar)', async () => {
+    const lista = await anon.storage.from('contratos').list('1', { limit: 5 })
+    assert.ok(lista.error || (lista.data ?? []).length === 0, 'anônimo não pode listar os fundos')
+    const { data: um } = await svc.storage.from('contratos').list('1', { limit: 1 })
+    if (!um?.length) return
+    const url = svc.storage.from('contratos').getPublicUrl(`1/${um[0].name}`).data.publicUrl
+    const r = await fetch(url, { method: 'HEAD' })
+    assert.equal(r.status, 200, 'o contrato emitido usa o fundo por URL pública')
+  })
+
   test('fila de análises: paginação ordenada devolve o mesmo que a leitura inteira', async () => {
     const tudo = await svc.rpc('zapintel_analises_pendentes', { p_empresa: 1, p_versao: 'p2' })
     const pag = await svc.rpc('zapintel_analises_pendentes', { p_empresa: 1, p_versao: 'p2' }).order('lead_id').range(0, 999)
