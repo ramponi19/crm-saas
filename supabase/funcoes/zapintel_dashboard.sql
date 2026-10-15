@@ -24,10 +24,11 @@
 --
 -- ══ QUEM VÊ O QUÊ ══════════════════════════════════════════════════════════
 --
--- `zapintel_escopo` decide empresa e lojas: dono, admin e suporte escolhem
--- entre a rede e uma loja (o seletor "Vendo" do ZapIntel); os demais veem só a
--- própria loja, pela mesma `filiais_visiveis()` da RLS. Sem o complemento
--- ZapIntel ativo, nada sai.
+-- `zapintel_escopo` decide empresa e lojas: dono, admin e superadmin escolhem
+-- entre a rede e uma loja (o seletor "Vendo" do ZapIntel). Os demais papéis
+-- (vendedor, técnico) são recusados desde 15/10/2026 — decisão do Lucas: *"só
+-- dono, admin e superadmin"* (supabase/pendentes/05_zapintel_so_dono_admin.sql,
+-- aplicada nessa data). Sem o complemento ZapIntel ativo, nada sai.
 
 create or replace function public.zapintel_escopo(p_filial bigint default null, p_empresa bigint default null)
 returns table (empresa bigint, filiais bigint[])
@@ -61,7 +62,8 @@ begin
     select coalesce(array_agg(id), array[]::bigint[]) || 0::bigint into v_lojas
       from filiais where empresa_id = v_emp;
   else
-    v_lojas := filiais_visiveis();
+    -- 15/10/2026: o ZapIntel é do dono, do admin e do superadmin.
+    raise exception 'ZapIntel restrito ao dono e aos administradores' using errcode = '42501';
   end if;
 
   if p_filial is not null then

@@ -143,4 +143,8 @@ erro do painel em vez da mensagem). Fora do escopo: o assistente do CRM (robô d
 - Dono e admin da JM (contas reais, sessão simulada no banco): escopo, resumo, dashboard, lista, insights, atendimento, pós-venda, "como a loja conversa" e listas do dashboard — todos ok.
 - Vercel: 0 erro de runtime (1 h). Sentry: nenhum problema novo ou reaparecido (2 h).
 - Rollback: **não foi necessário** (`05_zapintel_so_dono_admin.volta.sql` segue pronto).
-- Pendente: atualizar o texto de `zapintel_escopo` em supabase/funcoes/zapintel_dashboard.sql para o estado aplicado (o banco é a fonte; o arquivo ficou com o ramo antigo). Confirmação no navegador com a sessão do dono depois da 05: não feita (a janela está com o vendedor).
+- Arquivo × banco: `zapintel_escopo` em supabase/funcoes/zapintel_dashboard.sql atualizado para o estado aplicado (só no repositório; nada executado no banco). Conferido por hash: o corpo do arquivo é idêntico ao `prosrc` do banco (md5 `abe1f0d4…`, 1.367 caracteres) quando se descontam 2 linhas de comentário sobre a prévia do superadmin que já existiam no repositório e nunca foram gravadas no banco — não mudam o comportamento.
+
+### Releitura com o dono depois da 05 (navegador, conta dona da JM)
+
+Só leitura. Conversa 615 e 1706 = 200, 1204 (Imobiliária) = 404, lead inválido = 400, corpo nulo = 400, funil interno = 422 sem IA; fila do robô 48 + 35; funções do banco chamadas com a sessão do dono = 200; contratos/1 = 61; sino 869. Telas Dashboard, Leads (1.886), ficha 1706, Atendimento, Insights e Pós-venda (254) abrindo, "Ao vivo"; console sem erro; Vercel e Sentry sem nada novo.
