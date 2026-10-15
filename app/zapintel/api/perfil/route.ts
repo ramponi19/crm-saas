@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
 import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
@@ -72,6 +72,10 @@ export async function POST(req: Request) {
     if (guardado?.atual) {
       return NextResponse.json({ ...guardado, doCache: true })
     }
+  }
+
+  if (await leadDeFunilInterno(db, empresaId, id)) {
+    return NextResponse.json({ erro: 'Conversa de funil interno (equipe ou candidatos) fica fora das análises do ZapIntel.' }, { status: 422 })
   }
 
   // Daqui para baixo é chamada PAGA ao provedor. Teto por pessoa: o robô gera

@@ -209,7 +209,8 @@ export async function aptosParaRetirada(
  * as mensagens VIZINHAS — o PostgREST não faz essa junção, e trazê-la para cá
  * custa uma consulta por lead em vez de uma por imagem.
  */
-async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): Promise<Retirada[]> {
+/** Exportada para os testes (tests/zapintel.test.ts); o uso real é via `aptosParaRetirada`. */
+export async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): Promise<Retirada[]> {
   /**
    * NA DÚVIDA, NADA SAI — revisto em 15/10/2026. Antes:
    *   · `.in('id', ids)` com até 2.000 ids voltava cortado em 1.000 (teto da

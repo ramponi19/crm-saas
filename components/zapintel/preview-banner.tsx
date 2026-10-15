@@ -15,12 +15,15 @@ export function PreviewBanner({ empresaNome }: { empresaNome: string }) {
       <span style={{ flex: 1, minWidth: 0 }}>
         <strong>Modo preview (super admin)</strong> — você está vendo os dados de <strong>{empresaNome}</strong>. Ações e envios afetam a empresa real.
       </span>
-      <a href="/api/zapintel/preview?clear=1" style={{
-        background: '#92400e', color: '#fff', borderRadius: 8, padding: '4px 12px',
-        fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
-      }}>
-        Sair do preview
-      </a>
+      <form method="post" action="/api/zapintel/preview" style={{ flexShrink: 0 }}>
+        <input type="hidden" name="clear" value="1" />
+        <button type="submit" style={{
+          background: '#92400e', color: '#fff', borderRadius: 8, padding: '4px 12px', border: 'none', cursor: 'pointer',
+          fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+        }}>
+          Sair do preview
+        </button>
+      </form>
     </div>
   )
 }

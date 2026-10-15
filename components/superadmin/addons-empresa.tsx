@@ -64,12 +64,16 @@ export function AddonsEmpresa({ empresaId, zapintelInit }: {
               </div>
               {/* Preview: super admin inspeciona esta empresa mesmo com o add-on
                   desligado (não impersona o CRM inteiro). */}
-              <a
-                href={`/api/zapintel/preview?empresa=${empresaId}`}
-                className="flex flex-none items-center gap-1 rounded-control border border-line px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:border-[#6D28D9] hover:text-[#6D28D9]"
-              >
-                <ExternalLink size={13} strokeWidth={1.8} /> Prever
-              </a>
+              {/* POST, não link: GET que liga o preview era CSRF (ver a rota). */}
+              <form method="post" action="/api/zapintel/preview" className="flex-none">
+                <input type="hidden" name="empresa" value={empresaId} />
+                <button
+                  type="submit"
+                  className="flex items-center gap-1 rounded-control border border-line px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:border-[#6D28D9] hover:text-[#6D28D9]"
+                >
+                  <ExternalLink size={13} strokeWidth={1.8} /> Prever
+                </button>
+              </form>
               <button
                 type="button" role="switch" aria-checked={r.on} aria-label={r.label}
                 disabled={saving === r.key}

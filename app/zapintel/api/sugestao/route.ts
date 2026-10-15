@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
 import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
@@ -142,6 +142,10 @@ export async function POST(req: Request) {
     '',
     contextoDaSugestao(lead, travou, ficha),
   ].join('\n')
+
+  if (await leadDeFunilInterno(db, empresaId, id)) {
+    return NextResponse.json({ erro: 'Conversa de funil interno (equipe ou candidatos) fica fora das análises do ZapIntel.' }, { status: 422 })
+  }
 
   // Chamada paga e sem cache (cada clique escreve de novo): teto por pessoa.
   if (await excedeuLimiteDoUsuario(db, 'zapintel-sugestao', userId, 40)) {

@@ -82,8 +82,15 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       supabase.rpc(rpc as never, JSON.parse(chave) as never).then(({ data, error }) => {
         if (!vivo) return;
         if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); return; }
-        // Permissão negada não melhora tentando de novo.
-        if (n < 2 && error.code !== "42501") { espera = setTimeout(() => tentar(n + 1), 1500 * (n + 1)); return; }
+        // Permissão negada não melhora tentando de novo. Tempo esgotado (57014)
+        // tenta UMA vez, e só depois de 5 s: em 15/10/2026, com várias telas
+        // abertas, cada consulta cortada aos 8 s era repetida mais duas vezes —
+        // 8 s de CPU a mais por tentativa, justo quando o banco já estava
+        // sobrecarregado (40 cortes em 4 minutos nos logs). O caso que a
+        // repetição resolve (cache frio na 1ª consulta do dia) sai na segunda.
+        const limite = error.code === "57014" ? 1 : 2;
+        const atraso = error.code === "57014" ? 5000 : 1500 * (n + 1);
+        if (n < limite && error.code !== "42501") { espera = setTimeout(() => tentar(n + 1), atraso); return; }
         // Desistiu dos parâmetros NOVOS (outra loja, outro filtro): os dados na
         // tela são dos antigos. Mantê-los mostrava os números da loja anterior
         // com o nome da loja nova, e as telas só exibem o erro sem dados.

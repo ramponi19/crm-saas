@@ -76,6 +76,18 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
   const [gerando, setGerando] = useState<{ feitos: number; total: number } | null>(null);
   const [erroLote, setErroLote] = useState("");
   const parar = useRef(false);
+  const emCurso = useRef<AbortController | null>(null);
+  const desmontado = useRef(false);
+  // Saiu do ZapIntel (o layout desmonta este bloco): o lote para. Antes o laço
+  // seguia gastando a IA lead a lead com ninguém olhando. O pedido que já está
+  // no servidor termina e fica salvo; os próximos não saem. Acesso revogado no
+  // meio do lote não precisa disto: o servidor confere a cada lead
+  // (`zapintelAcesso`), responde 403, e o laço para no primeiro erro.
+  // (O corpo zera a marca: em desenvolvimento o React monta, desmonta e monta de novo.)
+  useEffect(() => {
+    desmontado.current = false;
+    return () => { desmontado.current = true; parar.current = true; emCurso.current?.abort(); };
+  }, []);
 
   const aplicar = useCallback((d: Contagem | null) => {
     if (!d) { setFalhou(true); return; }
@@ -119,10 +131,12 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
       if (parar.current) break;
       const p = fila[i];
       try {
+        emCurso.current = new AbortController();
         const r = await fetch("/zapintel/api/perfil", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lead: p.leadId, forcar: false }),
+          signal: emCurso.current.signal,
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) {
@@ -131,11 +145,15 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
         }
         window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: p.leadId }));
       } catch {
+        if (desmontado.current) break;
         setErroLote(`Parei em ${p.nome}: sem conexão. As já geradas ficaram salvas.`);
         break;
       }
       setGerando({ feitos: i + 1, total: fila.length });
     }
+    emCurso.current = null;
+    // Botão "Parar" cai aqui normalmente; só a saída da tela não mexe no estado.
+    if (desmontado.current) return;
     setGerando(null);
     contar();
   }

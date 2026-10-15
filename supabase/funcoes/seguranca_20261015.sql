@@ -26,3 +26,23 @@ alter table public.zapintel_lead_perfil
 
 -- 5. Desempenho: zapintel_turnos chamava zapintel_horario() uma vez por turno
 --    (1,3 s → 0,27 s com `materialized`). Ver zapintel_turnos.sql.
+
+-- ══ FASE 2 (15/10/2026, fechamento técnico) ════════════════════════════════
+
+-- 6. `v_orfaos_chat_midia` (view SECURITY DEFINER, sem uso no código — a
+--    retenção lê `storage_orfaos`) era legível pela chave anônima: 8 nomes de
+--    arquivo de mídia de conversa. Só a chave de serviço lê agora.
+revoke all on public.v_orfaos_chat_midia from anon, authenticated;
+alter view public.v_orfaos_chat_midia set (security_invoker = true);
+
+-- 7. RLS de leads e lead_mensagens: a mesma regra, com get_empresa_id() avaliado
+--    UMA vez por consulta em vez de uma por linha. A contagem de não lidas do
+--    sino (86.856 chamadas desde junho, média 482 ms — o maior gasto de CPU do
+--    banco feito pelo app) caiu para ~30 ms; resultado idêntico para dono,
+--    admin, vendedor, outra empresa e empresa de prévia (conferido por hash).
+alter policy tenant_isolamento on public.lead_mensagens
+  using ((empresa_id = (select get_empresa_id())) and ((select filiais_visiveis()) @> array[coalesce(filial_id, 0::bigint)]))
+  with check (empresa_id = (select get_empresa_id()));
+alter policy tenant_isolamento on public.leads
+  using ((empresa_id = (select get_empresa_id())) and ((select filiais_visiveis()) @> array[coalesce(filial_id, 0::bigint)]))
+  with check ((empresa_id = (select get_empresa_id())) and ((select filiais_visiveis()) @> array[coalesce(filial_id, 0::bigint)]));

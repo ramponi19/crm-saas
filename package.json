@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
+    "test": "node --import ./tests/alias.mjs --experimental-test-module-mocks --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --test tests/*.test.ts",
     "types:gen": "supabase gen types typescript --project-id guiuzbcqkvelqcuogxtd > types/database.ts",
     "db:sync": "npm run types:gen && npm run type-check",
     "check:nucleo": "node scripts/check-nucleo.mjs",
