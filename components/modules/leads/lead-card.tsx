@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Lead, Usuario } from './types'
@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { calcularScore } from '@/lib/lead-score'
 import { aguardandoResposta } from '@/lib/esteira'
 import { useScoreConfig } from './score-config-context'
+import { assinarRelogio, instanteDoRelogio } from './relogio'
 
 const TIER_CHIP: Record<string, { label: string; cls: string }> = {
   quente: { label: 'Quente', cls: 'bg-accent-soft text-accent' },
@@ -105,20 +106,28 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
 
   const style = { transform: CSS.Transform.toString(transform), transition }
 
-  // Relógio do cartão: começa no instante do servidor (o 1º desenho tem de sair
-  // igual nos dois lados) e depois anda pelo relógio do navegador a cada 30 s.
-  const [agora, setAgora] = useState(() => agoraInicial ?? Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setAgora(Date.now()), 30_000)
-    return () => clearInterval(id)
-  }, [])
-
   const responsavel = usuarios.find((u) => u.id === lead.responsavel_id)
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
   const esperandoDesde = aguardandoDesde(lead)
-  const slaTone = getSlaTone(esperandoDesde, agora, sla)
   const scoreCfg = useScoreConfig()
-  const { score, tier } = calcularScore(lead, scoreCfg, agora)
+
+  /**
+   * Tudo o que depende do relógio, num texto só: o cartão se redesenha apenas
+   * quando ele muda — não a cada tique. No servidor e na hidratação vale o
+   * instante do servidor (o 1º desenho sai igual nos dois lados); depois, o
+   * relógio compartilhado da página (./relogio).
+   */
+  const doTempo = (agora: number) => {
+    const { score, tier } = calcularScore(lead, scoreCfg, agora)
+    return `${humanElapsed(esperandoDesde, agora)}|${getSlaTone(esperandoDesde, agora, sla)}|${score}|${tier}`
+  }
+  const [espera, tom, scoreTxt, tier] = useSyncExternalStore(
+    assinarRelogio,
+    () => doTempo(instanteDoRelogio(agoraInicial)),
+    () => doTempo(agoraInicial ?? instanteDoRelogio()),
+  ).split('|')
+  const slaTone = tom as SlaTone
+  const score = Number(scoreTxt)
   const chip = TIER_CHIP[tier]
 
   return (
@@ -166,7 +175,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
                 title="Cliente esperando resposta"
                 className={`whitespace-nowrap text-[10px] font-semibold ${SLA_CLASS[slaTone]}`}
               >
-                {humanElapsed(esperandoDesde, agora)}
+                {espera}
               </span>
             )}
           </div>
