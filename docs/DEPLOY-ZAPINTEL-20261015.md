@@ -126,3 +126,11 @@ Antes, o link ficava no /admin (dono/admin), mas o vendedor que digitasse
 Ordem: push primeiro, depois a 05 (com a 05 antes, o vendedor veria a tela de
 erro do painel em vez da mensagem). Fora do escopo: o assistente do CRM (robô do
 /dashboard), que não é o ZapIntel, continua disponível ao vendedor.
+
+## Push autorizado — deploy `3a69d0b` (15/10)
+
+- Push `74139b3..3a69d0b` (7 commits, autor Lucas Ramponi); Vercel **READY**; 0 erro de runtime na última hora.
+- Vendedor `reviewer.meta@jmstore.app`, depois do deploy: tela do ZapIntel = "O ZapIntel é usado pelo dono e pelos administradores…", sem painel; rotas conversa 615/1706/1204 = **403**; análise e sugestão para o 615 (loja dele) = **403** antes de qualquer IA; fila do robô = 403.
+- **Ainda aberto até a 05:** a função do banco `zapintel_resumo`, chamada direto pela API com a sessão do vendedor, devolve dados (200).
+- Sino (sessão do vendedor, /dashboard): título "(869)" = contador 869 = view 869.
+- Console: React #418 (hidratação) no /dashboard — **anterior a este deploy**: `saudacao()` em components/modules/dashboard/dashboard-view.tsx (sem mudança desde 01/09) usa a hora do servidor (UTC) na renderização e a do navegador (SP) na hidratação. Gravidade baixa; correção proposta, não feita.
