@@ -38,8 +38,15 @@ const PERIOD_LABELS: Record<string, string> = {
   hoje: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', mes: 'este mês', ano: 'este ano',
 }
 
+/**
+ * Hora e data em fuso FIXO: a página é desenhada no servidor (UTC) e depois no
+ * navegador (São Paulo). Sem fuso, 9 horas por dia a saudação saía diferente nos
+ * dois lados — e de 21h à meia-noite também a data —, e o React acusava o #418.
+ */
+const FUSO = 'America/Sao_Paulo'
+
 function saudacao() {
-  const h = new Date().getHours()
+  const h = Number(new Intl.DateTimeFormat('pt-BR', { hour: 'numeric', hourCycle: 'h23', timeZone: FUSO }).format(new Date()))
   return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
 }
 
@@ -325,7 +332,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
             <div>
               <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">{saudacao()}{userName ? `, ${userName}` : ''}.</h1>
               <p className="mt-0.5 text-[13px] text-ink-2">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FUSO })}
                 {globais.leadsNovos > 0 && <> — <span className="font-medium text-ink">{globais.leadsNovos}</span> leads aguardam primeira resposta.</>}
               </p>
             </div>
@@ -391,7 +398,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
                 <div>
                   {vendasRecentes.map((v) => {
                     const canal = CANAIS_VENDA.find((c) => c.value === v.canal_venda)
-                    const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
+                    const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO }) : '—'
                     return (
                       <div key={v.id} className="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0 hover:bg-raised">
                         <span className="num w-[46px] flex-none text-[12px] text-ink-3">{data}</span>
