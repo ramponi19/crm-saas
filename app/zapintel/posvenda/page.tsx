@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useLeads } from "@/hooks/zapintel/useLeads";
+import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
+import { AvisoPainelAntigo } from "@/components/zapintel/aviso-painel-antigo";
 import type { LeadLeve } from "@/lib/zapintel/painel";
 import { getCrossSell } from "@/lib/zapintel/segments/segments";
 import { ArrowRight, Copy } from "lucide-react";
@@ -123,7 +124,7 @@ function ScriptCard({ name, phone }: { name: string; phone: string }) {
 }
 
 export default function PosVendaPage() {
-  const { leads, loaded, segment } = useLeads();
+  const { leads, loaded, segment } = usePainelAntigo();
   const crossMap = getCrossSell(segment.id); // celulares tem mapa; demais → genérico
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -173,6 +174,7 @@ export default function PosVendaPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <AvisoPainelAntigo />
 
       {/* Header */}
       <div style={{ marginBottom: 22 }}>

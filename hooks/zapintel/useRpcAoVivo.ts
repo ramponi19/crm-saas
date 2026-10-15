@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ouvirZapintel } from "./canalZapintel";
 
 /**
  * UMA CONSULTA AO BANCO QUE SE ATUALIZA SOZINHA — SEM PULSO E SEM VERCEL.
@@ -12,7 +13,8 @@ import { createClient } from "@/lib/supabase/client";
  *      banco decide empresa e lojas (`zapintel_escopo`);
  *   2. o AVISO — o canal privado `zapintel:<empresa>`, que o próprio banco
  *      alimenta a cada lote de mensagens, ficha refeita ou venda registrada
- *      (`supabase/funcoes/zapintel_ao_vivo.sql`).
+ *      (`supabase/funcoes/zapintel_ao_vivo.sql`). Um canal só por empresa,
+ *      dividido entre todas as consultas da tela (`canalZapintel.ts`).
  *
  * ══ O RITMO ═════════════════════════════════════════════════════════════════
  *
@@ -95,21 +97,21 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       const espera = Math.max(RESPIRO, ultimaConsulta.current + INTERVALO_MINIMO - agora);
       timer.current = setTimeout(() => { if (ativo) buscar(); }, espera);
     };
-    const canal = supabase
-      .channel(`zapintel:${empresaDoCanal}`, { config: { private: true } })
-      .on("broadcast", { event: "mensagens" }, agendar)
-      .on("broadcast", { event: "analises" }, agendar)
-      .on("broadcast", { event: "vendas" }, agendar)
-      .subscribe((status) => {
+    // O canal é compartilhado entre as consultas ao vivo da tela (o menu e a
+    // página escutam ao mesmo tempo) — ver `canalZapintel.ts`.
+    const sair = ouvirZapintel(supabase, empresaDoCanal, {
+      evento: agendar,
+      status: (status) => {
         if (!ativo) return;
         setAoVivo(status === "SUBSCRIBED");
         // Reconectou depois de cair: pode ter perdido avisos no meio.
         if (status === "SUBSCRIBED" && atrasado.current) buscar();
-      });
+      },
+    });
     return () => {
       ativo = false;
       if (timer.current) clearTimeout(timer.current);
-      supabase.removeChannel(canal);
+      sair();
     };
   }, [supabase, empresaDoCanal, buscar]);
 

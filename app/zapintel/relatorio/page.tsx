@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
-import { useLeads } from "@/hooks/zapintel/useLeads";
+import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
+import { AvisoPainelAntigo } from "@/components/zapintel/aviso-painel-antigo";
 import { FileText, Sparkles, RefreshCw, Copy, CheckCircle2 } from "lucide-react";
 
 function fmtCurrency(v: number) {
@@ -10,7 +11,7 @@ function fmtCurrency(v: number) {
 }
 
 export default function RelatorioPage() {
-  const { leads, stats, loaded, storeName, segment } = useLeads();
+  const { leads, stats, loaded, storeName, segment } = usePainelAntigo();
   const loja = storeName || "sua empresa";
   const [report, setReport]     = useState("");
   const [loading, setLoading]   = useState(false);
@@ -137,6 +138,7 @@ Gere um relatório com estas seções:
 
   return (
     <div style={{maxWidth:780,margin:"0 auto"}}>
+      <AvisoPainelAntigo />
       <div style={{marginBottom:22}}>
         <h1 style={{fontSize:22,fontWeight:800,letterSpacing:-.5,marginBottom:4,display:"flex",alignItems:"center",gap:10}}>
           <FileText size={22} color="var(--purple)"/> Relatório Semanal com IA

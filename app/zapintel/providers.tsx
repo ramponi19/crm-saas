@@ -17,7 +17,7 @@ export const useEmpresaZapintel = () => useContext(EmpresaContext);
 export default function Providers({ children, empresaId }: { children: React.ReactNode; empresaId?: number }) {
   return (
     <EmpresaContext.Provider value={empresaId ?? null}>
-      <LeadProvider>{children}</LeadProvider>
+      <LeadProvider empresa={empresaId ?? null}>{children}</LeadProvider>
     </EmpresaContext.Provider>
   );
 }

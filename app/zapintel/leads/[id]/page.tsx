@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useLeads } from "@/hooks/zapintel/useLeads";
+import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
 import type { Travou } from "@/lib/zapintel/travou";
@@ -177,7 +177,7 @@ type Tab = "whatsapp" | "instagram" | "all";
 export default function LeadDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { leads, markSaleClosed, storeName, sellerName, segment, calculadoEm } = useLeads();
+  const { leads, markSaleClosed, storeName, sellerName, segment, calculadoEm } = usePainelAntigo();
   const saleProducts = [...getProducts(segment.id), "Outro"];
   const resumo = leads.find(l => l.id === id);
   /**

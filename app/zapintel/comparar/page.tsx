@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
-import { useLeads } from "@/hooks/zapintel/useLeads";
+import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
+import { AvisoPainelAntigo } from "@/components/zapintel/aviso-painel-antigo";
 import { comparePeriods, type PeriodComparison, type PeriodStats } from "@/lib/zapintel/insights/stats";
 import { TrendingUp, TrendingDown, Minus, BarChart2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -31,7 +32,7 @@ function addDays(d: Date, n: number) {
 function toIso(d: Date) { return d.toISOString().split("T")[0]; }
 
 export default function ComparePage() {
-  const { leads, loaded, agregados } = useLeads();
+  const { leads, loaded, agregados } = usePainelAntigo();
   const [preset, setPreset] = useState<Preset>("30d");
 
   const today = useMemo(() => new Date(), []);
@@ -85,6 +86,7 @@ export default function ComparePage() {
 
   return (
     <div style={{maxWidth:1040,margin:"0 auto"}}>
+      <AvisoPainelAntigo />
       <div style={{marginBottom:22}}>
         <h1 style={{fontSize:22,fontWeight:800,letterSpacing:-.5,marginBottom:4,display:"flex",alignItems:"center",gap:10}}>
           <BarChart2 size={22} color="var(--purple)"/> Comparação de Períodos

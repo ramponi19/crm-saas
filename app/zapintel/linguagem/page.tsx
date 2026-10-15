@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useLeads } from "@/hooks/zapintel/useLeads";
+import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
+import { AvisoPainelAntigo } from "@/components/zapintel/aviso-painel-antigo";
 import { MessageSquare, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -17,7 +18,7 @@ const TT = { contentStyle:{ background:"var(--card)", border:"1px solid var(--br
  */
 
 export default function LinguagemPage() {
-  const { agregados, loaded, sellerName } = useLeads();
+  const { agregados, loaded, sellerName } = usePainelAntigo();
   const vend = sellerName.toLowerCase();
   const [tab, setTab] = useState<"words"|"phrases"|"patterns">("words");
 
@@ -35,6 +36,7 @@ export default function LinguagemPage() {
 
   return (
     <div style={{maxWidth:1040,margin:"0 auto"}}>
+      <AvisoPainelAntigo />
       <div style={{marginBottom:22}}>
         <h1 style={{fontSize:22,fontWeight:800,letterSpacing:-.5,marginBottom:4,display:"flex",alignItems:"center",gap:10}}>
           <MessageSquare size={22} color="var(--purple)"/> Análise de Linguagem

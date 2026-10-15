@@ -1,9 +1,10 @@
 "use client";
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import type { Lead, DashboardStats, ManualSale } from "@/types/zapintel";
 import type { LeadLeve, Agregados, Loja, Painel } from "@/lib/zapintel/painel";
-import { getSegment, getRole, DEFAULT_SEGMENT_ID } from "@/lib/zapintel/segments/segments";
+import { getSegment, getRole, DEFAULT_SEGMENT_ID, mapCrmSegmento } from "@/lib/zapintel/segments/segments";
 import type { SegmentConfig } from "@/lib/zapintel/segments/segments";
+import { useRpcAoVivo } from "./useRpcAoVivo";
 
 /**
  * A FONTE DE DADOS DO ZAPINTEL.
@@ -21,6 +22,16 @@ import type { SegmentConfig } from "@/lib/zapintel/segments/segments";
  *
  * O que sobrou é o que sempre foi o produto: pedir o painel ao servidor,
  * escolher a loja, e saber de quando é o número.
+ *
+ * ══ 15/10/2026: O MENU SAIU DO PAINEL, E O PAINEL VIROU SOB DEMANDA ════════
+ *
+ * *"achei que ele rodava online fulltime"* — o Lucas, ao ver o menu "Vendo"
+ * parado em 1.911 enquanto o banco tinha 1.919. Lojas, contagens e nome da
+ * empresa agora vêm de `zapintel_resumo`, ao vivo (mesmo canal e mesmo teto
+ * das telas novas). E o painel antigo — calculado na Vercel, congelado até
+ * "Sincronizar" — só é baixado pelas telas que ainda dependem dele, via
+ * `usePainelAntigo()`. Antes TODA tela do ZapIntel o baixava ao abrir,
+ * inclusive as que já liam o banco: uma chamada à Vercel por tela, à toa.
  *
  * ══ LEAD LEVE ══════════════════════════════════════════════════════════════
  *
@@ -40,12 +51,20 @@ interface LeadStore {
   loaded: boolean;
   loading: boolean;
 
-  /** As lojas disponíveis. A primeira é sempre "toda a rede" (`id: null`). */
+  /** As lojas disponíveis, ao vivo. A primeira é sempre "toda a rede" (`id: null`). */
   lojas: Loja[];
+  /** Leads ativos com conversa, ao vivo (`zapintel_resumo`). */
+  conversas: number;
+  /** Instante da mensagem mais recente — o "última mensagem há X" do menu. */
+  ultimaMensagem: string | null;
+  /** O canal ao vivo está conectado. */
+  aoVivo: boolean;
+  /** As telas antigas chamam (via `usePainelAntigo`) para o painel ser baixado. */
+  pedirPainel: () => void;
   lojaAtiva: number | null;
   setLojaAtiva: (id: number | null) => void;
 
-  /** Mensagens que entraram na análise — o número que antes vinha truncado. */
+  /** Mensagens das conversas, ao vivo. */
   mensagens: number;
   /** Leads ativos sem nenhuma conversa. Ficam fora dos agregados, de propósito. */
   semConversa: number;
@@ -68,11 +87,19 @@ interface LeadStore {
 
 const Ctx = createContext<LeadStore | null>(null);
 
-export function LeadProvider({ children }: { children: ReactNode }) {
+interface Resumo {
+  empresa: number; empresaNome: string | null; segmento: string | null;
+  conversas: number; semConversa: number; mensagens: number; ultimaMensagem: string | null;
+  lojas: Loja[];
+}
+
+export function LeadProvider({ children, empresa }: { children: ReactNode; empresa: number | null }) {
   const [painel, setPainel] = useState<Painel | null>(null);
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const painelPedido = useRef(false);
+  const { dados: resumo, aoVivo } = useRpcAoVivo<Resumo>("zapintel_resumo", { p_empresa: empresa }, empresa);
 
   // Quem avisa "estou carregando" é o CHAMADOR, não esta função: o primeiro
   // carregamento já começa com `loading` ligado, e marcar de novo dentro do
@@ -94,7 +121,13 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => { void buscar(); }, [buscar]);
+  // Só baixa quando uma tela antiga pede — e uma vez; o resto é "Sincronizar".
+  const pedirPainel = useCallback(() => {
+    if (painelPedido.current) return;
+    painelPedido.current = true;
+    setLoading(true);
+    void buscar();
+  }, [buscar]);
 
   // ── Atualizar: só quando pedem ────────────────────────────────────────────
   //
@@ -122,7 +155,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   }, [painel, lojaAtiva]);
 
   const agregados = painel?.agregados[chave] ?? null;
-  const segmentId = painel?.segmentId ?? DEFAULT_SEGMENT_ID;
+  const segmentId = resumo ? mapCrmSegmento(resumo.segmento) : (painel?.segmentId ?? DEFAULT_SEGMENT_ID);
 
   const syncFromCRM = useCallback(() => {
     setSyncing(true);
@@ -146,16 +179,20 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     segment: getSegment(segmentId),
     loaded: !!painel,
     loading,
-    lojas: painel?.lojas ?? [],
+    lojas: resumo?.lojas ?? [],
+    conversas: resumo?.conversas ?? 0,
+    ultimaMensagem: resumo?.ultimaMensagem ?? null,
+    aoVivo,
+    pedirPainel,
     lojaAtiva,
     setLojaAtiva,
-    mensagens: painel?.mensagens ?? 0,
-    semConversa: painel?.semConversa ?? 0,
+    mensagens: resumo?.mensagens ?? 0,
+    semConversa: resumo?.semConversa ?? 0,
     calculadoEm: painel?.calculadoEm ?? null,
     markSaleClosed,
     syncFromCRM,
     syncing,
-    storeName: painel?.empresaNome ?? "",
+    storeName: resumo?.empresaNome ?? painel?.empresaNome ?? "",
     sellerName: getRole(segmentId),
   };
 
@@ -165,6 +202,19 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 export function useLeads() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useLeads must be inside LeadProvider");
+  return ctx;
+}
+
+/**
+ * Para as telas que AINDA leem o painel antigo (Comparar, Linguagem,
+ * Relatório, Pós-venda e a ficha do lead): pede o painel ao abrir. Cada uma
+ * mostra `AvisoPainelAntigo` — de quando é o número e o "Sincronizar".
+ * Some quando a última delas passar a ler o banco.
+ */
+export function usePainelAntigo() {
+  const ctx = useLeads();
+  const { pedirPainel } = ctx;
+  useEffect(() => { pedirPainel(); }, [pedirPainel]);
   return ctx;
 }
 

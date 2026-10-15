@@ -72,7 +72,13 @@ v "so o botao recalcula"            "lib/zapintel/cache.ts" "if (!forcado) retur
 n "a tela nao tem relogio nenhum"   "hooks/zapintel/useLeads.tsx" "setInterval"
 n "a tela nao pergunta por pulso"   "hooks/zapintel/useLeads.tsx" "api/pulso"
 v "o botao fura o cache"            "hooks/zapintel/useLeads.tsx" "buscar(true)"
-v "a barra diz de quando e o numero" "components/zapintel/zap-sidebar.tsx" "idadeDoCalculo"
+# 15/10/2026: o menu virou ao vivo (zapintel_resumo) e o "Sincronizar" saiu
+# dele; as telas que ainda leem o painel antigo dizem de quando é o número.
+v "menu le o banco ao vivo"         "hooks/zapintel/useLeads.tsx" "useRpcAoVivo<Resumo>(\"zapintel_resumo\""
+n "menu sem sincronizar"            "components/zapintel/zap-sidebar.tsx" "syncFromCRM"
+v "tela antiga diz de quando e"     "components/zapintel/aviso-painel-antigo.tsx" "Esta tela ainda não atualiza sozinha"
+v "painel so sob demanda"           "hooks/zapintel/useLeads.tsx" "export function usePainelAntigo"
+v "canal unico por empresa"         "hooks/zapintel/useRpcAoVivo.ts" "ouvirZapintel(supabase"
 # -- ponte venda->conversa (10/10/2026) ------------------------------------
 # Sem ligar venda a conversa, todo numero do ZapIntel e heuristica escrita a
 # mao. Estes checks guardam as decisoes que a medicao obrigou.

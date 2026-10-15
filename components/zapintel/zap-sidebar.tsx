@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, GitCompare, Languages, FileText, Headset, ArrowLeft, RefreshCw, Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, GitCompare, Languages, FileText, Headset, ArrowLeft, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
@@ -28,36 +28,23 @@ const NAV = [
   { href: "/zapintel/posvenda", icon: ShoppingBag, label: "Pós Venda" },
 ];
 
-/**
- * DE QUANDO É O NÚMERO QUE ESTÁ NA TELA — E QUÃO VELHO ISSO JÁ É.
- *
- * O painel deixou de se atualizar sozinho em 09/10/2026 (o cálculo custa 2,76 s
- * de CPU, contra um teto de 4 h por mês que ao estourar PAUSA os projetos na
- * Vercel). A troca combinada foi essa: não atualiza sozinho, mas DIZ a data.
- *
- * Por isso a cor envelhece junto com o número. Data escrita em cinza é fácil de
- * não ler — e um painel de três dias atrás com cara de painel de agora é
- * exatamente o defeito que este módulo já teve duas vezes, as duas caladas.
- */
-function idadeDoCalculo(iso: string | null) {
+/** "há 3 min", "há 2 h" — de quando é a última mensagem que chegou. */
+function haQuanto(iso: string | null, agora: number) {
   if (!iso) return null
-  const t = new Date(iso)
-  const horas = (Date.now() - t.getTime()) / 3_600_000
-  const hoje = new Date().toDateString() === t.toDateString()
-  const hora = t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-  const dia = t.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-  return {
-    texto: hoje ? `Atualizado hoje às ${hora}` : `Atualizado em ${dia} às ${hora}`,
-    // Verde até 2 h, amarelo no mesmo dia, vermelho de ontem para trás. Quem
-    // olha de relance precisa perceber a idade sem ler a data.
-    cor: horas < 2 ? "var(--green)" : horas < 24 ? "var(--yellow)" : "var(--red)",
-  }
+  const min = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 60000))
+  if (min < 1) return "agora"
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `há ${h} h` : `há ${Math.floor(h / 24)} d`
 }
 
 export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: string }) {
   const path = usePathname();
-  const { syncFromCRM, syncing, lojas, lojaAtiva, setLojaAtiva, mensagens, semConversa, calculadoEm } = useLeads();
-  const idade = idadeDoCalculo(calculadoEm);
+  const { lojas, lojaAtiva, setLojaAtiva, conversas, mensagens, semConversa, ultimaMensagem, aoVivo } = useLeads();
+  // O relógio do "última mensagem há X" anda sozinho; os números chegam pelo canal.
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  const ultima = haQuanto(ultimaMensagem, agora);
   /**
    * NO CELULAR A BARRA VIRA MENU. Antes ela ocupava 210 px fixos, metade de
    * uma tela de 390 — o dashboard ao vivo, que o vendedor abre no balcão pelo
@@ -123,7 +110,7 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
                 <button
                   key={loja.id ?? "geral"}
                   onClick={() => setLojaAtiva(loja.id)}
-                  title={`${loja.leads} conversas analisadas`}
+                  title={`${loja.leads} conversas`}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                     width: "100%", textAlign: "left", cursor: "pointer",
@@ -142,45 +129,26 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
         </div>
       )}
 
+      {/*
+        AO VIVO DESDE 15/10/2026. Aqui ficava "Atualizado em 14/10 às 17:37" e o
+        botão "Sincronizar agora", do painel antigo — e o menu inteiro parecia
+        depender de clique (*"achei que ele rodava online fulltime"*). Agora os
+        números vêm de `zapintel_resumo`, pelo mesmo canal das telas. As telas
+        que ainda leem o painel antigo têm o próprio aviso no topo.
+      */}
       <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
-        {/*
-          A DATA É O TÍTULO DO BLOCO, e não um rodapé em cinza.
-          Antes aqui ficava o estado da assinatura de tempo real ("Conectado ao
-          CRM"). Não há mais assinatura nem pulso: o que o usuário precisa saber
-          agora não é se o canal está de pé, é de quando é o número que ele está
-          lendo.
-        */}
-        <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: idade ? idade.cor : "var(--muted)" }}>
-          {syncing ? "● Refazendo a conta…" : idade ? `● ${idade.texto}` : "● Carregando…"}
+        <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: aoVivo ? "var(--green)" : "var(--muted)" }}>
+          {aoVivo ? "● Ao vivo" : "● Conectando…"}
         </div>
-        {/*
-          O que o painel analisou, em números — e não a promessa de que analisa.
-          Antes dizia só "sincroniza sozinho", enquanto por baixo cortava a
-          análise em 40.000 mensagens e parava três semanas atrás.
-        */}
-        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8, lineHeight: 1.5 }}>
-          {mensagens > 0 ? (
+        <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>
+          {conversas > 0 ? (
             <>
-              {mensagens.toLocaleString("pt-BR")} mensagens analisadas
+              {conversas.toLocaleString("pt-BR")} conversas · {mensagens.toLocaleString("pt-BR")} mensagens
               {semConversa > 0 && <> · {semConversa} lead{semConversa > 1 ? "s" : ""} sem conversa</>}
-              <br />Não atualiza sozinho — clique para refazer
+              {ultima && <><br />Última mensagem {ultima}</>}
             </>
-          ) : "Lendo as conversas reais dos leads"}
+          ) : "Lendo as conversas…"}
         </div>
-        <button
-          onClick={syncFromCRM}
-          disabled={syncing}
-          title="Refaz a conta agora, sem esperar os 10 minutos. Descarta imports manuais e relê as conversas atuais dos leads"
-          style={{
-            width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            background: "var(--purple)", color: "#fff", border: "none", borderRadius: 8,
-            padding: "7px 10px", fontSize: 11.5, fontWeight: 700, cursor: syncing ? "default" : "pointer",
-            opacity: syncing ? 0.6 : 1,
-          }}
-        >
-          <RefreshCw size={13} style={{ animation: syncing ? "zi-spin 1s linear infinite" : undefined }} />
-          {syncing ? "Sincronizando..." : "Sincronizar agora"}
-        </button>
       </div>
       <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, textDecoration: "none", fontSize: 12, color: "var(--dim)" }}>
         <ArrowLeft size={15} /> Voltar ao CRM
