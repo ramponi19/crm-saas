@@ -38,6 +38,7 @@ como `video/mp4`). Basta um ffmpeg avulso no PATH.
 """
 import argparse
 import os
+import atexit
 import shutil
 import subprocess
 import sys
@@ -202,10 +203,13 @@ def main() -> int:
     print(f"carregando {args.modelo} na GPU...")
     modelo = WhisperModel(args.modelo, device="cuda", compute_type="float16")
 
-    feitos = vazios = falhas = 0
+    feitos = vazios = falhas = quebrados = 0
     seg_audio = 0.0
     t_inicio = time.time()
     tmp = tempfile.mkdtemp(prefix="transcr-")
+    # Sai mesmo se o script cair no meio: em 15/10/2026 duas rodadas que
+    # quebraram deixaram 21 áudios de clientes nesta pasta.
+    atexit.register(shutil.rmtree, tmp, True)
 
     # ══ O GARGALO ERA A REDE, NÃO A GPU ═══════════════════════════════════
     #
@@ -219,6 +223,28 @@ def main() -> int:
     # processamento continua a mesma — `map` preserva a sequência —, o que
     # mantém o progresso legível e a retomada previsível.
     piscina = ThreadPoolExecutor(max_workers=6)
+
+    def descartar(linha) -> None:
+        """
+        ARQUIVO QUEBRADO SAI — a mensagem fica, sem link.
+
+        15/10/2026: os dois arquivos de 99 bytes (25460, 153566) ficaram dois
+        meses voltando a cada rodada. Não há som para ouvir nem para guardar.
+        A URL sai primeiro (a tela passa a dizer "Áudio — indisponível para o
+        CRM", que é a verdade), depois o arquivo, pela API do Storage — nunca
+        por SQL. `transcricao` continua nula: não houve escuta.
+        """
+        rest("PATCH", f"lead_mensagens?id=eq.{linha['id']}",
+             {"midia_url": None}, {"Prefer": "return=minimal"})
+        marca = "/storage/v1/object/public/chat-midia/"
+        if marca in linha["midia_url"]:
+            caminho = linha["midia_url"].split(marca, 1)[1]
+            # Remoção em lote, como o `remove()` do supabase-js: o DELETE de
+            # um objeto só, sem corpo, volta 400.
+            req = urllib.request.Request(
+                f"{url_base}/storage/v1/object/chat-midia", method="DELETE",
+                data=json.dumps({"prefixes": [caminho]}).encode(), headers=cab)
+            urllib.request.urlopen(req, timeout=60).read()
 
     def pegar(linha):
         destino = os.path.join(tmp, f"a{linha['id']}")
@@ -262,6 +288,16 @@ def main() -> int:
             else:
                 vazios += 1
         except Exception as e:
+            # Menos de 1 KB e não decodifica: não é áudio, é o download que
+            # nunca veio. Ver `descartar`.
+            if (isinstance(item, tuple) and os.path.exists(item[1])
+                    and os.path.getsize(item[1]) < 1024):
+                print(f"  [{item[0]['id']}] arquivo quebrado "
+                      f"({os.path.getsize(item[1])} bytes): link e arquivo apagados")
+                descartar(item[0])
+                quebrados += 1
+                gravou_nesta_leva += 1
+                continue
             falhas += 1
             print(f"  [{item[0]['id'] if isinstance(item, tuple) else '?'}] "
                   f"{type(e).__name__}: {str(e)[:70]}")
@@ -294,7 +330,7 @@ def main() -> int:
     # pastas vazias tinham ficado para trás, uma com um arquivo de 99 bytes).
     shutil.rmtree(tmp, ignore_errors=True)
     gasto = time.time() - t_inicio
-    print(f"\n{feitos} transcritos, {vazios} sem fala, {falhas} falhas")
+    print(f"\n{feitos} transcritos, {vazios} sem fala, {quebrados} quebrados apagados, {falhas} falhas")
     print(f"{seg_audio/3600:.1f} h de audio em {gasto/60:.0f} min "
           f"=> {seg_audio/gasto:.1f}x tempo real\n")
     return 1 if falhas and not feitos else 0

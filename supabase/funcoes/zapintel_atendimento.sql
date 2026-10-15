@@ -140,16 +140,8 @@ begin
         'itens', coalesce((select jsonb_agg(i) from (
             select jsonb_build_object('leadId', RETOMAR.id, 'nome', nome, 'classe', cls, 'score', score, 'desde', ue,
                    'loja', (select rotulo from NOMES where NOMES.id = RETOMAR.filial_id)) i
-            from RETOMAR order by score desc nulls last, ue desc limit 8) z), '[]'::jsonb)),
-
-    -- ── Dá para ver por vendedor? Só com responsável ou envio pelo CRM ───
-    'vendedor', jsonb_build_object(
-        'leads', (select count(*) from L join U on U.lead_id = L.id),
-        'comResponsavel', (select count(*) from L join U on U.lead_id = L.id where L.responsavel_id is not null),
-        'mensagensDaLoja', (select count(*) from lead_mensagens m join L on L.id = m.lead_id
-                            where m.empresa_id = v_emp and m.direcao = 'enviada' and m.created_at >= v_desde),
-        'mensagensComUsuario', (select count(*) from lead_mensagens m join L on L.id = m.lead_id
-                                where m.empresa_id = v_emp and m.direcao = 'enviada' and m.usuario_id is not null and m.created_at >= v_desde))
+            from RETOMAR order by score desc nulls last, ue desc limit 8) z), '[]'::jsonb))
+    -- Por vendedor: saiu em 15/10 para `zapintel_conversa` (cartão "Como a loja conversa").
   ) into v_out;
 
   return v_out;

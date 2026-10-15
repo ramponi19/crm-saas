@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { ArrowRight, AlertTriangle, Sparkles, Clock, MoonStar, UserX, RotateCcw, Users, TrendingUp, Grid3x3 } from "lucide-react";
+import { ArrowRight, AlertTriangle, Sparkles, Clock, MoonStar, UserX, RotateCcw, MessagesSquare, TrendingUp, Grid3x3, Mic, RefreshCw } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
@@ -40,7 +41,26 @@ interface Atendimento {
   cobertura: { dow: number; hora: number; turnos: number; mais4h: number }[];
   largadas: { total: number; itens: Item[] };
   retomar: { total: number; itens: Item[] };
-  vendedor: { leads: number; comResponsavel: number; mensagensDaLoja: number; mensagensComUsuario: number };
+}
+
+/** `zapintel_conversa` — supabase/funcoes/zapintel_conversa.sql. */
+interface LinhaConversa {
+  tipo: "geral" | "loja" | "vendedor"; id: string | null; nome: string | null; loja: string | null;
+  mensagens: number; conversas: number; vendas: number; palavrasPorMsg: number | null;
+  audioPct: number | null; perguntasPct: number | null; giriaPct: number | null; risadaPct: number | null;
+  falaLojaPct: number | null; rajadaPct: number | null;
+  resposta: { turnos: number; mediana: number | null; ate5: number | null };
+  girias: { palavra: string; n: number }[];
+  exemplos: { leadId: number; texto: string; audio: boolean }[] | null;
+}
+interface PerfilVenda { vendeu: boolean; conversas: number; falaLojaPct: number; perguntasPct: number; giriaPct: number; audioPct: number; rajadaPct: number }
+interface Conversa {
+  dias: number;
+  /** Quando a conta foi feita — vem guardada (ver o cabeçalho da função). */
+  geradoEm: string;
+  cobertura: { mensagens: number; crm: number; apresentacao: number; dono: number; nenhum: number };
+  linhas: LinhaConversa[];
+  venda: PerfilVenda[] | null;
 }
 
 const PERIODOS: [string, string][] = [["7", "7 dias"], ["30", "30 dias"], ["90", "90 dias"], ["tudo", "Tudo"]];
@@ -129,9 +149,9 @@ export default function AtendimentoPage() {
           <Cobertura d={dados} />
           <Semanas d={dados} />
           <ForaDoHorario d={dados} />
-          <Vendedor d={dados} />
         </div>
       )}
+      <ComoConversa dias={dias} loja={lojaAtiva} empresa={empresa} />
     </div>
   );
 }
@@ -341,21 +361,184 @@ function ForaDoHorario({ d }: { d: Atendimento }) {
   );
 }
 
-function Vendedor({ d }: { d: Atendimento }) {
-  const v = d.vendedor;
-  const pctMsg = v.mensagensDaLoja ? Math.round((v.mensagensComUsuario / v.mensagensDaLoja) * 100) : 0;
+/**
+ * COMO A LOJA CONVERSA — no geral, por loja e por vendedor (15/10/2026).
+ *
+ * Pedido do Lucas: *"vendedor usa giria demais, fala demais e escuta de menos"*
+ * e *"da para deixar pronto por vendedor e no geral"*. Tudo vem de
+ * `zapintel_conversa`, que diz quem escreveu cada mensagem da loja (CRM,
+ * apresentação no áudio, dono do lead) — ver o cabeçalho de
+ * supabase/funcoes/zapintel_conversa.sql.
+ *
+ * NÃO É AO VIVO, de propósito: a conta leva ~5 s em 30 dias, e com a página
+ * carregando as outras consultas ela passou do limite de 8 s do banco (testado
+ * em 15/10). Então o banco guarda o resultado — o cron diário refaz — e a tela
+ * lê pronto (10 ms). "Recalcular" faz a conta na hora. Mede no máximo 30 dias.
+ */
+function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: number | null; empresa: number | null }) {
+  const diasConta = dias == null || dias > 30 ? 30 : dias;
+  const [d, setD] = useState<Conversa | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [rodada, setRodada] = useState(0);
+  // Só o clique em "recalcular" força a conta; trocar loja ou período lê o guardado.
+  const forcar = useRef(false);
+
+  useEffect(() => {
+    if (empresa == null) return;
+    let vivo = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- marca o início da consulta que este efeito dispara
+    setCarregando(true);
+    const p_recalcular = forcar.current;
+    forcar.current = false;
+    createClient().rpc("zapintel_conversa" as never, { p_dias: diasConta, p_filial: loja, p_empresa: empresa, p_recalcular } as never)
+      .then(({ data, error }) => {
+        if (!vivo) return;
+        if (error) setErro(/timeout|canceling/i.test(error.message) ? "A conta demorou demais. Tente 7 dias." : error.message);
+        else { setD(data as unknown as Conversa); setErro(null); }
+        setCarregando(false);
+      });
+    return () => { vivo = false; };
+  }, [diasConta, loja, empresa, rodada]);
+
+  const geral = d?.linhas.find((l) => l.tipo === "geral");
+  const lojas = d?.linhas.filter((l) => l.tipo === "loja") ?? [];
+  // Quem escreveu menos de 20 mensagens no período não tem número que se sustente.
+  const pessoas = (d?.linhas.filter((l) => l.tipo === "vendedor" && l.id) ?? []).filter((l) => l.mensagens >= 20);
+  const semAutor = d?.linhas.find((l) => l.tipo === "vendedor" && !l.id);
+  const cob = d?.cobertura;
+  const idPct = cob && cob.mensagens ? Math.round(((cob.mensagens - cob.nenhum) / cob.mensagens) * 100) : 0;
+  const vendeu = d?.venda?.find((v) => v.vendeu);
+  const naoVendeu = d?.venda?.find((v) => !v.vendeu);
+
   return (
-    <Cartao icone={<Users size={15} />} titulo="Por vendedor"
-      sub="Para comparar vendedores, o sistema precisa saber quem atendeu cada conversa.">
-      <div className="at-mini">
-        <div className={v.comResponsavel < v.leads * 0.5 ? "ruim" : ""}><b>{num(v.comResponsavel)}</b><span>de {num(v.leads)} conversas têm responsável</span></div>
-        <div className={pctMsg < 50 ? "ruim" : ""}><b>{pctMsg}%</b><span>das respostas saíram pelo CRM (as outras, do celular)</span></div>
+    <section className="card at-cartao at-conv">
+      <div className="at-cartao-topo">
+        <div>
+          <h2><MessagesSquare size={15} /> Como a loja conversa</h2>
+          <p>
+            Quanto a loja fala, pergunta, usa gíria e manda mensagem seguida — no geral, por loja e por vendedor, nos últimos {diasConta} dias
+            {dias == null || dias > 30 ? " (esta parte mede no máximo 30)" : ""}. Áudio transcrito conta como fala.
+          </p>
+        </div>
+        <div className="at-recalc-caixa">
+          {d?.geradoEm && !carregando && (
+            <span>calculado {new Date(d.geradoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+          )}
+          <button className="at-link at-recalc" onClick={() => { forcar.current = true; setRodada((r) => r + 1); }} disabled={carregando}>
+            <RefreshCw size={12} className={carregando ? "gira" : ""} /> {carregando ? "calculando…" : "recalcular"}
+          </button>
+        </div>
       </div>
-      <p className="at-nota">
-        O ranking por vendedor aparece aqui quando a equipe atribuir o responsável de cada lead ou responder pelo CRM. Até lá,
-        qualquer número por pessoa seria palpite.
-      </p>
-    </Cartao>
+
+      {erro && <p className="at-vazio"><AlertTriangle size={14} style={{ color: "var(--yellow)" }} /> {erro}</p>}
+      {!d && !erro && <div className="at-osso" style={{ height: 260, borderRadius: 10 }} />}
+
+      {d && geral && (
+        <div className={carregando ? "apagada" : ""}>
+          <div className="at-conv-tabela">
+            <table>
+              <thead>
+                <tr>
+                  <th>Quem</th>
+                  <th title="Conversas em que escreveu no período">Conversas</th>
+                  <th title="Dessas, quantas viraram venda registrada no CRM">Viraram venda</th>
+                  <th title="Palavras da loja ÷ palavras da conversa (loja + cliente). 50% = falam igual.">Loja fala</th>
+                  <th title="Mensagens da loja com pergunta">Perguntas</th>
+                  <th title="Mensagens da loja com gíria (cara, bora, mano, patrão…)">Gíria</th>
+                  <th title="Mensagens da loja que são áudio">Áudio</th>
+                  <th title="Vezes em que a loja mandou 3 ou mais mensagens seguidas sem o cliente responder">3+ seguidas</th>
+                  <th title="Espera típica do cliente no horário da loja — a mesma conta do quadro de tempo de resposta">Resposta</th>
+                </tr>
+              </thead>
+              <tbody>
+                <LinhaTabela l={geral} rotulo={lojas.length > 1 ? "Toda a rede" : "Total"} forte />
+                {lojas.length > 1 && lojas.map((l) => <LinhaTabela key={`l${l.id}`} l={l} rotulo={l.nome ?? "Loja"} />)}
+                {pessoas.map((l) => <LinhaTabela key={`v${l.id}`} l={l} rotulo={l.nome ?? ""} sub={l.loja} pessoa />)}
+                {semAutor && <LinhaTabela l={semAutor} rotulo="Não identificado" sub="ninguém se apresentou nem pegou o lead" apagada />}
+              </tbody>
+            </table>
+          </div>
+
+          {pessoas.some((p) => (p.exemplos?.length ?? 0) > 0) && (
+            <div className="at-conv-falas">
+              {pessoas.filter((p) => (p.exemplos?.length ?? 0) > 0).map((p) => (
+                <div key={p.id} className="at-conv-fala">
+                  <b>{primeiroNome(p.nome)}</b>
+                  <span className="at-conv-chips">{p.girias.map((g) => <i key={g.palavra}>{g.palavra} <em>{num(g.n)}</em></i>)}</span>
+                  <ul>
+                    {p.exemplos!.map((e, i) => (
+                      <li key={i}><Link href={`/zapintel/leads/lead-${e.leadId}`}>{e.audio && <Mic size={11} />} &ldquo;{e.texto}{e.texto.length >= 180 ? "…" : ""}&rdquo;</Link></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {vendeu && naoVendeu && (
+            <div className="at-conv-venda">
+              <b>Nas conversas que viraram venda</b>
+              <div className="at-conv-comp">
+                <Comparar rotulo="loja fala" a={vendeu.falaLojaPct} b={naoVendeu.falaLojaPct} />
+                <Comparar rotulo="com gíria" a={vendeu.giriaPct} b={naoVendeu.giriaPct} />
+                <Comparar rotulo="áudio" a={vendeu.audioPct} b={naoVendeu.audioPct} />
+                <Comparar rotulo="3+ seguidas" a={vendeu.rajadaPct} b={naoVendeu.rajadaPct} />
+                <Comparar rotulo="perguntas" a={vendeu.perguntasPct} b={naoVendeu.perguntasPct} />
+              </div>
+              <p className="at-nota">
+                {num(vendeu.conversas)} conversas que viraram venda contra {num(naoVendeu.conversas)} que não (com 3+ mensagens da loja e 2+ do cliente).
+                {vendeu.conversas < 50 && " Poucas vendas no período: é indício, não prova — conversa que vende também é diferente por outros motivos."}
+              </p>
+            </div>
+          )}
+
+          {cob && (
+            <p className="at-nota">
+              <b>De quem é cada mensagem:</b> {idPct}% identificadas — {num(cob.apresentacao)} pela apresentação no áudio (&ldquo;Pedro aqui&rdquo;),
+              {" "}{num(cob.dono)} pelo dono do lead (&ldquo;Pegar lead&rdquo;), {num(cob.crm)} enviadas pelo CRM. As outras {num(cob.nenhum)} ficam em
+              &ldquo;Não identificado&rdquo;. Para subir esse número, cada vendedor clica em <b>Pegar lead</b> antes de responder. A venda conta para a
+              conversa, não para o vendedor: quem atende no WhatsApp nem sempre é quem fecha no balcão.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function primeiroNome(n: string | null) {
+  return (n ?? "").trim().split(/\s+/).slice(0, 2).join(" ");
+}
+
+function pct(v: number | null | undefined) { return v == null ? "—" : `${v}%`; }
+
+function LinhaTabela({ l, rotulo, sub, forte, pessoa, apagada }: {
+  l: LinhaConversa; rotulo: string; sub?: string | null; forte?: boolean; pessoa?: boolean; apagada?: boolean;
+}) {
+  const taxa = l.conversas ? Math.round((l.vendas / l.conversas) * 100) : 0;
+  return (
+    <tr className={`${forte ? "forte" : ""} ${apagada ? "apagada" : ""}`}>
+      <td><b>{pessoa ? primeiroNome(rotulo) : rotulo}</b>{sub && <span>{sub}</span>}</td>
+      <td>{num(l.conversas)}</td>
+      <td>{num(l.vendas)} <span>{taxa}%</span></td>
+      <td className={(l.falaLojaPct ?? 0) >= 70 ? "alto" : ""}>{pct(l.falaLojaPct)}</td>
+      <td>{pct(l.perguntasPct)}</td>
+      <td className={(l.giriaPct ?? 0) >= 10 ? "alto" : ""}>{pct(l.giriaPct)}</td>
+      <td>{pct(l.audioPct)}</td>
+      <td className={(l.rajadaPct ?? 0) >= 35 ? "alto" : ""}>{pct(l.rajadaPct)}</td>
+      <td>{minutos(l.resposta?.mediana)}</td>
+    </tr>
+  );
+}
+
+function Comparar({ rotulo, a, b }: { rotulo: string; a: number; b: number }) {
+  return (
+    <div>
+      <span>{rotulo}</span>
+      <b>{a}%</b>
+      <em>nas que não venderam: {b}%</em>
+    </div>
   );
 }
 
@@ -429,6 +612,40 @@ const CSS = `
 .at-mini .ruim b { color: var(--red); }
 .at-osso { background: linear-gradient(90deg, var(--card2), #eceef2, var(--card2)); background-size: 200% 100%; animation: at-osso 1.2s linear infinite; }
 @keyframes at-osso { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.at-recalc-caixa { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.at-recalc-caixa span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.at-recalc { background: none; border: none; cursor: pointer; font: inherit; }
+.at-recalc:disabled { color: var(--muted); cursor: default; }
+.at-recalc .gira { animation: at-gira 1s linear infinite; }
+@keyframes at-gira { to { transform: rotate(360deg); } }
+.at-conv .apagada { opacity: .55; }
+.at-conv-tabela { overflow-x: auto; }
+.at-conv-tabela table { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 12.5px; }
+.at-conv-tabela th { text-align: right; font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--brd); white-space: nowrap; cursor: help; }
+.at-conv-tabela th:first-child, .at-conv-tabela td:first-child { text-align: left; }
+.at-conv-tabela td { text-align: right; padding: 8px; border-bottom: 1px solid var(--brd2); white-space: nowrap; }
+.at-conv-tabela td span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 400; }
+.at-conv-tabela td:nth-child(3) span { display: inline; margin-left: 4px; }
+.at-conv-tabela tr.forte td { background: var(--card2); font-weight: 700; }
+.at-conv-tabela tr.apagada td { color: var(--muted); }
+.at-conv-tabela td.alto { color: var(--red); font-weight: 700; }
+.at-conv-falas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 12px; }
+.at-conv-fala { background: var(--card2); border: 1px solid var(--brd2); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.at-conv-fala b { font-size: 13px; }
+.at-conv-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.at-conv-chips i { font-style: normal; font-size: 11px; background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 1px 8px; }
+.at-conv-chips em { font-style: normal; color: var(--muted); }
+.at-conv-fala ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.at-conv-fala a { font-size: 11.5px; color: var(--dim); text-decoration: none; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.at-conv-fala a:hover { color: var(--txt); }
+.at-conv-fala a svg { vertical-align: -1px; margin-right: 3px; color: var(--purple-l); }
+.at-conv-venda { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.at-conv-venda > b { font-size: 12.5px; }
+.at-conv-comp { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.at-conv-comp > div { background: var(--card2); border: 1px solid var(--brd2); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; }
+.at-conv-comp span { font-size: 11px; color: var(--dim); }
+.at-conv-comp b { font-size: 19px; font-weight: 800; }
+.at-conv-comp em { font-style: normal; font-size: 11px; color: var(--muted); }
 .at button:focus-visible, .at a:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
 @media (max-width: 960px) {
   .at-grade { grid-template-columns: minmax(0, 1fr); }
@@ -439,5 +656,5 @@ const CSS = `
   .at-titulo { font-size: 20px; }
   .at-sem small { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .at-osso { animation: none; } .at-grade { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .at-osso { animation: none; } .at-grade { transition: none; } .at-recalc .gira { animation: none; } }
 `;
