@@ -134,3 +134,13 @@ erro do painel em vez da mensagem). Fora do escopo: o assistente do CRM (robô d
 - **Ainda aberto até a 05:** a função do banco `zapintel_resumo`, chamada direto pela API com a sessão do vendedor, devolve dados (200).
 - Sino (sessão do vendedor, /dashboard): título "(869)" = contador 869 = view 869.
 - Console: React #418 (hidratação) no /dashboard — **anterior a este deploy**: `saudacao()` em components/modules/dashboard/dashboard-view.tsx (sem mudança desde 01/09) usa a hora do servidor (UTC) na renderização e a do navegador (SP) na hidratação. Gravidade baixa; correção proposta, não feita.
+
+## Migração 05 aplicada (autorizada, 15/10)
+
+- Pré-condição conferida (ramo antigo presente, não aplicada, 0 consultas longas). Hash de `zapintel_escopo`: antes `2b2e4fd4…`, depois `c31499c7…`; só essa função mudou.
+- `supabase/testes/zapintel_acesso.sql`: **18 ok, 0 falhas** (antes 16/18).
+- Vendedor `reviewer.meta@jmstore.app`, chamada direta pela API do banco: `zapintel_resumo`, `zapintel_dashboard` e `zapintel_leads_lista` = **403** "ZapIntel restrito ao dono e aos administradores" (antes 200).
+- Dono e admin da JM (contas reais, sessão simulada no banco): escopo, resumo, dashboard, lista, insights, atendimento, pós-venda, "como a loja conversa" e listas do dashboard — todos ok.
+- Vercel: 0 erro de runtime (1 h). Sentry: nenhum problema novo ou reaparecido (2 h).
+- Rollback: **não foi necessário** (`05_zapintel_so_dono_admin.volta.sql` segue pronto).
+- Pendente: atualizar o texto de `zapintel_escopo` em supabase/funcoes/zapintel_dashboard.sql para o estado aplicado (o banco é a fonte; o arquivo ficou com o ramo antigo). Confirmação no navegador com a sessão do dono depois da 05: não feita (a janela está com o vendedor).
