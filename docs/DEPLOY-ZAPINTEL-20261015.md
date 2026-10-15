@@ -149,3 +149,22 @@ erro do painel em vez da mensagem). Fora do escopo: o assistente do CRM (robô d
 ### Releitura com o dono depois da 05 (navegador, conta dona da JM)
 
 Só leitura. Conversa 615 e 1706 = 200, 1204 (Imobiliária) = 404, lead inválido = 400, corpo nulo = 400, funil interno = 422 sem IA; fila do robô 48 + 35; funções do banco chamadas com a sessão do dono = 200; contratos/1 = 61; sino 869. Telas Dashboard, Leads (1.886), ficha 1706, Atendimento, Insights e Pós-venda (254) abrindo, "Ao vivo"; console sem erro; Vercel e Sentry sem nada novo.
+
+## Correção do React #418 no /dashboard — encerramento (autorizado, 15/10)
+
+- Publicado: `cd8d50e` — `fix: padroniza fuso horário do dashboard`. Único arquivo de código: `components/modules/dashboard/dashboard-view.tsx` (saudação, data do cabeçalho e datas das vendas recentes passam a usar `America/Sao_Paulo`). Vercel `dpl_B3fjHRa9WwG6AXrRdGkWbEFTu3CZ` **READY**.
+- Causa: o servidor (UTC) e o navegador (SP) calculavam a saudação e as datas cada um no seu fuso; a saudação divergia 9 h por dia e a data de 21h à meia-noite.
+- Testes em produção depois do deploy:
+
+| Cenário | Resultado |
+|---|---|
+| Controle, sem simulação | aprovado |
+| A — hora local do navegador em 12h | aprovado (antes da correção dava #418) |
+| B' — navegador no fuso de Tóquio, mesmo instante | aprovado |
+| Captura do #418 com divergência forçada de propósito | capturou, como esperado |
+| B literal — relógio do navegador atrasado 19 h | **inconclusivo**: as datas divergiram sem registro de #418 |
+| Vercel, 30 min observados | nenhum erro novo |
+
+- **Limitação aceita:** se o horário virar 12h, 18h ou meia-noite entre a renderização no servidor e a hidratação no navegador, o #418 ainda pode ocorrer (reproduzido no teste local).
+- Sentry: nada alterado (configuração, filtros e issues). `NEXUS-CRM-6` ("Date.parse is not a function", `GET /sw.js`) foi atribuído ao teste local anterior à correção — atribuição do relatório, não verificada de forma independente. O Sentry descarta erros de hidratação na entrada (filtro `react-hydration-errors`); os descartes recentes incluem testes provocados e não permitem separar todos os espontâneos.
+- **Pendente, não corrigido:** causas próprias em `/leads` (quadro de arrastar sem `id` fixo, "há X min"), `/tarefas` e `/agenda` (horas sem fuso) e no gráfico de meses do dashboard (`area-chart`).
