@@ -98,3 +98,13 @@ caminho, o bucket teria de virar privado e a emissão do contrato passaria a usa
 URL assinada (mudança de código em lib/contrato-modelo.ts) — fica como opção.
 Exclusão dentro da própria empresa (liberada pela 02) não foi testada com arquivo
 real, para não apagar fundo em uso; conferir excluindo um modelo de teste.
+
+## Validação com contas reais — registro
+
+| Data | Conta | Resultado |
+|---|---|---|
+| 15/10 | "Meta" (Preview · Loja, sem ZapIntel) | tela "não habilitado"; 403 em todas as rotas; contratos da JM: 61 antes da 02 → **0** depois; exclusão de fundo da JM: nada apagado |
+| 15/10 | JM Store Importados (dono) | conversa 615 e 1706 = 200, 1204 (Imobiliária) = 404, lead inválido = 400, corpo nulo = 400, funil interno = 422 sem IA; fila do robô 45 + 33; contratos/1 = 61; URL pública = 200; sino: 865 leads com não lidas (view e contador iguais), 10.053 mensagens; telas Dashboard, Leads (`?pagina=999` → 38), ficha 615, Atendimento, Insights e Pós-venda abrindo, "Ao vivo"; 0 erro de runtime na Vercel (2 h) |
+| — | vendedor (`reviewer.meta@jmstore.app`) | **pendente** |
+| — | superadmin | **pendente** |
+| — | contratos (subir/emitir/excluir modelo de teste) | **pendente** — grava/apaga arquivo: só com modelo de teste e autorização |
