@@ -99,13 +99,23 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       setSearching(true)
       const supabase = createClient()
       const q = query.trim()
-      const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }] = await Promise.all([
+      /**
+       * "#5836" (ou "5836"): o lead por NÚMERO — o que fichas e relatórios citam.
+       * Pedido do Lucas em 15/10/2026: *"#5836 faz assim e eu ja procuro"*. Vai
+       * por função do banco porque a RLS de leads segue a loja selecionada no
+       * topo e esconderia o lead da outra loja (supabase/funcoes/buscar_lead_por_numero.sql).
+       */
+      const numero = /^#?\s*(\d{1,9})$/.exec(q)?.[1]
+      const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }, { data: peloNumero }] = await Promise.all([
         supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
         // O lead também atende por telefone: quem liga para a loja é procurado pelo
         // número, e antes só quem já era cliente aparecia nessa busca.
         supabase.from('leads').select('id, nome, produto_interessado, telefone, ultima_mensagem_at').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(LOTE),
         supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
         supabase.from('produtos').select('id').ilike('nome', `%${q}%`).limit(10),
+        numero
+          ? supabase.rpc('buscar_lead_por_numero' as never, { p_id: Number(numero) } as never)
+          : Promise.resolve({ data: [] }),
       ])
       type EstoqueRow = { id: number; imei: string | null; numero_serie: string | null; produtos: { nome: string | null } | { nome: string | null }[] | null }
       const produtoIds = ((produtosMatch ?? []) as Array<{ id: number }>).map((p) => p.id)
@@ -130,12 +140,20 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       // Lote cheio: pode haver mais la fora do que coube nesta consulta.
       setTemMais(cli.length >= LOTE || lds.length >= LOTE)
 
+      const achado = ((peloNumero ?? []) as unknown as Array<{ id: number; nome: string | null; telefone: string | null; produto_interessado: string | null; loja: string | null; outra_loja: boolean }>)
+      const porNumero = achado.map((l) => ({
+        tipo: 'lead' as const, id: l.id,
+        titulo: `#${l.id} · ${l.nome ?? 'sem nome'}`,
+        sub: [l.loja, l.outra_loja ? 'outra loja: abre com "Abrir na Rede"' : null, l.produto_interessado].filter(Boolean).join(' · ') || 'lead',
+        href: `/leads?lead=${l.id}`,
+      }))
       setResults([
+        ...porNumero,
         ...cli.map((c) => ({ tipo: 'cliente' as const, id: c.id, titulo: c.nome ?? `Cliente #${c.id}`, sub: c.telefone ?? 'sem telefone', href: '/clientes' })),
         // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
-        ...lds.map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
+        ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
@@ -181,7 +199,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Buscar cliente, venda, produto… ou digite uma ação"
+            placeholder="Buscar cliente, lead (#5836), produto… ou digite uma ação"
             className="w-full bg-transparent py-3.5 text-[14.5px] text-ink placeholder:text-ink-3 outline-none"
           />
         </div>

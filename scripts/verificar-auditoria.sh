@@ -96,6 +96,8 @@ v "resposta nao reroda por linha"   "supabase/funcoes/zapintel_conversa.sql" "RE
 v "venda sem lead nulo"             "supabase/funcoes/zapintel_conversa.sql" "z.lead_id is not null"
 v "audio quebrado sai"              "scripts/transcrever-audios.py" "def descartar(linha)"
 v "pasta temporaria sai no erro"    "scripts/transcrever-audios.py" "atexit.register(shutil.rmtree"
+v "busca acha lead pelo numero"    "components/layout/command-palette.tsx" "buscar_lead_por_numero"
+v "busca por numero respeita a loja" "supabase/funcoes/buscar_lead_por_numero.sql" "or l.filial_id is null or l.filial_id = any (v_vis))"
 v "posvenda le do banco"            "app/zapintel/posvenda/page.tsx" "useRpcAoVivo<PosVenda>(\"zapintel_posvenda\""
 n "posvenda sem promessa de brinde" "app/zapintel/posvenda/page.tsx" "ganha um brinde"
 v "funil interno fora do zapintel"  "supabase/funcoes/zapintel_turnos.sql" "zapintel_funil_interno(l.funil_id)"
