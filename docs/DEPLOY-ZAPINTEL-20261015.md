@@ -11,6 +11,8 @@ nada ficou gravado**.
 |---|---|
 | Código `74139b3` (auditoria + fechamento) | Vercel READY, sem erro de runtime |
 | `supabase/funcoes/seguranca_20261015.sql` (backups fora da API, FK, índice, turnos, canal ao vivo, RLS de leads/lead_mensagens, view de órfãos sem anônimo) | aplicado |
+| **00 instantâneo** (autorizado 15/10) | aplicado — `backup.politicas_pre_20261015` 136 regras, `backup.permissoes_funcoes_pre_20261015` 53 funções, `backup.funcoes_zapintel_pre_20261015` 3 definições; não exposto na API |
+| **02 contratos** (autorizado 15/10) | aplicado — listagem: dono/admin/vendedores JM 61, Imobiliária 0, Preview · Loja 0 (antes 61, conferido pela API real com a sessão dela); exclusão de fundo da JM pela Preview: nada apagado; URL pública 200. Assinaturas das demais regras, permissões e funções idênticas às de antes |
 
 ## Backup e recuperação
 
@@ -23,8 +25,8 @@ nada ficou gravado**.
 
 | # | Operação (exata) | O que altera | Resultado esperado | Se falhar / reverter |
 |---|---|---|---|---|
-| 00 | `supabase/pendentes/00_instantaneo.sql` | cria 3 tabelas em `backup` | 136 políticas, 53 funções, 3 definições guardadas | nada a reverter; não muda o que está em uso |
-| 02 | `supabase/pendentes/02_contratos_bucket.sql` | 3 políticas de `storage.objects` (bucket contratos) | conta da Preview · Loja: listar `contratos/1` = **0** (hoje 61); dono JM = 61; URL pública do fundo = 200 | `02_contratos_bucket.volta.sql` |
+| ~~00~~ ✔ | `supabase/pendentes/00_instantaneo.sql` | cria 3 tabelas em `backup` | 136 políticas, 53 funções, 3 definições guardadas | nada a reverter; não muda o que está em uso |
+| ~~02~~ ✔ | `supabase/pendentes/02_contratos_bucket.sql` | 3 políticas de `storage.objects` (bucket contratos) | conta da Preview · Loja: listar `contratos/1` = **0** (hoje 61); dono JM = 61; URL pública do fundo = 200 | `02_contratos_bucket.volta.sql` |
 | 01 | `supabase/pendentes/01_sem_resposta_do_cliente.sql` | 3 funções do ZapIntel | rodapé do dashboard: "N sem análise · 55 sem resposta do cliente"; funil com a fatia nova; lista filtrada mostra os 55 | `01_sem_resposta_do_cliente.volta.sql` |
 | P | `git -C ".../scratchpad/wt-perfil" push origin entrega-perfil-ia:main` | `components/layout/topbar.tsx` (sino) + docs/SQL/testes | Vercel READY; sino com o total certo (admin JM: 1.109 leads) | Vercel → Promote `74139b3` |
 | 03 | `supabase/pendentes/03_rls_uma_vez_por_consulta.sql` | 96 políticas de RLS do CRM | `supabase/testes/zapintel_acesso.sql` "0 falhas"; telas do CRM abrindo normalmente | `03_rls_uma_vez_por_consulta.volta.sql` |
@@ -84,3 +86,15 @@ os fundos dele. IA (análise, sugestão, robô, "Parar") só com a ANTHROPIC_API
 
 As 75 tabelas do schema `backup` e a view `v_orfaos_chat_midia` ficam intactas
 até decisão separada (`docs/BACKUP-INVENTARIO-20261015.md`).
+
+## Observação sobre o bucket de contratos (15/10, depois da 02)
+
+O bucket continua PÚBLICO de propósito (o contrato emitido usa os fundos por URL).
+Num bucket público, o Storage entrega o arquivo a quem souber o caminho — tanto em
+`/object/public/` quanto em `/object/contratos/` (conferido: 200 para a conta da
+Preview · Loja). Isso não é exposição nova: o caminho é um UUID aleatório e, depois
+da 02, ninguém de fora consegue mais LISTAR os nomes. Para fechar até a leitura por
+caminho, o bucket teria de virar privado e a emissão do contrato passaria a usar
+URL assinada (mudança de código em lib/contrato-modelo.ts) — fica como opção.
+Exclusão dentro da própria empresa (liberada pela 02) não foi testada com arquivo
+real, para não apagar fundo em uso; conferir excluindo um modelo de teste.
