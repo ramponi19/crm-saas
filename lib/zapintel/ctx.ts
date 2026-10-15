@@ -46,3 +46,32 @@ export async function zapintelEmpresa(): Promise<{ userId: string; empresaId: nu
   }
   redirect('/entrar')
 }
+
+/**
+ * Quem pode o quê no ZapIntel — A MESMA REGRA DAS TELAS, perguntada ao banco.
+ *
+ * As rotas de API leem com a chave de serviço (passa por cima do RLS) e até
+ * 15/10/2026 filtravam só pela empresa: um vendedor de Mogi abria a ficha de um
+ * lead de Jaguariúna pelo número, e uma empresa SEM o ZapIntel ligado disparava
+ * análise paga. As telas não tinham esse furo porque cada função do banco passa
+ * por `zapintel_escopo` (supabase/funcoes/zapintel_dashboard.sql): ZapIntel
+ * ativo para a empresa, dono/admin/superadmin veem todas as lojas (mais "sem
+ * loja" = 0), vendedor só as dele. Aqui a rota pergunta à mesma função — duas
+ * regras para a mesma coisa só servem para divergir.
+ *
+ * Devolve `null` quando a empresa não tem o ZapIntel (ou o usuário não tem
+ * empresa): a rota responde 403.
+ */
+export async function zapintelAcesso(): Promise<{ userId: string; empresaId: number; lojas: number[] } | null> {
+  const { userId, empresaId } = await zapintelEmpresa()
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('zapintel_escopo' as never, { p_filial: null, p_empresa: empresaId } as never)
+  const linha = (Array.isArray(data) ? data[0] : data) as { empresa: number; filiais: number[] } | null
+  if (error || !linha || Number(linha.empresa) !== empresaId) return null
+  return { userId, empresaId, lojas: (linha.filiais ?? []).map(Number) }
+}
+
+/** O lead está numa loja que este usuário pode ver? Lead sem loja conta como 0. */
+export function lojaVisivel(acesso: { lojas: number[] }, filialId: number | null | undefined): boolean {
+  return acesso.lojas.includes(Number(filialId ?? 0))
+}

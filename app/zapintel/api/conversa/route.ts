@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelEmpresa } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
@@ -30,9 +30,13 @@ import { iaDoCrmLigada } from '@/lib/zapintel/ia'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
-  const { empresaId } = await zapintelEmpresa()
+  const acesso = await zapintelAcesso()
+  if (!acesso) {
+    return NextResponse.json({ erro: 'O ZapIntel não está ativo para esta empresa.' }, { status: 403 })
+  }
+  const { empresaId } = acesso
   const id = Number(new URL(req.url).searchParams.get('lead'))
-  if (!Number.isInteger(id) || id <= 0) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json({ erro: 'lead invalido' }, { status: 400 })
   }
 
@@ -43,7 +47,11 @@ export async function GET(req: Request) {
     const { analisados, porId } = await carregarConversas(db, empresaId, [id])
     const lead = analisados[0]
     const banco = porId.get(id)
-    if (!lead || !banco) return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+    // Lead de loja que este usuário não vê responde igual a lead inexistente:
+    // dizer "existe, mas não é seu" já é informação.
+    if (!lead || !banco || !lojaVisivel(acesso, banco.filial_id)) {
+      return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+    }
 
     // Comprou? Vem da ponte, não de palavra na conversa — é a diferença entre
     // a ficha afirmar e a ficha adivinhar.

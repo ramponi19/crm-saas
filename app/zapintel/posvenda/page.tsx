@@ -47,7 +47,7 @@ export default function PosVendaPage() {
   const [busca, setBusca] = useState("");
   const [mostrar, setMostrar] = useState(POR_VEZ);
 
-  const { dados, erro, aoVivo } = useRpcAoVivo<PosVenda>("zapintel_posvenda", { p_filial: lojaAtiva, p_empresa: empresa }, empresa);
+  const { dados, erro, aoVivo, carregando } = useRpcAoVivo<PosVenda>("zapintel_posvenda", { p_filial: lojaAtiva, p_empresa: empresa }, empresa);
   const recorte = lojaAtiva == null ? `${storeName || "Sua empresa"} · toda a rede` : (lojas.find((l) => l.id === lojaAtiva)?.nome ?? "Loja");
 
   const filtrados = useMemo(() => {
@@ -79,14 +79,14 @@ export default function PosVendaPage() {
             {dados ? `${num(dados.total)} clientes · ${num(dados.comVendaRegistrada)} com a venda registrada no CRM` : "carregando…"} · {recorte}
           </p>
         </div>
-        <span className="pv2-vivo"><span className={`pv2-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}</span>
+        <span className={`pv2-vivo ${aoVivo ? "" : "off"}`}><span className={`pv2-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}</span>
       </header>
 
       {erro && !dados && <div className="card pv2-vazio"><AlertTriangle size={16} /> {erro}</div>}
       {!dados && !erro && <div className="card pv2-osso" style={{ height: 420 }} />}
 
       {dados && (
-        <>
+        <div aria-busy={carregando} style={carregando ? { opacity: 0.55, transition: "opacity .2s" } : undefined}>
           <div className="pv2-barra">
             <div className="pv2-abas" role="tablist">
               {abas.map(([id, nome, n]) => (
@@ -98,7 +98,7 @@ export default function PosVendaPage() {
             </div>
             <label className="pv2-busca">
               <Search size={14} />
-              <input value={busca} onChange={(e) => { setBusca(e.target.value); setMostrar(POR_VEZ); }} placeholder="Nome, telefone ou produto" />
+              <input value={busca} onChange={(e) => { setBusca(e.target.value); setMostrar(POR_VEZ); }} placeholder="Nome, telefone ou produto" aria-label="Buscar clientes" />
             </label>
           </div>
 
@@ -119,7 +119,7 @@ export default function PosVendaPage() {
               Mostrar mais ({num(filtrados.length - mostrar)})
             </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -130,8 +130,10 @@ function Cartao({ c, agora }: { c: Cliente; agora: number }) {
   const crm = `/leads?lead=${c.leadId}`;
   async function copiar() {
     if (!c.mensagem) return;
-    await navigator.clipboard.writeText(c.mensagem);
-    setCopiado(true); setTimeout(() => setCopiado(false), 1800);
+    try {
+      await navigator.clipboard.writeText(c.mensagem);
+      setCopiado(true); setTimeout(() => setCopiado(false), 1800);
+    } catch { /* sem permissão de área de transferência */ }
   }
   return (
     <li className="card pv2-cartao">
@@ -145,7 +147,7 @@ function Cartao({ c, agora }: { c: Cliente; agora: number }) {
       <div className="pv2-compra">
         <ShoppingBag size={12} />
         {c.vendaEm
-          ? <>{c.produto || "Produto não informado"}{c.valor ? ` · ${reais(c.valor)}` : ""} · {new Date(c.vendaEm).toLocaleDateString("pt-BR")}</>
+          ? <>{c.produto || "Produto não informado"}{c.valor ? ` · ${reais(c.valor)}` : ""} · {new Date(c.vendaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}</>
           : <span className="pv2-sem">venda não registrada no CRM — a conversa diz que comprou</span>}
       </div>
       {!!c.pendencias?.length && (
@@ -175,6 +177,7 @@ const CSS = `
 .pv2-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .pv2-topo h1 { font-size: 23px; font-weight: 800; letter-spacing: -.6px; }
 .pv2-topo p { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+.pv2-vivo.off { color: var(--dim); }
 .pv2-vivo { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green); background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; }
 .pv2-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .pv2-ponto.on { background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }

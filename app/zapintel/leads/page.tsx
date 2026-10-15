@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useRef, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, ChevronLeft, ChevronRight, X, Clock, AlertTriangle, Sparkles, SlidersHorizontal } from "lucide-react";
@@ -7,7 +7,7 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
-import { CLASSE, ORDEM_FUNIL, URG, FAMILIAS_DE_OBJECAO, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
+import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAMILIAS_DE_OBJECAO, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 
 /**
  * A LISTA DE LEADS DO ZAPINTEL — RECONSTRUÍDA EM 14/10/2026 SOBRE AS ANÁLISES.
@@ -82,7 +82,8 @@ export default function LeadsPage() {
   const q = busca.get("q") ?? "";
   if (q) filtros.busca = q;
   const ordem = busca.get("ordem") ?? "prioridade";
-  const pagina = Math.max(1, Number(busca.get("pagina") ?? 1) || 1);
+  // Inteiro: `?pagina=2.5` ia para o banco como página fracionária.
+  const pagina = Math.max(1, Math.floor(Number(busca.get("pagina") ?? 1)) || 1);
 
   function mudar(alteracoes: Record<string, string | null>, manterPagina = false) {
     // A URL de AGORA, não a deste render: a busca grava depois de uma pausa,
@@ -123,6 +124,23 @@ export default function LeadsPage() {
   const [verFiltros, setVerFiltros] = useState(false);
   const totalPaginas = dados ? Math.max(1, Math.ceil(dados.total / dados.porPagina)) : 1;
 
+  // A página passou do fim — trocou de loja (a loja não está na URL), o total
+  // encolheu ao vivo, ou veio `?pagina=999`. A tela dizia "Nenhum lead com
+  // esses filtros" e "201–120 de 120". Volta para a última que existe.
+  const passouDoFim = !!dados && !carregando && dados.total > 0 && pagina > totalPaginas;
+  useEffect(() => {
+    if (passouDoFim) mudar({ pagina: totalPaginas > 1 ? String(totalPaginas) : null }, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `mudar` lê a URL atual
+  }, [passouDoFim, totalPaginas]);
+  // Outra loja é outra lista: começa da página 1.
+  const lojaAnterior = useRef(lojaAtiva);
+  useEffect(() => {
+    if (lojaAnterior.current === lojaAtiva) return;
+    lojaAnterior.current = lojaAtiva;
+    if (new URLSearchParams(window.location.search).has("pagina")) mudar({ pagina: null }, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `mudar` lê a URL atual
+  }, [lojaAtiva]);
+
   return (
     <div className="lv">
       <style>{CSS}</style>
@@ -135,7 +153,7 @@ export default function LeadsPage() {
             {carregando && dados && <span className="lv-carregando"> · buscando…</span>}
           </p>
         </div>
-        <span className="lv-vivo" title={aoVivo ? "Atualiza sozinha a cada mensagem" : "Reconectando"}>
+        <span className={`lv-vivo ${aoVivo ? "" : "off"}`} title={aoVivo ? "Atualiza sozinha a cada mensagem" : "Reconectando"}>
           <span className={`lv-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}
         </span>
       </header>
@@ -144,11 +162,11 @@ export default function LeadsPage() {
       <div className="lv-barra">
         <label className="lv-busca">
           <Search size={14} />
-          <input value={digitado} onChange={(e) => setDigitado(e.target.value)}
+          <input value={digitado} onChange={(e) => setDigitado(e.target.value)} aria-label="Buscar leads"
             placeholder="Buscar por nome, telefone ou o que foi dito na conversa (ex.: 18 Pro Max, boleto)" />
           {digitado && <button onClick={() => setDigitado("")} aria-label="Limpar busca"><X size={13} /></button>}
         </label>
-        <select className="lv-select" value={ordem} onChange={(e) => mudar({ ordem: e.target.value === "prioridade" ? null : e.target.value })}>
+        <select className="lv-select" aria-label="Ordenar por" value={ordem} onChange={(e) => mudar({ ordem: e.target.value === "prioridade" ? null : e.target.value })}>
           {ORDENS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
         </select>
       </div>
@@ -242,7 +260,7 @@ function Seletor({ valor, vazio, opcoes, onChange }: {
   valor?: string; vazio: string; opcoes: [string, string][]; onChange: (v: string | null) => void;
 }) {
   return (
-    <select className={`lv-select pequeno ${valor ? "ativo" : ""}`} value={valor ?? ""} onChange={(e) => onChange(e.target.value || null)}>
+    <select className={`lv-select pequeno ${valor ? "ativo" : ""}`} aria-label={vazio} value={valor ?? ""} onChange={(e) => onChange(e.target.value || null)}>
       <option value="">{vazio}</option>
       {opcoes.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
     </select>
@@ -270,7 +288,7 @@ function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
         </div>
       </td>
       <td>
-        <span className="lv-tag" style={{ color: cls.cor, borderColor: cls.cor }}>{cls.nome}</span>
+        <span className="lv-tag" style={{ color: corDoTexto(cls), borderColor: cls.cor }}>{cls.nome}</span>
         <div className="lv-selos">
           {l.esperando && <Selo cor="var(--red)"><Clock size={10} /> esperando {ha(l.ultimaDoCliente, agora).replace("há ", "")}</Selo>}
           {l.comprou && <Selo cor="var(--green)">venda registrada</Selo>}
@@ -303,6 +321,7 @@ const CSS = `
 .lv-titulo { font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
 .lv-sub { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
 .lv-carregando { color: var(--purple-l); }
+.lv-vivo.off { color: var(--dim); }
 .lv-vivo { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green); background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; }
 .lv-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .lv-ponto.on { background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
@@ -365,7 +384,7 @@ const CSS = `
   .lv-barra { flex-direction: column; }
   .lv-select { padding: 9px 10px; }
   .lv-limpar { margin-left: 0; }
-  .lv-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; }
+  .lv-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
   .lv-chip { flex: none; }
   .lv-abre-filtros { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--txt); cursor: pointer; }
   .lv-filtros { display: none; }

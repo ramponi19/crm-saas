@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { zapintelEmpresa } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
+import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { ondeTravou, contextoDaSugestao } from '@/lib/zapintel/travou'
@@ -52,20 +53,26 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(req: Request) {
-  const { empresaId } = await zapintelEmpresa()
+  const acesso = await zapintelAcesso()
+  if (!acesso) {
+    return NextResponse.json({ erro: 'O ZapIntel não está ativo para esta empresa.' }, { status: 403 })
+  }
+  const { empresaId, userId } = acesso
 
-  const body = (await req.json().catch(() => ({}))) as { lead?: number }
+  const body = ((await req.json().catch(() => null)) ?? {}) as { lead?: unknown }
   const id = Number(body.lead)
-  if (!Number.isInteger(id) || id <= 0) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json({ erro: 'lead invalido' }, { status: 400 })
   }
 
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a conversa de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, nomeDaLoja, segmento } = await carregarConversas(db, empresaId, [id])
+  const { analisados, porId, nomeDaLoja, segmento } = await carregarConversas(db, empresaId, [id])
   const lead = analisados[0]
-  if (!lead) return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+  if (!lead || !lojaVisivel(acesso, porId.get(id)?.filial_id)) {
+    return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+  }
 
   const { data: ponte } = await db
     .from('zapintel_venda_lead').select('venda_id')
@@ -135,6 +142,11 @@ export async function POST(req: Request) {
     '',
     contextoDaSugestao(lead, travou, ficha),
   ].join('\n')
+
+  // Chamada paga e sem cache (cada clique escreve de novo): teto por pessoa.
+  if (await excedeuLimiteDoUsuario(db, 'zapintel-sugestao', userId, 40)) {
+    return NextResponse.json({ erro: 'Muitas sugestões nesta hora. Tente de novo daqui a pouco.' }, { status: 429 })
+  }
 
   const r = await perguntarIA({
     empresaId,

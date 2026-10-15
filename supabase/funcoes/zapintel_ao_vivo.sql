@@ -120,6 +120,8 @@ create trigger zapintel_vendas_ao_vivo
 
 -- Quem pode OUVIR o canal: gente da própria empresa (ou o suporte). O aviso
 -- não tem conteúdo, mas mesmo assim cada empresa só ouve o seu.
+-- `(select ...)` em volta de get_empresa_id()/auth.uid(): avaliado uma vez por
+-- consulta, não por linha (aviso auth_rls_initplan do Supabase, 15/10/2026).
 drop policy if exists "zapintel ao vivo: ouvir a propria empresa" on realtime.messages;
 create policy "zapintel ao vivo: ouvir a propria empresa"
   on realtime.messages
@@ -128,9 +130,9 @@ create policy "zapintel ao vivo: ouvir a propria empresa"
   using (
     realtime.messages.extension = 'broadcast'
     and (
-      realtime.topic() = 'zapintel:' || public.get_empresa_id()::text
+      realtime.topic() = 'zapintel:' || (select public.get_empresa_id())::text
       or (realtime.topic() like 'zapintel:%'
-          and exists (select 1 from public.usuarios u where u.id = auth.uid() and u.is_super_admin))
+          and exists (select 1 from public.usuarios u where u.id = (select auth.uid()) and u.is_super_admin))
     )
   );
 

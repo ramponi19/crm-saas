@@ -624,6 +624,21 @@ export async function guardarPerfil(
   modelo: string | null,
   ms: number,
 ): Promise<void> {
+  // Dois pedidos no mesmo lead (o robô e alguém na tela) podem terminar fora
+  // de ordem: o que começou com a conversa ANTIGA chegava por último e gravava
+  // a marca velha por cima — a ficha nova passava a aparecer "desatualizada".
+  // Não grava se já há ficha desta versão escrita para uma conversa mais nova.
+  // (Não é atômico; fecha a janela de segundos da IA, que é a que acontece.)
+  const { data: atual } = await db
+    .from('zapintel_lead_perfil').select('marca, mensagens, versao')
+    .eq('empresa_id', empresaId).eq('lead_id', leadId).maybeSingle()
+  const guardada = atual as { marca: number; mensagens: number; versao: string } | null
+  if (guardada && guardada.versao === VERSAO_DO_PERFIL
+      && (Number(guardada.marca) > marca.marca
+          || (Number(guardada.marca) === marca.marca && guardada.mensagens > marca.mensagens))) {
+    return
+  }
+
   const { error } = await db
     .from('zapintel_lead_perfil')
     .upsert({

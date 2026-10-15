@@ -55,7 +55,10 @@ export default function InsightsPage() {
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
-  const periodo = busca.get("periodo") ?? "30";
+  // Só os períodos que a tela oferece: `?periodo=-5` ia ao banco e aparecia
+  // "nos últimos -5 dias"; `abc` deixava nenhum botão marcado.
+  const pedido = busca.get("periodo") ?? "30";
+  const periodo = PERIODOS.some(([v]) => v === pedido) ? pedido : "30";
   const dias = periodo === "tudo" ? null : Number(periodo) || 30;
   const { dados, erro, aoVivo, carregando } = useRpcAoVivo<Insights>("zapintel_insights", {
     p_dias: dias, p_filial: lojaAtiva, p_empresa: empresa,
@@ -95,7 +98,7 @@ export default function InsightsPage() {
           }))}>
             <Sparkles size={13} /> Resumo do período
           </button>
-          <span className="ins-vivo" title={aoVivo ? "Atualiza sozinha quando uma análise ou venda muda" : "Reconectando"}>
+          <span className={`ins-vivo ${aoVivo ? "" : "off"}`} title={aoVivo ? "Atualiza sozinha quando uma análise ou venda muda" : "Reconectando"}>
             <span className={`ins-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}
           </span>
         </div>
@@ -187,7 +190,7 @@ function Variacao({ atual, antes, rotulo, prefixo = "" }: { atual: number; antes
     <small style={{ color: "var(--muted)" }}>
       {prefixo}
       {pct != null && <b style={{ color: cor }}>{pct > 0 ? "+" : ""}{pct}% </b>}
-      · {num(antes)} {rotulo}
+      {prefixo || pct != null ? "· " : ""}{num(antes)} {rotulo}
     </small>
   );
 }
@@ -360,6 +363,7 @@ const CSS = `
 .ins-periodo button { background: none; border: none; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; color: var(--dim); cursor: pointer; }
 .ins-periodo button.ativo { background: var(--txt); color: #fff; font-weight: 700; }
 .ins-botao { display: inline-flex; align-items: center; gap: 6px; background: var(--purple); color: #fff; border: none; border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ins-vivo.off { color: var(--dim); }
 .ins-vivo { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green); background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; }
 .ins-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .ins-ponto.on { background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }

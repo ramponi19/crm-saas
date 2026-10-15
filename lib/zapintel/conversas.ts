@@ -121,15 +121,7 @@ export const idDoLead = (lead: Lead): number | null => {
   return m ? Number(m[1]) : null
 }
 
-/** Onde o tempo da leitura foi. Vai junto na resposta: ver `Painel.tempos`. */
-export interface TemposLeitura {
-  leads: number
-  mensagens: number
-  motor: number
-}
-
 export interface Conversas {
-  tempos: TemposLeitura
   /** O que o motor produziu, COM as mensagens. Nunca deve viajar inteiro. */
   analisados: Lead[]
   /** Os leads como estão no CRM, por id — é daqui que sai a loja de cada um. */
@@ -137,15 +129,6 @@ export interface Conversas {
   nomeDaLoja: string
   /** O segmento da empresa no CRM (`empresas.segmento`), cru. Ver `papel.ts`. */
   segmento: string | null
-  totalMensagens: number
-  /**
-   * O id da mensagem mais recente que ENTROU nesta análise.
-   *
-   * É a âncora do "tem coisa nova": a tela compara este número com o pulso do
-   * servidor. Comparar por contagem não serviria — mensagem apagada faria o
-   * total cair e o painel pareceria atualizado quando não está.
-   */
-  ultimaMensagem: number
 }
 
 /**
@@ -166,7 +149,6 @@ export async function carregarConversas(
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
   const segmento = (empresa as { segmento?: string | null } | null)?.segmento ?? null
 
-  const t0 = Date.now()
   const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
     let q = db.from('leads')
       .select('id, nome, telefone, origem_id, origem, filial_id, empresa_id, created_at,'
@@ -209,14 +191,9 @@ export async function carregarConversas(
     l.responsavel_nome = l.responsavel_id ? nomeDoUsuario.get(l.responsavel_id) ?? null : null
   }
 
-  const t1 = Date.now()
-
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
   if (!porId.size) {
-    return {
-      analisados: [], porId, nomeDaLoja, segmento, totalMensagens: 0, ultimaMensagem: 0,
-      tempos: { leads: t1 - t0, mensagens: 0, motor: 0 },
-    }
+    return { analisados: [], porId, nomeDaLoja, segmento }
   }
 
   const alvo = [...porId.keys()]
@@ -241,16 +218,5 @@ export async function carregarConversas(
   // memória, sobre dado já carregado: milissegundos.
   msgs.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
 
-  const t2 = Date.now()
-
-  const analisados = montarLeads(porId, msgs)
-  const t3 = Date.now()
-
-  let ultimaMensagem = 0
-  for (const m of msgs) if (m.id > ultimaMensagem) ultimaMensagem = m.id
-
-  return {
-    analisados, porId, nomeDaLoja, segmento, totalMensagens: msgs.length, ultimaMensagem,
-    tempos: { leads: t1 - t0, mensagens: t2 - t1, motor: t3 - t2 },
-  }
+  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, segmento }
 }

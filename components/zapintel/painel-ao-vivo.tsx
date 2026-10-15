@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,7 +8,7 @@ import {
 import {
   useDashboardAoVivo, type Dashboard, type ItemFila, type LeadDaLista,
 } from "@/hooks/zapintel/useDashboardAoVivo";
-import { CLASSE, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
+import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 
 /**
  * O DASHBOARD DO ZAPINTEL — RECONSTRUÍDO EM 14/10/2026 SOBRE AS ANÁLISES.
@@ -65,7 +65,7 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
   filial: number | null; nomeDoRecorte: string; empresa: number | null;
 }) {
   const router = useRouter();
-  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem } = useDashboardAoVivo(filial, empresa);
+  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem, carregando } = useDashboardAoVivo(filial, empresa);
   const agora = useRelogio();
   const [gaveta, setGaveta] = useState<Gaveta>(null);
   const abrir = (g: NonNullable<Gaveta>) => setGaveta(g);
@@ -87,7 +87,9 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
   const pisca = ultimoAviso != null && agora - ultimoAviso < 4000;
 
   return (
-    <div className="pv">
+    // Trocou de loja e a resposta não chegou: os números ainda são da anterior.
+    // Esmaecidos, para ninguém ler os de uma loja com o nome da outra.
+    <div className="pv" aria-busy={carregando} style={carregando ? { opacity: 0.55, transition: "opacity .2s" } : undefined}>
       <style>{CSS}</style>
 
       {/* ── Cabeçalho ───────────────────────────────────────────────────── */}
@@ -381,7 +383,7 @@ function ItemDaFila({ i, agora, novo }: { i: ItemFila; agora: number; novo: bool
       <div className="pv-item-topo">
         <span className="pv-urg" style={{ background: urg.cor }} title={`Urgência ${urg.nome.toLowerCase()}`} />
         <Link href={`/zapintel/leads/lead-${i.leadId}`} className="pv-nome">{i.nome || "Sem nome"}</Link>
-        <span className="pv-tag" style={{ color: cls.cor, borderColor: cls.cor }}>{cls.nome}</span>
+        <span className="pv-tag" style={{ color: corDoTexto(cls), borderColor: cls.cor }}>{cls.nome}</span>
         {i.loja && <span className="pv-loja">{i.loja}</span>}
         <span className={`pv-espera ${espera > 3_600_000 ? "longa" : ""}`}>
           <Clock size={11} /> {ha(i.desde, agora).replace("há ", "")}
@@ -455,7 +457,7 @@ function Pendencias({ d, abrir }: { d: Dashboard; abrir: (g: NonNullable<Gaveta>
         <ul className="pv-pend">
           {p.itens.slice(0, 6).map((i, k) => (
             <li key={`${i.leadId}-${k}`}>
-              <span className="pv-urg" style={{ background: URG[i.urgencia].cor, marginTop: 5 }} />
+              <span className="pv-urg" style={{ background: (URG[i.urgencia] ?? URG.low).cor, marginTop: 5 }} />
               <div>
                 <Link href={`/zapintel/leads/lead-${i.leadId}`} className="pv-nome pequeno">{i.nome || "Sem nome"}</Link>
                 {i.loja && <span className="pv-loja"> · {i.loja}</span>}
@@ -526,7 +528,10 @@ function Calor({ celulas }: { celulas: [number, number, number][] }) {
   const horas = Array.from({ length: 16 }, (_, k) => k + 7); // 7h às 22h
   const mapa = new Map(celulas.map(([dia, h, n]) => [`${dia}-${h}`, n]));
   const max = Math.max(1, ...celulas.filter(([, h]) => h >= 7 && h <= 22).map(([, , n]) => n));
-  const pico = celulas.reduce((a, c) => (c[2] > a[2] ? c : a), [0, 0, 0] as [number, number, number]);
+  // O pico só entre as horas que o mapa mostra: antes podia anunciar "pico às
+  // 3h" de uma célula que não aparece na tela.
+  const pico = celulas.filter((c) => c[1] >= horas[0] && c[1] <= horas[horas.length - 1])
+    .reduce((a, c) => (c[2] > a[2] ? c : a), [0, 0, 0] as [number, number, number]);
   return (
     <Bloco titulo="Quando os clientes escrevem" nota={pico[2] ? `pico: ${DIAS[pico[0]]} às ${pico[1]}h · últimas 4 semanas` : "últimas 4 semanas"}>
       <div className="pv-calor">
@@ -602,15 +607,32 @@ function GavetaLeads({ g, lista, agora, fechar }: {
     lista(g.tipo, g.valor).then((r) => { if (vivo) setRes(r); }).catch((e: Error) => { if (vivo) setErro(e.message); });
     return () => { vivo = false; };
   }, [g, lista]);
+  // Diálogo de verdade para o teclado: o foco entra ao abrir, o Tab não sai
+  // para o painel por trás, e ao fechar volta para o cartão que abriu.
+  // `fechar` chega novo a cada render (o relógio do painel re-renderiza); por
+  // ref, o efeito roda só ao abrir — senão o foco voltava para a caixa a cada tique.
+  const caixa = useRef<HTMLElement>(null);
+  const fecharRef = useRef(fechar);
+  useEffect(() => { fecharRef.current = fechar; }, [fechar]);
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") fechar(); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [fechar]);
+    const antes = document.activeElement as HTMLElement | null;
+    caixa.current?.focus();
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { fecharRef.current(); return; }
+      if (e.key !== "Tab" || !caixa.current) return;
+      const focaveis = caixa.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
+      if (!focaveis.length) return;
+      const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
+      if (e.shiftKey && (document.activeElement === primeiro || document.activeElement === caixa.current)) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => { window.removeEventListener("keydown", tecla); antes?.focus?.(); };
+  }, []);
 
   return (
     <div className="pv-gaveta-fundo" onClick={fechar}>
-      <aside className="pv-gaveta" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={g.titulo}>
+      <aside ref={caixa} tabIndex={-1} className="pv-gaveta" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={g.titulo}>
         <div className="pv-gaveta-topo">
           <div>
             <h3>{g.titulo}</h3>
@@ -628,9 +650,9 @@ function GavetaLeads({ g, lista, agora, fechar }: {
             <li key={l.leadId}>
               <Link href={`/zapintel/leads/lead-${l.leadId}`} onClick={fechar}>
                 <div className="pv-item-topo">
-                  <span className="pv-urg" style={{ background: URG[l.urgencia].cor }} />
+                  <span className="pv-urg" style={{ background: (URG[l.urgencia] ?? URG.low).cor }} />
                   <span className="pv-nome">{l.nome || "Sem nome"}</span>
-                  <span className="pv-tag" style={{ color: (CLASSE[l.classificacao] ?? CLASSE.sem_analise).cor, borderColor: (CLASSE[l.classificacao] ?? CLASSE.sem_analise).cor }}>{(CLASSE[l.classificacao] ?? CLASSE.sem_analise).nome}</span>
+                  <span className="pv-tag" style={{ color: corDoTexto(CLASSE[l.classificacao] ?? CLASSE.sem_analise), borderColor: (CLASSE[l.classificacao] ?? CLASSE.sem_analise).cor }}>{(CLASSE[l.classificacao] ?? CLASSE.sem_analise).nome}</span>
                   {l.loja && <span className="pv-loja">{l.loja}</span>}
                   <span className="pv-espera">{ha(l.ultimaMensagem, agora)}</span>
                 </div>
@@ -781,6 +803,7 @@ const CSS = `
 .pv-rodape .pv-botao { margin-left: auto; }
 
 .pv-gaveta-fundo { position: fixed; inset: 0; background: rgba(21,24,28,.32); z-index: 950; display: flex; justify-content: flex-end; }
+.pv-gaveta:focus { outline: none; }
 .pv-gaveta { width: min(480px, 100vw); height: 100dvh; background: var(--bg); box-shadow: -12px 0 40px rgba(21,24,28,.18); display: flex; flex-direction: column; animation: pv-gaveta .22s ease-out; }
 @keyframes pv-gaveta { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .pv-gaveta-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 18px 18px 12px; border-bottom: 1px solid var(--brd); background: var(--card); }

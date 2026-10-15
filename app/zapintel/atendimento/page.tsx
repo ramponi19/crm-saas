@@ -8,7 +8,7 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
 import type { Classe } from "@/hooks/zapintel/useDashboardAoVivo";
-import { CLASSE, num, ha } from "@/components/zapintel/rotulos";
+import { CLASSE, corDoTexto, num, ha } from "@/components/zapintel/rotulos";
 
 /**
  * ATENDIMENTO — COMO A LOJA ATENDE. Substitui Performance I e II (15/10/2026).
@@ -90,7 +90,10 @@ export default function AtendimentoPage() {
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
-  const periodo = busca.get("periodo") ?? "30";
+  // Só os períodos que a tela oferece: `?periodo=-5` ia ao banco e aparecia
+  // "nos últimos -5 dias"; `abc` deixava nenhum botão marcado.
+  const pedido = busca.get("periodo") ?? "30";
+  const periodo = PERIODOS.some(([v]) => v === pedido) ? pedido : "30";
   const dias = periodo === "tudo" ? null : Number(periodo) || 30;
   const { dados, erro, aoVivo, carregando } = useRpcAoVivo<Atendimento>("zapintel_atendimento", {
     p_dias: dias, p_filial: lojaAtiva, p_empresa: empresa,
@@ -128,7 +131,7 @@ export default function AtendimentoPage() {
           }))}>
             <Sparkles size={13} /> Resumo do atendimento
           </button>
-          <span className="at-vivo" title={aoVivo ? "Atualiza sozinha a cada mensagem" : "Reconectando"}>
+          <span className={`at-vivo ${aoVivo ? "" : "off"}`} title={aoVivo ? "Atualiza sozinha a cada mensagem" : "Reconectando"}>
             <span className={`at-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}
           </span>
         </div>
@@ -222,7 +225,7 @@ function Pessoa({ i, agora, detalhe }: { i: Item; agora: number; detalhe: ReactN
       <Link href={`/zapintel/leads/lead-${i.leadId}`}>
         <div className="at-item-topo">
           <b>{i.nome || "Sem nome"}</b>
-          <span className="at-tag" style={{ color: c.cor, borderColor: c.cor }}>{c.nome}</span>
+          <span className="at-tag" style={{ color: corDoTexto(c), borderColor: c.cor }}>{c.nome}</span>
           {i.loja && <span>{i.loja}</span>}
           <span className="at-quando">{ha(i.desde, agora)}</span>
         </div>
@@ -423,7 +426,7 @@ function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: numb
         </div>
         <div className="at-recalc-caixa">
           {d?.geradoEm && !carregando && (
-            <span>calculado {new Date(d.geradoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            <span>calculado {new Date(d.geradoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}</span>
           )}
           <button className="at-link at-recalc" onClick={() => { forcar.current = true; setRodada((r) => r + 1); }} disabled={carregando}>
             <RefreshCw size={12} className={carregando ? "gira" : ""} /> {carregando ? "calculando…" : "recalcular"}
@@ -553,6 +556,7 @@ const CSS = `
 .at-periodo button { background: none; border: none; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; color: var(--dim); cursor: pointer; }
 .at-periodo button.ativo { background: var(--txt); color: #fff; font-weight: 700; }
 .at-botao { display: inline-flex; align-items: center; gap: 6px; background: var(--purple); color: #fff; border: none; border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.at-vivo.off { color: var(--dim); }
 .at-vivo { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green); background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; }
 .at-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .at-ponto.on { background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }

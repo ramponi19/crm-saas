@@ -76,8 +76,9 @@ export type TipoRetido = (typeof TIPOS_RETIDOS)[number]
  * guardando: o custo de um falso positivo é um arquivo a mais no bucket, e o
  * de um falso negativo é o comprovante de pagamento de um cliente.
  */
-const PALAVRAS_DE_PROVA =
-  '(comprovante|pix|pagamento|paguei|transferi|nota fiscal|boleto|contrato|cpf|rg )'
+const PALAVRAS_DE_PROVA = [
+  'comprovante', 'pix', 'pagamento', 'paguei', 'transferi', 'nota fiscal', 'boleto', 'contrato', 'cpf', 'rg ',
+]
 
 /** Minutos para cada lado, ao procurar as palavras de prova. */
 const JANELA_DE_PROVA_MIN = 20
@@ -209,28 +210,48 @@ export async function aptosParaRetirada(
  * custa uma consulta por lead em vez de uma por imagem.
  */
 async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): Promise<Retirada[]> {
+  /**
+   * NA DÚVIDA, NADA SAI — revisto em 15/10/2026. Antes:
+   *   · `.in('id', ids)` com até 2.000 ids voltava cortado em 1.000 (teto da
+   *     API), e as imagens além disso ficavam SEM a checagem de prova;
+   *   · erro de consulta virava "nenhuma vizinha" — falhava apagando;
+   *   · o filtro real não tinha `cpf` nem `rg` (só a constante, que nem era usada)
+   *     e não olhava a transcrição: um áudio dizendo "paguei" não protegia o
+   *     comprovante ao lado.
+   * Agora tudo paginado, erro interrompe a rodada, e as palavras vêm da constante,
+   * no texto e na transcrição.
+   */
   const ids = alvos.map((a) => a.mensagemId)
-  const { data } = await db
-    .from('lead_mensagens')
-    .select('id, lead_id, created_at')
-    .in('id', ids)
-  const quando = new Map(
-    ((data ?? []) as { id: number; lead_id: number; created_at: string }[])
-      .map((m) => [m.id, m]),
-  )
+  const quando = new Map<number, { id: number; lead_id: number; created_at: string }>()
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data, error } = await db
+      .from('lead_mensagens')
+      .select('id, lead_id, created_at')
+      .in('id', ids.slice(i, i + 500))
+    if (error) throw new Error(`retencao: nao consegui conferir as imagens, nada apagado: ${error.message}`)
+    for (const m of (data ?? []) as { id: number; lead_id: number; created_at: string }[]) quando.set(m.id, m)
+  }
 
+  const filtro = PALAVRAS_DE_PROVA
+    .flatMap((p) => [`conteudo.ilike.%${p}%`, `transcricao.ilike.%${p}%`])
+    .join(',')
   const leads = [...new Set([...quando.values()].map((m) => m.lead_id))]
   const protegidas = new Set<number>()
 
   for (let i = 0; i < leads.length; i += 50) {
-    const { data: vizinhas } = await db
-      .from('lead_mensagens')
-      .select('lead_id, created_at, conteudo, transcricao')
-      .in('lead_id', leads.slice(i, i + 50))
-      .or(`conteudo.ilike.%comprovante%,conteudo.ilike.%pix%,conteudo.ilike.%pagamento%,`
-        + `conteudo.ilike.%paguei%,conteudo.ilike.%nota fiscal%,conteudo.ilike.%contrato%,`
-        + `conteudo.ilike.%boleto%,conteudo.ilike.%transferi%`)
-    const marcos = (vizinhas ?? []) as { lead_id: number; created_at: string }[]
+    const marcos: { lead_id: number; created_at: string }[] = []
+    for (let de = 0; ; de += 1000) {
+      const { data: vizinhas, error } = await db
+        .from('lead_mensagens')
+        .select('lead_id, created_at')
+        .in('lead_id', leads.slice(i, i + 50))
+        .or(filtro)
+        .order('id')
+        .range(de, de + 999)
+      if (error) throw new Error(`retencao: nao consegui ler as conversas, nada apagado: ${error.message}`)
+      marcos.push(...((vizinhas ?? []) as { lead_id: number; created_at: string }[]))
+      if (!vizinhas || vizinhas.length < 1000) break
+    }
 
     for (const a of alvos) {
       const m = quando.get(a.mensagemId)
@@ -244,8 +265,8 @@ async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): Promise<
     }
   }
 
-  void PALAVRAS_DE_PROVA
-  return alvos.filter((a) => !protegidas.has(a.mensagemId))
+  // Imagem que nem foi encontrada para conferir também fica.
+  return alvos.filter((a) => quando.has(a.mensagemId) && !protegidas.has(a.mensagemId))
 }
 
 /** Faz a retirada. Ver as três regras no cabeçalho — a ordem importa. */
@@ -270,17 +291,22 @@ export async function retirarMidia(
 
   // 2. A URL sai antes do arquivo, junto com a marca que a tela lê.
   const agora = new Date().toISOString()
+  const limpas = new Set<number>()
   for (let i = 0; i < alvos.length; i += 200) {
     const ids = alvos.slice(i, i + 200).map((a) => a.mensagemId)
     const { error } = await db.from('lead_mensagens')
       .update({ midia_url: null, midia_retida_em: agora } as never).in('id', ids)
     if (error) { r.falhas += ids.length; continue }
     r.urlsLimpas += ids.length
+    for (const id of ids) limpas.add(id)
   }
 
-  // 3. Os arquivos, pela API do Storage.
-  for (let i = 0; i < alvos.length; i += 100) {
-    const nomes = alvos.slice(i, i + 100).map((a) => a.arquivo)
+  // 3. Os arquivos, pela API do Storage — SÓ os de mensagem cuja URL saiu no
+  // passo 2. Se o lote falhou lá, a mensagem ainda aponta para o arquivo, e
+  // apagá-lo deixaria a conversa com um anexo quebrado.
+  const aApagar = alvos.filter((a) => limpas.has(a.mensagemId))
+  for (let i = 0; i < aApagar.length; i += 100) {
+    const nomes = aApagar.slice(i, i + 100).map((a) => a.arquivo)
     const { error } = await db.storage.from(BUCKET).remove(nomes)
     if (error) { r.falhas += nomes.length; continue }
     r.arquivosApagados += nomes.length

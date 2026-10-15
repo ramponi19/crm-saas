@@ -46,8 +46,11 @@ security definer
 set search_path = public
 as $$
   with
-  H as (select zapintel_horario(p_emp) h),
-  HH as (
+  -- `materialized` em H e HH (15/10/2026): sem ele o Postgres embutia o horário
+  -- na junção final e chamava zapintel_horario() UMA VEZ POR TURNO — 11 mil
+  -- chamadas em 8 semanas, 1,3 s. Com ele, 0,27 s e a mesma saída linha a linha.
+  H as materialized (select zapintel_horario(p_emp) h),
+  HH as materialized (
     select split_part(h->>'inicio', ':', 1)::int * 60 + split_part(h->>'inicio', ':', 2)::int ini,
            split_part(h->>'fim', ':', 1)::int * 60 + split_part(h->>'fim', ':', 2)::int fim,
            array(select jsonb_array_elements_text(h->'dias')::int) dias

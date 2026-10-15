@@ -65,3 +65,27 @@ export async function excedeuLimite(
   }
   return Number(data) > max
 }
+
+/**
+ * O mesmo contador, por USUÁRIO logado em vez de por IP — para rotas que gastam
+ * dinheiro por chamada (IA do ZapIntel). Janela fixa de `janelaMinutos`.
+ *
+ * Também deixa passar quando o contador falha, pelo mesmo motivo de
+ * `excedeuLimite`: o limite protege a rota, não pode derrubá-la.
+ */
+export async function excedeuLimiteDoUsuario(
+  svc: SupabaseClient,
+  escopo: string,
+  userId: string,
+  max: number,
+  janelaMinutos = 60,
+): Promise<boolean> {
+  const ms = janelaMinutos * 60_000
+  const janela = new Date(Math.floor(Date.now() / ms) * ms).toISOString()
+  const { data, error } = await svc.rpc('rate_limit_bump', { p_chave: `${escopo}:u:${userId}`, p_janela: janela })
+  if (error) {
+    console.error('[rate-limit] contador falhou, chamada liberada:', error.message)
+    return false
+  }
+  return Number(data) > max
+}

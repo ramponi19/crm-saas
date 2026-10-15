@@ -167,10 +167,12 @@ export async function perguntarIA(opts: {
   })
 
   const chamar = (comThinking: boolean) => fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
+    // A chave no cabeçalho, não na URL: URL aparece em log de proxy e em
+    // mensagem de erro de rede; cabeçalho não.
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: corpo(comThinking),
       // Provedor lento prende a função até o limite da plataforma e o usuário
       // fica olhando um botão girar. 45 s porque 20 s não bastavam: ver
@@ -235,8 +237,17 @@ export async function perguntarIA(opts: {
     await svc.from('assistente_uso').insert({
       empresa_id: empresaId,
       tokens_in: uso?.promptTokenCount ?? null,
-      tokens_out: uso?.candidatesTokenCount ?? null,
+      // O raciocínio é cobrado como saída: sem somá-lo, o consumo registrado
+      // ficava abaixo do que o Google cobra.
+      tokens_out: uso ? (uso.candidatesTokenCount ?? 0) + (uso.thoughtsTokenCount ?? 0) : null,
     } as never)
+
+    // SAFETY ou MAX_TOKENS devolvem 200 com o texto vazio. Passar isso como
+    // sucesso fazia a sugestão responder `mensagem: ""` e a tela não mostrar nada.
+    if (!texto.trim()) {
+      console.error(`[zapintel/ia:${origem}] resposta vazia:`, modelo, j?.candidates?.[0]?.finishReason)
+      return { ok: false, status: 502, erro: 'A IA não conseguiu responder agora. Tente de novo.' }
+    }
 
     return { ok: true, texto: texto.trim(), modelo }
   } catch (e) {
@@ -358,6 +369,12 @@ async function perguntarAnthropic(o: {
       tokens_in: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
       tokens_out: u.output_tokens ?? null,
     } as never)
+
+    // Parar em max_tokens antes de escrever texto também devolve vazio.
+    if (!texto.trim()) {
+      console.error(`[zapintel/ia:${o.origem}] resposta vazia:`, o.modelo, r.stop_reason)
+      return { ok: false, status: 502, erro: 'A IA não conseguiu responder agora. Tente de novo.' }
+    }
 
     return { ok: true, texto: texto.trim(), modelo: o.modelo }
   } catch (e) {

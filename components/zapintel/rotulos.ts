@@ -4,19 +4,27 @@
  */
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 
-export const CLASSE: Record<Classe, { nome: string; cor: string }> = {
+/**
+ * `cor` pinta ponto, borda e barra; `texto` é a mesma família legível como
+ * letra. As classes cinza-claro (fora do funil, sem análise, sem resposta)
+ * ficavam com contraste de 1,3 a 2,3 sobre o branco quando a cor virava texto
+ * da etiqueta — o mínimo é 4,5. `corDoTexto` escolhe.
+ */
+export const CLASSE: Record<Classe, { nome: string; cor: string; texto?: string }> = {
   hot:         { nome: "Quente",        cor: "#dc2626" },
   warm:        { nome: "Morno",         cor: "#ea580c" },
   customer:    { nome: "Cliente",       cor: "#16a34a" },
   followup:    { nome: "Acompanhar",    cor: "#2563eb" },
   stalled:     { nome: "Parado",        cor: "#7c5cfc" },
   lost:        { nome: "Perdido",       cor: "#6b7280" },
-  unqualified: { nome: "Fora do funil", cor: "#a1a8b3" },
-  sem_analise: { nome: "Sem análise",   cor: "#c4c9d1" },
+  unqualified: { nome: "Fora do funil", cor: "#a1a8b3", texto: "#5c6470" },
+  sem_analise: { nome: "Sem análise",   cor: "#c4c9d1", texto: "#5c6470" },
   // Sem análise = o cliente falou e ninguém pediu a análise ainda (o robô
   // oferece). Sem resposta = só a loja escreveu: não há o que analisar.
-  sem_resposta: { nome: "Sem resposta do cliente", cor: "#e2e5ea" },
+  sem_resposta: { nome: "Sem resposta do cliente", cor: "#e2e5ea", texto: "#5c6470" },
 };
+
+export const corDoTexto = (c: { cor: string; texto?: string }) => c.texto ?? c.cor;
 
 export const ORDEM_FUNIL: Classe[] = ["customer", "hot", "warm", "followup", "stalled", "lost", "unqualified", "sem_analise", "sem_resposta"];
 

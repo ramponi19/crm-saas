@@ -49,6 +49,11 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
   /** Quando a última consulta começou — o teto de ritmo conta a partir daqui. */
   const ultimaConsulta = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Os parâmetros que a tela pede AGORA — resposta de outros é descartada. */
+  const chaveAtual = useRef(chave);
+  useEffect(() => { chaveAtual.current = chave; }, [chave]);
+  /** Já esteve conectado: uma queda depois disso pode ter perdido avisos. */
+  const conectou = useRef(false);
 
   const buscar = useCallback(async () => {
     if (typeof document !== "undefined" && document.hidden) { atrasado.current = true; return; }
@@ -57,6 +62,10 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     setAtualizando(true);
     const { data, error } = await supabase.rpc(rpc as never, JSON.parse(chave) as never);
     setAtualizando(false);
+    // Um aviso disparou esta consulta na página 1; a pessoa foi para a página 2
+    // e a 2 respondeu antes. Sem esta linha, a página 1 chegava por último e
+    // tomava a tela (esmaecida, como "carregando", até o próximo aviso).
+    if (chave !== chaveAtual.current) return;
     if (error) { setErro(error.message); return; }
     setErro(null);
     setDados(data as T);
@@ -75,6 +84,11 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
         if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); return; }
         // Permissão negada não melhora tentando de novo.
         if (n < 2 && error.code !== "42501") { espera = setTimeout(() => tentar(n + 1), 1500 * (n + 1)); return; }
+        // Desistiu dos parâmetros NOVOS (outra loja, outro filtro): os dados na
+        // tela são dos antigos. Mantê-los mostrava os números da loja anterior
+        // com o nome da loja nova, e as telas só exibem o erro sem dados.
+        setDados(null);
+        setChaveDosDados(null);
         setErro(error.message);
       });
     };
@@ -104,7 +118,11 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       status: (status) => {
         if (!ativo) return;
         setAoVivo(status === "SUBSCRIBED");
-        // Reconectou depois de cair: pode ter perdido avisos no meio.
+        // Caiu depois de ter conectado: o que chegar durante a queda não avisa.
+        // Marca como atrasado para reconsultar quando voltar (antes, só a aba
+        // escondida marcava, e a reconexão não recuperava nada).
+        if (status === "SUBSCRIBED") conectou.current = true;
+        else if (conectou.current) atrasado.current = true;
         if (status === "SUBSCRIBED" && atrasado.current) buscar();
       },
     });

@@ -6,7 +6,7 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../../providers";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "@/hooks/zapintel/canalZapintel";
-import { CLASSE, URG, num } from "@/components/zapintel/rotulos";
+import { CLASSE, corDoTexto, URG, num } from "@/components/zapintel/rotulos";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
@@ -183,7 +183,7 @@ export default function FichaDoLead() {
           </div>
           {ia && classe && urg && (
             <div className="fc-selos">
-              <span className="fc-tag" style={{ color: classe.cor, borderColor: classe.cor }}>{classe.nome}</span>
+              <span className="fc-tag" style={{ color: corDoTexto(classe), borderColor: classe.cor }}>{classe.nome}</span>
               <span className="fc-urg" style={{ color: urg.cor }}><span style={{ background: urg.cor }} /> urgência {urg.nome.toLowerCase()}</span>
               {ia.perfil && <span className="fc-perfil">{ia.perfil}</span>}
             </div>
@@ -214,7 +214,7 @@ export default function FichaDoLead() {
       <section className={`card fc-analise ${ia ? "" : "vazia"}`}>
         <div className="fc-cab">
           <h2><Sparkles size={14} /> Análise de IA</h2>
-          {analisando && <span className="fc-andando"><RefreshCw size={12} className="spin" /> lendo a conversa…</span>}
+          {analisando && <span className="fc-andando"><RefreshCw size={12} style={{ animation: "zi-spin 1s linear infinite" }} /> lendo a conversa…</span>}
         </div>
         {ia ? (
           <>
@@ -226,7 +226,7 @@ export default function FichaDoLead() {
               </div>
             )}
             <div className="fc-rodape">
-              <span>Análise de {new Date(guardado!.geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+              <span>Análise de {new Date(guardado!.geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })}</span>
               {iaLigada && guardado?.atual && (
                 <button className="fc-link" onClick={() => analisar(true)} disabled={analisando}><RefreshCw size={11} /> Refazer análise</button>
               )}
@@ -369,7 +369,7 @@ function Rascunho({ rotulo, texto, nota }: { rotulo: string; texto: string; nota
     <div className="fc-rascunho">
       <div className="fc-cab">
         <span className="fc-rotulo">{rotulo}</span>
-        <button className="fc-link" onClick={async () => { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 1800); }}>
+        <button className="fc-link" onClick={async () => { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 1800); } catch { /* sem permissão de área de transferência */ } }}>
           {copiado ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
         </button>
       </div>

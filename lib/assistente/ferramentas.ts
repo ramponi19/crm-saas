@@ -571,16 +571,26 @@ async function conversaLer(c: Contexto, e: Entrada): Promise<string> {
 }
 
 async function analisesPendentes(c: Contexto): Promise<string> {
-  const [visiveis, { data, error }] = await Promise.all([
-    leadsVisiveis(c),
-    c.svc.rpc('zapintel_analises_pendentes', { p_empresa: c.acesso.empresaId, p_versao: VERSAO_DO_PERFIL }),
-  ])
-  if (error) return saida({ erro: 'não consegui contar agora' })
-  const pode = new Set(visiveis.map((l) => l.id))
-  const linhas = ((data ?? []) as {
+  type Pendente = {
     lead_id: number; nome: string | null; filial: string | null; tem_ficha: boolean; gerado_em: string | null
     mensagens_na_ficha: number | null; mensagens_agora: number; loja_deve: boolean | null
-  }[]).filter((l) => pode.has(Number(l.lead_id)))
+  }
+  // Paginado: a API corta em 1.000 linhas sem avisar, e numa troca de versão
+  // da ficha a fila passa disso (ver /zapintel/api/perfil/pendentes).
+  let visiveis: Awaited<ReturnType<typeof leadsVisiveis>>
+  let data: Pendente[]
+  try {
+    ;[visiveis, data] = await Promise.all([
+      leadsVisiveis(c),
+      buscarTudo<Pendente>((de, ate) =>
+        c.svc.rpc('zapintel_analises_pendentes', { p_empresa: c.acesso.empresaId, p_versao: VERSAO_DO_PERFIL })
+          .order('lead_id').range(de, ate)),
+    ])
+  } catch {
+    return saida({ erro: 'não consegui contar agora' })
+  }
+  const pode = new Set(visiveis.map((l) => l.id))
+  const linhas = data.filter((l) => pode.has(Number(l.lead_id)))
   const desat = linhas.filter((l) => l.tem_ficha)
   return saida({
     desatualizadas: desat.length,

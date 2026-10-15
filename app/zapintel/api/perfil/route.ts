@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { zapintelEmpresa } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
+import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
@@ -39,11 +40,18 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(req: Request) {
-  const { empresaId } = await zapintelEmpresa()
+  const acesso = await zapintelAcesso()
+  if (!acesso) {
+    return NextResponse.json({ erro: 'O ZapIntel não está ativo para esta empresa.' }, { status: 403 })
+  }
+  const { empresaId, userId } = acesso
 
-  const body = (await req.json().catch(() => ({}))) as { lead?: number; forcar?: boolean }
+  // `?? {}`: o corpo pode ser o JSON literal `null`, e `null.lead` derrubava a
+  // rota com 500. `forcar` só vale como booleano — a string "false" é verdadeira.
+  const body = ((await req.json().catch(() => null)) ?? {}) as { lead?: unknown; forcar?: unknown }
   const id = Number(body.lead)
-  if (!Number.isInteger(id) || id <= 0) {
+  const forcar = body.forcar === true
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json({ erro: 'lead invalido' }, { status: 400 })
   }
 
@@ -53,15 +61,25 @@ export async function POST(req: Request) {
   const { analisados, porId, nomeDaLoja } = await carregarConversas(db, empresaId, [id])
   const lead = analisados[0]
   const banco = porId.get(id)
-  if (!lead || !banco) return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+  if (!lead || !banco || !lojaVisivel(acesso, banco.filial_id)) {
+    return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
+  }
 
   const marca = marcaDaConversa(lead)
 
-  if (!body.forcar) {
+  if (!forcar) {
     const guardado = await lerPerfil(db, empresaId, id, marca)
     if (guardado?.atual) {
       return NextResponse.json({ ...guardado, doCache: true })
     }
+  }
+
+  // Daqui para baixo é chamada PAGA ao provedor. Teto por pessoa: o robô gera
+  // um lead por vez e "Refazer análise" ignora o guardado — sem teto, um laço
+  // no console gastava a chave da empresa sem limite. 120/h cobre o robô
+  // esvaziando a fila de um dia normal (~60) com folga.
+  if (await excedeuLimiteDoUsuario(db, 'zapintel-perfil', userId, 120)) {
+    return NextResponse.json({ erro: 'Muitas análises nesta hora. Tente de novo daqui a pouco.' }, { status: 429 })
   }
 
   // Comprou? Vem da ponte, não de palavra na conversa. O prompt recebe os dois

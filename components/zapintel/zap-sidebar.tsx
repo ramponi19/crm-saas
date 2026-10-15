@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, Headset, ArrowLeft, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
@@ -49,21 +49,33 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
    * por cima do conteúdo, e qualquer clique dentro dela fecha.
    */
   const [aberta, setAberta] = useState(false);
+  // Teclado no celular: o foco entra no menu ao abrir, Escape fecha e o foco
+  // volta ao botão. Fechado, o menu fica `visibility: hidden` (abaixo) — antes
+  // ele só saía da tela por `transform` e o Tab caía em links invisíveis.
+  const lado = useRef<HTMLElement>(null);
+  const botao = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!aberta) return;
+    lado.current?.querySelector<HTMLElement>("a, button")?.focus();
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { setAberta(false); botao.current?.focus(); } };
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, [aberta]);
   return (
     <>
     <style>{`
       .zi-side-botao { display: none; }
       @media (max-width: 860px) {
-        .zi-side { position: fixed; inset: 0 auto 0 0; z-index: 960; transform: translateX(-105%); transition: transform .2s ease-out; box-shadow: 12px 0 40px rgba(21,24,28,.18); overflow-y: auto; }
-        .zi-side.aberta { transform: none; }
+        .zi-side { position: fixed; inset: 0 auto 0 0; z-index: 960; transform: translateX(-105%); visibility: hidden; transition: transform .2s ease-out, visibility 0s linear .2s; box-shadow: 12px 0 40px rgba(21,24,28,.18); overflow-y: auto; }
+        .zi-side.aberta { transform: none; visibility: visible; transition: transform .2s ease-out; }
         .zi-side-botao { display: grid; place-items: center; position: fixed; top: 12px; left: 12px; z-index: 955; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--brd); background: var(--card); color: var(--txt); box-shadow: 0 2px 8px rgba(21,24,28,.08); }
         .zi-side-fundo { position: fixed; inset: 0; z-index: 958; background: rgba(21,24,28,.32); }
       }
       @media (prefers-reduced-motion: reduce) { .zi-side { transition: none; } }
     `}</style>
-    <button className="zi-side-botao" onClick={() => setAberta(true)} aria-label="Abrir menu do ZapIntel"><Menu size={19} /></button>
+    <button ref={botao} className="zi-side-botao" onClick={() => setAberta(true)} aria-label="Abrir menu do ZapIntel" aria-expanded={aberta}><Menu size={19} /></button>
     {aberta && <div className="zi-side-fundo" onClick={() => setAberta(false)} />}
-    <aside className={`zi-side ${aberta ? "aberta" : ""}`} onClick={(e) => { if ((e.target as HTMLElement).closest("a, button")) setAberta(false); }}
+    <aside ref={lado} className={`zi-side ${aberta ? "aberta" : ""}`} onClick={(e) => { if ((e.target as HTMLElement).closest("a, button")) setAberta(false); }}
       style={{ width: 210, background: "var(--panel)", borderRight: "1px solid var(--brd)", display: "flex", flexDirection: "column", padding: "20px 12px", gap: 4, flexShrink: 0 }}>
       {aberta && (
         <button onClick={() => setAberta(false)} aria-label="Fechar menu"
