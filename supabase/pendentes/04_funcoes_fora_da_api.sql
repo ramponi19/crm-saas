@@ -7,6 +7,8 @@
 --    explorável, é ruído no linter. Testado em 15/10 (transação desfeita):
 --    sem EXECUTE para logado, o gatilho continua disparando (insert em
 --    `tarefas` como logado preencheu a loja = 3).
+set local lock_timeout = '5s';
+
 revoke execute on function public.preencher_filial(), public.preencher_filial_do_lead(), public.sincronizar_nao_lidas(),
   public.marcar_cliente_proprietario(), public.numerar_cotacao_troca(), public.propagar_filial_do_lead()
   from public, anon, authenticated;

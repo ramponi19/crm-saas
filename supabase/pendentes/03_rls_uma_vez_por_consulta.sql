@@ -19,7 +19,18 @@
 -- NÃO mexe em is_empresa_admin(empresa_id): depende da linha.
 -- Guarda as definições atuais em backup.rls_politicas_20261015 ANTES de mudar.
 -- VOLTA ATRÁS: 03_rls_uma_vez_por_consulta.volta.sql (lê esse backup).
-create table if not exists backup.rls_politicas_20261015 as
+set local lock_timeout = '5s';  -- cada ALTER POLICY trava a tabela por instantes; se alguma estiver ocupada, falha tudo e nada muda
+
+-- Pré-condição: exatamente as 96 políticas testadas em 15/10, e o backup ainda não existe.
+do $$ declare n int; begin
+  select count(*) into n from pg_policy p join pg_class c on c.oid = p.polrelid
+   where c.relnamespace = 'public'::regnamespace
+     and (coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')) ~ '(?<!SELECT )(get_empresa_id|is_super_admin)\(\)';
+  if n <> 96 then raise exception '03: esperava 96 políticas, achou % — nada foi alterado', n; end if;
+  if to_regclass('backup.rls_politicas_20261015') is not null then raise exception '03: backup já existe (já aplicada?) — nada foi alterado'; end if;
+end $$;
+
+create table backup.rls_politicas_20261015 as
 select c.relname::text tabela, p.polname::text politica,
        pg_get_expr(p.polqual, p.polrelid) usando, pg_get_expr(p.polwithcheck, p.polrelid) checa
 from pg_policy p join pg_class c on c.oid = p.polrelid

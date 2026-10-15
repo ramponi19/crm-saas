@@ -16,6 +16,15 @@
 -- (app/api/contrato-documentos) falha calada, deixando arquivo órfão.
 --
 -- VOLTA ATRÁS: 02_contratos_bucket.volta.sql.
+set local lock_timeout = '5s';  -- não fica preso atrás de upload em andamento: falha e nada muda
+
+-- Pré-condição: o estado de 15/10 (política antiga presente, novas ausentes).
+do $$ begin
+  if not exists (select 1 from pg_policy where polrelid = 'storage.objects'::regclass and polname = 'contratos_leitura')
+     or exists (select 1 from pg_policy where polrelid = 'storage.objects'::regclass and polname in ('contratos_leitura_do_tenant', 'contratos_delete_do_tenant'))
+  then raise exception '02: storage.objects não está no estado esperado — nada foi alterado'; end if;
+end $$;
+
 drop policy if exists contratos_leitura on storage.objects;
 create policy contratos_leitura_do_tenant on storage.objects for select to authenticated
   using (bucket_id = 'contratos' and (storage.foldername(name))[1] = (select get_empresa_id())::text);
