@@ -19,10 +19,8 @@
 -- TURNO: cada vez que o cliente volta a falar depois da loja (a primeira
 -- mensagem de uma sequência dele). A resposta é a próxima mensagem da loja.
 --
--- HORÁRIO DA LOJA: o mesmo da esteira de leads — `configuracoes_sistema`,
--- chave `horario` ({inicio, fim, dias}, 0 = domingo), e na falta dele o
--- padrão de `lib/horario-util.ts` (seg–sex, 09:00–18:00). Um só horário para
--- a empresa: as duas lojas da JM abrem igual.
+-- HORÁRIO DA LOJA e TURNOS: `zapintel_horario` e `zapintel_turnos`
+-- (zapintel_turnos.sql) — a mesma conta que o dashboard usa desde 15/10.
 --
 -- p_dias: 7 | 30 | 90 | null (tudo). A evolução semanal usa sempre 8 semanas.
 create or replace function public.zapintel_atendimento(
@@ -41,21 +39,11 @@ declare
   v_lojas  bigint[];
   v_agora  timestamptz := now();
   v_desde  timestamptz := case when p_dias is null then '-infinity'::timestamptz else now() - make_interval(days => p_dias) end;
-  v_base   timestamptz;
   v_hor    jsonb;
-  v_ini    int;
-  v_fim    int;
-  v_dias   int[];
   v_out    jsonb;
 begin
   select e.empresa, e.filiais into v_emp, v_lojas from zapintel_escopo(p_filial, p_empresa) e;
-  v_base := least(v_desde, v_agora - interval '8 weeks');
-
-  select valor into v_hor from configuracoes_sistema where empresa_id = v_emp and chave = 'horario';
-  v_hor := jsonb_build_object('inicio', '09:00', 'fim', '18:00', 'dias', '[1,2,3,4,5]'::jsonb) || coalesce(v_hor, '{}'::jsonb);
-  v_ini := split_part(v_hor->>'inicio', ':', 1)::int * 60 + split_part(v_hor->>'inicio', ':', 2)::int;
-  v_fim := split_part(v_hor->>'fim', ':', 1)::int * 60 + split_part(v_hor->>'fim', ':', 2)::int;
-  v_dias := array(select jsonb_array_elements_text(v_hor->'dias')::int);
+  v_hor := zapintel_horario(v_emp);
 
   with
   L as materialized (
@@ -63,31 +51,11 @@ begin
     from leads l
     where l.empresa_id = v_emp and l.ativo and coalesce(l.filial_id, 0) = any (v_lojas)
   ),
-  -- Uma passada só: a direção anterior e a próxima resposta da loja vêm por
-  -- janela. Ordenada ao contrário, "as linhas antes desta" são as mensagens
-  -- DEPOIS dela — e a menor data de loja entre elas é a resposta.
-  MS as materialized (
-    select m.lead_id, m.direcao, m.created_at, m.usuario_id,
-           lag(m.direcao) over (partition by m.lead_id order by m.created_at, m.id) dir_ant,
-           min(case when m.direcao = 'enviada' then m.created_at end) over (
-             partition by m.lead_id order by m.created_at desc, m.id desc
-             rows between unbounded preceding and 1 preceding) resposta
-    from lead_mensagens m join L on L.id = m.lead_id
-    where m.empresa_id = v_emp and m.created_at >= v_base
-  ),
-  T as materialized (
-    select MS.lead_id, L.filial_id, MS.created_at chegou,
-           extract(epoch from MS.resposta - MS.created_at) / 60 espera,
-           extract(dow from MS.created_at at time zone 'America/Sao_Paulo')::int dow,
-           extract(hour from MS.created_at at time zone 'America/Sao_Paulo')::int hora,
-           (extract(hour from MS.created_at at time zone 'America/Sao_Paulo') * 60
-            + extract(minute from MS.created_at at time zone 'America/Sao_Paulo'))::int minuto
-    from MS join L on L.id = MS.lead_id
-    where MS.direcao = 'recebida' and MS.dir_ant is distinct from 'recebida'
-  ),
-  TH as (
-    select T.*, (T.dow = any (v_dias) and T.minuto >= v_ini and T.minuto < v_fim) aberto
-    from T
+  -- Os turnos e o horário vêm de `zapintel_turnos` — a mesma conta do
+  -- dashboard (supabase/funcoes/zapintel_turnos.sql). A evolução semanal
+  -- precisa de 8 semanas mesmo quando o período é 7 dias.
+  TH as materialized (
+    select * from zapintel_turnos(v_emp, v_lojas, least(v_desde, v_agora - interval '8 weeks'))
   ),
   -- Conversa que ainda pode virar venda, segundo a análise.
   F as materialized (
@@ -116,8 +84,8 @@ begin
   select jsonb_build_object(
     'dias', p_dias,
     'empresa', v_emp,
-    'horario', v_hor,
-    'horarioConfigurado', exists (select 1 from configuracoes_sistema where empresa_id = v_emp and chave = 'horario'),
+    'horario', v_hor - 'configurado',
+    'horarioConfigurado', (v_hor->>'configurado')::boolean,
 
     -- ── Tempo de resposta no horário da loja, por loja e no total ─────────
     'resposta', coalesce((select jsonb_agg(r order by r->>'loja' nulls first) from (
@@ -178,8 +146,10 @@ begin
     'vendedor', jsonb_build_object(
         'leads', (select count(*) from L join U on U.lead_id = L.id),
         'comResponsavel', (select count(*) from L join U on U.lead_id = L.id where L.responsavel_id is not null),
-        'mensagensDaLoja', (select count(*) from MS where direcao = 'enviada' and created_at >= v_desde),
-        'mensagensComUsuario', (select count(*) from MS where direcao = 'enviada' and usuario_id is not null and created_at >= v_desde))
+        'mensagensDaLoja', (select count(*) from lead_mensagens m join L on L.id = m.lead_id
+                            where m.empresa_id = v_emp and m.direcao = 'enviada' and m.created_at >= v_desde),
+        'mensagensComUsuario', (select count(*) from lead_mensagens m join L on L.id = m.lead_id
+                                where m.empresa_id = v_emp and m.direcao = 'enviada' and m.usuario_id is not null and m.created_at >= v_desde))
   ) into v_out;
 
   return v_out;

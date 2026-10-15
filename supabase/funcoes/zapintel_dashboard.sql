@@ -173,31 +173,19 @@ begin
     from lead_mensagens m
     where m.empresa_id = v_emp and m.created_at >= v_hoje and coalesce(m.filial_id, 0) = any (v_lojas)
   ),
-  -- Tempo de resposta: cada vez que o cliente RETOMA a palavra (a mensagem
-  -- anterior foi da loja, ou é a primeira), quanto a loja levou para falar de
-  -- novo. Só o que começou em horário comercial (8h-20h, seg-sáb): madrugada
-  -- esperando a loja abrir não é atendimento lento.
-  R as (
-    select m.lead_id, m.filial_id, m.direcao, m.created_at,
-           lag(m.direcao) over (partition by m.lead_id order by m.created_at, m.id) anterior
-    from lead_mensagens m
-    where m.empresa_id = v_emp and m.created_at >= v_agora - interval '7 days'
-      and coalesce(m.filial_id, 0) = any (v_lojas)
-  ),
+  -- Tempo de resposta: a MESMA conta da tela Atendimento, de `zapintel_turnos`
+  -- (zapintel_turnos.sql) — cada vez que o cliente retoma a palavra, no
+  -- horário da loja (configurações → Horário). Até 15/10/2026 o dashboard
+  -- tinha regra própria (seg–sáb 8h–20h, mediana só das respondidas, "% em
+  -- até 15 min") e os dois números não batiam. Sem resposta conta como 24 h.
   RS as materialized (
-    select r.lead_id, r.filial_id, r.created_at t0,
-           (select min(e.created_at) from lead_mensagens e
-             where e.lead_id = r.lead_id and e.direcao = 'enviada' and e.created_at > r.created_at) t1
-    from R r
-    where r.direcao = 'recebida' and (r.anterior is null or r.anterior = 'enviada')
-      and extract(hour from r.created_at at time zone 'America/Sao_Paulo') between 8 and 19
-      and extract(isodow from r.created_at at time zone 'America/Sao_Paulo') <= 6
+    select * from zapintel_turnos(v_emp, v_lojas, v_agora - interval '7 days') where aberto
   ),
   RESP as (
-    select percentile_cont(0.5) within group (order by extract(epoch from t1 - t0) / 60) filter (where t1 is not null) mediana,
-           count(*) filter (where t1 is not null and t1 - t0 <= interval '15 minutes') rapidas,
-           count(*) filter (where t1 is not null) respondidas,
-           count(*) filter (where t1 is null) sem_resposta,
+    select percentile_cont(0.5) within group (order by least(coalesce(espera, 1440), 1440)) mediana,
+           count(*) filter (where espera < 5) rapidas,
+           count(*) filter (where espera is null or espera >= 240) longas,
+           count(*) filter (where espera is null) sem_resposta,
            count(*) total
     from RS
   ),
@@ -282,10 +270,12 @@ begin
       ) from HOJE),
 
     'resposta', (select jsonb_build_object(
-        'medianaMin', round(mediana::numeric, 1),
-        'ate15minPct', case when respondidas > 0 then round(100.0 * rapidas / respondidas) else null end,
+        'medianaMin', round(mediana::numeric),
+        'ate5Pct', case when total > 0 then round(100.0 * rapidas / total) else null end,
+        'mais4hPct', case when total > 0 then round(100.0 * longas / total) else null end,
         'semResposta', sem_resposta,
-        'retomadas', total
+        'retomadas', total,
+        'horario', zapintel_horario(v_emp)
       ) from RESP),
 
     'fila', (select coalesce(jsonb_agg(f order by f.ordem, f.desde), '[]') from (
@@ -392,8 +382,8 @@ begin
                (select count(*) from X where X.filial_id = NOMES.id and X.esperando and X.ur >= v_agora - interval '72 hours' and X.cls <> 'unqualified') esperando,
                (select count(*) from X where X.filial_id = NOMES.id and X.cls = 'hot') quentes,
                (select coalesce(sum(valor_venda), 0) from V where V.filial_id = NOMES.id and V.data_venda >= v_mes and V.status <> 'cancelada') "vendasMes",
-               (select round((percentile_cont(0.5) within group (order by extract(epoch from t1 - t0) / 60))::numeric, 1)
-                  from RS where RS.filial_id = NOMES.id and t1 is not null) "respostaMin"
+               (select round((percentile_cont(0.5) within group (order by least(coalesce(espera, 1440), 1440)))::numeric)
+                  from RS where RS.filial_id = NOMES.id) "respostaMin"
         from NOMES where NOMES.id = any (v_lojas)) pl)
   ) into v_out;
 

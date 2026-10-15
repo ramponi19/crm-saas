@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Copy, Check, ArrowRight, MessageCircle, Clock, Inbox, Sparkles, AlertTriangle, X, Bot,
 } from "lucide-react";
@@ -63,6 +64,7 @@ type Gaveta = { titulo: string; tipo: string; valor?: string | null; explica?: s
 export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
   filial: number | null; nomeDoRecorte: string; empresa: number | null;
 }) {
+  const router = useRouter();
   const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem } = useDashboardAoVivo(filial, empresa);
   const agora = useRelogio();
   const [gaveta, setGaveta] = useState<Gaveta>(null);
@@ -139,8 +141,10 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
           rotulo="Tempo de resposta"
           valor={d.resposta.medianaMin == null ? "—" : `${d.resposta.medianaMin.toLocaleString("pt-BR")} min`}
           cor={d.resposta.medianaMin != null && d.resposta.medianaMin > 15 ? "var(--orange)" : "var(--txt)"}
-          linha={d.resposta.ate15minPct == null ? "sem conversa nos últimos 7 dias" : `${d.resposta.ate15minPct}% respondidas em até 15 min`}
-          rodape="mediana · 7 dias · seg a sáb, 8h–20h"
+          linha={d.resposta.ate5Pct == null ? "ninguém falou no horário da loja nos últimos 7 dias"
+            : `${d.resposta.ate5Pct}% em até 5 min · ${d.resposta.mais4hPct}% esperaram 4 h+`}
+          rodape={`espera típica · 7 dias · ${descreverHorario(d.resposta.horario)}`}
+          onClick={() => router.push("/zapintel/atendimento?periodo=7")}
         />
         <Pulso
           rotulo="Vendas no mês"
@@ -238,6 +242,18 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
 }
 
 // ── Peças ────────────────────────────────────────────────────────────────────
+
+/**
+ * "seg a sex, 09:00 às 18:00" — o horário da loja que vale para o tempo de
+ * resposta, o mesmo da tela Atendimento (`zapintel_horario` no banco).
+ */
+function descreverHorario(h: { inicio: string; fim: string; dias: number[] }) {
+  const N = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const d = [...h.dias].sort();
+  const seguidos = d.length > 1 && d.every((x, i) => i === 0 || x === d[i - 1] + 1);
+  const dias = d.length === 0 ? "nenhum dia" : seguidos ? `${N[d[0]]} a ${N[d[d.length - 1]]}` : d.map((x) => N[x]).join(", ");
+  return `${dias}, ${h.inicio}–${h.fim}`;
+}
 
 function Pulso({ rotulo, valor, linha, rodape, cor = "var(--txt)", onClick, destaque }: {
   rotulo: string; valor: string; linha: string; rodape?: ReactNode; cor?: string; onClick?: () => void; destaque?: boolean;

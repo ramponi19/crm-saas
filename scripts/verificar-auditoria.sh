@@ -94,6 +94,12 @@ n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
 n "atendimento sem ticket inventado" "app/zapintel/atendimento/page.tsx" "5200"
 v "atendimento le do banco"          "app/zapintel/atendimento/page.tsx" "useRpcAoVivo<Atendimento>(\"zapintel_atendimento\""
 v "atendimento fechado para anon"    "supabase/funcoes/zapintel_atendimento.sql" "revoke all on function public.zapintel_atendimento"
+# Tempo de resposta: UMA conta para dashboard e Atendimento (15/10/2026). O
+# dashboard tinha regra própria (seg–sáb 8h–20h) e os números não batiam.
+v "dashboard usa a conta comum"      "supabase/funcoes/zapintel_dashboard.sql" "from zapintel_turnos(v_emp"
+v "atendimento usa a conta comum"    "supabase/funcoes/zapintel_atendimento.sql" "from zapintel_turnos(v_emp"
+n "dashboard sem horario proprio"    "supabase/funcoes/zapintel_dashboard.sql" "between 8 and 19"
+n "card sem a regra antiga"          "components/zapintel/painel-ao-vivo.tsx" "seg a sáb, 8h–20h"
 v "endereco antigo redireciona"      "next.config.ts" "destination: '/zapintel/atendimento'"
 v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
 n "nao chama a Anthropic direto"     "app/zapintel/api/analyze/route.ts" "api.anthropic.com"

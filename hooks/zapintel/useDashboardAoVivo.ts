@@ -31,7 +31,11 @@ export interface Dashboard {
     esperando: number; esperandoMais1h: number; esperandoAntigos: number; esperandoForaDoFunil: number;
     esperaMaisAntiga: string | null;
   };
-  resposta: { medianaMin: number | null; ate15minPct: number | null; semResposta: number; retomadas: number };
+  /** A mesma conta da tela Atendimento (`zapintel_turnos`), nos últimos 7 dias. */
+  resposta: {
+    medianaMin: number | null; ate5Pct: number | null; mais4hPct: number | null; semResposta: number; retomadas: number;
+    horario: { inicio: string; fim: string; dias: number[]; configurado: boolean };
+  };
   fila: ItemFila[];
   funil: Partial<Record<Classe, number>>;
   dinheiro: {
