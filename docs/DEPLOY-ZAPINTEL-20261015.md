@@ -28,9 +28,10 @@ nada ficou gravado**.
 | ~~00~~ ✔ | `supabase/pendentes/00_instantaneo.sql` | cria 3 tabelas em `backup` | 136 políticas, 53 funções, 3 definições guardadas | nada a reverter; não muda o que está em uso |
 | ~~02~~ ✔ | `supabase/pendentes/02_contratos_bucket.sql` | 3 políticas de `storage.objects` (bucket contratos) | conta da Preview · Loja: listar `contratos/1` = **0** (hoje 61); dono JM = 61; URL pública do fundo = 200 | `02_contratos_bucket.volta.sql` |
 | 01 | `supabase/pendentes/01_sem_resposta_do_cliente.sql` | 3 funções do ZapIntel | rodapé do dashboard: "N sem análise · 55 sem resposta do cliente"; funil com a fatia nova; lista filtrada mostra os 55 | `01_sem_resposta_do_cliente.volta.sql` |
-| P | `git -C ".../scratchpad/wt-perfil" push origin entrega-perfil-ia:main` | `components/layout/topbar.tsx` (sino) + docs/SQL/testes | Vercel READY; sino com o total certo (admin JM: 1.109 leads) | Vercel → Promote `74139b3` |
+| P | `git -C ".../scratchpad/wt-perfil" push origin entrega-perfil-ia:main` | `components/layout/topbar.tsx` (sino), `app/zapintel/layout.tsx` + `lib/zapintel/ctx.ts` (ZapIntel só dono/admin/superadmin) + docs/SQL/testes | Vercel READY; sino com o total certo (admin JM: 1.109 leads) | Vercel → Promote `74139b3` |
 | 03 | `supabase/pendentes/03_rls_uma_vez_por_consulta.sql` | 96 políticas de RLS do CRM | `supabase/testes/zapintel_acesso.sql` "0 falhas"; telas do CRM abrindo normalmente | `03_rls_uma_vez_por_consulta.volta.sql` |
 | 04 | `supabase/pendentes/04_funcoes_fora_da_api.sql` | EXECUTE de 10 funções | tarefas, vendas, leads continuam recebendo a loja ao gravar; avisos do linter somem | `04_funcoes_fora_da_api.volta.sql` |
+| 05 | `supabase/pendentes/05_zapintel_so_dono_admin.sql` (depois do push) | `zapintel_escopo`: vendedor/técnico recusados (42501) | `zapintel_acesso.sql` 18/18 ok; dono, admin, superadmin e Imobiliária seguem entrando (ensaio 15/10) | `05_zapintel_so_dono_admin.volta.sql` |
 
 Aplicação: um arquivo por vez (pelo Claude com `apply_migration`, que é
 transacional, ou no SQL Editor do Supabase). Conferir o resultado esperado antes
@@ -72,7 +73,7 @@ Com login — `tests/producao/conferir.js`, rodado na janela logada (só lê):
 | Conta | Papel do script | Esperado |
 |---|---|---|
 | Lucas (dono JM) | `dono` | 615 e 1706 = 200, 1204 = 404; funil interno = 422; corpo nulo = 400; contratos/1 = 61 |
-| `reviewer.meta@jmstore.app` | `vendedor` | 615 = 200, **1706 = 404**, 1204 = 404 |
+| `reviewer.meta@jmstore.app` | `vendedor` | depois do push: tela "O ZapIntel é usado pelo dono e pelos administradores" e **403 em todas as rotas** (até 15/10 via só Mogi) |
 | superadmin | `superadmin` | 615/1706 = 200; e na tela /superadmin: "Prever" abre o ZapIntel da empresa, "Sair do preview" volta |
 | "Meta" (Preview · Loja) | `sem-zapintel` | 403 nas rotas; contratos/1 = **0** depois da 02 (61 em 15/10, antes) |
 
@@ -108,3 +109,20 @@ real, para não apagar fundo em uso; conferir excluindo um modelo de teste.
 | 15/10 | vendedor (`reviewer.meta@jmstore.app`, só Mogi) | conversa 615 = 200, **1706 (Jaguariúna) = 404**, 1204 = 404; análise e sugestão para o 1706 = 404 sem IA; corpo nulo = 400; robô só com leads de Mogi (36 + 16); leads pela API só da loja 3; dashboard 1.573 conversas (dono: 1.796); lista 1.640 sem nenhum de Jaguariúna; ficha do 1706 "não encontrado"; contratos/1 = 61 (mesma empresa); sino 867 leads; 0 erro de runtime. Observação: o subtítulo diz "toda a rede" para quem só vê Mogi — texto enganoso, não é vazamento |
 | — | superadmin | **pendente** |
 | — | contratos (subir/emitir/excluir modelo de teste) | **pendente** — grava/apaga arquivo: só com modelo de teste e autorização |
+
+## Decisão de 15/10: ZapIntel só para dono, admin e superadmin
+
+Pedido do Lucas: *"vendedor deve ser bloqueado, só dono, admin e superadmin"*.
+Antes, o link ficava no /admin (dono/admin), mas o vendedor que digitasse
+`/zapintel` entrava e via a própria loja (conferido em produção com
+`reviewer.meta@jmstore.app`). Trava em três camadas:
+
+| Camada | Onde | Estado |
+|---|---|---|
+| Tela | `app/zapintel/layout.tsx` — mensagem e "Voltar ao CRM" | no próximo push |
+| Rotas de API | `lib/zapintel/ctx.ts` (`zapintelAcesso` → 403) | no próximo push |
+| Banco (telas chamam direto) | `supabase/pendentes/05_zapintel_so_dono_admin.sql` | pendente — ensaio: dono/admin/superadmin/Imobiliária entram, os 2 vendedores recusados, volta idêntica |
+
+Ordem: push primeiro, depois a 05 (com a 05 antes, o vendedor veria a tela de
+erro do painel em vez da mensagem). Fora do escopo: o assistente do CRM (robô do
+/dashboard), que não é o ZapIntel, continua disponível ao vendedor.

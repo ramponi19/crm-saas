@@ -1,7 +1,7 @@
 import './globals.css'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { zapintelEmpresa } from '@/lib/zapintel/ctx'
+import { zapintelEmpresa, zapintelPapelPermitido } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import Providers from './providers'
 import { ZapSidebar } from '@/components/zapintel/zap-sidebar'
@@ -19,17 +19,32 @@ export const metadata = { title: 'ZapIntel' }
 export default async function ZapIntelLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { empresaId } = await zapintelEmpresa()
+  const { userId, empresaId } = await zapintelEmpresa()
   // Status do add-on na tabela própria do complemento (complementos_empresa), não em
   // empresas — mantém o módulo removível sem alterar o schema do CRM.
-  const [{ data: usuario }, { data: empresa }, { data: addon }] = await Promise.all([
+  const [{ data: usuario }, { data: empresa }, { data: addon }, papelOk] = await Promise.all([
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     rastrDb().from('empresas').select('nome').eq('id', empresaId).single(),
     rastrDb().from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
+    zapintelPapelPermitido(userId, empresaId),
   ])
 
   const liberado = !!usuario?.is_super_admin || !!(addon as { zapintel_ativo?: boolean })?.zapintel_ativo
   const previewAtivo = !!usuario?.is_super_admin && Number((await cookies()).get('nexus_preview_empresa')?.value) === empresaId
+  // Empresa com o complemento, mas papel sem acesso (vendedor, técnico): o
+  // ZapIntel é do dono, do admin e do superadmin — lib/zapintel/quem-usa.ts.
+  if (liberado && !papelOk) {
+    return (
+      <div className="zi-root" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 24 }}>
+        <div style={{ maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ width: 52, height: 52, borderRadius: 14, margin: '0 auto 16px', background: 'linear-gradient(135deg,#7c5cfc,#4f46e5)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 22 }}>Z</div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>ZapIntel</h1>
+          <p style={{ fontSize: 14, color: 'var(--dim)', lineHeight: 1.7 }}>O ZapIntel é usado pelo dono e pelos administradores da empresa. Se você precisa de acesso, fale com o responsável pela loja.</p>
+          <a href="/dashboard" style={{ marginTop: 20, display: 'inline-block', background: '#7c5cfc', color: '#fff', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Voltar ao CRM</a>
+        </div>
+      </div>
+    )
+  }
   if (!liberado) {
     return (
       <div className="zi-root" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 24 }}>

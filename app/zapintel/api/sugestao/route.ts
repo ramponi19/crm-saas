@@ -55,7 +55,7 @@ export const maxDuration = 60
 export async function POST(req: Request) {
   const acesso = await zapintelAcesso()
   if (!acesso) {
-    return NextResponse.json({ erro: 'O ZapIntel não está ativo para esta empresa.' }, { status: 403 })
+    return NextResponse.json({ erro: 'Sem acesso ao ZapIntel (só dono, admin ou empresa com o complemento ativo).' }, { status: 403 })
   }
   const { empresaId, userId } = acesso
 

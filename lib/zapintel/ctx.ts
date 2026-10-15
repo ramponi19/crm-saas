@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { podeUsarZapintel } from '@/lib/zapintel/quem-usa'
 
 /**
  * Contexto do complemento ZapIntel: resolve a empresa ativa do usuário logado,
@@ -68,7 +69,23 @@ export async function zapintelAcesso(): Promise<{ userId: string; empresaId: num
   const { data, error } = await supabase.rpc('zapintel_escopo' as never, { p_filial: null, p_empresa: empresaId } as never)
   const linha = (Array.isArray(data) ? data[0] : data) as { empresa: number; filiais: number[] } | null
   if (error || !linha || Number(linha.empresa) !== empresaId) return null
+  // Só dono, admin e superadmin (lib/zapintel/quem-usa.ts) — conferido aqui
+  // também, para valer mesmo antes de o banco recusar o vendedor.
+  if (!(await zapintelPapelPermitido(userId, empresaId))) return null
   return { userId, empresaId, lojas: (linha.filiais ?? []).map(Number) }
+}
+
+/**
+ * O usuário é dono/admin DESTA empresa, ou superadmin? Superadmin impersonando
+ * ou em prévia não tem vínculo com a empresa e passa pelo flag global.
+ */
+export async function zapintelPapelPermitido(userId: string, empresaId: number): Promise<boolean> {
+  const supabase = await createClient()
+  const [{ data: usuario }, { data: vinculo }] = await Promise.all([
+    supabase.from('usuarios').select('is_super_admin').eq('id', userId).maybeSingle(),
+    supabase.from('empresa_usuarios').select('role').eq('usuario_id', userId).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
+  ])
+  return podeUsarZapintel((vinculo as { role?: string } | null)?.role, !!(usuario as { is_super_admin?: boolean } | null)?.is_super_admin)
 }
 
 /** O lead está numa loja que este usuário pode ver? Lead sem loja conta como 0. */

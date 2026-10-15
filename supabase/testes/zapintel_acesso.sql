@@ -27,18 +27,21 @@ begin
   if lojas_vend @> array[3, 6, 0]::bigint[] then ok := ok + 1; else falhas := falhas || ' [dono não vê todas as lojas]'; end if;
   n_dono := (zapintel_leads_lista('{}'::jsonb) ->> 'total')::int;
 
+  -- 2. Vendedor: SEM ZapIntel (decisão de 15/10/2026 — só dono, admin e
+  --    superadmin). Exige supabase/pendentes/05_zapintel_so_dono_admin.sql;
+  --    antes dela, estas duas checagens falham de propósito.
   perform set_config('request.jwt.claims', json_build_object('sub', vend, 'role', 'authenticated')::text, true);
-  select e.filiais into lojas_vend from zapintel_escopo(null, null) e;
-  if not (lojas_vend @> array[3, 6]::bigint[]) then ok := ok + 1; else falhas := falhas || ' [vendedor vê as duas lojas]'; end if;
-  n_vend := (zapintel_leads_lista('{}'::jsonb) ->> 'total')::int;
-  if n_vend < n_dono then ok := ok + 1; else falhas := falhas || format(' [vendedor lista %s, dono %s]', n_vend, n_dono); end if;
-
-  -- 2. Vendedor pedindo a loja que não é dele: recusado.
   begin
-    perform zapintel_dashboard((select f from unnest(array[3, 6]::bigint[]) f where f <> all (lojas_vend) limit 1), null, 'p2');
-    falhas := falhas || ' [vendedor abriu dashboard de outra loja]';
+    perform zapintel_escopo(null, null);
+    falhas := falhas || ' [vendedor ainda passa por zapintel_escopo — falta a 05]';
+  exception when others then if sqlstate = '42501' then ok := ok + 1; else falhas := falhas || ' [vendedor: erro inesperado ' || sqlstate || ']'; end if;
+  end;
+  begin
+    perform zapintel_dashboard(null, null, 'p2');
+    falhas := falhas || ' [vendedor abriu o dashboard do ZapIntel — falta a 05]';
   exception when others then ok := ok + 1;
   end;
+  select coalesce(array_agg(filial_id), '{}') into lojas_vend from empresa_usuarios where usuario_id = vend and empresa_id = 1 and ativo;
 
   -- 3. Busca por número: vendedor não acha lead da outra loja; dono acha com aviso.
   if (select count(*) from buscar_lead_por_numero(case when 6 = any (lojas_vend) then mogi else jag end)) = 0

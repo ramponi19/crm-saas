@@ -37,7 +37,7 @@ type Linha = {
 export async function GET() {
   const acesso = await zapintelAcesso()
   if (!acesso) {
-    return NextResponse.json({ erro: 'O ZapIntel não está ativo para esta empresa.' }, { status: 403 })
+    return NextResponse.json({ erro: 'Sem acesso ao ZapIntel (só dono, admin ou empresa com o complemento ativo).' }, { status: 403 })
   }
   const { empresaId } = acesso
   const db = rastrDb()

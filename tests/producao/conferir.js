@@ -19,7 +19,7 @@ async function conferir(papel, chavePublica) {
   // Rotas do ZapIntel: o que cada papel deve receber.
   const esperado = {
     dono:           { 615: 200, 1706: 200, 1204: 404 },
-    vendedor:       { 615: 200, 1706: 404, 1204: 404 },   // reviewer.meta: só Mogi
+    vendedor:       { 615: 403, 1706: 403, 1204: 403 },   // sem ZapIntel desde 15/10 (só dono/admin/superadmin)
     superadmin:     { 615: 200, 1706: 200, 1204: 404 },
     'sem-zapintel': { 615: 403, 1706: 403, 1204: 403 },
   }[papel]
@@ -27,7 +27,7 @@ async function conferir(papel, chavePublica) {
     const s = await st(`/zapintel/api/conversa?lead=${lead}`)
     r[`conversa ${lead}`] = s === codigo ? `ok (${s})` : `FALHOU: ${s}, esperado ${codigo}`
   }
-  if (papel !== 'sem-zapintel') {
+  if (papel !== 'sem-zapintel' && papel !== 'vendedor') {
     const s1 = await st('/zapintel/api/perfil', post('{"lead":2743}'))
     r['análise de funil interno'] = s1 === 422 ? 'ok (422, sem IA)' : `FALHOU: ${s1}`
     const s2 = await st('/zapintel/api/perfil', post('null'))
