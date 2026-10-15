@@ -6667,51 +6667,6 @@ export type Database = {
         }
         Relationships: []
       }
-      zapintel_painel: {
-        Row: {
-          calculado_em: string
-          empresa_id: number
-          mensagens: number
-          ms: number | null
-          painel: string
-          ultima_mensagem: number
-          versao: string
-        }
-        Insert: {
-          calculado_em?: string
-          empresa_id: number
-          mensagens?: number
-          ms?: number | null
-          painel: string
-          ultima_mensagem?: number
-          versao?: string
-        }
-        Update: {
-          calculado_em?: string
-          empresa_id?: number
-          mensagens?: number
-          ms?: number | null
-          painel?: string
-          ultima_mensagem?: number
-          versao?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "zapintel_painel_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: true
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "zapintel_painel_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: true
-            referencedRelation: "v_empresas_plano"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       zapintel_venda_lead: {
         Row: {
           casado_em: string
