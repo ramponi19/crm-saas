@@ -2450,6 +2450,7 @@ export type Database = {
           created_at: string
           empresa_id: number
           id: number
+          interno: boolean
           nome: string
           padrao: boolean
         }
@@ -2457,6 +2458,7 @@ export type Database = {
           created_at?: string
           empresa_id: number
           id?: never
+          interno?: boolean
           nome: string
           padrao?: boolean
         }
@@ -2464,6 +2466,7 @@ export type Database = {
           created_at?: string
           empresa_id?: number
           id?: never
+          interno?: boolean
           nome?: string
           padrao?: boolean
         }

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, GitCompare, Languages, FileText, Headset, ArrowLeft, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, Headset, ArrowLeft, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
@@ -22,9 +22,6 @@ const NAV = [
   // sobreviviam a um F5.
   { href: "/zapintel/insights", icon: Lightbulb, label: "Insights" },
   { href: "/zapintel/atendimento", icon: Headset, label: "Atendimento" },
-  { href: "/zapintel/comparar", icon: GitCompare, label: "Comparar" },
-  { href: "/zapintel/linguagem", icon: Languages, label: "Linguagem" },
-  { href: "/zapintel/relatorio", icon: FileText, label: "Relatório" },
   { href: "/zapintel/posvenda", icon: ShoppingBag, label: "Pós Venda" },
 ];
 

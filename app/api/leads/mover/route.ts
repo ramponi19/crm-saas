@@ -17,13 +17,33 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({})) as {
     leadId?: number
     kanban_status?: string
+    /** Troca de funil (15/10/2026): o lead entra na primeira etapa do funil novo. */
+    funilId?: number
     motivo_perda_id?: number | null
     perdido_em?: string | null
     observacoes?: string
   }
-  if (!body.leadId || !body.kanban_status) {
+  if (!body.leadId || (!body.kanban_status && !body.funilId)) {
     return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
   }
+
+  /**
+   * TROCA DE FUNIL. Não existia: o modal só mudava a etapa DENTRO do funil do
+   * lead, então um funil novo (ex.: "Equipe", para as conversas internas que
+   * ficam fora do ZapIntel) nascia sem jeito de receber lead. O lead entra na
+   * primeira etapa ativa do funil escolhido. RLS garante que é da empresa.
+   */
+  let funilNovo: number | null = null
+  if (body.funilId) {
+    const { data: funil } = await supabase.from('funis').select('id').eq('id', body.funilId).maybeSingle()
+    if (!funil) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
+    const { data: primeira } = await supabase.from('funil_etapas').select('slug')
+      .eq('funil_id', body.funilId).eq('ativo', true).order('ordem').limit(1).maybeSingle()
+    if (!primeira) return NextResponse.json({ error: 'Este funil não tem etapas ativas' }, { status: 400 })
+    funilNovo = funil.id
+    body.kanban_status = body.kanban_status ?? primeira.slug
+  }
+  const etapa = body.kanban_status as string
 
   // Lead atual (RLS garante que é da empresa do usuário).
   const { data: leadAtual } = await supabase
@@ -34,9 +54,10 @@ export async function POST(req: Request) {
   if (!leadAtual) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
 
   const patch: Record<string, unknown> = {
-    kanban_status: body.kanban_status,
+    kanban_status: etapa,
     data_transferencia_funil: new Date().toISOString(),
   }
+  if (funilNovo != null) patch.funil_id = funilNovo
   if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id
   if (body.perdido_em) patch.perdido_em = body.perdido_em
   if (body.observacoes) patch.observacoes = body.observacoes
@@ -45,17 +66,17 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Automações e cadências de entrada — só se a etapa realmente mudou.
-  if (leadAtual.kanban_status !== body.kanban_status) {
+  if (leadAtual.kanban_status !== etapa) {
     const db = supabase as unknown as SupabaseClient
     const leadMin = { id: leadAtual.id, nome: leadAtual.nome, responsavel_id: leadAtual.responsavel_id }
     try {
-      await executarEntradaEtapa(db, empresaId, leadMin, body.kanban_status)
+      await executarEntradaEtapa(db, empresaId, leadMin, etapa)
     } catch (e) {
       // Automação nunca quebra o move.
       console.error('[leads/mover] automações falharam:', e)
     }
     try {
-      await inscreverPorEtapa(db, empresaId, leadMin, body.kanban_status)
+      await inscreverPorEtapa(db, empresaId, leadMin, etapa)
     } catch (e) {
       // Cadência nunca quebra o move.
       console.error('[leads/mover] cadências falharam:', e)
@@ -82,5 +103,5 @@ export async function POST(req: Request) {
      */
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, kanban_status: etapa, funil_id: funilNovo })
 }

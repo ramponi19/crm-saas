@@ -28,7 +28,7 @@ begin
   with
   L as materialized (
     select l.id, l.filial_id from leads l
-    where l.empresa_id = v_emp and l.ativo and coalesce(l.filial_id, 0) = any (v_lojas)
+    where l.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
   ),
   M as materialized (
     select m.lead_id, count(*) n, max(m.created_at) um

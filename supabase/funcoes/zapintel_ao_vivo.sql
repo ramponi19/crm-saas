@@ -54,11 +54,15 @@ begin
   for r in
     select empresa_id, count(*) n,
            count(*) filter (where direcao = 'recebida') recebidas,
-           array_agg(distinct coalesce(filial_id, 0)) lojas
+           array_agg(distinct coalesce(filial_id, 0)) lojas,
+           -- Quais leads: a ficha aberta só se recarrega se o dela estiver
+           -- aqui (15/10/2026). Até 100 — um lote de sincronização maior não
+           -- precisa listar todos para as telas da empresa se atualizarem.
+           (array_agg(distinct lead_id))[1:100] leads
     from novas group by empresa_id
   loop
     perform zapintel_avisar(r.empresa_id, 'mensagens',
-      jsonb_build_object('n', r.n, 'recebidas', r.recebidas, 'lojas', to_jsonb(r.lojas)));
+      jsonb_build_object('n', r.n, 'recebidas', r.recebidas, 'lojas', to_jsonb(r.lojas), 'leads', to_jsonb(r.leads)));
   end loop;
   return null;
 exception when others then

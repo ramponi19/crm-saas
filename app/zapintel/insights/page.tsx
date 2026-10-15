@@ -31,6 +31,8 @@ interface Objecao extends Linha { perdidos: number; emAberto: number }
 type Fase = "aberto" | "pos" | "perdido";
 interface Insights {
   dias: number | null; conversas: number; taxaBase: number | null;
+  /** O período anterior, do mesmo tamanho (null em "Tudo"). Substitui a tela Comparar. */
+  comparacao: { vendas: number; valor: number; conversasNovas: number; conversasNovasAntes: number } | null;
   vendaTotal: { registradas: number; valor: number; ticket: number | null; comConversa: number; lidasNasConversas: number; ligadas: number; semRegistro: number };
   objecoes: Objecao[];
   sinais: Linha[];
@@ -153,11 +155,13 @@ function VendaTotal({ d, lista, quando }: { d: Insights; lista: (f: Record<strin
           <b>{num(v.registradas)}</b>
           <span>{reais(v.valor)}{v.ticket != null && <> · ticket {reais(v.ticket)}</>}</span>
           <small>{num(v.comConversa)} delas ligadas a uma conversa</small>
+          {d.comparacao && <Variacao atual={v.registradas} antes={d.comparacao.vendas} rotulo="vendas no período anterior" />}
         </div>
         <div className="ins-num">
           <span className="ins-num-rotulo">Compras lidas nas conversas</span>
           <b>{num(v.lidasNasConversas)}</b>
           <span>clientes, segundo a análise de cada conversa</span>
+          {d.comparacao && <Variacao atual={d.comparacao.conversasNovas} antes={d.comparacao.conversasNovasAntes} rotulo="conversas novas no período anterior" prefixo={`${num(d.comparacao.conversasNovas)} conversas novas · `} />}
           <Link href={lista({ classe: "customer" })} className="ins-link">ver quem <ArrowRight size={12} /></Link>
         </div>
         <Link href={lista({ sem_registro: "1" })} className="ins-num alerta">
@@ -172,6 +176,19 @@ function VendaTotal({ d, lista, quando }: { d: Insights; lista: (f: Record<strin
         Venda sem registro some do faturamento, da comissão e do pós-venda.
       </p>
     </Cartao>
+  );
+}
+
+/** "+12% · 30 no período anterior" — a comparação que antes era uma tela inteira. */
+function Variacao({ atual, antes, rotulo, prefixo = "" }: { atual: number; antes: number; rotulo: string; prefixo?: string }) {
+  const pct = antes > 0 ? Math.round(((atual - antes) / antes) * 100) : null;
+  const cor = pct == null || pct === 0 ? "var(--muted)" : pct > 0 ? "var(--green)" : "var(--red)";
+  return (
+    <small style={{ color: "var(--muted)" }}>
+      {prefixo}
+      {pct != null && <b style={{ color: cor }}>{pct > 0 ? "+" : ""}{pct}% </b>}
+      · {num(antes)} {rotulo}
+    </small>
   );
 }
 

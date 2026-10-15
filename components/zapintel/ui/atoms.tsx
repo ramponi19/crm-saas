@@ -46,10 +46,3 @@ export function UrgencyDot({ urgency }: { urgency: string }) {
   );
 }
 
-export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: .7, marginBottom: 12 }}>
-      {String(children).toUpperCase()}
-    </div>
-  );
-}

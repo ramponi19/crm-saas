@@ -1,0 +1,12 @@
+-- LIMPEZA DE 15/10/2026: A TABELA DO PAINEL ANTIGO DO ZAPINTEL.
+--
+-- `zapintel_painel` guardava o painel calculado na Vercel pelo motor de
+-- palavras (todos os leads classificados + os agregados de cada tela), servido
+-- de cache até alguém clicar em "Sincronizar agora". As telas passaram a ler o
+-- banco direto, Comparar/Linguagem/Relatório saíram, e a rota, o cálculo e o
+-- cache foram apagados no mesmo dia. Nenhuma função, visão ou job lê a tabela
+-- (conferido em 15/10: 1,7 MB, zero dependências).
+--
+-- APLICAR SÓ DEPOIS DO DEPLOY: até ele entrar, a produção anterior ainda lê
+-- esta tabela pela rota antiga.
+drop table if exists public.zapintel_painel;

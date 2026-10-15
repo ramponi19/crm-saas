@@ -84,6 +84,7 @@ as $$
   left join public.zapintel_lead_perfil p on p.lead_id = l.id and p.empresa_id = p_empresa
   where l.empresa_id = p_empresa
     and l.ativo
+    and not zapintel_funil_interno(l.funil_id)
     and (
       (p.lead_id is null and a.n >= 2 and a.cliente_falou)
       or (p.lead_id is not null and (

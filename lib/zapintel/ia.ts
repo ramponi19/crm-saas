@@ -5,11 +5,14 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 /**
  * A ÚNICA PORTA DE IA DO ZAPINTEL.
  *
+ * (A rota `/zapintel/api/analyze`, o Copiloto e o Relatório saíram em
+ * 15/10/2026 — eram os chamadores do motor antigo.)
+ *
  * ══ POR QUE ISTO VIROU UM MÓDULO ═══════════════════════════════════════════
  *
  * Em 11/10/2026 esta plumbing nasceu dentro de `/zapintel/api/analyze`, porque
- * havia um chamador só. Hoje há três — o Copiloto, a sugestão no ponto de
- * travamento e o parágrafo do dia — e um segundo caminho significaria:
+ * havia um chamador só. Depois vieram outros — a ficha por IA, a sugestão no
+ * ponto de travamento — e um segundo caminho significaria:
  * desligar a IA no painel e uma das telas continuar chamando; trocar o modelo
  * e uma ficar no antigo; consumo que não aparece na conta. É exatamente a
  * duplicidade que este módulo passou a semana removendo.

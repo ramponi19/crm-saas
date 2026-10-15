@@ -394,6 +394,14 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
   const { empresa } = useEmpresa()
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  /**
+   * Os funis da empresa, para TROCAR o lead de funil (15/10/2026). Antes só se
+   * mudava a etapa dentro do funil atual — um funil novo (ex.: "Equipe", marcado
+   * como interno para as conversas da equipe saírem do ZapIntel) não tinha como
+   * receber lead. Só aparece quando há mais de um funil.
+   */
+  const [funis, setFunis] = useState<{ id: number; nome: string; padrao: boolean; interno: boolean }[]>([])
+  const [trocandoFunil, setTrocandoFunil] = useState(false)
   // Relógio congelado no mount: a janela de 24h do WhatsApp era calculada com
   // `Date.now()` a cada render, o que deixa o componente impuro.
   const [agora] = useState(() => Date.now())
@@ -985,6 +993,39 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
    * recusar). A rota é a MESMA do quadro, então automação, cadência por etapa e
    * orçamento de negociação continuam disparando igual.
    */
+  useEffect(() => {
+    if (!empresa?.id) return
+    let vivo = true
+    supabase.from('funis').select('id, nome, padrao, interno').eq('empresa_id', empresa.id)
+      .order('padrao', { ascending: false }).order('nome')
+      .then(({ data }) => { if (vivo && data) setFunis(data) })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- o cliente do Supabase é recriado a cada render; a empresa é o que importa
+  }, [empresa?.id])
+  const funilAtual = lead.funil_id ?? funis.find((f) => f.padrao)?.id ?? null
+
+  async function mudarFunil(id: number) {
+    if (id === funilAtual) return
+    const destino = funis.find((f) => f.id === id)
+    setTrocandoFunil(true)
+    try {
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, funilId: id }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error ?? 'Falha ao trocar de funil')
+      onUpdate({ ...lead, funil_id: id, kanban_status: j.kanban_status })
+      notify.ok('Lead movido', destino?.interno ? `${destino.nome} — fora das métricas do ZapIntel` : destino?.nome)
+      // As etapas deste modal são do funil antigo: fecha para o quadro mostrar o novo.
+      onClose()
+    } catch (e) {
+      notify.bad('Não foi possível trocar de funil', e instanceof Error ? e.message : undefined)
+    } finally {
+      setTrocandoFunil(false)
+    }
+  }
+
   async function mudarEtapa(novo: string) {
     if (novo === (form.status || lead.kanban_status || 'novo')) return
     const alvo = columns.find((c) => c.id === novo)
@@ -1250,6 +1291,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             {/* Escolher a etapa MOVE o card na hora — não espera "Salvar".
                 Trocar o status é uma ação, não a edição de um texto: quem escolhe
                 "Negociando" quer que o quadro mostre isso agora. */}
+            {funis.length > 1 && funilAtual != null && (
+              <Select label="Funil" value={String(funilAtual)} onChange={(e) => mudarFunil(Number(e.target.value))} disabled={trocandoFunil}>
+                {funis.map((f) => <option key={f.id} value={String(f.id)}>{f.nome}{f.interno ? ' (interno)' : ''}</option>)}
+              </Select>
+            )}
             <Select label="Status no funil" value={form.status} onChange={(e) => mudarEtapa(e.target.value)} disabled={movendoEtapa}>
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>

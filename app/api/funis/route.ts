@@ -51,7 +51,7 @@ export async function PATCH(req: Request) {
   const auth = await requireEmpresaRoleApi([...ADMIN])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
-  const body = await req.json().catch(() => ({})) as { id?: number; nome?: string; padrao?: boolean }
+  const body = await req.json().catch(() => ({})) as { id?: number; nome?: string; padrao?: boolean; interno?: boolean }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
   if (typeof body.nome === 'string') {
@@ -61,7 +61,19 @@ export async function PATCH(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Funil interno (equipe): fora das métricas do ZapIntel. O padrão recebe os
+  // leads novos, então nunca pode ser interno — e um interno não vira padrão.
+  if (typeof body.interno === 'boolean') {
+    const { data: f } = await supabase.from('funis').select('padrao').eq('id', body.id).eq('empresa_id', empresaId).maybeSingle()
+    if (!f) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
+    if (f.padrao && body.interno) return NextResponse.json({ error: 'O funil padrão recebe os leads novos e não pode ser interno.' }, { status: 400 })
+    const { error } = await supabase.from('funis').update({ interno: body.interno }).eq('id', body.id).eq('empresa_id', empresaId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   if (body.padrao === true) {
+    const { data: f } = await supabase.from('funis').select('interno').eq('id', body.id).eq('empresa_id', empresaId).maybeSingle()
+    if (f?.interno) return NextResponse.json({ error: 'Um funil interno não pode ser o padrão.' }, { status: 400 })
     // Só um padrão por empresa.
     await supabase.from('funis').update({ padrao: false }).eq('empresa_id', empresaId)
     const { error } = await supabase.from('funis').update({ padrao: true }).eq('id', body.id).eq('empresa_id', empresaId)

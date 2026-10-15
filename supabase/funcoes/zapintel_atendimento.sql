@@ -49,7 +49,7 @@ begin
   L as materialized (
     select l.id, l.nome, l.filial_id, l.responsavel_id
     from leads l
-    where l.empresa_id = v_emp and l.ativo and coalesce(l.filial_id, 0) = any (v_lojas)
+    where l.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
   ),
   -- Os turnos e o horário vêm de `zapintel_turnos` — a mesma conta do
   -- dashboard (supabase/funcoes/zapintel_turnos.sql). A evolução semanal

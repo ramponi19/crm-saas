@@ -55,29 +55,32 @@ v "sentry sabe quem esta na tela"      "app/(dashboard)/layout.tsx" "<SentryUsua
 n "sentry nao manda email do usuario"  "components/layout/sentry-usuario.tsx" "email:"
 v "erro sem arquivo revela a origem"   "lib/sentry-comum.ts" "origem_desconhecida"
 v "tela de leads traz todos"           "app/(dashboard)/leads/page.tsx" "todosOsLeads"
-v "painel do zapintel no servidor"     "lib/zapintel/painel.ts" "montarPainel"
 v "conversas lidas em paralelo"        "lib/zapintel/conversas.ts" "Promise.all"
 v "paginacao paralela ordena por id"   "lib/zapintel/conversas.ts" "order(.id., { ascending"
-v "lead leve nao leva a conversa"      "lib/zapintel/painel.ts" "messages: \[\]"
-n "painel sem a performance antiga"   "lib/zapintel/painel.ts" "computePerformance"
 n "linguagem nao calcula no cliente"   "app/zapintel/linguagem/page.tsx" "POWER_WORDS"
 n "zapintel nao assina sob RLS"        "hooks/zapintel/useLeads.tsx" "postgres_changes"
 # ── o teto de 4h de Active CPU da Vercel (09/10/2026) ──────────────────────
 # Abrir o painel custava 2,76 s de CPU; 5.217 aberturas gastam o mes inteiro e
 # a Vercel PAUSA os projetos. Estes checks guardam o conserto, nao o estilo.
-v "painel serve do cache"             "app/zapintel/api/painel/route.ts" "cacheServe"
-v "cache do painel volta como texto"  "app/zapintel/api/painel/route.ts" "new NextResponse(cache.texto"
-n "painel nao re-serializa o cache"   "app/zapintel/api/painel/route.ts" "NextResponse.json(cache"
-v "so o botao recalcula"            "lib/zapintel/cache.ts" "if (!forcado) return true"
 n "a tela nao tem relogio nenhum"   "hooks/zapintel/useLeads.tsx" "setInterval"
 n "a tela nao pergunta por pulso"   "hooks/zapintel/useLeads.tsx" "api/pulso"
-v "o botao fura o cache"            "hooks/zapintel/useLeads.tsx" "buscar(true)"
 # 15/10/2026: o menu virou ao vivo (zapintel_resumo) e o "Sincronizar" saiu
 # dele; as telas que ainda leem o painel antigo dizem de quando é o número.
+# 15/10/2026: o painel antigo saiu inteiro. Estas regras impedem a volta.
+n "provider nao baixa o painel"     "hooks/zapintel/useLeads.tsx" "fetch(\"/zapintel/api/painel"
+n "ficha nao le o painel"           "app/zapintel/leads/[id]/page.tsx" "usePainelAntigo"
+n "ficha sem venda que nao grava"   "app/zapintel/leads/[id]/page.tsx" "markSaleClosed"
+v "ficha ao vivo so do lead dela"   "app/zapintel/leads/[id]/page.tsx" "ouvirZapintel(supabase"
+v "aviso do banco lista os leads"   "supabase/funcoes/zapintel_ao_vivo.sql" "'leads', to_jsonb(r.leads)"
+n "sem copilot com loja fixa"       "lib/zapintel/insights/followUp.ts" "Vendedor: Pedro"
+v "posvenda le do banco"            "app/zapintel/posvenda/page.tsx" "useRpcAoVivo<PosVenda>(\"zapintel_posvenda\""
+n "posvenda sem promessa de brinde" "app/zapintel/posvenda/page.tsx" "ganha um brinde"
+v "funil interno fora do zapintel"  "supabase/funcoes/zapintel_turnos.sql" "zapintel_funil_interno(l.funil_id)"
+v "robo conta as novas sem analise" "components/zapintel/robo-analises.tsx" "desatualizadas.length + semAnalise.length"
+v "lead troca de funil"             "app/api/leads/mover/route.ts" "funilId"
+v "sugestao exige sessao"           "app/zapintel/api/sugestao/route.ts" "zapintelEmpresa()"
 v "menu le o banco ao vivo"         "hooks/zapintel/useLeads.tsx" "useRpcAoVivo<Resumo>(\"zapintel_resumo\""
 n "menu sem sincronizar"            "components/zapintel/zap-sidebar.tsx" "syncFromCRM"
-v "tela antiga diz de quando e"     "components/zapintel/aviso-painel-antigo.tsx" "Esta tela ainda não atualiza sozinha"
-v "painel so sob demanda"           "hooks/zapintel/useLeads.tsx" "export function usePainelAntigo"
 v "canal unico por empresa"         "hooks/zapintel/useRpcAoVivo.ts" "ouvirZapintel(supabase"
 # -- ponte venda->conversa (10/10/2026) ------------------------------------
 # Sem ligar venda a conversa, todo numero do ZapIntel e heuristica escrita a
@@ -94,7 +97,6 @@ v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 # O check anterior olhava SO `stats.ts` — e foi por isso que um terceiro
 # `TICKET_MEDIO = 5200` sobreviveu em performance.ts por mais um dia. Agora
 # varre a pasta inteira: check estreito e a mesma coisa que check ausente.
-n "nenhum ticket escrito a mao"      "lib/zapintel/insights/stats.ts" "= 5200;"
 # Performance I e II viraram Atendimento (15/10/2026), calculado no banco. O
 # `5200 * 0.3` da ação #02 morava no page.tsx da tela antiga — fora de lib/.
 n "atendimento sem ticket inventado" "app/zapintel/atendimento/page.tsx" "5200"
@@ -108,17 +110,11 @@ n "dashboard sem horario proprio"    "supabase/funcoes/zapintel_dashboard.sql" "
 n "card sem a regra antiga"          "components/zapintel/painel-ao-vivo.tsx" "seg a sáb, 8h–20h"
 v "endereco antigo redireciona"      "next.config.ts" "destination: '/zapintel/atendimento'"
 v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
-n "nao chama a Anthropic direto"     "app/zapintel/api/analyze/route.ts" "api.anthropic.com"
 v "a IA respeita o desligar geral"   "lib/zapintel/ia.ts" "cfg.ativo === false"
-v "a rota de IA exige sessao"        "app/zapintel/api/analyze/route.ts" "await zapintelEmpresa()"
-n "pipeline nao supoe 70 por cento"  "lib/zapintel/insights/stats.ts" "ticket \* 0.70"
-v "pipeline usa taxa medida"         "lib/zapintel/painel.ts" "taxaPorClasse"
 # O padrao olha a DECLARACAO, nao a palavra: o arquivo cita `allText` no
 # comentario que explica por que o campo saiu, e o aviso deve continuar la.
 n "classificacao nao le a fala da loja" "lib/zapintel/classification/engine.ts" "allText: string"
-v "conversao vem de venda ligada"    "lib/zapintel/insights/stats.ts" "compradores.length / leads.length"
 v "sem venda a tela nao inventa"     "components/zapintel/painel-ao-vivo.tsx" "sem venda registrada para estimar o ticket"
-v "cache invalida por versao"        "lib/zapintel/cache.ts" "marca.versao !== VERSAO_DO_CALCULO"
 # -- ficha por lead e frase antes do silencio (10/10/2026) -----------------
 # O corte de 24h e a regra que torna o ranking honesto: sem ele o topo vira a
 # frase de RETOMADA, mandada dias depois para quem ja tinha sumido (740 -> 418
@@ -134,11 +130,8 @@ v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "mont
 # 133 leads eram marcados "cliente" por palavra; 33 compraram. E a conversa
 # funda no 1o dia prediz (7,65x) enquanto "Pediu 18x" nao prediz nada (+2pp).
 n "cliente nao sai de palavra-chave"  "lib/zapintel/classification/engine.ts" "CUSTOMER_KW ="
-v "cliente vem da ponte"             "lib/zapintel/painel.ts" "vendas.compradores.has(id)"
 v "conversa funda no 1o dia e quente" "lib/zapintel/classification/engine.ts" "trocasInicio >= 15"
 v "trocas medidas so nas 24h"        "lib/zapintel/montar.ts" "t - t0 <= DIA_MS"
-v "taxa medida antes do carimbo"     "lib/zapintel/painel.ts" "const taxaHot = taxaPorClasse"
-n "stats nao mede taxa apos carimbo" "lib/zapintel/insights/stats.ts" "const taxaDaClasse"
 v "o historico comeca fechado"       "app/zapintel/leads/[id]/page.tsx" "useState(false)"
 v "a conversa fica a um clique"      "app/zapintel/leads/[id]/page.tsx" "Ver a conversa"
 v "a ficha traz os tres momentos"    "lib/zapintel/ficha.ts" "primeiraFalaDoCliente"
@@ -191,7 +184,6 @@ v "audio conta como resposta"        "lib/zapintel/travou.ts" "if (!m.isStore) c
 v "tela marca por referencia"        "app/zapintel/leads/[id]/page.tsx" "lead.messages\[travou.indice\] === msg"
 # Uma porta de IA so: desligar no painel tem que calar as tres telas.
 v "ia do zapintel num lugar so"      "lib/zapintel/ia.ts" "assistente_config"
-v "analyze usa a porta unica"        "app/zapintel/api/analyze/route.ts" "perguntarIA"
 v "sugestao usa a porta unica"       "app/zapintel/api/sugestao/route.ts" "perguntarIA"
 # O prompt nao pode ter o nome de um tenant escrito no codigo.
 v "sugestao pega o nome do banco"    "app/zapintel/api/sugestao/route.ts" "nomeDaLoja"
@@ -249,7 +241,6 @@ echo "== direcao do historico importado (13/10) =="
 # A condicao era sempre falsa e TUDO entrava como recebida.
 n "nao decide direcao por to"        "supabase/functions/webhook-leads/index.ts" "doNegocio = !!m.to;"
 v "direcao vem do remetente"         "supabase/functions/webhook-leads/index.ts" "remetente === numeroDaLoja"
-v "versao subiu com a correcao"      "lib/zapintel/cache.ts" "VERSAO_DO_CALCULO = .v13."
 # O historico da Meta e RASO: 406 conversas, 613 mensagens (1,5 cada). Cada
 # reconexao enchia o funil de casca — 188 leads de 1 msg numa hora.
 v "conversa de 1 msg nao vira lead"  "supabase/functions/webhook-leads/index.ts" "linhas.length < 2"

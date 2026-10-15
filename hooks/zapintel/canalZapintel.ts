@@ -20,8 +20,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 
 export interface Ouvinte {
-  /** Um aviso do banco: mensagens, análises ou vendas. */
-  evento: (e: { event?: string }) => void;
+  /** Um aviso do banco: mensagens, análises ou vendas (`payload` diz quais leads). */
+  evento: (e: { event?: string; payload?: Record<string, unknown> }) => void;
   /** O estado da conexão ("SUBSCRIBED", "CLOSED", …). */
   status: (s: string) => void;
 }
@@ -39,7 +39,7 @@ export function ouvirZapintel(supabase: SupabaseClient, empresa: number, ouvinte
   if (!reg) {
     const ouvintes = new Set<Ouvinte>();
     const canal = supabase.channel(`zapintel:${empresa}`, { config: { private: true } });
-    const repassa = (e: { event?: string }) => ouvintes.forEach((o) => o.evento(e));
+    const repassa = (e: { event?: string; payload?: Record<string, unknown> }) => ouvintes.forEach((o) => o.evento(e));
     canal
       .on("broadcast", { event: "mensagens" }, repassa)
       .on("broadcast", { event: "analises" }, repassa)

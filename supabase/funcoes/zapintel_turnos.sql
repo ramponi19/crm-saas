@@ -55,7 +55,7 @@ as $$
   ),
   L as (
     select l.id, l.filial_id from leads l
-    where l.empresa_id = p_emp and l.ativo and coalesce(l.filial_id, 0) = any (p_lojas)
+    where l.empresa_id = p_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (p_lojas)
   ),
   -- Conversas que tiveram mensagem no período — e delas o HISTÓRICO INTEIRO.
   -- Cortar as mensagens na data fazia a primeira do período parecer "o cliente

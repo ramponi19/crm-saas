@@ -78,7 +78,7 @@ begin
   L as materialized (
     select l.id, l.nome, l.filial_id, l.kanban_status, l.convertido_em
     from leads l
-    where l.empresa_id = v_emp and l.ativo and coalesce(l.filial_id, 0) = any (v_lojas)
+    where l.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
   ),
   M as materialized (
     select m.lead_id, max(m.created_at) um
@@ -169,6 +169,26 @@ begin
     'conversas', (select count(*) from X),
     'taxaBase', (select round(100.0 * count(*) filter (where comprou) / nullif(count(*), 0), 1) from X),
 
+    -- O período anterior, do mesmo tamanho (15/10/2026): substitui a tela
+    -- Comparar, que comparava classificação e score do motor de palavras.
+    'comparacao', case when p_dias is null then null else jsonb_build_object(
+        'vendas', (select count(distinct coalesce(v.grupo_pdv::text, v.id::text)) from vendas v
+                   where v.empresa_id = v_emp and coalesce(v.filial_id, 0) = any (v_lojas) and v.status in ('concluida', 'encomenda')
+                     and coalesce(v.data_venda, v.created_at) >= v_desde - make_interval(days => p_dias)
+                     and coalesce(v.data_venda, v.created_at) < v_desde),
+        'valor', (select coalesce(sum(v.valor_venda), 0) from vendas v
+                   where v.empresa_id = v_emp and coalesce(v.filial_id, 0) = any (v_lojas) and v.status in ('concluida', 'encomenda')
+                     and coalesce(v.data_venda, v.created_at) >= v_desde - make_interval(days => p_dias)
+                     and coalesce(v.data_venda, v.created_at) < v_desde),
+        'conversasNovas', (select count(*) from (
+            select m.lead_id from lead_mensagens m join leads l on l.id = m.lead_id
+            where m.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
+            group by m.lead_id having min(m.created_at) >= v_desde) z),
+        'conversasNovasAntes', (select count(*) from (
+            select m.lead_id from lead_mensagens m join leads l on l.id = m.lead_id
+            where m.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
+            group by m.lead_id having min(m.created_at) >= v_desde - make_interval(days => p_dias) and min(m.created_at) < v_desde) z))
+      end,
     'vendaTotal', (select jsonb_build_object(
         'registradas', V.vendas, 'valor', V.valor,
         'ticket', case when V.vendas > 0 then round(V.valor / V.vendas) end,

@@ -17,9 +17,12 @@ import { RefreshCw, Sparkles, MessageCircle, ChevronDown, ChevronUp } from "luci
  * um lead por vez, parando no primeiro erro. Erro aqui quase sempre é cota do
  * provedor; insistir nos outros 40 seria colecionar o mesmo erro 40 vezes.
  *
- * Os leads internos (conversa com a própria equipe) ficam sem ficha de
- * propósito, então entram em "sem análise" para sempre. Por isso o número do
- * robô conta só as fichas DESATUALIZADAS — o que de fato pede ação.
+ * O número do robô conta as fichas DESATUALIZADAS e as conversas NOVAS SEM
+ * ANÁLISE (cliente falou, 2+ mensagens). Até 15/10/2026 contava só as
+ * primeiras: as sem análise eram tratadas como "conversas internas" — verdade
+ * no dia do lote, e falso para todo lead que chegou depois, que ficava
+ * invisível (eram 30 clientes em 15/10). As internas de verdade agora saem por
+ * funil (Configurações → Funis → "Marcar como interno"), já no banco.
  *
  * Sem "use client" de propósito: só é usado dentro do assistente, que já é
  * componente de cliente — e assim pode receber funções como props.
@@ -104,10 +107,11 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
   }, []);
 
   // O selo do robô acompanha a lista, inclusive quando um lead sai dela.
-  useEffect(() => { if (desatualizadas) onTotal?.(desatualizadas.length); }, [desatualizadas, onTotal]);
+  useEffect(() => { if (desatualizadas) onTotal?.(desatualizadas.length + semAnalise.length); }, [desatualizadas, semAnalise, onTotal]);
 
   async function gerarTodas() {
-    const fila = [...(desatualizadas ?? [])];
+    // As novas primeiro: sem análise nenhuma, é quem a loja menos conhece.
+    const fila = [...semAnalise, ...(desatualizadas ?? [])];
     if (!fila.length) return;
     setConfirmando(false); setErroLote(""); parar.current = false;
     setGerando({ feitos: 0, total: fila.length });
@@ -137,7 +141,9 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
   }
 
   if (falhou || desatualizadas === null) return null;
-  const n = desatualizadas.length;
+  const nAndou = desatualizadas.length;
+  const nNovas = semAnalise.length;
+  const n = nAndou + nNovas;
 
   const botao = (cheio: boolean): React.CSSProperties => ({
     background: cheio ? "var(--purple)" : "none", color: cheio ? "#fff" : "var(--dim)",
@@ -153,7 +159,11 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
           <Sparkles size={13} style={{ color: "var(--purple-l)", flex: "none" }} />
           {n === 0
             ? <span>Análises de IA em dia com as conversas.</span>
-            : <span><b>{n} {n === 1 ? "lead teve" : "leads tiveram"} conversa nova</b> desde a última análise.</span>}
+            : <span>
+                {nNovas > 0 && <><b>{nNovas} {nNovas === 1 ? "conversa nova" : "conversas novas"}</b> sem análise</>}
+                {nNovas > 0 && nAndou > 0 && " e "}
+                {nAndou > 0 && <><b>{nAndou}</b> {nAndou === 1 ? "que andou" : "que andaram"} desde a última análise</>}.
+              </span>}
         </div>
 
         {n > 0 && erroLote && (
@@ -196,7 +206,7 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
 
       {lista && n > 0 && (
         <div style={{ maxHeight: 220, overflowY: "auto", borderTop: "1px solid var(--brd)", background: "var(--card)" }}>
-          {desatualizadas.map((p) => (
+          {[...semAnalise.map((p) => ({ p, nova: true })), ...desatualizadas.map((p) => ({ p, nova: false }))].map(({ p, nova }) => (
             <Link
               key={p.leadId}
               href={`/zapintel/leads/lead-${p.leadId}`}
@@ -211,8 +221,8 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
                   {p.nome}
                 </div>
                 <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 1 }}>
-                  {p.novas > 0 ? `+${p.novas} ${p.novas === 1 ? "mensagem" : "mensagens"}` : "conversa mudou"}
-                  {p.geradoEm && ` desde ${dataCurta(p.geradoEm)}`}
+                  {nova ? "nova · ainda sem análise"
+                    : <>{p.novas > 0 ? `+${p.novas} ${p.novas === 1 ? "mensagem" : "mensagens"}` : "conversa mudou"}{p.geradoEm && ` desde ${dataCurta(p.geradoEm)}`}</>}
                   {p.filial && ` · ${p.filial}`}
                 </div>
               </div>
@@ -226,15 +236,11 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
               )}
             </Link>
           ))}
-          <Link href="/zapintel/leads?desatualizadas=1" onClick={() => onAbrirLead?.()}
-            style={{ display: "block", padding: "8px 14px", fontSize: 11.5, fontWeight: 700, color: "var(--purple-l)", textDecoration: "none", borderBottom: "1px solid var(--brd)" }}>
-            Ver todos na lista de leads →
-          </Link>
-          {semAnalise.length > 0 && (
-            <p style={{ fontSize: 10.5, color: "var(--muted)", padding: "8px 14px" }}>
-              {semAnalise.length} {semAnalise.length === 1 ? "conversa está" : "conversas estão"} sem análise
-              (conversas internas ficam assim de propósito).
-            </p>
+          {nAndou > 0 && (
+            <Link href="/zapintel/leads?desatualizadas=1" onClick={() => onAbrirLead?.()}
+              style={{ display: "block", padding: "8px 14px", fontSize: 11.5, fontWeight: 700, color: "var(--purple-l)", textDecoration: "none" }}>
+              Ver na lista as que andaram →
+            </Link>
           )}
         </div>
       )}

@@ -1,354 +1,222 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
-import { AvisoPainelAntigo } from "@/components/zapintel/aviso-painel-antigo";
-import type { LeadLeve } from "@/lib/zapintel/painel";
-import { getCrossSell } from "@/lib/zapintel/segments/segments";
-import { ArrowRight, Copy } from "lucide-react";
-
-type Offer = { product: string; reason: string; icon: string };
-
-// Cross-sell genérico (segmentos sem mapa próprio de produto): sem citar produto,
-// foca em recompra, item complementar e indicação.
-const GENERIC_CROSS: Offer[] = [
-  { product: "Recompra / upgrade", reason: "Cliente satisfeito compra de novo quando é lembrado na hora certa.", icon: "🔁" },
-  { product: "Item complementar", reason: "Ofereça um produto ou serviço que complemente o que ele já levou.", icon: "➕" },
-  { product: "Indicação premiada", reason: "Peça indicação oferecendo um benefício — o boca a boca é o canal mais barato.", icon: "🎁" },
-];
-
-// ── Referral scripts (neutros — sem produto específico) ─────────────────────────
-const REFERRAL_SCRIPTS = [
-  {
-    label: "Pós entrega — casual",
-    icon: "😊",
-    text: (name: string) =>
-      `${name}, tudo certo? Espero que esteja curtindo! Se você tiver algum amigo ou familiar pensando em algo parecido, me manda o contato — cuido de tudo com o mesmo cuidado que cuidei de você! 🙏`,
-  },
-  {
-    label: "Com desconto para indicado",
-    icon: "🎁",
-    text: (name: string) =>
-      `${name}! Tudo bem? Tenho uma novidade — toda indicação que você me fizer e fechar, você ganha um brinde especial da nossa parte! Conhece alguém que possa se interessar? 🙌`,
-  },
-  {
-    label: "Direto e objetivo",
-    icon: "🎯",
-    text: (name: string) =>
-      `${name}, ficou satisfeito com o atendimento? Qualquer amigo seu que precise, me passa o contato! Prometo cuidar super bem. 👊`,
-  },
-  {
-    label: "Aproveitando novidade",
-    icon: "🔥",
-    text: (name: string) =>
-      `${name}, chegou uma novidade aqui que eu sei que você vai querer mostrar para alguém! Conhece alguém procurando? Posso fazer um preço especial para indicação sua! 😉`,
-  },
-];
+import { AlertTriangle, Copy, Check, Search, Handshake, ShoppingBag, Clock, MessageCircle } from "lucide-react";
+import { useLeads } from "@/hooks/zapintel/useLeads";
+import { useEmpresaZapintel } from "../providers";
+import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
+import { num, ha } from "@/components/zapintel/rotulos";
 
 /**
- * Qual produto a conversa tratou.
+ * PÓS-VENDA — QUEM JÁ COMPROU E PRECISA DA LOJA. Reconstruída em 15/10/2026.
  *
- * A dedução (varrer o que a loja falou) mudou de lugar: roda no servidor, em
- * `lib/zapintel/painel.ts`, e chega aqui pronta no campo `produto`. Aqui ela
- * daria sempre "default", porque o lead chega sem o texto das conversas.
+ * A tela antiga lia o painel do motor de palavras: 35 "clientes" (as análises
+ * leem 246), produto deduzido por palavra-chave, um contador de "fechados
+ * manualmente" que vinha de um botão que não gravava nada, e quatro modelos de
+ * mensagem prometendo "brinde especial" e "preço especial" que a loja nunca
+ * ofereceu — o vendedor copiava e a loja ficava devendo.
+ *
+ * Agora vem de `zapintel_posvenda` (banco, ao vivo). Cliente é quem a análise
+ * leu comprando ou quem tem venda do CRM ligada à conversa. A mensagem é a que
+ * a análise daquela conversa sugeriu — escrita para aquela pessoa, sem promessa
+ * que ninguém fez.
  */
-function detectProductKey(lead: LeadLeve): string {
-  return lead.produto || "default";
+
+interface Cliente {
+  leadId: number; nome: string | null; telefone: string | null; origem: string | null; loja: string | null;
+  produto: string | null; valor: number | null; vendaEm: string | null; ultimaMensagem: string | null;
+  pendencias: string[] | null; pediuIndicacao: boolean; veioIndicado: boolean;
+  mensagem: string | null; diagnostico: string | null;
 }
-
-function getProductLabel(key: string): string {
-  const map: Record<string, string> = {
-    iphone: "📱 iPhone", "apple watch": "⌚ Apple Watch", ipad: "📲 iPad",
-    macbook: "💻 MacBook", perfume: "🌸 Perfume", airpods: "🎧 AirPods", default: "🛍️ Produto",
-  };
-  return map[key] || "🛍️ Produto";
+interface PosVenda {
+  total: number; comVendaRegistrada: number; comPendencia: number; semPedidoIndicacao: number; semConversa60d: number;
+  clientes: Cliente[];
 }
+type Aba = "pendencia" | "indicacao" | "recompra" | "todos";
 
-function whatsappLink(phone: string) {
-  const digits = (phone || "").replace(/[^0-9]/g, "");
-  if (!digits || digits.length < 10) return null;
-  const num = digits.startsWith("55") ? digits : `55${digits}`;
-  return `https://wa.me/${num}`;
-}
+const SESSENTA_DIAS = 60 * 86_400_000;
+const POR_VEZ = 30;
+const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-function ScriptCard({ name, phone }: { name: string; phone: string }) {
-  const [copied, setCopied] = useState<number | null>(null);
-  const waLink = whatsappLink(phone);
-  const firstName = name.split(" ")[0];
-
-  async function copy(idx: number, text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(idx);
-    setTimeout(() => setCopied(null), 2000);
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {REFERRAL_SCRIPTS.map((script, i) => {
-        const msg = script.text(firstName);
-        return (
-          <div key={i} className="card2" style={{ padding: "11px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-              <span style={{ fontSize: 15 }}>{script.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--txt)" }}>{script.label}</span>
-            </div>
-            <p style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.7, marginBottom: 10, whiteSpace: "pre-wrap" }}>{msg}</p>
-            <div style={{ display: "flex", gap: 7 }}>
-              <button onClick={() => copy(i, msg)} style={{
-                display: "flex", alignItems: "center", gap: 5,
-                background: copied === i ? "rgba(34,197,94,.15)" : "var(--card)",
-                border: `1px solid ${copied === i ? "rgba(34,197,94,.4)" : "var(--brd)"}`,
-                color: copied === i ? "var(--green)" : "var(--dim)",
-                borderRadius: 7, padding: "5px 12px", fontSize: 11, cursor: "pointer",
-              }}>
-                <Copy size={11} /> {copied === i ? "Copiado!" : "Copiar"}
-              </button>
-              {waLink && (
-                <a href={`${waLink}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer" style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  background: "rgba(37,211,102,.12)", border: "1px solid rgba(37,211,102,.35)",
-                  color: "#25d166", borderRadius: 7, padding: "5px 12px", fontSize: 11, textDecoration: "none",
-                }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                  </svg>
-                  Enviar no WhatsApp
-                </a>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function linkWhatsApp(telefone: string | null) {
+  const d = (telefone || "").replace(/\D/g, "");
+  if (d.length < 10) return null;
+  return `https://wa.me/${d.startsWith("55") ? d : `55${d}`}`;
 }
 
 export default function PosVendaPage() {
-  const { leads, loaded, segment } = usePainelAntigo();
-  const crossMap = getCrossSell(segment.id); // celulares tem mapa; demais → genérico
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Record<string, "crossell" | "indicacao">>({});
+  const { lojas, lojaAtiva, storeName } = useLeads();
+  const empresa = useEmpresaZapintel();
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  const [aba, setAba] = useState<Aba>("pendencia");
+  const [busca, setBusca] = useState("");
+  const [mostrar, setMostrar] = useState(POR_VEZ);
 
-  // ── Same customers as Dashboard: all with classification === "customer" ──
-  const customers = useMemo(() =>
-    leads.filter(l => l.classification === "customer"),
-  [leads]);
+  const { dados, erro, aoVivo } = useRpcAoVivo<PosVenda>("zapintel_posvenda", { p_filial: lojaAtiva, p_empresa: empresa }, empresa);
+  const recorte = lojaAtiva == null ? `${storeName || "Sua empresa"} · toda a rede` : (lojas.find((l) => l.id === lojaAtiva)?.nome ?? "Loja");
 
-  const enriched = useMemo(() =>
-    customers.map(l => ({
-      lead: l,
-      productKey: detectProductKey(l),
-      isManual: !!l.manualSale,
-    })),
-  [customers]);
+  const filtrados = useMemo(() => {
+    if (!dados) return [];
+    const q = busca.trim().toLowerCase();
+    return dados.clientes.filter((c) => {
+      if (q && !`${c.nome ?? ""} ${c.telefone ?? ""} ${c.produto ?? ""}`.toLowerCase().includes(q)) return false;
+      if (aba === "pendencia") return !!c.pendencias?.length;
+      if (aba === "indicacao") return !c.pediuIndicacao;
+      if (aba === "recompra") return !!c.ultimaMensagem && agora - new Date(c.ultimaMensagem).getTime() > SESSENTA_DIAS;
+      return true;
+    });
+  }, [dados, busca, aba, agora]);
 
-  const productGroups = useMemo(() => {
-    const g: Record<string, number> = {};
-    enriched.forEach(e => { g[e.productKey] = (g[e.productKey] || 0) + 1; });
-    return g;
-  }, [enriched]);
-
-  const filtered = useMemo(() => {
-    let list = enriched;
-    if (filter !== "all") list = list.filter(e => e.productKey === filter);
-    if (search) list = list.filter(e =>
-      e.lead.contact.toLowerCase().includes(search.toLowerCase())
-    );
-    return list;
-  }, [enriched, filter, search]);
-
-  function getTab(id: string) { return tab[id] || "crossell"; }
-  function setLeadTab(id: string, t: "crossell" | "indicacao") {
-    setTab(prev => ({ ...prev, [id]: t }));
-  }
-
-  if (!loaded) return (
-    <div style={{ textAlign: "center", paddingTop: 80 }}>
-      <p style={{ color: "var(--dim)", marginBottom: 16 }}>As conversas carregam automaticamente do CRM. Use “Sincronizar agora” na barra lateral se ainda não apareceram.</p>
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-      </div>
-    </div>
-  );
+  const abas: [Aba, string, number][] = dados ? [
+    ["pendencia", "Com pendência", dados.comPendencia],
+    ["indicacao", "Nunca pedimos indicação", dados.semPedidoIndicacao],
+    ["recompra", "Sem conversa há 60+ dias", dados.semConversa60d],
+    ["todos", "Todos os clientes", dados.total],
+  ] : [];
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <AvisoPainelAntigo />
+    <div className="pv2">
+      <style>{CSS}</style>
+      <header className="pv2-topo">
+        <div>
+          <h1>Pós-venda</h1>
+          <p>
+            {dados ? `${num(dados.total)} clientes · ${num(dados.comVendaRegistrada)} com a venda registrada no CRM` : "carregando…"} · {recorte}
+          </p>
+        </div>
+        <span className="pv2-vivo"><span className={`pv2-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}</span>
+      </header>
 
-      {/* Header */}
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -.5, marginBottom: 4 }}>Pós Venda</h1>
-        <p style={{ fontSize: 12, color: "var(--dim)" }}>
-          {customers.length} clientes · Cross-sell e scripts de indicação prontos para usar
-        </p>
-      </div>
+      {erro && !dados && <div className="card pv2-vazio"><AlertTriangle size={16} /> {erro}</div>}
+      {!dados && !erro && <div className="card pv2-osso" style={{ height: 420 }} />}
 
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 18 }}>
-        {[
-          { label: "Total de Clientes", value: customers.length, color: "var(--green)", icon: "✅" },
-          { label: "Fechados Manualmente", value: customers.filter(l => l.manualSale).length, color: "var(--teal)", icon: "✍️" },
-          { label: "Com Produto Detectado", value: enriched.filter(e => e.productKey !== "default").length, color: "var(--blue)", icon: "📦" },
-          { label: "Oportunidades Cross-sell", value: enriched.length, color: "var(--purple-l)", icon: "🎯" },
-        ].map(k => (
-          <div key={k.label} className="card" style={{ padding: "14px 16px" }}>
-            <div style={{ fontSize: 22, marginBottom: 6 }}>{k.icon}</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: k.color, letterSpacing: -1, marginBottom: 2 }}>{k.value}</div>
-            <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: .5 }}>{k.label.toUpperCase()}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente..."
-          style={{ background: "var(--card)", border: "1px solid var(--brd)", borderRadius: 10, padding: "8px 14px", color: "var(--txt)", fontSize: 13, outline: "none", flex: 1, minWidth: 160 }} />
-        {[
-          { key: "all", label: `Todos (${customers.length})` },
-          ...Object.entries(productGroups).sort((a,b) => b[1]-a[1]).map(([k,v]) => ({
-            key: k, label: `${getProductLabel(k)} (${v})`
-          }))
-        ].map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)} style={{
-            background: filter === f.key ? "var(--purple)" : "var(--card)",
-            border: `1px solid ${filter === f.key ? "var(--purple)" : "var(--brd)"}`,
-            color: filter === f.key ? "#fff" : "var(--dim)",
-            borderRadius: 20, padding: "6px 14px", fontSize: 12,
-            fontWeight: filter === f.key ? 700 : 400, cursor: "pointer", whiteSpace: "nowrap",
-          }}>{f.label}</button>
-        ))}
-      </div>
-
-      {/* Customer cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {filtered.map(({ lead, productKey, isManual }) => {
-          const isExpanded = expandedId === lead.id;
-          const currentTab = getTab(lead.id);
-          const crossSell = crossMap ? (crossMap[productKey] || crossMap.default) : GENERIC_CROSS;
-
-          return (
-            <div key={lead.id} className="card" style={{ overflow: "hidden" }}>
-              {/* Card header — always visible */}
-              <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}
-                onClick={() => setExpandedId(isExpanded ? null : lead.id)}>
-
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(34,197,94,.15)", border: "1px solid rgba(34,197,94,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-                  {getProductLabel(productKey).split(" ")[0]}
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{lead.contact}</div>
-                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                    {isManual
-                      ? <span style={{ color: "var(--teal)" }}>✍️ {lead.manualSale!.product}{lead.manualSale!.value > 0 ? ` · R$ ${lead.manualSale!.value.toLocaleString("pt-BR")}` : ""}</span>
-                      : <span style={{ color: "var(--blue)" }}>🔍 {getProductLabel(productKey)}</span>
-                    }
-                    {lead.manualSale?.closedAt ? ` · ${new Date(lead.manualSale.closedAt).toLocaleDateString("pt-BR")}` : ""}
-                  </div>
-                </div>
-
-                {/* Quick action pills */}
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{
-                    fontSize: 10, background: "rgba(124,92,252,.12)", border: "1px solid rgba(124,92,252,.3)",
-                    color: "var(--purple-l)", borderRadius: 20, padding: "3px 10px", fontWeight: 700,
-                  }}>
-                    🎯 {crossSell.length} sugestões
-                  </span>
-                  <span style={{
-                    fontSize: 10, background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)",
-                    color: "var(--green)", borderRadius: 20, padding: "3px 10px", fontWeight: 700,
-                  }}>
-                    💬 {REFERRAL_SCRIPTS.length} scripts
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--muted)", transform: isExpanded ? "rotate(180deg)" : "none", transition: ".2s" }}>▼</span>
-                </div>
-              </div>
-
-              {/* Expandable content */}
-              {isExpanded && (
-                <div style={{ borderTop: "1px solid var(--brd)", padding: "0 20px 20px" }}>
-
-                  {/* Tabs */}
-                  <div style={{ display: "flex", gap: 4, padding: "14px 0 14px", borderBottom: "1px solid var(--brd2)", marginBottom: 16 }}>
-                    {([
-                      { key: "crossell", icon: "🎯", label: "Cross-sell" },
-                      { key: "indicacao", icon: "👥", label: "Pedir Indicação" },
-                    ] as const).map(t => (
-                      <button key={t.key} onClick={() => setLeadTab(lead.id, t.key)} style={{
-                        background: currentTab === t.key ? "var(--purple)" : "var(--card2)",
-                        border: `1px solid ${currentTab === t.key ? "var(--purple)" : "var(--brd2)"}`,
-                        color: currentTab === t.key ? "#fff" : "var(--dim)",
-                        borderRadius: 9, padding: "7px 16px", fontSize: 12, fontWeight: currentTab === t.key ? 700 : 400,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                      }}>
-                        {t.icon} {t.label}
-                      </button>
-                    ))}
-                    <Link href={`/zapintel/leads/${lead.id}`} style={{
-                      marginLeft: "auto", display: "flex", alignItems: "center", gap: 5,
-                      fontSize: 11, color: "var(--dim)", textDecoration: "none",
-                    }}>
-                      Ver conversa <ArrowRight size={11} />
-                    </Link>
-                  </div>
-
-                  {/* Tab: Cross-sell */}
-                  {currentTab === "crossell" && (
-                    <div>
-                      <p style={{ fontSize: 11, color: "var(--dim)", marginBottom: 12, lineHeight: 1.6 }}>
-                        Baseado no produto detectado <strong style={{ color: "var(--txt)" }}>{getProductLabel(productKey)}</strong>, esses são os produtos mais indicados para oferecer a este cliente:
-                      </p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        {crossSell.map((offer, i) => (
-                          <div key={offer.product} className="card2" style={{ padding: "12px 14px", borderLeft: `3px solid ${i === 0 ? "var(--yellow)" : i === 1 ? "var(--purple-l)" : "var(--brd2)"}` }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                              <span style={{ fontSize: 18 }}>{offer.icon}</span>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? "var(--yellow)" : "var(--txt)" }}>
-                                {offer.product}
-                                {i === 0 && <span style={{ fontSize: 9, background: "rgba(234,179,8,.2)", color: "var(--yellow)", borderRadius: 5, padding: "1px 5px", marginLeft: 5 }}>TOP</span>}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.5 }}>{offer.reason}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab: Pedir Indicação */}
-                  {currentTab === "indicacao" && (
-                    <div>
-                      <div style={{ background: "rgba(34,197,94,.06)", border: "1px solid rgba(34,197,94,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "var(--dim)", lineHeight: 1.7 }}>
-                        <strong style={{ color: "var(--green)" }}>💡 Dica:</strong> O melhor momento para pedir indicação é logo após a entrega, quando o cliente está satisfeito. Escolha um script, copie e envie diretamente pelo WhatsApp.
-                      </div>
-                      <ScriptCard name={lead.contact} phone={lead.phone} />
-                    </div>
-                  )}
-                </div>
-              )}
+      {dados && (
+        <>
+          <div className="pv2-barra">
+            <div className="pv2-abas" role="tablist">
+              {abas.map(([id, nome, n]) => (
+                <button key={id} role="tab" aria-selected={aba === id} className={aba === id ? "ativo" : ""}
+                  onClick={() => { setAba(id); setMostrar(POR_VEZ); }}>
+                  {nome} <b>{num(n)}</b>
+                </button>
+              ))}
             </div>
-          );
-        })}
-
-        {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <div style={{ fontSize: 40, marginBottom: 14 }}>🛍️</div>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Nenhum cliente encontrado</div>
-            <div style={{ fontSize: 13, color: "var(--dim)", marginBottom: 20 }}>
-              {customers.length === 0
-                ? "Marque vendas como fechadas na tela de cada lead para elas aparecerem aqui."
-                : "Tente ajustar os filtros."}
-            </div>
-            {customers.length === 0 && (
-              <Link href="/zapintel/leads" style={{ background: "var(--purple)", color: "#fff", borderRadius: 9, padding: "10px 22px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
-                Ir para Leads →
-              </Link>
-            )}
+            <label className="pv2-busca">
+              <Search size={14} />
+              <input value={busca} onChange={(e) => { setBusca(e.target.value); setMostrar(POR_VEZ); }} placeholder="Nome, telefone ou produto" />
+            </label>
           </div>
-        )}
-      </div>
+
+          <p className="pv2-explica">
+            {aba === "pendencia" && "Algo que a loja ficou de resolver depois da venda — entrega, troca, nota, garantia. É o cliente que pode estar insatisfeito agora."}
+            {aba === "indicacao" && "Clientes que nunca ouviram um pedido de indicação. Quem já comprou e gostou é o caminho mais barato para o próximo cliente."}
+            {aba === "recompra" && "Clientes sem conversa há mais de 60 dias. Bom momento para saber como está o aparelho e oferecer a próxima troca."}
+            {aba === "todos" && "Todos os clientes: quem a análise leu comprando e quem tem venda do CRM ligada à conversa."}
+          </p>
+
+          {filtrados.length === 0 ? <div className="card pv2-vazio">Ninguém aqui{busca ? " com essa busca" : ""}.</div> : (
+            <ul className="pv2-lista">
+              {filtrados.slice(0, mostrar).map((c) => <Cartao key={c.leadId} c={c} agora={agora} />)}
+            </ul>
+          )}
+          {filtrados.length > mostrar && (
+            <button className="pv2-mais" onClick={() => setMostrar((m) => m + POR_VEZ)}>
+              Mostrar mais ({num(filtrados.length - mostrar)})
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
+
+function Cartao({ c, agora }: { c: Cliente; agora: number }) {
+  const [copiado, setCopiado] = useState(false);
+  const wa = linkWhatsApp(c.telefone);
+  async function copiar() {
+    if (!c.mensagem) return;
+    await navigator.clipboard.writeText(c.mensagem);
+    setCopiado(true); setTimeout(() => setCopiado(false), 1800);
+  }
+  return (
+    <li className="card pv2-cartao">
+      <div className="pv2-cab">
+        <Link href={`/zapintel/leads/lead-${c.leadId}`} className="pv2-nome">{c.nome || "Sem nome"}</Link>
+        {c.loja && <span>{c.loja}</span>}
+        {c.veioIndicado && <span className="pv2-tag ok"><Handshake size={10} /> veio por indicação</span>}
+        {c.pediuIndicacao && <span className="pv2-tag">já pedimos indicação</span>}
+        <span className="pv2-quando"><Clock size={11} /> {c.ultimaMensagem ? `conversa ${ha(c.ultimaMensagem, agora)}` : "sem conversa"}</span>
+      </div>
+      <div className="pv2-compra">
+        <ShoppingBag size={12} />
+        {c.vendaEm
+          ? <>{c.produto || "Produto não informado"}{c.valor ? ` · ${reais(c.valor)}` : ""} · {new Date(c.vendaEm).toLocaleDateString("pt-BR")}</>
+          : <span className="pv2-sem">venda não registrada no CRM — a conversa diz que comprou</span>}
+      </div>
+      {!!c.pendencias?.length && (
+        <ul className="pv2-pend">
+          {c.pendencias.map((p, i) => <li key={i}><AlertTriangle size={12} /> {p.replace(/^⚠\s*/, "")}</li>)}
+        </ul>
+      )}
+      {c.mensagem && (
+        <div className="pv2-msg">
+          <span className="pv2-msg-rotulo">Mensagem sugerida pela análise</span>
+          <p>{c.mensagem}</p>
+          <div className="pv2-acoes">
+            <button onClick={copiar}>{copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}</button>
+            {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={12} /> Abrir no WhatsApp</a>}
+          </div>
+        </div>
+      )}
+      {!c.mensagem && wa && (
+        <div className="pv2-acoes"><a href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={12} /> Abrir no WhatsApp</a></div>
+      )}
+    </li>
+  );
+}
+
+const CSS = `
+.pv2 { display: flex; flex-direction: column; gap: 12px; max-width: 1100px; margin: 0 auto; font-variant-numeric: tabular-nums; }
+.pv2-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.pv2-topo h1 { font-size: 23px; font-weight: 800; letter-spacing: -.6px; }
+.pv2-topo p { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+.pv2-vivo { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green); background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; }
+.pv2-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pv2-ponto.on { background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+.pv2-barra { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.pv2-abas { display: flex; gap: 6px; flex-wrap: wrap; }
+.pv2-abas button { background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; color: var(--dim); cursor: pointer; }
+.pv2-abas button b { color: var(--txt); margin-left: 3px; }
+.pv2-abas button.ativo { background: var(--txt); border-color: var(--txt); color: #fff; }
+.pv2-abas button.ativo b { color: #fff; }
+.pv2-busca { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 0 12px; color: var(--muted); min-width: 240px; }
+.pv2-busca input { border: none; outline: none; background: transparent; color: var(--txt); font: inherit; font-size: 13px; padding: 9px 0; width: 100%; }
+.pv2-explica { font-size: 12px; color: var(--dim); line-height: 1.5; }
+.pv2-lista { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.pv2-cartao { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.pv2-cab { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
+.pv2-nome { font-size: 14px; font-weight: 800; color: var(--txt); text-decoration: none; }
+.pv2-nome:hover { color: var(--purple-l); }
+.pv2-quando { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.pv2-tag { font-size: 10.5px; font-weight: 700; border: 1px solid var(--brd2); border-radius: 999px; padding: 0 7px; color: var(--dim); display: inline-flex; align-items: center; gap: 3px; }
+.pv2-tag.ok { color: var(--green); border-color: rgba(22,163,74,.35); }
+.pv2-compra { font-size: 12.5px; color: var(--txt); display: flex; gap: 6px; align-items: center; }
+.pv2-sem { color: var(--orange); font-size: 12px; }
+.pv2-pend { list-style: none; display: flex; flex-direction: column; gap: 4px; background: rgba(234,88,12,.06); border: 1px solid rgba(234,88,12,.25); border-radius: 10px; padding: 8px 10px; }
+.pv2-pend li { font-size: 12px; color: var(--txt); line-height: 1.45; display: flex; gap: 6px; }
+.pv2-pend svg { color: var(--orange); flex: none; margin-top: 2px; }
+.pv2-msg { background: var(--card2); border: 1px solid var(--brd2); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
+.pv2-msg-rotulo { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--purple-l); }
+.pv2-msg p { font-size: 12.5px; color: var(--txt); line-height: 1.5; white-space: pre-wrap; }
+.pv2-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.pv2-acoes button, .pv2-acoes a { display: inline-flex; align-items: center; gap: 5px; background: var(--card); border: 1px solid var(--brd); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--txt); text-decoration: none; cursor: pointer; }
+.pv2-acoes a:hover, .pv2-acoes button:hover { border-color: var(--purple); }
+.pv2-mais { align-self: center; background: var(--card); border: 1px solid var(--brd); border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--txt); cursor: pointer; }
+.pv2-vazio { padding: 28px 0; text-align: center; color: var(--muted); font-size: 13px; display: flex; gap: 8px; justify-content: center; align-items: center; }
+.pv2-osso { background: linear-gradient(90deg, var(--card2), #eceef2, var(--card2)); background-size: 200% 100%; animation: pv2-osso 1.2s linear infinite; }
+@keyframes pv2-osso { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.pv2 button:focus-visible, .pv2 a:focus-visible, .pv2 input:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+@media (max-width: 560px) { .pv2-busca { min-width: 0; width: 100%; } .pv2-quando { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .pv2-osso { animation: none; } }
+`;

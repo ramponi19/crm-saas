@@ -1,9 +1,3 @@
-export interface ManualSale {
-  product: string;
-  value: number;
-  notes: string;
-  closedAt: string; // ISO date
-}
 
 export type Classification =
   | "customer"
@@ -103,7 +97,6 @@ export interface Lead {
   urgency: "critical" | "high" | "medium" | "low";
   insight: string;
   lossRisk: number;
-  manualSale?: ManualSale;
   sellerName: string;
   /**
    * Canal de origem, gravado na IMPORTAÇÃO (`hooks/zapintel/useLeads.tsx`).
@@ -137,45 +130,6 @@ export interface Objection {
   label: string;
 }
 
-export interface DashboardStats {
-  total: number;
-  customer: number;
-  hot: number;
-  warm: number;
-  followup: number;
-  stalled: number;
-  lost: number;
-  unqualified: number;
-  avgScore: number;
-  avgDaysInactive: number;
-  topObjections: { label: string; count: number }[];
-  // New metrics
-  conversionRate: number;
-  pipelineValue: number;
-  ghostRate: number;
-  referralCount: number;
-  topModels: { model: string; count: number }[];
-  reactivationRate: number;
-
-  // ── O que veio da ponte venda↔conversa (10/10/2026) ──────────────────────
-  //
-  // Até aqui todo valor em reais nesta tela saía de `TICKET_MEDIO = 5200`,
-  // escrito à mão. Estes campos existem para que número em dinheiro nunca mais
-  // apareça sem dizer de onde veio.
-
-  /** Ticket MEDIDO das vendas concluídas. `null` = empresa sem venda. */
-  ticketMedido: number | null;
-  /** De quantas vendas o ticket saiu. Poucas vendas = ticket frágil, e a tela diz. */
-  vendasNaConta: number;
-  /**
-   * Taxa MEDIDA de fechamento por classificação, em % (já corrigida pela
-   * cobertura da ponte). A fórmula antiga do pipeline supunha 70% e 25%; o
-   * medido na JM foi 2,8% e 0,0%.
-   */
-  taxaFechamentoHot: number;
-  taxaFechamentoWarm: number;
-}
-
 export const STATUS_META: Record<
   Classification,
   { label: string; color: string; bg: string; border: string }
@@ -191,41 +145,3 @@ export const STATUS_META: Record<
 
 // ── Performance Stats ─────────────────────────────────────────────────────
 
-// ── Agenda ────────────────────────────────────────────────────────────────────
-export interface FollowUpTask {
-  id: string;
-  leadId: string;
-  contact: string;
-  phone: string;
-  classification: Classification;
-  score: number;
-  urgency: "critical" | "high" | "medium" | "low";
-  scheduledFor: string; // ISO date YYYY-MM-DD
-  note: string;
-  done: boolean;
-  createdAt: string;
-  nextAction: string;
-  daysInactive: number;
-  conversationDays: number; // dias entre primeira e última mensagem
-}
-
-// ── Scripts ───────────────────────────────────────────────────────────────────
-export interface Script {
-  id: string;
-  title: string;
-  category: "price" | "reconnect" | "closing" | "referral" | "followup" | "custom";
-  situation: string;
-  message: string;
-  usageCount: number;
-  createdAt: string;
-}
-
-// ── Action Log ────────────────────────────────────────────────────────────────
-export interface ActionLog {
-  id: string;
-  leadId: string;
-  contact: string;
-  type: "followup_sent" | "sale_closed" | "script_used" | "status_changed" | "note_added" | "task_created";
-  description: string;
-  timestamp: string;
-}

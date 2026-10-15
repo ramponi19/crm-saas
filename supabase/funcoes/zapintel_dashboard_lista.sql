@@ -43,7 +43,7 @@ begin
   L as materialized (
     select l.id, l.nome, l.filial_id, l.created_at, l.kanban_status, l.convertido_em
     from leads l
-    where l.empresa_id = v_emp and l.ativo and coalesce(l.filial_id, 0) = any (v_lojas)
+    where l.empresa_id = v_emp and l.ativo and not zapintel_funil_interno(l.funil_id) and coalesce(l.filial_id, 0) = any (v_lojas)
   ),
   M as materialized (
     select m.lead_id, count(*)::int n,

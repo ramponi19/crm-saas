@@ -1,115 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { usePainelAntigo } from "@/hooks/zapintel/useLeads";
+import { useLeads } from "@/hooks/zapintel/useLeads";
+import { useEmpresaZapintel } from "../../providers";
+import { createClient } from "@/lib/supabase/client";
+import { ouvirZapintel } from "@/hooks/zapintel/canalZapintel";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
 import type { Travou } from "@/lib/zapintel/travou";
 import type { PerfilIA } from "@/lib/zapintel/perfil";
 import { Badge, ScoreRing, UrgencyDot } from "@/components/zapintel/ui/atoms";
-import { generateCopilot, type CopilotResult, type CopilotStrategy } from "@/lib/zapintel/insights/followUp";
-import { getProducts } from "@/lib/zapintel/segments/segments";
-import { ArrowLeft, Copy, RefreshCw, Sparkles, CheckCircle2, X, Bot, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
-import type { ManualSale } from "@/types/zapintel";
-
-// ── Manual Sale Modal ─────────────────────────────────────────────────────────
-function SaleModal({ contact, products, onConfirm, onClose }: {
-  contact: string;
-  products: string[];
-  onConfirm: (sale: ManualSale) => void;
-  onClose: () => void;
-}) {
-  const [product, setProduct] = useState("");
-  const [customProduct, setCustomProduct] = useState("");
-  const [value, setValue] = useState("");
-  const [notes, setNotes] = useState("");
-
-  function handleSubmit() {
-    const prod = product === "Outro" ? customProduct : product;
-    if (!prod) return;
-    onConfirm({
-      product: prod,
-      value: parseFloat(value.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0,
-      notes,
-      closedAt: new Date().toISOString().split("T")[0],
-    });
-  }
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        background: "var(--panel)", border: "1px solid var(--brd)", borderRadius: 16,
-        padding: 28, width: "100%", maxWidth: 460,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>✅ Marcar Venda Fechada</h2>
-            <p style={{ fontSize: 12, color: "var(--dim)" }}>{contact}</p>
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, letterSpacing: .6, display: "block", marginBottom: 6 }}>PRODUTO VENDIDO *</label>
-            <select value={product} onChange={e => setProduct(e.target.value)} style={{
-              width: "100%", background: "var(--card)", border: "1px solid var(--brd2)",
-              borderRadius: 9, padding: "9px 12px", color: product ? "var(--txt)" : "var(--muted)",
-              fontSize: 13, cursor: "pointer",
-            }}>
-              <option value="">Selecione o produto...</option>
-              {products.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-
-          {product === "Outro" && (
-            <div>
-              <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, letterSpacing: .6, display: "block", marginBottom: 6 }}>QUAL PRODUTO?</label>
-              <input value={customProduct} onChange={e => setCustomProduct(e.target.value)}
-                placeholder="Descreva o produto vendido..."
-                style={{ width: "100%", background: "var(--card)", border: "1px solid var(--brd2)", borderRadius: 9, padding: "9px 12px", color: "var(--txt)", fontSize: 13 }} />
-            </div>
-          )}
-
-          <div>
-            <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, letterSpacing: .6, display: "block", marginBottom: 6 }}>VALOR DA VENDA (R$)</label>
-            <input value={value} onChange={e => setValue(e.target.value)}
-              placeholder="Ex: 5995,00"
-              style={{ width: "100%", background: "var(--card)", border: "1px solid var(--brd2)", borderRadius: 9, padding: "9px 12px", color: "var(--txt)", fontSize: 13 }} />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, letterSpacing: .6, display: "block", marginBottom: 6 }}>OBSERVAÇÃO (opcional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="Ex: Pagou à vista, entregue na loja, cliente fidelizado..."
-              rows={3}
-              style={{ width: "100%", background: "var(--card)", border: "1px solid var(--brd2)", borderRadius: 9, padding: "9px 12px", color: "var(--txt)", fontSize: 13, resize: "vertical" }} />
-          </div>
-
-          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-            <button onClick={onClose} style={{
-              flex: 1, background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 9,
-              padding: "11px 0", fontSize: 13, color: "var(--dim)", cursor: "pointer",
-            }}>Cancelar</button>
-            <button onClick={handleSubmit} disabled={!product || (product === "Outro" && !customProduct)} style={{
-              flex: 2, background: "var(--green)", border: "none", borderRadius: 9,
-              padding: "11px 0", fontSize: 13, fontWeight: 700, color: "#fff",
-              cursor: !product ? "not-allowed" : "pointer", opacity: !product ? .5 : 1,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-            }}>
-              <CheckCircle2 size={16} /> Confirmar Venda Fechada
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { ArrowLeft, Copy, RefreshCw, Sparkles, Bot, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
 /**
  * O SELO DE ORIGEM — e por que ele mora AQUI FORA.
@@ -177,16 +78,17 @@ type Tab = "whatsapp" | "instagram" | "all";
 export default function LeadDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { leads, markSaleClosed, storeName, sellerName, segment, calculadoEm } = usePainelAntigo();
-  const saleProducts = [...getProducts(segment.id), "Outro"];
-  const resumo = leads.find(l => l.id === id);
+  const { storeName, sellerName } = useLeads();
+  const empresa = useEmpresaZapintel();
   /**
-   * O número do lead sai da URL (`lead-5760`), não do painel: o painel é
-   * calculado de tempos em tempos, e um lead que chegou depois do último
-   * cálculo não está nele — a ficha dizia "Lead não encontrado" para quem a
-   * lista nova (que lê o banco ao vivo) acabou de mostrar. Medido em 14/10.
+   * A FICHA NÃO LÊ MAIS O PAINEL ANTIGO — DESDE 15/10/2026.
+   *
+   * O número do lead sai da URL (`lead-5760`) e o lead inteiro vem de
+   * `/zapintel/api/conversa`, calculado na hora. Antes o topo vinha do painel
+   * (calculado de tempos em tempos): o lead 1196 mostrava "Inativo há 7d" e
+   * "152 mensagens" com o cliente tendo falado naquele dia, na mensagem 153.
    */
-  const leadNum = resumo?.leadId ?? (Number(String(id ?? "").replace(/^lead-/, "")) || null);
+  const leadNum = Number(String(id ?? "").replace(/^lead-/, "")) || null;
 
   /**
    * A CONVERSA NÃO VEM NA LISTA — É BUSCADA AQUI.
@@ -261,13 +163,12 @@ export default function LeadDetailPage() {
   const [verConversa, setVerConversa] = useState(false);
   const [falhouConversa, setFalhouConversa] = useState(false);
 
-  useEffect(() => {
+  const carregar = useCallback((vivo: () => boolean) => {
     if (!leadNum) return;
-    let vivo = true;
     fetch(`/zapintel/api/conversa?lead=${leadNum}`, { cache: "no-store" })
       .then(r => r.json())
       .then(d => {
-        if (!vivo) return;
+        if (!vivo()) return;
         if (d?.lead) {
           setConversa(d.lead as Lead);
           setFicha((d.ficha as Ficha) ?? null);
@@ -285,9 +186,39 @@ export default function LeadDetailPage() {
         }
         else setFalhouConversa(true);
       })
-      .catch(() => { if (vivo) setFalhouConversa(true); });
-    return () => { vivo = false; };
+      .catch(() => { if (vivo()) setFalhouConversa(true); });
   }, [leadNum]);
+
+  useEffect(() => {
+    let vivo = true;
+    carregar(() => vivo);
+    return () => { vivo = false; };
+  }, [carregar]);
+
+  /**
+   * AO VIVO: quando chega mensagem DESTE lead (o aviso do banco diz quais
+   * leads mudaram — `zapintel_ao_vivo.sql`) ou a análise dele é refeita, a
+   * ficha se recarrega sozinha. Só este lead: a loja recebe ~240 mensagens por
+   * hora, e recarregar a cada uma seria uma chamada à Vercel por mensagem.
+   */
+  const [supabase] = useState(() => createClient());
+  useEffect(() => {
+    if (!empresa || !leadNum) return;
+    let vivo = true;
+    let espera: ReturnType<typeof setTimeout> | null = null;
+    const sair = ouvirZapintel(supabase, empresa, {
+      evento: (e) => {
+        const p = (e.payload ?? {}) as { leads?: number[]; lead?: number };
+        const meu = e.event === "mensagens" ? (p.leads ?? []).includes(leadNum) : e.event === "analises" && p.lead === leadNum;
+        if (!meu) return;
+        if (espera) clearTimeout(espera);
+        espera = setTimeout(() => carregar(() => vivo), 2500);
+      },
+      status: () => {},
+    });
+    return () => { vivo = false; if (espera) clearTimeout(espera); sair(); };
+  }, [supabase, empresa, leadNum, carregar]);
+
 
   /**
    * Pede a ficha nova. `forcar` é o botão "Refazer análise" — o único caminho
@@ -322,26 +253,11 @@ export default function LeadDetailPage() {
   // ainda não chegou". Um estado separado só poderia divergir disso.
   const carregandoConversa = !!leadNum && !conversa && !falhouConversa;
 
-  // O resumo (score, classificação, perfil) vem da lista e aparece na hora; as
-  // mensagens chegam depois. Enquanto não chegam, a conversa fica vazia — e a
-  // tela diz que está carregando, em vez de afirmar que não há nada.
-  // Fora do painel, o lead inteiro vem da conversa — o mesmo cálculo.
-  const lead: Lead | null = (resumo
-    ? { ...(resumo as unknown as Lead), messages: conversa?.messages ?? [] }
-    : conversa);
+  const lead: Lead | null = conversa;
 
   const [tab, setTab] = useState<Tab>("all");
-  const [showSaleModal, setShowSaleModal] = useState(false);
-  const [copilot, setCopilot] = useState<CopilotResult | null>(null);
-  const [copilotLoading, setCopilotLoading] = useState(false);
-  const [copilotError, setCopilotError] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [regenId, setRegenId] = useState<string | null>(null);
-  const [actionLog, setActionLog] = useState<{id:string;type:string;description:string;timestamp:string}[]>([]);
 
-  function logAction(type: string, description: string) {
-    setActionLog(prev => [{id:Math.random().toString(36).slice(2),type,description,timestamp:new Date().toISOString()},...prev].slice(0,50));
-  }
 
   if (!lead) return (
     <div style={{ textAlign: "center", paddingTop: 80, color: "var(--dim)" }}>
@@ -383,51 +299,18 @@ export default function LeadDetailPage() {
       });
       const d = await r.json();
       if (!r.ok) setErroSugestao(d?.erro || "Não consegui gerar agora.");
-      else {
-        setSugestao(String(d?.mensagem || ""));
-        logAction("sugestao", "Mensagem de retomada sugerida pela IA");
-      }
+      else setSugestao(String(d?.mensagem || ""));
     } catch {
       setErroSugestao("Não consegui gerar agora.");
     }
     setSugerindo(false);
   }
 
-  async function runCopilot() {
-    if (!lead) return;
-    setCopilotLoading(true); setCopilotError(""); setCopilot(null);
-    try {
-      const result = await generateCopilot(lead);
-      setCopilot(result);
-      logAction("copilot", "Copilot ativado — diagnóstico e 3 estratégias geradas");
-    } catch (e) {
-      setCopilotError(e instanceof Error ? e.message : "Erro ao gerar. Verifique a chave da API.");
-    }
-    setCopilotLoading(false);
-  }
-
   async function copyMsg(id: string, text: string) {
     await navigator.clipboard.writeText(text);
-    logAction("message_copied", `Mensagem copiada: estratégia "${id}"`);
 
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  async function regenStrategy(stratId: string) {
-    if (!lead || !copilot) return;
-    setRegenId(stratId);
-    try {
-      const fresh = await generateCopilot(lead);
-      const updated = fresh.strategies.find(s => s.id === stratId);
-      if (updated) {
-        setCopilot(prev => prev ? {
-          ...prev,
-          strategies: prev.strategies.map(s => s.id === stratId ? updated : s),
-        } : prev);
-      }
-    } catch { /* keep old */ }
-    setRegenId(null);
   }
 
   /**
@@ -799,80 +682,6 @@ export default function LeadDetailPage() {
       </div>
 
       {/*
-        ── Marcar Venda Fechada ─────────────────────────────────────────────
-
-        ⚠ A CONDIÇÃO AQUI É `lead.classification`, NÃO `vClass`, E ISSO É DE
-        PROPÓSITO.
-
-        `lead.classification` só diz "customer" quando existe venda ligada a
-        este lead na ponte `zapintel_venda_lead` — fato do CRM. A IA diz
-        "customer" quando LÊ na conversa que a pessoa comprou. Quando os dois
-        divergem, é justamente aí que este botão mais serve: a venda aconteceu
-        e o sistema não sabe.
-
-        Trocar por `vClass` esconderia o botão exatamente no caso que ele
-        existe para resolver. Medido no lead 439 em 13/10/2026: a Carol pagou
-        R$ 5.695 em 22/08, e não há nenhuma venda entre R$ 5.000 e R$ 6.500 na
-        empresa 1 em toda aquela semana.
-      */}
-      {lead.classification !== "customer" && (
-        <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-          {ia?.classificacao === "customer" && (
-            <div style={{
-              background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
-              borderRadius: 9, padding: "10px 13px", marginBottom: 14,
-              display: "flex", gap: 9, alignItems: "flex-start",
-            }}>
-              <AlertTriangle size={14} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
-              <div style={{ fontSize: 11.5, color: "var(--dim)", lineHeight: 1.6 }}>
-                <b style={{ color: "var(--green)" }}>A conversa diz que esta venda aconteceu</b>, mas não há
-                venda ligada a este lead no CRM. Se foi fechada mesmo, registre aqui — o faturamento, o
-                ticket médio e o ciclo de venda do painel só contam o que está registrado.
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Venda fechada fora do chat?</div>
-              <div style={{ fontSize: 11, color: "var(--dim)" }}>Marque manualmente e o dashboard será atualizado.</div>
-            </div>
-            <button onClick={() => setShowSaleModal(true)} style={{
-              background: "var(--green)", border: "none", borderRadius: 10,
-              padding: "10px 18px", fontSize: 13, fontWeight: 700, color: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
-              transition: "opacity .15s",
-            }}
-              onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              <CheckCircle2 size={15} /> Marcar como Venda Fechada
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Manual sale badge if already marked */}
-      {lead.classification === "customer" && lead.manualSale && (
-        <div style={{
-          background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
-          borderRadius: 12, padding: "12px 18px", marginBottom: 14,
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <CheckCircle2 size={18} color="var(--green)" />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--green)" }}>
-              ✅ Venda fechada manualmente — {lead.manualSale.product}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--dim)" }}>
-              {lead.manualSale.value > 0 ? `R$ ${lead.manualSale.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · ` : ""}
-              {lead.manualSale.closedAt}
-              {lead.manualSale.notes ? ` · ${lead.manualSale.notes}` : ""}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/*
         A FICHA — o que aconteceu nesta conversa, antes de qualquer número.
 
         Pedida pelo Lucas em 10/10/2026: "ao invés de trazer o histórico de
@@ -885,9 +694,10 @@ export default function LeadDetailPage() {
         absoluto. A ordem passou a ser: quem é o lead, depois o que aconteceu
         nele, depois o que fazer.
 
-        Faz sentido: os dois são leitura da conversa e alimentam exatamente a
-        decisão que o Copiloto propõe. Separados por 300px de cartões de
-        número, ninguém ligava um ao outro.
+        Faz sentido: os dois são leitura da conversa e alimentam a decisão do
+        que fazer. Separados por 300px de cartões de número, ninguém ligava um
+        ao outro. (O "Copilot de Vendas" que vinha embaixo saiu em 15/10/2026:
+        tinha "JM Store, vendedor Pedro" fixo no prompt e repetia a análise.)
       */}
       {ficha && (
         <div className="card" style={{ padding: 20, marginBottom: 14, borderLeft: "3px solid var(--purple)" }}>
@@ -917,13 +727,6 @@ export default function LeadDetailPage() {
               {ficha.ultimaEm
                 ? new Date(`${ficha.ultimaEm}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
                 : "—"}
-              {calculadoEm && (
-                <> · números do painel de{" "}
-                  {new Date(calculadoEm).toLocaleString("pt-BR", {
-                    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-                  })}
-                </>
-              )}
             </div>
           </div>
           {/*
@@ -1138,22 +941,6 @@ export default function LeadDetailPage() {
         );
       })()}
 
-      {/* ── Copilot de Vendas ───────────────────────────────────────────── */}
-      <SalesCopilot
-        lead={lead}
-        copilot={copilot}
-        loading={copilotLoading}
-        error={copilotError}
-        copiedId={copiedId}
-        regenId={regenId}
-        onRun={runCopilot}
-        onCopy={copyMsg}
-        onRegen={regenStrategy}
-      />
-
-      {/* ── Histórico de Ações ──────────────────────────────────────────── */}
-      <ActionLogPanel log={actionLog} />
-
       {/* ── Conversation history with tabs ──────────────────────────────── */}
       <div className="card" style={{ padding: 22 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
@@ -1319,310 +1106,10 @@ export default function LeadDetailPage() {
           })}
         </div>
       </div>
-      {/* Sale modal */}
-      {showSaleModal && (
-        <SaleModal
-          contact={lead.contact}
-          products={saleProducts}
-          onConfirm={sale => { markSaleClosed(lead.id, sale); setShowSaleModal(false); }}
-          onClose={() => setShowSaleModal(false)}
-        />
-      )}
     </div>
   );
 }
 
-// ── Copilot de Vendas Component ─────────────────────────────────────────────
-function SalesCopilot({
-  lead, copilot, loading, error, copiedId, regenId, onRun, onCopy, onRegen,
-}: {
-  lead: Lead;
-  copilot: CopilotResult | null;
-  loading: boolean;
-  error: string;
-  copiedId: string | null;
-  regenId: string | null;
-  onRun: () => void;
-  onCopy: (id: string, text: string) => void;
-  onRegen: (id: string) => void;
-}) {
-  const [diagOpen, setDiagOpen] = useState(true);
-
-  const momentumConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-    heating:   { icon: <span style={{ fontSize: 16 }}>🔥</span>, color: "#f97316", bg: "rgba(249,115,22,.08)" },
-    cooling:   { icon: <span style={{ fontSize: 16 }}>🧊</span>, color: "#60a5fa", bg: "rgba(96,165,250,.08)" },
-    cold:      { icon: <span style={{ fontSize: 16 }}>❄️</span>, color: "#94a3b8", bg: "rgba(148,163,184,.08)" },
-    converted: { icon: <span style={{ fontSize: 16 }}>✅</span>, color: "#22c55e", bg: "rgba(34,197,94,.08)" },
-  };
-
-  return (
-    <div className="card" style={{ marginBottom: 14, overflow: "hidden" }}>
-      {/* Header */}
-      <div style={{
-        padding: "16px 22px",
-        background: "linear-gradient(135deg, rgba(124,92,252,.12), rgba(67,56,202,.08))",
-        borderBottom: "1px solid var(--brd)",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 9,
-            background: "linear-gradient(135deg,#7c5cfc,#4338ca)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Bot size={16} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: -.3 }}>Copilot de Vendas</div>
-            <div style={{ fontSize: 10, color: "var(--muted)" }}>IA analisa a conversa e sugere as melhores abordagens</div>
-          </div>
-        </div>
-        <button
-          onClick={onRun}
-          disabled={loading}
-          style={{
-            padding: "9px 18px",
-            background: loading ? "var(--brd)" : "linear-gradient(135deg,#7c5cfc,#4338ca)",
-            border: "none", borderRadius: 10, color: "#fff",
-            fontSize: 12, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", gap: 6, transition: "opacity .15s",
-          }}
-          onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = ".85"; }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
-        >
-          {loading
-            ? <><RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> Analisando...</>
-            : copilot ? <><RefreshCw size={13} /> Reanalisar</> : <><Sparkles size={13} /> Ativar Copilot</>
-          }
-        </button>
-      </div>
-
-      {/* Empty / Error state */}
-      {!copilot && !loading && (
-        <div style={{ padding: "32px 22px", textAlign: "center" }}>
-          {error ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <AlertTriangle size={22} color="var(--red)" />
-              <div style={{ fontSize: 13, color: "var(--red)", fontWeight: 600 }}>{error}</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>Verifique se a chave ANTHROPIC_API_KEY está no .env.local</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 32 }}>🤖</div>
-              <div style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.7, maxWidth: 380 }}>
-                Clique em <strong style={{ color: "var(--purple-l)" }}>Ativar Copilot</strong> para a IA ler toda a conversa de {lead.contact} e gerar 3 estratégias de abordagem personalizadas.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Loading skeleton */}
-      {loading && (
-        <div style={{ padding: "24px 22px" }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{
-              height: 100, borderRadius: 12, marginBottom: 10,
-              background: "linear-gradient(90deg, var(--card2) 0%, var(--brd) 50%, var(--card2) 100%)",
-              backgroundSize: "200% 100%",
-              animation: "shimmer 1.5s infinite",
-            }} />
-          ))}
-          <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
-            Lendo {lead.messages.length} mensagens da conversa...
-          </div>
-        </div>
-      )}
-
-      {/* Copilot result */}
-      {copilot && !loading && (
-        <div style={{ padding: "0 0 4px" }}>
-
-          {/* Diagnóstico */}
-          <div style={{ borderBottom: "1px solid var(--brd)" }}>
-            <button
-              onClick={() => setDiagOpen(o => !o)}
-              style={{
-                width: "100%", padding: "14px 22px",
-                background: "transparent", border: "none",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "var(--txt)", letterSpacing: -.2 }}>
-                  🔍 Diagnóstico da Conversa
-                </span>
-              </div>
-              {diagOpen ? <ChevronUp size={14} color="var(--muted)" /> : <ChevronDown size={14} color="var(--muted)" />}
-            </button>
-
-            {diagOpen && (() => {
-              const d = copilot.diagnosis;
-              const mc = momentumConfig[d.momentum] || momentumConfig.cold;
-              return (
-                <div style={{ padding: "0 22px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  {/* Momentum badge */}
-                  <div style={{
-                    display: "inline-flex", alignItems: "center", gap: 8,
-                    background: mc.bg, border: `1px solid ${mc.color}30`,
-                    borderRadius: 10, padding: "8px 14px", alignSelf: "flex-start",
-                  }}>
-                    {mc.icon}
-                    <span style={{ fontSize: 13, fontWeight: 700, color: mc.color }}>{d.momentumLabel}</span>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "var(--muted)", letterSpacing: .7, marginBottom: 5 }}>PONTO DE VIRADA</div>
-                      <div style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6 }}>{d.turningPoint}</div>
-                    </div>
-                    <div style={{ background: "var(--card2)", border: "1px solid var(--brd2)", borderRadius: 10, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "var(--purple-l)", letterSpacing: .7, marginBottom: 5 }}>MELHOR JOGADA AGORA</div>
-                      <div style={{ fontSize: 12, color: "var(--dim)", lineHeight: 1.6 }}>{d.recommendedApproach}</div>
-                    </div>
-                  </div>
-
-                  {d.riskAlert && (
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.3)",
-                      borderRadius: 10, padding: "9px 14px",
-                    }}>
-                      <AlertTriangle size={14} color="var(--red)" />
-                      <span style={{ fontSize: 12, color: "var(--red)", fontWeight: 600 }}>{d.riskAlert}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Strategies */}
-          <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: .7 }}>ESTRATÉGIAS — escolha e copie</div>
-            {copilot.strategies.map(s => (
-              <StrategyCard
-                key={s.id}
-                strategy={s}
-                copied={copiedId === s.id}
-                regening={regenId === s.id}
-                onCopy={() => onCopy(s.id, s.message)}
-                onRegen={() => onRegen(s.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        /* O ícone que gira enquanto a IA lê a conversa. O keyframe já existia
-           aqui; faltava a classe, e sem ela o ícone ficava parado anunciando
-           trabalho em andamento. */
-        .spin { animation: spin 1s linear infinite; }
-        @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
-      `}</style>
-    </div>
-  );
-}
-
-function StrategyCard({ strategy: s, copied, regening, onCopy, onRegen }: {
-  strategy: CopilotStrategy;
-  copied: boolean;
-  regening: boolean;
-  onCopy: () => void;
-  onRegen: () => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div style={{
-      border: `1px solid ${s.toneColor}30`,
-      borderRadius: 12,
-      overflow: "hidden",
-      background: `${s.toneColor}06`,
-      transition: "border-color .2s",
-    }}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = `${s.toneColor}60`)}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = `${s.toneColor}30`)}
-    >
-      {/* Strategy header */}
-      <button
-        onClick={() => setExpanded(o => !o)}
-        style={{
-          width: "100%", padding: "12px 14px",
-          background: "transparent", border: "none",
-          display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-        }}
-      >
-        <span style={{ fontSize: 18, lineHeight: 1 }}>{s.emoji}</span>
-        <div style={{ flex: 1, textAlign: "left" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--txt)", marginBottom: 1 }}>{s.label}</div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: s.toneColor, letterSpacing: .5 }}>{s.tone.toUpperCase()}</div>
-        </div>
-        {expanded ? <ChevronUp size={14} color="var(--muted)" /> : <ChevronDown size={14} color="var(--muted)" />}
-      </button>
-
-      {expanded && (
-        <div style={{ padding: "0 14px 14px" }}>
-          {/* Message bubble */}
-          <div style={{
-            background: "var(--card2)", border: "1px solid var(--brd2)",
-            borderRadius: 10, padding: "12px 14px", marginBottom: 10,
-          }}>
-            <p style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{s.message}</p>
-          </div>
-
-          {/* Reasoning chip */}
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
-            <span style={{ color: s.toneColor, fontWeight: 700 }}>Por que funciona: </span>{s.reasoning}
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={onCopy}
-              style={{
-                flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                background: copied ? "rgba(34,197,94,.15)" : `${s.toneColor}18`,
-                border: `1px solid ${copied ? "rgba(34,197,94,.4)" : `${s.toneColor}40`}`,
-                borderRadius: 8, color: copied ? "var(--green)" : s.toneColor,
-                fontSize: 12, fontWeight: 700, padding: "7px 0", cursor: "pointer",
-                transition: "all .2s",
-              }}
-            >
-              {copied ? <><CheckCircle2 size={13} /> Copiado!</> : <><Copy size={13} /> Copiar mensagem</>}
-            </button>
-            <button
-              onClick={onRegen}
-              disabled={regening}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                background: "transparent", border: "1px solid var(--brd2)",
-                borderRadius: 8, color: "var(--muted)", fontSize: 11, padding: "7px 0",
-                cursor: regening ? "not-allowed" : "pointer",
-              }}
-            >
-              <RefreshCw size={11} style={{ animation: regening ? "spin 1s linear infinite" : "none" }} />
-              {regening ? "Gerando..." : "Regenerar"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Um momento da conversa, citado.
- *
- * Citação curta e com rótulo é o que permite fechar o histórico sem perder o
- * que importa: a pessoa reconhece a própria conversa em uma linha. O texto vem
- * cortado em 180 caracteres lá na ficha — bloco inteiro de preço vira parágrafo
- * e desfaz justamente a economia de leitura que isto veio trazer.
- */
 function Momento({ rotulo, texto, cor }: { rotulo: string; texto: string; cor: string }) {
   return (
     <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -1654,44 +1141,5 @@ function SourceBadge({ type }: { type: "whatsapp" | "instagram" }) {
     }}>
       {isIG ? "📸 Instagram" : "💬 WhatsApp"}
     </span>
-  );
-}
-
-// ── Action Log Panel ──────────────────────────────────────────────────────────
-function ActionLogPanel({ log }: { log: {id:string;type:string;description:string;timestamp:string}[] }) {
-  const [open, setOpen] = useState(false);
-  if (log.length === 0) return null;
-  const fmt = (ts: string) => {
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  };
-  const icons: Record<string,string> = {
-    copilot:"🤖", message_copied:"📋", sale_closed:"✅", note:"📝", default:"⚡"
-  };
-  return (
-    <div className="card" style={{ marginBottom: 14, overflow: "hidden" }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        width:"100%", padding:"14px 20px", background:"transparent", border:"none",
-        display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer",
-      }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:14 }}>📋</span>
-          <span style={{ fontSize:13, fontWeight:700 }}>Histórico de Ações</span>
-          <span style={{ fontSize:11, background:"var(--purple)", color:"#fff", borderRadius:10, padding:"1px 7px" }}>{log.length}</span>
-        </div>
-        <span style={{ fontSize:12, color:"var(--muted)" }}>{open?"▲":"▼"}</span>
-      </button>
-      {open && (
-        <div style={{ borderTop:"1px solid var(--brd)", padding:"12px 20px", display:"flex", flexDirection:"column", gap:6 }}>
-          {log.map(entry => (
-            <div key={entry.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", borderBottom:"1px solid var(--brd)" }}>
-              <span style={{ fontSize:14 }}>{icons[entry.type] || icons.default}</span>
-              <span style={{ flex:1, fontSize:12, color:"var(--dim)" }}>{entry.description}</span>
-              <span style={{ fontSize:10, color:"var(--muted)", flexShrink:0 }}>{fmt(entry.timestamp)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
