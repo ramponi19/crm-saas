@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import * as Sentry from '@sentry/nextjs'
 import { buscarTudo } from '@/lib/zapintel/conversas'
 
 /**
@@ -214,6 +215,36 @@ export async function montarPonte(db: SupabaseClient, empresaId: number): Promis
 }
 
 /**
+ * A ponte não gravou (ou gravou só uma parte): deixa rastro e avisa.
+ *
+ * O cron só devolve 500 e não chama o Sentry (o `onRequestError` do
+ * instrumentation.ts pega erro NÃO tratado, e o cron trata). Sem isto a falha
+ * ficava só no log da Vercel, que no Hobby dura uma hora, e a próxima tentativa
+ * é no dia seguinte. O log JSON fica para quem filtrar o log; o Sentry, para
+ * alguém ser avisado.
+ *
+ * Fora do Next (scripts/ponte-zapintel.mts rodando no Node puro) o import de
+ * `@sentry/nextjs` cai na versão CommonJS e o `captureException` não vem como
+ * exportação nomeada — chamar daria TypeError e trocaria o erro real por ele.
+ * Ali também não há `init`, então não havia o que enviar: o log JSON basta.
+ */
+function avisarGravacaoPulada(
+  erro: Error,
+  motivo: 'ligacoes_manuais_nao_lidas' | 'upsert_falhou',
+  empresaId: number,
+  contexto: { linhas: number } & Record<string, number>,
+) {
+  console.error(JSON.stringify({
+    evento: 'zapintel.ponte.gravacao_pulada', motivo, empresa_id: empresaId, ...contexto, erro: erro.message,
+  }))
+  if (typeof Sentry.captureException !== 'function') return
+  Sentry.captureException(erro, {
+    tags: { modulo: 'zapintel', job: 'ponte', empresa_id: String(empresaId), motivo },
+    contexts: { ponte: contexto },
+  })
+}
+
+/**
  * Grava a ponte.
  *
  * `manual` nunca é sobrescrito: se uma pessoa confirmou qual conversa gerou a
@@ -221,18 +252,48 @@ export async function montarPonte(db: SupabaseClient, empresaId: number): Promis
  */
 export async function gravarPonte(db: SupabaseClient, linhas: LinhaPonte[]): Promise<number> {
   if (!linhas.length) return 0
+  const empresaId = linhas[0].empresa_id
 
-  const { data: fixos } = await db
-    .from('zapintel_venda_lead').select('venda_id')
-    .eq('empresa_id', linhas[0].empresa_id).eq('como', 'manual')
-  const protegidos = new Set((fixos ?? []).map((f) => (f as { venda_id: number }).venda_id))
+  /**
+   * ERRO AO LER NÃO É LISTA VAZIA.
+   *
+   * Lista vazia é o normal — nenhuma venda confirmada à mão — e grava. Erro é não
+   * saber quais são, e aí não grava nada: antes o erro era ignorado, o conjunto
+   * vinha vazio e o upsert sobrescrevia justamente as ligações confirmadas.
+   *
+   * Paginado pelo mesmo motivo: o PostgREST corta em 1000 linhas em silêncio, e a
+   * 1001ª confirmada seria tratada como palpite. `buscarTudo` pagina e lança no
+   * erro.
+   */
+  let fixos: { venda_id: number }[]
+  try {
+    fixos = await buscarTudo<{ venda_id: number }>((de, ate) =>
+      db.from('zapintel_venda_lead').select('venda_id')
+        .eq('empresa_id', empresaId).eq('como', 'manual')
+        .order('venda_id', { ascending: true }).range(de, ate))
+  } catch (e) {
+    const causa = e instanceof Error ? e.message : String(e)
+    const erro = new Error(`ponte nao gravada (empresa ${empresaId}): ligacoes manuais nao lidas: ${causa}`)
+    avisarGravacaoPulada(erro, 'ligacoes_manuais_nao_lidas', empresaId, { linhas: linhas.length })
+    throw erro
+  }
+  const protegidos = new Set(fixos.map((f) => f.venda_id))
 
   const gravar = linhas.filter((l) => !protegidos.has(l.venda_id))
   for (let i = 0; i < gravar.length; i += 500) {
+    const lote = gravar.slice(i, i + 500)
     const { error } = await db
       .from('zapintel_venda_lead')
-      .upsert(gravar.slice(i, i + 500), { onConflict: 'venda_id' })
-    if (error) throw new Error(error.message)
+      .upsert(lote, { onConflict: 'venda_id' })
+    if (error) {
+      // Os lotes anteriores JÁ foram gravados: o contexto diz quanto entrou antes
+      // da falha, para ninguém ler "nada gravado" onde houve gravação parcial.
+      const erro = new Error(`ponte gravada em parte (empresa ${empresaId}): ${error.message}`)
+      avisarGravacaoPulada(erro, 'upsert_falhou', empresaId, {
+        linhas: linhas.length, a_gravar: gravar.length, gravadas_antes_da_falha: i, lote: lote.length,
+      })
+      throw erro
+    }
   }
   return gravar.length
 }
