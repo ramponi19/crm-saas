@@ -359,3 +359,104 @@ Não existe teste SQL da ponte; ela é coberta por `tests/zapintel-ponte.test.ts
 | Testes, build e deploy | **aprovada** | 114/114, tsc, lint 0 erros, build; deploy READY 16:05:28 |
 | Dependências | **parcialmente verificada** | 7 vulnerabilidades conhecidas (Tailwind 3), nada novo desde 15/10 |
 | Observabilidade (logs, Sentry) | **parcialmente verificada** | logs da Vercel lidos e classificados; envio Vercel → Sentry nunca confirmado |
+
+---
+
+## Fase 2 e quarentena (16–17/10/2026)
+
+### Inventário de qualidade
+
+A fase 2 está em [ZAPINTEL-INVENTARIO-QUALIDADE-20261017.md](ZAPINTEL-INVENTARIO-QUALIDADE-20261017.md)
+(com capturas anonimizadas em [capturas/zapintel-20261017/](capturas/zapintel-20261017/)).
+Ela cobriu código e arquitetura, fluxos e bugs, performance de cliente e banco, interface e
+acessibilidade, e manutenção. Resultado: **21 defeitos comprovados, 11 riscos, 10
+oportunidades** e uma proposta de 5 lotes. Achado de código morto: nenhum.
+
+### O que o lote de estabilidade corrigiu
+
+Merge `82ab84e` (branch `audit/zapintel-estabilidade`, commit `2d7d393`), deploy
+`dpl_RVBnC4JoThCDham5EPTaC9Fs63qv`, READY às 18:03:32 de 16/10 (21:03:32 UTC). Sem SQL em
+produção.
+
+| # | O que | Arquivos | Verificação | Veredito |
+|---|---|---|---|---|
+| 1 | Contagem do robô: falha (timeout, erro da função ou da leitura de `leads`) responde 200 `indisponivel` + log `zapintel.pendentes.falha` + Sentry (`modulo=zapintel`); o robô diz "Não foi possível verificar as análises pendentes", com "Tentar de novo" — nunca "em dia". Cache de 60 s por empresa + lojas, log `zapintel.pendentes.cache`; `?atualizar=1` depois de um lote | `app/zapintel/api/perfil/pendentes/route.ts`, `lib/zapintel/cache-pendentes.ts`, `components/zapintel/robo-analises.tsx` | 9 testes. **Em produção:** às 21:04:34 UTC a função estourou o tempo de verdade → log `zapintel.pendentes.falha` motivo `timeout` e issue **NEXUS-CRM-7** no Sentry com `modulo=zapintel`; depois, 4 respostas do cache (idade 0,5–30 s) | **testado e aprovado** |
+| 2 | Dado do CRM que entra no prompt e falha na leitura (venda, valor, nome da empresa, responsáveis) vira "informação indisponível"; a sugestão responde 503 se não dá para saber se comprou | `lib/zapintel/conversas.ts`, `lib/zapintel/perfil.ts`, rotas `perfil` e `sugestao` | 8 testes com o dublê do banco | **testado e aprovado** |
+| 3 | Checagem de funil interno que falha: ficha e sugestão respondem **503** ("Não foi possível confirmar se esta conversa é de funil interno…"); a tela trata como interno | `lib/zapintel/funil-interno.ts` (novo), `lib/zapintel/ctx.ts`, rotas | 7 testes | **testado e aprovado** |
+| 4 | Toda chamada à Anthropic grava em `assistente_uso`: sucesso, recusa, resposta vazia, timeout, erro da API e o lote do script. Erro ao gravar vai para o log (`zapintel.ia.uso_nao_gravado`) | `lib/zapintel/ia.ts` | 7 testes | **testado e aprovado** |
+| 5 | `perfil-zapintel.mts` pula funil interno (e lead cuja checagem falha); `tsconfig.scripts.json` + `tests/scripts-compilam.test.ts` compilam os `.mts` dentro do `npm test` | `scripts/`, `tsconfig.scripts.json` | o teste roda os 6 scripts que compilam. **`calibrar-zapintel.mts` e `travou-zapintel.mts` não compilam**: marcados QUEBRADOS no cabeçalho (TODO 2026-10-17) e fora da checagem. O `travou` foi achado pela checagem; o inventário o dava como funcionando | **testado e aprovado** (com os 2 quebrados registrados) |
+| 6 | Telas: nunca TypeError, URL do Supabase ou texto do Postgres; aviso único com "Tentar de novo"; ficha do lead por status | `lib/zapintel/mensagem-erro.ts`, `components/zapintel/erro-de-tela.tsx`, as 6 telas, `hooks/zapintel/useRpcAoVivo.ts` | 6 testes; em produção, `/zapintel/leads/abc` → "Lead não encontrado." | **testado e aprovado** (o erro sem rede foi testado por componente, não de novo em produção) |
+| 7 | Menu do ZapIntel com `prefetch={false}` | `components/zapintel/zap-sidebar.tsx` | **Abertura de `/zapintel`: antes, 24 requisições `?_rsc=`** (12 do menu: as 5 telas + `/dashboard`, duas vezes cada; 12 de links de lead do painel). **Depois: 0 do menu**; restam as 13 dos links de lead do painel, fora deste item. A navegação pelo menu continua (Leads, Insights clicados em produção) | **testado e aprovado** |
+| 8 | Validação | — | `npm test` **151/151** (eram 114; 37 novos); mutação: desfazer cada uma das 6 correções principais faz o teste correspondente falhar; `npx tsc --noEmit` sem erros; lint sem avisos nos arquivos mexidos; `npm run build` ok (182 páginas). Smoke do dono: dashboard, lista (50 linhas), ficha existente (lead 1120), robô ("21 conversas novas sem análise e 120 que andaram", sem disparar lote) | **testado e aprovado** |
+
+**Logs dos 10 minutos depois do deploy (21:03–21:13 UTC):**
+
+- **Vercel:** um único grupo de erro, o `zapintel.pendentes.falha` acima — é o comportamento novo
+  registrando uma falha real do banco.
+- **Sentry:** só o NEXUS-CRM-7 (o mesmo evento).
+- **Postgres:** 11 cancelamentos por tempo entre 21:04 e 21:05, com o banco frio logo após o
+  deploy (o `zapintel_dashboard` deu 500 duas vezes e respondeu na terceira tentativa; uma
+  consulta de monitoramento do próprio Supabase levou 13,5 s no mesmo minuto). Nenhum depois
+  das 21:06. São os defeitos D2/D3 do inventário (funções que releem `lead_mensagens`
+  inteira), que pedem SQL e ficaram para a reconstrução.
+
+**Duas correções neste relatório, a partir do que o lote mostrou:**
+
+- **Canal Vercel → Sentry** (seção 9: "nunca confirmado"): **confirmado** em 16/10 21:04:34
+  UTC, pelo NEXUS-CRM-7, que chegou com stack, release `82ab84e` e as tags do código.
+- **Scripts:** havia dois quebrados (`calibrar` e `travou`), não só um.
+
+### O que ficou para a reconstrução
+
+Os números são os do inventário.
+
+- **Lote 1, o que não entrou:**
+  - D8, overflow a 360 px;
+  - D9, rolagem ao voltar;
+  - D10, filtro inválido na URL;
+  - D15, rótulo "Abrir conversa";
+  - D18, `#número` na busca;
+  - D19, acentos nas mensagens das rotas (a tela já não as mostra cruas).
+- **Lote 2, o que não entrou:**
+  - D13, `zapintel_escopo` que falha vira "sem acesso" sem log;
+  - R4, `iaDoCrmLigada` liberando na falha;
+  - R7, o log de 400 caracteres da resposta da IA;
+  - D17, paginação da venda no script (o funil interno entrou).
+- **Lote 3 inteiro:**
+  - D2/D3, contadores por lead em vez de reler `lead_mensagens` (SQL);
+  - R1, recálculo da conversa só no cron;
+  - R2, índice de busca;
+  - D16, os dois scripts quebrados;
+  - R9, testes SQL de conteúdo.
+- **Lote 4 inteiro:**
+  - R5, prefetch dos links de lead do painel (13 por abertura);
+  - R6, renders do painel;
+  - D6, contraste;
+  - D7, toque no celular;
+  - O1, tokens Precisão;
+  - O6/O7, textos e "Voltar";
+  - R11, índices redundantes.
+- **Lote 5 inteiro:**
+  - D20/D21, comentários e referências mortas;
+  - O2, duplicação;
+  - O3, tipos das RPCs;
+  - O4, exports;
+  - O5, nomes;
+  - O8, pequenos;
+  - O9, regra de import;
+  - O10, docs;
+  - R8, testes das telas e hooks;
+  - R10, documentar scripts.
+
+### Quarentena
+
+Tag **`zapintel-quarentena-2026-10-17`** no commit deste adendo.
+
+**Regra: nenhum commit em arquivos do ZapIntel até a reconstrução, salvo incidente.**
+
+- **O que conta como arquivo do ZapIntel:** `app/zapintel/**`, `app/api/zapintel/**`,
+  `lib/zapintel/**`, `components/zapintel/**`, `hooks/zapintel/**`, `scripts/*zapintel*`,
+  `tests/*zapintel*`, `supabase/funcoes/zapintel_*` e `supabase/testes/zapintel_*`.
+- **Incidente** é defeito em produção que afeta dado, acesso ou custo. A correção é a mínima,
+  vai com teste e é registrada neste adendo.
+- **A reconstrução parte desta tag.**
