@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto'
+import * as Sentry from '@sentry/nextjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -72,6 +73,11 @@ export async function excedeuLimite(
  *
  * Também deixa passar quando o contador falha, pelo mesmo motivo de
  * `excedeuLimite`: o limite protege a rota, não pode derrubá-la.
+ *
+ * Mas liberar CALADO deixava o teto cego sem ninguém saber — e cego, ele não
+ * segura o laço que gasta a chave de IA. Desde 16/10 cada falha deixa um log
+ * JSON (`zapintel.rate_limit.falha`) e um evento no Sentry com
+ * `modulo=zapintel`. Uma vez por falha: é uma chamada por clique, não um laço.
  */
 export async function excedeuLimiteDoUsuario(
   svc: SupabaseClient,
@@ -82,10 +88,31 @@ export async function excedeuLimiteDoUsuario(
 ): Promise<boolean> {
   const ms = janelaMinutos * 60_000
   const janela = new Date(Math.floor(Date.now() / ms) * ms).toISOString()
-  const { data, error } = await svc.rpc('rate_limit_bump', { p_chave: `${escopo}:u:${userId}`, p_janela: janela })
-  if (error) {
-    console.error('[rate-limit] contador falhou, chamada liberada:', error.message)
+  let resposta: { data: unknown; error: { message: string } | null }
+  try {
+    resposta = await svc.rpc('rate_limit_bump', { p_chave: `${escopo}:u:${userId}`, p_janela: janela })
+  } catch (e) {
+    resposta = { data: null, error: { message: e instanceof Error ? e.message : String(e) } }
+  }
+  if (resposta.error) {
+    avisarContadorCego(escopo, userId, resposta.error.message)
     return false
   }
-  return Number(data) > max
+  return Number(resposta.data) > max
+}
+
+/**
+ * Fora do Next (scripts no Node puro) o import de `@sentry/nextjs` cai na
+ * versão CommonJS e `captureException` não vem como exportação nomeada — o
+ * mesmo cuidado de `lib/zapintel/ponte.ts`. Ali o log JSON basta.
+ */
+function avisarContadorCego(escopo: string, userId: string, mensagem: string) {
+  console.error(JSON.stringify({
+    evento: 'zapintel.rate_limit.falha', escopo, user_id: userId, erro: mensagem, liberado: true,
+  }))
+  if (typeof Sentry.captureException !== 'function') return
+  Sentry.captureException(new Error(`rate limit cego (${escopo}): ${mensagem}`), {
+    tags: { modulo: 'zapintel', escopo },
+    user: { id: userId },
+  })
 }

@@ -265,7 +265,7 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
        * ATÉ TRÊS TENTATIVAS, COM ESPERA CRESCENTE.
        *
        * No teste de 14/10, 2 de 3 chamadas pegaram "alta demanda" do Google
-       * (503). `perguntarIA` já tenta uma segunda vez após 2 s; num lote de
+       * (503). `perguntarIA` repete uma vez (o SDK da Anthropic); num lote de
        * quase duas mil chamadas isso não basta, e 5 falhas seguidas parariam
        * tudo por um pico que passa em segundos. 8 s e depois 25 s cobrem o
        * pico sem mascarar o que é permanente — cota esgotada ou chave

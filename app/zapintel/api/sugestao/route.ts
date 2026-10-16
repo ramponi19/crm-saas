@@ -42,13 +42,13 @@ import { perguntarIA } from '@/lib/zapintel/ia'
 export const dynamic = 'force-dynamic'
 
 /**
- * A função pode esperar até 45 s pelo provedor (ver `lib/zapintel/ia.ts`), e o
- * padrão da plataforma é menor que isso — sem esta linha a função morreria
- * antes do `fetch` desistir, e o log não diria por quê.
+ * A IA tem prazo total de 50 s (25 s por tentativa, uma repetição — ver
+ * `TIMEOUT_POR_TENTATIVA_MS` em `lib/zapintel/ia.ts`), e o resto é a leitura
+ * do banco. O Hobby permitiria até 300 s; 60 é escolha, não teto, e a razão
+ * está lá. Estourou o prazo, a tela recebe "A análise demorou demais".
  *
  * Não ameaça o teto de CPU da conta: no modelo da Vercel, função PARADA
- * esperando rede não é Active CPU. O que custa é processar, e aqui quem
- * processa é o Google.
+ * esperando rede não é Active CPU.
  */
 export const maxDuration = 60
 
@@ -126,7 +126,10 @@ export async function POST(req: Request) {
     'REGRAS, todas obrigatórias:',
     '- Escreva em português brasileiro informal e caloroso, como gente de loja fala.',
     '- No máximo 2 frases. É mensagem de WhatsApp, não e-mail.',
-    '- Trate a pessoa pelo primeiro nome.',
+    '- Trate a pessoa pelo primeiro nome. Se o nome for "Cliente", ele não é',
+    '  conhecido: não use nome nenhum (nada de "Oi, Cliente").',
+    '- Trechos como [CPF], [TELEFONE], [E-MAIL] ou [Nº] foram ocultados de',
+    '  propósito: não os escreva na mensagem nem tente adivinhar o que havia.',
     '- NUNCA invente preço, desconto, parcela, prazo ou condição que não esteja',
     '  escrito no contexto. Prometer o que a loja não disse cria dívida que',
     '  alguém vai ter que honrar ou desdizer.',

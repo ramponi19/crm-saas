@@ -116,8 +116,8 @@ export async function GET(req: Request) {
      * chave-geral do superadmin. Checá-las aqui custa a consulta que já
      * aconteceria de qualquer jeito, uma vez, em vez de uma função inteira.
      */
-    // A chave que importa é a do provedor do modelo CONFIGURADO: com um
-    // modelo `claude-` e só a chave do Google, a IA não responde nada.
+    // Desde 16/10 a IA do ZapIntel é só Anthropic: sem a chave dela, ou com
+    // um modelo configurado que não é `claude-`, ela não responde nada.
     const iaDisponivel = await iaDoCrmLigada()
 
     /**
