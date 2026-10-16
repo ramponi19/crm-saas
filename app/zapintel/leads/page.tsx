@@ -6,6 +6,7 @@ import { Search, ChevronLeft, ChevronRight, X, Clock, AlertTriangle, Sparkles, S
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
+import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAMILIAS_DE_OBJECAO, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 
@@ -110,7 +111,7 @@ export default function LeadsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `mudar` lê a URL atual; refazer o efeito por ela recomeçaria a pausa a cada render
   }, [digitado]);
 
-  const { dados, erro, aoVivo, carregando } = useRpcAoVivo<Lista>("zapintel_leads_lista", {
+  const { dados, erro, aoVivo, carregando, tentarDeNovo } = useRpcAoVivo<Lista>("zapintel_leads_lista", {
     p_filtros: filtros, p_ordem: ordem, p_pagina: pagina, p_por_pagina: 50,
     p_filial: lojaAtiva, p_empresa: empresa,
   }, empresa);
@@ -219,9 +220,7 @@ export default function LeadsPage() {
       </div>
 
       {erro && !dados && (
-        <div className="card lv-vazio"><AlertTriangle size={18} style={{ color: "var(--yellow)" }} />
-          {/loja fora/i.test(erro) ? "Esta loja não está no seu acesso. Escolha \"Toda a rede\" ou a sua loja no menu." : erro}
-        </div>
+        <div className="card lv-vazio"><ErroDeTela erro={erro} onTentar={tentarDeNovo} /></div>
       )}
       {!dados && !erro && <div className="card lv-osso" style={{ height: 420 }} />}
 

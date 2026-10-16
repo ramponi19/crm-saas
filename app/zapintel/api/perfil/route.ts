@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno, logFalhaFunilInterno, MENSAGEM_FALHA_FUNIL } from '@/lib/zapintel/ctx'
 import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a ficha de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, porId, nomeDaLoja } = await carregarConversas(db, empresaId, [id])
+  const { analisados, porId, nomeDaLoja, indisponivel } = await carregarConversas(db, empresaId, [id])
   const lead = analisados[0]
   const banco = porId.get(id)
   if (!lead || !banco || !lojaVisivel(acesso, banco.filial_id)) {
@@ -75,7 +75,14 @@ export async function POST(req: Request) {
     }
   }
 
-  if (await leadDeFunilInterno(db, empresaId, id)) {
+  // Não deu para checar: bloqueia (503). Liberar seria gastar IA com conversa
+  // da equipe justamente quando o banco está instável.
+  let interno: boolean
+  try { interno = await leadDeFunilInterno(db, empresaId, id) } catch (e) {
+    logFalhaFunilInterno('perfil', empresaId, id, e)
+    return NextResponse.json({ erro: MENSAGEM_FALHA_FUNIL }, { status: 503 })
+  }
+  if (interno) {
     return NextResponse.json({ erro: 'Conversa de funil interno (equipe ou candidatos) fica fora das análises do ZapIntel.' }, { status: 422 })
   }
 
@@ -90,18 +97,26 @@ export async function POST(req: Request) {
   // Comprou? Vem da ponte, não de palavra na conversa. O prompt recebe os dois
   // lados — o registro e a conversa — e é instruído a dizer quando divergem,
   // em vez de escolher um e calar o outro.
-  const { data: ponte } = await db
+  const { data: ponte, error: erroPonte } = await db
     .from('zapintel_venda_lead')
     .select('venda_id, dias_ate_venda')
     .eq('empresa_id', empresaId).eq('lead_id', id)
     .order('dias_ate_venda', { ascending: true })
     .limit(1).maybeSingle()
 
+  // Falhou ao ler? O prompt recebe "informação indisponível", nunca o padrão
+  // ("não há venda ligada"), que a IA leria como fato do CRM.
+  const faltou = [...indisponivel]
+  if (erroPonte) faltou.push('venda')
   let valorVenda: number | null = null
   if (ponte?.venda_id) {
-    const { data: venda } = await db
+    const { data: venda, error: erroVenda } = await db
       .from('vendas').select('valor_venda').eq('id', ponte.venda_id).maybeSingle()
+    if (erroVenda) faltou.push('valor_venda')
     valorVenda = venda?.valor_venda != null ? Number(venda.valor_venda) : null
+  }
+  if (faltou.length) {
+    console.error(JSON.stringify({ evento: 'zapintel.prompt.dado_indisponivel', rota: 'perfil', empresa_id: empresaId, lead_id: id, dados: faltou }))
   }
 
   const ficha = montarFicha(lead, {
@@ -123,6 +138,7 @@ export async function POST(req: Request) {
     temVendaRegistrada: !!ponte,
     valorVenda,
     diasAteVenda: (ponte?.dias_ate_venda as number | null) ?? null,
+    indisponivel: faltou,
   })
 
   if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })

@@ -44,6 +44,8 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
   /** Última mensagem que o AVISO anunciou (sem esperar a consulta). */
   const [mensagemAvisada, setMensagemAvisada] = useState<number | null>(null);
   const [atualizando, setAtualizando] = useState(false);
+  // Sobe a cada "Tentar de novo" da tela: refaz a busca inicial com as mesmas regras.
+  const [tentativa, setTentativa] = useState(0);
   const [supabase] = useState(() => createClient());
   const atrasado = useRef(false);
   /** Quando a última consulta começou — o teto de ritmo conta a partir daqui. */
@@ -101,7 +103,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     };
     tentar(0);
     return () => { vivo = false; if (espera) clearTimeout(espera); };
-  }, [supabase, rpc, chave]);
+  }, [supabase, rpc, chave, tentativa]);
 
   // O canal ao vivo. Só se inscreve quando sabe a empresa — vem do servidor
   // (contexto) ou, na falta dele, da própria resposta do banco.
@@ -147,8 +149,10 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     return () => document.removeEventListener("visibilitychange", voltar);
   }, [buscar]);
 
+  const tentarDeNovo = useCallback(() => { setErro(null); setTentativa((n) => n + 1); }, []);
+
   return {
-    dados, erro, aoVivo, ultimoAviso, atualizando, mensagemAvisada, supabase,
+    dados, erro, aoVivo, ultimoAviso, atualizando, mensagemAvisada, supabase, tentarDeNovo,
     /** Parâmetros novos pedidos e ainda sem resposta. */
     carregando: chaveDosDados !== chave,
   };

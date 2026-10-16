@@ -220,6 +220,34 @@ async function perguntarAnthropic(o: {
       evento: 'zapintel.ia.falha', motivo, origem: o.origem, modelo: o.modelo, ms: Date.now() - t0, ...extra,
     }))
 
+  /**
+   * TODA CHAMADA À ANTHROPIC VIRA UMA LINHA EM `assistente_uso` (17/10/2026).
+   *
+   * Antes, só a que voltava com texto: recusa, resposta vazia, timeout e erro da
+   * API sumiam da conta do superadmin — e algumas dessas a Anthropic cobra (a
+   * recusa e a resposta vazia vêm com `usage`). Agora grava no `finally`, com os
+   * tokens quando a resposta chegou e `null` quando não chegou (não dá para
+   * saber o que foi cobrado num timeout). Vale para as rotas e para o lote do
+   * script, que passam por aqui. Erro ao gravar não derruba a resposta: vai
+   * para o log (`zapintel.ia.uso_nao_gravado`).
+   */
+  let usoRecebido: Anthropic.Usage | null = null
+  const gravarUso = async () => {
+    const u = usoRecebido
+    try {
+      const { error } = await o.svc.from('assistente_uso').insert({
+        empresa_id: o.empresaId,
+        tokens_in: u ? (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) : null,
+        tokens_out: u ? u.output_tokens ?? null : null,
+      } as never) as { error: { message: string } | null }
+      if (error) throw new Error(error.message)
+    } catch (e) {
+      console.error(JSON.stringify({
+        evento: 'zapintel.ia.uso_nao_gravado', origem: o.origem, empresa_id: o.empresaId, erro: e instanceof Error ? e.message : String(e),
+      }))
+    }
+  }
+
   try {
     const r = await client.messages.create({
       model: o.modelo,
@@ -235,6 +263,7 @@ async function perguntarAnthropic(o: {
       })),
       output_config: { effort: 'low' },
     }, { signal: prazo })
+    usoRecebido = r.usage ?? null
 
     if (r.stop_reason === 'refusal') {
       falha('recusa', { categoria: r.stop_details?.category ?? null })
@@ -244,13 +273,6 @@ async function perguntarAnthropic(o: {
     const texto = r.content
       .map((b) => (b.type === 'text' ? b.text : ''))
       .join('')
-
-    const u = r.usage
-    await o.svc.from('assistente_uso').insert({
-      empresa_id: o.empresaId,
-      tokens_in: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
-      tokens_out: u.output_tokens ?? null,
-    } as never)
 
     // Parar em max_tokens antes de escrever texto também devolve vazio.
     if (!texto.trim()) {
@@ -283,5 +305,7 @@ async function perguntarAnthropic(o: {
       status: 500,
       erro: 'A IA está indisponível neste momento. Tente de novo em alguns minutos.',
     }
+  } finally {
+    await gravarUso()
   }
 }

@@ -62,7 +62,7 @@ export interface LeadDaLista {
 }
 
 export function useDashboardAoVivo(filial: number | null, empresa: number | null) {
-  const { dados, erro, aoVivo, ultimoAviso, atualizando, mensagemAvisada, supabase, carregando } =
+  const { dados, erro, aoVivo, ultimoAviso, atualizando, mensagemAvisada, supabase, carregando, tentarDeNovo } =
     useRpcAoVivo<Dashboard>("zapintel_dashboard", { p_filial: filial, p_empresa: empresa }, empresa);
 
   const lista = useCallback(async (tipo: string, valor?: string | null) => {
@@ -78,5 +78,5 @@ export function useDashboardAoVivo(filial: number | null, empresa: number | null
   const maior = Math.max(doBanco, mensagemAvisada ?? 0);
   const ultimaMensagem = maior ? new Date(maior).toISOString() : null;
 
-  return { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem, carregando };
+  return { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem, carregando, tentarDeNovo };
 }

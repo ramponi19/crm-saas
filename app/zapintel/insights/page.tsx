@@ -6,6 +6,7 @@ import { ArrowRight, AlertTriangle, Sparkles, Users, TrendingDown, Receipt, Hand
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
+import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import { num, ha } from "@/components/zapintel/rotulos";
 
 /**
@@ -60,7 +61,7 @@ export default function InsightsPage() {
   const pedido = busca.get("periodo") ?? "30";
   const periodo = PERIODOS.some(([v]) => v === pedido) ? pedido : "30";
   const dias = periodo === "tudo" ? null : Number(periodo) || 30;
-  const { dados, erro, aoVivo, carregando } = useRpcAoVivo<Insights>("zapintel_insights", {
+  const { dados, erro, aoVivo, carregando, tentarDeNovo } = useRpcAoVivo<Insights>("zapintel_insights", {
     p_dias: dias, p_filial: lojaAtiva, p_empresa: empresa,
   }, empresa);
 
@@ -105,9 +106,7 @@ export default function InsightsPage() {
       </header>
 
       {erro && !dados && (
-        <div className="card ins-vazio"><AlertTriangle size={16} style={{ color: "var(--yellow)" }} />
-          {/loja fora/i.test(erro) ? "Esta loja não está no seu acesso. Escolha \"Toda a rede\" ou a sua loja no menu." : erro}
-        </div>
+        <div className="card ins-vazio"><ErroDeTela erro={erro} onTentar={tentarDeNovo} /></div>
       )}
       {!dados && !erro && <div className="card ins-osso" style={{ height: 520 }} />}
 

@@ -4,6 +4,7 @@ import type { Ficha } from '@/lib/zapintel/ficha'
 import type { Travou } from '@/lib/zapintel/travou'
 import { perguntarIA } from '@/lib/zapintel/ia'
 import { leadParaIA } from '@/lib/zapintel/mascara'
+import type { DadoIndisponivel } from '@/lib/zapintel/conversas'
 
 /**
  * A FICHA DO LEAD ESCRITA POR IA — tudo que a tela do lead afirma, acima do
@@ -231,6 +232,9 @@ function conversaEmTexto(lead: Lead, contato: string): string {
  * afirmava "cliente" por palavra na conversa enquanto a tabela de vendas dizia
  * outra coisa.
  */
+/** O que vai no prompt quando um dado do CRM não pôde ser lido. */
+export const INDISPONIVEL = 'informação indisponível'
+
 export function contextoDoPerfil(opts: {
   lead: Lead
   ficha: Ficha
@@ -240,8 +244,16 @@ export function contextoDoPerfil(opts: {
   temVendaRegistrada: boolean
   valorVenda: number | null
   diasAteVenda: number | null
+  /**
+   * Dados do CRM que não deu para ler (17/10/2026). O prompt diz "informação
+   * indisponível" — nunca o padrão, que a IA leria como fato ("não há venda
+   * ligada", "Loja: Loja").
+   */
+  indisponivel?: readonly DadoIndisponivel[]
 }): string {
-  const { ficha, travou, nomeDaLoja, kanban, temVendaRegistrada } = opts
+  const { ficha, travou, kanban, temVendaRegistrada } = opts
+  const falta = (d: DadoIndisponivel) => !!opts.indisponivel?.includes(d)
+  const nomeDaLoja = falta('empresa') ? INDISPONIVEL : opts.nomeDaLoja
   // O que vai à IA é a CÓPIA mascarada: primeiro nome e sem CPF, telefone,
   // e-mail, cartão nem número da casa. Ver `lib/zapintel/mascara.ts`.
   const lead = leadParaIA(opts.lead)
@@ -258,13 +270,16 @@ export function contextoDoPerfil(opts: {
      * um vendedor chamado Loja. Quando há nome de verdade na conversa (nesta
      * aparecem "Pedro aqui da JM" e "Luiz Felipe aqui"), a IA o lê de lá.
      */
-    f.vendedor && f.vendedor !== 'Loja' ? `Quem atendeu: ${f.vendedor}` : '',
+    falta('responsaveis') ? `Quem atendeu: ${INDISPONIVEL}`
+      : f.vendedor && f.vendedor !== 'Loja' ? `Quem atendeu: ${f.vendedor}` : '',
     kanban ? `Etapa no funil do CRM (movida por uma pessoa): ${kanban}` : '',
     `Primeira mensagem: ${data(f.primeiraEm)} · Última: ${data(f.ultimaEm)}`,
     `${f.mensagensLead + f.mensagensLoja} mensagens — ${f.mensagensLead} do cliente, ${f.mensagensLoja} da loja`,
     `Sem falar há ${f.diasInativo} dia(s)`,
-    temVendaRegistrada
-      ? `VENDA REGISTRADA NO CRM: sim${opts.valorVenda ? `, R$ ${opts.valorVenda.toLocaleString('pt-BR')}` : ''}${opts.diasAteVenda != null ? `, ${opts.diasAteVenda} dias após o primeiro contato` : ''}`
+    falta('venda')
+      ? `VENDA REGISTRADA NO CRM: ${INDISPONIVEL} — o sistema não respondeu a esta consulta; não afirme que houve venda nem que não houve`
+      : temVendaRegistrada
+      ? `VENDA REGISTRADA NO CRM: sim${falta('valor_venda') ? `, valor: ${INDISPONIVEL}` : opts.valorVenda ? `, R$ ${opts.valorVenda.toLocaleString('pt-BR')}` : ''}${opts.diasAteVenda != null ? `, ${opts.diasAteVenda} dias após o primeiro contato` : ''}`
       : 'VENDA REGISTRADA NO CRM: não há venda ligada a este lead no sistema',
   ].filter(Boolean)
 
@@ -566,11 +581,13 @@ export async function gerarPerfil(opts: {
   diasAteVenda: number | null
   /** Modelo desta chamada por cima do configurado. Ver `perguntarIA`. */
   modelo?: string
+  /** O que do CRM não deu para ler — ver `contextoDoPerfil`. */
+  indisponivel?: readonly DadoIndisponivel[]
 }): Promise<ResultadoPerfil> {
   const t0 = Date.now()
   const r = await perguntarIA({
     empresaId: opts.empresaId,
-    system: regras(opts.nomeDaLoja),
+    system: regras(opts.indisponivel?.includes('empresa') ? 'uma loja' : opts.nomeDaLoja),
     mensagens: [{ role: 'user', content: contextoDoPerfil(opts) }],
     origem: 'perfil',
     modelo: opts.modelo,

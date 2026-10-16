@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
+import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
+import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
 import type { Classe } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, num, ha } from "@/components/zapintel/rotulos";
 
@@ -95,7 +97,7 @@ export default function AtendimentoPage() {
   const pedido = busca.get("periodo") ?? "30";
   const periodo = PERIODOS.some(([v]) => v === pedido) ? pedido : "30";
   const dias = periodo === "tudo" ? null : Number(periodo) || 30;
-  const { dados, erro, aoVivo, carregando } = useRpcAoVivo<Atendimento>("zapintel_atendimento", {
+  const { dados, erro, aoVivo, carregando, tentarDeNovo } = useRpcAoVivo<Atendimento>("zapintel_atendimento", {
     p_dias: dias, p_filial: lojaAtiva, p_empresa: empresa,
   }, empresa);
 
@@ -138,9 +140,7 @@ export default function AtendimentoPage() {
       </header>
 
       {erro && !dados && (
-        <div className="card at-vazio"><AlertTriangle size={16} style={{ color: "var(--yellow)" }} />
-          {/loja fora/i.test(erro) ? "Esta loja não está no seu acesso. Escolha \"Toda a rede\" ou a sua loja no menu." : erro}
-        </div>
+        <div className="card at-vazio"><ErroDeTela erro={erro} onTentar={tentarDeNovo} /></div>
       )}
       {!dados && !erro && <div className="card at-osso" style={{ height: 520 }} />}
 
@@ -397,7 +397,7 @@ function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: numb
     createClient().rpc("zapintel_conversa" as never, { p_dias: diasConta, p_filial: loja, p_empresa: empresa, p_recalcular } as never)
       .then(({ data, error }) => {
         if (!vivo) return;
-        if (error) setErro(/timeout|canceling/i.test(error.message) ? "A conta demorou demais. Tente 7 dias." : error.message);
+        if (error) setErro(/timeout|canceling|57014/i.test(error.message) ? "A conta demorou demais. Tente 7 dias." : mensagemDeErroDeTela(error.message));
         else { setD(data as unknown as Conversa); setErro(null); }
         setCarregando(false);
       });

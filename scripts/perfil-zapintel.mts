@@ -30,6 +30,7 @@ import { createClient } from '@supabase/supabase-js'
 import { carregarConversas } from '../lib/zapintel/conversas'
 import { montarFicha } from '../lib/zapintel/ficha'
 import { ondeTravou } from '../lib/zapintel/travou'
+import { leadDeFunilInterno } from '../lib/zapintel/funil-interno'
 import {
   contextoDoPerfil, gerarPerfil, guardarPerfil, lerPerfil, marcaDaConversa,
 } from '../lib/zapintel/perfil'
@@ -78,6 +79,11 @@ const { analisados, porId, nomeDaLoja } = await carregarConversas(db, EMPRESA, [
 const lead = analisados[0]
 const banco = porId.get(LEAD)
 if (!lead || !banco) { console.error('conversa nao encontrada'); process.exit(1) }
+
+// O mesmo critério da rota (que responde 422): conversa de funil interno —
+// equipe, candidatos — fica fora das análises. Sem conseguir checar, também para.
+const interno = await leadDeFunilInterno(db, EMPRESA, LEAD).catch((e: Error) => { console.error(`nao consegui checar o funil interno: ${e.message}`); process.exit(1) })
+if (interno) { console.error(`lead ${LEAD} e de funil interno: fica fora das analises do ZapIntel (a rota responderia 422)`); process.exit(1) }
 
 const { data: ponte } = await db
   .from('zapintel_venda_lead').select('venda_id, dias_ate_venda')
@@ -252,6 +258,14 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
       const id = Number(String(a.id).replace('lead-', ''))
       const banco = porId.get(id)!
       const marca = marcaDaConversa(a)
+
+      // Funil interno fica fora, como na rota (422). Falha ao checar também pula.
+      const interno = await leadDeFunilInterno(db, empresaId, id).catch(() => null)
+      if (interno !== false) {
+        console.log(`  ${id}: pulado — ${interno ? 'funil interno' : 'não deu para checar o funil interno'}`)
+        pulados++
+        return
+      }
 
       const guardado = await lerPerfil(db, empresaId, id, marca)
       if (guardado?.atual) { pulados++; return }

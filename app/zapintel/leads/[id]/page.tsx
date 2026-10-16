@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Check, AlertTriangle, ExternalLink, MessageSquareText, Clock } from "lucide-react";
+import { ArrowLeft, Copy, Check, AlertTriangle, ExternalLink, MessageSquareText, Clock, RefreshCw } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../../providers";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "@/hooks/zapintel/canalZapintel";
 import { CLASSE, corDoTexto, URG, num } from "@/components/zapintel/rotulos";
 import { AnaliseDeIA } from "@/components/zapintel/analise-de-ia";
+import { mensagemPorStatus, mensagemDeErroDeTela, TEXTOS_DE_ERRO } from "@/lib/zapintel/mensagem-erro";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
@@ -53,7 +54,9 @@ export default function FichaDoLead() {
   const [guardado, setGuardado] = useState<Guardado | null>(null);
   const [iaLigada, setIaLigada] = useState(true);
   const [funilInterno, setFunilInterno] = useState(false);
-  const [falhou, setFalhou] = useState(false);
+  /** Por que a ficha não abriu — a frase já pronta para a tela; vazio enquanto carrega. */
+  const [falhou, setFalhou] = useState("");
+  const [tentativa, setTentativa] = useState(0);
 
   const [analisando, setAnalisando] = useState(false);
   const [erroIA, setErroIA] = useState("");
@@ -64,10 +67,12 @@ export default function FichaDoLead() {
   const carregar = useCallback((vivo: () => boolean) => {
     if (!leadNum) return;
     fetch(`/zapintel/api/conversa?lead=${leadNum}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
+      .then(async (r) => ({ r, d: await r.json().catch(() => null) }))
+      .then(({ r, d }) => {
         if (!vivo()) return;
-        if (!d?.lead) { setFalhou(true); return; }
+        if (!r.ok) { setFalhou(mensagemPorStatus(r.status, d?.erro)); return; }
+        if (!d?.lead) { setFalhou(TEXTOS_DE_ERRO.leadNaoEncontrado); return; }
+        setFalhou("");
         setLead(d.lead as Lead);
         setFicha((d.ficha as Ficha) ?? null);
         setTravou((d.travou as TravouComTrecho) ?? null);
@@ -75,14 +80,14 @@ export default function FichaDoLead() {
         setIaLigada(d.iaDisponivel !== false);
         setFunilInterno(d.funilInterno === true);
       })
-      .catch(() => { if (vivo()) setFalhou(true); });
+      .catch((e) => { if (vivo()) setFalhou(mensagemDeErroDeTela(e)); });
   }, [leadNum]);
 
   useEffect(() => {
     let vivo = true;
     carregar(() => vivo);
     return () => { vivo = false; };
-  }, [carregar]);
+  }, [carregar, tentativa]);
 
   // Ao vivo: só quando o aviso do banco traz ESTE lead (mensagem nova ou
   // análise refeita). A loja recebe ~240 mensagens por hora; recarregar a cada
@@ -114,13 +119,13 @@ export default function FichaDoLead() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead: leadNum, forcar }),
       });
-      const d = await r.json();
-      if (!r.ok) setErroIA(d?.erro || "Não consegui analisar agora.");
+      const d = await r.json().catch(() => null);
+      if (!r.ok) setErroIA(mensagemPorStatus(r.status, d?.erro));
       else if (d?.perfil) {
         setGuardado({ perfil: d.perfil as PerfilIA, atual: true, geradoEm: String(d.geradoEm || new Date().toISOString()), mensagensNaFicha: lead?.totalMessages });
         window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: leadNum }));
       }
-    } catch { setErroIA("Não consegui analisar agora."); }
+    } catch (e) { setErroIA(mensagemDeErroDeTela(e)); }
     setAnalisando(false);
   }
 
@@ -132,10 +137,10 @@ export default function FichaDoLead() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead: leadNum }),
       });
-      const d = await r.json();
-      if (!r.ok) setErroSugestao(d?.erro || "Não consegui escrever agora.");
+      const d = await r.json().catch(() => null);
+      if (!r.ok) setErroSugestao(mensagemPorStatus(r.status, d?.erro));
       else setSugestao(String(d?.mensagem || ""));
-    } catch { setErroSugestao("Não consegui escrever agora."); }
+    } catch (e) { setErroSugestao(mensagemDeErroDeTela(e)); }
     setSugerindo(false);
   }
 
@@ -146,9 +151,20 @@ export default function FichaDoLead() {
       <div className="fc">
         <style>{CSS}</style>
         <button className="fc-voltar" onClick={() => router.back()}><ArrowLeft size={14} /> Voltar</button>
-        {falhou || !leadNum
-          ? <div className="card fc-vazio">Lead não encontrado — ou ele não tem conversa.</div>
-          : <div className="card fc-osso" style={{ height: 420 }} />}
+        {!leadNum
+          ? <div className="card fc-vazio">{TEXTOS_DE_ERRO.leadNaoEncontrado}</div>
+          : falhou
+            ? (
+              <div className="card fc-vazio" role="alert">
+                <p>{falhou}</p>
+                {falhou !== TEXTOS_DE_ERRO.leadNaoEncontrado && falhou !== TEXTOS_DE_ERRO.leadSemAcesso && (
+                  <button className="fc-botao" style={{ marginTop: 12 }} onClick={() => { setFalhou(""); setTentativa((n) => n + 1); }}>
+                    <RefreshCw size={13} /> Tentar de novo
+                  </button>
+                )}
+              </div>
+            )
+            : <div className="card fc-osso" style={{ height: 420 }} />}
       </div>
     );
   }

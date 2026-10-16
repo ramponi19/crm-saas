@@ -28,6 +28,8 @@ mock.module('@/lib/zapintel/ctx', {
     zapintelAcesso: async () => estado.acesso,
     lojaVisivel: (a: { lojas: number[] }, f: number | null | undefined) => a.lojas.includes(Number(f ?? 0)),
     leadDeFunilInterno: async () => estado.interno,
+    logFalhaFunilInterno: () => {},
+    MENSAGEM_FALHA_FUNIL: 'Não foi possível confirmar se esta conversa é de funil interno. Tente de novo em instantes.',
   },
 })
 mock.module('@/lib/rate-limit', { namedExports: { excedeuLimiteDoUsuario: async () => estado.estourou } })
@@ -46,7 +48,7 @@ mock.module('@/lib/zapintel/conversas', {
     carregarConversas: async () => ({
       analisados: [{ id: `lead-${estado.lead.id}`, messages: [], crm: { filialId: estado.lead.filial_id } }],
       porId: new Map([[estado.lead.id, { id: estado.lead.id, filial_id: estado.lead.filial_id, origem: 'whatsapp', kanban_status: null }]]),
-      nomeDaLoja: 'Loja', segmento: 'varejo',
+      nomeDaLoja: 'Loja', segmento: 'varejo', indisponivel: [],
     }),
   },
 })

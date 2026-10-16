@@ -1,4 +1,12 @@
 /**
+ * ⚠ QUEBRADO EM PARTE — TODO(2026-10-17): consertar ou apagar na reconstrução do ZapIntel.
+ *
+ * Lê `t.objecao` (linha ~72), que saiu do tipo `Travou`: a coluna de objeção do
+ * relatório sai vazia. Achado pela checagem de compilação dos scripts em 17/10
+ * (o inventário daquele dia tinha marcado este script como funcionando, por
+ * leitura). Fica FORA de `tsconfig.scripts.json` até lá.
+ */
+/**
  * ONDE AS CONVERSAS TRAVARAM — a distribuição e as amostras.
  *
  * O ponto marcado dentro da conversa só vale se apontar para a mensagem CERTA.

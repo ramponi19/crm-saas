@@ -93,18 +93,6 @@ export function lojaVisivel(acesso: { lojas: number[] }, filialId: number | null
   return acesso.lojas.includes(Number(filialId ?? 0))
 }
 
-/**
- * O lead está num funil INTERNO (equipe, candidatos)? Regra de 15/10/2026
- * (supabase/funcoes/zapintel_funil_interno.sql): esses leads "ficam fora das
- * métricas e análises do ZapIntel". As telas já os escondiam; as rotas de IA
- * aceitavam o número direto e gastavam análise com conversa da equipe.
- */
-export async function leadDeFunilInterno(
-  db: import('@supabase/supabase-js').SupabaseClient, empresaId: number, leadId: number,
-): Promise<boolean> {
-  const { data: lead } = await db.from('leads').select('funil_id').eq('empresa_id', empresaId).eq('id', leadId).maybeSingle()
-  const funil = (lead as { funil_id: number | null } | null)?.funil_id
-  if (funil == null) return false
-  const { data: f } = await db.from('funis').select('interno').eq('id', funil).maybeSingle()
-  return !!(f as { interno: boolean } | null)?.interno
-}
+// A checagem de funil interno mora em `funil-interno.ts` (sem dependência do
+// Next, para o script de lote usar a mesma regra); reexportada aqui para as rotas.
+export { leadDeFunilInterno, FalhaFunilInterno, MENSAGEM_FALHA_FUNIL, logFalhaFunilInterno } from '@/lib/zapintel/funil-interno'
