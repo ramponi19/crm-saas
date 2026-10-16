@@ -9,6 +9,7 @@ import type { ScoreConfig } from '@/lib/lead-score'
 import { TermometroLeads } from './termometro-leads'
 import { LeadsParados, type LeadParado } from './leads-parados'
 import { diasParado, DIAS_PARADO } from '@/lib/lead-parado'
+import { formatarHora, formatarDiaMes, meiaNoiteSP } from '@/lib/datas'
 
 type LeadRow = {
   id: number; nome: string | null; kanban_status: string | null; origem: string | null
@@ -18,8 +19,9 @@ type LeadRow = {
 }
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+// Componente de servidor: sem o fuso da loja, a hora da visita saía em UTC (3h adiantada).
+const hora = (iso: string) => formatarHora(iso)
+const diaMes = (iso: string) => formatarDiaMes(iso)
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 /** Janela dos "próximos compromissos" — hoje mais os dias seguintes. */
@@ -76,10 +78,10 @@ export default async function DashboardImob() {
     .eq('empresa_id', empresaId).eq('ativo', true)
   if (!isGestor) q = q.eq('responsavel_id', user.id)
 
-  // janela de "hoje" (local) e a dos próximos dias, para a agenda do cockpit
+  // janela de "hoje" (no calendário da loja) e a dos próximos dias, para a agenda do cockpit
   const agora = new Date()
-  const iniHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString()
-  const fimJanela = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + DIAS_AGENDA).toISOString()
+  const iniHoje = meiaNoiteSP(agora).toISOString()
+  const fimJanela = meiaNoiteSP(agora, DIAS_AGENDA).toISOString()
 
   let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome), imoveis(codigo, titulo)')
     .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimJanela).order('data_hora').limit(8)

@@ -70,3 +70,79 @@ export function formatarData(
 export function formatarDiaMes(valor: string | Date | null | undefined, vazio = ''): string {
   return formatarData(valor, { day: '2-digit', month: '2-digit' }, vazio)
 }
+
+/** Hora e minuto no fuso da loja (`14:05`) — igual no servidor e no navegador. */
+export function formatarHora(valor: string | Date | null | undefined, vazio = ''): string {
+  const d = paraData(valor)
+  return d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO }) : vazio
+}
+
+/** Data e hora no fuso da loja (`16/10/2026, 14:05`). */
+export function formatarDataHora(
+  valor: string | Date | null | undefined,
+  opcoes: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+  vazio = '',
+): string {
+  const d = paraData(valor)
+  return d ? d.toLocaleString('pt-BR', { timeZone: FUSO, ...opcoes }) : vazio
+}
+
+/**
+ * O DIA E O MÊS DA LOJA, não do processo.
+ *
+ * O servidor da Vercel roda em UTC: lá, `getDate()`, `setHours(0, 0, 0, 0)` e
+ * `new Date(ano, mes, 1)` valem para Greenwich. Entre 21h e meia-noite de
+ * Brasília o servidor já está no dia seguinte, e o "início do mês" vira 21h do
+ * último dia do mês anterior — a venda das 22h do dia 31 entrava no mês errado.
+ * As funções abaixo calculam no fuso da loja em qualquer processo.
+ *
+ * Brasília está em UTC−3 fixo desde 2019 (sem horário de verão); é o
+ * deslocamento fixo que permite montar a meia-noite sem tabela de fuso.
+ */
+const DESLOCAMENTO_HORAS = 3
+
+const PARTES = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit' })
+
+/** Ano, mês (1–12) e dia do calendário de Brasília em que o instante cai. */
+export function partesSP(d: Date = new Date()): { ano: number; mes: number; dia: number } {
+  const p: Record<string, string> = {}
+  for (const x of PARTES.formatToParts(d)) p[x.type] = x.value
+  return { ano: Number(p.year), mes: Number(p.month), dia: Number(p.day) }
+}
+
+const doisDigitos = (n: number) => String(n).padStart(2, '0')
+
+/** `2026-10-16` — o dia de Brasília. Serve de chave e de valor de `<input type="date">`. */
+export function diaSP(d: Date = new Date()): string {
+  const { ano, mes, dia } = partesSP(d)
+  return `${ano}-${doisDigitos(mes)}-${doisDigitos(dia)}`
+}
+
+/** `2026-10` — o mês de Brasília. Mesmo formato de `metas_comissoes.mes_ano`. */
+export function mesSP(d: Date = new Date()): string {
+  const { ano, mes } = partesSP(d)
+  return `${ano}-${doisDigitos(mes)}`
+}
+
+/**
+ * O instante da meia-noite de Brasília de um dia (`YYYY-MM-DD` ou o dia em que
+ * o instante cai), somando `dias` — negativo volta. Limite de período para
+ * consulta: `gte(meiaNoiteSP())` é "de hoje"; `lt(meiaNoiteSP(hoje, 1))`, "até hoje".
+ */
+export function meiaNoiteSP(dia: string | Date = new Date(), dias = 0): Date {
+  const { ano, mes, dia: d } = typeof dia === 'string'
+    ? (() => { const [a, m, x] = dia.split('-').map(Number); return { ano: a, mes: m, dia: x } })()
+    : partesSP(dia)
+  return new Date(Date.UTC(ano, mes - 1, d + dias, DESLOCAMENTO_HORAS))
+}
+
+/** Meia-noite do dia 1º do mês de Brasília, somando `meses` — negativo volta. */
+export function inicioMesSP(d: Date = new Date(), meses = 0): Date {
+  const { ano, mes } = partesSP(d)
+  return new Date(Date.UTC(ano, mes - 1 + meses, 1, DESLOCAMENTO_HORAS))
+}
+
+/** Meia-noite de 1º de janeiro do ano de Brasília. */
+export function inicioAnoSP(d: Date = new Date()): Date {
+  return new Date(Date.UTC(partesSP(d).ano, 0, 1, DESLOCAMENTO_HORAS))
+}
