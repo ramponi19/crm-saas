@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
 interface ItemOrc { descricao?: string; qtd?: number; valor?: number }
@@ -70,6 +71,21 @@ export async function POST(req: Request) {
     clienteId = cli?.id ?? null
   }
 
+  /**
+   * O lead tambem e conferido, como o cliente. A aprovacao pelo link le o
+   * `responsavel_id` desse lead com service role para dar a venda a um vendedor:
+   * com um lead de outro tenant, a venda desta loja saia no ranking e na comissao
+   * de alguem de outra empresa. Conferido com service role filtrando a empresa,
+   * e nao com a sessao, porque a RLS de leads filtra pela LOJA do seletor e um
+   * admin com outra loja aberta perderia o vinculo legitimo.
+   */
+  let leadId: number | null = null
+  if (b.lead_id != null) {
+    const { data: ld } = await createServiceClient().from('leads')
+      .select('id').eq('id', b.lead_id).eq('empresa_id', empresaId).maybeSingle()
+    leadId = ld?.id ?? null
+  }
+
   const itens = (b.itens ?? [])
     .map((i) => ({ descricao: (i.descricao || '').trim(), qtd: Math.max(1, Number(i.qtd) || 1), valor: Math.max(0, Number(i.valor) || 0) }))
     .filter((i) => i.descricao)
@@ -83,8 +99,12 @@ export async function POST(req: Request) {
   // `total` = o que o CLIENTE paga · `devolver` = o que a LOJA acerta com ele.
   // Exclusivos: um dos dois é sempre zero. Guardar os dois separados, em vez de
   // um número com sinal, evita total negativo vazando para relatório e venda.
+  // Preco do novo e valor do usado nunca negativos: um negativo inflava o total
+  // (entrada) ou criava um "devolver" que vira despesa no Financeiro (novo).
+  const valorNovo = Math.max(0, Number(b.valor_novo) || 0)
+  const valorEntrada = Math.max(0, Number(b.valor_entrada) || 0)
   const saldo = tipo === 'downgrade'
-    ? (Number(b.valor_novo) || 0) + itensTotal - (Number(b.valor_entrada) || 0)
+    ? valorNovo + itensTotal - valorEntrada
     : itensTotal
   const total = Math.max(0, saldo)
   const devolver = tipo === 'downgrade' ? Math.max(0, -saldo) : 0
@@ -99,7 +119,7 @@ export async function POST(req: Request) {
 
   const dados = {
     empresa_id: empresaId,
-    lead_id: b.lead_id ?? null,
+    lead_id: leadId,
     cliente_nome: nome,
     cliente_telefone: b.cliente_telefone?.trim() || null,
     cliente_id: clienteId,
@@ -111,9 +131,9 @@ export async function POST(req: Request) {
     garantia_dias: b.garantia_dias != null ? Math.max(0, Number(b.garantia_dias) || 0) : null,
     itens: itens as never,
     aparelho_novo: b.aparelho_novo?.trim() || null,
-    valor_novo: tipo === 'downgrade' ? (Number(b.valor_novo) || 0) : null,
+    valor_novo: tipo === 'downgrade' ? valorNovo : null,
     aparelho_usado: b.aparelho_usado?.trim() || null,
-    valor_entrada: tipo === 'downgrade' ? (Number(b.valor_entrada) || 0) : null,
+    valor_entrada: tipo === 'downgrade' ? valorEntrada : null,
     /**
      * A unidade do estoque agora vale para DOWNGRADE também.
      *
@@ -141,9 +161,23 @@ export async function POST(req: Request) {
 
   if (b.id) {
     const patch = statusEnviado ? { ...dados, status: statusEnviado } : dados
-    const { data, error } = await supabase.from('orcamentos').update(patch).eq('id', b.id).select('id, token').single()
+    /**
+     * Orcamento APROVADO nao muda mais. A aprovacao ja gerou a venda (e, na venda
+     * por link, deu baixa no estoque) com os itens e o total daquele momento;
+     * editar depois deixava orcamento e venda contando historias diferentes.
+     */
+    const { data, error } = await supabase.from('orcamentos').update(patch)
+      .eq('id', b.id).eq('empresa_id', empresaId).is('aprovado_em', null)
+      .select('id, token').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, id: b.id, token: data?.token })
+    if (!data) {
+      const { data: existe } = await supabase.from('orcamentos').select('aprovado_em')
+        .eq('id', b.id).eq('empresa_id', empresaId).maybeSingle()
+      return existe
+        ? NextResponse.json({ error: 'Orçamento já aprovado — crie um novo para mudar valores.' }, { status: 409 })
+        : NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 })
+    }
+    return NextResponse.json({ ok: true, id: b.id, token: data.token })
   }
   // `usuario_id` só na CRIAÇÃO: é o dono do orçamento, e o escopo por vendedor
   // depende dele. Na edição o dono não muda — senão o admin que corrigisse uma

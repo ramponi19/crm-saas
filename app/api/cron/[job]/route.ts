@@ -213,8 +213,12 @@ export async function GET(
 
         // Regra 3 — confirmação D-1: consultas/visitas de AMANHÃ → tarefa de confirmar
         // (útil p/ saúde e imob; varejo não tem visitas, então não gera ruído).
-        const amanhaIni = new Date(now); amanhaIni.setDate(now.getDate() + 1); amanhaIni.setHours(0, 0, 0, 0)
-        const amanhaFim = new Date(amanhaIni); amanhaFim.setHours(23, 59, 59, 999)
+        // "Amanha" no dia de BRASILIA. Com setHours no servidor (UTC na Vercel) a
+        // janela ia das 21h de hoje as 20h59 de amanha, e consulta de amanha a noite
+        // ficava sem confirmacao. Brasil nao tem horario de verao desde 2019: -03:00.
+        const hojeSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now)
+        const amanhaIni = new Date(`${hojeSP}T00:00:00-03:00`); amanhaIni.setUTCDate(amanhaIni.getUTCDate() + 1)
+        const amanhaFim = new Date(amanhaIni.getTime() + 86400000 - 1)
         const { data: consultasAmanha } = await supabase
           .from('visitas')
           .select('id, empresa_id, lead_id, corretor_id, data_hora, status, leads(nome, responsavel_id)')
@@ -225,7 +229,7 @@ export async function GET(
           if (!v.lead_id || desativadas.has(v.empresa_id)) continue
           if (['realizada', 'cancelada'].includes(v.status ?? '')) continue
           const lead = one(v.leads)
-          const quando = new Date(v.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+          const quando = new Date(v.data_hora).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
           criadas += await gerar({
             empresaId: v.empresa_id, leadId: v.lead_id, responsavelId: lead?.responsavel_id ?? v.corretor_id,
             regra: 'confirmacao_d1', chave: `confirmacao_d1:visita:${v.id}`,

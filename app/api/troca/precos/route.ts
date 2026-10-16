@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { AVARIA_POR_CHAVE } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
+import { getEmpresaRole } from '@/lib/owner'
 
 /**
  * Grava a matriz de troca — uma LINHA por vez (modelo + armazenamento).
@@ -72,6 +73,24 @@ export async function POST(req: Request) {
   for (const [chave, valor] of Object.entries(descontosPatch)) {
     if (valor == null) delete descontos[chave]   // limpar a célula = tirar a chave
     else descontos[chave] = valor
+  }
+
+  /**
+   * Quem nao e dono nem admin so PREENCHE celula em branco.
+   *
+   * E a regra que as telas de atendimento descrevem ("o campo em branco e editavel
+   * no lugar; a matriz se preenche pelo uso"), mas so a tela a aplicava. Pela rota,
+   * um vendedor subia o valor de um modelo ja avaliado e em seguida gravava a
+   * cotacao — que recalcula do zero, a partir da tabela que ele acabou de mudar.
+   */
+  const papel = await getEmpresaRole()
+  if (papel !== 'owner' && papel !== 'admin') {
+    const descAtuais = (atual?.descontos ?? {}) as Record<string, number>
+    const mexeBase = 'na_troca' in b && atual?.na_troca != null
+    const mexeDesconto = Object.keys(descontosPatch).some((k) => k in descAtuais)
+    if (mexeBase || mexeDesconto) {
+      return NextResponse.json({ error: 'Só o dono ou um administrador altera um valor já preenchido.' }, { status: 403 })
+    }
   }
 
   const naTroca = 'na_troca' in b ? valorOuNulo(b.na_troca) : (atual?.na_troca ?? null)

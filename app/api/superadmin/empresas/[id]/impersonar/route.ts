@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
+import { mesmaOrigem } from '@/lib/mesma-origem'
 
 const IMPERSONATE_COOKIE = 'impersonating_empresa_id'
 
@@ -14,6 +15,9 @@ export async function POST(
   if (!Number.isFinite(empresaId)) {
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   }
+
+  // Entrar num tenant e acao de alto impacto: so de uma pagina deste site.
+  if (!mesmaOrigem(req)) return NextResponse.json({ error: 'Origem não permitida' }, { status: 403 })
 
   const ctx = await requireSuperAdminApi()
   if (ctx.error) return ctx.error
@@ -30,12 +34,6 @@ export async function POST(
     return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
   }
 
-  await logSuperAdminAction({
-    adminUserId: userId,
-    empresaId,
-    acao: 'impersonar',
-    detalhes: { empresa_nome: empresa.nome },
-  })
 
   // Persistir a empresa impersonada — fonte de verdade para o RLS (get_empresa_id
   // considera isto quando o usuário é super admin). Via RPC SECURITY DEFINER
@@ -54,6 +52,15 @@ export async function POST(
   if (updErr) {
     return NextResponse.json({ error: `Falha ao iniciar impersonação: ${updErr.message}` }, { status: 500 })
   }
+
+  // O log vem DEPOIS da RPC: antes ele era gravado primeiro, e uma falha da RPC
+  // deixava na auditoria uma impersonacao que nao aconteceu.
+  await logSuperAdminAction({
+    adminUserId: userId,
+    empresaId,
+    acao: 'impersonar',
+    detalhes: { empresa_nome: empresa.nome },
+  })
 
   const res = NextResponse.json({ ok: true, empresa: empresa.nome })
   res.cookies.set(IMPERSONATE_COOKIE, String(empresaId), {
@@ -103,11 +110,15 @@ export async function DELETE() {
       )
     }
 
-    await logSuperAdminAction({
-      adminUserId: user.id,
-      empresaId: usuario?.impersonando_empresa_id ?? null,
-      acao: 'encerrar_impersonacao',
-    })
+    // So registra quem de fato estava dentro de um tenant. Antes qualquer usuario
+    // logado chamava este DELETE e gravava "encerrar_impersonacao" na auditoria.
+    if (usuario?.impersonando_empresa_id) {
+      await logSuperAdminAction({
+        adminUserId: user.id,
+        empresaId: usuario.impersonando_empresa_id,
+        acao: 'encerrar_impersonacao',
+      })
+    }
   }
 
   const res = NextResponse.json({ ok: true })

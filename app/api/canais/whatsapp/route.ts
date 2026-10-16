@@ -113,9 +113,24 @@ export async function POST(req: Request) {
      */
     const [{ data: lojaSel }, { data: jaExistia }] = await Promise.all([
       supabase.rpc('filial_atual'),
-      svc.from('canais_conectados').select('id')
+      svc.from('canais_conectados').select('id, empresa_id')
         .eq('tipo', 'whatsapp').eq('external_id', String(phoneNumberId)).maybeSingle(),
     ])
+
+    /**
+     * Numero ja conectado em OUTRA empresa e recusa explicita, como no Instagram.
+     *
+     * O upsert abaixo e por (tipo, external_id), e essa e a unica chave unica: com
+     * ela o upsert vira UPDATE e trocaria o `empresa_id` e o token do canal de
+     * outro tenant, sem erro nenhum. As mensagens dos clientes dele passariam a cair
+     * aqui. O `phoneNumberId` pode vir do corpo, entao nao basta confiar na Meta.
+     */
+    if (jaExistia && jaExistia.empresa_id !== empresaId) {
+      return NextResponse.json(
+        { error: 'Este número já está conectado em outra conta do sistema.' },
+        { status: 409 },
+      )
+    }
     const { data: canal, error: erroGravar } = await svc
       .from('canais_conectados')
       .upsert(

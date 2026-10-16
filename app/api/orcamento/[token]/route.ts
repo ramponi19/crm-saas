@@ -67,7 +67,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
        */
       let vendedorId: string | null = null
       if (orc.lead_id) {
-        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
+        const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).eq('empresa_id', orc.empresa_id).maybeSingle()
         vendedorId = lead?.responsavel_id ?? null
       }
       vendedorId = vendedorId ?? orc.usuario_id ?? null
@@ -180,7 +180,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       } else {
         let vendedorId: string | null = null
         if (orc.lead_id) {
-          const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).maybeSingle()
+          const { data: lead } = await svc.from('leads').select('responsavel_id').eq('id', orc.lead_id).eq('empresa_id', orc.empresa_id).maybeSingle()
           vendedorId = lead?.responsavel_id ?? null
         }
         // Ver a nota na ramificação do downgrade: sem lead, quem fez o orçamento leva.

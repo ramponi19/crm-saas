@@ -154,11 +154,22 @@ export async function POST(req: Request) {
      */
     const [{ data: lojaSel }, { data: jaExistiam }] = await Promise.all([
       supabase.rpc('filial_atual'),
-      svc.from('canais_conectados').select('tipo, external_id')
+      svc.from('canais_conectados').select('tipo, external_id, empresa_id')
         .in('external_id', linhas.map((l) => l.external_id)),
     ])
-    const existia = new Set(((jaExistiam ?? []) as { tipo: string; external_id: string }[])
-      .map((e) => e.tipo + ':' + e.external_id))
+    const doPedido = new Set(linhas.map((l) => l.tipo + ':' + l.external_id))
+    const anteriores = ((jaExistiam ?? []) as { tipo: string; external_id: string; empresa_id: number }[])
+      .filter((e) => doPedido.has(e.tipo + ':' + e.external_id))
+    const existia = new Set(anteriores.map((e) => e.tipo + ':' + e.external_id))
+
+    // Pagina ou Instagram ja conectado em OUTRA empresa: recusa, como em
+    // instagram/retorno. O upsert por (tipo, external_id) trocaria o dono do canal.
+    if (anteriores.some((e) => e.empresa_id !== empresaId)) {
+      return NextResponse.json(
+        { error: 'Esta Página já está conectada em outra conta do sistema.' },
+        { status: 409 },
+      )
+    }
 
     const { error } = await svc.from('canais_conectados')
       .upsert(linhas, { onConflict: 'tipo,external_id' })

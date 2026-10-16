@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { AVARIA_POR_CHAVE } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { familiasDeTroca } from '@/lib/troca-modelos'
+import { getEmpresaRole } from '@/lib/owner'
 
 /**
  * Aplica UM valor a UMA coluna em toda uma família de modelos.
@@ -40,6 +41,10 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
+  // Aplicar em bloco sobrescreve valores ja preenchidos da familia inteira: so
+  // dono ou admin (o vendedor so preenche celula em branco, em /api/troca/precos).
+  const papel = await getEmpresaRole()
+  if (papel !== 'owner' && papel !== 'admin') return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
   const b = (await req.json().catch(() => ({}))) as Body
   const avaria = (b.avaria || '').trim()

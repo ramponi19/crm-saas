@@ -45,7 +45,7 @@ export async function executarAcao(db: Db, empresaId: number, lead: LeadMin, aca
       corpo = render(tmpls[chave] ?? '', lead)
     }
     const titulo = `Enviar WhatsApp para ${lead.nome ?? 'lead'}${corpo ? `: ${corpo.slice(0, 140)}` : ''}`
-    await db.from('tarefas').insert({ empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo: 'ligacao', vencimento: nowIso })
+    await inserirTarefa(db, { empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo: 'ligacao', vencimento: nowIso })
     return
   }
 
@@ -54,7 +54,7 @@ export async function executarAcao(db: Db, empresaId: number, lead: LeadMin, aca
       .select('usuario_id').eq('empresa_id', empresaId).in('role', ['owner', 'admin']).eq('ativo', true).limit(1)
     const gestorId = (gestores?.[0] as { usuario_id: string } | undefined)?.usuario_id ?? lead.responsavel_id
     const titulo = render((config.titulo as string) || `Atenção com o lead ${lead.nome ?? ''}`, lead)
-    await db.from('tarefas').insert({ empresa_id: empresaId, lead_id: lead.id, responsavel_id: gestorId, titulo, tipo: 'ligacao', vencimento: nowIso })
+    await inserirTarefa(db, { empresa_id: empresaId, lead_id: lead.id, responsavel_id: gestorId, titulo, tipo: 'ligacao', vencimento: nowIso })
     return
   }
 
@@ -63,7 +63,20 @@ export async function executarAcao(db: Db, empresaId: number, lead: LeadMin, aca
   const tipo = (config.tipo as string) || 'ligacao'
   const prazoDias = Number(config.prazo_dias) || 0
   const vencimento = prazoDias > 0 ? new Date(Date.now() + prazoDias * 86400000).toISOString() : nowIso
-  await db.from('tarefas').insert({ empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo, vencimento })
+  await inserirTarefa(db, { empresa_id: empresaId, lead_id: lead.id, responsavel_id: lead.responsavel_id, titulo, tipo, vencimento })
+}
+
+/**
+ * Grava a tarefa e LANCA se o banco recusar.
+ *
+ * O erro do insert era ignorado: a tarefa nao nascia, mas quem chamou achava que
+ * sim. No cron isso era pior — a marca de "follow-up ja gerado" ficava gravada e
+ * o `catch` que a apagaria (para tentar de novo no dia seguinte) nunca rodava, e
+ * a contagem de disparos subia mesmo assim. Quem chama ja tem try/catch por acao.
+ */
+async function inserirTarefa(db: Db, tarefa: Record<string, unknown>) {
+  const { error } = await db.from('tarefas').insert(tarefa as never)
+  if (error) throw new Error(`tarefa nao gravada: ${error.message}`)
 }
 
 /** Dispara as automações de "entrou_na_etapa" ao mover um lead para `etapaSlug`. */

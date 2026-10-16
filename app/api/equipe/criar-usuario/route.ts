@@ -7,6 +7,20 @@ import { verificarLimite } from '@/lib/limites'
 // na criação da empresa e não pode ser concedido aqui.
 const ROLES_PERMITIDOS = ['admin', 'vendedor'] as const
 
+/**
+ * Mesma regra da rota atualizar-usuario: quem chama so concede papel ABAIXO do
+ * proprio. Sem isso, um admin criava outros admins (ou readmitia um ex-vendedor
+ * ja como admin) e, rebaixado depois, continuava entrando como admin por eles.
+ */
+const HIERARQUIA: Record<string, number> = { superadmin: 4, owner: 3, admin: 2, vendedor: 1, tecnico: 1 }
+
+/**
+ * E-mail aceito pela rota. Recusa `%` e `*`, que o filtro `ilike` abaixo leria
+ * como coringa (o PostgREST traduz `*` para `%`): com eles um admin descobria
+ * e-mails de OUTRAS empresas pela diferenca entre as respostas.
+ */
+const EMAIL_VALIDO = /^[^\s@%*]+@[^\s@%*]+\.[^\s@%*]+$/
+
 export async function POST(req: NextRequest) {
   const { nome, email, senha, role, filialId } = await req.json() as
     { nome?: string; email?: string; senha?: string; role?: string; filialId?: number | null }
@@ -17,6 +31,9 @@ export async function POST(req: NextRequest) {
   // verificacao em si continua a mesma, feita em tempo de execucao.
   if (!ROLES_PERMITIDOS.includes(role as (typeof ROLES_PERMITIDOS)[number]))
     return NextResponse.json({ error: 'Papel inválido' }, { status: 400 })
+
+  if (!EMAIL_VALIDO.test(String(email).trim()))
+    return NextResponse.json({ error: 'E-mail inválido' }, { status: 400 })
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -32,6 +49,7 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
+  let callerRole = 'superadmin'
   if (!usuarioAtual?.is_super_admin) {
     // Usuário normal: verifica vínculo e papel
     const { data: eu } = await supabase
@@ -44,7 +62,11 @@ export async function POST(req: NextRequest) {
 
     if (!eu || !['owner', 'admin'].includes(eu.role))
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+    callerRole = eu.role
   }
+
+  if ((HIERARQUIA[callerRole] ?? 0) <= (HIERARQUIA[role] ?? 0))
+    return NextResponse.json({ error: 'Sem permissão para conceder este papel' }, { status: 403 })
 
   /**
    * Loja onde a pessoa trabalha. Nula = sem loja definida (cai na principal).
@@ -81,8 +103,10 @@ export async function POST(req: NextRequest) {
   // "e-mail já registrado" e o dono ficaria sem caminho de volta. Aqui, e-mail
   // já conhecido com vínculo INATIVO nesta empresa reativa em vez de recusar.
   const emailNormalizado = String(email).trim().toLowerCase()
+  // `ilike` continua (e-mails antigos podem ter maiusculas), mas sem coringa:
+  // `%` e `*` ja foram recusados acima e `_` e escapado para valer so ele mesmo.
   const { data: existente } = await service
-    .from('usuarios').select('id').ilike('email', emailNormalizado).maybeSingle()
+    .from('usuarios').select('id').ilike('email', emailNormalizado.replace(/_/g, '\\_')).maybeSingle()
 
   if (existente?.id) {
     const { data: vinculo } = await service

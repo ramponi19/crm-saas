@@ -29,6 +29,13 @@ export async function POST(req: Request) {
   const escopo = b.escopo === 'equipe' ? 'equipe' : 'pessoa'
   const tipo = TIPOS.includes(b.tipo || '') ? b.tipo! : 'vendas'
   if (escopo === 'pessoa' && !b.usuario_id) return NextResponse.json({ error: 'Escolha a pessoa' }, { status: 400 })
+  // A pessoa precisa ser da equipe ativa: um uuid qualquer criava meta para
+  // alguem de outra empresa (ou inexistente), lixo que entrava no ranking.
+  if (escopo === 'pessoa') {
+    const { data: membro } = await supabase.from('empresa_usuarios').select('usuario_id')
+      .eq('empresa_id', empresaId).eq('usuario_id', b.usuario_id!).eq('ativo', true).maybeSingle()
+    if (!membro) return NextResponse.json({ error: 'Pessoa não encontrada na equipe' }, { status: 404 })
+  }
 
   const { error } = await supabase.from('metas').insert({
     empresa_id: empresaId, escopo, usuario_id: escopo === 'equipe' ? null : b.usuario_id, tipo,

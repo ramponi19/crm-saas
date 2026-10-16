@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
+import { getEmpresaRole } from '@/lib/owner'
 
 /**
  * As duas regras da loja: o bônus e o corte de bateria.
@@ -21,6 +22,10 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
+  // O bonus e o corte valem para TODA cotacao da loja: e regra do dono, nao do
+  // atendimento. Antes qualquer usuario logado mudava os dois.
+  const papel = await getEmpresaRole()
+  if (papel !== 'owner' && papel !== 'admin') return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
   const b = (await req.json().catch(() => ({}))) as Body
 

@@ -91,9 +91,26 @@ export async function distribuirExistente(
   // `responsavel_desde` é o marco do prazo de devolução. Sem gravá-lo, um lead
   // ANTIGO distribuído agora seria medido pela data de criação e nasceria com o
   // prazo já estourado — devolvido no primeiro ciclo, sem ninguém ter falhado.
-  await svc.from('leads')
+  /**
+   * Claim atomico: so atribui se o lead AINDA estiver sem dono.
+   *
+   * O `responsavel_id` acima foi lido antes; entre a leitura e esta escrita, outra
+   * distribuicao (a esteira do admin rodando junto com a do cadastro) ou alguem
+   * pegando o lead a mao pode te-lo atribuido. Sem a condicao, o segundo update
+   * trocava o dono e gravava duas atribuicoes.
+   */
+  const { data: pegou, error: ePegou } = await svc.from('leads')
     .update({ responsavel_id: escolhido, responsavel_desde: new Date().toISOString() })
-    .eq('id', lead.id)
+    .eq('id', lead.id).eq('empresa_id', empresaId).is('responsavel_id', null)
+    .select('id').maybeSingle()
+  // Falha de escrita = nao atribuido (null), como ja era "ninguem disponivel":
+  // a esteira do admin segue para os proximos leads em vez de parar no primeiro.
+  if (ePegou) return null
+  if (!pegou) {
+    const { data: atual } = await svc.from('leads').select('responsavel_id')
+      .eq('id', lead.id).eq('empresa_id', empresaId).maybeSingle()
+    return (atual?.responsavel_id as string | null | undefined) ?? null
+  }
   await svc.from('lead_atribuicoes').insert({
     empresa_id: empresaId, lead_id: lead.id, de_responsavel: null, para_responsavel: escolhido, por_usuario: null, acao: 'distribuir',
   })

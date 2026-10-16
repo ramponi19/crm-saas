@@ -48,18 +48,60 @@ export async function POST(req: Request) {
   // Lead atual (RLS garante que é da empresa do usuário).
   const { data: leadAtual } = await supabase
     .from('leads')
-    .select('id, nome, telefone, responsavel_id, kanban_status')
+    .select('id, nome, telefone, responsavel_id, kanban_status, funil_id, motivo_perda_id, perdido_em')
     .eq('id', body.leadId)
     .maybeSingle()
   if (!leadAtual) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
+
+  /**
+   * A etapa de destino precisa existir no funil do lead.
+   *
+   * Antes qualquer texto era aceito: uma etapa de OUTRO funil (mandada junto com
+   * `funilId`) ou digitada errada gravava o lead numa coluna que nao existe, e ele
+   * sumia do quadro. Empresa sem etapas cadastradas usa as colunas padrao da tela,
+   * e ai so o slug decide se e perda.
+   */
+  const funilFinal = funilNovo ?? leadAtual.funil_id
+  const { data: etapasRaw } = await supabase.from('funil_etapas')
+    .select('slug, tipo, funil_id').eq('empresa_id', empresaId).eq('ativo', true)
+  const etapas = (etapasRaw ?? []) as { slug: string; tipo: string; funil_id: number | null }[]
+  let tipoEtapa = etapa === 'perdido' ? 'perdido' : ''
+  if (etapas.length > 0) {
+    const doFunil = etapas.filter((e) => funilFinal == null || e.funil_id == null || e.funil_id === funilFinal)
+    const alvo = doFunil.find((e) => e.slug === etapa)
+    if (!alvo) return NextResponse.json({ error: 'Etapa não encontrada neste funil' }, { status: 400 })
+    tipoEtapa = alvo.tipo
+  }
+
+  /**
+   * Perda exige motivo — a regra estava so na tela. Um POST direto mandava o lead
+   * para Perdido sem motivo, e o relatorio de perdas o contava como "nao perdido".
+   * O motivo e conferido pela RLS: so passa motivo da propria empresa.
+   */
+  const viraPerda = tipoEtapa === 'perdido'
+  if (viraPerda) {
+    if (body.motivo_perda_id == null) {
+      return NextResponse.json({ error: 'Informe o motivo da perda' }, { status: 400 })
+    }
+    const { data: motivo } = await supabase.from('motivos_perda').select('id')
+      .eq('id', body.motivo_perda_id).eq('empresa_id', empresaId).maybeSingle()
+    if (!motivo) return NextResponse.json({ error: 'Motivo de perda inválido' }, { status: 400 })
+  }
 
   const patch: Record<string, unknown> = {
     kanban_status: etapa,
     data_transferencia_funil: new Date().toISOString(),
   }
   if (funilNovo != null) patch.funil_id = funilNovo
-  if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id
-  if (body.perdido_em) patch.perdido_em = body.perdido_em
+  if (viraPerda) {
+    patch.motivo_perda_id = body.motivo_perda_id
+    patch.perdido_em = body.perdido_em || new Date().toISOString()
+  } else if (leadAtual.motivo_perda_id != null || leadAtual.perdido_em != null) {
+    // Lead que sai da perda deixa de ser perdido. Sem isto o motivo e a data
+    // ficavam, e o assistente e o ZapIntel continuavam contando-o como perdido.
+    patch.motivo_perda_id = null
+    patch.perdido_em = null
+  }
   if (body.observacoes) patch.observacoes = body.observacoes
 
   const { error } = await supabase.from('leads').update(patch as never).eq('id', body.leadId)

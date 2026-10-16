@@ -63,6 +63,9 @@ export async function POST(req: Request) {
   const valor = Number(b.valor)
 
   if (!tipo) return NextResponse.json({ error: 'Diga se é venda ou locação' }, { status: 400 })
+  // Conferido ANTES do ramo manual: la o valor nao era validado e um negativo
+  // gerava comissao negativa somando no financeiro.
+  if (!Number.isFinite(valor) || !(valor > 0)) return NextResponse.json({ error: 'Informe o valor fechado do negócio' }, { status: 400 })
   if (b.origem === 'manual') return lancarComissaoManual(b, tipo, valor, empresaId, userId, auth.role)
   if (!b.imovel_id) return NextResponse.json({ error: 'Escolha o imóvel do negócio' }, { status: 400 })
   /**
@@ -107,9 +110,40 @@ export async function POST(req: Request) {
     .select('valor').eq('empresa_id', empresaId).eq('chave', 'comissao_imob').maybeSingle()
   const taxas = mesclarTaxas((cfgRow?.valor ?? null) as Partial<TaxasComissao> | null)
   const cashback = Math.max(0, Number(b.cashback) || 0)
-  // Quem de fato assume cada papel — parte de papel vago fica com a casa.
+  /**
+   * Quem de fato assume cada papel — parte de papel vago fica com a casa.
+   *
+   * Os ids vem do navegador e eram gravados com service role sem conferencia: um
+   * uuid de outra empresa virava corretor, e um vendedor fechava o negocio com
+   * `captador_id` = ele mesmo e ficava com a parte de quem captou o imovel. Agora
+   * cada pessoa precisa ser da equipe ativa, e para quem nao e dono nem admin o
+   * captador e sempre o do imovel — o mesmo "nao assina o proprio recibo" do
+   * `comissao_status`.
+   */
+  const ehAdmin = ['owner', 'admin'].includes(auth.role)
   const corretorId = b.corretor_id ?? userId
-  const captadorId = b.captador_id ?? imovel.captado_por ?? null
+  const captadorId = ehAdmin ? (b.captador_id ?? imovel.captado_por ?? null) : (imovel.captado_por ?? null)
+  const pessoas = [...new Set([corretorId, captadorId].filter(Boolean) as string[])]
+  if (pessoas.length) {
+    const { data: daEquipe } = await svc.from('empresa_usuarios').select('usuario_id')
+      .eq('empresa_id', empresaId).eq('ativo', true).in('usuario_id', pessoas)
+    const ok = new Set(((daEquipe ?? []) as { usuario_id: string }[]).map((p) => p.usuario_id))
+    if (!ok.has(corretorId)) return NextResponse.json({ error: 'Corretor não encontrado nesta empresa' }, { status: 404 })
+    // Captador que saiu da equipe (imovel antigo) nao bloqueia o negocio: a parte
+    // dele vai para a casa, como papel vago.
+    if (captadorId && !ok.has(captadorId) && captadorId !== imovel.captado_por) {
+      return NextResponse.json({ error: 'Captador não encontrado nesta empresa' }, { status: 404 })
+    }
+  }
+  // Lead e cliente: da empresa, senao nulo (o mesmo que orcamentos faz).
+  const [{ data: leadOk }, { data: clienteOk }] = await Promise.all([
+    b.lead_id != null
+      ? svc.from('leads').select('id').eq('id', b.lead_id).eq('empresa_id', empresaId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    b.cliente_id != null
+      ? svc.from('clientes').select('id').eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
   const com = calcularComissao(tipo as 'venda' | 'locacao', valor, taxas, cashback, {
     captador: !!captadorId, vendedor: !!corretorId,
   })
@@ -117,8 +151,8 @@ export async function POST(req: Request) {
   const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
     empresa_id: empresaId,
     imovel_id: imovel.id,
-    lead_id: b.lead_id ?? null,
-    cliente_id: b.cliente_id ?? null,
+    lead_id: (leadOk as { id: number } | null)?.id ?? null,
+    cliente_id: (clienteOk as { id: number } | null)?.id ?? null,
     tipo,
     valor,
     // Quem vendeu é quem está fechando, salvo indicação contrária.
@@ -216,6 +250,12 @@ async function lancarComissaoManual(
   const pctCashback = Math.min(100, Math.max(0, Number(b.cashback_percentual) || 0))
   const cashback = Math.round(valor * (pctCashback / 100) * 100) / 100
   const captadorId = b.captador_id ?? null
+  // O captador tambem precisa ser da equipe — antes so o corretor era conferido.
+  if (captadorId) {
+    const { data: cap } = await svc.from('empresa_usuarios')
+      .select('usuario_id').eq('empresa_id', empresaId).eq('usuario_id', captadorId).eq('ativo', true).maybeSingle()
+    if (!cap) return NextResponse.json({ error: 'Captador não encontrado nesta empresa' }, { status: 404 })
+  }
   const com = calcularComissaoPorPercentual(pct, valor, taxas, cashback, {
     captador: !!captadorId, vendedor: true,
   })
@@ -318,10 +358,9 @@ export async function PATCH(req: Request) {
    * As datas são do SERVIDOR: data de pagamento vinda do navegador é o relógio de
    * quem clicou, e comissão paga é dinheiro que saiu, não palpite de fuso.
    */
-  const hojeIso = () => {
-    const h = new Date()
-    return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`
-  }
+  // Dia de Brasilia, nao do servidor (UTC na Vercel): comissao paga depois das
+  // 21h saia com a data do dia seguinte.
+  const hojeIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
   if (b.comissao_status === 'paga') {
     patch.comissao_status = 'paga'
     patch.comissao_paga_em = hojeIso()

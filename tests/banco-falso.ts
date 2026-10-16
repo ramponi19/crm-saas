@@ -23,7 +23,7 @@ export function bancoFalso(responder: Responder) {
       maybeSingle: () => resultado(),
       single: () => resultado(),
     }
-    for (const m of ['select', 'eq', 'in', 'or', 'order', 'range', 'lt', 'gte', 'not', 'is', 'limit', 'filter', 'neq']) {
+    for (const m of ['select', 'eq', 'in', 'or', 'order', 'range', 'lt', 'gte', 'not', 'is', 'limit', 'filter', 'neq', 'ilike']) {
       b[m] = (...args: unknown[]) => {
         if (m === 'select' && c.op === 'select' && c.filtros.length === 0 && c.dados === undefined) c.dados = args[0]
         else c.filtros.push([m, ...args])
