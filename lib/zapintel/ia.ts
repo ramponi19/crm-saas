@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/service'
-import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
+import { mensagemDoProvedor } from '@/lib/assistente-erros'
 
 /**
  * A ÚNICA PORTA DE IA DO ZAPINTEL.
@@ -24,72 +24,94 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
  *   `mensagemDoProvedor()` ........ traduz o erro do provedor para o balcão
  *   `assistente_uso` .............. a contabilidade de tokens, por empresa
  *
+ * ══ UM PROVEDOR SÓ: ANTHROPIC (desde 16/10/2026) ═══════════════════════════
+ *
+ * Até 16/10 esta porta escolhia o provedor pelo nome do modelo e mandava ao
+ * Google tudo o que não começasse com `claude-`. Saiu porque:
+ *
+ *   - a chave do Gemini deste projeto era do plano GRATUITO (20 chamadas por
+ *     dia no `gemini-3.6-flash`, medido em 14/10) — e o gratuito do Google usa
+ *     o que recebe para treinar, com conversas que têm CPF e endereço;
+ *   - em produção não havia `GEMINI_API_KEY`, então o caminho existia só para
+ *     falhar com 503;
+ *   - dois provedores são duas traduções de erro, dois formatos de uso e duas
+ *     regras de raciocínio para manter de acordo.
+ *
+ * A regra agora (ver `modeloDoZapintel`): modelo vazio → `claude-haiku-5-5`;
+ * modelo `claude-…` → ele; QUALQUER outro → 503 com a instrução de trocar em
+ * /superadmin/assistente. Nunca outro provedor, nem por engano.
+ *
+ * O assistente (`/api/assistente`, `/api/assistente/meu-dia`) usa o mesmo
+ * `assistente_config.modelo` e continua no Gemini por `fetch` — fora deste
+ * módulo e fora do escopo desta troca.
+ *
  * ══ O TETO DE TOKENS É DE SEGURANÇA, NUNCA DE FORMATAÇÃO ═══════════════════
  *
- * Este foi um erro meu, pego em produção em 13/10/2026. Pedi 4 frases e pus
- * `maxOutputTokens: 400` achando que estava limitando o TAMANHO da resposta. O
- * que voltou para a tela do Lucas foi isto:
+ * Erro meu, pego em produção em 13/10/2026 (ainda no Gemini): pedi 4 frases e
+ * pus um teto de 400 tokens achando que limitava o TAMANHO da resposta. O
+ * pensamento do modelo é cobrado do mesmo saldo, os 400 acabaram no meio do
+ * raciocínio, e a tela recebeu meia frase em inglês. Vale igual no Claude.
  *
- *     Sales conversion: 32 (1.4%)
- *         *
- *
- * Em inglês, truncado, com um asterisco solto. A documentação do Gemini
- * explica por quê, e desaconselha exatamente o que eu fiz:
- *
- *   "max_output_tokens ... sets the maximum number of tokens a response can
- *    generate, INCLUDING THOUGHT TOKENS. If the model hits this limit while
- *    reasoning, it stops generating with status 'incomplete' and returns
- *    truncated or empty output (while still billing for any thinking tokens
- *    generated). To reduce cost or latency without truncating responses,
- *    lower thinking_level instead of setting a small max_output_tokens."
- *
- * O modelo deste CRM é `gemini-3.6-flash` (escolhido em `assistente_config`),
- * que pensa em nível `medium` por padrão. Os 400 tokens acabavam no meio do
- * raciocínio e a resposta nascia pela metade.
- *
- * **O tamanho se controla pelo PROMPT** ("no máximo 4 frases"), que o modelo
- * obedece. O teto aqui existe só para que um modelo em loop não prenda a
- * função até o limite da plataforma. Medido com 8.000: as mesmas 4 frases, em
- * português, só com os números do briefing.
+ * **O tamanho se controla pelo PROMPT** ("no máximo 2 frases"), que o modelo
+ * obedece. O teto existe só para um modelo em loop não prender a função.
  *
  * ══ O ERRO NUNCA É SÓ `false` ══════════════════════════════════════════════
  *
  * Devolve `{ ok: false, status, erro }` com a mensagem JÁ traduzida, porque
  * quem lê é um vendedor no balcão. A rota repassa; o cru vai para o log do
- * servidor, onde serve. "Quota exceeded for metric generativelanguage..." na
- * tela é texto que manda o lojista para a documentação de uma API que não é
- * dele.
+ * servidor, onde serve.
  */
 
-/**
- * Folga suficiente para o modelo pensar e ainda escrever. Não é o tamanho da
- * resposta — esse se pede no `system`. Ver o cabeçalho.
- */
-const TETO_DE_SEGURANCA = 8_000
+/** Modelo do ZapIntel quando `assistente_config.modelo` está vazio. */
+export const MODELO_PADRAO_ZAPINTEL = 'claude-haiku-5-5'
+
+export const ERRO_MODELO_NAO_CLAUDE =
+  'Modelo de IA não configurado; defina um modelo Claude em /superadmin/assistente'
 
 /**
- * QUANTO O MODELO PENSA ANTES DE ESCREVER.
- *
- * Medido em produção em 13/10/2026: com o padrão (`medium` no
- * `gemini-3.6-flash`), o resumo do dia **estourou 20 s de timeout** — duas
- * vezes seguidas, com o briefing completo da JM. O log registrou
- * `TimeoutError` e a tela mostrou "a IA está indisponível".
- *
- * A documentação do Gemini diz que é por aqui que se corta tempo e custo, e
- * não pelo teto de saída:
- *
- *   "To reduce cost or latency without truncating responses, lower
- *    thinking_level (low or medium) instead of setting a small
- *    max_output_tokens."
- *
- * `low` é o certo para o que este módulo pede: escrever em frase números que
- * já vêm calculados, e redigir uma mensagem de WhatsApp. Nenhuma das duas é
- * tarefa de raciocínio — é redação. Raciocínio aqui é tempo e cota gastos
- * para chegar na mesma frase.
- *
- * Níveis que o 3.6 aceita: minimal, low, medium, high.
+ * O modelo que a ficha e a sugestão vão usar — ou `null` se o configurado não
+ * é da Anthropic. Ver o cabeçalho: não existe "outro provedor" para cair.
  */
-const NIVEL_DE_RACIOCINIO = 'low'
+export function modeloDoZapintel(configurado: string | null | undefined): string | null {
+  const m = (configurado ?? '').trim()
+  if (!m) return MODELO_PADRAO_ZAPINTEL
+  return m.startsWith('claude-') ? m : null
+}
+
+/**
+ * QUANTO A FUNÇÃO ESPERA PELA IA — e por que estes números.
+ *
+ * As duas rotas que chamam daqui (`/zapintel/api/perfil` e `/sugestao`) têm
+ * `maxDuration = 60`. O plano da Vercel deste projeto é o Hobby, e com Fluid
+ * Compute o teto dele é 300 s (documentação de limites, conferida em
+ * 16/10/2026) — dava para subir. Não subi, de propósito:
+ *
+ *   - quem pede a ficha é um vendedor no balcão olhando um botão girar. Uma
+ *     resposta que leva mais de 50 s já fracassou como ajuda; esticar o teto
+ *     só alonga a espera antes da mesma mensagem de erro;
+ *   - a ficha normal (Haiku, ~2.400 tokens de entrada e ~1.500 de saída)
+ *     volta em poucos segundos. 25 s por tentativa é folga de várias vezes;
+ *   - o robô de fichas pede uma de cada vez: uma chamada presa 5 minutos
+ *     segura a fila inteira.
+ *
+ * Então: 25 s por tentativa, UMA repetição (o SDK repete sozinho em 408, 409,
+ * 429, 5xx e queda de conexão), e um prazo TOTAL de 50 s por cima de tudo.
+ *
+ * O prazo total existe porque o SDK (0.133) obedece o cabeçalho `retry-after`
+ * do provedor sem teto: um 429 com `retry-after: 40` faria 25 + 40 + 25 s e
+ * a função morreria em 60 s sem dizer por quê. Com o prazo, o pior caso é
+ * 50 s de IA mais a leitura do banco, dentro dos 60.
+ *
+ * Risco aceito: Sonnet e Opus escrevem mais devagar e podem passar de 25 s
+ * numa conversa longa. Se o superadmin trocar para um deles e as fichas
+ * começarem a voltar "demorou demais", o log `zapintel.ia.falha` com
+ * `motivo: "timeout"` mostra — e o número a mexer é este.
+ */
+const TIMEOUT_POR_TENTATIVA_MS = 25_000
+const REPETICOES = 1
+const PRAZO_TOTAL_MS = 50_000
+
+export const ERRO_DEMOROU = 'A análise demorou demais, tente novamente'
 
 export interface MensagemIA { role: string; content: string }
 
@@ -99,8 +121,7 @@ export type ResultadoIA =
    * a escreveu. A ficha do lead (`lib/zapintel/perfil.ts`) fica meses no
    * banco, e o superadmin pode trocar o modelo na tela a qualquer momento —
    * sem este campo, uma ficha ruim não teria como ser atribuída ao modelo que
-   * a produziu, e a comparação entre dois modelos viraria memória de quem
-   * estava na sala.
+   * a produziu.
    */
   | { ok: true; texto: string; modelo: string }
   | { ok: false; status: number; erro: string }
@@ -120,11 +141,9 @@ export async function perguntarIA(opts: {
   /**
    * Modelo a usar NESTA chamada, por cima do que o superadmin configurou.
    *
-   * Existe para o lote de fichas (`scripts/perfil-zapintel.mts --modelo`):
-   * ele roda na máquina do Lucas com outro provedor enquanto a produção
-   * continua no modelo configurado. Trocar `assistente_config.modelo` para
-   * isso derrubaria toda a IA do CRM em produção, que não tem a chave do
-   * outro provedor. Nenhuma rota do CRM passa este campo.
+   * Existe para o lote de fichas (`scripts/perfil-zapintel.mts --modelo`),
+   * que roda na máquina do Lucas. Vale a mesma regra do configurado: só
+   * `claude-…`. Nenhuma rota do CRM passa este campo.
    */
   modelo?: string
 }): Promise<ResultadoIA> {
@@ -140,187 +159,44 @@ export async function perguntarIA(opts: {
   if (cfg && cfg.ativo === false) {
     return { ok: false, status: 503, erro: 'A IA está temporariamente desativada.' }
   }
-  const modelo = opts.modelo || cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
 
-  if (provedorDo(modelo) === 'anthropic') {
-    return perguntarAnthropic({ svc, empresaId, system, mensagens, maxTokens, origem, modelo })
+  const pedido = opts.modelo || (cfg?.modelo as string | null | undefined)
+  const modelo = modeloDoZapintel(pedido)
+  if (!modelo) {
+    console.error(JSON.stringify({ evento: 'zapintel.ia.falha', motivo: 'modelo_nao_claude', origem, modelo: pedido }))
+    return { ok: false, status: 503, erro: ERRO_MODELO_NAO_CLAUDE }
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return { ok: false, status: 503, erro: 'A IA ainda não foi configurada neste CRM. Avise o responsável.' }
-  }
-
-  const corpo = (comThinking: boolean) => JSON.stringify({
-    // O Gemini separa a instrução de sistema das mensagens, e chama
-    // "model" o que a Anthropic chama "assistant".
-    ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
-    contents: mensagens.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    })),
-    generationConfig: {
-      temperature: 0.5,
-      maxOutputTokens: maxTokens ?? TETO_DE_SEGURANCA,
-      ...(comThinking ? { thinkingConfig: { thinkingLevel: NIVEL_DE_RACIOCINIO } } : {}),
-    },
-  })
-
-  const chamar = (comThinking: boolean) => fetch(
-    // A chave no cabeçalho, não na URL: URL aparece em log de proxy e em
-    // mensagem de erro de rede; cabeçalho não.
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: corpo(comThinking),
-      // Provedor lento prende a função até o limite da plataforma e o usuário
-      // fica olhando um botão girar. 45 s porque 20 s não bastavam: ver
-      // NIVEL_DE_RACIOCINIO.
-      signal: AbortSignal.timeout(45_000),
-    },
-  )
-
-  try {
-    let r = await chamar(true)
-    let j = await r.json()
-
-    /**
-     * O MODELO PODE NÃO CONHECER `thinkingLevel` — e aí a culpa não é do pedido.
-     *
-     * `assistente_config.modelo` é escolhido pelo superadmin numa lista que vem
-     * da própria API do Google, então amanhã pode estar lá um modelo antigo que
-     * recusa o campo com 400. Sem esta volta, UMA escolha de modelo na tela de
-     * configuração derrubaria TODA a IA do CRM — assistente, copiloto, sugestão
-     * e resumo do dia — com um erro que não diz o que houve.
-     *
-     * Então: se o 400 fala do campo, repete sem ele. Uma vez só, e o log diz
-     * que aconteceu, para ninguém descobrir isso de novo do zero.
-     */
-    if (!r.ok && r.status === 400 && /thinking/i.test(String(j?.error?.message ?? ''))) {
-      console.warn(`[zapintel/ia:${origem}] ${modelo} recusou thinkingLevel; repetindo sem ele`)
-      r = await chamar(false)
-      j = await r.json()
-    }
-
-    /**
-     * 503 DO GOOGLE É PICO DE DEMANDA, E ELE MESMO DIZ QUE PASSA.
-     *
-     *   "This model is currently experiencing high demand. Spikes in demand
-     *    are usually temporary. Please try again later."
-     *
-     * Visto várias vezes em 13/10/2026 no `gemini-3.6-flash`, intercalado com
-     * respostas boas — 6 de 6 numa medição, 2 recusas na seguinte. Desistir na
-     * primeira faz uma funcionalidade que funciona parecer quebrada.
-     *
-     * Uma tentativa, depois de dois segundos. Mais que isso vira espera longa
-     * para alguém que está olhando a tela, e o erro traduzido já diz o que
-     * fazer.
-     */
-    if (!r.ok && r.status === 503) {
-      console.warn(`[zapintel/ia:${origem}] ${modelo} em alta demanda; tentando de novo`)
-      await new Promise((ok) => setTimeout(ok, 2_000))
-      r = await chamar(true)
-      j = await r.json()
-    }
-
-    if (!r.ok) {
-      const cru = (j?.error?.message as string) ?? `HTTP ${r.status}`
-      console.error(`[zapintel/ia:${origem}] provedor recusou:`, r.status, modelo, cru)
-      return { ok: false, status: 502, erro: mensagemDoProvedor(r.status, cru) }
-    }
-
-    const texto = (j?.candidates?.[0]?.content?.parts ?? [])
-      .map((p: { text?: string }) => p.text ?? '').join('')
-
-    const uso = j?.usageMetadata
-    await svc.from('assistente_uso').insert({
-      empresa_id: empresaId,
-      tokens_in: uso?.promptTokenCount ?? null,
-      // O raciocínio é cobrado como saída: sem somá-lo, o consumo registrado
-      // ficava abaixo do que o Google cobra.
-      tokens_out: uso ? (uso.candidatesTokenCount ?? 0) + (uso.thoughtsTokenCount ?? 0) : null,
-    } as never)
-
-    // SAFETY ou MAX_TOKENS devolvem 200 com o texto vazio. Passar isso como
-    // sucesso fazia a sugestão responder `mensagem: ""` e a tela não mostrar nada.
-    if (!texto.trim()) {
-      console.error(`[zapintel/ia:${origem}] resposta vazia:`, modelo, j?.candidates?.[0]?.finishReason)
-      return { ok: false, status: 502, erro: 'A IA não conseguiu responder agora. Tente de novo.' }
-    }
-
-    return { ok: true, texto: texto.trim(), modelo }
-  } catch (e) {
-    console.error(`[zapintel/ia:${origem}]`, e)
-    return {
-      ok: false,
-      status: 500,
-      erro: 'A IA está indisponível neste momento. Tente de novo em alguns minutos.',
-    }
-  }
+  return perguntarAnthropic({ svc, empresaId, system, mensagens, maxTokens, origem, modelo })
 }
 
 /**
- * DE QUEM É O MODELO — decidido pelo nome, não por configuração à parte.
- *
- * Um campo "provedor" separado de "modelo" seria duas coisas para manter de
- * acordo, e a primeira vez que alguém trocasse uma sem a outra o CRM mandaria
- * um nome de modelo do Google para a Anthropic. O nome já diz: os da
- * Anthropic começam com `claude-`.
- */
-export function provedorDo(modelo: string): 'anthropic' | 'gemini' {
-  return modelo.startsWith('claude-') ? 'anthropic' : 'gemini'
-}
-
-/**
- * Existe chave para o provedor deste modelo? É o que a tela pergunta antes de
- * pedir uma ficha — ver `iaDisponivel` em `/zapintel/api/conversa`.
- */
-export function iaConfigurada(modelo: string): boolean {
-  return provedorDo(modelo) === 'anthropic'
-    ? !!process.env.ANTHROPIC_API_KEY
-    : !!process.env.GEMINI_API_KEY
-}
-
-/**
- * A IA do CRM vai responder? Chave do provedor do modelo CONFIGURADO e a
- * chave-geral do superadmin — as mesmas duas condições que `perguntarIA`
- * checa, perguntadas antes, numa consulta, em vez de descobertas lead a lead
- * por uma função inteira que já nasce morta.
+ * A IA do CRM vai responder? Chave da Anthropic, modelo Claude (ou vazio) e a
+ * chave-geral do superadmin — as mesmas condições que `perguntarIA` checa,
+ * perguntadas antes, numa consulta, em vez de descobertas lead a lead por uma
+ * função inteira que já nasce morta. É o `iaDisponivel` que a tela e o robô
+ * de fichas leem.
  */
 export async function iaDoCrmLigada(): Promise<boolean> {
   const { data: cfg } = await createServiceClient()
     .from('assistente_config').select('ativo, modelo').eq('id', 1).maybeSingle()
-  return iaConfigurada((cfg?.modelo as string) || MODELO_PADRAO) && cfg?.ativo !== false
+  return !!process.env.ANTHROPIC_API_KEY
+    && !!modeloDoZapintel(cfg?.modelo as string | null | undefined)
+    && cfg?.ativo !== false
 }
 
 /**
- * O MESMO CONTRATO, PELA ANTHROPIC.
- *
- * ══ POR QUE EXISTE ═════════════════════════════════════════════════════════
- *
- * Medido em 14/10/2026: a chave do Gemini deste projeto é do plano GRATUITO,
- * com limite de **20 chamadas por dia** no `gemini-3.6-flash`. O lote de
- * ~1.800 fichas parou na sexta chamada com "Quota exceeded ... limit: 20".
- * Além do limite, o gratuito do Google usa os dados para treinar — e estas
- * conversas têm CPF, endereço e e-mail de cliente.
- *
- * O Lucas já tinha decidido o caminho: *"se o free do gemini nao for
- * suficiente irei de anthropic mesmo"*.
- *
- * ══ AS DIFERENÇAS QUE IMPORTAM ═════════════════════════════════════════════
+ * ══ AS ESCOLHAS DA CHAMADA ═════════════════════════════════════════════════
  *
  * - **Sem `temperature`.** No Claude Haiku 5.5 um valor diferente do padrão
- *   é recusado com 400 — copiar o corpo do Gemini quebraria toda chamada.
- * - **`effort: 'low'`** no lugar do `thinkingLevel` do Gemini, pelo mesmo
- *   motivo de lá: o trabalho aqui é redação sobre fatos já separados, não
- *   raciocínio. O padrão do Haiku 5.5 é `medium`, e por isso vai explícito.
+ *   é recusado com 400.
+ * - **`effort: 'low'`**: o trabalho aqui é redação sobre fatos já separados,
+ *   não raciocínio. O padrão do Haiku 5.5 é `medium`, e por isso vai explícito.
  * - **O `system` vai com `cache_control`.** Regras + gabarito são idênticos
  *   em toda ficha; a partir da segunda chamada a Anthropic cobra ~10% por
  *   esse trecho. Abaixo do mínimo cacheável do modelo ele simplesmente não
  *   cacheia — não há erro, só não há desconto.
- * - **Repetição já vem do SDK** para 429, 529 (sobrecarga) e 5xx. Aqui fica
- *   só a tradução do erro para quem está no balcão.
+ * - **Repetição vem do SDK**, uma vez (ver `TIMEOUT_POR_TENTATIVA_MS`).
  */
 async function perguntarAnthropic(o: {
   svc: ReturnType<typeof createServiceClient>
@@ -336,13 +212,19 @@ async function perguntarAnthropic(o: {
     return { ok: false, status: 503, erro: 'A IA ainda não foi configurada neste CRM. Avise o responsável.' }
   }
 
-  const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 3 })
+  const client = new Anthropic({ apiKey, timeout: TIMEOUT_POR_TENTATIVA_MS, maxRetries: REPETICOES })
+  const prazo = AbortSignal.timeout(PRAZO_TOTAL_MS)
+  const t0 = Date.now()
+  const falha = (motivo: string, extra: Record<string, unknown> = {}) =>
+    console.error(JSON.stringify({
+      evento: 'zapintel.ia.falha', motivo, origem: o.origem, modelo: o.modelo, ms: Date.now() - t0, ...extra,
+    }))
 
   try {
     const r = await client.messages.create({
       model: o.modelo,
-      // Teto de SEGURANÇA, como no Gemini: o pensamento sai deste saldo.
-      // O tamanho da resposta se pede no `system`.
+      // Teto de SEGURANÇA: o pensamento sai deste saldo. O tamanho da
+      // resposta se pede no `system`.
       max_tokens: o.maxTokens ?? 16_000,
       ...(o.system
         ? { system: [{ type: 'text' as const, text: o.system, cache_control: { type: 'ephemeral' as const } }] }
@@ -352,10 +234,10 @@ async function perguntarAnthropic(o: {
         content: m.content,
       })),
       output_config: { effort: 'low' },
-    })
+    }, { signal: prazo })
 
     if (r.stop_reason === 'refusal') {
-      console.error(`[zapintel/ia:${o.origem}] ${o.modelo} recusou:`, r.stop_details?.category ?? '?')
+      falha('recusa', { categoria: r.stop_details?.category ?? null })
       return { ok: false, status: 502, erro: 'A IA não conseguiu analisar esta conversa.' }
     }
 
@@ -372,19 +254,30 @@ async function perguntarAnthropic(o: {
 
     // Parar em max_tokens antes de escrever texto também devolve vazio.
     if (!texto.trim()) {
-      console.error(`[zapintel/ia:${o.origem}] resposta vazia:`, o.modelo, r.stop_reason)
+      falha('resposta_vazia', { stop_reason: r.stop_reason })
       return { ok: false, status: 502, erro: 'A IA não conseguiu responder agora. Tente de novo.' }
     }
 
     return { ok: true, texto: texto.trim(), modelo: o.modelo }
   } catch (e) {
-    // Do mais específico para o mais geral. `APIError` carrega o status HTTP,
-    // que é o que `mensagemDoProvedor` usa para escolher a frase.
+    /**
+     * DEMOROU ≠ O PROVEDOR RECUSOU — e o log diz qual dos dois.
+     *
+     * A ordem importa: `APIConnectionTimeoutError` e `APIUserAbortError` são
+     * subclasses de `APIError`. Testar `APIError` primeiro faria todo estouro
+     * de tempo aparecer como "provedor recusou", sem status, e ninguém saberia
+     * que o número a mexer é o timeout. O abort aqui só pode ser o nosso
+     * `PRAZO_TOTAL_MS` — nenhum chamador passa outro sinal.
+     */
+    if (e instanceof Anthropic.APIConnectionTimeoutError || e instanceof Anthropic.APIUserAbortError || prazo.aborted) {
+      falha('timeout', { limite_ms: prazo.aborted ? PRAZO_TOTAL_MS : TIMEOUT_POR_TENTATIVA_MS })
+      return { ok: false, status: 504, erro: ERRO_DEMOROU }
+    }
     if (e instanceof Anthropic.APIError) {
-      console.error(`[zapintel/ia:${o.origem}] provedor recusou:`, e.status, o.modelo, e.message)
+      falha('erro_api', { status: e.status ?? null, erro: e.message })
       return { ok: false, status: 502, erro: mensagemDoProvedor(e.status ?? 500, e.message) }
     }
-    console.error(`[zapintel/ia:${o.origem}]`, e)
+    falha('erro_inesperado', { erro: e instanceof Error ? e.message : String(e) })
     return {
       ok: false,
       status: 500,

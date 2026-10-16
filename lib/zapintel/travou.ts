@@ -1,5 +1,6 @@
 import type { Lead, RawMessage } from '@/types/zapintel'
 import { ehFala, indiceDaFalaQueEncerrou, type Ficha } from '@/lib/zapintel/ficha'
+import { leadParaIA, mascararDadosPessoais } from '@/lib/zapintel/mascara'
 
 /**
  * ONDE A VENDA COMEÇOU A SE PERDER — o ponto exato, dentro da conversa.
@@ -197,8 +198,13 @@ export function ondeTravou(a: Lead, comprou: boolean): Travou | null {
  * Mandar a conversa inteira para a IA seria caro e pior: o modelo se perde em
  * 40 mensagens e devolve genérico. O que decide a próxima mensagem é o que ele
  * pediu, o que a loja ofereceu, onde travou e há quanto tempo.
+ *
+ * Vai mascarado (16/10/2026): só o primeiro nome — "Cliente" quando o cadastro
+ * não tem nome — e sem CPF, telefone, e-mail nem cartão nos trechos citados.
+ * Ver `lib/zapintel/mascara.ts`.
  */
-export function contextoDaSugestao(a: Lead, t: Travou, f?: Ficha): string {
+export function contextoDaSugestao(original: Lead, t: Travou, f?: Ficha): string {
+  const a = leadParaIA(original)
   const m = (a.messages || [])[t.indice]
   const linhas = [
     `Cliente: ${a.contact}`,
@@ -217,8 +223,8 @@ export function contextoDaSugestao(a: Lead, t: Travou, f?: Ficha): string {
      * varejo de celular de varejo de roupa. O que o CLIENTE pediu, nesta
      * conversa, é fato — e descreve o negócio melhor que qualquer rótulo.
      */
-    f?.procurou.length ? `O que ele procurou: ${f.procurou.join(', ')}` : '',
-    f?.ultimaOferta ? `A última oferta da loja foi: "${f.ultimaOferta.slice(0, TAMANHO)}"` : '',
+    f?.procurou.length ? `O que ele procurou: ${mascararDadosPessoais(f.procurou.join(', '))}` : '',
+    f?.ultimaOferta ? `A última oferta da loja foi: "${mascararDadosPessoais(f.ultimaOferta).slice(0, TAMANHO)}"` : '',
     m ? `A mensagem onde travou (${m.isStore ? 'loja' : 'cliente'}): "${corpo(m).slice(0, TAMANHO)}"` : '',
     `Inativo há ${a.daysInactive} dia(s).`,
   ]

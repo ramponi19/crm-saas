@@ -3,6 +3,7 @@ import type { Classification, Lead, RawMessage } from '@/types/zapintel'
 import type { Ficha } from '@/lib/zapintel/ficha'
 import type { Travou } from '@/lib/zapintel/travou'
 import { perguntarIA } from '@/lib/zapintel/ia'
+import { leadParaIA } from '@/lib/zapintel/mascara'
 
 /**
  * A FICHA DO LEAD ESCRITA POR IA — tudo que a tela do lead afirma, acima do
@@ -20,27 +21,25 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  * Dois leads com conversas completamente diferentes recebiam a mesma frase,
  * sob um rótulo que dizia "IA".
  *
- * Medido no lead 439 (Carol Baldasso) em 13/10/2026, com a conversa inteira
- * na mão, a tela dizia:
+ * Medido num lead real em 13/10/2026, com a conversa inteira na mão, a tela
+ * dizia:
  *
  *     🔥 QUENTE · Score 100 · Risco de perda 75%
  *     ANÁLISE DE IA: "Preocupação com saúde da bateria — reforçar garantia…"
  *     PRÓXIMA AÇÃO: "FECHAR AGORA — confirmar pagamento e finalizar pedido."
  *
- * Ela tinha comprado 52 dias antes, pago R$ 5.695 em 18x, recebido em casa e
- * mandado foto com o aparelho. Dois dos seis "sinais de compra" eram lixo de
- * substring: `Pediu NF` saiu de "só me co-NF-irma se é esse valor", e
- * `Indecisão / Timing` saiu da palavra "depois" em "tenho que ir aí pagar
- * depois buscar?".
+ * A cliente tinha comprado semanas antes, recebido em casa e mandado foto com
+ * o aparelho. Dois dos seis "sinais de compra" eram lixo de substring: `Pediu
+ * NF` saiu de um "confirma" (co-NF-irma), e `Indecisão / Timing` saiu da
+ * palavra "depois".
  *
  * ══ POR QUE AGORA DÁ, E ANTES NÃO DAVA ═════════════════════════════════════
  *
  * Porque 35% do que a loja fala é áudio (10.201 de 29.135 mensagens enviadas),
  * e até 13/10/2026 isso era `[audio]` para qualquer motor. Com o backfill do
- * Whisper, a IA lê o que foi DITO. Na mesma Carol, três fatos que decidem o
- * que fazer com ela estão todos dentro de áudio: a promessa de recomprar o
- * iPhone 12 Pro Max dela, a revelação de que o aparelho era por encomenda com
- * 100% antecipado, e o carregador de R$ 199 que ficou pendente.
+ * Whisper, a IA lê o que foi DITO. Na mesma conversa, os três fatos que
+ * decidem o que fazer com a cliente estavam dentro de áudio: uma promessa da
+ * loja, uma condição de pagamento e um acessório que ficou pendente.
  *
  * ══ O QUE A IA PODE DIZER, E O QUE ELA NÃO PODE ════════════════════════════
  *
@@ -63,15 +62,21 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  *   p2  13/10/2026  o GABARITO entrou no prompt: um exemplo de ficha pronta
  *                   vale mais que instrução para ensinar o nível de detalhe,
  *                   e pesa mais ainda num modelo barato. Ver `GABARITO`.
+ *
+ *   (16/10/2026, SEM subir a versão: o gabarito virou exemplo inventado, a
+ *    conversa vai com dado pessoal mascarado e só o primeiro nome. O que a
+ *    ficha deve conter não mudou; subir para p3 marcaria todas as fichas
+ *    atuais como desatualizadas e o robô pediria IA para cada uma.)
  */
 export const VERSAO_DO_PERFIL = 'p2'
 
 /**
  * Quanto da conversa cabe no prompt.
  *
- * A Carol (lead 439) tem 165 mensagens e ~18 mil caracteres — cabe inteira. A
- * média da base é 27 mensagens. O teto existe para o caso raro: o lead 4089
- * tem 1.400 mensagens, e mandá-las custaria mais que a ficha vale.
+ * Uma conversa longa de verdade (165 mensagens, ~18 mil caracteres) cabe
+ * inteira. A média da base é 27 mensagens. O teto existe para o caso raro: o
+ * maior lead da base tem 1.400 mensagens, e mandá-las custaria mais que a
+ * ficha vale.
  *
  * Quando estoura, o corte é no MEIO e anunciado dentro do texto. Cortar o fim
  * seria jogar fora exatamente o que decide a próxima ação; cortar o começo,
@@ -101,11 +106,10 @@ export interface PerfilIA {
   /**
    * O que ficou em aberto DENTRO da conversa e ninguém retomou.
    *
-   * Nasceu do teste na Carol: o marido pagou cheio e o iPhone 12 Pro Max dela
-   * nunca foi entregue na troca, embora o vendedor tenha prometido, em áudio,
-   * aceitá-lo como entrada. É um seminovo de R$ 1.200 parado na gaveta de uma
-   * cliente que confia na loja — e nenhum motor de palavra-chave chegaria
-   * perto disso.
+   * Nasceu de um teste com conversa real: a loja prometeu, em áudio, aceitar o
+   * aparelho antigo da cliente como entrada, e a troca nunca aconteceu. É um
+   * seminovo parado na gaveta de uma cliente que confia na loja — e nenhum
+   * motor de palavra-chave chegaria perto disso.
    */
   pontasSoltas: string[]
   proximaAcao: string
@@ -164,7 +168,7 @@ export function marcaDaConversa(lead: Lead): MarcaDaConversa {
  *
  * `new Date('2026-07-31')` é interpretado como meia-noite UTC. Em São Paulo
  * (UTC-3) isso é 21h de 30/07, e `toLocaleDateString` imprime **30/07**.
- * Medido no lead 439 em 13/10/2026: o contexto dizia "Primeira mensagem:
+ * Medido num lead real em 13/10/2026: o contexto dizia "Primeira mensagem:
  * 30/07" enquanto a primeira linha da conversa, logo abaixo no mesmo prompt,
  * era `[2026-07-31 12:24]`. A IA receberia duas datas diferentes para o mesmo
  * fato e teria de escolher uma.
@@ -237,7 +241,10 @@ export function contextoDoPerfil(opts: {
   valorVenda: number | null
   diasAteVenda: number | null
 }): string {
-  const { lead, ficha, travou, nomeDaLoja, kanban, temVendaRegistrada } = opts
+  const { ficha, travou, nomeDaLoja, kanban, temVendaRegistrada } = opts
+  // O que vai à IA é a CÓPIA mascarada: primeiro nome e sem CPF, telefone,
+  // e-mail, cartão nem número da casa. Ver `lib/zapintel/mascara.ts`.
+  const lead = leadParaIA(opts.lead)
   const f = ficha
 
   const fatos = [
@@ -302,23 +309,31 @@ export function contextoDoPerfil(opts: {
  *
  * ══ DE ONDE VEIO ═══════════════════════════════════════════════════════════
  *
- * Do Lucas, em 13/10/2026, olhando a ficha da Carol que eu havia escrito a
- * mão: *"nao podemos aplicar o seu modelo e caso faça a ligacao de uma ia e
+ * Do Lucas, em 13/10/2026, olhando uma ficha que eu havia escrito à mão:
+ * *"nao podemos aplicar o seu modelo e caso faça a ligacao de uma ia e
  * solicite a analise ela puxa conforme o modelo pronto?"*
  *
- * Ele tem razão na parte que importa. O que separa "Preocupação com saúde da
- * bateria" de "ela checou se a bateria trocada daria problema na revenda, e a
- * loja se comprometeu a aceitar o aparelho de volta" não é inteligência do
- * modelo — é saber que nível de detalhe se espera. Um exemplo ensina isso em
- * uma passada; vinte linhas de instrução não ensinam.
+ * Ele tem razão na parte que importa. O que separa um rótulo genérico de uma
+ * frase que conta o que a pessoa perguntou e o que a loja prometeu não é
+ * inteligência do modelo — é saber que nível de detalhe se espera. Um exemplo
+ * ensina isso em uma passada; vinte linhas de instrução não ensinam.
+ *
+ * ══ O EXEMPLO É INVENTADO (desde 16/10/2026) ══════════════════════════════
+ *
+ * A primeira versão era a ficha de uma cliente real, e ia ao provedor de IA em
+ * TODA chamada: valor, parcelas, data e frases dela. Foi trocada por uma
+ * história fictícia com a mesma forma — mesmos campos, mesmo nível de detalhe,
+ * evidência citada em cada sinal, uma ponta solta virando a próxima ação. O
+ * teste `tests/zapintel-ia.test.ts` guarda o SHA-256 das frases originais (não
+ * o texto) e falha se alguma voltar.
  *
  * É o que pesa mais num modelo barato, que é justamente onde este CRM vai
  * rodar: dar o padrão pronto vale mais do que pagar por um modelo melhor.
  *
  * ══ O RISCO, E COMO ELE É CONTIDO ══════════════════════════════════════════
  *
- * Exemplo contamina. O modelo que vê "iPhone 12 Pro Max" e "carregador de
- * R$ 199" aqui pode escrevê-los numa conversa onde ninguém os mencionou — e
+ * Exemplo contamina. O modelo que vê um produto e um preço aqui pode
+ * escrevê-los numa conversa onde ninguém os mencionou — e
  * seria o mesmo defeito que o vocabulário do Whisper causou em 13/10, quando
  * listar modelos fez a transcrição inventar "o Pro Max" num áudio que não
  * dizia isso. Invenção induzida por exemplo é pior que texto genérico, porque
@@ -332,34 +347,34 @@ export function contextoDoPerfil(opts: {
  * `VERSAO_DO_PERFIL` junto, senão as fichas antigas continuam no banco
  * passando por atuais.
  */
-const GABARITO = `
-EXEMPLO — ficha de OUTRO cliente, de outra conversa. Serve só para mostrar o
-nível de detalhe, o tom e o formato esperados. NENHUM fato dele aparece na
-conversa que você vai ler agora; não reaproveite produto, preço, nome nem
-situação daqui.
+export const GABARITO = `
+EXEMPLO — ficha de OUTRO cliente, de outra conversa (inventada para servir de
+modelo). Serve só para mostrar o nível de detalhe, o tom e o formato esperados.
+NENHUM fato dele aparece na conversa que você vai ler agora; não reaproveite
+produto, preço, nome nem situação daqui.
 
 {
   "classificacao": "customer",
-  "score": 78,
-  "riscoPerda": 15,
-  "perfil": "Cautelosa e decidida",
-  "diagnostico": "Comprou o aparelho por R$ 5.695 em 18x no dia 22/08, recebeu em casa no mesmo dia e mandou foto agradecendo. Não há nada a fechar aqui — o que existe é um cliente satisfeito com duas pontas soltas que valem dinheiro.",
-  "relato": "Conheceu a loja pessoalmente numa feira, onde ouviu o preço e a avaliação do aparelho dela na troca. Voltou pelo WhatsApp onze dias depois perguntando boleto e parcelamento.\\n\\nO primeiro travamento foi crédito: mandou dois CPFs e os dois foram negados. Reagiu com humor e propôs sozinha a saída — pedir o cartão do irmão. Pediu uma coisa específica, que a loja cumpriu: ser avisada se entrasse outro na cor certa. Foi esse aviso, sete dias depois, que reabriu a conversa.\\n\\nO atrito que quase custou a venda apareceu no último dia: só então o vendedor contou que o aparelho era de um parceiro de outra cidade, por encomenda, com 100% pago antes. Ela acabara de dizer que mora longe. O vendedor resolveu no mesmo minuto, com link de pagamento e entrega em casa.",
+  "score": 74,
+  "riscoPerda": 20,
+  "perfil": "Pesquisador e direto",
+  "diagnostico": "Comprou o aparelho por R$ 3.480 em 10x no dia 05/09 e retirou na loja no dia seguinte, elogiando o atendimento. Não há venda a fechar — o que existe é um cliente satisfeito com uma ponta solta que vale dinheiro.",
+  "relato": "Chegou por um anúncio perguntando preço e prazo. Comparou com outra loja na mesma conversa e pediu foto da caixa lacrada antes de seguir.\\n\\nO primeiro travamento foi o parcelamento: queria mais parcelas sem juros do que a loja oferecia. Ele mesmo propôs a saída — dar uma entrada maior no Pix —, e a loja aceitou.\\n\\nO atrito que quase custou a venda apareceu na véspera da retirada: a cor escolhida tinha acabado e o vendedor só avisou quando ele perguntou o horário. A loja resolveu no mesmo minuto, oferecendo a outra cor com uma capa de cortesia, que ele aceitou.",
   "sinais": [
-    { "rotulo": "Insistiu após o crédito negado", "evidencia": "vou pedir cartão pro meu irmão então rs" },
-    { "rotulo": "Mandou o marido à loja", "evidencia": "Meu marido tá indo aí. Vc consegue esperar ?" }
+    { "rotulo": "Pediu prova de procedência", "evidencia": "consegue mandar foto da caixa lacrada?" },
+    { "rotulo": "Propôs a própria saída", "evidencia": "se eu der metade no pix fecha em 10?" }
   ],
   "objecoes": [
-    { "rotulo": "Bateria substituída", "evidencia": "Mais da algum b.o? Pq caso eu tento vender depois", "desfecho": "A loja se comprometeu a aceitar de volta como entrada" },
-    { "rotulo": "Pagar antes de ver o aparelho", "evidencia": "Tenho que ir aí pagar depois buscar ? Kkk", "desfecho": "Resolvida com link de pagamento e entrega em casa" }
+    { "rotulo": "Parcelamento menor que o esperado", "evidencia": "na outra loja faz em mais vezes", "desfecho": "Resolvida com entrada maior no Pix" },
+    { "rotulo": "Cor indisponível", "evidencia": "mas era a azul que eu queria", "desfecho": "Aceitou a outra cor com capa de cortesia" }
   ],
   "pontasSoltas": [
-    "O aparelho antigo dela continua com ela — o marido pagou cheio e a troca não aconteceu, embora o vendedor tenha prometido em áudio aceitá-lo como entrada."
+    "Ele perguntou se a loja compra o aparelho antigo dele e ninguém respondeu essa pergunta."
   ],
-  "proximaAcao": "Oferecer a compra do aparelho antigo dela — a loja já prometeu aceitá-lo e ele continua parado com ela.",
-  "proximaAcaoPorque": "Retoma uma promessa que a loja fez, não uma oferta nova, e não pede nada: oferece dinheiro por um seminovo que entraria no estoque por um canal que já confia na loja.",
+  "proximaAcao": "Responder a pergunta que ficou sem resposta: oferecer uma avaliação do aparelho antigo dele.",
+  "proximaAcaoPorque": "Retoma algo que ele mesmo pediu, não uma oferta nova, e pode trazer um seminovo para o estoque por um cliente que já confia na loja.",
   "urgencia": "medium",
-  "mensagemSugerida": "Oi! Tudo bem? Me conta, como tá sendo o aparelho novo? 😄 Lembra que eu falei que a gente pegava o seu antigo como entrada? Seu marido acabou pagando tudo e ele ficou com você — se tiver só parado aí, a gente compra de você. Quer que eu faça uma avaliação?"
+  "mensagemSugerida": "Oi! Tudo certo com o aparelho novo? 😄 Você tinha perguntado se a gente compra o seu antigo e acabou ficando sem resposta — se ainda estiver com ele, faço uma avaliação sem compromisso. Quer?"
 }
 
 REPARE no exemplo: cada sinal cita o que a pessoa ESCREVEU; cada objeção diz
@@ -409,7 +424,12 @@ function regras(nomeDaLoja: string): string {
     '',
     '7. Escreva em português brasileiro, direto, para alguém de balcão ler em',
     '   quinze segundos. Sem jargão de consultoria, sem "potencial cliente",',
-    '   sem "jornada". Chame a pessoa pelo nome.',
+    '   sem "jornada". Chame a pessoa pelo primeiro nome; se o nome for',
+    '   "Cliente", ele não é conhecido — não use nome nenhum.',
+    '',
+    '8. Trechos como [CPF], [TELEFONE], [E-MAIL], [CEP], [Nº] ou [CARTÃO] foram',
+    '   ocultados de propósito. Não tente adivinhar o que havia ali e não os',
+    '   escreva na mensagem sugerida.',
     '',
     'RESPONDA SOMENTE COM JSON VÁLIDO, sem markdown e sem texto fora do JSON,',
     'exatamente neste formato:',
