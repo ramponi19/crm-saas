@@ -54,9 +54,28 @@ export async function POST(req: Request) {
     const token = tokenEmClaro(cfg)
     // Cancela o que estiver assinado antes de perder o token — senão o C2S segue
     // mandando para uma URL que ninguém mais controla do lado deles.
-    if (token) for (const g of cfg.assinaturas ?? []) await cancelar(token, g)
-    await salvarConfig(svc, empresaId, { ...cfg, token: undefined, assinaturas: [], assinado_em: null })
-    return NextResponse.json({ ok: true })
+    const falharam: string[] = []
+    if (token) {
+      for (const g of cfg.assinaturas ?? []) {
+        const r = await cancelar(token, g)
+        if (!r.ok) falharam.push(g)
+      }
+    }
+    /**
+     * O segredo de ENTRADA tambem sai. Antes ele ficava: se o cancelamento no C2S
+     * falhasse (ou nem fosse tentado, sem token), o C2S seguia postando e o webhook
+     * seguia aceitando e criando leads — "removido" na tela, aberto na pratica.
+     * Sem `entrada`, o webhook recusa; reconectar gera um segredo novo.
+     */
+    await salvarConfig(svc, empresaId, {
+      ...cfg, token: undefined, assinaturas: [], assinado_em: null, entrada: undefined, url_assinada: null,
+    })
+    return NextResponse.json({
+      ok: true,
+      aviso: falharam.length
+        ? `O C2S não confirmou o cancelamento de: ${falharam.join(', ')}. Mesmo assim o CRM parou de aceitar os envios deles.`
+        : null,
+    })
   }
 
   const token = tokenEmClaro(cfg)

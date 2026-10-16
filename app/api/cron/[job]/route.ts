@@ -90,16 +90,26 @@ export async function GET(
         if (eErr) throw eErr
 
         let atualizadas = 0
+        /**
+         * Falha por empresa nao derruba as outras, mas tambem nao some: antes o
+         * `catch {}` vazio escondia ate o Stripe fora do ar, e um update recusado
+         * pelo banco contava como "atualizada". O job responde quem falhou e por que.
+         */
+        const falhas: { empresa: number; erro: string }[] = []
         for (const emp of empresas ?? []) {
           try {
             const sub = await stripe.subscriptions.retrieve(emp.stripe_subscription_id as string)
             const priceId = sub.items.data[0]?.price?.id ?? null
             const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
-            await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+            const { error: uErr } = await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+            if (uErr) throw uErr
             atualizadas++
-          } catch { /* assinatura cancelada ou inválida — ignora */ }
+          } catch (e) {
+            falhas.push({ empresa: emp.id as number, erro: e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e) })
+          }
         }
-        return NextResponse.json({ ok: true, job, atualizadas })
+        if (falhas.length) console.error('[cron sync-stripe] falhas:', falhas)
+        return NextResponse.json({ ok: falhas.length === 0, job, atualizadas, falhas })
       }
 
       case 'gerar-followups': {
@@ -401,12 +411,20 @@ export async function GET(
           .from('complementos_empresa').select('empresa_id').eq('zapintel_ativo', true)
         if (error) throw error
         const resultado: { empresa: number; vendas: number; gravadas: number }[] = []
+        // Uma empresa que falha nao impede as outras (antes a primeira falha
+        // abortava o job inteiro e ninguem recebia a ponte do dia).
+        const falhasPonte: { empresa: number; erro: string }[] = []
         for (const { empresa_id } of (ativas ?? []) as { empresa_id: number }[]) {
-          const linhas = await montarPonte(supabase as unknown as SupabaseClient, empresa_id)
-          const gravadas = await gravarPonte(supabase as unknown as SupabaseClient, linhas)
-          resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
+          try {
+            const linhas = await montarPonte(supabase as unknown as SupabaseClient, empresa_id)
+            const gravadas = await gravarPonte(supabase as unknown as SupabaseClient, linhas)
+            resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
+          } catch (e) {
+            falhasPonte.push({ empresa: empresa_id, erro: e instanceof Error ? e.message : String(e) })
+          }
         }
-        return NextResponse.json({ ok: true, job, resultado })
+        if (falhasPonte.length) console.error('[cron ponte-vendas] falhas:', falhasPonte)
+        return NextResponse.json({ ok: falhasPonte.length === 0, job, resultado, falhas: falhasPonte })
       }
 
       default:

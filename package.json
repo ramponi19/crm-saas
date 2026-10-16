@@ -34,7 +34,6 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^3.10.1",
     "sonner": "^1.7.2",
     "stripe": "^18.0.0",
     "tailwind-merge": "^2.6.0",

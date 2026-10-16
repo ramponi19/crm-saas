@@ -54,10 +54,13 @@ export async function carregarConfig(svc: Svc, empresaId: number): Promise<Confi
 }
 
 export async function salvarConfig(svc: Svc, empresaId: number, cfg: ConfigC2S): Promise<void> {
-  await svc.from('configuracoes_sistema').upsert(
+  // Lanca se o banco recusar: antes o erro era ignorado e a tela recebia "ok" com
+  // nada gravado — token "salvo" que nao existia, assinatura que nao ficava.
+  const { error } = await svc.from('configuracoes_sistema').upsert(
     { empresa_id: empresaId, chave: CHAVE, valor: cfg as never },
     { onConflict: 'empresa_id,chave' },
   )
+  if (error) throw new Error(`configuracao do C2S nao gravada: ${error.message}`)
 }
 
 /**

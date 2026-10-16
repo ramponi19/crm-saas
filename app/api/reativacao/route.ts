@@ -33,6 +33,14 @@ export async function POST(req: Request) {
     cadencia_id: body.cadencia_id ? Number(body.cadencia_id) : null,
   }
   const svc = createServiceClient()
+  // A cadencia precisa ser DESTA empresa: o cron le os passos dela com service
+  // role e inscreve os leads frios nela — com um id alheio, as inscricoes iam
+  // para a cadencia de outro tenant.
+  if (config.cadencia_id != null) {
+    const { data: cad } = await svc.from('cadencias').select('id')
+      .eq('id', config.cadencia_id).eq('empresa_id', empresaId).maybeSingle()
+    if (!cad) return NextResponse.json({ error: 'Cadência não encontrada nesta empresa' }, { status: 404 })
+  }
   const { error } = await svc.from('configuracoes_sistema').upsert(
     { empresa_id: empresaId, chave: 'reativacao', valor: config as never },
     { onConflict: 'empresa_id,chave' },
