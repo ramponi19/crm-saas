@@ -221,11 +221,39 @@ export async function montarPonte(db: SupabaseClient, empresaId: number): Promis
  */
 export async function gravarPonte(db: SupabaseClient, linhas: LinhaPonte[]): Promise<number> {
   if (!linhas.length) return 0
+  const empresaId = linhas[0].empresa_id
 
-  const { data: fixos } = await db
-    .from('zapintel_venda_lead').select('venda_id')
-    .eq('empresa_id', linhas[0].empresa_id).eq('como', 'manual')
-  const protegidos = new Set((fixos ?? []).map((f) => (f as { venda_id: number }).venda_id))
+  /**
+   * ERRO AO LER NÃO É LISTA VAZIA.
+   *
+   * Lista vazia é o normal — nenhuma venda confirmada à mão — e grava. Erro é não
+   * saber quais são, e aí não grava nada: antes o erro era ignorado, o conjunto
+   * vinha vazio e o upsert sobrescrevia justamente as ligações confirmadas.
+   *
+   * Paginado pelo mesmo motivo: o PostgREST corta em 1000 linhas em silêncio, e a
+   * 1001ª confirmada seria tratada como palpite. `buscarTudo` pagina e lança no
+   * erro.
+   */
+  let fixos: { venda_id: number }[]
+  try {
+    fixos = await buscarTudo<{ venda_id: number }>((de, ate) =>
+      db.from('zapintel_venda_lead').select('venda_id')
+        .eq('empresa_id', empresaId).eq('como', 'manual')
+        .order('venda_id', { ascending: true }).range(de, ate))
+  } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e)
+    // Uma linha de JSON: o cron só devolve 500 e o Sentry não vê erro tratado,
+    // então o log da Vercel é o único rastro — e assim dá para filtrar pelo evento.
+    console.error(JSON.stringify({
+      evento: 'zapintel.ponte.gravacao_pulada',
+      motivo: 'ligacoes_manuais_nao_lidas',
+      empresa_id: empresaId,
+      linhas: linhas.length,
+      erro,
+    }))
+    throw new Error(`ponte nao gravada (empresa ${empresaId}): ligacoes manuais nao lidas: ${erro}`)
+  }
+  const protegidos = new Set(fixos.map((f) => f.venda_id))
 
   const gravar = linhas.filter((l) => !protegidos.has(l.venda_id))
   for (let i = 0; i < gravar.length; i += 500) {
