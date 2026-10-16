@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
@@ -118,7 +118,12 @@ export async function GET(req: Request) {
      */
     // Desde 16/10 a IA do ZapIntel é só Anthropic: sem a chave dela, ou com
     // um modelo configurado que não é `claude-`, ela não responde nada.
-    const iaDisponivel = await iaDoCrmLigada()
+    // Funil interno (equipe, candidatos): a rota da ficha responde 422, então
+    // a tela nem oferece o botão. MESMA função da rota — um critério só.
+    const [iaDisponivel, funilInterno] = await Promise.all([
+      iaDoCrmLigada(),
+      leadDeFunilInterno(db, empresaId, id),
+    ])
 
     /**
      * A CONVERSA NÃO VIAJA MAIS — DESDE 15/10/2026.
@@ -141,6 +146,7 @@ export async function GET(req: Request) {
       travou: travou ? { ...travou, trecho } : null,
       perfil,
       iaDisponivel,
+      funilInterno,
     })
   } catch (e) {
     console.error('zapintel/conversa:', (e as Error).message)
