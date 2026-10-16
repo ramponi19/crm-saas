@@ -9,11 +9,19 @@
  *
  *   npm test
  */
-import { test, describe } from 'node:test'
+import { test, describe, mock, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { bancoFalso, filtro, type Consulta } from './banco-falso'
-import { gravarPonte, type LinhaPonte } from '@/lib/zapintel/ponte'
+import type { LinhaPonte } from '@/lib/zapintel/ponte'
+
+// O Sentry de mentira precisa estar no lugar ANTES de a ponte ser importada.
+const capturar = mock.fn((_erro: unknown, _contexto?: unknown) => 'id-falso')
+mock.module('@sentry/nextjs', { namedExports: { captureException: capturar } })
+const { gravarPonte } = await import('@/lib/zapintel/ponte')
+beforeEach(() => capturar.mock.resetCalls())
+
+type Captura = { tags: Record<string, string>; contexts: { ponte: Record<string, number> } }
 
 const como = (db: unknown) => db as unknown as SupabaseClient
 
@@ -46,6 +54,33 @@ describe('ponte: ligação confirmada à mão nunca é sobrescrita', () => {
       { evento: 'zapintel.ponte.gravacao_pulada', motivo: 'ligacoes_manuais_nao_lidas', empresa_id: 1, linhas: 2 },
     )
     assert.match(registro.erro, /statement timeout/)
+
+    // E alguém é avisado: o cron engole o erro em 500, então o aviso sai daqui.
+    assert.equal(capturar.mock.callCount(), 1)
+    const [erro, ctx] = capturar.mock.calls[0].arguments as [Error, Captura]
+    assert.match(erro.message, /ligacoes manuais nao lidas/)
+    assert.deepEqual(ctx.tags, { modulo: 'zapintel', job: 'ponte', empresa_id: '1', motivo: 'ligacoes_manuais_nao_lidas' })
+    assert.deepEqual(ctx.contexts.ponte, { linhas: 2 })
+  })
+
+  test('erro no upsert: avisa com quanto já tinha entrado antes da falha', async (t) => {
+    const log = t.mock.method(console, 'error', () => {})
+    let lotes = 0
+    const db = bancoFalso((c) => {
+      if (c.op !== 'upsert') return { data: [], error: null }
+      lotes++
+      return lotes === 2 ? { data: null, error: { message: 'connection reset' } } : { data: null, error: null }
+    })
+    const muitas = Array.from({ length: 700 }, (_, i) => linha(i + 1))
+
+    await assert.rejects(gravarPonte(como(db), muitas), /gravada em parte/)
+
+    assert.equal(log.mock.callCount(), 1)
+    assert.equal(JSON.parse(String(log.mock.calls[0].arguments[0])).motivo, 'upsert_falhou')
+    assert.equal(capturar.mock.callCount(), 1)
+    const [, ctx] = capturar.mock.calls[0].arguments as [Error, Captura]
+    assert.deepEqual(ctx.tags, { modulo: 'zapintel', job: 'ponte', empresa_id: '1', motivo: 'upsert_falhou' })
+    assert.deepEqual(ctx.contexts.ponte, { linhas: 700, a_gravar: 700, gravadas_antes_da_falha: 500, lote: 200 })
   })
 
   test('lista vazia de verdade (nenhuma confirmada): grava tudo normalmente', async (t) => {
@@ -57,6 +92,7 @@ describe('ponte: ligação confirmada à mão nunca é sobrescrita', () => {
     assert.equal(n, 3)
     assert.deepEqual(gravados(db.consultas), [1, 2, 3])
     assert.equal(log.mock.callCount(), 0, 'lista vazia não é erro')
+    assert.equal(capturar.mock.callCount(), 0, 'lista vazia não avisa ninguém')
     const leitura = db.consultas.find(ehLeituraManual)!
     assert.deepEqual(leitura.filtros.filter((f) => f[0] === 'eq'), [['eq', 'empresa_id', 1], ['eq', 'como', 'manual']])
   })
