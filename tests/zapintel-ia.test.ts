@@ -36,13 +36,15 @@ class AnthropicFalso {
 mock.module('@anthropic-ai/sdk', { defaultExport: AnthropicFalso })
 
 const cfg = { atual: { ativo: true, modelo: '' as string | null } }
+/** Cada linha que `perguntarIA` grava em `assistente_uso` (item 4 de 17/10). */
+const usos: Array<Record<string, unknown>> = []
 mock.module('@/lib/supabase/service', {
   namedExports: {
     createServiceClient: () => {
       const q: Record<string, unknown> = {}
       for (const m of ['select', 'eq']) q[m] = () => q
       q.maybeSingle = async () => ({ data: cfg.atual, error: null })
-      q.insert = async () => ({ error: null })
+      q.insert = async (linha: Record<string, unknown>) => { usos.push(linha); return { error: null } }
       return { from: () => q }
     },
   },
@@ -323,6 +325,58 @@ describe('perguntarIA: só Anthropic', () => {
     const log = JSON.parse(logs[0])
     assert.equal(log.motivo, 'erro_api')
     assert.equal(log.status, 429)
+  })
+})
+
+// ── 4b. toda chamada à Anthropic grava em assistente_uso (17/10/2026) ──────
+
+describe('assistente_uso: toda chamada à Anthropic vira uma linha', () => {
+  const chamar = (modelo?: string) => ia.perguntarIA({ empresaId: 7, system: 's', mensagens: [{ role: 'user', content: 'x' }], origem: 'teste', modelo })
+  beforeEach(() => { usos.length = 0; cfg.atual = { ativo: true, modelo: 'claude-haiku-5-5' } })
+
+  test('sucesso: grava com os tokens (entrada soma o cache)', async () => {
+    sdk.responder = async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 } })
+    const r = await chamar()
+    assert.equal(r.ok, true)
+    assert.deepEqual(usos, [{ empresa_id: 7, tokens_in: 16, tokens_out: 7 }])
+  })
+
+  test('recusa: grava (a Anthropic cobra) e responde 502', async () => {
+    sdk.responder = async () => ({ stop_reason: 'refusal', stop_details: { category: 'x' }, content: [], usage: { input_tokens: 3, output_tokens: 1 } })
+    const { r } = await comLogs(() => chamar())
+    assert.equal(!r.ok && r.status, 502)
+    assert.deepEqual(usos, [{ empresa_id: 7, tokens_in: 3, tokens_out: 1 }])
+  })
+
+  test('resposta vazia: grava', async () => {
+    sdk.responder = async () => ({ stop_reason: 'max_tokens', content: [], usage: { input_tokens: 4, output_tokens: 9 } })
+    await comLogs(() => chamar())
+    assert.equal(usos.length, 1)
+  })
+
+  test('timeout: grava, com tokens nulos (não dá para saber o que foi cobrado)', async () => {
+    sdk.responder = async () => { throw new APIConnectionTimeoutError() }
+    const { r } = await comLogs(() => chamar())
+    assert.equal(!r.ok && r.status, 504)
+    assert.deepEqual(usos, [{ empresa_id: 7, tokens_in: null, tokens_out: null }])
+  })
+
+  test('erro da API: grava', async () => {
+    sdk.responder = async () => { throw new APIError(529, 'overloaded') }
+    await comLogs(() => chamar())
+    assert.equal(usos.length, 1)
+  })
+
+  test('o caminho do script de lote (`modelo` explícito) também grava', async () => {
+    sdk.responder = async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 2, output_tokens: 2 } })
+    await chamar('claude-haiku-5-5')
+    assert.equal(usos.length, 1)
+  })
+
+  test('modelo não Claude não chama a Anthropic — e não grava nada', async () => {
+    cfg.atual = { ativo: true, modelo: 'gemini-3.6-flash' }
+    await comLogs(() => chamar())
+    assert.equal(usos.length, 0)
   })
 })
 

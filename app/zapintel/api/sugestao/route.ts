@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno, logFalhaFunilInterno, MENSAGEM_FALHA_FUNIL } from '@/lib/zapintel/ctx'
 import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
@@ -68,15 +68,23 @@ export async function POST(req: Request) {
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a conversa de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, porId, nomeDaLoja, segmento } = await carregarConversas(db, empresaId, [id])
+  const { analisados, porId, nomeDaLoja: nomeDoCrm, segmento, indisponivel } = await carregarConversas(db, empresaId, [id])
+  // Nome da empresa ilegível: o prompt não inventa um ("Loja"). Ver `contextoDoPerfil`.
+  const nomeDaLoja = indisponivel.includes('empresa') ? 'a loja' : nomeDoCrm
   const lead = analisados[0]
   if (!lead || !lojaVisivel(acesso, porId.get(id)?.filial_id)) {
     return NextResponse.json({ erro: 'conversa nao encontrada' }, { status: 404 })
   }
 
-  const { data: ponte } = await db
+  const { data: ponte, error: erroPonte } = await db
     .from('zapintel_venda_lead').select('venda_id')
     .eq('empresa_id', empresaId).eq('lead_id', id).limit(1).maybeSingle()
+  // Sem saber se ele já comprou, não há como escolher o ponto de retomada — e
+  // tratar a falha como "não comprou" mandaria cobrar quem já pagou.
+  if (erroPonte) {
+    console.error(JSON.stringify({ evento: 'zapintel.prompt.dado_indisponivel', rota: 'sugestao', empresa_id: empresaId, lead_id: id, dados: ['venda'] }))
+    return NextResponse.json({ erro: 'Não foi possível confirmar se este lead já comprou. Tente de novo em instantes.' }, { status: 503 })
+  }
 
   const travou = ondeTravou(lead, !!ponte)
   if (!travou) {
@@ -146,7 +154,14 @@ export async function POST(req: Request) {
     contextoDaSugestao(lead, travou, ficha),
   ].join('\n')
 
-  if (await leadDeFunilInterno(db, empresaId, id)) {
+  // Não deu para checar: bloqueia (503). Liberar seria gastar IA com conversa
+  // da equipe justamente quando o banco está instável.
+  let interno: boolean
+  try { interno = await leadDeFunilInterno(db, empresaId, id) } catch (e) {
+    logFalhaFunilInterno('sugestao', empresaId, id, e)
+    return NextResponse.json({ erro: MENSAGEM_FALHA_FUNIL }, { status: 503 })
+  }
+  if (interno) {
     return NextResponse.json({ erro: 'Conversa de funil interno (equipe ou candidatos) fica fora das análises do ZapIntel.' }, { status: 422 })
   }
 

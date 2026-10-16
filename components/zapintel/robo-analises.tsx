@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { mensagemPorStatus } from "@/lib/zapintel/mensagem-erro";
 import { RefreshCw, Sparkles, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 /**
@@ -38,22 +39,63 @@ type Pendente = {
   lojaDeve: boolean;
 };
 
-type Contagem = { desatualizadas: Pendente[]; semAnalise: Pendente[]; iaDisponivel: boolean };
+type Contagem = { desatualizadas: Pendente[]; semAnalise: Pendente[]; iaDisponivel: boolean; indisponivel: boolean };
 
-/** Pergunta ao servidor; `null` quando não deu para contar. Não mexe em estado. */
-async function buscarContagem(): Promise<Contagem | null> {
+const SEM_CONTAGEM: Contagem = { desatualizadas: [], semAnalise: [], iaDisponivel: false, indisponivel: true };
+
+/**
+ * Pergunta ao servidor. Não mexe em estado.
+ *
+ * Qualquer falha — a rota dizendo `indisponivel` (o banco estourou o tempo),
+ * erro HTTP ou rede — vira `indisponivel: true`. Antes virava `null` e o bloco
+ * sumia; e um erro dentro da rota chegava aqui como lista vazia, que o robô
+ * lia como "em dia" (inventário de 17/10/2026, D1 e D11). `atualizar` pula o
+ * cache de 60 s da rota: é para depois de um lote, quando a fila mudou.
+ */
+async function buscarContagem(atualizar = false): Promise<Contagem> {
   try {
-    const r = await fetch("/zapintel/api/perfil/pendentes", { cache: "no-store" });
+    const r = await fetch(`/zapintel/api/perfil/pendentes${atualizar ? "?atualizar=1" : ""}`, { cache: "no-store" });
     const d = await r.json();
-    if (!r.ok) return null;
+    if (!r.ok || d?.indisponivel || !Array.isArray(d?.desatualizadas) || !Array.isArray(d?.semAnalise)) return SEM_CONTAGEM;
     return {
       desatualizadas: d.desatualizadas as Pendente[],
       semAnalise: d.semAnalise as Pendente[],
       iaDisponivel: !!d.iaDisponivel,
+      indisponivel: false,
     };
   } catch {
-    return null;
+    return SEM_CONTAGEM;
   }
+}
+
+/**
+ * A frase do topo do robô. Separada para ser testada sozinha
+ * (`tests/zapintel-estabilidade.test.ts`): sem contagem confiável, ela NUNCA
+ * diz "em dia".
+ */
+export function ResumoPendentes({ indisponivel, nNovas, nAndou, onTentar }: {
+  indisponivel: boolean; nNovas: number; nAndou: number; onTentar?: () => void;
+}) {
+  if (indisponivel) {
+    return (
+      <span>
+        Não foi possível verificar as análises pendentes.{" "}
+        {onTentar && (
+          <button type="button" onClick={onTentar} style={{
+            background: "none", border: "none", padding: 0, color: "var(--purple-l)", fontWeight: 700, cursor: "pointer", fontSize: 12,
+          }}>Tentar de novo</button>
+        )}
+      </span>
+    );
+  }
+  if (nNovas + nAndou === 0) return <span>Análises de IA em dia com as conversas.</span>;
+  return (
+    <span>
+      {nNovas > 0 && <><b>{nNovas} {nNovas === 1 ? "conversa nova" : "conversas novas"}</b> sem análise</>}
+      {nNovas > 0 && nAndou > 0 && " e "}
+      {nAndou > 0 && <><b>{nAndou}</b> {nAndou === 1 ? "que andou" : "que andaram"} desde a última análise</>}.
+    </span>
+  );
 }
 
 const dataCurta = (iso: string | null) =>
@@ -89,15 +131,15 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
     return () => { desmontado.current = true; parar.current = true; emCurso.current?.abort(); };
   }, []);
 
-  const aplicar = useCallback((d: Contagem | null) => {
-    if (!d) { setFalhou(true); return; }
+  const aplicar = useCallback((d: Contagem) => {
+    if (d.indisponivel) { setFalhou(true); return; }
     setDesatualizadas(d.desatualizadas);
     setSemAnalise(d.semAnalise);
     setIaDisponivel(d.iaDisponivel);
     setFalhou(false);
   }, []);
 
-  const contar = useCallback(() => { buscarContagem().then(aplicar); }, [aplicar]);
+  const contar = useCallback((atualizar = false) => { buscarContagem(atualizar).then(aplicar); }, [aplicar]);
 
   // Conta ao montar e a cada abertura do chat. O estado só muda na resposta,
   // dentro do `then` — e só se o bloco ainda estiver na tela.
@@ -140,7 +182,7 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) {
-          setErroLote(`Parei em ${p.nome}: ${d?.erro || "a IA não respondeu"}. As já geradas ficaram salvas.`);
+          setErroLote(`Parei em ${p.nome}: ${mensagemPorStatus(r.status, d?.erro)} As já geradas ficaram salvas.`);
           break;
         }
         window.dispatchEvent(new CustomEvent("zapintel:analise-feita", { detail: p.leadId }));
@@ -155,10 +197,22 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
     // Botão "Parar" cai aqui normalmente; só a saída da tela não mexe no estado.
     if (desmontado.current) return;
     setGerando(null);
-    contar();
+    contar(true);
   }
 
-  if (falhou || desatualizadas === null) return null;
+  // Sem contagem confiável: diz isso, com tentar de novo — nunca "em dia" e
+  // nunca some calado.
+  if (falhou) {
+    return (
+      <div style={{ borderBottom: "1px solid var(--brd)", background: "var(--card2)", padding: "10px 14px" }}>
+        <div role="status" style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--txt)", lineHeight: 1.45 }}>
+          <Sparkles size={13} style={{ color: "var(--yellow)", flex: "none" }} />
+          <ResumoPendentes indisponivel nNovas={0} nAndou={0} onTentar={() => contar(true)} />
+        </div>
+      </div>
+    );
+  }
+  if (desatualizadas === null) return null;
   const nAndou = desatualizadas.length;
   const nNovas = semAnalise.length;
   const n = nAndou + nNovas;
@@ -175,13 +229,7 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
       <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--txt)", lineHeight: 1.45 }}>
           <Sparkles size={13} style={{ color: "var(--purple-l)", flex: "none" }} />
-          {n === 0
-            ? <span>Análises de IA em dia com as conversas.</span>
-            : <span>
-                {nNovas > 0 && <><b>{nNovas} {nNovas === 1 ? "conversa nova" : "conversas novas"}</b> sem análise</>}
-                {nNovas > 0 && nAndou > 0 && " e "}
-                {nAndou > 0 && <><b>{nAndou}</b> {nAndou === 1 ? "que andou" : "que andaram"} desde a última análise</>}.
-              </span>}
+          <ResumoPendentes indisponivel={false} nNovas={nNovas} nAndou={nAndou} />
         </div>
 
         {n > 0 && erroLote && (

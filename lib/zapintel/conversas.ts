@@ -129,7 +129,15 @@ export interface Conversas {
   nomeDaLoja: string
   /** O segmento da empresa no CRM (`empresas.segmento`), cru. Ver `papel.ts`. */
   segmento: string | null
+  /**
+   * O que do CRM não deu para ler nesta carga (17/10/2026). Nas telas, o
+   * padrão ("Loja", sem responsável) basta; no PROMPT da IA, padrão pareceria
+   * fato — então o prompt diz "informação indisponível" para cada item daqui.
+   */
+  indisponivel: DadoIndisponivel[]
 }
+
+export type DadoIndisponivel = 'empresa' | 'responsaveis' | 'motivos_perda' | 'venda' | 'valor_venda'
 
 /**
  * Carrega e analisa as conversas da empresa.
@@ -143,8 +151,10 @@ export async function carregarConversas(
   empresaId: number,
   ids: number[] = [],
 ): Promise<Conversas> {
-  const { data: empresa } = await db
+  const indisponivel: DadoIndisponivel[] = []
+  const { data: empresa, error: erroEmpresa } = await db
     .from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle()
+  if (erroEmpresa) indisponivel.push('empresa')
 
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
   const segmento = (empresa as { segmento?: string | null } | null)?.segmento ?? null
@@ -162,18 +172,20 @@ export async function carregarConversas(
   // O motivo da perda é escolhido de uma lista por quem perdeu o lead. São
   // poucas linhas por empresa, então vale uma consulta e um mapa — bem mais
   // barato que um join carregado em cada página de leads.
-  const { data: motivosRaw } = await db
+  const { data: motivosRaw, error: erroMotivos } = await db
     .from('motivos_perda').select('id, label').eq('empresa_id', empresaId)
+  if (erroMotivos) indisponivel.push('motivos_perda')
   const motivo = new Map<number, string>(
     ((motivosRaw ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label]),
   )
   // O vendedor RESPONSÁVEL, quando alguém atribuiu. É fato; o que o ZapIntel
   // fazia era deduzir o nome do texto da conversa, e o resultado tinha "hoje",
   // "Pedroe" e "Pedreo" na lista de vendedores.
-  const { data: usuariosRaw } = (await db
+  const { data: usuariosRaw, error: erroUsuarios } = (await db
     .from('empresa_usuarios')
     .select('usuario_id, usuarios(id, nome)')
-    .eq('empresa_id', empresaId).eq('ativo', true)) as { data: unknown[] | null }
+    .eq('empresa_id', empresaId).eq('ativo', true)) as { data: unknown[] | null; error: { message: string } | null }
+  if (erroUsuarios) indisponivel.push('responsaveis')
   const nomeDoUsuario = new Map<string, string>()
   // O PostgREST devolve o relacionamento como ARRAY quando não consegue provar
   // que é 1-para-1, então o tipo gerado é mais largo do que a realidade. Achatar
@@ -193,7 +205,7 @@ export async function carregarConversas(
 
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
   if (!porId.size) {
-    return { analisados: [], porId, nomeDaLoja, segmento }
+    return { analisados: [], porId, nomeDaLoja, segmento, indisponivel }
   }
 
   const alvo = [...porId.keys()]
@@ -218,5 +230,5 @@ export async function carregarConversas(
   // memória, sobre dado já carregado: milissegundos.
   msgs.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
 
-  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, segmento }
+  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, segmento, indisponivel }
 }

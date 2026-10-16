@@ -94,7 +94,11 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
       {NAV.map(({ href, icon: Icon, label, exact }) => {
         const active = exact ? path === href : path === href || path.startsWith(href + "/");
         return (
-          <Link key={href} href={href} style={{
+          // Sem prefetch (17/10/2026): cada abertura de tela pedia de antemão as 5
+          // telas do menu e o /dashboard (12 requisições ?_rsc=), gastando CPU da
+          // Vercel no plano gratuito para telas que quase nunca são abertas em
+          // seguida. A navegação continua igual; só busca ao clicar.
+          <Link key={href} href={href} prefetch={false} style={{
             display: "flex", alignItems: "center", gap: 9, padding: "9px 12px",
             borderRadius: 9, textDecoration: "none", fontSize: 13, fontWeight: active ? 700 : 400,
             background: active ? "rgba(124,92,252,.18)" : "transparent",
@@ -159,7 +163,7 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
           ) : "Lendo as conversas…"}
         </div>
       </div>
-      <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, textDecoration: "none", fontSize: 12, color: "var(--dim)" }}>
+      <Link href="/dashboard" prefetch={false} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, textDecoration: "none", fontSize: 12, color: "var(--dim)" }}>
         <ArrowLeft size={15} /> Voltar ao CRM
       </Link>
     </aside>

@@ -6,6 +6,7 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
 import { num, ha } from "@/components/zapintel/rotulos";
+import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 
 /**
  * PÓS-VENDA — QUEM JÁ COMPROU E PRECISA DA LOJA. Reconstruída em 15/10/2026.
@@ -47,7 +48,7 @@ export default function PosVendaPage() {
   const [busca, setBusca] = useState("");
   const [mostrar, setMostrar] = useState(POR_VEZ);
 
-  const { dados, erro, aoVivo, carregando } = useRpcAoVivo<PosVenda>("zapintel_posvenda", { p_filial: lojaAtiva, p_empresa: empresa }, empresa);
+  const { dados, erro, aoVivo, carregando, tentarDeNovo } = useRpcAoVivo<PosVenda>("zapintel_posvenda", { p_filial: lojaAtiva, p_empresa: empresa }, empresa);
   const recorte = lojaAtiva == null ? `${storeName || "Sua empresa"} · toda a rede` : (lojas.find((l) => l.id === lojaAtiva)?.nome ?? "Loja");
 
   const filtrados = useMemo(() => {
@@ -82,7 +83,7 @@ export default function PosVendaPage() {
         <span className={`pv2-vivo ${aoVivo ? "" : "off"}`}><span className={`pv2-ponto ${aoVivo ? "on" : ""}`} /> {aoVivo ? "Ao vivo" : "Reconectando…"}</span>
       </header>
 
-      {erro && !dados && <div className="card pv2-vazio"><AlertTriangle size={16} /> {erro}</div>}
+      {erro && !dados && <div className="card pv2-vazio"><ErroDeTela erro={erro} onTentar={tentarDeNovo} /></div>}
       {!dados && !erro && <div className="card pv2-osso" style={{ height: 420 }} />}
 
       {dados && (

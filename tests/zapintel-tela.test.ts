@@ -19,6 +19,8 @@ mock.module('@/lib/zapintel/ctx', {
     zapintelAcesso: async () => ({ userId: 'u', empresaId: 1, lojas: [3] }),
     lojaVisivel: () => true,
     leadDeFunilInterno: async (_db: unknown, empresaId: number, leadId: number) => { estado.perguntas.push([empresaId, leadId]); return estado.interno },
+    logFalhaFunilInterno: () => {},
+    MENSAGEM_FALHA_FUNIL: 'Não foi possível confirmar se esta conversa é de funil interno. Tente de novo em instantes.',
   },
 })
 mock.module('@/lib/rastreamento/db', {

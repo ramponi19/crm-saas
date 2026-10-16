@@ -1,4 +1,13 @@
 /**
+ * ⚠ QUEBRADO — NÃO RODAR. TODO(2026-10-17): reescrever ou apagar na reconstrução do ZapIntel.
+ *
+ * Usa `lead.classification`, `lead.score` e `ficha.sinais`, que saíram dos tipos
+ * em 15/10 (o motor de palavras foi removido): as réguas de classe dão zero e as
+ * de score ordenam por `undefined`, sem erro nenhum. Fica FORA da checagem de
+ * compilação dos scripts (`tsconfig.scripts.json`) até lá; o resto dela pega
+ * qualquer script novo que quebrar.
+ */
+/**
  * MEDE O QUE DE FATO SEPARA QUEM COMPROU — para a classificação parar de ser opinião.
  *
  * ══ POR QUE ISTO EXISTE ════════════════════════════════════════════════════

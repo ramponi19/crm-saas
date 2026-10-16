@@ -9,6 +9,8 @@ import {
   useDashboardAoVivo, type Dashboard, type ItemFila, type LeadDaLista,
 } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
+import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
+import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
 
 /**
  * O DASHBOARD DO ZAPINTEL — RECONSTRUÍDO EM 14/10/2026 SOBRE AS ANÁLISES.
@@ -65,19 +67,15 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
   filial: number | null; nomeDoRecorte: string; empresa: number | null;
 }) {
   const router = useRouter();
-  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem, carregando } = useDashboardAoVivo(filial, empresa);
+  const { dados, erro, aoVivo, ultimoAviso, atualizando, lista, ultimaMensagem, carregando, tentarDeNovo } = useDashboardAoVivo(filial, empresa);
   const agora = useRelogio();
   const [gaveta, setGaveta] = useState<Gaveta>(null);
   const abrir = (g: NonNullable<Gaveta>) => setGaveta(g);
 
   if (erro && !dados) {
     return (
-      <div className="card" style={{ padding: 28, maxWidth: 560, margin: "60px auto", textAlign: "center" }}>
-        <AlertTriangle size={22} style={{ color: "var(--yellow)", marginBottom: 10 }} />
-        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Não consegui abrir o painel</p>
-        <p style={{ fontSize: 12.5, color: "var(--dim)", lineHeight: 1.6 }}>
-          {/loja fora/i.test(erro) ? "Esta loja não está no seu acesso. Escolha \"Toda a rede\" ou a sua loja no menu ao lado." : erro}
-        </p>
+      <div className="card" style={{ padding: 28, maxWidth: 560, margin: "60px auto" }}>
+        <ErroDeTela erro={erro} onTentar={tentarDeNovo} titulo="Não consegui abrir o painel" />
       </div>
     );
   }
@@ -644,7 +642,7 @@ function GavetaLeads({ g, lista, agora, fechar }: {
         <Link href={linkDaLista(g)} className="pv-gaveta-lista-link" onClick={fechar}>
           Abrir na lista de leads <ArrowRight size={12} />
         </Link>
-        {erro && <p className="pv-vazio">{erro}</p>}
+        {erro && <p className="pv-vazio">{mensagemDeErroDeTela(erro)}</p>}
         <ul className="pv-gaveta-lista">
           {res?.leads.map((l) => (
             <li key={l.leadId}>

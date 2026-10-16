@@ -1,0 +1,7 @@
+{
+  "//": "Checagem de tipos dos scripts .mts, que o tsconfig.json principal não inclui (e o next build também não). Roda dentro do npm test (tests/scripts-compilam.test.ts). Os dois excluídos estão marcados como QUEBRADOS no cabeçalho, com TODO de 17/10/2026.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "incremental": false, "allowImportingTsExtensions": true },
+  "include": ["next-env.d.ts", "scripts/**/*.mts"],
+  "exclude": ["node_modules", "scripts/calibrar-zapintel.mts", "scripts/travou-zapintel.mts"]
+}

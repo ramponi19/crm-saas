@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { zapintelAcesso, lojaVisivel, leadDeFunilInterno } from '@/lib/zapintel/ctx'
+import { zapintelAcesso, lojaVisivel, leadDeFunilInterno, logFalhaFunilInterno } from '@/lib/zapintel/ctx'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
@@ -122,7 +122,9 @@ export async function GET(req: Request) {
     // a tela nem oferece o botão. MESMA função da rota — um critério só.
     const [iaDisponivel, funilInterno] = await Promise.all([
       iaDoCrmLigada(),
-      leadDeFunilInterno(db, empresaId, id),
+      // Sem a checagem, trata como interno: a tela esconde o botão de gerar (a
+      // rota da ficha também bloquearia, com 503). A ficha guardada continua visível.
+      leadDeFunilInterno(db, empresaId, id).catch((e) => { logFalhaFunilInterno('conversa', empresaId, id, e); return true }),
     ])
 
     /**
