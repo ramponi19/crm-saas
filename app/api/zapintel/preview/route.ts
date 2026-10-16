@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { mesmaOrigem } from '@/lib/mesma-origem'
 
 /**
  * Preview de super admin para o complemento ZapIntel.
@@ -28,14 +29,6 @@ export async function GET(req: Request) {
   return NextResponse.redirect(new URL('/superadmin/empresas', req.url), { status: 303 })
 }
 
-/** O pedido veio de uma página deste mesmo site? (Origin, ou Sec-Fetch-Site.) */
-function mesmaOrigem(req: Request): boolean {
-  const origem = req.headers.get('origin')
-  if (origem) {
-    try { return new URL(origem).host === new URL(req.url).host } catch { return false }
-  }
-  return req.headers.get('sec-fetch-site') === 'same-origin'
-}
 
 export async function POST(req: Request) {
   if (!mesmaOrigem(req)) return new NextResponse('origem recusada', { status: 403 })
