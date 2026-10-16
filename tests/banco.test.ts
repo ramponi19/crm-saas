@@ -58,6 +58,20 @@ describe('banco (BANCO=1)', { skip: !ligado && 'defina BANCO=1 para rodar' }, ()
     }
   })
 
+  /**
+   * O bucket `contratos` é público DE PROPÓSITO — e este teste trava as duas
+   * metades da decisão (docs/DECISAO-BUCKET-CONTRATOS-20261016.md).
+   *
+   * Ele guarda só os fundos dos modelos (capa e papel timbrado; o importador
+   * remove o texto do PDF antes de gerar a imagem). O contrato emitido é HTML que
+   * usa o fundo pela URL pública, e os contratos já arquivados em
+   * `contratos_venda.html` têm essa URL gravada: se ela parar de responder, a 2ª
+   * via sai sem capa nem timbrado. Por isso o HEAD precisa dar 200.
+   *
+   * O que NÃO pode voltar é listar: sem os nomes (UUID aleatório), ninguém de
+   * fora acha um arquivo. Se o bucket passar a guardar contrato emitido ou
+   * documento de cliente, este teste está errado — o bucket vira privado.
+   */
   test('contratos: anônimo não lista o bucket, mas a URL pública do fundo continua servindo (só cabeçalho, sem baixar)', async () => {
     const lista = await anon.storage.from('contratos').list('1', { limit: 5 })
     assert.ok(lista.error || (lista.data ?? []).length === 0, 'anônimo não pode listar os fundos')
