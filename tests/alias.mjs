@@ -7,6 +7,6 @@
  *   BANCO=1 npm test              → inclui os de integração (ver banco.test.ts)
  */
 import { registerHooks } from 'node:module'
-import { resolver } from './resolver.mjs'
+import { resolver, carregador } from './resolver.mjs'
 
-registerHooks({ resolve: resolver })
+registerHooks({ resolve: resolver, load: carregador })

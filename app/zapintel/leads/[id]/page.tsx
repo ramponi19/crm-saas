@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Check, RefreshCw, Sparkles, AlertTriangle, ExternalLink, MessageSquareText, Clock, Bot } from "lucide-react";
+import { ArrowLeft, Copy, Check, AlertTriangle, ExternalLink, MessageSquareText, Clock } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../../providers";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "@/hooks/zapintel/canalZapintel";
 import { CLASSE, corDoTexto, URG, num } from "@/components/zapintel/rotulos";
+import { AnaliseDeIA } from "@/components/zapintel/analise-de-ia";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
@@ -51,6 +52,7 @@ export default function FichaDoLead() {
   const [travou, setTravou] = useState<TravouComTrecho | null>(null);
   const [guardado, setGuardado] = useState<Guardado | null>(null);
   const [iaLigada, setIaLigada] = useState(true);
+  const [funilInterno, setFunilInterno] = useState(false);
   const [falhou, setFalhou] = useState(false);
 
   const [analisando, setAnalisando] = useState(false);
@@ -71,6 +73,7 @@ export default function FichaDoLead() {
         setTravou((d.travou as TravouComTrecho) ?? null);
         setGuardado((d.perfil as Guardado) ?? null);
         setIaLigada(d.iaDisponivel !== false);
+        setFunilInterno(d.funilInterno === true);
       })
       .catch(() => { if (vivo()) setFalhou(true); });
   }, [leadNum]);
@@ -210,42 +213,18 @@ export default function FichaDoLead() {
         {ia && <Fato rotulo="Risco de perda" valor={`${ia.riscoPerda}%`} cor={ia.riscoPerda > 60 ? "var(--red)" : ia.riscoPerda > 30 ? "var(--orange)" : "var(--green)"} />}
       </div>
 
-      {/* ── A análise de IA ────────────────────────────────────────────── */}
-      <section className={`card fc-analise ${ia ? "" : "vazia"}`}>
-        <div className="fc-cab">
-          <h2><Sparkles size={14} /> Análise de IA</h2>
-          {analisando && <span className="fc-andando"><RefreshCw size={12} style={{ animation: "zi-spin 1s linear infinite" }} /> lendo a conversa…</span>}
-        </div>
-        {ia ? (
-          <>
-            <p className="fc-diag">{ia.diagnostico}</p>
-            {!guardado?.atual && !analisando && (
-              <div className="fc-aviso">
-                <span><b>Nova análise disponível</b> · {novas > 0 ? `${novas} ${novas === 1 ? "mensagem nova" : "mensagens novas"} desde esta análise` : "a conversa mudou desde esta análise"}</span>
-                {iaLigada && <button className="fc-botao" onClick={() => analisar(false)}><Bot size={13} /> Gerar nova análise</button>}
-              </div>
-            )}
-            <div className="fc-rodape">
-              <span>Análise de {new Date(guardado!.geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })}</span>
-              {iaLigada && guardado?.atual && (
-                <button className="fc-link" onClick={() => analisar(true)} disabled={analisando}><RefreshCw size={11} /> Refazer análise</button>
-              )}
-            </div>
-          </>
-        ) : lead.leadMessages === 0 ? (
-          <div className="fc-sem">
-            <p>Sem resposta do cliente: só a loja escreveu até agora ({lead.storeMessages} {lead.storeMessages === 1 ? "mensagem" : "mensagens"}). A análise fica disponível quando o cliente responder.</p>
-          </div>
-        ) : (
-          <div className="fc-sem">
-            <p>Este lead ainda não tem análise de IA. Ela lê a conversa inteira — inclusive os áudios transcritos — e escreve o diagnóstico, os sinais, as objeções e a próxima ação, com a frase do cliente como prova.</p>
-            {iaLigada
-              ? <button className="fc-botao" onClick={() => analisar(false)} disabled={analisando}><Bot size={13} /> {analisando ? "Analisando…" : "Gerar análise"}</button>
-              : <span className="fc-mudo">A IA do CRM está desligada.</span>}
-          </div>
-        )}
-        {erroIA && <p className="fc-erro"><AlertTriangle size={12} /> {erroIA}</p>}
-      </section>
+      {/* ── A análise de IA (sem botão de gerar no funil interno) ─────── */}
+      <AnaliseDeIA
+        guardado={guardado}
+        analisando={analisando}
+        novas={novas}
+        leadMessages={lead.leadMessages}
+        storeMessages={lead.storeMessages}
+        iaLigada={iaLigada}
+        funilInterno={funilInterno}
+        erroIA={erroIA}
+        onAnalisar={analisar}
+      />
 
       {ia && (
         <>
