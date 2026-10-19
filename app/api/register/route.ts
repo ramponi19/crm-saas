@@ -4,6 +4,7 @@ import { normalizarSegmento } from '@/lib/segmentos'
 import { motivosDoSegmento } from '@/lib/motivos-perda'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
+import { slugValido } from '@/lib/slug-publico'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -15,6 +16,17 @@ import { excedeuLimite } from '@/lib/rate-limit'
  *
  * O cliente, após o sucesso, faz signInWithPassword para obter a sessão.
  */
+
+// local@dominio.tld, sem espaço; o Auth recusa o resto.
+const EMAIL = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/
+
+/** Slug da empresa: nome + 8 caracteres do id do usuário, no formato de lib/slug-publico (3–40). */
+function slugDaEmpresa(nomeEmpresa: string, userId: string): string {
+  const sufixo = userId.slice(0, 8).toLowerCase()
+  const base = (slugify(nomeEmpresa) || 'loja').slice(0, 31).replace(/-+$/, '') || 'loja'
+  const slug = `${base}-${sufixo}`
+  return slugValido(slug) ? slug : `loja-${sufixo}`
+}
 
 function slugify(text: string) {
   return text
@@ -59,7 +71,7 @@ export async function POST(req: Request) {
   const nomeUsuario = (body.nomeUsuario || '').trim()
   const nomeEmpresa = (body.nomeEmpresa || '').trim()
 
-  if (!email.includes('@')) return NextResponse.json({ error: 'E-mail inválido' }, { status: 400 })
+  if (email.length > 254 || !EMAIL.test(email)) return NextResponse.json({ error: 'E-mail inválido' }, { status: 400 })
   if (password.length < 8) return NextResponse.json({ error: 'Senha deve ter ao menos 8 caracteres' }, { status: 400 })
   if (!nomeUsuario) return NextResponse.json({ error: 'Informe seu nome' }, { status: 400 })
   if (!nomeEmpresa) return NextResponse.json({ error: 'Informe o nome da loja' }, { status: 400 })
@@ -76,7 +88,8 @@ export async function POST(req: Request) {
     if (/already|exist|registered|duplicate/i.test(msg)) {
       return NextResponse.json({ error: 'Este e-mail já está cadastrado. Faça login ou use outro.' }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Erro ao criar usuário: ' + msg }, { status: 500 })
+    console.error('[register] criar usuário:', msg)
+    return NextResponse.json({ error: 'Não foi possível criar o usuário. Tente novamente.' }, { status: 500 })
   }
   const userId = created.user.id
 
@@ -88,7 +101,7 @@ export async function POST(req: Request) {
     .maybeSingle()
   const planoId = planoRow?.id ?? 'free'
 
-  const slug = `${slugify(nomeEmpresa) || 'loja'}-${userId.slice(0, 8)}`
+  const slug = slugDaEmpresa(nomeEmpresa, userId)
   const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
   // 2) empresa
@@ -111,7 +124,8 @@ export async function POST(req: Request) {
     .single()
   if (empErr || !empresa) {
     await svc.auth.admin.deleteUser(userId) // rollback: não deixa usuário órfão
-    return NextResponse.json({ error: 'Erro ao criar empresa: ' + (empErr?.message ?? 'desconhecido') }, { status: 500 })
+    console.error('[register] criar empresa:', empErr?.message)
+    return NextResponse.json({ error: 'Não foi possível criar a empresa. Tente novamente.' }, { status: 500 })
   }
 
   // rollback completo: evita órfãos em qualquer falha após criar a empresa
@@ -129,7 +143,8 @@ export async function POST(req: Request) {
     .upsert({ id: userId, nome: nomeUsuario, email }, { onConflict: 'id' })
   if (usrErr) {
     await rollback()
-    return NextResponse.json({ error: 'Erro ao criar perfil: ' + usrErr.message }, { status: 500 })
+    console.error('[register] criar perfil:', usrErr.message)
+    return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
   // 4) vínculo owner (empresa_usuarios não tem trigger de bloqueio)
@@ -138,7 +153,8 @@ export async function POST(req: Request) {
     .insert({ empresa_id: empresa.id, usuario_id: userId, role: 'owner', ativo: true })
   if (vinErr) {
     await rollback()
-    return NextResponse.json({ error: 'Erro ao vincular usuário: ' + vinErr.message }, { status: 500 })
+    console.error('[register] vincular usuário:', vinErr.message)
+    return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
   /**

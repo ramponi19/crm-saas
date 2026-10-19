@@ -1,4 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { excedeuLimite } from '@/lib/rate-limit'
+import { slugValido } from '@/lib/slug-publico'
 
 /**
  * Feed XML de imóveis para portais (padrão OLX / Canal Pro — Grupo OLX Brasil:
@@ -38,16 +40,21 @@ function imovelXml(im: ImovelFeed): string {
 ${tag('CodigoImovel', im.codigo || im.id)}${tag('TituloImovel', im.titulo)}${tag('TipoImovel', cap(im.tipo))}${tag('Finalidade', im.finalidade === 'locacao' ? 'Locação' : im.finalidade === 'ambos' ? 'Venda e Locação' : 'Venda')}${tag('PrecoVenda', im.valor_venda)}${tag('PrecoLocacao', im.valor_locacao)}${tag('ValoresCondominio', im.valor_condominio)}${tag('ValorIPTU', im.valor_iptu)}${tag('AreaUtil', im.area_util)}${tag('AreaTotal', im.area_total)}${tag('QtdDormitorios', im.quartos)}${tag('QtdSuites', im.suites)}${tag('QtdBanheiros', im.banheiros)}${tag('QtdVagas', im.vagas)}${tag('CEP', im.cep)}${tag('Endereco', im.logradouro)}${im.ocultar_numero_publico ? '' : tag('Numero', im.numero)}${tag('Complemento', im.complemento)}${tag('Bairro', im.bairro)}${tag('Cidade', im.cidade)}${tag('UF', im.uf)}${tag('Latitude', im.latitude)}${tag('Longitude', im.longitude)}${im.descricao ? `      <Observacao>${cdata(im.descricao)}</Observacao>\n` : ''}${fotosXml}    </Imovel>`
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const svc = createServiceClient()
+  const xmlHeaders = { 'Content-Type': 'application/xml; charset=utf-8' }
+  // Mesmo 404 para slug malformado, inexistente ou de empresa inativa: não confirma nada.
+  const naoAchou = () => new Response('<?xml version="1.0" encoding="UTF-8"?>\n<Imoveis></Imoveis>', { status: 404, headers: xmlHeaders })
 
-  const { data: empresa } = await svc.from('empresas').select('id, nome').eq('slug', slug).maybeSingle()
-  if (!empresa) {
-    return new Response('<?xml version="1.0" encoding="UTF-8"?>\n<Imoveis></Imoveis>', {
-      status: 404, headers: { 'Content-Type': 'application/xml; charset=utf-8' },
-    })
+  // Os portais reconsultam a cada ~30 min; 60 por hora por origem sobra.
+  if (await excedeuLimite(svc, 'portais-feed', req, 60)) {
+    return new Response('<?xml version="1.0" encoding="UTF-8"?>\n<Imoveis></Imoveis>', { status: 429, headers: xmlHeaders })
   }
+  if (!slugValido(slug)) return naoAchou()
+
+  const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).eq('status', 'ativo').maybeSingle()
+  if (!empresa) return naoAchou()
 
   const { data: imoveis } = await svc
     .from('imoveis')

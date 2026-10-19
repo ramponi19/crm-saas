@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { rastrDb } from '@/lib/rastreamento/db'
+import { excedeuLimite } from '@/lib/rate-limit'
 
 /**
  * Link rastreável público: /i/<id-do-link>
@@ -19,17 +20,23 @@ function ip(req: NextRequest): string | null {
 export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: string }> }) {
   const { codigo } = await ctx.params
   const db = rastrDb()
+  // Mesma resposta para código malformado, inexistente, link desligado ou empresa inativa.
+  const naoAchou = () => new NextResponse('Link não encontrado', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 
-  const id = /^\d+$/.test(codigo) ? Number(codigo) : null
-  const { data: link } = id != null
-    ? await db.from('rastreamento_links').select('*').eq('id', id).maybeSingle()
-    : { data: null }
-
-  if (!link || link.ativo === false) {
-    return NextResponse.redirect(new URL('/', req.url))
+  // Cada acesso grava visita e evento: sem teto, um script enchia as tabelas.
+  // 120 por hora por origem cobre quem clica no anúncio e volta.
+  if (await excedeuLimite(db, 'link-rastreavel', req, 120)) {
+    return new NextResponse('Muitas requisições', { status: 429, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   }
 
+  const id = /^\d{1,12}$/.test(codigo) ? Number(codigo) : null
+  if (id == null) return naoAchou()
+  const { data: link } = await db.from('rastreamento_links').select('*').eq('id', id).maybeSingle()
+  if (!link || link.ativo === false) return naoAchou()
+
   const empresaId = link.empresa_id as number
+  const { data: empresa } = await db.from('empresas').select('id').eq('id', empresaId).eq('status', 'ativo').maybeSingle()
+  if (!empresa) return naoAchou()
   const q = req.nextUrl.searchParams
   const pick = (k: string, fb?: string | null) => (q.get(k) || fb || null)
   const fbclid = pick('fbclid')

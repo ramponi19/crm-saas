@@ -1,5 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { excedeuLimite } from '@/lib/rate-limit'
+import { slugValido } from '@/lib/slug-publico'
 
 /**
  * Feed XML de veículos para portais (Sprint 4.2c). O portal consome esta URL
@@ -15,13 +17,19 @@ function parseFotos(v: string | null): string[] {
   return v.split(/[,\n;]/).map((s) => s.trim()).filter(Boolean)
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const svc = createServiceClient()
   const xmlHeaders = { 'Content-Type': 'application/xml; charset=utf-8' }
-
-  const { data: empresa } = await svc.from('empresas').select('id, nome, segmento').eq('slug', slug).maybeSingle()
   const vazio = new Response('<?xml version="1.0" encoding="UTF-8"?>\n<Veiculos></Veiculos>', { status: 404, headers: xmlHeaders })
+
+  // Portal reconsulta periodicamente; 60 por hora por origem sobra.
+  if (await excedeuLimite(svc, 'veiculos-feed', req, 60)) {
+    return new Response('<?xml version="1.0" encoding="UTF-8"?>\n<Veiculos></Veiculos>', { status: 429, headers: xmlHeaders })
+  }
+  if (!slugValido(slug)) return vazio
+
+  const { data: empresa } = await svc.from('empresas').select('id, nome, segmento').eq('slug', slug).eq('status', 'ativo').maybeSingle()
   if (!empresa) return vazio
 
   /**
