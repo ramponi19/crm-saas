@@ -1308,6 +1308,24 @@ begin
     end loop;
   end loop;
 
+  -- 8.7 Realtime: postgres_changes lê o WAL de TABELA — assinar as views novas não dispara nada.
+  -- A publicação passa das tabelas trocadas (que continuam nela depois do rename) para as do
+  -- core. O app escolhe a tabela por NEXT_PUBLIC_DB_CORE (lib/realtime/tabelas.ts).
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach v in array array['old_leads', 'old_clientes', 'old_lead_mensagens', 'old_canais_conectados'] loop
+      if exists (select 1 from pg_publication_rel pr join pg_publication p on p.oid = pr.prpubid
+                  where p.pubname = 'supabase_realtime' and pr.prrelid = ('public.' || v)::regclass) then
+        execute format('alter publication supabase_realtime drop table public.%I', v);
+      end if;
+    end loop;
+    foreach v in array array['negocios', 'conversas', 'mensagens', 'contatos', 'tarefas'] loop
+      if not exists (select 1 from pg_publication_rel pr join pg_publication p on p.oid = pr.prpubid
+                      where p.pubname = 'supabase_realtime' and pr.prrelid = ('public.' || v)::regclass) then
+        execute format('alter publication supabase_realtime add table public.%I', v);
+      end if;
+    end loop;
+  end if;
+
   perform migracao.marcar(8, 'prefixo, views de compatibilidade e FKs', jsonb_build_object('views_recriadas', v_view_defs));
 end $$;
 
@@ -1331,6 +1349,14 @@ begin
            where attrelid = to_regclass('public.' || r.antigo) and attnum > 0 and not attisdropped);
   perform migracao.afirmar(8, 'views com as colunas antigas', v_falta is null,
     format('%s views de compatibilidade; divergentes: %s', (select count(*) from migracao.renomeadas), coalesce(v_falta, 'nenhuma')));
+
+  perform migracao.afirmar(8, 'publicação do Realtime nas tabelas do core',
+    not exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    or ((select count(*) from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'
+          and tablename in ('negocios', 'conversas', 'mensagens', 'contatos', 'tarefas')) = 5
+        and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename like 'old\_%')),
+    coalesce((select string_agg(tablename, ', ' order by tablename) from pg_publication_tables where pubname = 'supabase_realtime'),
+             'sem publicação supabase_realtime neste banco'));
 
   select count(*) into v_fk_old from pg_constraint c join pg_class cl on cl.oid = c.conrelid join pg_class rf on rf.oid = c.confrelid
    where c.contype = 'f' and rf.relname like 'old\_%' and cl.relname not like 'old\_%';

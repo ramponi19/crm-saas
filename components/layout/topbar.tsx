@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { TABELAS, mensagemComLead } from '@/lib/realtime/tabelas'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from './command-palette'
 import { SeletorFilial } from './seletor-filial'
@@ -109,11 +110,14 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
     let caiu = false
     const channel = supabase
       .channel(`topbar_notifs_${Date.now()}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_mensagens', filter: 'direcao=eq.recebida' }, () => scheduleLoad())
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lead_mensagens' }, () => scheduleLoad())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: 'direcao=eq.recebida' }, async (payload: Mudanca) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: TABELAS.mensagem, filter: 'direcao=eq.recebida' }, () => scheduleLoad())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: TABELAS.mensagem }, () => scheduleLoad())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABELAS.mensagem, filter: 'direcao=eq.recebida' }, async (payload: Mudanca) => {
         scheduleLoad()
         if (payload.eventType === 'INSERT' && payload.new?.direcao === 'recebida') {
+          // No v1 a linha vem de mensagens, sem lead_id: relida pela view (lib/realtime/tabelas).
+          const nova = await mensagemComLead<{ lead_id: number; conteudo: string | null }>(supabase, payload.new)
+          if (!nova) return
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             /**
              * O LEAD SER VISÍVEL É A CONDIÇÃO, não só a fonte do título.
@@ -131,7 +135,7 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
             let titulo = 'Nova mensagem'
             let podeVer = false
             try {
-              const { data } = await supabase.from('leads').select('nome, origem').eq('id', payload.new.lead_id).maybeSingle()
+              const { data } = await supabase.from('leads').select('nome, origem').eq('id', nova.lead_id).maybeSingle()
               podeVer = !!data
               if (data?.nome) titulo = `Nova mensagem de ${data.nome}`
               else if (data?.origem) titulo = `Nova mensagem · ${data.origem}`
@@ -139,8 +143,8 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
             if (!podeVer) return
             try {
               const notif = new Notification(titulo, {
-                body: payload.new.conteudo?.slice(0, 120) ?? '',
-                tag: `lead-${payload.new.lead_id}`,
+                body: nova.conteudo?.slice(0, 120) ?? '',
+                tag: `lead-${nova.lead_id}`,
                 renotify: true,
               } as NotificationOptions)
               notif.onclick = () => { window.focus(); router.push('/leads') }

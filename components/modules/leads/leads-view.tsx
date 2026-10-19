@@ -7,6 +7,7 @@ import { Button, Select } from '@/components/ui'
 import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo, type Funil } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { TABELAS, leadsDaLinha, mensagemComLead } from '@/lib/realtime/tabelas'
 import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
@@ -167,13 +168,50 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
   // e leads novos (conversas que ainda não estão na tela) entram sozinhos.
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
+    // Tabelas e formato da linha vêm de lib/realtime/tabelas (NEXT_PUBLIC_DB_CORE).
+    function aoAtualizarLead(l: Lead) {
+      // Some só quando foi para OUTRA pessoa. Voltar para a esteira
+      // (responsável nulo) deixa o lead livre — e livre é de todos, então
+      // ele continua na tela para quem quiser pegar.
+      if (restringe && l.responsavel_id != null && l.responsavel_id !== meuId) {
+        setLeads(prev => prev.filter(x => x.id !== l.id))
+        return
+      }
+      setLeads(prev => {
+        if (l.ativo === false) return prev.filter(x => x.id !== l.id)
+        // ENTRA na lista se ainda não estava. O tratador só sabia ALTERAR o
+        // que já estava na tela: um lead que era de outro vendedor — e por
+        // isso nem tinha sido carregado — voltava para a esteira e não
+        // aparecia para ninguém até alguém recarregar a página. Justamente
+        // o caso em que a pressa importa, porque o lead está sem dono.
+        if (!prev.some(x => x.id === l.id)) {
+          return porMensagemRecente([{ ...l, msgs_nao_lidas: l.msgs_nao_lidas ?? 0 }, ...prev])
+        }
+        return porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x))
+      })
+      /**
+       * O MODAL ABERTO TAMBEM E ATUALIZADO.
+       *
+       * O tratador so mexia na lista. Com a conversa aberta, mudanca vinda
+       * de fora — outro vendedor assumindo, ou a propria posse gravada ao
+       * responder — nao chegava na tela, e so aparecia depois do F5.
+       * Relatado em 18/09/2026: o lead mostrava "sem ninguem" enquanto no
+       * banco ja tinha dono.
+       *
+       * Mescla em vez de trocar: o payload do realtime traz a linha do
+       * banco, e o que esta na tela pode ter campo que so existe aqui.
+       */
+      setSelectedLead(prev => (prev && prev.id === l.id ? { ...prev, ...l } : prev))
+    }
+
+    let channel = supabase
       .channel('kanban_msgs')
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'lead_mensagens' },
-        (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; created_at: string }>) => {
-          const m = payload.new as { direcao: string; lead_id: number; created_at: string }
-          if (m.direcao !== 'recebida') return
+        { event: 'INSERT', schema: 'public', table: TABELAS.mensagem },
+        async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; created_at: string }>) => {
+          if ((payload.new as { direcao?: string }).direcao !== 'recebida') return
+          const m = await mensagemComLead<{ direcao: string; lead_id: number; created_at: string }>(supabase, payload.new)
+          if (!m || m.direcao !== 'recebida') return
           // REORDENA. A lista chega do servidor por ultima_mensagem_at desc, mas
           // atualizar a data no lugar deixava o card parado onde estava: quem
           // acabou de escrever continuava no fim da coluna, que é justamente
@@ -185,65 +223,41 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           )))
         })
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'leads' },
-        (payload: RealtimePostgresChangesPayload<Lead>) => {
-          const novo = payload.new as Lead
-          if (novo.ativo === false) return
-          // Lead SEM dono é da esteira e aparece para todos. Sem o `!= null` o
-          // vendedor não via chegar lead novo nenhum: todo lead nasce sem
-          // responsável, e ele só apareceria depois de recarregar a página.
-          if (restringe && novo.responsavel_id != null && novo.responsavel_id !== meuId) return
-          setLeads(prev =>
-            prev.some(l => l.id === novo.id)
-              ? prev
-              : porMensagemRecente([{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev]))
+        { event: 'INSERT', schema: 'public', table: TABELAS.lead },
+        async (payload: RealtimePostgresChangesPayload<Lead>) => {
+          for (const novo of await leadsDaLinha<Lead>(supabase, TABELAS.lead, payload.new)) {
+            if (novo.ativo === false) continue
+            // Lead SEM dono é da esteira e aparece para todos. Sem o `!= null` o
+            // vendedor não via chegar lead novo nenhum: todo lead nasce sem
+            // responsável, e ele só apareceria depois de recarregar a página.
+            if (restringe && novo.responsavel_id != null && novo.responsavel_id !== meuId) continue
+            setLeads(prev =>
+              prev.some(l => l.id === novo.id)
+                ? prev
+                : porMensagemRecente([{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev]))
+          }
         })
       // Lead atualizado: reflete na hora; se foi desativado (excluído), some da lista
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads' },
-        (payload: RealtimePostgresChangesPayload<Lead>) => {
-          const l = payload.new as Lead
-          // Some só quando foi para OUTRA pessoa. Voltar para a esteira
-          // (responsável nulo) deixa o lead livre — e livre é de todos, então
-          // ele continua na tela para quem quiser pegar.
-          if (restringe && l.responsavel_id != null && l.responsavel_id !== meuId) {
-            setLeads(prev => prev.filter(x => x.id !== l.id))
-            return
-          }
-          setLeads(prev => {
-            if (l.ativo === false) return prev.filter(x => x.id !== l.id)
-            // ENTRA na lista se ainda não estava. O tratador só sabia ALTERAR o
-            // que já estava na tela: um lead que era de outro vendedor — e por
-            // isso nem tinha sido carregado — voltava para a esteira e não
-            // aparecia para ninguém até alguém recarregar a página. Justamente
-            // o caso em que a pressa importa, porque o lead está sem dono.
-            if (!prev.some(x => x.id === l.id)) {
-              return porMensagemRecente([{ ...l, msgs_nao_lidas: l.msgs_nao_lidas ?? 0 }, ...prev])
-            }
-            return porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x))
-          })
-          /**
-           * O MODAL ABERTO TAMBEM E ATUALIZADO.
-           *
-           * O tratador so mexia na lista. Com a conversa aberta, mudanca vinda
-           * de fora — outro vendedor assumindo, ou a propria posse gravada ao
-           * responder — nao chegava na tela, e so aparecia depois do F5.
-           * Relatado em 18/09/2026: o lead mostrava "sem ninguem" enquanto no
-           * banco ja tinha dono.
-           *
-           * Mescla em vez de trocar: o payload do realtime traz a linha do
-           * banco, e o que esta na tela pode ter campo que so existe aqui.
-           */
-          setSelectedLead(prev => (prev && prev.id === l.id ? { ...prev, ...l } : prev))
+        { event: 'UPDATE', schema: 'public', table: TABELAS.lead },
+        async (payload: RealtimePostgresChangesPayload<Lead>) => {
+          for (const l of await leadsDaLinha<Lead>(supabase, TABELAS.lead, payload.new)) aoAtualizarLead(l)
         })
-      // Lead removido do banco: some da lista na hora
+      // Lead removido do banco: some da lista na hora (no v1 o id do negócio é o do lead)
       .on('postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'leads' },
+        { event: 'DELETE', schema: 'public', table: TABELAS.lead },
         (payload: RealtimePostgresChangesPayload<{ id: number }>) => {
           const old = payload.old as { id: number }
           setLeads(prev => prev.filter(x => x.id !== old.id))
         })
-      .subscribe()
+    // v1: não lidas e última mensagem moram em conversas, e o nome em contatos.
+    for (const tabela of TABELAS.extrasDoLead) {
+      channel = channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: tabela },
+        async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          for (const l of await leadsDaLinha<Lead>(supabase, tabela, payload.new)) aoAtualizarLead(l)
+        })
+    }
+    channel.subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
 

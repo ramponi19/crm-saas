@@ -10,6 +10,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
 import { urlDeMidia } from '@/lib/storage/midia'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { TABELAS, filtroMensagensDoLead, leadsDaLinha } from '@/lib/realtime/tabelas'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
 import { PaineisDaVertical } from './paineis-vertical'
@@ -703,75 +704,84 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
     }
     load()
 
-    const channel = supabase
-      .channel(`lead_msgs_${lead.id}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
-        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
-          const m = payload.new as LinhaMsg
-          setChat((prev) => {
-            const novaMsg: ChatMsg = {
-              from: m.direcao === 'enviada' ? 'loja' : 'cliente',
-              text: m.conteudo ?? '',
-              time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-              tipo: m.tipo ?? 'texto',
-              midiaUrl: m.midia_url,
-              status: m.status_entrega ?? null,
-              erro: m.erro_envio ?? null,
-              externalId: m.external_id ?? null,
-              iso: m.created_at,
+    // Tabela e filtro vêm de lib/realtime/tabelas (NEXT_PUBLIC_DB_CORE). No v1
+    // o filtro é pelo contato do negócio, que exige uma consulta antes de assinar.
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    filtroMensagensDoLead(supabase, lead.id).then((filtroMsgs) => {
+      if (cancel) return
+      let ch = supabase.channel(`lead_msgs_${lead.id}`)
+      if (filtroMsgs) ch = ch
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: TABELAS.mensagem, filter: filtroMsgs },
+          (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+            const m = payload.new as LinhaMsg
+            setChat((prev) => {
+              const novaMsg: ChatMsg = {
+                from: m.direcao === 'enviada' ? 'loja' : 'cliente',
+                text: m.conteudo ?? '',
+                time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                tipo: m.tipo ?? 'texto',
+                midiaUrl: m.midia_url,
+                status: m.status_entrega ?? null,
+                erro: m.erro_envio ?? null,
+                externalId: m.external_id ?? null,
+                iso: m.created_at,
+              }
+              if (novaMsg.from === 'loja') {
+                // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
+                const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && (x.midiaUrl ? x.midiaUrl === novaMsg.midiaUrl : x.text === novaMsg.text))
+                if (idx >= 0) { const copy = [...prev]; copy[idx] = novaMsg; return copy }
+              }
+              return [...prev, novaMsg]
+            })
+            if (m.direcao === 'recebida' && !m.lida) {
+              supabase.from('lead_mensagens').update({ lida: true }).eq('id', m.id)
             }
-            if (novaMsg.from === 'loja') {
-              // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
-              const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && (x.midiaUrl ? x.midiaUrl === novaMsg.midiaUrl : x.text === novaMsg.text))
-              if (idx >= 0) { const copy = [...prev]; copy[idx] = novaMsg; return copy }
-            }
-            return [...prev, novaMsg]
           })
-          if (m.direcao === 'recebida' && !m.lida) {
-            supabase.from('lead_mensagens').update({ lida: true }).eq('id', m.id)
-          }
-        })
-      // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
-      // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'lead_mensagens', filter: `lead_id=eq.${lead.id}` },
-        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
-          const m = payload.new as LinhaMsg
-          if (!m.external_id && !m.status_entrega) return
-          setChat((prev) => prev.map((x) =>
-            x.externalId && x.externalId === m.external_id
-              ? { ...x, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? x.erro, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
-              : x,
-          ))
-        })
-      /**
-       * O PRÓPRIO LEAD TAMBÉM MUDA ENQUANTO A CONVERSA ESTÁ ABERTA: outro
-       * vendedor move de etapa, o admin troca o responsável, a esteira devolve
-       * para o pool. Nada disso aparecia sem F5 — a tela mostrava um estado que
-       * já não existia, e salvar por cima desfazia a mudança do colega.
-       *
-       * Só campos de ESTADO são adotados. Nome, telefone e observações ficam de
-       * fora de propósito: sobrescrever o que a pessoa está digitando seria pior
-       * que ficar desatualizado.
-       */
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${lead.id}` },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          const l = payload.new as {
-            kanban_status?: string | null; responsavel_id?: string | null
-            funil_id?: number | null; valor_estimado?: number | null
-          }
-          setForm((f) => ({
-            ...f,
-            status: l.kanban_status ?? f.status,
-            responsavel: l.responsavel_id ?? '',
-          }))
-          onUpdate({ ...lead, ...(payload.new as object) })
-        })
-      .subscribe()
+        // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
+        // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: TABELAS.mensagem, filter: filtroMsgs },
+          (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+            const m = payload.new as LinhaMsg
+            if (!m.external_id && !m.status_entrega) return
+            setChat((prev) => prev.map((x) =>
+              x.externalId && x.externalId === m.external_id
+                ? { ...x, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? x.erro, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
+                : x,
+            ))
+          })
+      ch = ch
+        /**
+         * O PRÓPRIO LEAD TAMBÉM MUDA ENQUANTO A CONVERSA ESTÁ ABERTA: outro
+         * vendedor move de etapa, o admin troca o responsável, a esteira devolve
+         * para o pool. Nada disso aparecia sem F5 — a tela mostrava um estado que
+         * já não existia, e salvar por cima desfazia a mudança do colega.
+         *
+         * Só campos de ESTADO são adotados. Nome, telefone e observações ficam de
+         * fora de propósito: sobrescrever o que a pessoa está digitando seria pior
+         * que ficar desatualizado.
+         */
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: TABELAS.lead, filter: `id=eq.${lead.id}` },
+          async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+            const [linha] = await leadsDaLinha<Record<string, unknown>>(supabase, TABELAS.lead, payload.new)
+            if (!linha || cancel) return
+            const l = linha as {
+              kanban_status?: string | null; responsavel_id?: string | null
+              funil_id?: number | null; valor_estimado?: number | null
+            }
+            setForm((f) => ({
+              ...f,
+              status: l.kanban_status ?? f.status,
+              responsavel: l.responsavel_id ?? '',
+            }))
+            onUpdate({ ...lead, ...(linha as object) })
+          })
+      channel = ch.subscribe()
+    })
 
-    return () => { cancel = true; supabase.removeChannel(channel) }
+    return () => { cancel = true; if (channel) supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id])
 
