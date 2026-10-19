@@ -1011,12 +1011,105 @@ begin
   return new;
 end $$;
 
+-- mensagem_registrar — VERSÃO B. Mesmo contrato da versão A (migração 20261021000000), que a
+-- Edge webhook-leads já chama antes do corte; aqui só o corpo muda, na mesma transação que
+-- troca lead_mensagens por view (ON CONFLICT não funciona em view com INSTEAD OF).
+--   · grava em mensagens; external_id repetido → não grava nada e devolve NULL;
+--   · contato: pelo negócio (p_dados.lead_id = id do negócio, preservado na migração) ou,
+--     sem negócio, pela identidade do canal (p_dados.identidade + origem ou tipo do canal) em
+--     contato_identidades — cria contato e identidade quando não existem;
+--   · conversa = (contato, canal), a mesma regra da view lead_mensagens; criada se faltar;
+--   · nao_lidas e ultima_mensagem/recebida/enviada_at da conversa: gatilho mensagens_sincroniza
+--     (core v1), disparado pelo insert — não são somados aqui para não contar duas vezes.
+create or replace function public.mensagem_registrar(p_empresa bigint, p_canal_id bigint, p_external_id text, p_dados jsonb)
+  returns bigint
+  language plpgsql security definer set search_path to 'public', 'pg_temp' as $$
+declare
+  d           jsonb := coalesce(p_dados, '{}'::jsonb);
+  v_negocio   bigint := nullif(d ->> 'lead_id', '')::bigint;
+  v_filial    bigint := nullif(d ->> 'filial_id', '')::bigint;
+  v_ident     text := nullif(d ->> 'identidade', '');
+  v_canal_tipo   text;
+  v_canal_filial bigint;
+  v_tipo      text;
+  v_contato   bigint;
+  v_resp      uuid;
+  v_conversa  bigint;
+  v_e164      text;
+  v_id        bigint;
+begin
+  if p_external_id is not null and exists (select 1 from mensagens where external_id = p_external_id) then
+    return null;
+  end if;
+  if p_canal_id is not null then
+    select tipo, filial_id into v_canal_tipo, v_canal_filial from canais where id = p_canal_id and empresa_id = p_empresa;
+    if not found then
+      raise exception 'mensagem_registrar: canal % não é da empresa %', p_canal_id, p_empresa using errcode = '42501';
+    end if;
+  end if;
+  v_tipo := coalesce(nullif(d ->> 'origem', ''), v_canal_tipo);
+
+  if v_negocio is not null then
+    select n.contato_id, coalesce(v_filial, n.filial_id), n.responsavel_id into v_contato, v_filial, v_resp
+      from negocios n where n.id = v_negocio and n.empresa_id = p_empresa;
+    if v_contato is null then
+      raise exception 'mensagem_registrar: lead % não é da empresa %', v_negocio, p_empresa using errcode = '42501';
+    end if;
+  else
+    if v_ident is null or v_tipo is null then
+      raise exception 'mensagem_registrar: informe lead_id, ou identidade com origem/canal' using errcode = '23502';
+    end if;
+    select contato_id into v_contato from contato_identidades
+     where empresa_id = p_empresa and canal_tipo = v_tipo and external_id = v_ident;
+    if v_contato is null then
+      v_e164 := case when v_tipo = 'whatsapp' then core_telefone_e164(v_ident) end;
+      if v_e164 is not null then
+        select id into v_contato from contatos where empresa_id = p_empresa and telefone_e164 = v_e164;
+      end if;
+      if v_contato is null then
+        insert into contatos (empresa_id, filial_id, nome, telefone, telefone_e164, instagram, origem, origem_id)
+        values (p_empresa, coalesce(v_filial, v_canal_filial), coalesce(nullif(d ->> 'nome', ''), v_ident),
+                case when v_tipo = 'whatsapp' then v_ident end, v_e164, nullif(d ->> 'instagram', ''), v_tipo, v_ident)
+        returning id into v_contato;
+      end if;
+      insert into contato_identidades (empresa_id, contato_id, canal_tipo, external_id, canal_id)
+      values (p_empresa, v_contato, v_tipo, v_ident, p_canal_id) on conflict do nothing;
+    end if;
+  end if;
+
+  select id into v_conversa from conversas
+   where empresa_id = p_empresa and contato_id = v_contato and canal_id is not distinct from p_canal_id;
+  if v_conversa is null then
+    insert into conversas (empresa_id, filial_id, contato_id, canal_id, responsavel_id)
+    values (p_empresa, coalesce(v_filial, v_canal_filial), v_contato, p_canal_id, v_resp)
+    on conflict on constraint conversas_contato_canal_key do nothing
+    returning id into v_conversa;
+    if v_conversa is null then
+      select id into v_conversa from conversas
+       where empresa_id = p_empresa and contato_id = v_contato and canal_id is not distinct from p_canal_id;
+    end if;
+  end if;
+
+  insert into mensagens (empresa_id, filial_id, conversa_id, contato_id, direcao, conteudo, tipo, origem, external_id,
+                         midia_url, midia_retida_em, transcricao, status_entrega, status_em, erro_envio, lida, usuario_id,
+                         canal_id, created_at)
+  values (p_empresa, nullif(d ->> 'filial_id', '')::bigint, v_conversa, v_contato, d ->> 'direcao',
+          coalesce(d ->> 'conteudo', ''), coalesce(nullif(d ->> 'tipo', ''), 'texto'), v_tipo, p_external_id,
+          d ->> 'midia_url', (d ->> 'midia_retida_em')::timestamptz, d ->> 'transcricao', d ->> 'status_entrega',
+          (d ->> 'status_em')::timestamptz, d ->> 'erro_envio', coalesce((d ->> 'lida')::boolean, false),
+          (d ->> 'usuario_id')::uuid, p_canal_id, coalesce((d ->> 'created_at')::timestamptz, now()))
+  on conflict (external_id) where external_id is not null do nothing
+  returning id into v_id;
+  return v_id;
+end $$;
+
 do $$
 declare
   f text;
 begin
   foreach f in array array['compat_etapa(bigint,bigint,text)', 'compat_guarda(bigint)', 'compat_leads_iud()',
-                           'compat_clientes_iud()', 'compat_lead_mensagens_iud()', 'imoveis_perfil_espelho()'] loop
+                           'compat_clientes_iud()', 'compat_lead_mensagens_iud()', 'imoveis_perfil_espelho()',
+                           'mensagem_registrar(bigint,bigint,text,jsonb)'] loop
     execute format('revoke execute on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
@@ -1312,7 +1405,51 @@ begin
     if sqlerrm <> 'desfazer_teste' then v_upsert_msg := sqlerrm; end if;
   end;
   perform migracao.afirmar(8, 'AVISO upsert em lead_mensagens (webhook-leads)', true,
-    'não suportado em view com instead of: ' || v_upsert_msg || ' — exige deploy do webhook-leads antes de aplicar');
+    'não suportado em view com instead of: ' || v_upsert_msg
+    || ' — a Edge grava por mensagem_registrar (runbook passo c) antes do corte');
+
+  -- mensagem_registrar versão B, como a Edge chama (service_role), desfeito no fim
+  v_erros := '';
+  begin
+    execute 'set local role service_role';
+    select n.id into v_lead from negocios n where n.empresa_id = 1 and n.status = 'aberto' order by n.id limit 1;
+    select c.id into v_canal from canais c where c.empresa_id = 1 and c.tipo = 'whatsapp' order by c.id limit 1;
+    select coalesce(sum(nao_lidas), 0) into v_n from conversas
+     where contato_id = (select contato_id from negocios where id = v_lead);
+    v_msg := mensagem_registrar(1, v_canal, 'teste-registrar-1',
+               jsonb_build_object('lead_id', v_lead, 'direcao', 'recebida', 'conteudo', 'oi', 'origem', 'whatsapp'));
+    if v_msg is null then v_erros := v_erros || ' pelo negócio não gravou;'; end if;
+    if (select coalesce(sum(nao_lidas), 0) from conversas where contato_id = (select contato_id from negocios where id = v_lead)) <> v_n + 1 then
+      v_erros := v_erros || ' nao_lidas não subiu;';
+    end if;
+    if (select count(*) from lead_mensagens where id = v_msg and external_id = 'teste-registrar-1') <> 1 then
+      v_erros := v_erros || ' não aparece na view lead_mensagens;';
+    end if;
+    if mensagem_registrar(1, v_canal, 'teste-registrar-1', jsonb_build_object('lead_id', v_lead, 'direcao', 'recebida', 'conteudo', 'oi'))
+       is not null or (select count(*) from mensagens where external_id = 'teste-registrar-1') <> 1 then
+      v_erros := v_erros || ' external_id repetido gravou de novo;';
+    end if;
+    v_msg := mensagem_registrar(1, v_canal, 'teste-registrar-2',
+               jsonb_build_object('identidade', '5519900001234', 'direcao', 'recebida', 'conteudo', 'contato novo', 'nome', 'Teste registrar'));
+    if v_msg is null
+       or not exists (select 1 from contato_identidades i join contatos c on c.id = i.contato_id
+                       where i.empresa_id = 1 and i.canal_tipo = 'whatsapp' and i.external_id = '5519900001234'
+                         and c.telefone_e164 = '+5519900001234')
+       or (select c.nao_lidas from conversas c join mensagens m on m.conversa_id = c.id where m.id = v_msg) <> 1 then
+      v_erros := v_erros || ' identidade nova não criou contato/conversa;';
+    end if;
+    begin
+      perform mensagem_registrar(3, v_canal, 'teste-registrar-3', jsonb_build_object('lead_id', v_lead, 'direcao', 'recebida'));
+      v_erros := v_erros || ' aceitou canal de outra empresa;';
+    exception when insufficient_privilege then null;
+    end;
+    raise exception 'desfazer_teste';
+  exception when others then
+    if sqlerrm <> 'desfazer_teste' then v_erros := v_erros || ' erro: ' || sqlerrm; end if;
+  end;
+  execute 'reset role';
+  perform migracao.afirmar(8, 'mensagem_registrar versão B', v_erros = '',
+    coalesce(nullif(v_erros, ''), 'pelo negócio, identidade nova (contato + identidade + conversa), external_id repetido = NULL, outra empresa recusada; nao_lidas pelo gatilho'));
 end $$;
 
 -- =====================================================================================

@@ -898,6 +898,30 @@ function extrairAnuncio(m: Record<string, unknown>): AnuncioOrigem | null {
   return (anuncio.titulo || anuncio.corpo || anuncio.url || anuncio.anuncio_id) ? anuncio : null;
 }
 
+/**
+ * TODA MENSAGEM ENTRA PELA FUNÇÃO `mensagem_registrar` DO BANCO, nunca por
+ * insert/upsert direto em `lead_mensagens`.
+ *
+ * No core v1 `lead_mensagens` vira view, e o Postgres não aceita ON CONFLICT
+ * em view com INSTEAD OF: o upsert do histórico pararia no minuto do corte.
+ * Com a gravação atrás da função, esta Edge não muda no corte — só o corpo
+ * da função muda, na mesma transação que troca as tabelas.
+ *
+ * `externalId` repetido (a Meta reenvia webhook; o echo do Instagram chega com
+ * o mesmo id do envio) não grava nada e devolve `id: null` — a mesma semântica
+ * do upsert com ignoreDuplicates. `dados` usa os nomes de coluna de
+ * lead_mensagens (lead_id, direcao, conteudo, tipo, ...).
+ */
+async function registrarMensagem(
+  empresaId: number, canalId: number | null, externalId: string | null, dados: Record<string, unknown>,
+): Promise<{ id: number | null; erro: string | null }> {
+  const { data, error } = await db.rpc("mensagem_registrar", {
+    p_empresa: empresaId, p_canal_id: canalId, p_external_id: externalId, p_dados: dados,
+  });
+  if (error) return { id: null, erro: error.message };
+  return { id: (data as number | null) ?? null, erro: null };
+}
+
 async function upsertLead(canal: Canal, p: {
   nome: string | null; telefone: string | null; instagramUser: string | null;
   origem: string; origemId: string; texto: string; externalId: string | null;
@@ -1009,19 +1033,18 @@ async function upsertLead(canal: Canal, p: {
   // `external_id` derivado do id da mensagem: se a Meta reenviar o webhook, o
   // índice único impede um segundo card.
   if (p.anuncio) {
-    await db.from("lead_mensagens").insert([{
-      empresa_id: empresaId, lead_id: leadId, direcao: "recebida", canal_id: canal.id,
-      conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
-      external_id: p.externalId ? `anuncio:${p.externalId}` : null,
+    const { erro } = await registrarMensagem(empresaId, canal.id, p.externalId ? `anuncio:${p.externalId}` : null, {
+      lead_id: leadId, direcao: "recebida", conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
       tipo: "anuncio", midia_url: p.anuncio.midia,
-    }]);
+    });
+    if (erro) console.error("anúncio na conversa:", erro);
   }
 
-  const { error: msgErr } = await db.from("lead_mensagens").insert([{
-    empresa_id: empresaId, lead_id: leadId, direcao: "recebida", conteudo: p.texto, canal_id: canal.id,
-    origem: p.origem, lida: false, external_id: p.externalId, tipo, midia_url: midiaUrl,
-  }]);
-  if (msgErr) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
+  const { id: msgId, erro: msgErr } = await registrarMensagem(empresaId, canal.id, p.externalId, {
+    lead_id: leadId, direcao: "recebida", conteudo: p.texto, origem: p.origem, lida: false, tipo, midia_url: midiaUrl,
+  });
+  if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return leadId; }
+  if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
 
   /**
    * O contador de nao lidas NAO e somado aqui — quem mantem e o gatilho
@@ -1081,14 +1104,14 @@ async function registrarEcho(
       }
     }
     if (!lead?.id) return;
-    const { error } = await db.from("lead_mensagens").insert([{
-      empresa_id: canal.empresa_id, lead_id: lead.id, direcao: "enviada", conteudo: texto, canal_id: canal.id,
-      origem, lida: true, external_id: mid, tipo, midia_url: midiaUrl,
+    const { id: msgId, erro } = await registrarMensagem(canal.empresa_id, canal.id, mid, {
+      lead_id: lead.id, direcao: "enviada", conteudo: texto, origem, lida: true, tipo, midia_url: midiaUrl,
       // Echo = a mensagem comprovadamente saiu (foi enviada pelo app do celular).
       // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
       status_entrega: "enviada", status_em: new Date().toISOString(),
-    }]);
-    if (error) { console.log("echo duplicado ignorado:", mid); return; }
+    });
+    if (erro) { console.error("gravar echo:", mid, erro); return; }
+    if (msgId == null) { console.log("echo duplicado ignorado:", mid); return; }
 
     // A lista de leads é ordenada por `ultima_mensagem_at`. O recebimento já
     // atualizava; o echo não — então responder pelo CRM subia a conversa e
@@ -1202,7 +1225,6 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
           ? ((m.text as Record<string, string> | undefined)?.body ?? "")
           : TIPO_DB[tipoMsg] ? `[${TIPO_DB[tipoMsg]}]` : descreverSemArquivo(tipoMsg, m);
         const linha: Record<string, unknown> = {
-          empresa_id: canal.empresa_id, canal_id: canal.id,
           direcao: doNegocio ? "enviada" : "recebida", conteudo, origem: "whatsapp",
           lida: true, external_id: m.id ?? null,
           tipo: TIPO_DB[tipoMsg] ?? "texto", midia_url: null,
@@ -1299,10 +1321,15 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
         criados++;
       }
 
-      for (const l of linhas) l.lead_id = leadId;
-      const { error } = await db.from("lead_mensagens")
-        .upsert(linhas, { onConflict: "external_id", ignoreDuplicates: true });
-      if (error) { console.error("histórico lote:", error.message); falhas++; continue; }
+      // Uma chamada por mensagem: o histórico vem raso (1,5 mensagem por
+      // conversa, medido em 13/10), então o lote nunca foi grande.
+      let erroLote: string | null = null;
+      for (const { external_id, ...l } of linhas) {
+        const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (external_id as string | null) ?? null,
+          { ...l, lead_id: leadId });
+        if (erro) { erroLote = erro; break; }
+      }
+      if (erroLote) { console.error("histórico lote:", erroLote); falhas++; continue; }
       importadas += linhas.length;
       // ultima_mensagem_at REAL da conversa: histórico velho não pode passar na
       // frente do atendimento de hoje na ordenação da lista.
@@ -1440,14 +1467,13 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
       return json({ error: msg }, r.status);
     }
     if (leadId) {
-      await db.from("lead_mensagens").insert([{
-        empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", conteudo, canal_id: canal.id,
-        origem: "whatsapp", lida: true, tipo: tipoDb, midia_url: midiaUrl ?? null,
-        external_id: (data?.messages?.[0]?.id as string) ?? null,
-        usuario_id: usuarioId,
+      const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (data?.messages?.[0]?.id as string) ?? null, {
+        lead_id: leadId, direcao: "enviada", conteudo, origem: "whatsapp", lida: true, tipo: tipoDb,
+        midia_url: midiaUrl ?? null, usuario_id: usuarioId,
         // Primeiro estado; o webhook depois promove para entregue/lida.
         status_entrega: "enviada", status_em: new Date().toISOString(),
-      }]);
+      });
+      if (erro) console.error("gravar mensagem enviada:", erro);
     }
     return json({ success: true, provider: "oficial", data });
   }
@@ -1507,13 +1533,12 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
   }
 
   if (leadId) {
-    await db.from("lead_mensagens").insert([{
-      empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", canal_id: canal.id,
-      conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
-      tipo: "texto", external_id: (data?.messages?.[0]?.id as string) ?? null,
-      usuario_id: usuarioId,
+    const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (data?.messages?.[0]?.id as string) ?? null, {
+      lead_id: leadId, direcao: "enviada", conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
+      tipo: "texto", usuario_id: usuarioId,
       status_entrega: "enviada", status_em: new Date().toISOString(),
-    }]);
+    });
+    if (erro) console.error("gravar modelo enviado:", erro);
   }
   return json({ success: true, modelo: nome });
 }
@@ -1632,13 +1657,12 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
 
     return json({ error: msg }, r.status);
   }
-  await db.from("lead_mensagens").insert([{
-    empresa_id: canal.empresa_id, lead_id: leadId, direcao: "enviada", canal_id: canal.id,
-    conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, lida: true,
-    tipo: tipoDb, midia_url: midiaUrl ?? null, external_id: (data?.message_id as string) ?? null,
-    usuario_id: usuarioId,
+  const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (data?.message_id as string) ?? null, {
+    lead_id: leadId, direcao: "enviada", conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, lida: true,
+    tipo: tipoDb, midia_url: midiaUrl ?? null, usuario_id: usuarioId,
     status_entrega: "enviada", status_em: new Date().toISOString(),
-  }]);
+  });
+  if (erro) console.error("gravar mensagem enviada:", erro);
   return json({ success: true });
 }
 
