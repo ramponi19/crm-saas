@@ -27,6 +27,7 @@ import { ContratoCard } from './contrato-card'
 import { TrocaCard } from './troca-card'
 import type { OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
+import { CAMPO_SECRETO } from '@/lib/segredos'
 
 interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
 
@@ -34,6 +35,8 @@ interface Props {
   official: OfficialConfig | null
   instagram: MetaConfig | null
   messenger: MetaConfig | null
+  /** Segredos preenchidos no banco, por canal (o valor não vem para o navegador). */
+  configurados?: { whatsapp: string[]; instagram: string[]; messenger: string[] }
   dadosLoja: unknown
   preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
@@ -88,7 +91,7 @@ const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeh
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ official, instagram, messenger, taxas, segmento, slug }: Props) {
+export function ConfiguracoesView({ official, instagram, messenger, configurados, taxas, segmento, slug }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
@@ -248,17 +251,24 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
       if (official) {
         init.phone_number_id = official.phone_number_id ?? ''
         init.waba_id = official.waba_id ?? ''
-        init.access_token = official.access_token ?? ''
-        init.webhook_verify_token = official.webhook_verify_token ?? ''
       }
     } else if (canal.provider === 'meta') {
       const cfg = canal.id === 'instagram' ? instagram : canal.id === 'messenger' ? messenger : null
       if (cfg) {
         init.pageid = cfg.page_id ?? ''
-        init.token = cfg.access_token ?? ''
       }
     }
+    // Tokens não vêm para o navegador: o campo abre vazio e, se já houver valor
+    // no banco, diz "configurado". Em branco ao salvar = mantém o atual.
     setModalValues(init)
+  }
+
+  function segredoConfigurado(canalId: string, campo: string) {
+    if (!CAMPO_SECRETO.test(campo)) return false
+    const lista = canalId === 'whatsapp' ? configurados?.whatsapp
+      : canalId === 'instagram' ? configurados?.instagram
+      : canalId === 'messenger' ? configurados?.messenger : undefined
+    return !!lista?.includes(campo === 'token' ? 'access_token' : campo)
   }
 
   function copyWebhook() {
@@ -271,9 +281,13 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
     const empId = await garantirEmpresaId()
     if (!empId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSaving(true)
-    const upsert = (chave: string, valor: unknown) =>
-      supabase.from('configuracoes_sistema')
-        .upsert({ empresa_id: empId, chave, valor: valor as Json }, { onConflict: 'empresa_id,chave' })
+    // Pelo servidor: ele completa os segredos deixados em branco com o valor atual.
+    const upsert = async (chave: string, valor: unknown) => {
+      const r = await fetch('/api/configuracoes/canal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chave, valor }),
+      })
+      if (!r.ok) throw new Error('falha ao salvar')
+    }
     try {
       if (modalCanal.id === 'whatsapp') {
         const cfg: OfficialConfig = {
@@ -513,7 +527,7 @@ export function ConfiguracoesView({ official, instagram, messenger, taxas, segme
               <Input
                 key={f.key}
                 label={f.label}
-                placeholder={f.placeholder}
+                placeholder={segredoConfigurado(modalCanal.id, f.key) ? 'configurado' : f.placeholder}
                 value={modalValues[f.key] ?? ''}
                 onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
               />

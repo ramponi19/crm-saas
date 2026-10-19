@@ -3,6 +3,7 @@ import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import type { OfficialConfig } from '@/lib/whatsapp/types'
+import { semSegredos } from '@/lib/segredos'
 
 type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
 
@@ -25,15 +26,21 @@ async function getConfigs() {
     supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
   ])
 
-  const official     = configs?.find(d => d.chave === 'whatsapp_official')?.valor as OfficialConfig | undefined
-  const instagram    = (configs?.find(d => d.chave === 'meta_instagram')?.valor ?? null) as MetaConfig | null
-  const messenger    = (configs?.find(d => d.chave === 'meta_messenger')?.valor ?? null) as MetaConfig | null
-  const dadosLoja    = configs?.find(d => d.chave === 'dados_loja')?.valor ?? null
-  const preferencias = configs?.find(d => d.chave === 'preferencias')?.valor ?? null
+  // Token, secret, key e senha não vão para o navegador: só o nome dos que estão
+  // preenchidos, para a tela mostrar "configurado" (lib/segredos.ts).
+  const ler = (chave: string) => semSegredos(configs?.find(d => d.chave === chave)?.valor ?? null)
+  const official     = ler('whatsapp_official')
+  const instagram    = ler('meta_instagram')
+  const messenger    = ler('meta_messenger')
+  const dadosLoja    = ler('dados_loja').valor
+  const preferencias = ler('preferencias').valor
 
   return {
-    official: official ?? null,
-    instagram, messenger, dadosLoja, preferencias,
+    official: (official.valor ?? null) as OfficialConfig | null,
+    instagram: instagram.valor as MetaConfig | null,
+    messenger: messenger.valor as MetaConfig | null,
+    configurados: { whatsapp: official.configurados, instagram: instagram.configurados, messenger: messenger.configurados },
+    dadosLoja, preferencias,
     segmento: empresa?.segmento ?? null,
     slug: empresa?.slug ?? null,
     taxas: ((taxas ?? []) as Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>).map(t => ({
@@ -47,7 +54,7 @@ async function getConfigs() {
 
 export default async function ConfiguracoesPage() {
   await requireEmpresaRole(['owner', 'admin'])
-  const { official, instagram, messenger, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
+  const { official, instagram, messenger, configurados, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
 
   return (
     <>
@@ -56,6 +63,7 @@ export default async function ConfiguracoesPage() {
         official={official}
         instagram={instagram}
         messenger={messenger}
+        configurados={configurados}
         dadosLoja={dadosLoja}
         preferencias={preferencias}
         taxas={taxas}

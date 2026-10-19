@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
+import { mesclarSegredos } from '@/lib/segredos'
 
 export async function POST(req: Request) {
   try {
@@ -8,10 +9,15 @@ export async function POST(req: Request) {
     const { supabase, empresaId } = auth
     const body = await req.json()
 
+    // Segredo em branco mantém o atual: a tela de Configurações não recebe mais o token.
+    const { data: atual } = await supabase.from('configuracoes_sistema')
+      .select('valor').eq('empresa_id', empresaId).eq('chave', 'whatsapp_official').maybeSingle()
+    const valor = mesclarSegredos(body, atual?.valor)
+
     const { error } = await supabase
       .from('configuracoes_sistema')
       .upsert(
-        { chave: 'whatsapp_official', valor: body, empresa_id: empresaId, updated_at: new Date().toISOString() },
+        { chave: 'whatsapp_official', valor: valor as never, empresa_id: empresaId, updated_at: new Date().toISOString() },
         { onConflict: 'empresa_id,chave' }
       )
 
