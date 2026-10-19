@@ -7,7 +7,30 @@
  * ambientes (navegador, servidor, edge) não divergirem.
  */
 
-import type { ErrorEvent } from '@sentry/nextjs'
+import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs'
+
+/**
+ * Tira da URL os parâmetros que carregam credencial (`token`, `access_token`,
+ * `hub.verify_token`). Portais, site da imobiliária e C2S ainda mandam o token na
+ * query (lib/token-externo.ts), e a URL vai inteira no evento e nos breadcrumbs.
+ */
+const PARAM_SECRETO = /([?&])(token|access_token|hub\.verify_token)=[^&#\s]*(&?)/gi
+export function semTokenNaUrl(texto: string): string {
+  return texto
+    .replace(PARAM_SECRETO, (_m, sep: string, _nome: string, eComercial: string) => (eComercial ? sep : ''))
+    .replace(/\?(#|$)/, '$1')
+}
+
+function limparBreadcrumb(b: Breadcrumb): Breadcrumb {
+  if (b.message) b.message = semTokenNaUrl(b.message)
+  if (b.data) {
+    for (const k of ['url', 'from', 'to']) {
+      const v = b.data[k]
+      if (typeof v === 'string') b.data[k] = semTokenNaUrl(v)
+    }
+  }
+  return b
+}
 
 /**
  * DSN do projeto (org ramponi19 / nexus-crm).
@@ -60,7 +83,16 @@ export const opcoesComuns = {
         delete req.headers.authorization
         delete req.headers.cookie
       }
+      if (req.url) req.url = semTokenNaUrl(req.url)
+      if (typeof req.query_string === 'string') {
+        req.query_string = semTokenNaUrl(`?${req.query_string}`).replace(/^\?/, '')
+      } else if (req.query_string) {
+        req.query_string = Array.isArray(req.query_string)
+          ? req.query_string.filter(([k]) => !/^(token|access_token|hub\.verify_token)$/i.test(k))
+          : Object.fromEntries(Object.entries(req.query_string).filter(([k]) => !/^(token|access_token|hub\.verify_token)$/i.test(k)))
+      }
     }
+    evento.breadcrumbs = evento.breadcrumbs?.map(limparBreadcrumb)
 
     /**
      * ERRO SEM ARQUIVO: anexa QUEM estava carregado na página.
@@ -126,6 +158,11 @@ export const opcoesComuns = {
     }
 
     return evento
+  },
+
+  /** Breadcrumb de fetch/navegação leva a URL inteira: sai sem token. */
+  beforeBreadcrumb(b: Breadcrumb) {
+    return limparBreadcrumb(b)
   },
 
   /**

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { carregarConfig, leadDoPayload, type LeadC2S } from '@/lib/c2s'
+import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
 
 /**
  * Webhook INBOUND do Contact2Sale.
@@ -47,14 +48,14 @@ async function registrar(
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const token = new URL(req.url).searchParams.get('token')
+  const token = tokenDaRequisicao(req, 'webhook/c2s')
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const cfg = await carregarConfig(svc, empresa.id)
-  if (!cfg.entrada || token !== cfg.entrada) {
+  if (!tokenConfere(token, cfg.entrada)) {
     // Sem log: token errado é tentativa de fora, e gravar o payload de quem não se
     // identificou é encher a tela do lojista com ruído de terceiro.
     return NextResponse.json({ error: 'not_authorized' }, { status: 401 })

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
+import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
 
 /**
  * Webhook INBOUND de leads dos portais (Grupo OLX: ZAP, VivaReal, Imovelweb).
@@ -28,14 +29,14 @@ function pick(obj: any, ...keys: string[]) {
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const token = new URL(req.url).searchParams.get('token')
+  const token = tokenDaRequisicao(req, 'portais/leads')
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
   const esperado = await getPortalToken(svc, empresa.id)
-  if (!esperado || token !== esperado) {
+  if (!tokenConfere(token, esperado)) {
     return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
   }
 

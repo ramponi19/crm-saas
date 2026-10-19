@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { excedeuLimite } from '@/lib/rate-limit'
+import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
 
 /**
  * Captura de leads do SITE PRÓPRIO da imobiliária.
@@ -16,7 +17,7 @@ import { excedeuLimite } from '@/lib/rate-limit'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
 export function OPTIONS() {
@@ -25,7 +26,7 @@ export function OPTIONS() {
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const token = new URL(req.url).searchParams.get('token')
+  const token = tokenDaRequisicao(req, 'imob/lead')
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
@@ -51,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   }
 
   const esperado = await getPortalToken(svc, empresa.id)
-  if (!esperado || token !== esperado) {
+  if (!tokenConfere(token, esperado)) {
     return NextResponse.json({ error: 'Token inválido' }, { status: 401, headers: CORS })
   }
 
