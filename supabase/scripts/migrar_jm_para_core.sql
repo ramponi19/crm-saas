@@ -1128,6 +1128,77 @@ exception when others then
   return null;
 end $$;
 
+-- hard_delete_empresa depois do corte. A versão do core_v1 apaga por leads/clientes/lead_mensagens,
+-- que aqui viram views com INSTEAD OF — e a guarda delas (compat_guarda) recusa o superadmin, cuja
+-- sessão não é da empresa apagada: a exclusão quebrava no primeiro DELETE. Mesma ordem, nas
+-- tabelas de verdade (core v1 e nomes com prefixo). As old_* vão junto com a empresa (FK com
+-- cascade, 8.9); o resto do core também tem cascade, mas sai explícito para a ordem ficar à vista.
+create or replace function public.hard_delete_empresa(p_empresa_id bigint) returns void
+  language plpgsql security definer set search_path to 'public' as $$
+declare
+  v_super boolean;
+begin
+  select is_super_admin into v_super from public.usuarios where id = auth.uid();
+  if not coalesce(v_super, false) then
+    raise exception 'Permission denied: not a super admin';
+  end if;
+  if not exists (select 1 from public.empresas where id = p_empresa_id) then
+    raise exception 'Empresa % nao encontrada', p_empresa_id;
+  end if;
+
+  -- Folhas primeiro. Transacional: se algo falhar, nada é apagado.
+  -- Tabelas com empresa_id SEM FK para empresas: nada as apagava e ficavam órfãs.
+  delete from public.zapintel_venda_lead     where empresa_id = p_empresa_id;
+  delete from public.zapintel_lead_perfil    where empresa_id = p_empresa_id;
+  delete from public.zapintel_conversa_cache where empresa_id = p_empresa_id;
+  delete from public.assistente_uso          where empresa_id = p_empresa_id;
+  delete from public.historico_bruto         where empresa_id = p_empresa_id;
+  delete from public.diagnostico_canais      where empresa_id = p_empresa_id;
+  delete from public.assistencia_servicos    where empresa_id = p_empresa_id;
+  delete from public.estoque_tabela_precos   where empresa_id = p_empresa_id;
+  delete from public.vendas_alertas          where empresa_id = p_empresa_id;
+  delete from public.vendas_termos           where empresa_id = p_empresa_id;
+  delete from public.estoque_imei_consultas  where empresa_id = p_empresa_id;
+  delete from public.vendas_pagamentos       where empresa_id = p_empresa_id;
+  delete from public.financeiro_cobrancas    where empresa_id = p_empresa_id;
+  delete from public.vendas_comissoes        where empresa_id = p_empresa_id;
+  delete from public.vendas_pre_vendas       where empresa_id = p_empresa_id;
+  delete from public.estoque_movimentacoes   where empresa_id = p_empresa_id;
+  delete from public.followups_gerados       where empresa_id = p_empresa_id;
+  delete from public.visitas                 where empresa_id = p_empresa_id;
+  delete from public.tarefas                 where empresa_id = p_empresa_id;
+  delete from public.mensagens               where empresa_id = p_empresa_id;
+  delete from public.conversas               where empresa_id = p_empresa_id;
+  delete from public.imoveis_perfis_busca    where empresa_id = p_empresa_id;
+  delete from public.assistencia_garantias   where empresa_id = p_empresa_id;
+  delete from public.estoque_unidades        where empresa_id = p_empresa_id;
+  delete from public.vendas_pedidos_compra   where empresa_id = p_empresa_id;
+  delete from public.vendas_vendas           where empresa_id = p_empresa_id;
+  delete from public.negocios                where empresa_id = p_empresa_id;
+  delete from public.imoveis_imoveis         where empresa_id = p_empresa_id;
+  delete from public.estoque_produtos        where empresa_id = p_empresa_id;
+  delete from public.estoque_subcategorias   where empresa_id = p_empresa_id;
+  delete from public.estoque_marcas          where empresa_id = p_empresa_id;
+  delete from public.estoque_categorias      where empresa_id = p_empresa_id;
+  delete from public.estoque_fornecedores    where empresa_id = p_empresa_id;
+  delete from public.contatos                where empresa_id = p_empresa_id;
+  delete from public.metas_comissoes         where empresa_id = p_empresa_id;
+  delete from public.financeiro_lancamentos  where empresa_id = p_empresa_id;
+  delete from public.configuracoes_sistema   where empresa_id = p_empresa_id;
+  delete from public.funil_etapas            where empresa_id = p_empresa_id;
+  delete from public.financeiro_taxas        where empresa_id = p_empresa_id;
+  delete from public.financeiro_config_pagamento where empresa_id = p_empresa_id;
+  delete from public.stripe_eventos          where empresa_id = p_empresa_id;
+  delete from public.empresa_usuarios        where empresa_id = p_empresa_id;
+
+  -- Preserva a trilha de auditoria (inclui o log da propria exclusao).
+  update public.superadmin_logs set empresa_id = null where empresa_id = p_empresa_id;
+
+  delete from public.empresas where id = p_empresa_id;
+end $$;
+revoke execute on function public.hard_delete_empresa(p_empresa_id bigint) from public, anon;
+grant execute on function public.hard_delete_empresa(p_empresa_id bigint) to authenticated, service_role;
+
 do $$
 declare
   f text;
@@ -1365,6 +1436,22 @@ begin
   drop trigger if exists zapintel_vendas_ao_vivo on public.vendas_vendas;
   create trigger zapintel_vendas_ao_vivo after insert on public.vendas_vendas
     referencing new table as novas for each statement execute function public.tg_zapintel_vendas_ao_vivo();
+
+  -- 8.9 old_* saem junto com a empresa (hard_delete_empresa): FK para empresas com cascade.
+  -- old_canais_conectados já era; leads, clientes e lead_mensagens eram NO ACTION e travavam a
+  -- exclusão de qualquer empresa com dado antigo. As FKs entre as old_* ficam como estão: a
+  -- cascata apaga as quatro no mesmo comando e a checagem de NO ACTION é no fim dele.
+  for r in
+    select c.conname, cl.relname tabela, a.attname coluna
+      from pg_constraint c join pg_class cl on cl.oid = c.conrelid
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+     where c.contype = 'f' and c.confrelid = 'public.empresas'::regclass and c.confdeltype <> 'c'
+       and cl.relname in ('old_leads', 'old_clientes', 'old_lead_mensagens', 'old_canais_conectados')
+  loop
+    execute format('alter table public.%I drop constraint %I', r.tabela, r.conname);
+    execute format('alter table public.%I add constraint %I foreign key (%I) references public.empresas(id) on delete cascade',
+                   r.tabela, r.conname, r.coluna);
+  end loop;
 
   perform migracao.marcar(8, 'prefixo, views de compatibilidade e FKs', jsonb_build_object('views_recriadas', v_view_defs));
 end $$;

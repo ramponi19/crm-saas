@@ -1195,6 +1195,22 @@ begin
 
   -- Deleta filhos em ordem topologica (folhas primeiro). Transacional: se algo
   -- falhar, tudo faz rollback e nada e apagado.
+  -- Core v1 (19/10): a de produção citava `proprietarios`, que não existe mais —
+  -- falhava para qualquer empresa. Sai; entram as três com FK para empresas sem
+  -- cascade que ela não apagava (imei_consultas, vendas_alertas, vendas_termos).
+  -- Depois do script do JM o corpo é outro (passo 8): sem as views.
+  -- Tabelas com empresa_id SEM FK para empresas: nada as apagava e ficavam órfãs.
+  delete from public.zapintel_venda_lead     where empresa_id = p_empresa_id;
+  delete from public.zapintel_lead_perfil    where empresa_id = p_empresa_id;
+  delete from public.zapintel_conversa_cache where empresa_id = p_empresa_id;
+  delete from public.assistente_uso          where empresa_id = p_empresa_id;
+  delete from public.historico_bruto         where empresa_id = p_empresa_id;
+  delete from public.diagnostico_canais      where empresa_id = p_empresa_id;
+  delete from public.servicos_reparo         where empresa_id = p_empresa_id;
+  delete from public.tabela_precos           where empresa_id = p_empresa_id;
+  delete from public.vendas_alertas          where empresa_id = p_empresa_id;
+  delete from public.vendas_termos           where empresa_id = p_empresa_id;
+  delete from public.imei_consultas          where empresa_id = p_empresa_id;
   delete from public.vendas_pagamentos       where empresa_id = p_empresa_id;
   delete from public.cobrancas               where empresa_id = p_empresa_id;
   delete from public.comissoes               where empresa_id = p_empresa_id;
@@ -1216,7 +1232,6 @@ begin
   delete from public.marcas_produtos         where empresa_id = p_empresa_id;
   delete from public.categorias_produtos     where empresa_id = p_empresa_id;
   delete from public.fornecedores            where empresa_id = p_empresa_id;
-  delete from public.proprietarios           where empresa_id = p_empresa_id;
   delete from public.clientes                where empresa_id = p_empresa_id;
   delete from public.metas_comissoes         where empresa_id = p_empresa_id;
   delete from public.lancamentos_financeiros where empresa_id = p_empresa_id;
