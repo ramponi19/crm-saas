@@ -1103,13 +1103,38 @@ begin
   return v_id;
 end $$;
 
+-- ZapIntel ao vivo sobre mensagens (gatilho zapintel_ao_vivo, recriado no 8.8). Mesmo corpo da
+-- produção (baseline, tg_zapintel_mensagens_ao_vivo) com UMA coluna trocada: mensagens não tem
+-- lead_id. "leads" do aviso continua sendo id de lead = id de negócio (preservado), agora os
+-- negócios do contato da mensagem. Quem lê é app/zapintel/leads/[id]/page.tsx (payload.leads).
+create or replace function public.tg_zapintel_mensagens_ao_vivo() returns trigger
+  language plpgsql security definer set search_path to 'public' as $$
+declare r record;
+begin
+  for r in
+    select empresa_id, count(*) n,
+           count(*) filter (where direcao = 'recebida') recebidas,
+           array_agg(distinct coalesce(filial_id, 0)) lojas,
+           (select (array_agg(distinct ng.id))[1:100] from negocios ng
+             where ng.contato_id = any (array_agg(distinct novas.contato_id))) leads
+    from novas group by empresa_id
+  loop
+    perform zapintel_avisar(r.empresa_id, 'mensagens',
+      jsonb_build_object('n', r.n, 'recebidas', r.recebidas, 'lojas', to_jsonb(r.lojas), 'leads', to_jsonb(r.leads)));
+  end loop;
+  return null;
+exception when others then
+  raise warning '[zapintel_ao_vivo] %', sqlerrm;
+  return null;
+end $$;
+
 do $$
 declare
   f text;
 begin
   foreach f in array array['compat_etapa(bigint,bigint,text)', 'compat_guarda(bigint)', 'compat_leads_iud()',
                            'compat_clientes_iud()', 'compat_lead_mensagens_iud()', 'imoveis_perfil_espelho()',
-                           'mensagem_registrar(bigint,bigint,text,jsonb)'] loop
+                           'mensagem_registrar(bigint,bigint,text,jsonb)', 'tg_zapintel_mensagens_ao_vivo()'] loop
     execute format('revoke execute on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
@@ -1326,6 +1351,21 @@ begin
     end loop;
   end if;
 
+  -- 8.8 ZapIntel ao vivo. RENAME leva o gatilho junto com a tabela:
+  --   zapintel_ao_vivo        ficou em old_lead_mensagens, onde ninguém mais grava → sai dali e
+  --                           nasce em mensagens (corpo ajustado acima: lead_id → contato_id);
+  --   zapintel_vendas_ao_vivo foi com vendas para vendas_vendas (insert pela view simples
+  --                           vendas chega na tabela e dispara) → recriado igual, explícito;
+  --   zapintel_ficha_ao_vivo  está em zapintel_lead_perfil, que não é renomeada nem trocada:
+  --                           continua onde está (lead_id dela já aponta para negocios, 8.5).
+  drop trigger if exists zapintel_ao_vivo on public.old_lead_mensagens;
+  drop trigger if exists zapintel_ao_vivo on public.mensagens;
+  create trigger zapintel_ao_vivo after insert on public.mensagens
+    referencing new table as novas for each statement execute function public.tg_zapintel_mensagens_ao_vivo();
+  drop trigger if exists zapintel_vendas_ao_vivo on public.vendas_vendas;
+  create trigger zapintel_vendas_ao_vivo after insert on public.vendas_vendas
+    referencing new table as novas for each statement execute function public.tg_zapintel_vendas_ao_vivo();
+
   perform migracao.marcar(8, 'prefixo, views de compatibilidade e FKs', jsonb_build_object('views_recriadas', v_view_defs));
 end $$;
 
@@ -1357,6 +1397,34 @@ begin
         and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename like 'old\_%')),
     coalesce((select string_agg(tablename, ', ' order by tablename) from pg_publication_tables where pubname = 'supabase_realtime'),
              'sem publicação supabase_realtime neste banco'));
+
+  select string_agg(t.tgname || '@' || c.relname, ', ' order by t.tgname) into v_falta
+    from pg_trigger t join pg_class c on c.oid = t.tgrelid
+   where not t.tgisinternal and t.tgname like 'zapintel\_%';
+  perform migracao.afirmar(8, 'gatilhos do ZapIntel ao vivo nas tabelas novas',
+    v_falta = 'zapintel_ao_vivo@mensagens, zapintel_ficha_ao_vivo@zapintel_lead_perfil, zapintel_vendas_ao_vivo@vendas_vendas',
+    v_falta);
+
+  -- os três avisam de verdade: zapintel_avisar trocado por um que anota, desfeito no fim
+  begin
+    create temp table zap_avisos (empresa bigint, evento text, dados jsonb) on commit drop;
+    create or replace function public.zapintel_avisar(p_empresa bigint, p_evento text, p_dados jsonb) returns void
+      language sql security definer set search_path to 'public' as
+      'insert into zap_avisos values (p_empresa, p_evento, p_dados)';
+    select n.id into v_lead from negocios n where n.empresa_id = 1 and n.status = 'aberto' order by n.id limit 1;
+    perform mensagem_registrar(1, null, 'teste-zap-1', jsonb_build_object('lead_id', v_lead, 'direcao', 'recebida', 'conteudo', 'x'));
+    insert into vendas (empresa_id, valor_venda) values (1, 1);
+    update zapintel_lead_perfil set gerado_em = gerado_em
+     where lead_id = (select lead_id from zapintel_lead_perfil where empresa_id = 1 limit 1);
+    v_upsert_msg := (select string_agg(evento || coalesce(':' || (dados -> 'leads' @> to_jsonb(v_lead))::text, ''), ', ' order by evento)
+                       from zap_avisos where empresa = 1);
+    raise exception 'desfazer_teste';
+  exception when others then
+    if sqlerrm <> 'desfazer_teste' then v_upsert_msg := 'erro: ' || sqlerrm; end if;
+  end;
+  perform migracao.afirmar(8, 'ZapIntel ao vivo avisa (mensagens, vendas, análises)',
+    v_upsert_msg = 'analises, mensagens:true, vendas',
+    coalesce(v_upsert_msg, 'nenhum aviso') || ' (mensagens:true = o negócio da mensagem veio em leads)');
 
   select count(*) into v_fk_old from pg_constraint c join pg_class cl on cl.oid = c.conrelid join pg_class rf on rf.oid = c.confrelid
    where c.contype = 'f' and rf.relname like 'old\_%' and cl.relname not like 'old\_%';
