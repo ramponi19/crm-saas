@@ -100,8 +100,9 @@ RUIDO = {
 }
 
 
-def baixar(url: str, destino: str) -> None:
-    with urllib.request.urlopen(url, timeout=60) as r, open(destino, "wb") as f:
+def baixar(url: str, destino: str, cabecalhos: dict | None = None) -> None:
+    req = urllib.request.Request(url, headers=cabecalhos or {})
+    with urllib.request.urlopen(req, timeout=60) as r, open(destino, "wb") as f:
         f.write(r.read())
 
 
@@ -248,7 +249,15 @@ def main() -> int:
 
     def pegar(linha):
         destino = os.path.join(tmp, f"a{linha['id']}")
-        baixar(linha["midia_url"], destino)
+        # O bucket chat-midia é privado: a URL gravada não abre. Com a chave de
+        # serviço o arquivo vem pelo endpoint autenticado do Storage.
+        marca = "/storage/v1/object/public/chat-midia/"
+        if marca in linha["midia_url"]:
+            caminho = linha["midia_url"].split(marca, 1)[1].split("?")[0]
+            baixar(f"{url_base}/storage/v1/object/authenticated/chat-midia/{caminho}", destino,
+                   {"apikey": chave, "Authorization": f"Bearer {chave}"})
+        else:
+            baixar(linha["midia_url"], destino)
         return linha, destino
 
     n = 0

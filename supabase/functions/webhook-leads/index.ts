@@ -1372,6 +1372,20 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
 }
 
 // ── Envio ───────────────────────────────────────────────────────────────────
+// O bucket chat-midia é privado: a Meta baixa a mídia que enviamos por uma URL
+// assinada de 600 s gerada aqui, na hora do envio. O banco continua gravando a
+// URL que o upload devolveu — ela é o identificador do arquivo, não um link.
+const MARCA_CHAT_MIDIA = "/storage/v1/object/public/chat-midia/";
+async function linkParaMeta(url: string, empresaId: number): Promise<string> {
+  const i = url.indexOf(MARCA_CHAT_MIDIA);
+  if (i < 0) return url;
+  const caminho = decodeURIComponent(url.slice(i + MARCA_CHAT_MIDIA.length).split("?")[0]);
+  if (!caminho.startsWith(`${empresaId}/`)) throw new Error("mídia de outra empresa");
+  const { data, error } = await db.storage.from("chat-midia").createSignedUrl(caminho, 600);
+  if (error || !data?.signedUrl) throw new Error(`não foi possível preparar a mídia: ${error?.message ?? "sem URL"}`);
+  return data.signedUrl;
+}
+
 async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assinatura = "", usuarioId: string | null = null) {
   const number = body.number as string;
   const text = body.text as string | undefined;
@@ -1389,12 +1403,17 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
   const destino = num.startsWith("55") ? num : "55" + num;
 
   if (canal.token && canal.external_id) {
+    let link = midiaUrl;
+    if (comMidia) {
+      try { link = await linkParaMeta(midiaUrl!, canal.empresa_id); }
+      catch (e) { return json({ error: (e as Error).message }, 400); }
+    }
     const payload = comMidia
       ? {
           messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: tipoMidia,
           [tipoMidia!]: tipoMidia === "audio"
-            ? { link: midiaUrl }
-            : (text ? { link: midiaUrl, caption: textoEnviado } : { link: midiaUrl }),
+            ? { link }
+            : (text ? { link, caption: textoEnviado } : { link }),
         }
       : { messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: "text", text: { body: textoEnviado } };
     const r = await fetch(`https://graph.facebook.com/${GRAPH}/${canal.external_id}/messages`, {
@@ -1509,9 +1528,14 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
   if (!canal.token) return json({ error: `${nomeCanal} sem token válido. Reconecte em Configurações.` }, 502);
   const comMidia = !!(midiaUrl && tipoMidia);
   const tipoDb = comMidia ? TIPO_DB[tipoMidia!] : "texto";
+  let link = midiaUrl;
+  if (comMidia) {
+    try { link = await linkParaMeta(midiaUrl!, canal.empresa_id); }
+    catch (e) { return json({ error: (e as Error).message }, 400); }
+  }
   // A Send API não aceita texto + anexo na mesma mensagem.
   const message = comMidia
-    ? { attachment: { type: tipoMidia, payload: { url: midiaUrl, is_reusable: true } } }
+    ? { attachment: { type: tipoMidia, payload: { url: link, is_reusable: true } } }
     : { text: texto ? assinatura + texto : texto };
 
   /**

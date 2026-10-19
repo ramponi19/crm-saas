@@ -8,6 +8,7 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import { useEmpresa } from '@/lib/empresa-context'
 import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
+import { urlDeMidia } from '@/lib/storage/midia'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
@@ -1229,7 +1230,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
           {lead.foto_url && !fotoQuebrada ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={lead.foto_url}
+              src={urlDeMidia(lead.foto_url) ?? undefined}
               alt={form.nome || 'Contato'}
               className="h-9 w-9 flex-none rounded-full object-cover"
               onError={() => setFotoQuebrada(true)}
@@ -1385,16 +1386,16 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                       {m.tipo === 'anuncio' && <AnuncioChat conteudo={m.text} midiaUrl={m.midiaUrl} />}
                       {m.tipo === 'reel' && <ReelChat conteudo={m.text} />}
                       {m.midiaUrl && m.tipo === 'imagem' && (
-                        <a href={m.midiaUrl} target="_blank" rel="noreferrer">
+                        <a href={urlDeMidia(m.midiaUrl) ?? undefined} target="_blank" rel="noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.midiaUrl} alt="Imagem da conversa" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
+                          <img src={urlDeMidia(m.midiaUrl) ?? undefined} alt="Imagem da conversa" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
                         </a>
                       )}
                       {m.midiaUrl && m.tipo === 'video' && (
-                        <video src={m.midiaUrl} controls preload="metadata" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
+                        <video src={urlDeMidia(m.midiaUrl) ?? undefined} controls preload="metadata" className="mb-1 max-h-[240px] w-auto max-w-full rounded-[8px]" />
                       )}
                       {m.midiaUrl && m.tipo === 'audio' && (
-                        <AudioChat url={m.midiaUrl} />
+                        <AudioChat url={urlDeMidia(m.midiaUrl) ?? m.midiaUrl} />
                       )}
                       {/* Midia retirada pela retencao numa mensagem que TEM
                           legenda: o ramo do placeholder la embaixo so cobre a
@@ -1415,7 +1416,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                           no NOME e no download, não em prévia. */}
                       {m.midiaUrl && m.tipo === 'documento' && (
                         <a
-                          href={m.midiaUrl}
+                          href={urlDeMidia(m.midiaUrl) ?? undefined}
                           target="_blank"
                           rel="noreferrer"
                           className="mb-1 flex items-center gap-2 rounded-[8px] bg-black/[0.06] px-2 py-1.5 text-[12.5px] font-medium text-[#111b21] transition-colors hover:bg-black/10"
