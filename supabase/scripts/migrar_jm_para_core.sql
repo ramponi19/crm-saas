@@ -2,7 +2,9 @@
 -- Migração dos dados para o core v1 (aba "Desenho do core v1", seção "Migração do JM").
 -- NÃO APLICADO EM PRODUÇÃO. Roda numa cópia (Postgres local restaurado do dump ou branch).
 --
--- Pré-requisito: 20261019000000_baseline_producao.sql + 20261019000100_core_v1.sql aplicados.
+-- Pré-requisito, nesta ordem: 20261019000000_baseline_producao, 20261020000000_revoke_rpc,
+-- 20261020000100_configuracoes_sem_segredo, 20261020000200_core_v1 (era 20261019000100,
+-- renomeada no rebase sobre o passo A) e 20261021000000_mensagem_registrar.
 -- Como rodar:  psql -v ON_ERROR_STOP=1 -d <copia> -f supabase/scripts/migrar_jm_para_core.sql
 --              (como o dono das tabelas: postgres)
 --

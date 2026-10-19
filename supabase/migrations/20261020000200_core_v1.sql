@@ -32,7 +32,10 @@
 --     onde o app logado depende dela (policies de RLS e RPC chamado pela sessão do usuário):
 --     get_empresa_id, is_super_admin, is_empresa_admin, filial_atual, filiais_visiveis,
 --     chat_marcar_lido, chat_nao_lidas_por_conversa, set_impersonation, encerrar_impersonacao,
---     set_super_admin, hard_delete_empresa. anon perde EXECUTE em todas.
+--     set_super_admin, hard_delete_empresa, filial_gravacao (lib/whatsapp chama com a sessão;
+--     alinhado ao 20261020000000_revoke_rpc no rebase). anon perde EXECUTE em todas.
+--     Fora as reescritas, authenticated segue com as 22 do revoke_rpc (RPCs do ZapIntel e
+--     buscar_lead_por_numero não são tocadas aqui).
 --  8. Regra de limite (#26/P1): core_limite_negocios em negocios conta status='aberto' contra
 --     planos_config.limite_leads; empresas.limite_leads só vale como override quando > 0
 --     (hoje a JM tem 0 nessa coluna, e 0 no navegador já significa "sem override").
@@ -1111,8 +1114,8 @@ begin
   return v;
 end $function$
 ;
-revoke execute on function public.filial_gravacao(p_empresa bigint) from public, anon, authenticated;
-grant execute on function public.filial_gravacao(p_empresa bigint) to service_role;
+revoke execute on function public.filial_gravacao(p_empresa bigint) from public, anon;
+grant execute on function public.filial_gravacao(p_empresa bigint) to authenticated, service_role;
 
 -- fundir_clientes (só privilégios; a versão do modelo novo é core_*)
 revoke execute on function public.fundir_clientes(p_empresa bigint, p_principal bigint, p_secundario bigint) from public, anon, authenticated;
