@@ -1,17 +1,20 @@
-import type { OfficialConfig, SendMessageParams, SendMessageResult } from './types'
+import type { SendMessageParams, SendMessageResult } from './types'
+
+/** Canal de envio já resolvido no servidor (ver lib/whatsapp/index.ts). */
+export interface CanalEnvio { phoneNumberId: string; token: string; graph: string }
 
 export async function sendViaOfficial(
-  config: OfficialConfig,
+  canal: CanalEnvio,
   params: SendMessageParams
 ): Promise<SendMessageResult> {
   try {
-    const url = `${config.api_url}/${config.api_version}/${config.phone_number_id}/messages`
+    const url = `https://graph.facebook.com/${canal.graph}/${canal.phoneNumberId}/messages`
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.access_token}`,
+        Authorization: `Bearer ${canal.token}`,
       },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
