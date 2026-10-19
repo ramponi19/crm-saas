@@ -1302,9 +1302,16 @@ begin
       from public.negocios n
       join public.contatos c on c.id = n.contato_id
       left join public.funil_etapas e on e.id = n.etapa_id
+      -- Não lidas e última mensagem SÓ no negócio principal do contato — a mesma regra da view
+      -- lead_mensagens, que põe a conversa nele. Sem isto cada negócio de um contato fundido
+      -- mostrava o badge do contato inteiro (32 cards, 920 mensagens contadas duas vezes na cópia
+      -- de 19/10) e abrir o card não mostrava conversa nenhuma.
       left join lateral (select sum(x.nao_lidas) as nao_lidas, max(x.ultima_mensagem_at) as ultima_mensagem_at,
                                 max(x.ultima_recebida_at) as ultima_recebida_at, max(x.ultima_enviada_at) as ultima_enviada_at
-                           from public.conversas x where x.contato_id = n.contato_id) cv on true;
+                           from public.conversas x
+                          where x.contato_id = n.contato_id
+                            and n.id = (select p.id from public.negocios p where p.contato_id = n.contato_id
+                                         order by (p.status = 'aberto') desc, p.created_at desc, p.id desc limit 1)) cv on true;
   alter view public.leads alter column ativo set default true;
   alter view public.leads alter column kanban_status set default 'novo';
   alter view public.leads alter column kanban_ordem set default 0;
