@@ -2,10 +2,6 @@ import { requireSuperAdminApi, logSuperAdminAction } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
-// Chaves de integração cujo `ativo=true` bloqueia a exclusão (protege o
-// recebimento de mensagens da Meta em análise).
-const CHAVES_META = ['meta_instagram', 'meta_messenger', 'whatsapp_official']
-
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireSuperAdminApi()
   if (auth.error) return auth.error
@@ -25,17 +21,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: 'O nome digitado não confere com o da empresa.' }, { status: 400 })
   }
 
-  // 2) Trava anti-Meta: recusa se houver integração Meta/WhatsApp ativa.
-  const { data: cfgs } = await svc
-    .from('configuracoes_sistema')
-    .select('chave, valor')
+  // 2) Trava anti-Meta: recusa se houver canal Meta/WhatsApp ativo (protege o
+  // recebimento de mensagens). A fonte é canais_conectados — configuracoes_sistema
+  // não guarda mais canal nem token.
+  const { count: canaisAtivos } = await svc
+    .from('canais_conectados')
+    .select('id', { count: 'exact', head: true })
     .eq('empresa_id', empresaId)
-    .in('chave', CHAVES_META)
-  const metaAtiva = (cfgs ?? []).some(c => {
-    const v = c.valor as { ativo?: boolean } | null
-    return v && v.ativo === true
-  })
-  if (metaAtiva) {
+    .eq('status', 'ativo')
+  if ((canaisAtivos ?? 0) > 0) {
     return NextResponse.json({
       error: 'Esta empresa tem integração Meta/WhatsApp ativa. Desative as integrações antes de excluir (proteção do teste da Meta).',
     }, { status: 409 })

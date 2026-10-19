@@ -2,44 +2,38 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
-import type { OfficialConfig } from '@/lib/whatsapp/types'
 import { semSegredos } from '@/lib/segredos'
-
-type MetaConfig = { ativo?: boolean; page_id?: string; access_token?: string }
 
 export const metadata = { title: 'Configurações' }
 
 async function getConfigs() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: configs }, { data: taxas }, { data: empresa }] = await Promise.all([
+  const [{ data: configs }, { data: taxas }, { data: empresa }, { data: canais }] = await Promise.all([
     supabase
       .from('configuracoes_sistema')
       .select('chave, valor')
       .eq('empresa_id', empresaId)
-      .in('chave', ['whatsapp_official', 'meta_instagram', 'meta_messenger', 'dados_loja', 'preferencias']),
+      .in('chave', ['dados_loja', 'preferencias']),
     supabase
       .from('taxas_pagamento')
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
     supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
+    // Status dos canais: a fonte é canais_conectados (o que o chat e o envio usam).
+    // Sem access_token_enc: o token nunca sai do servidor.
+    supabase.from('canais_conectados').select('tipo').eq('empresa_id', empresaId).eq('status', 'ativo'),
   ])
 
-  // Token, secret, key e senha não vão para o navegador: só o nome dos que estão
-  // preenchidos, para a tela mostrar "configurado" (lib/segredos.ts).
-  const ler = (chave: string) => semSegredos(configs?.find(d => d.chave === chave)?.valor ?? null)
-  const official     = ler('whatsapp_official')
-  const instagram    = ler('meta_instagram')
-  const messenger    = ler('meta_messenger')
-  const dadosLoja    = ler('dados_loja').valor
-  const preferencias = ler('preferencias').valor
+  // Token, secret, key e senha não vão para o navegador (lib/segredos.ts).
+  const ler = (chave: string) => semSegredos(configs?.find(d => d.chave === chave)?.valor ?? null).valor
+  const dadosLoja    = ler('dados_loja')
+  const preferencias = ler('preferencias')
+  const conta = (tipo: string) => (canais ?? []).filter(c => c.tipo === tipo).length
 
   return {
-    official: (official.valor ?? null) as OfficialConfig | null,
-    instagram: instagram.valor as MetaConfig | null,
-    messenger: messenger.valor as MetaConfig | null,
-    configurados: { whatsapp: official.configurados, instagram: instagram.configurados, messenger: messenger.configurados },
+    canaisAtivos: { whatsapp: conta('whatsapp'), instagram: conta('instagram'), messenger: conta('messenger') },
     dadosLoja, preferencias,
     segmento: empresa?.segmento ?? null,
     slug: empresa?.slug ?? null,
@@ -54,16 +48,13 @@ async function getConfigs() {
 
 export default async function ConfiguracoesPage() {
   await requireEmpresaRole(['owner', 'admin'])
-  const { official, instagram, messenger, configurados, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
+  const { canaisAtivos, dadosLoja, preferencias, taxas, segmento, slug } = await getConfigs()
 
   return (
     <>
       <Topbar eyebrow="SISTEMA" title="Configurações" />
       <ConfiguracoesView
-        official={official}
-        instagram={instagram}
-        messenger={messenger}
-        configurados={configurados}
+        canaisAtivos={canaisAtivos}
         dadosLoja={dadosLoja}
         preferencias={preferencias}
         taxas={taxas}

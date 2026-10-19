@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
-import { Card, Input, Button, Badge, Tabs, Modal, notify } from '@/components/ui'
+import { Card, Input, Button, Badge, Tabs, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
 import { AssinaturaCard } from './assinatura-card'
@@ -25,18 +25,11 @@ import { VeiculosPortalCard } from './veiculos-portal-card'
 import { FidelidadeCard } from './fidelidade-card'
 import { ContratoCard } from './contrato-card'
 import { TrocaCard } from './troca-card'
-import type { OfficialConfig } from '@/lib/whatsapp/types'
 import type { Json } from '@/types/database'
-import { CAMPO_SECRETO } from '@/lib/segredos'
-
-interface MetaConfig { ativo?: boolean; page_id?: string; access_token?: string }
 
 interface Props {
-  official: OfficialConfig | null
-  instagram: MetaConfig | null
-  messenger: MetaConfig | null
-  /** Segredos preenchidos no banco, por canal (o valor não vem para o navegador). */
-  configurados?: { whatsapp: string[]; instagram: string[]; messenger: string[] }
+  /** Canais ativos em canais_conectados, por tipo (sem token: ele não sai do servidor). */
+  canaisAtivos: { whatsapp: number; instagram: number; messenger: number }
   dadosLoja: unknown
   preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
@@ -75,23 +68,9 @@ interface IntegracaoCanal {
   svg: React.ReactNode
 }
 
-// Campos por provider (espelha o modelo)
-const PROVIDER_FIELDS: Record<string, Array<{ key: string; label: string; placeholder: string }>> = {
-  oficial: [
-    { key: 'phone_number_id', label: 'Phone Number ID',          placeholder: '123456789012345' },
-    { key: 'waba_id',         label: 'WABA ID',                  placeholder: '123456789012345' },
-    { key: 'access_token',    label: 'Token de acesso permanente', placeholder: 'EAAxxxxx...' },
-    { key: 'webhook_verify_token', label: 'Token de verificação do webhook', placeholder: 'um-token-secreto' },
-  ],
-  meta: [
-    { key: 'pageid', label: 'ID da página / conta', placeholder: '1029384756' },
-    { key: 'token',  label: 'Token de acesso',      placeholder: 'EAAB••••••••' },
-  ],
-}
-
 const supabase = createClient()
 
-export function ConfiguracoesView({ official, instagram, messenger, configurados, taxas, segmento, slug }: Props) {
+export function ConfiguracoesView({ canaisAtivos, taxas, segmento, slug }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
@@ -115,9 +94,6 @@ export function ConfiguracoesView({ official, instagram, messenger, configurados
   const tabs = extras.length
     ? [...TABS, ...extras.map((e) => ({ ...e, Icon: LinkIcon }))]
     : TABS
-  const [modalCanal, setModalCanal] = useState<IntegracaoCanal | null>(null)
-  const [modalValues, setModalValues] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
   const [empresaId, setEmpresaId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -224,96 +200,27 @@ export function ConfiguracoesView({ official, instagram, messenger, configurados
   const integracoes: IntegracaoCanal[] = [
     {
       id: 'whatsapp', nome: 'WhatsApp', color: '#25D366', provider: 'oficial',
-      ativo: !!official?.ativo,
-      desc: official?.phone_number_id
-        ? 'Meta Cloud API · número oficial'
-        : 'Meta Cloud API · configure sua conta',
+      ativo: canaisAtivos.whatsapp > 0,
+      desc: canaisAtivos.whatsapp ? `Meta Cloud API · ${canaisAtivos.whatsapp} número(s) conectado(s)` : 'Meta Cloud API · conecte em Canais',
       svg: <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.66-.61-2.93-1.27-4.85-4.22-5-4.42-.15-.2-1.2-1.59-1.2-3.03 0-1.44.76-2.15 1.02-2.44.27-.29.59-.37.79-.37.2 0 .39 0 .57.01.18.01.43-.07.67.51.24.6.83 2.04.9 2.19.07.15.12.32.02.51-.09.2-.14.32-.27.49-.14.17-.29.38-.41.51-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.2.68-.79.86-1.06.18-.27.36-.22.61-.13.25.09 1.58.74 1.86.88.27.14.46.2.52.31.07.12.07.66-.17 1.34z" fill="currentColor"/>,
     },
     {
       id: 'instagram', nome: 'Instagram Direct', color: '#E1487B', provider: 'meta',
-      ativo: !!instagram?.ativo,
-      desc: instagram?.page_id ? `Meta · página ${instagram.page_id}` : 'Meta · conecte a conta @ comercial',
+      ativo: canaisAtivos.instagram > 0,
+      desc: canaisAtivos.instagram ? `Meta · ${canaisAtivos.instagram} conta(s) conectada(s)` : 'Meta · conecte a conta @ comercial em Canais',
       svg: <><rect x="2" y="2" width="20" height="20" rx="5.5" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.3" fill="currentColor"/></>,
     },
     {
       id: 'messenger', nome: 'Messenger', color: '#3B9BFF', provider: 'meta',
-      ativo: !!messenger?.ativo,
-      desc: messenger?.page_id ? `Meta · página ${messenger.page_id}` : 'Meta · conecte a página do Facebook',
+      ativo: canaisAtivos.messenger > 0,
+      desc: canaisAtivos.messenger ? `Meta · ${canaisAtivos.messenger} página(s) conectada(s)` : 'Meta · conecte a página do Facebook em Canais',
       svg: <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.19.16.14.26.35.27.57l.05 1.78c.02.57.6.94 1.12.71l1.99-.88c.17-.07.36-.09.53-.04 1.91.53 3.92.5 5.81-.07C20.36 19.85 22 16.04 22 11.7 22 6.13 17.64 2 12 2z" fill="currentColor"/>,
     },
   ]
 
-  function openModal(canal: IntegracaoCanal) {
-    setModalCanal(canal)
-    const init: Record<string, string> = {}
-    if (canal.id === 'whatsapp') {
-      if (official) {
-        init.phone_number_id = official.phone_number_id ?? ''
-        init.waba_id = official.waba_id ?? ''
-      }
-    } else if (canal.provider === 'meta') {
-      const cfg = canal.id === 'instagram' ? instagram : canal.id === 'messenger' ? messenger : null
-      if (cfg) {
-        init.pageid = cfg.page_id ?? ''
-      }
-    }
-    // Tokens não vêm para o navegador: o campo abre vazio e, se já houver valor
-    // no banco, diz "configurado". Em branco ao salvar = mantém o atual.
-    setModalValues(init)
-  }
-
-  function segredoConfigurado(canalId: string, campo: string) {
-    if (!CAMPO_SECRETO.test(campo)) return false
-    const lista = canalId === 'whatsapp' ? configurados?.whatsapp
-      : canalId === 'instagram' ? configurados?.instagram
-      : canalId === 'messenger' ? configurados?.messenger : undefined
-    return !!lista?.includes(campo === 'token' ? 'access_token' : campo)
-  }
-
   function copyWebhook() {
     navigator.clipboard?.writeText(WEBHOOK_URL)
     notify.ok('URL do webhook copiada!')
-  }
-
-  async function saveModal() {
-    if (!modalCanal) return
-    const empId = await garantirEmpresaId()
-    if (!empId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
-    setSaving(true)
-    // Pelo servidor: ele completa os segredos deixados em branco com o valor atual.
-    const upsert = async (chave: string, valor: unknown) => {
-      const r = await fetch('/api/configuracoes/canal', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chave, valor }),
-      })
-      if (!r.ok) throw new Error('falha ao salvar')
-    }
-    try {
-      if (modalCanal.id === 'whatsapp') {
-        const cfg: OfficialConfig = {
-          ativo: true,
-          provider: 'meta',
-          phone_number_id: modalValues.phone_number_id ?? '',
-          waba_id: modalValues.waba_id ?? '',
-          access_token: modalValues.access_token ?? '',
-          webhook_verify_token: modalValues.webhook_verify_token ?? '',
-          api_version: official?.api_version ?? 'v19.0',
-          api_url: official?.api_url ?? 'https://graph.facebook.com',
-        }
-        await upsert('whatsapp_official', cfg)
-      } else {
-        await upsert(`meta_${modalCanal.id}`, {
-          ativo: true, page_id: modalValues.pageid ?? '', access_token: modalValues.token ?? '',
-        })
-      }
-      notify.ok(`${modalCanal.nome} configurado!`)
-      setModalCanal(null)
-      setTimeout(() => location.reload(), 600)
-    } catch {
-      notify.bad('Erro ao salvar')
-    } finally {
-      setSaving(false)
-    }
   }
 
   // Taxas 1-18
@@ -366,7 +273,6 @@ export function ConfiguracoesView({ official, instagram, messenger, configurados
                     <div className="text-[11.5px] text-ink-2">{i.desc}</div>
                   </div>
                   <Badge tone={i.ativo ? 'ok' : 'neutro'} dot>{i.ativo ? 'Conectado' : 'Inativo'}</Badge>
-                  <Button variant="ghost" size="sm" onClick={() => openModal(i)}>Manual</Button>
                 </div>
               ))}
             </div>
@@ -374,9 +280,21 @@ export function ConfiguracoesView({ official, instagram, messenger, configurados
               <Link href="/admin/canais">
                 <Button icon={<Plug size={15} strokeWidth={1.7} />}>Abrir Canais</Button>
               </Link>
-              <span className="text-[11.5px] text-ink-3">
-                &quot;Manual&quot; é para casos especiais (credencial fornecida pelo suporte). O caminho normal é Canais.
-              </span>
+            </div>
+            <div className="mt-4 rounded-card border border-line bg-raised px-4 py-3.5">
+              <div className="mb-2 flex items-center gap-2">
+                <LinkIcon size={16} strokeWidth={1.7} className="text-ink-3" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">URL do webhook</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-line bg-bg px-3 py-2 text-[12px] text-ink-2">
+                  {WEBHOOK_URL}
+                </code>
+                <Button variant="outline" size="sm" icon={<Copy size={14} strokeWidth={1.7} />} onClick={copyWebhook}>Copiar</Button>
+              </div>
+              <p className="mt-2 text-[11px] text-ink-3">
+                Token de verificação: <strong className="text-ink-2">configurado na Edge</strong> (variável WEBHOOK_VERIFY_TOKEN). Não fica no banco.
+              </p>
             </div>
           </Card>
         )}
@@ -491,67 +409,6 @@ export function ConfiguracoesView({ official, instagram, messenger, configurados
 
       </div>
 
-      {/* ── MODAL CONFIGURAR ── */}
-      {modalCanal && (
-        <Modal
-          open
-          onClose={() => setModalCanal(null)}
-          size="sm"
-          title={
-            <span className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 flex-none place-items-center rounded-control" style={{ background: modalCanal.color + '22', color: modalCanal.color }}>
-                <svg width={20} height={20} viewBox="0 0 24 24">{modalCanal.svg}</svg>
-              </span>
-              Configurar {modalCanal.nome}
-            </span>
-          }
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setModalCanal(null)} disabled={saving}>Cancelar</Button>
-              <Button onClick={saveModal} loading={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button>
-            </>
-          }
-        >
-          <div className="mb-3 text-[12px] text-ink-3">Meta Cloud API</div>
-
-          {/* Seletor de provider — só WhatsApp */}
-          {modalCanal.id === 'whatsapp' && (
-            <div className="mb-4 flex items-center gap-2 rounded-control border border-line bg-raised px-3 py-2.5">
-              <span className="text-[12.5px] font-semibold text-ink">API Oficial</span>
-              <Badge tone="ok">Recomendado</Badge>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-4">
-            {(PROVIDER_FIELDS[modalCanal.provider]).map(f => (
-              <Input
-                key={f.key}
-                label={f.label}
-                placeholder={segredoConfigurado(modalCanal.id, f.key) ? 'configurado' : f.placeholder}
-                value={modalValues[f.key] ?? ''}
-                onChange={e => setModalValues(v => ({ ...v, [f.key]: e.target.value }))}
-              />
-            ))}
-          </div>
-
-          {/* Webhook URL */}
-          <div className="mt-[18px] rounded-card border border-accent/20 bg-accent-soft px-4 py-3.5">
-            <div className="mb-2 flex items-center gap-2">
-              <LinkIcon size={16} strokeWidth={1.7} className="text-accent" />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">URL do webhook</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-line bg-bg px-3 py-2 text-[12px] text-ink-2">
-                {WEBHOOK_URL}
-              </code>
-              <Button variant="outline" size="sm" icon={<Copy size={14} strokeWidth={1.7} />} onClick={copyWebhook}>Copiar</Button>
-            </div>
-            <p className="mt-2 text-[11px] text-ink-3">
-              Configure esta URL no painel da Meta para receber as mensagens.
-            </p>
-          </div>
-        </Modal>
-      )}
     </main>
   )
 }

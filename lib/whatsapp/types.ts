@@ -16,15 +16,3 @@ export interface SendMessageResult {
   error?: string
   provider: WhatsAppProvider
 }
-
-// Estrutura salva no banco — API Oficial Meta
-export interface OfficialConfig {
-  ativo: boolean
-  provider: 'meta'
-  phone_number_id: string
-  waba_id: string
-  access_token: string
-  webhook_verify_token: string
-  api_version: string
-  api_url: string
-}

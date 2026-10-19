@@ -23,13 +23,14 @@ export function OnboardingCard() {
     ;(async () => {
       const [prod, wpp, leads, vendas] = await Promise.all([
         supabase.from('produtos').select('*', { count: 'exact', head: true }).eq('ativo', true),
-        supabase.from('configuracoes_sistema').select('*', { count: 'exact', head: true }).in('chave', ['whatsapp_official']),
+        // o WhatsApp conectado é o canal ativo (canais_conectados), não mais configuracoes_sistema
+        supabase.from('canais_conectados').select('id', { count: 'exact', head: true }).eq('tipo', 'whatsapp').eq('status', 'ativo'),
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('ativo', true),
         supabase.from('vendas').select('*', { count: 'exact', head: true }),
       ])
       setPassos([
         { key: 'prod', label: 'Cadastre seus produtos', href: '/produtos', feito: (prod.count ?? 0) >= 3 },
-        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/admin/configuracoes', feito: (wpp.count ?? 0) >= 1 },
+        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/admin/canais', feito: (wpp.count ?? 0) >= 1 },
         { key: 'lead', label: 'Registre seu primeiro lead', href: '/leads', feito: (leads.count ?? 0) >= 1 },
         { key: 'venda', label: 'Faça uma venda no PDV', href: '/pdv', feito: (vendas.count ?? 0) >= 1 },
       ])
