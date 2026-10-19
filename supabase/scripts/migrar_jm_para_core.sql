@@ -1017,7 +1017,8 @@ end $$;
 --   · grava em mensagens; external_id repetido → não grava nada e devolve NULL;
 --   · contato: pelo negócio (p_dados.lead_id = id do negócio, preservado na migração) ou,
 --     sem negócio, pela identidade do canal (p_dados.identidade + origem ou tipo do canal) em
---     contato_identidades — cria contato e identidade quando não existem;
+--     contato_identidades — cria contato e identidade quando não existem, e resolve o negócio
+--     sem duplicar (usa o aberto, reabre o mais recente ou cria — ver abaixo);
 --   · conversa = (contato, canal), a mesma regra da view lead_mensagens; criada se faltar;
 --   · nao_lidas e ultima_mensagem/recebida/enviada_at da conversa: gatilho mensagens_sincroniza
 --     (core v1), disparado pelo insert — não são somados aqui para não contar duas vezes.
@@ -1037,6 +1038,10 @@ declare
   v_conversa  bigint;
   v_e164      text;
   v_id        bigint;
+  v_funil       bigint;
+  v_funil_neg   bigint;
+  v_etapa       bigint;
+  v_etapa_antes bigint;
 begin
   if p_external_id is not null and exists (select 1 from mensagens where external_id = p_external_id) then
     return null;
@@ -1075,6 +1080,40 @@ begin
       insert into contato_identidades (empresa_id, contato_id, canal_tipo, external_id, canal_id)
       values (p_empresa, v_contato, v_tipo, v_ident, p_canal_id) on conflict do nothing;
     end if;
+
+    -- O NEGÓCIO DO CONTATO, SEM DUPLICAR. No legado cada volta de quem tinha o lead desativado
+    -- abria um lead novo: o contato 1333 juntou 13 na migração. Aberto = status 'aberto' E ativo
+    -- (desativar pela tela grava dados._lead.ativo = false e deixa o status como está).
+    --   1. aberto no funil do canal → usa. Canal não tem funil: é o funil padrão da empresa.
+    --      Aberto em outro funil (ex.: interno "Time JM") também serve — mensagem de quem é da
+    --      equipe não vira negócio de venda;
+    --   2. só fechado/desativado → reabre o mais recente na etapa inicial do funil DELE e
+    --      registra 'reaberto_por_mensagem' em negocio_historico;
+    --   3. nenhum → cria no funil do canal, etapa inicial.
+    select f.id into v_funil from funis f where f.empresa_id = p_empresa and f.padrao and not f.interno order by f.id limit 1;
+    select n.id into v_negocio from negocios n
+     where n.contato_id = v_contato and n.status = 'aberto' and coalesce((n.dados -> '_lead' ->> 'ativo')::boolean, true)
+     order by (n.funil_id is not distinct from v_funil) desc, n.created_at desc, n.id desc limit 1;
+    if v_negocio is null then
+      select n.id, coalesce(n.funil_id, v_funil), n.etapa_id into v_negocio, v_funil_neg, v_etapa_antes
+        from negocios n where n.contato_id = v_contato order by n.created_at desc, n.id desc limit 1;
+      if v_negocio is not null then
+        select e.id into v_etapa from funil_etapas e where e.funil_id = v_funil_neg order by e.ordem, e.id limit 1;
+        update negocios set status = 'aberto', funil_id = v_funil_neg, etapa_id = coalesce(v_etapa, etapa_id),
+               motivo_perda_id = null, perdido_em = null, ganho_em = null,
+               dados = jsonb_set(dados, '{_lead}', coalesce(dados -> '_lead', '{}'::jsonb) || '{"ativo": true}'::jsonb)
+         where id = v_negocio;
+        insert into negocio_historico (empresa_id, negocio_id, de_etapa_id, para_etapa_id, acao)
+        values (p_empresa, v_negocio, v_etapa_antes, coalesce(v_etapa, v_etapa_antes), 'reaberto_por_mensagem');
+      else
+        select e.id into v_etapa from funil_etapas e where e.funil_id = v_funil order by e.ordem, e.id limit 1;
+        insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status, dados)
+        values (p_empresa, coalesce(v_filial, v_canal_filial), v_contato, v_funil, v_etapa, 'aberto',
+                jsonb_build_object('_lead', jsonb_strip_nulls(jsonb_build_object('ativo', true, 'primeira_msg', d ->> 'conteudo'))))
+        returning id into v_negocio;
+      end if;
+    end if;
+    select coalesce(v_filial, n.filial_id), n.responsavel_id into v_filial, v_resp from negocios n where n.id = v_negocio;
   end if;
 
   select id into v_conversa from conversas
