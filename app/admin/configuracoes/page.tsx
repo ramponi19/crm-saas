@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
@@ -22,8 +23,11 @@ async function getConfigs() {
       .eq('ativo', true),
     supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
     // Status dos canais: a fonte é canais_conectados (o que o chat e o envio usam).
-    // Sem access_token_enc: o token nunca sai do servidor.
-    supabase.from('canais_conectados').select('tipo').eq('empresa_id', empresaId).eq('status', 'ativo'),
+    // Chave de serviço porque a RLS de canais_conectados exige vínculo em
+    // empresa_usuarios, que o superadmin impersonando não tem (a tela mostrava tudo
+    // "Inativo"). Só o tipo, filtrado pela empresa da sessão; a página já exige
+    // dono/admin. Sem access_token_enc: o token nunca sai do servidor.
+    createServiceClient().from('canais_conectados').select('tipo').eq('empresa_id', empresaId).eq('status', 'ativo'),
   ])
 
   // Token, secret, key e senha não vão para o navegador (lib/segredos.ts).
