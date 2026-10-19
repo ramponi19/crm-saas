@@ -54,3 +54,6 @@ supabase/.temp/
 # divergente faria o deploy da funcao falhar. Fixar versao, se for o caso, se faz
 # no import do codigo, deliberadamente; nao de raspao por um arquivo de cache.
 deno.lock
+
+# dumps do banco (dado pessoal de cliente): nunca no git
+/dumps/
