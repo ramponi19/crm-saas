@@ -113,8 +113,9 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
 - **Views de compatibilidade:** sair conforme as telas migram para o core.
   - Regra: uma view só cai quando `grep -rn "from('<nome>')" app components lib hooks supabase/functions` volta vazio.
   - Ordem natural: as 37 views simples de módulo (renomear as chamadas para `vendas_vendas`, `estoque_produtos` etc.) → `canais_conectados` → `clientes` → `lead_mensagens` → `leads`.
+  - **Quando a view `leads` cair, a Edge passa a chamar `mensagem_registrar` por identidade** (`identidade` + canal, sem `lead_id`) e deixa de resolver o lead pela `upsertLead`. Hoje a regra de não duplicar negócio de quem volta pelo canal vive em dois lugares: no gatilho `compat_leads_iud`, que morre com a view, e na `mensagem_registrar` B. As duas chamam `core_negocio_do_canal`. Sem essa troca na Edge, a duplicação volta.
   - Quando `leads` e `lead_mensagens` caírem, saem também:
-    - os gatilhos e funções `compat_*`;
+    - os gatilhos e funções `compat_*` (a `core_negocio_do_canal` fica);
     - o ramo "legado" de `lib/realtime/tabelas.ts`, que passa a ler `negocios`/`mensagens` direto e deixa de reler pelas views;
     - a variável `NEXT_PUBLIC_DB_CORE`.
 - **`mensagem_registrar`:** fica. A Edge continua gravando por ela, e o corpo é a versão B.

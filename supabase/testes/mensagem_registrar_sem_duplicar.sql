@@ -57,5 +57,44 @@ begin
     (select count(*) from leads l join negocios n on n.id = l.id where n.contato_id = v_contato and l.ativo)));
 end $$;
 
+-- Cenários 3–5: a Edge de hoje (upsertLead, webhook-leads/index.ts) — procura lead ATIVO pelo origem_id
+-- na loja do canal e, sem achar, INSERE pela view leads; o gatilho compat_leads_iud decide.
+do $$
+declare
+  v_lead bigint; v_novo bigint; i int; v0 int := (select count(*) from negocios where contato_id = 1333);
+  v_max bigint := (select max(id) from negocios); v_ct record;
+begin
+  -- 3. três voltas pela loja 3, desativando entre elas
+  for i in 1 .. 3 loop
+    select id into v_lead from leads where empresa_id = 1 and origem_id = '3104989889695698' and ativo and filial_id = 3 order by id limit 1;
+    if v_lead is null then
+      insert into leads (empresa_id, nome, origem, origem_id, primeira_msg, kanban_status, ativo, filial_id)
+      values (1, 'via webhook', 'instagram', '3104989889695698', 'volta ' || i, 'novo', true, 3) returning id into v_lead;
+      insert into resultado values ('edge loja 3', 'volta ' || i, 'sem lead ativo → insert na view devolveu o lead ' || v_lead);
+    else
+      insert into resultado values ('edge loja 3', 'volta ' || i, 'achou o lead ativo ' || v_lead);
+    end if;
+    if i < 3 then update leads set ativo = false where id = v_lead; end if;
+  end loop;
+  insert into resultado values ('edge loja 3', 'FIM', format('negócios do contato: %s antes, %s depois · ativos: %s',
+    v0, (select count(*) from negocios where contato_id = 1333),
+    (select count(*) from leads l join negocios n on n.id = l.id where n.contato_id = 1333 and l.ativo)));
+
+  -- 4. o mesmo contato pelo Instagram da loja 6: cada loja tem a sua conversa
+  insert into leads (empresa_id, nome, origem, origem_id, kanban_status, ativo, filial_id)
+  values (1, 'via webhook', 'instagram', '3104989889695698', 'novo', true, 6) returning id into v_novo;
+  insert into resultado values ('edge loja 6', 'FIM', format('lead %s · filial %s · novo negócio: %s · negócios do contato: %s',
+    v_novo, (select filial_id from negocios where id = v_novo), (v_novo > v_max)::text, (select count(*) from negocios where contato_id = 1333)));
+
+  -- 5. lead criado à mão para um contato que já existe (casa pelo telefone): continua criando negócio novo
+  select c.id, c.telefone, (select count(*) from negocios n where n.contato_id = c.id) n into v_ct
+    from contatos c where c.empresa_id = 1 and c.telefone_e164 is not null
+     and exists (select 1 from negocios n where n.contato_id = c.id and n.filial_id = 3) order by c.id limit 1;
+  insert into leads (empresa_id, nome, telefone, origem, kanban_status, ativo, filial_id)
+  values (1, 'cadastro manual', v_ct.telefone, 'manual', 'novo', true, 3) returning id into v_novo;
+  insert into resultado values ('manual', 'FIM', format('contato %s: negócios %s antes, %s depois · lead %s é negócio novo: %s',
+    v_ct.id, v_ct.n, (select count(*) from negocios where contato_id = v_ct.id), v_novo, (v_novo > v_max)::text));
+end $$;
+
 select cenario, passo, detalhe from resultado;
 rollback;
