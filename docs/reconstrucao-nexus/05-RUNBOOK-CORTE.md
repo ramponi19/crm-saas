@@ -17,6 +17,40 @@
 - Ferramentas: `C:\Ferramentas\pgsql-18.4\bin` (`psql`, `pg_dump`, `pg_restore`).
 - Todos os comandos rodam a partir da raiz do repositório, com a branch `db/core-v1` em uso.
 
+**⚠ Regra de I/O no plano free (desde 20/10/2026, vale para qualquer operação em produção):**
+1. **Gate de IOwait, em toda operação e em todo bloco.** Olhar o IOwait no painel do Supabase: Observability → Database → gráfico *CPU usage*, passando o mouse; os pontos são de 2 min.
+   - **Acima de 20%: não começar.**
+   - **Acima de 30% durante a operação: parar** e esperar voltar.
+   - **Referência de normal:** IOwait de 4–9% (manhã de 20/10). No incidente chegou a 58–64%.
+   - Este gate substitui o *Disk IO budget*: o painel do plano free não mostra o budget em porcentagem.
+2. **I/O só fora do expediente** (com a loja aberta, nunca). I/O aqui é:
+   - dump (`pg_dump`, inclusive parcial);
+   - purga ou `DELETE` em massa;
+   - `VACUUM`;
+   - `CREATE` ou `DROP INDEX`;
+   - restore;
+   - qualquer migração (DDL).
+3. **Toda migração (DDL) faz o PostgREST recarregar o cache de schema.** Com o banco lento, essa recarga falha, e **a API inteira responde 503 até ela passar**. Por isso DDL também é I/O.
+
+4. **Logs não são monitoramento.**
+   - **Como monitorar:** pelo próprio Postgres:
+     - `pg_stat_database` (transações, `blks_read`, `temp_bytes`), comparando uma foto com a anterior;
+     - `pg_stat_statements`, também por diferença entre fotos;
+     - contagem de mensagens por canal na última hora;
+     - gráfico de IOwait no painel.
+   - **Consulta de log (`query_logs`, Log Explorer, API) só para investigar um ponto específico,** sempre com:
+     - **janela de no máximo 15 minutos;**
+     - **filtro por função ou rota.**
+   - **Nunca:**
+     - "desde 00h" ou "desde 13/10";
+     - a janela padrão de 24 h;
+     - fotos programadas que leiam logs.
+   - **Por quê:** cada consulta lê todo o volume da janela. Em 20/10 foram consultados **92,5 GB** de log num dia, e o ciclo chegou a 137,9 GB consultados contra 2 GB ingeridos.
+
+Por que a regra existe: em 20/10, com a loja aberta, houve dois episódios (ver o incidente no `06-OBSERVACAO-POS-CORTE.md`):
+- **10:42:** o dump do `public` levou 230 s, contra 26 s antes do expediente, e travou o app por 4 min.
+- **11:04:** a primeira purga do `historico_bruto`, junto com a recarga do schema causada por uma migração, deixou a API fora por ~7 min. 97 eventos da Meta foram perdidos.
+
 ---
 
 ## Antes da janela (pode ser dias antes)
