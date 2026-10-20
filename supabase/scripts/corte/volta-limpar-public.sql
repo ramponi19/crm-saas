@@ -11,7 +11,8 @@
 -- antes do corte. Objetos de extensão ficam (não há extensão no public em produção).
 --
 --   passo 1: psql "<conexão>" -X -v ON_ERROR_STOP=1 -f volta-limpar-public.sql
---   passo 2: pg_restore -d "<conexão>" --single-transaction --exit-on-error -n public <public.dump>
+--   passo 2: pg_restore -l <public.dump> | grep -v "DEFAULT ACL .* supabase_admin" > restaurar.lst
+--            pg_restore -d "<conexão>" --single-transaction --exit-on-error -n public -L restaurar.lst <public.dump>
 --   passo 3: psql "<conexão>" -X -v ON_ERROR_STOP=1 -f externos.sql
 -- =====================================================================================
 \set ON_ERROR_STOP on
@@ -48,6 +49,15 @@ begin
     execute format('drop type if exists public.%I cascade', r.typname);
   end loop;
 end $$;
+-- Default privileges do postgres no public: zeradas aqui e DEVOLVIDAS no passo 2 pelas entradas
+-- DEFAULT ACL do próprio dump (o passo 2 pula só as do supabase_admin, que o postgres não pode
+-- recriar e que continuam no lugar). Sem isto o pg_restore cria cada tabela e função já com os
+-- grants padrão (anon, authenticated, service_role), e o dump não revoga o que não existia: no
+-- ensaio de 20/10 a volta reabriu 215 grants de anon e 140 de authenticated em tabelas que a
+-- produção fechou (ex.: canais_conectados) e EXECUTE de service_role numa função.
+alter default privileges for role postgres in schema public revoke all on tables from postgres, anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all on sequences from postgres, anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all on functions from postgres, anon, authenticated, service_role;
 -- conferência: o public tem de estar vazio (fora objetos de extensão)
 do $$
 declare n int;

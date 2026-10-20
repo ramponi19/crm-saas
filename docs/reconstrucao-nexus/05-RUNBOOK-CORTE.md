@@ -82,19 +82,19 @@ Use se d4, e ou f falharem. Ela devolve o banco ao estado do b1. A ordem importa
 | # | Passo | Comando | Cópia |
 |---|---|---|---|
 | g0 | Salvar as mensagens que chegaram depois do corte | `cd dumps\AAAA-MM-DD-corte` e `psql "$con" -X -v ON_ERROR_STOP=1 -v marco=<b3> -f ..\..\supabase\scripts\corte\volta-salvar-mensagens.sql` → gera `mensagens-pos-corte.csv` | 0,15 s |
-| g1 | Esvaziar o `public` (o schema fica) | `psql "$con" -X -v ON_ERROR_STOP=1 -f supabase/scripts/corte/volta-limpar-public.sql` | 1,0–1,7 s |
-| g2 | Restaurar o dump | `pg_restore -d "$con" --single-transaction --exit-on-error -n public dumps\AAAA-MM-DD-corte\public.dump` | 15–35 s |
+| g1 | Esvaziar o `public` (o schema fica) e **zerar os privilégios padrão do `postgres` no `public`**, na mesma transação | `psql "$con" -X -v ON_ERROR_STOP=1 -f supabase/scripts/corte/volta-limpar-public.sql`. Os privilégios padrão voltam no g2, pelo próprio dump. Sem zerar, o `pg_restore` cria cada tabela e função já com os grants padrão do Supabase, e o dump não revoga o que não existia. No ensaio de 20/10 isso reabriu 215 grants de anon e 140 de authenticated em tabelas que a produção fechou (ex.: `canais_conectados`), mais EXECUTE de `service_role` numa função. | 0,9–1,1 s |
+| g2 | Restaurar o dump **sem as entradas DEFAULT ACL do `supabase_admin`** | `pg_restore -l dumps\AAAA-MM-DD-corte\public.dump \| findstr /V /R /C:"DEFAULT ACL .* supabase_admin" > dumps\AAAA-MM-DD-corte\restaurar.lst` e depois `pg_restore -d "$con" --single-transaction --exit-on-error -n public -L dumps\AAAA-MM-DD-corte\restaurar.lst dumps\AAAA-MM-DD-corte\public.dump`. **Sem a lista o g2 FALHA:** o `postgres` não pode recriar os privilégios padrão do `supabase_admin`; a transação volta e o `public` fica vazio do g1. Elas nem saíram, porque o g1 não apaga o schema. As do `postgres` ficam na lista: é por elas que os privilégios zerados no g1 voltam. Conferir que a lista tem as 3 entradas do `postgres` e nenhuma do `supabase_admin`. | 14,7–16,6 s |
 | g3 | Recriar o que fica fora do `public` | `psql "$con" -X -v ON_ERROR_STOP=1 -f dumps\AAAA-MM-DD-corte\externos.sql`. Em produção roda como `postgres`: o `supautils.policy_grants` libera policy em `storage.objects`/`realtime.messages` e o privilégio TRIGGER libera `auth.users` (conferido em 19/10). | 0,1–0,2 s |
-| g4 | Fechar as funções de novo | `psql "$con" -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261020000000_revoke_rpc.sql`. **Obrigatório:** o `pg_restore` recria as funções com os default privileges do Supabase e reabre as 54 para anon/authenticated. | 0,1–0,2 s |
+| g4 | Conferir as funções | `select count(*) filter (where has_function_privilege('anon',oid,'execute')), count(*) filter (where has_function_privilege('authenticated',oid,'execute')) from pg_proc where pronamespace='public'::regnamespace` → **0 e 22**. Com o g1 e o g2 acima, a ACL volta exatamente a do dump. Só se der diferente: rodar `supabase/migrations/20261020000000_revoke_rpc.sql`. | — |
 | g5 | Repor as mensagens | no mesmo diretório do g0: `psql "$con" -X -v ON_ERROR_STOP=1 -f ..\..\supabase\scripts\corte\volta-repor-mensagens.sql` | 0,2 s |
 | g6 | Código anterior | Vercel → Deployments → o último deploy de produção **antes** do e2 → **Instant Rollback**. Ele foi buildado sem `NEXT_PUBLIC_DB_CORE`, então é legado. **E** apagar `NEXT_PUBLIC_DB_CORE` das variáveis de Production; se ficar, o próximo build sai `v1`. | segundos (manual) |
 | g7 | Conferir | `foto-funil.sql` igual ao `funil-antes.txt`; `select count(*) filter (where has_function_privilege('anon',oid,'execute')), count(*) filter (where has_function_privilege('authenticated',oid,'execute')) from pg_proc where pronamespace='public'::regnamespace` → **0 e 22**; uma mensagem recebida entra (a Edge do c3 chama a versão A, que o restore trouxe de volta). | — |
 
-**Volta no banco, medida na cópia:** g0–g5 = **17–20 s**. Mais o rollback da Vercel, que leva segundos.
+**Volta no banco, medida na cópia** (ensaio de 20/10 com o dump completo da produção, duas passadas seguidas): g0–g5 = **16,5–18,3 s**. Mais o rollback da Vercel, que leva segundos.
 
 No ensaio, comparando o banco depois da volta com o de antes:
 - contagem por tabela: igual nas 95, fora `lead_mensagens` +1, que é a mensagem reposta;
-- funções, grants, policies, gatilho de auth, publicação e o hash das ACLs de tabelas e de funções: iguais.
+- funções, grants, policies, gatilho de auth, publicação, privilégios padrão e o hash das ACLs de tabelas e de funções: iguais.
 
 Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo foi listada, e esse é o comportamento esperado.
 
