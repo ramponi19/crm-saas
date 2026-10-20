@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, Gift, FileText, ArrowLeftRight } from 'lucide-react'
+import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, FileText, ArrowLeftRight } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
@@ -22,7 +22,6 @@ import { PortaisCard } from './portais-card'
 import { CardapioCard } from './cardapio-card'
 import { AgendamentoCard } from './agendamento-card'
 import { VeiculosPortalCard } from './veiculos-portal-card'
-import { FidelidadeCard } from './fidelidade-card'
 import { ContratoCard } from './contrato-card'
 import { TrocaCard } from './troca-card'
 import type { Json } from '@/types/database'
@@ -47,7 +46,6 @@ const TABS = [
   { id: 'funis',       label: 'Funis',            Icon: GitBranch },
   { id: 'motivos',     label: 'Motivos de perda', Icon: Ban     },
   { id: 'automacoes',  label: 'Automações',       Icon: Zap     },
-  { id: 'fidelidade',  label: 'Fidelidade',       Icon: Gift    },
   { id: 'contrato',    label: 'Contrato',         Icon: FileText },
   { id: 'troca',       label: 'Troca',            Icon: ArrowLeftRight },
   { id: 'horario',     label: 'Horário',          Icon: Clock   },
@@ -403,7 +401,6 @@ export function ConfiguracoesView({ canaisAtivos, taxas, segmento, slug }: Props
         {aba === 'cardapio' && <CardapioCard slug={slug ?? null} />}
         {aba === 'agendamento' && <AgendamentoCard slug={slug ?? null} />}
         {aba === 'veiculos-portais' && <VeiculosPortalCard slug={slug ?? null} />}
-        {aba === 'fidelidade' && <FidelidadeCard />}
         {aba === 'contrato' && <ContratoCard />}
         {aba === 'troca' && <TrocaCard />}
 

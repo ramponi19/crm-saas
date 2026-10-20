@@ -6,7 +6,6 @@ import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { Topbar } from '@/components/layout/topbar'
 import { Plus, Clock, MapPin, Phone, CalendarDays, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
-import { ListaEspera, type Espera } from '@/components/modules/saude/lista-espera'
 import type { Tables } from '@/types/database'
 
 /**
@@ -209,16 +208,6 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
     setModal(true)
   }
 
-  // Encaixar alguém da lista de espera: abre o modal com os dados na observação.
-  function agendarDaEspera(e: Espera) {
-    setForm({
-      ...vazio,
-      titulo: e.nome,
-      observacoes: `${e.nome}${e.telefone ? ` · ${e.telefone}` : ''}${e.observacao ? ` — ${e.observacao}` : ''} (lista de espera)`,
-    })
-    setModal(true)
-  }
-
   async function salvar() {
     if (!form.data_hora) { notify.warn('Informe data e hora'); return }
     /**
@@ -328,12 +317,6 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
                   </Select>
                 </div>
               )}
-            </div>
-          )}
-
-          {isSaude && (
-            <div className="mb-4">
-              <ListaEspera empresaId={empresaId} onAgendar={agendarDaEspera} />
             </div>
           )}
 
