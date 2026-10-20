@@ -31,6 +31,10 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") ?? "v25.0";
+/** Base da Graph API no ENVIO. Só muda no teste local, que aponta para uma Meta falsa. */
+const GRAPH_BASE = Deno.env.get("META_GRAPH_BASE") ?? "https://graph.facebook.com";
+/** Prazo da chamada de envio à Meta (ver postarNaMeta). */
+const PRAZO_ENVIO_META_MS = Number(Deno.env.get("META_PRAZO_ENVIO_MS") ?? 20_000);
 const APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 /**
  * Segredo do app do INSTAGRAM — outro par, nao o do Facebook.
@@ -923,6 +927,53 @@ async function registrarMensagem(
   return { id: (data as number | null) ?? null, erro: null };
 }
 
+/**
+ * ENVIO À META COM PRAZO. Sem ele, um envio esperou 69,5 s pela resposta da Graph
+ * API em 20/10/2026 — a Meta já tinha despachado a mensagem em ~3 s — e a tela do
+ * vendedor ficou presa 77 s. O prazo cobre a resposta INTEIRA (cabeçalho e corpo).
+ * "timeout" não quer dizer "não enviado": a Meta pode ter entregue; por isso quem
+ * chama grava a mensagem como `falha_envio` e o webhook de status a corrige.
+ */
+async function postarNaMeta(
+  url: string, init: RequestInit,
+): Promise<{ r: Response; data: Record<string, any> } | "timeout"> {
+  const ctl = new AbortController();
+  const prazo = setTimeout(() => ctl.abort(), PRAZO_ENVIO_META_MS);
+  try {
+    const r = await fetch(url, { ...init, signal: ctl.signal });
+    const data = await r.json();
+    return { r, data };
+  } catch (e) {
+    if (ctl.signal.aborted) return "timeout";
+    throw e;
+  } finally {
+    clearTimeout(prazo);
+  }
+}
+
+const MSG_TIMEOUT_META = "A Meta não respondeu em 20 segundos. A mensagem pode ter chegado ao cliente — "
+  + "confira no celular antes de tentar de novo.";
+
+/**
+ * Envio que estourou o prazo: grava a mensagem como `falha_envio` (o chat mostra
+ * "Tentar de novo") e responde 504 com `codigo: timeout_meta`, que o app trata à parte.
+ * `marca` é o biz_opaque_callback_data mandado à Meta (só WhatsApp): o webhook de
+ * status devolve a marca junto com o id real, e a linha vira enviada/entregue.
+ */
+async function respostaTimeoutMeta(
+  canal: Canal, marca: string | null, dados: Record<string, unknown>,
+): Promise<Response> {
+  console.error("envio_meta_timeout", JSON.stringify({ canal: canal.id, tipo: canal.tipo, lead: dados.lead_id ?? null }));
+  if (dados.lead_id) {
+    const { erro } = await registrarMensagem(canal.empresa_id, canal.id, marca, {
+      ...dados, direcao: "enviada", lida: true,
+      status_entrega: "falha_envio", erro_envio: "timeout_meta", status_em: new Date().toISOString(),
+    });
+    if (erro) console.error("gravar envio sem resposta da Meta:", erro);
+  }
+  return json({ error: MSG_TIMEOUT_META, codigo: "timeout_meta" }, 504);
+}
+
 async function upsertLead(canal: Canal, p: {
   nome: string | null; telefone: string | null; instagramUser: string | null;
   origem: string; origemId: string; texto: string; externalId: string | null;
@@ -1436,20 +1487,29 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
       try { link = await linkParaMeta(midiaUrl!, canal.empresa_id); }
       catch (e) { return json({ error: (e as Error).message }, 400); }
     }
+    // Volta no webhook de status: é como um envio que estourou o prazo reencontra a linha.
+    const marca = `crm:${crypto.randomUUID()}`;
     const payload = comMidia
       ? {
           messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: tipoMidia,
           [tipoMidia!]: tipoMidia === "audio"
             ? { link }
             : (text ? { link, caption: textoEnviado } : { link }),
+          biz_opaque_callback_data: marca,
         }
-      : { messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: "text", text: { body: textoEnviado } };
-    const r = await fetch(`https://graph.facebook.com/${GRAPH}/${canal.external_id}/messages`, {
+      : { messaging_product: "whatsapp", recipient_type: "individual", to: destino, type: "text", text: { body: textoEnviado },
+          biz_opaque_callback_data: marca };
+    const resposta = await postarNaMeta(`${GRAPH_BASE}/${GRAPH}/${canal.external_id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${canal.token}` },
       body: JSON.stringify(payload),
     });
-    const data = await r.json();
+    if (resposta === "timeout") {
+      return await respostaTimeoutMeta(canal, marca, {
+        lead_id: leadId ?? null, conteudo, origem: "whatsapp", tipo: tipoDb, midia_url: midiaUrl ?? null, usuario_id: usuarioId,
+      });
+    }
+    const { r, data } = resposta;
     if (!r.ok) {
       const cod = data?.error?.code as number | undefined;
       let msg = data?.error?.message ?? "erro ao enviar pelo WhatsApp";
@@ -1510,16 +1570,23 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
     ? [{ type: "body", parameters: params.map((p) => ({ type: "text", text: String(p) })) }]
     : undefined;
 
-  const r = await fetch(`https://graph.facebook.com/${GRAPH}/${canal.external_id}/messages`, {
+  const marca = `crm:${crypto.randomUUID()}`;
+  const resposta = await postarNaMeta(`${GRAPH_BASE}/${GRAPH}/${canal.external_id}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${canal.token}` },
     body: JSON.stringify({
       messaging_product: "whatsapp", recipient_type: "individual", to: destino,
       type: "template",
       template: { name: nome, language: { code: idioma }, ...(componentes ? { components: componentes } : {}) },
+      biz_opaque_callback_data: marca,
     }),
   });
-  const data = await r.json();
+  if (resposta === "timeout") {
+    return await respostaTimeoutMeta(canal, marca, {
+      lead_id: leadId ?? null, conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", tipo: "texto", usuario_id: usuarioId,
+    });
+  }
+  const { r, data } = resposta;
   if (!r.ok) {
     const cod = data?.error?.code as number | undefined;
     let msg = data?.error?.message ?? "erro ao enviar o modelo";
@@ -1602,7 +1669,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
       const achado = data?.[0]?.external_id;
       if (achado) pageId = String(achado);
     }
-    destinoUrl = `https://graph.facebook.com/${GRAPH}/${pageId}/messages?access_token=${canal.token}`;
+    destinoUrl = `${GRAPH_BASE}/${GRAPH}/${pageId}/messages?access_token=${canal.token}`;
   }
 
   /**
@@ -1616,11 +1683,19 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
     ? { recipient: { id: origemId }, message }
     : { recipient: { id: origemId }, message, messaging_type: "RESPONSE" };
 
-  const r = await fetch(destinoUrl, {
+  const resposta = await postarNaMeta(destinoUrl, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(corpoEnvio),
   });
-  const data = await r.json();
+  if (resposta === "timeout") {
+    // Instagram/Messenger não devolvem marca no status: a linha fica como falha_envio.
+    // Se a mensagem saiu, o eco da Meta chega e entra como mensagem enviada à parte.
+    return await respostaTimeoutMeta(canal, null, {
+      lead_id: leadId ?? null, conteudo: texto || `[${tipoDb}]`, origem: nomeCanal, tipo: tipoDb,
+      midia_url: midiaUrl ?? null, usuario_id: usuarioId,
+    });
+  }
+  const { r, data } = resposta;
   if (!r.ok) {
     const cod = data?.error?.code as number | undefined;
     const cru = data?.error?.message ?? `erro ao enviar pelo ${nomeCanal}`;
@@ -1876,6 +1951,15 @@ serve(async (req: Request) => {
               };
               const status = mapa[bruto];
               if (!status) continue;
+
+              // Envio que estourou o prazo (postarNaMeta): a linha foi gravada com a
+              // marca no lugar do id da Meta. A marca volta aqui junto com o id real —
+              // troca, limpa o erro, e o status segue o caminho normal abaixo.
+              const marca = s.biz_opaque_callback_data as string | undefined;
+              if (marca?.startsWith("crm:")) {
+                await db.from("lead_mensagens").update({ external_id: id, erro_envio: null })
+                  .eq("empresa_id", canal.empresa_id).eq("external_id", marca);
+              }
 
               const erro = (s.errors as Record<string, unknown>[] | undefined)?.[0];
               const patch: Record<string, unknown> = {

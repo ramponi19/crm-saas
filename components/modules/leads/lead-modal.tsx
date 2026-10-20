@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines } from 'lucide-react'
+import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines, AlertTriangle, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
@@ -86,12 +86,30 @@ async function entregarViaEdge(
   })
   const data = await res.json().catch(() => ({} as Record<string, unknown>))
   if (!res.ok || (data as { error?: string }).error) {
-    throw new Error((data as { error?: string }).error ?? 'Falha ao enviar a mensagem')
+    const { error, codigo } = data as { error?: string; codigo?: string }
+    throw new ErroEnvio(error ?? 'Falha ao enviar a mensagem', codigo)
   }
 }
 
+/**
+ * Erro do envio com o código da Edge. `timeout_meta` é diferente dos outros: a
+ * mensagem JÁ FOI GRAVADA (como falha_envio) e pode até ter chegado ao cliente —
+ * a bolha fica na conversa com "Tentar de novo", em vez de sumir e voltar para o
+ * campo de texto, o que levaria a mandar duas vezes sem perceber.
+ */
+class ErroEnvio extends Error {
+  constructor(mensagem: string, readonly codigo?: string) { super(mensagem) }
+}
+const ehTimeoutMeta = (e: unknown) => e instanceof ErroEnvio && e.codigo === 'timeout_meta'
+
 interface ChatMsg {
   from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null
+  /**
+   * id da linha. A confirmação de entrega acha a bolha por ele quando o
+   * `externalId` muda — o envio que estourou o prazo é gravado com uma marca
+   * provisória, trocada pelo id da Meta quando o status chega.
+   */
+  id?: number
   /**
    * Quando a RETENCAO retirou o arquivo desta mensagem.
    *
@@ -127,6 +145,7 @@ interface ChatMsg {
 
 const ROTULO_ENTREGA: Record<string, string> = {
   enviada: 'Enviada', entregue: 'Entregue no aparelho', lida: 'Lida pelo cliente', falhou: 'Não enviada',
+  falha_envio: 'A Meta não respondeu a tempo — pode ter chegado; confira antes de tentar de novo',
 }
 
 /** Linha de lead_mensagens como ela chega pelo realtime. */
@@ -652,18 +671,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       setLoadingChat(true)
       const { data } = await supabase
         .from('lead_mensagens')
-        .select('direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em')
+        .select('id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em')
         .eq('lead_id', lead.id)
         .order('created_at', { ascending: true })
       if (cancel) return
       type MsgRow = {
-        direcao: string | null; conteudo: string | null; created_at: string
+        id: number; direcao: string | null; conteudo: string | null; created_at: string
         tipo: string | null; midia_url: string | null
         status_entrega: string | null; erro_envio: string | null; external_id: string | null
         usuario_id: string | null; transcricao: string | null
         midia_retida_em: string | null
       }
       const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
+        id: m.id,
         from: m.direcao === 'enviada' ? 'loja' : 'cliente',
         text: m.conteudo ?? '',
         time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
@@ -717,6 +737,7 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             const m = payload.new as LinhaMsg
             setChat((prev) => {
               const novaMsg: ChatMsg = {
+                id: m.id,
                 from: m.direcao === 'enviada' ? 'loja' : 'cliente',
                 text: m.conteudo ?? '',
                 time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
@@ -745,9 +766,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
           (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
             const m = payload.new as LinhaMsg
             if (!m.external_id && !m.status_entrega) return
+            // Pelo id primeiro: a bolha de um envio que estourou o prazo tem a marca
+            // provisória, e o UPDATE já chega com o id da Meta no lugar dela.
             setChat((prev) => prev.map((x) =>
-              x.externalId && x.externalId === m.external_id
-                ? { ...x, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? x.erro, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
+              (x.id != null && x.id === m.id) || (x.externalId && x.externalId === m.external_id)
+                ? { ...x, externalId: m.external_id ?? x.externalId, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? null, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
                 : x,
             ))
           })
@@ -789,15 +812,19 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
     if (!loadingChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat.length, loadingChat])
 
-  async function sendMsg() {
-    const t = draft.trim(); if (!t) return
+  /** `reenvio`: o texto de uma bolha "Tentar de novo" — não mexe no campo de digitação. */
+  async function sendMsg(reenvio?: unknown) {
+    const ehReenvio = typeof reenvio === 'string'
+    const t = (ehReenvio ? reenvio : draft).trim(); if (!t) return
     const canal = lead.origem ?? 'manual'
-    setDraft('')
-    setRascunhoRestaurado(false)
-    // Enviou: deixou de ser rascunho. O `rollback` abaixo devolve o texto ao
-    // campo se o envio falhar, e o efeito de gravação salva de novo — então não
-    // há risco de perder a mensagem por limpar aqui.
-    if (chaveRascunho) { try { window.localStorage.removeItem(chaveRascunho) } catch {} }
+    if (!ehReenvio) {
+      setDraft('')
+      setRascunhoRestaurado(false)
+      // Enviou: deixou de ser rascunho. O `rollback` abaixo devolve o texto ao
+      // campo se o envio falhar, e o efeito de gravação salva de novo — então não
+      // há risco de perder a mensagem por limpar aqui.
+      if (chaveRascunho) { try { window.localStorage.removeItem(chaveRascunho) } catch {} }
+    }
     setChat((prev) => [...prev, { from: 'loja', text: t, time: 'agora' }])
 
     const rollback = () => {
@@ -806,7 +833,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
         if (idx < 0) return prev
         const copy = [...prev]; copy.splice(idx, 1); return copy
       })
-      setDraft(t)
+      if (!ehReenvio) setDraft(t)
+    }
+    // Timeout da Meta: a mensagem foi gravada como falha_envio. A bolha fica, com o
+    // aviso — se a linha gravada já chegou pelo realtime, ela já substituiu esta.
+    const marcarSemResposta = (erro: string) => {
+      setChat((prev) => prev.map((x) =>
+        x.from === 'loja' && x.text === t && x.time === 'agora' ? { ...x, status: 'falha_envio', erro } : x))
     }
 
     try {
@@ -829,6 +862,11 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
       await assumirSeLivre()
     } catch (e) {
+      if (ehTimeoutMeta(e)) {
+        marcarSemResposta((e as Error).message)
+        notify.warn('A Meta não respondeu', (e as Error).message)
+        return
+      }
       rollback()
       notify.bad('Erro ao enviar', e instanceof Error ? e.message : 'Tente novamente.')
     }
@@ -906,6 +944,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
       }
       await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
     } catch (e) {
+      if (ehTimeoutMeta(e)) {
+        // Gravada como falha_envio: a bolha fica, com o aviso (ver sendMsg).
+        if (bolhaUrl) setChat((prev) => prev.map((x) =>
+          x.from === 'loja' && x.time === 'agora' && x.midiaUrl === bolhaUrl ? { ...x, status: 'falha_envio', erro: (e as Error).message } : x))
+        notify.warn('A Meta não respondeu', (e as Error).message)
+        return
+      }
       if (bolhaUrl) setChat((prev) => {
         const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && x.midiaUrl === bolhaUrl)
         if (idx < 0) return prev
@@ -1452,6 +1497,21 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
                         {isLoja && m.status && (
                           m.status === 'falhou'
                             ? <span className="text-[10px] text-bad" title={m.erro ?? 'Falha no envio'}>não enviada</span>
+                            : m.status === 'falha_envio'
+                            // A Meta não respondeu no prazo: pode ter chegado. O botão
+                            // reenvia o texto (mídia volta a ser anexada à mão); se a
+                            // confirmação da Meta chegar depois, a bolha vira ✓✓ sozinha.
+                            ? <span className="inline-flex items-center gap-1.5 text-[10px] text-bad" title={ROTULO_ENTREGA.falha_envio}>
+                                <AlertTriangle size={11} strokeWidth={2} aria-hidden />
+                                sem confirmação
+                                {(!m.tipo || m.tipo === 'texto') && m.text && m.time !== 'agora' && (
+                                  <button type="button" onClick={() => sendMsg(m.text)}
+                                    className="inline-flex items-center gap-1 font-semibold text-accent hover:text-accent/80">
+                                    <RotateCcw size={10} strokeWidth={2} aria-hidden />
+                                    Tentar de novo
+                                  </button>
+                                )}
+                              </span>
                             : <span
                                 // Lida ganha o azul do WhatsApp, que todo mundo já
                                 // entende sem legenda.
