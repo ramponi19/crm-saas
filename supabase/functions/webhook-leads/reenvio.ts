@@ -50,3 +50,26 @@ export async function jaRecebido(
   if (error) { console.error("webhook_reenvio:", error.message); return false; }
   return data === true;
 }
+
+/**
+ * Esquece o hash de um pacote que NÃO foi processado (erro de banco no meio), para
+ * que o reenvio da Meta seja processado em vez de descartado. Melhor esforço: se o
+ * banco ainda estiver fora, o hash fica e expira em 24 h.
+ */
+export async function esquecer(rpc: Rpc, hash: string): Promise<void> {
+  const { error } = await rpc("webhook_reenvio_esquecer", { p_hash: hash });
+  if (error) console.error("webhook_reenvio_esquecer:", error.message);
+}
+
+/**
+ * Erro de banco num ponto em que seguir em frente PERDE o evento. O handler
+ * responde 500 e a Meta reenvia — o contrário do "200 mesmo em erro", que vale para
+ * evento problemático (dado ruim) e não para banco indisponível.
+ *
+ * 20/10/2026 11:07–11:09: com o PostgREST devolvendo 503, a busca do canal "não
+ * achava" o canal, o evento virava órfão e a Edge respondia 200. 97 eventos
+ * (mensagens, ecos e Instagram) foram descartados e a Meta nunca reenviou.
+ */
+export class ErroDeBanco extends Error {
+  constructor(mensagem: string) { super(mensagem); this.name = "ErroDeBanco"; }
+}

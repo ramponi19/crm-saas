@@ -24,7 +24,7 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { contaDoEvento, hashCorpo, jaRecebido, LIMITE_GRANDE, tamanhoCorpo } from "./reenvio.ts";
+import { contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, tamanhoCorpo } from "./reenvio.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -210,9 +210,12 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
   const emCache = cache.get(chave);
   if (emCache !== undefined) return emCache;
 
-  let { data } = await db.from("canais_conectados")
+  // Erro de banco NÃO é "canal desconhecido": vira ErroDeBanco (500, a Meta reenvia)
+  // e não entra no cache. Ver ErroDeBanco em reenvio.ts — 97 eventos perdidos em 20/10.
+  let { data, error } = await db.from("canais_conectados")
     .select(COLUNAS)
     .eq("tipo", tipo).eq("external_id", String(externalId)).maybeSingle();
+  if (error) throw new ErroDeBanco(`canal ${chave}: ${error.message}`);
 
   /**
    * SEGUNDA TENTATIVA PELO `ig_user_id`, e ela nao e paranoia.
@@ -230,6 +233,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
     const alt = await db.from("canais_conectados")
       .select(COLUNAS)
       .eq("tipo", tipo).eq("ig_user_id", String(externalId)).maybeSingle();
+    if (alt.error) throw new ErroDeBanco(`canal ${chave} (ig_user_id): ${alt.error.message}`);
     data = alt.data;
   }
 
@@ -2115,6 +2119,14 @@ serve(async (req: Request) => {
     // Pacote pequeno processado: agora sim lembra o hash (o grande gravou antes).
     if (!grande) await jaRecebido(rpc, hash, tamanho, conta, true);
   } catch (e) {
+    // Banco fora: 500 para a Meta reenviar. O pacote grande já tinha gravado o hash;
+    // sem esquecê-lo, o reenvio seria descartado como repetição. O que já foi gravado
+    // antes do erro não duplica: mensagem_registrar ignora external_id repetido.
+    if (e instanceof ErroDeBanco) {
+      console.error("banco indisponível — 500 para a Meta reenviar:", e.message);
+      if (grande) await esquecer(rpc, hash);
+      return new Response("banco indisponivel", { status: 500, headers: cors });
+    }
     // 200 mesmo em erro: 5xx faz a Meta reenviar em loop, e um evento problemático
     // não pode travar a fila dos outros.
     console.error("processamento:", e);

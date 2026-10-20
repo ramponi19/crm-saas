@@ -56,3 +56,17 @@ end $$;
 
 revoke execute on function public.webhook_reenvio(text, integer, text, boolean) from public, anon, authenticated;
 grant execute on function public.webhook_reenvio(text, integer, text, boolean) to service_role;
+
+-- Esquecer um hash: o pacote grande grava o hash ANTES de processar; se o
+-- processamento cair por erro de banco, a Edge responde 500 para a Meta reenviar
+-- e precisa apagar o hash — senão o reenvio seria tomado por repetição e descartado.
+create or replace function public.webhook_reenvio_esquecer(p_hash text)
+  returns void
+  language sql security definer
+  set search_path to 'public', 'pg_temp'
+as $$
+  delete from ops.webhook_recebidos where hash = p_hash;
+$$;
+
+revoke execute on function public.webhook_reenvio_esquecer(text) from public, anon, authenticated;
+grant execute on function public.webhook_reenvio_esquecer(text) to service_role;
