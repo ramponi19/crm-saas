@@ -34,7 +34,8 @@ export async function sendViaOfficial(
 
     const data = await res.json()
     const messageId = data?.messages?.[0]?.id
-    return { success: true, messageId, provider: 'official' }
+    const waId = data?.contacts?.[0]?.wa_id
+    return { success: true, messageId, waId, provider: 'official' }
   } catch (err) {
     return {
       success: false,

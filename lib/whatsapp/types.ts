@@ -13,6 +13,8 @@ export interface SendMessageParams {
 export interface SendMessageResult {
   success: boolean
   messageId?: string
+  /** O número como a Meta o reconhece (contacts[0].wa_id) — é a identidade do contato. */
+  waId?: string
   error?: string
   provider: WhatsAppProvider
 }

@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
     }
 
-    const result = await sendWhatsApp({ to, message, empresaId })
+    const result = await sendWhatsApp({ to, message, empresaId, usuarioId: user.id })
     // Propaga o status real: se o WhatsApp não está conectado ou a Graph falhou,
     // NÃO devolver 200 — senão a loja vê "enviado" e o cliente não recebe.
     return NextResponse.json(result, { status: result.success ? 200 : 502 })
