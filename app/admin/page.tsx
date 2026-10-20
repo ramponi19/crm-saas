@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
-import { ReguaFollowupCard } from '@/components/admin/regua-followup-card'
 import { Topbar } from '@/components/layout/topbar'
 import { createServiceClient } from '@/lib/supabase/service'
 import { contarLeadsPorFilial } from '@/lib/filiais-consulta'
@@ -87,13 +85,6 @@ export default async function AdminOverviewPage() {
     // eslint-disable-next-line react-hooks/purity
     ? Math.ceil((new Date(empresa.trial_ends_at).getTime() - Date.now()) / 86400000)
     : null
-
-  // Régua de follow-up: default ligada (ausência de config = ativa). Só desliga com {ativo:false}.
-  const { data: reguaCfg } = await supabase
-    .from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'regua_followup').maybeSingle()
-  const reguaAtiva = (reguaCfg?.valor as { ativo?: boolean } | null)?.ativo !== false
-  // O que muda aqui são os atalhos de portais/site — capacidade, não identidade.
-  const isImob = !!SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.integraPortais
 
   const stats = [
     { label: 'Faturamento no mês', value: brl(faturamentoMes), icon: TrendingUp, sub: `${qtdVendas} venda${qtdVendas === 1 ? '' : 's'} concluída${qtdVendas === 1 ? '' : 's'}` },
@@ -201,12 +192,6 @@ export default async function AdminOverviewPage() {
                 ))}
               </div>
             </Card>
-          </div>
-
-          {/* Automação */}
-          <div>
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">Automação</div>
-            <ReguaFollowupCard inicialAtivo={reguaAtiva} isImob={isImob} />
           </div>
 
           {/* Atalhos de administração */}
