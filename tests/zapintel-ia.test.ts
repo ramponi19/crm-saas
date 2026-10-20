@@ -257,12 +257,12 @@ describe('perguntarIA: só Anthropic', () => {
   })
   const depois = () => { globalThis.fetch = fetchOriginal }
 
-  test('modelo vazio → claude-haiku-5-5, 25 s por tentativa e uma repetição', async () => {
+  test('modelo vazio → claude-haiku-5-5, 90 s por tentativa e uma repetição', async () => {
     cfg.atual = { ativo: true, modelo: '' }
     const r = await pergunta(); depois()
     assert.deepEqual(r, { ok: true, texto: 'ok', modelo: 'claude-haiku-5-5' })
     assert.equal(sdk.pedidos[0].model, 'claude-haiku-5-5')
-    assert.equal(sdk.opcoes[0].timeout, 25_000)
+    assert.equal(sdk.opcoes[0].timeout, 90_000)
     assert.equal(sdk.opcoes[0].maxRetries, 1)
   })
 

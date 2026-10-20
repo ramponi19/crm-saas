@@ -107,9 +107,18 @@ export function modeloDoZapintel(configurado: string | null | undefined): string
  * começarem a voltar "demorou demais", o log `zapintel.ia.falha` com
  * `motivo: "timeout"` mostra — e o número a mexer é este.
  */
-const TIMEOUT_POR_TENTATIVA_MS = 25_000
+/*
+ * 20/10/2026 — 25/50 s virou 90/110 s. Medido com conversas reais e o
+ * Haiku: ele escreve ~100 tokens/s e a ficha sai com 2.000 a 4.800 tokens
+ * (o raciocínio conta), não os ~1.500 da conta acima. Com 25 s, uma conversa
+ * longa estourava a primeira tentativa até com o prompt antigo, e a segunda
+ * recomeçava do zero; com o prompt de diretor, 2 de 5 fichas de teste
+ * voltavam "demorou demais". Uma ficha que falha custa mais espera que uma
+ * que leva 50 s. As rotas subiram para `maxDuration = 120` junto.
+ */
+const TIMEOUT_POR_TENTATIVA_MS = 90_000
 const REPETICOES = 1
-const PRAZO_TOTAL_MS = 50_000
+const PRAZO_TOTAL_MS = 110_000
 
 export const ERRO_DEMOROU = 'A análise demorou demais, tente novamente'
 

@@ -42,15 +42,15 @@ import { perguntarIA } from '@/lib/zapintel/ia'
 export const dynamic = 'force-dynamic'
 
 /**
- * A IA tem prazo total de 50 s (25 s por tentativa, uma repetição — ver
+ * A IA tem prazo total de 110 s (90 s por tentativa, uma repetição — ver
  * `TIMEOUT_POR_TENTATIVA_MS` em `lib/zapintel/ia.ts`), e o resto é a leitura
- * do banco. O Hobby permitiria até 300 s; 60 é escolha, não teto, e a razão
+ * do banco. O Hobby permitiria até 300 s; 120 é escolha, não teto, e a razão
  * está lá. Estourou o prazo, a tela recebe "A análise demorou demais".
  *
  * Não ameaça o teto de CPU da conta: no modelo da Vercel, função PARADA
  * esperando rede não é Active CPU.
  */
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function POST(req: Request) {
   const acesso = await zapintelAcesso()
