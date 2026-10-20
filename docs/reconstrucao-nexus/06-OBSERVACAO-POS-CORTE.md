@@ -284,5 +284,5 @@ Corrigido em `85250c3` (ainda não está no ar): erro de banco responde 500 e a 
 - **Retenção:** está no ar. Faltam **1.574** linhas do `historico_bruto`, para o cron das 04:00.
   - O cron hoje chama `ops.purgar_retencao()` com o padrão de **5.000 por lote**.
   - A troca para 500 (`cron.alter_job`) fica para depois das 18h.
-- **Regra nova no runbook (05):** conferir o *Disk IO budget* antes de qualquer I/O; abaixo de 50%, parar; I/O e DDL só fora do expediente.
+- **Regra nova no runbook (05):** gate de IOwait no gráfico de CPU do painel. Acima de 20%, não começar; acima de 30% durante a operação, parar. I/O e DDL só fora do expediente.
 - **Decisão do Lucas (20/10):** nada mais em produção com a loja aberta enquanto estivermos no plano free. Sem Supabase Pro.

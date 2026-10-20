@@ -18,7 +18,11 @@
 - Todos os comandos rodam a partir da raiz do repositório, com a branch `db/core-v1` em uso.
 
 **⚠ Regra de I/O no plano free (desde 20/10/2026, vale para qualquer operação em produção):**
-1. **Antes de qualquer I/O, conferir o Disk IO budget no painel do Supabase** (Reports → Database → Disk IO). **Abaixo de 50%: parar.** Não começa, ou para no meio e espera recuperar.
+1. **Gate de IOwait, em toda operação e em todo bloco.** Olhar o IOwait no painel do Supabase: Observability → Database → gráfico *CPU usage*, passando o mouse; os pontos são de 2 min.
+   - **Acima de 20%: não começar.**
+   - **Acima de 30% durante a operação: parar** e esperar voltar.
+   - **Referência de normal:** IOwait de 4–9% (manhã de 20/10). No incidente chegou a 58–64%.
+   - Este gate substitui o *Disk IO budget*: o painel do plano free não mostra o budget em porcentagem.
 2. **I/O só fora do expediente** (com a loja aberta, nunca). I/O aqui é:
    - dump (`pg_dump`, inclusive parcial);
    - purga ou `DELETE` em massa;
