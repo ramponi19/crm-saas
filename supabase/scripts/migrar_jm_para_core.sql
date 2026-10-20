@@ -35,7 +35,7 @@
 --  i. Módulos da empresa saem dos hrefs liberados (segmento + extras + menu_override.habilitados);
 --     menu oculto não desliga módulo. Inteligência = complementos_empresa.zapintel_ativo.
 --  j. lead_mensagens (view) mostra cada mensagem uma vez, no negócio principal do contato
---     (aberto mais recente; senão o mais recente).
+--     (o ATIVO mais recente; sem ativo, o mais recente).
 -- =====================================================================================
 
 \set ON_ERROR_STOP on
@@ -1345,12 +1345,15 @@ begin
       -- lead_mensagens, que põe a conversa nele. Sem isto cada negócio de um contato fundido
       -- mostrava o badge do contato inteiro (32 cards, 920 mensagens contadas duas vezes na cópia
       -- de 19/10) e abrir o card não mostrava conversa nenhuma.
+      -- Principal = o negócio ATIVO mais recente; sem ativo, o mais recente. A regra antiga
+      -- ("aberto primeiro") escolhia negócio desativado com status aberto em vez do card visível
+      -- (ex.: 2341 desativado x 3964 ganho e ativo) — 2 contatos ficavam com badge escondido.
       left join lateral (select sum(x.nao_lidas) as nao_lidas, max(x.ultima_mensagem_at) as ultima_mensagem_at,
                                 max(x.ultima_recebida_at) as ultima_recebida_at, max(x.ultima_enviada_at) as ultima_enviada_at
                            from public.conversas x
                           where x.contato_id = n.contato_id
                             and n.id = (select p.id from public.negocios p where p.contato_id = n.contato_id
-                                         order by (p.status = 'aberto') desc, p.created_at desc, p.id desc limit 1)) cv on true;
+                                         order by coalesce((p.dados -> '_lead' ->> 'ativo')::boolean, true) desc, p.created_at desc, p.id desc limit 1)) cv on true;
   alter view public.leads alter column ativo set default true;
   alter view public.leads alter column kanban_status set default 'novo';
   alter view public.leads alter column kanban_ordem set default 0;
@@ -1396,7 +1399,7 @@ begin
            m.midia_retida_em
       from public.mensagens m
       left join lateral (select n.id from public.negocios n where n.contato_id = m.contato_id
-                          order by (n.status = 'aberto') desc, n.created_at desc, n.id desc limit 1) p on true;
+                          order by coalesce((n.dados -> '_lead' ->> 'ativo')::boolean, true) desc, n.created_at desc, n.id desc limit 1) p on true;
   alter view public.lead_mensagens alter column lida set default false;
   alter view public.lead_mensagens alter column tipo set default 'texto';
   alter view public.lead_mensagens alter column created_at set default now();
