@@ -160,7 +160,8 @@ O que cada foto mede:
 | 10:40 | Mogi 191 / 343 · IG 3 / 7 · Jaguariúna 54 / 76 | 0. C2S depois do corte: 83 POST, todos 200, 6 leads novos | 0 | 0 do app desde a correção da view (10:36) | — |
 | 10:45 | entrando | 0 | 1 (Edge de 60 a 144 s por chamada) | 8 timeouts (10:44–10:46), **durante o dump do `public`** | — |
 | 11:00 | entrando | 0 | 0 desde 10:50 | 0 desde 10:47 | — |
-| **11:04–11:11** | — | — | 546 × 24, 504 × 11, 503 × 2 | **API fora: ver a seção 6** | — |
+| **11:04–11:20** | — | — | 546, 504 e 503 em série; Edge com mediana de 100–150 s até 11:20 | **API fora até 11:11; ver a seção 6** | — |
+| 11:20–11:30 | entrando | — | 0; mediana 1,3–1,5 s, p90 ~3 s | 0 do app | — |
 
 **Os dois 500 do webhook C2S da imobiliária:** aconteceram antes do corte, mas esse webhook cria leads, que agora passam pela view. Por isso ficam em observação.
 
@@ -206,7 +207,7 @@ A primeira execução em cada conexão custa cerca de 2,4 s a mais, com a view v
 
 ---
 
-## 6. Incidente de 20/10, 11:04–11:11: a API fora durante a limpeza
+## 6. Incidente de 20/10, 11:04–11:20: a API fora e a Edge degradada durante a limpeza
 
 ### Linha do tempo (horário de São Paulo)
 
@@ -220,7 +221,10 @@ A primeira execução em cada conexão custa cerca de 2,4 s a mais, com a view v
 | 11:07:53–11:09:17 | A Edge não conseguia buscar o canal, tratava o evento como órfão e respondia 200. **97 eventos da Meta descartados.** |
 | 11:08:05 | Cache de schema carregado (a consulta levou 8,4 s). PostgREST reconectado às 11:08:47. |
 | 11:09–11:10 | Mais ~550 respostas 5xx, de chamadas que estavam na fila. |
-| 11:11 | API sem 5xx. A Edge ainda terminou, até 11:12, chamadas presas desde 11:09 (546 em 150 s). |
+| 11:10–11:17 | Mais 13 timeouts no Postgres e **35 falhas de gravação na Edge** (26 ecos, 9 recebidas). |
+| 11:11 | API sem 5xx. |
+| 11:11–11:20 | **A Edge segue degradada:** ~780 chamadas com mediana de 100–150 s (muitas 546, o limite de 150 s), boa parte reenvio da Meta represado. |
+| 11:20 | Normal: mediana 1,3 s, p90 2,9 s, 0 erro do app. |
 
 ### Causa provável
 
@@ -246,7 +250,10 @@ Corrigido em `85250c3` (ainda não está no ar): erro de banco responde 500 e a 
 | Instagram @jmstore_importados (26, `17841460104258132`) | 18 (mensagens, ecos e status do Instagram vêm todos no mesmo evento) | | |
 
 - **Não dá para saber quantos eram mensagem de cliente:** o log guarda só o canal e o campo, não o conteúdo, e parte dos `messages` é status de entrega ou leitura.
-- **Outros 7 erros vieram com o id da mensagem** ("gravar mensagem recebida" ou "gravar echo"). Deles, 6 foram regravados quando a Meta reenviou; **1 eco de Mogi continua faltando** (`wamid.HBgTQlIuMTU5ODIwNTk0NTE4MDk3NhUUABEYFjNFQjAwMUFENDFERkQ1NkJGQ0FGQkUA`).
+- **Outras 33 mensagens tiveram erro de gravação com o id registrado** ("gravar mensagem recebida" ou "gravar echo", entre 11:04 e 11:17).
+  - Nesses casos a Edge demorou ou caiu, e a Meta reenviou: **29 já estão no banco**.
+  - **4 continuam faltando:** 3 respostas pelo celular (ecos) e 1 mensagem recebida. Os ids estão nos logs da Edge (`function_logs`, "gravar", 20/10 14:03–14:20 UTC).
+  - Quatro mensagens de WhatsApp não voltam pela API; só pelo celular.
 
 ### O que dá para recuperar
 
