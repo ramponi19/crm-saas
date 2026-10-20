@@ -156,6 +156,11 @@ O que cada foto mede:
 | Foto | Mensagens hoje (rec / env) | 5xx Vercel | 5xx Edge (desde 0h) | Erros Postgres (desde 0h) | `integracao_eventos` |
 |---|---|---|---|---|---|
 | 09:12 | Mogi 15: 20 / 3 · IG 26: 1 / 0 · Jaguariúna 28: 22 / 8 | 2 × 500 em `/api/webhook/c2s/imobiliaria-cf893076` às 07:55 (deploy anterior ao corte) | 0 | 0 | 11.348 linhas, 40 MB (banco 324 MB) |
+| 10:13 | Mogi 147 / 222 · IG 2 / 4 · Jaguariúna 51 / 68 | só os 2 do C2S às 07:55 | 0 | **8 depois do corte**: 7 timeouts no dashboard do ZapIntel (08:58–09:05) e 1 ao abrir o chat (10:11). Causa: a view `lead_mensagens` (ver a seção 5) | 11.401 linhas, 40 MB (banco 326 MB) |
+| 10:40 | Mogi 191 / 343 · IG 3 / 7 · Jaguariúna 54 / 76 | 0. C2S depois do corte: 83 POST, todos 200, 6 leads novos | 0 | 0 do app desde a correção da view (10:36) | — |
+| 10:45 | entrando | 0 | 1 (Edge de 60 a 144 s por chamada) | 8 timeouts (10:44–10:46), **durante o dump do `public`** | — |
+| 11:00 | entrando | 0 | 0 desde 10:50 | 0 desde 10:47 | — |
+| **11:04–11:11** | — | — | 546 × 24, 504 × 11, 503 × 2 | **API fora: ver a seção 6** | — |
 
 **Os dois 500 do webhook C2S da imobiliária:** aconteceram antes do corte, mas esse webhook cria leads, que agora passam pela view. Por isso ficam em observação.
 
@@ -173,3 +178,89 @@ A loja 6 tem **2.297 mensagens não lidas, de 306 contatos**, com data anterior 
 - **Sugestão de rotina:** a fila do dia e o contador de não lidas já existem. Falta alguém responsável por zerar a caixa da loja 6 todos os dias.
 
 **O que não fazer:** marcar todas como lidas de uma vez pelo banco. Isso apaga o sinal antes de alguém olhar.
+
+---
+
+## 5. A view `lead_mensagens` lenta, corrigida às 10:36 (`69579bf`)
+
+**Sintoma:** abrir o chat ficou lento depois do corte, e às 10:11 uma abertura passou dos 8 s e caiu por timeout. O dashboard do ZapIntel teve 7 timeouts entre 08:58 e 09:05.
+
+**Causa:** a view do corte achava o negócio principal mensagem por mensagem (`LEFT JOIN LATERAL` sobre `mensagens`). Por isso o filtro `lead_id = X` não tinha onde se apoiar:
+- **chat:** cada abertura lia as ~80 mil mensagens da empresa;
+- **dashboard:** o `zapintel_turnos` cruzava 499 leads ativos com essa varredura, ou seja, 40 milhões de linhas.
+
+**Correção:** a view passou a partir do negócio (`n.id` = principal do contato; mensagens pelo índice de contato), mais as mensagens de contato sem negócio, com `lead_id` nulo, num `UNION ALL`.
+
+**Conferências:**
+- **mesmas linhas:** 80.162 na cópia, com 0 diferenças nos dois sentidos;
+- **dashboard idêntico** ao da view antiga, rodando as duas no mesmo instante;
+- **os 22 usos de `lead_mensagens` no código, medidos na cópia:** nenhum passou de 500 ms. O pior é o assistente procurando quem citou um produto, de 123 para 191 ms.
+
+| Medida em produção, como usuário logado | Antes | Depois |
+|---|---|---|
+| Chat do lead 3598 (61 mensagens) | 2.548 ms (1ª) / 55 ms | 11 ms (1ª) / 1–2 ms |
+| Trecho do `zapintel_turnos` (EXPLAIN) | 38,7 s | 2,6 s (1ª) / 225 ms |
+| `zapintel_dashboard` inteiro | timeout (> 8 s) | 3,1 s (1ª) / 1,1 s |
+
+A primeira execução em cada conexão custa cerca de 2,4 s a mais, com a view velha e com a nova. Não é efeito da view e não investiguei a causa.
+
+---
+
+## 6. Incidente de 20/10, 11:04–11:11: a API fora durante a limpeza
+
+### Linha do tempo (horário de São Paulo)
+
+| Hora | O que aconteceu |
+|---|---|
+| 10:42–10:46 | Dump completo do `public` pelo operador (Bloco 1 da limpeza). Levou **230 s**; no corte, antes do expediente, foram 26 s. Durante o dump, a Edge levou de 60 a 144 s por chamada, houve 8 timeouts do app no Postgres e 1 resposta 5xx da Edge. |
+| 10:47–11:03 | Tudo de volta: Postgres sem erro, Edge com mediana de 1,8–2 s. Dumps pequenos às 11:00 (`backup` e `evolution`, menos de 1 MB). |
+| 11:04 | Migração da retenção aplicada (2.1: procedure, tabela de registro e pg_cron). **Todo DDL faz o PostgREST recarregar o cache de schema.** |
+| 11:04:44 | Primeira purga do `historico_bruto`, em lotes de 500 com pausa de 1 s. Seis lotes passaram (**3.000 de 4.573 linhas**). O 7º estourou o tempo limite de 2 min às 11:06:53. |
+| 11:04–11:08 | Com o banco lento, a recarga do cache do PostgREST falhou várias vezes (`PGRST002: Could not query the database for the schema cache`), e **a API passou a responder 503 para todo mundo**: app e Edge. Pico de 785 erros às 11:07. |
+| 11:07:53–11:09:17 | A Edge não conseguia buscar o canal, tratava o evento como órfão e respondia 200. **97 eventos da Meta descartados.** |
+| 11:08:05 | Cache de schema carregado (a consulta levou 8,4 s). PostgREST reconectado às 11:08:47. |
+| 11:09–11:10 | Mais ~550 respostas 5xx, de chamadas que estavam na fila. |
+| 11:11 | API sem 5xx. A Edge ainda terminou, até 11:12, chamadas presas desde 11:09 (546 em 150 s). |
+
+### Causa provável
+
+**O disco do plano free estava sem fôlego desde o dump das 10:42.** Duas evidências:
+- o dump levou quase 9 vezes o tempo de antes do expediente;
+- um lote de 500 linhas passou de 2 minutos (cada linha tem ~15 KB de TOAST).
+
+Sobre isso vieram duas cargas: a purga, apagando TOAST, e a recarga do schema pelo DDL. **Não comprovado:** falta ver o *Disk IO budget* no painel do Supabase nesse horário.
+
+**O que transformou lentidão em perda** foi um defeito antigo da Edge:
+- erro de banco na busca do canal era tratado como "canal não existe";
+- o evento era descartado com 200, e a Meta não reenvia quando recebe 200;
+- esse "não existe" ainda ia para o cache do worker, então o evento seguinte também virava órfão, mesmo com o banco já de volta.
+
+Corrigido em `85250c3` (ainda não está no ar): erro de banco responde 500 e a Meta reenvia.
+
+### Os 97 eventos descartados, por canal
+
+| Canal | `messages` (mensagem do cliente ou status) | `smb_message_echoes` (resposta pelo celular) | Outros |
+|---|---|---|---|
+| Mogi (15, `1252570627941541`) | 26 | 27 | — |
+| Jaguariúna (28, `1390168490838928`) | 13 | 12 | 1 `smb_app_state_sync` |
+| Instagram @jmstore_importados (26, `17841460104258132`) | 18 (mensagens, ecos e status do Instagram vêm todos no mesmo evento) | | |
+
+- **Não dá para saber quantos eram mensagem de cliente:** o log guarda só o canal e o campo, não o conteúdo, e parte dos `messages` é status de entrega ou leitura.
+- **Outros 7 erros vieram com o id da mensagem** ("gravar mensagem recebida" ou "gravar echo"). Deles, 6 foram regravados quando a Meta reenviou; **1 eco de Mogi continua faltando** (`wamid.HBgTQlIuMTU5ODIwNTk0NTE4MDk3NhUUABEYFjNFQjAwMUFENDFERkQ1NkJGQ0FGQkUA`).
+
+### O que dá para recuperar
+
+- **Instagram (canais 25 e 26):** dá. A API do Instagram lista as conversas e as mensagens com o id.
+  - O script `scripts/recuperar-instagram-20261020.mts` busca a janela 11:06:30–11:10:30.
+  - Ele pula o que já existe e grava o que falta por `mensagem_registrar`, de forma idempotente. Sem lead, só lista: não cria.
+  - **Preparado, não rodado.** Simula por padrão; `--gravar` grava.
+- **WhatsApp (Mogi e Jaguariúna):** a Cloud API não tem como listar mensagens passadas. O que se perdeu só volta se o cliente escrever de novo, ou pela sincronização de histórico da coexistência, se a Meta mandar outra.
+  - **Ação de negócio:** avisar Mogi e Jaguariúna de que mensagens recebidas entre 11:07 e 11:10 podem não ter aparecido no CRM; conferir no celular.
+
+### Estado depois do incidente
+
+- **Retenção:** está no ar. Faltam **1.574** linhas do `historico_bruto`, para o cron das 04:00.
+  - O cron hoje chama `ops.purgar_retencao()` com o padrão de **5.000 por lote**.
+  - A troca para 500 (`cron.alter_job`) fica para depois das 18h.
+- **Regra nova no runbook (05):** conferir o *Disk IO budget* antes de qualquer I/O; abaixo de 50%, parar; I/O e DDL só fora do expediente.
+- **Decisão do Lucas (20/10):** nada mais em produção com a loja aberta enquanto estivermos no plano free. Sem Supabase Pro.

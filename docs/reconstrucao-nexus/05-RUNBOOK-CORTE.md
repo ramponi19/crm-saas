@@ -17,6 +17,21 @@
 - Ferramentas: `C:\Ferramentas\pgsql-18.4\bin` (`psql`, `pg_dump`, `pg_restore`).
 - Todos os comandos rodam a partir da raiz do repositório, com a branch `db/core-v1` em uso.
 
+**⚠ Regra de I/O no plano free (desde 20/10/2026, vale para qualquer operação em produção):**
+1. **Antes de qualquer I/O, conferir o Disk IO budget no painel do Supabase** (Reports → Database → Disk IO). **Abaixo de 50%: parar.** Não começa, ou para no meio e espera recuperar.
+2. **I/O só fora do expediente** (com a loja aberta, nunca). I/O aqui é:
+   - dump (`pg_dump`, inclusive parcial);
+   - purga ou `DELETE` em massa;
+   - `VACUUM`;
+   - `CREATE` ou `DROP INDEX`;
+   - restore;
+   - qualquer migração (DDL).
+3. **Toda migração (DDL) faz o PostgREST recarregar o cache de schema.** Com o banco lento, essa recarga falha, e **a API inteira responde 503 até ela passar**. Por isso DDL também é I/O.
+
+Por que a regra existe: em 20/10, com a loja aberta, houve dois episódios (ver o incidente no `06-OBSERVACAO-POS-CORTE.md`):
+- **10:42:** o dump do `public` levou 230 s, contra 26 s antes do expediente, e travou o app por 4 min.
+- **11:04:** a primeira purga do `historico_bruto`, junto com a recarga do schema causada por uma migração, deixou a API fora por ~7 min. 97 eventos da Meta foram perdidos.
+
 ---
 
 ## Antes da janela (pode ser dias antes)
