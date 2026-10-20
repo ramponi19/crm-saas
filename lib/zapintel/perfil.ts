@@ -499,8 +499,37 @@ function extrairJson(texto: string): unknown {
 const CLASSES: Classification[] = ['customer', 'hot', 'warm', 'followup', 'stalled', 'lost', 'unqualified']
 const URGENCIAS = ['critical', 'high', 'medium', 'low'] as const
 
-const texto = (v: unknown, teto: number): string =>
-  typeof v === 'string' ? v.trim().slice(0, teto) : ''
+/**
+ * TETOS DA FICHA — 20/10/2026, pedido do Lucas: "cada caso é um caso e ficar
+ * comprimindo isso pode afetar nas análises". Os tetos antigos (diagnóstico 600,
+ * itens 240, perfil 40) cortavam a análise no meio da frase sem avisar ninguém.
+ * Os de agora ficam MUITO acima de qualquer ficha real; existem só para uma
+ * resposta quebrada da IA (texto repetido sem fim) não derrubar a tela. Quando
+ * um teto ainda for atingido, o corte acontece numa palavra inteira, com "…".
+ */
+const TETO = {
+  perfil: 80,
+  diagnostico: 6_000,
+  relato: 20_000,
+  rotulo: 120,
+  evidencia: 1_500,
+  desfecho: 1_000,
+  ponta: 1_500,
+  pontas: 12,
+  sinais: 15,
+  objecoes: 12,
+  acao: 3_000,
+  mensagem: 3_000,
+} as const
+
+const texto = (v: unknown, teto: number): string => {
+  if (typeof v !== 'string') return ''
+  const t = v.trim()
+  if (t.length <= teto) return t
+  const corte = t.slice(0, teto)
+  const espaco = corte.lastIndexOf(' ')
+  return (espaco > teto * 0.8 ? corte.slice(0, espaco) : corte).trimEnd() + '…'
+}
 
 const numero = (v: unknown, padrao: number): number => {
   const n = typeof v === 'number' ? v : Number(v)
@@ -519,8 +548,8 @@ function validar(bruto: unknown): PerfilIA | null {
   if (!bruto || typeof bruto !== 'object') return null
   const o = bruto as Record<string, unknown>
 
-  const relato = texto(o.relato, 4_000)
-  const diagnostico = texto(o.diagnostico, 600)
+  const relato = texto(o.relato, TETO.relato)
+  const diagnostico = texto(o.diagnostico, TETO.diagnostico)
   // Sem relato nem diagnóstico não há ficha — devolver um esqueleto vazio
   // seria pior que assumir a falha e deixar o motor antigo aparecer.
   if (!relato && !diagnostico) return null
@@ -541,26 +570,26 @@ function validar(bruto: unknown): PerfilIA | null {
     classificacao,
     score: numero(o.score, 50),
     riscoPerda: numero(o.riscoPerda, 0),
-    perfil: texto(o.perfil, 40) || '—',
+    perfil: texto(o.perfil, TETO.perfil) || '—',
     diagnostico,
     relato,
     sinais: lista(o.sinais, (x) => {
-      const rotulo = texto(x.rotulo, 60)
-      return rotulo ? { rotulo, evidencia: texto(x.evidencia, 240) } : null
-    }, 8),
+      const rotulo = texto(x.rotulo, TETO.rotulo)
+      return rotulo ? { rotulo, evidencia: texto(x.evidencia, TETO.evidencia) } : null
+    }, TETO.sinais),
     objecoes: lista(o.objecoes, (x) => {
-      const rotulo = texto(x.rotulo, 60)
-      return rotulo ? { rotulo, evidencia: texto(x.evidencia, 240), desfecho: texto(x.desfecho, 160) } : null
-    }, 6),
+      const rotulo = texto(x.rotulo, TETO.rotulo)
+      return rotulo ? { rotulo, evidencia: texto(x.evidencia, TETO.evidencia), desfecho: texto(x.desfecho, TETO.desfecho) } : null
+    }, TETO.objecoes),
     pontasSoltas: Array.isArray(o.pontasSoltas)
-      ? o.pontasSoltas.map((x) => texto(x, 240)).filter(Boolean).slice(0, 5)
+      ? o.pontasSoltas.map((x) => texto(x, TETO.ponta)).filter(Boolean).slice(0, TETO.pontas)
       : [],
-    proximaAcao: texto(o.proximaAcao, 400),
-    proximaAcaoPorque: texto(o.proximaAcaoPorque, 400),
+    proximaAcao: texto(o.proximaAcao, TETO.acao),
+    proximaAcaoPorque: texto(o.proximaAcaoPorque, TETO.acao),
     urgencia: (URGENCIAS as readonly string[]).includes(String(o.urgencia))
       ? (o.urgencia as PerfilIA['urgencia'])
       : 'medium',
-    mensagemSugerida: texto(o.mensagemSugerida, 900),
+    mensagemSugerida: texto(o.mensagemSugerida, TETO.mensagem),
   }
 }
 

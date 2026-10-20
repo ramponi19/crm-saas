@@ -42,8 +42,20 @@ import type { Lead, RawMessage } from '@/types/zapintel'
  * vezes", nunca "mata venda".
  */
 
-/** Quanto da frase final cabe na ficha. O suficiente para reconhecê-la. */
-const TAMANHO_DA_FRASE = 180
+/**
+ * Quanto de uma fala cabe na ficha. Era 180 e cortava no meio da palavra, sem
+ * aviso: a pessoa lia "Ele abriu com" e a frase parava pela metade (20/10/2026).
+ * Agora cabe a fala inteira na quase totalidade dos casos, e o que passar disso
+ * termina numa palavra inteira com "…", para ficar claro que houve corte.
+ */
+const TAMANHO_DA_FRASE = 600
+
+function frase(t: string): string {
+  if (t.length <= TAMANHO_DA_FRASE) return t
+  const corte = t.slice(0, TAMANHO_DA_FRASE)
+  const espaco = corte.lastIndexOf(' ')
+  return (espaco > TAMANHO_DA_FRASE * 0.6 ? corte.slice(0, espaco) : corte).trimEnd() + '…'
+}
 
 export interface Ficha {
   /** Id do lead no CRM. */
@@ -283,7 +295,7 @@ function montarRelato(f: Omit<Ficha, 'relato'>): string {
  */
 export function falaQueEncerrou(a: Lead): string | null {
   const i = indiceDaFalaQueEncerrou(a)
-  return i == null ? null : texto((a.messages || [])[i]).slice(0, TAMANHO_DA_FRASE)
+  return i == null ? null : frase(texto((a.messages || [])[i]))
 }
 
 /**
@@ -391,11 +403,11 @@ export function montarFicha(a: Lead, ctx: ContextoDaFicha): Ficha {
       const dele = comTexto.filter((m) => !m.isStore && ehFala(m))
       // A primeira que não é só cumprimento; se todas forem, vale a primeira.
       const p = dele.find((m) => !SAUDACAO.test(soLetras(texto(m)))) ?? dele[0]
-      return p ? texto(p).slice(0, TAMANHO_DA_FRASE) : null
+      return p ? frase(texto(p)) : null
     })(),
     ultimaOferta: (() => {
       const o = [...comTexto].reverse().find((m) => m.isStore && ehOferta(texto(m)))
-      return o ? texto(o).slice(0, TAMANHO_DA_FRASE) : null
+      return o ? frase(texto(o)) : null
     })(),
 
     procurou,
