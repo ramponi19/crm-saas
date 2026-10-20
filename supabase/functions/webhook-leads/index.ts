@@ -24,6 +24,7 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { contaDoEvento, hashCorpo, jaRecebido, LIMITE_GRANDE, tamanhoCorpo } from "./reenvio.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1784,6 +1785,24 @@ serve(async (req: Request) => {
     return new Response("assinatura invalida", { status: 403, headers: cors });
   }
 
+  /**
+   * REENVIO DA META: o mesmo corpo de novo → 200 na hora, sem processar.
+   *
+   * Pacote de sincronização leva ~1 min aqui; a Meta não espera tanto e reentrega
+   * (418 vezes o mesmo pacote no canal de Jaguariúna, 13–20/10/2026). Pacote grande
+   * grava o hash JÁ, antes de processar; o pequeno só depois de processado — ver
+   * reenvio.ts e a migração 20261021000200_webhook_recebidos.
+   */
+  const hash = await hashCorpo(corpoCru);
+  const tamanho = tamanhoCorpo(corpoCru);
+  const conta = contaDoEvento(body);
+  const grande = tamanho > LIMITE_GRANDE;
+  const rpc = (fn: string, args: Record<string, unknown>) => db.rpc(fn, args);
+  if (await jaRecebido(rpc, hash, tamanho, conta, grande)) {
+    console.log(`reenvio da Meta ignorado: ${tamanho} bytes, conta ${conta ?? "?"}`);
+    return ok();
+  }
+
   try {
     if (objeto === "whatsapp_business_account") {
       for (const entry of (body.entry as Record<string, unknown>[] ?? [])) {
@@ -2009,6 +2028,8 @@ serve(async (req: Request) => {
         }
       }
     }
+    // Pacote pequeno processado: agora sim lembra o hash (o grande gravou antes).
+    if (!grande) await jaRecebido(rpc, hash, tamanho, conta, true);
   } catch (e) {
     // 200 mesmo em erro: 5xx faz a Meta reenviar em loop, e um evento problemático
     // não pode travar a fila dos outros.
