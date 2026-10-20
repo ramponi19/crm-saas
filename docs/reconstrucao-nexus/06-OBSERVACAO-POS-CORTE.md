@@ -232,7 +232,22 @@ A primeira execução em cada conexão custa cerca de 2,4 s a mais, com a view v
 - o dump levou quase 9 vezes o tempo de antes do expediente;
 - um lote de 500 linhas passou de 2 minutos (cada linha tem ~15 KB de TOAST).
 
-Sobre isso vieram duas cargas: a purga, apagando TOAST, e a recarga do schema pelo DDL. **Não comprovado:** falta ver o *Disk IO budget* no painel do Supabase nesse horário.
+Sobre isso vieram duas cargas: a purga, apagando TOAST, e a recarga do schema pelo DDL.
+
+**O que o painel do Supabase mostrou depois** (Observability → Database, gráfico de CPU, pontos de 2 min):
+
+| Hora | IOwait | CPU total | IOPS (máx. 3.000) |
+|---|---|---|---|
+| 10:02–10:08 (antes) | 4–9% | 7–16% | 11–17 |
+| 10:44–10:46 (dump) | **sem dado**: o coletor de métricas não conseguiu ler o banco | — | — |
+| 10:48 | **58%** | 75% | 23 |
+| 11:04–11:18 (incidente) | **sem dado** de novo | — | — |
+| 11:20 | **64%** | 82% | 19 |
+| 11:22–11:32 | 9–15% | 13–22% | 13–23 |
+
+- **CPU 98%:** é o máximo do dia no painel de infraestrutura, e quem enche a CPU é o IOwait: o processador esperando o disco. Contas de verdade (User) ficaram abaixo de 18%.
+- **Poucas operações e muita espera:** as operações por segundo ficaram baixas (~20 de 3.000), mas a espera pelo disco foi alta. Isso aponta para o limite de banda de disco da própria máquina (t4g.nano), não o do volume.
+- **O painel do plano free não mostra o *Disk IO budget* em porcentagem.** O que dá para acompanhar é o IOwait no gráfico de CPU. O "Disk IO 1%" do dia, no painel de infraestrutura, é consumo médio e não pegou o pico.
 
 **O que transformou lentidão em perda** foi um defeito antigo da Edge:
 - erro de banco na busca do canal era tratado como "canal não existe";
