@@ -68,6 +68,10 @@ import type { DadoIndisponivel } from '@/lib/zapintel/conversas'
  *    conversa vai com dado pessoal mascarado e só o primeiro nome. O que a
  *    ficha deve conter não mudou; subir para p3 marcaria todas as fichas
  *    atuais como desatualizadas e o robô pediria IA para cada uma.)
+ *
+ *   (20/10/2026, também SEM subir: o prompt passou a escrever como diretor
+ *    comercial — ver `regras`. Os campos são os mesmos; as fichas antigas
+ *    ganham o formato novo quando a conversa andar e forem regeradas.)
  */
 export const VERSAO_DO_PERFIL = 'p2'
 
@@ -98,7 +102,7 @@ export interface PerfilIA {
   riscoPerda: number
   /** Rótulo curto de como esta pessoa compra. Livre — não é mais um enum. */
   perfil: string
-  /** O bloco "ANÁLISE DE IA": 1 a 2 frases, o diagnóstico. */
+  /** O bloco "ANÁLISE DE IA": Fato, Valor em jogo e Leitura (com a confiança). */
   diagnostico: string
   /** O bloco "O QUE ACONTECEU": o relato da conversa, em parágrafos. */
   relato: string
@@ -260,6 +264,9 @@ export function contextoDoPerfil(opts: {
   const f = ficha
 
   const fatos = [
+    // A próxima ação leva prazo ("até 23/10"), e o modelo não sabe que dia é
+    // hoje: sem esta linha ele conta a partir da última mensagem ou inventa.
+    `Hoje: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}`,
     `Loja: ${nomeDaLoja}`,
     `Cliente: ${lead.contact}`,
     `Canal: ${f.canal}`,
@@ -373,8 +380,8 @@ produto, preço, nome nem situação daqui.
   "score": 74,
   "riscoPerda": 20,
   "perfil": "Pesquisador e direto",
-  "diagnostico": "Comprou o aparelho por R$ 3.480 em 10x no dia 05/09 e retirou na loja no dia seguinte, elogiando o atendimento. Não há venda a fechar — o que existe é um cliente satisfeito com uma ponta solta que vale dinheiro.",
-  "relato": "Chegou por um anúncio perguntando preço e prazo. Comparou com outra loja na mesma conversa e pediu foto da caixa lacrada antes de seguir.\\n\\nO primeiro travamento foi o parcelamento: queria mais parcelas sem juros do que a loja oferecia. Ele mesmo propôs a saída — dar uma entrada maior no Pix —, e a loja aceitou.\\n\\nO atrito que quase custou a venda apareceu na véspera da retirada: a cor escolhida tinha acabado e o vendedor só avisou quando ele perguntou o horário. A loja resolveu no mesmo minuto, oferecendo a outra cor com uma capa de cortesia, que ele aceitou.",
+  "diagnostico": "Fato: comprou o aparelho por R$ 3.480 em 10x no dia 05/09 e retirou na loja no dia seguinte, elogiando o atendimento. Perguntou se a loja compra o aparelho antigo dele, e ninguém respondeu.\\n\\nValor em jogo: um seminovo para o estoque (valor não discutido na conversa) e a próxima compra de um cliente que saiu satisfeito.\\n\\nLeitura (confiança média): não há venda a fechar; há uma pergunta dele sem resposta que vale dinheiro. Responder agora é retomar algo que ele mesmo pediu, não insistir.",
+  "relato": "Chegou em 02/09 por um anúncio perguntando preço e prazo. Comparou com outra loja na mesma conversa e pediu foto da caixa lacrada antes de seguir.\\n\\nO primeiro travamento foi o parcelamento: queria mais parcelas sem juros do que a loja oferecia. Ele mesmo propôs a saída — dar uma entrada maior no Pix —, e a loja aceitou.\\n\\nO atrito que quase custou a venda apareceu na véspera da retirada: a cor escolhida tinha acabado e a Tatiane, que o atendia, só avisou quando ele perguntou o horário. A loja resolveu no mesmo minuto, oferecendo a outra cor com uma capa de cortesia, que ele aceitou.\\n\\nNa retirada, em 06/09, ele perguntou se a loja compra o aparelho antigo. A pergunta ficou sem resposta.",
   "sinais": [
     { "rotulo": "Pediu prova de procedência", "evidencia": "consegue mandar foto da caixa lacrada?" },
     { "rotulo": "Propôs a própria saída", "evidencia": "se eu der metade no pix fecha em 10?" }
@@ -384,18 +391,21 @@ produto, preço, nome nem situação daqui.
     { "rotulo": "Cor indisponível", "evidencia": "mas era a azul que eu queria", "desfecho": "Aceitou a outra cor com capa de cortesia" }
   ],
   "pontasSoltas": [
-    "Ele perguntou se a loja compra o aparelho antigo dele e ninguém respondeu essa pergunta."
+    "Ele perguntou se a loja compra o aparelho antigo dele e ninguém respondeu essa pergunta.",
+    "Ponto de treino: a falta da cor só foi avisada quando ele perguntou o horário da retirada. Avisar assim que souber evita o susto que quase custou a venda."
   ],
-  "proximaAcao": "Responder a pergunta que ficou sem resposta: oferecer uma avaliação do aparelho antigo dele.",
-  "proximaAcaoPorque": "Retoma algo que ele mesmo pediu, não uma oferta nova, e pode trazer um seminovo para o estoque por um cliente que já confia na loja.",
+  "proximaAcao": "Tatiane · até 12/09 — responder a pergunta que ficou sem resposta e oferecer uma avaliação do aparelho antigo dele.",
+  "proximaAcaoPorque": "Retoma algo que ele mesmo pediu, não uma oferta nova, e pode trazer um seminovo para o estoque por um cliente que já confia na loja. Métrica: avaliação feita até 19/09.",
   "urgencia": "medium",
   "mensagemSugerida": "Oi! Tudo certo com o aparelho novo? 😄 Você tinha perguntado se a gente compra o seu antigo e acabou ficando sem resposta — se ainda estiver com ele, faço uma avaliação sem compromisso. Quer?"
 }
 
-REPARE no exemplo: cada sinal cita o que a pessoa ESCREVEU; cada objeção diz
-como terminou; o relato conta uma história com causa e sequência, não uma
-lista de rótulos; e a próxima ação sai de algo que ficou em aberto na própria
-conversa, não de uma regra geral de vendas.
+REPARE no exemplo: o diagnóstico separa o que aconteceu (Fato) do que você
+conclui (Leitura, com o grau de confiança); cada sinal cita o que a pessoa
+ESCREVEU; cada objeção diz como terminou; o relato conta uma história com
+datas, causa e sequência, não uma lista de rótulos; a próxima ação tem dono e
+prazo e sai de algo que ficou em aberto na própria conversa, não de uma regra
+geral de vendas; e o porquê termina dizendo como se mede o resultado.
 `.trim()
 
 /**
@@ -406,16 +416,34 @@ conversa, não de uma regra geral de vendas.
  * `getSegment().followupContext`, a JM cai em `ecommerce` ("loja de moda/
  * varejo"), e a IA escreveu "ainda tenho suas PEÇAS separadinhas aqui" para
  * quem queria iPhone. O negócio se descreve sozinho na conversa.
+ *
+ * ══ O DIRETOR COMERCIAL (20/10/2026) ═══════════════════════════════════════
+ *
+ * Pedido do Lucas: a ficha deixa de ser "análise genérica de IA" e passa a ser
+ * escrita por quem responde pelo resultado da loja — fato separado de leitura,
+ * valor em jogo, ação com dono, prazo e métrica, e nunca desconto que destrua
+ * margem como recomendação. O mesmo formato das fichas escritas à mão desde
+ * então, para a tela não mostrar dois padrões.
+ *
+ * E "cada caso é um caso": as instruções de tamanho ("1 ou 2 frases", "2 a 4
+ * parágrafos curtos", "ler em quinze segundos") saíram. O tamanho acompanha a
+ * conversa; só a mensagem de WhatsApp continua curta, porque é WhatsApp.
  */
 function regras(nomeDaLoja: string): string {
   return [
-    `Você analisa conversas de venda de ${nomeDaLoja} e escreve a ficha do cliente para o vendedor ler antes de falar com ele.`,
+    `Você é o diretor comercial de ${nomeDaLoja}. Lê cada conversa de venda como quem responde pelo resultado da loja e escreve a ficha do cliente para a equipe agir: o vendedor que atende e a gerência.`,
     '',
     'REGRAS, todas obrigatórias:',
     '',
-    '1. NÃO INVENTE. Toda afirmação precisa estar na conversa ou nos fatos do',
-    '   CRM. Não há "provavelmente", não há o que costuma acontecer em vendas.',
-    '   Se o dado não está aí, o campo fica curto ou vazio.',
+    '1. NÃO INVENTE FATO. Toda afirmação de fato precisa estar na conversa ou',
+    '   nos fatos do CRM. O que você conclui é LEITURA, não fato: fica no bloco',
+    '   "Leitura" do diagnóstico, com o grau de confiança (alta, média ou baixa),',
+    '   e nunca vem do que "costuma acontecer em vendas". Se o dado não está',
+    '   aí, diga que não está — não preencha.',
+    '',
+    '1a. VALOR EM JOGO é dinheiro que aparece na conversa ou no CRM (preço',
+    '   cotado, avaliação do aparelho, diferença a pagar). Se nenhum valor foi',
+    '   falado, escreva "não informado na conversa".',
     '',
     '2. CADA SINAL E CADA OBJEÇÃO LEVA EVIDÊNCIA: um trecho curto do que foi',
     '   dito, de onde você tirou aquilo. Se não consegue citar, não inclua.',
@@ -424,6 +452,13 @@ function regras(nomeDaLoja: string): string {
     '   loja não tenha oferecido NESTA conversa. A mensagem sugerida vai para',
     '   um cliente de verdade, e promessa inventada alguém tem que honrar ou',
     '   desdizer.',
+    '',
+    '3a. DESCONTO NÃO É AÇÃO DO VENDEDOR. Quando a saída for preço (o cliente',
+    '   tem oferta menor, pede abatimento, acha a avaliação baixa), escreva em',
+    '   pontasSoltas um item "Decisão da gerência: ..." com o tamanho da',
+    '   diferença em R$ e o que se ganha ou perde — e deixe a decisão com a',
+    '   gerência. Prefira saídas que não cortam margem: entrada, troca,',
+    '   parcelamento, outra cor ou memória, prova do aparelho.',
     '',
     '4. FATO DO CRM E DEDUÇÃO SUA SÃO COISAS DIFERENTES. Se a conversa mostra',
     '   que a pessoa comprou mas o CRM não tem venda registrada, diga as duas',
@@ -437,10 +472,22 @@ function regras(nomeDaLoja: string): string {
     '6. Transcrição de áudio pode ter erro de transcrição. Use o sentido, não',
     '   cite palavra por palavra como se fosse texto digitado.',
     '',
-    '7. Escreva em português brasileiro, direto, para alguém de balcão ler em',
-    '   quinze segundos. Sem jargão de consultoria, sem "potencial cliente",',
-    '   sem "jornada". Chame a pessoa pelo primeiro nome; se o nome for',
-    '   "Cliente", ele não é conhecido — não use nome nenhum.',
+    '7. Escreva em português brasileiro, direto, de diretor para a equipe. Sem',
+    '   jargão de consultoria, sem "potencial cliente", sem "jornada". Chame a',
+    '   pessoa pelo primeiro nome; se o nome for "Cliente", ele não é',
+    '   conhecido — não use nome nenhum. O TAMANHO ACOMPANHA A CONVERSA: não',
+    '   resuma o que importa para caber, nem encha uma conversa curta.',
+    '',
+    '7a. PONTO DE TREINO: quando a conversa mostrar um acerto ou um erro do',
+    '   vendedor que vale ensinar (demorou a responder, mandou só áudio, não deu',
+    '   o preço, não perguntou se há aparelho de entrada, contornou bem uma',
+    '   objeção), escreva em pontasSoltas um item "Ponto de treino: ..." citando',
+    '   o que aconteceu.',
+    '',
+    '7b. A PRÓXIMA AÇÃO TEM DONO E PRAZO. Dono é quem atendeu (pelos fatos do',
+    '   CRM ou pelo nome que aparece na conversa); se não der para saber,',
+    '   "Vendedor"; se a decisão for de preço ou de regra da loja, "Gerência".',
+    '   Prazo é uma data real contada a partir de HOJE (está nos fatos do CRM).',
     '',
     '8. Trechos como [CPF], [TELEFONE], [E-MAIL], [CEP], [Nº] ou [CARTÃO] foram',
     '   ocultados de propósito. Não tente adivinhar o que havia ali e não os',
@@ -454,15 +501,15 @@ function regras(nomeDaLoja: string): string {
     '  "score": 0 a 100,',
     '  "riscoPerda": 0 a 100,',
     '  "perfil": "como esta pessoa compra, em 1 a 3 palavras",',
-    '  "diagnostico": "o estado desta conversa agora, em 1 ou 2 frases",',
-    '  "relato": "o que aconteceu, do começo ao fim, em 2 a 4 parágrafos curtos separados por \\n\\n",',
+    '  "diagnostico": "três blocos separados por \\n\\n: \'Fato: ...\' (o estado da conversa agora, com o que foi pedido, cotado e respondido), \'Valor em jogo: ...\' e \'Leitura (confiança alta|média|baixa): ...\' (o que você conclui e por quê)",',
+    '  "relato": "o que aconteceu, do começo ao fim, com as datas, em parágrafos separados por \\n\\n — quantos a conversa pedir",',
     '  "sinais": [{ "rotulo": "o sinal, curto", "evidencia": "o trecho que prova" }],',
     '  "objecoes": [{ "rotulo": "a objeção", "evidencia": "o trecho", "desfecho": "como terminou, ou \'em aberto\'" }],',
-    '  "pontasSoltas": ["o que ficou combinado ou prometido e ninguém retomou"],',
-    '  "proximaAcao": "o que fazer agora, uma frase, concreta",',
-    '  "proximaAcaoPorque": "por que essa e não outra, uma frase",',
+    '  "pontasSoltas": ["o que ficou combinado ou prometido e ninguém retomou; e, quando couber, \'Decisão da gerência: ...\' e \'Ponto de treino: ...\'"],',
+    '  "proximaAcao": "Dono · até DD/MM — o que fazer, concreto",',
+    '  "proximaAcaoPorque": "por que essa e não outra, terminando com \'Métrica: ...\' (o que conta como resultado e até quando)",',
     '  "urgencia": "critical|high|medium|low",',
-    '  "mensagemSugerida": "a mensagem de WhatsApp para mandar agora, no máximo 3 frases"',
+    '  "mensagemSugerida": "a mensagem de WhatsApp para mandar agora, no tom de WhatsApp (2 a 4 frases)"',
     '}',
     '',
     'Sobre a CLASSIFICAÇÃO: use "customer" quando a conversa mostra que a pessoa',
@@ -473,7 +520,8 @@ function regras(nomeDaLoja: string): string {
     'não comprou, é a chance de fechar. Não é nota de simpatia.',
     '',
     'Listas vazias são respostas válidas. Conversa de três mensagens produz',
-    'ficha de três linhas, e está certo.',
+    'ficha curta, e está certo — mas o diagnóstico mantém os três blocos e a',
+    'próxima ação mantém dono, prazo e métrica.',
     '',
     GABARITO,
   ].join('\n')
