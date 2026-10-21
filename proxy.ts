@@ -66,6 +66,8 @@ const LEGADO_ADMIN = [
  * justamente por isso.
  */
 const SEM_SESSAO = [
+  // Monitor de uptime (21/10/2026): também fora do matcher, abaixo.
+  '/api/saude',
   '/api/webhook/',
   '/api/cron/',
   '/api/rastreamento/',
@@ -367,7 +369,7 @@ async function modulosHabilitados(
  * rodar em tudo e nada avisaria. A economia sumiria em silêncio.
  */
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|monitoring|api/webhook/|api/cron/|api/rastreamento/|api/portais/|i/|offline|sw\\.js|track\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|monitoring|api/saude|api/webhook/|api/cron/|api/rastreamento/|api/portais/|i/|offline|sw\\.js|track\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
 
 

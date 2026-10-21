@@ -529,6 +529,9 @@ v "imei e aba do estoque"               "app/(dashboard)/estoque/components/esto
 v "fipe mora em avaliacoes"             "app/(dashboard)/avaliacoes/avaliacoes-view.tsx" "useFerramenta('/consulta-fipe')"
 v "cmd+k abre as ferramentas"           "components/layout/command-palette.tsx" "useFerramentas()"
 v "endereco antigo responde 308"        "next.config.ts" "destination: '/estoque/imei', permanent: true"
+# 21/10/2026: monitor de uptime em /api/saude (sem banco, fora do matcher do proxy).
+v "saude nao toca no banco"            "app/api/saude/route.ts" "export function GET()"
+v "saude fora do matcher do proxy"     "proxy.ts" "|monitoring|api/saude|api/webhook/|"
 # 21/10/2026 (etapa 0, 2.3): duplicadas num lugar so. Relatorios/Financeiro = CRM;
 # Integracoes = /admin/integracoes; codigo copiado de stripe e preview vira funcao.
 v "admin/relatorios responde 308"       "next.config.ts" "source: '/admin/relatorios', destination: '/relatorios', permanent: true"
@@ -579,16 +582,16 @@ v "emprestimo mora na ficha"           "app/(dashboard)/imoveis/imoveis-view.tsx
 n "campo de texto de chave saiu"       "app/(dashboard)/imoveis/imoveis-view.tsx" "status_chaves"
 
 echo "== contact2sale (21/08) =="
+# 21/10/2026: a rota que recebia o webhook do C2S saiu (o unico tenant que usava foi
+# apagado em 20/10; a C2S seguia chamando: 556 invocacoes/dia para devolver 404). Sem a
+# rota, o 404 vem da pagina estatica (_not-found) pela CDN, sem funcao nem middleware.
+if [ ! -e "app/api/webhook/c2s/[slug]/route.ts" ]; then printf "  ok    %s\n" "webhook do c2s fora (404 estatico)"; ok=$((ok+1)); else printf "  FALHA %s\n" "webhook do c2s voltou sem religar a integracao"; falha=$((falha+1)); fi
+v "c2s nao assina endereco que da 404"  "app/api/admin/c2s/route.ts" "A integração com o C2S está desligada no Nexus."
 v "webhook e rota publica"            "proxy.ts" "startsWith('/api/webhook/')"
 v "token deles entra cifrado"         "app/api/admin/c2s/route.ts" "cifrarToken(t)"
 v "token deles nunca volta pra tela"  "app/admin/integracoes/page.tsx" "temToken: !!cfgC2S.token"
 v "valida token antes de guardar"     "app/api/admin/c2s/route.ts" "const teste = await testarToken(t)"
-v "repeticao nao duplica lead"        "app/api/webhook/c2s/[slug]/route.ts" ".eq('origem_id', lead.externoId)"
-v "update nao apaga o que nao veio"   "app/api/webhook/c2s/[slug]/route.ts" "if (lead.produto) patch.produto_interessado"
-v "log grava o payload cru"           "app/api/webhook/c2s/[slug]/route.ts" "payload: (dados.payload ?? null)"
-v "teto de requisicao no webhook"     "app/api/webhook/c2s/[slug]/route.ts" "excedeuLimite(svc,"
 v "avisa do um-endpoint-por-token"    "app/api/admin/c2s/route.ts" "um endereço por token"
-v "vendedor casa por e-mail"          "app/api/webhook/c2s/[slug]/route.ts" "eq('email', lead.vendedorEmail)"
 v "recusa assinar endereco local"    "app/api/admin/c2s/route.ts" "if (local) {"
 v "guarda a url que foi assinada"    "app/api/admin/c2s/route.ts" "url_assinada: feitos.length ? url"
 v "tela e rota usam a mesma conta"   "app/admin/integracoes/page.tsx" "basePublica(hostReq"

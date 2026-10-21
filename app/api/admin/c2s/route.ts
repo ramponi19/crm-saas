@@ -6,6 +6,9 @@ import {
   salvarConfig, testarToken, tokenEmClaro, basePublica, type AcaoC2S,
 } from '@/lib/c2s'
 
+/** Interruptor da integração (21/10/2026): ver o bloqueio em `assinar`. `boolean` de propósito, para o resto do bloco seguir tipado. */
+const C2S_DESLIGADO: boolean = true
+
 /**
  * Ações da integração Contact2Sale — só dono e admin.
  *
@@ -68,6 +71,15 @@ export async function POST(req: Request) {
   }
 
   if (b.acao === 'assinar') {
+    /**
+     * DESLIGADO EM 21/10/2026. A rota que recebia o webhook (/api/webhook/c2s/[slug])
+     * saiu: a única empresa que usava a C2S (a imobiliária, tenant 3) foi apagada em
+     * 20/10, e a C2S seguia chamando o endereço dela — 556 invocações por dia de
+     * CPU da Vercel para devolver 404. Assinar agora registraria na C2S um endereço
+     * que responde 404: o lead se perderia calado. Para religar, restaurar a rota
+     * (git log -- 'app/api/webhook/c2s') ANTES de tirar este bloqueio.
+     */
+    if (C2S_DESLIGADO) return NextResponse.json({ error: 'A integração com o C2S está desligada no Nexus.' }, { status: 409 })
     const { data: empresa } = await svc.from('empresas').select('slug').eq('id', empresaId).maybeSingle()
     if (!empresa?.slug) return NextResponse.json({ error: 'A empresa precisa de um slug para receber webhook' }, { status: 400 })
 
