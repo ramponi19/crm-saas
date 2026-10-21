@@ -254,7 +254,7 @@ Sobre isso vieram duas cargas: a purga, apagando TOAST, e a recarga do schema pe
 - o evento era descartado com 200, e a Meta não reenvia quando recebe 200;
 - esse "não existe" ainda ia para o cache do worker, então o evento seguinte também virava órfão, mesmo com o banco já de volta.
 
-Corrigido em `85250c3` (ainda não está no ar): erro de banco responde 500 e a Meta reenvia.
+Corrigido em `85250c3`: erro de banco responde 500 e a Meta reenvia. **No ar desde 20/10 19:43 (Edge v66).**
 
 ### Os 97 eventos descartados, por canal
 
@@ -286,3 +286,102 @@ Corrigido em `85250c3` (ainda não está no ar): erro de banco responde 500 e a 
   - A troca para 500 (`cron.alter_job`) fica para depois das 18h.
 - **Regra nova no runbook (05):** gate de IOwait no gráfico de CPU do painel. Acima de 20%, não começar; acima de 30% durante a operação, parar. I/O e DDL só fora do expediente.
 - **Decisão do Lucas (20/10):** nada mais em produção com a loja aberta enquanto estivermos no plano free. Sem Supabase Pro.
+
+---
+
+## 7. A noite de 20/10 (18:13–21:40): limpeza, deploy e o que apareceu nos testes
+
+Loja fechada. Gate de IOwait em todo item (acima de 20% não começa, acima de 30% para). O IOwait ficou entre 0 e 18% a noite toda; os picos foram das próprias operações.
+
+### O que foi feito
+
+| Hora | Item | Resultado |
+|---|---|---|
+| 18:1x | 0.2 cron da retenção | `call ops.purgar_retencao(500, 1)` às 04:00 (lotes de 500, pausa de 1 s) |
+| 18:21 | 2.2 índices | 2 índices de FK em `tarefas` (CONCURRENTLY); 8 índices nunca usados que não cobrem FK, fora |
+| 18:2x | 2.3 | `v_inventario_veiculo` fora |
+| 18:34 | 2.4 régua de follow-up | rota, cron e card fora; 1.112 tarefas de automação abertas apagadas (3 lotes, 7,1 s); `followups_gerados` fora |
+| 18:39 | 2.5 tenant 3 (Imobiliária) | `hard_delete_empresa(3)` em 36 s; 0 linha restante; rota do C2S responde 404 `not_found` |
+| 18:4x | 2.6 / 2.7 | schemas `backup` e `evolution` fora; `old_leads`, `old_clientes`, `old_lead_mensagens`, `old_canais_conectados` fora |
+| 19:24 | 2.8 índice da view `leads` | `negocios_contato_principal_idx`; contagem de não lidas 20,5 → 18,2 ms |
+| 19:26 | 2.9 Realtime | `tarefas` fora da publicação |
+| 19:43 | 3.2 / 3.3 | `ops.webhook_recebidos` + Edge **v66** (reenvio, prazo de 20 s, 500 com banco fora) |
+| 19:48 | 3.3 app | main `0699fdf` no ar |
+| 20:13–20:19 | 3.4 testes | (a) 4 mensagens nos 4 canais; (c) resposta pelo CRM; (d) `/api/whatsapp/send` 200; (e) lead e 2ª via; (f) funil; (g) anon 0 / authenticated 22; (h) menu |
+| 20:56 | principal por loja | ver abaixo |
+| 20:59 | furo do `security_invoker` fechado | ver abaixo |
+| 21:0x | RLS de `contatos` e `storage_orfaos` | ver abaixo |
+| 21:17 | deploy | main `6a25a66` no ar |
+| 21:2x | 3.5 | `campanhas_fidelidade`, `lista_espera`, `solicitacoes_marketing` fora (vazias) |
+| 21:2x | bloco 4 Instagram | simulação: 5 mensagens na janela do incidente, **as 5 já gravadas**; nada a recuperar |
+| 21:37 | bloco 5 vacuum | `historico_bruto` 69 MB → 69 MB (ver abaixo) |
+
+**Banco:** 329 MB (18:13) → **191 MB** (21:37, 200.584.339 bytes). **Em `public`:** 103 tabelas e 46 views, todas com `security_invoker`.
+
+### O que o Lucas achou no teste (a): duas lojas, um card
+
+Ele mandou "Teste" para o WhatsApp de Mogi e o de Jaguariúna; as duas mensagens caíram no card de Mogi (3598). O card de Jaguariúna (3548) ficou sem a conversa dele. Três peças:
+- as views `leads` e `lead_mensagens` escolhiam **um** principal por contato (ativo mais recente), sem olhar a loja;
+- o gatilho de filial dava à mensagem e à conversa a loja do **contato**: a mensagem 274137, do canal de Jaguariúna, nasceu "de Mogi". Em produção eram 24 conversas e 107 mensagens assim;
+- `core_negocio_do_canal` devolvia nada quando o contato não tinha negócio na loja do canal.
+
+**Conserto (`721a063`):** principal, badge, última mensagem e mensagens por contato **e loja**; mensagem e conversa de canal têm a loja do canal (`core_filial_do_canal`); `core_negocio_do_canal` cria o negócio que falta (mensagem enviada não reabre nem cria). Produção: 82.445 mensagens, 0 perdidas ou duplicadas, 0 fora da loja do canal, 0 negócio de loja com conversa vazia. A loja antiga das linhas corrigidas ficou em `ops.volta_filial_20261020`.
+
+O `/api/whatsapp/send` (PDV e OS) enviava e não gravava: o recibo chegava no celular e não aparecia no card. Agora grava pela `mensagem_registrar` (`34e7174`); testado às 21:19 (274145, card 3598, entregue).
+
+### O furo do `security_invoker` (20:56:47 → 20:59:31, 2 min 44 s)
+
+- **Causa:** a migração do principal por loja recriou `leads` e `lead_mensagens` com `CREATE OR REPLACE VIEW` sem `with (security_invoker = true)`. O replace **apaga** as opções que não forem repetidas; as views passaram a rodar como o dono (postgres, que ignora RLS).
+- **Efeito:** a separação por loja não valia por essas duas views. Um vendedor de Jaguariúna lia 1.885 cards e 61.762 mensagens de Mogi. **Só a JM tem dados** (o tenant 3 já tinha saído às 18:39): nenhuma outra empresa exposta.
+- **Achado** no teste do card nas duas lojas, ao medir o que um vendedor de Jaguariúna enxergava. Corrigido com `ALTER VIEW ... SET (security_invoker = true)` às 20:59:31.
+- **Trava em duas camadas (`1884960`):**
+  1. **Banco:** event trigger `exigir_security_invoker` no fim de todo `CREATE VIEW` / `ALTER VIEW`. Se qualquer view de `public` ficar sem a opção, o comando falha e a migração inteira volta. Testado na cópia: recusa o replace sem a opção, aceita com ela.
+  2. **Build:** `scripts/check-views.mjs` no `npm run build` (o build da Vercel) e no `npm run check`. Acompanha as views pelos arquivos de migração; sem a correção, reprova `leads`, `lead_mensagens` e `storage_orfaos`. Limite: as views criadas pelo script do corte (SQL dinâmico) só a trava do banco vê.
+- `storage_orfaos` também estava sem a opção, e com SELECT para anon e authenticated (lista nomes de arquivo do `chat-midia`). Passou a `security_invoker` e a só `service_role` (`6a25a66`); a retenção lê como `service_role`.
+- Produção depois: 46 views, todas com a opção.
+
+### Os 69 cards que faltavam por loja desde o corte
+
+A view `leads` junta `contatos`, e a RLS de `contatos` olhava só a loja do contato. Contato com negócio nas duas lojas tem **uma** loja: na outra, o contato sumia e levava o card junto (as mensagens do negócio apareciam, o card não). Desde o corte, **faltavam 60 cards em Mogi e 9 em Jaguariúna**.
+
+**Conserto (`a3de246`):** o contato fica visível para quem enxerga a loja dele **ou** tem negócio ou conversa numa loja que a pessoa enxerga (só a leitura). Testado na cópia com um vendedor de cada loja e com o dono em Mogi, em Jaguariúna e na rede: cards = negócios visíveis, 0 de outra loja, 0 contato sem vínculo, contatos das duas lojas 88/88 e 62/62. Kanban 110 → 115 ms. Produção: Mogi 1.885 cards = 1.885 negócios; Jaguariúna 671 = 671.
+
+Na tela às 21:18: o card do Lucas em Mogi (3598) só com a conversa do número de Mogi; em Jaguariúna (3548), só com a do número de Jaguariúna.
+
+### Item para o card novo: o formulário marca "alteração não salva" ao abrir
+
+Ao abrir o card 3548 em Jaguariúna, o formulário mostrou **"alteração não salva"** e o botão Salvar sem ninguém ter mexido em nada. Fechado sem salvar. Não investigado: o card novo (reconstrução) deve comparar com o valor carregado, não com o estado inicial vazio.
+
+### Vacuum do `historico_bruto` (bloco 5)
+
+Às 21:37:33, pelo operador (`sql-vacuum-historico`). Gate: 21:22–21:37 abaixo de 10% (máx. 8,75%), último ponto 1,6%.
+
+| | total | tabela | vivas | mortas |
+|---|---|---|---|---|
+| antes | 69 MB | 2,9 MB | 2.440 (estimativa) | 0 |
+| depois | 69 MB | 2,9 MB | 2.329 | 0 |
+
+- `VACUUM (VERBOSE)` em **0,46 s**: 0 páginas removidas, 0 linhas mortas (o autovacuum já tinha passado às 11:07, depois da purga do incidente), 29 páginas sujas, 12 KB de WAL.
+- **Não devolve espaço ao disco**, como era de esperar: o VACUUM comum só marca para reuso. Os 66 MB são TOAST de 14.719 pedaços dos pacotes brutos. Quem diminui a tabela é a retenção (cron das 04:00, 7 dias), e o espaço volta ao disco só com `VACUUM FULL`, que trava a tabela e não foi feito.
+
+### O que NÃO foi dropado, e por quê
+
+| O quê | Por quê |
+|---|---|
+| `segmentos_config` (7 linhas) | o menu lê (11 arquivos) |
+| `complementos_empresa` (2 linhas) | liga o ZapIntel por empresa; o cron `ponte-vendas` lê (6 arquivos) |
+| `lead_atribuicoes` (191 linhas) | a distribuição de leads lê (3 arquivos) |
+| `historico_bruto` (2.440 linhas, 69 MB) | retenção de 7 dias pelo cron das 04:00; a tabela fica |
+| as 18 colunas `obsoleta` de `empresas` | não estavam no escopo da noite |
+| ~89 índices nunca usados | cobrem FK; só os 8 que não cobrem saíram |
+| views de compatibilidade (`leads`, `lead_mensagens`, `clientes`, `canais_conectados` e as 37 de módulo) | as telas ainda leem; caem conforme migrarem (05) |
+| `v_orfaos_chat_midia` | sem leitor no código: candidata para a próxima leva |
+| `ops.volta_filial_20261020` (131 linhas) | volta do principal por loja; apagar depois de 14 dias |
+| usuário do auth do dono do tenant 3 | `auth.users` fora do escopo; decisão do Lucas |
+| `types/database.ts` cita as tabelas apagadas | arquivo gerado; regenerar |
+
+### Pendente
+
+- **(b) reenvio em menos de 1 s:** não houve reenvio real da Meta nas janelas da noite. A Edge v66 grava os hashes (23 em `ops.webhook_recebidos` às 21:2x). Conferir amanhã numa janela de 15 min.
+- **POSTs reais do C2S levando 404:** a rota responde 404; os POSTs do C2S não foram conferidos (o MCP da Vercel está sem acesso ao time, 403).
+- **Instagram de Jaguariúna (canal 25):** a busca de perfil às 20:14 deu "session invalidated because the user changed their password", mas o envio funciona (resposta às 20:37 com ✓). Acompanhar.

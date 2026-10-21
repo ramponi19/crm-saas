@@ -138,12 +138,20 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
 
 ## Depois do corte
 
-- **Dia +14** (ex.: corte em 26/10 → 09/11): apagar as `old_*`.
-  1. Dump só delas: `pg_dump -d "$con" -Fc -t public.old_leads -t public.old_clientes -t public.old_lead_mensagens -t public.old_canais_conectados -f old.dump`.
-  2. Depois: `drop table public.old_lead_mensagens, public.old_clientes, public.old_leads, public.old_canais_conectados;`. A FK já é CASCADE para `empresas` (8.9), e nenhuma FK nova aponta para elas (checagem do passo 8).
-  3. Na mesma leva:
-     - as 18 colunas de `empresas` com `COMMENT 'obsoleta'`;
-     - `segmentos_config`, `complementos_empresa`, `followups_gerados` e `lead_atribuicoes`, se o grep não achar mais leitura.
+- **Lista de morte — o que já saiu (noite de 20/10, loja fechada; volta = restaurar só a tabela/schema do dump `dumps/2026-10-21-limpeza/public.dump` de 20/10 10:42, nunca restore completo):**
+  - `old_leads`, `old_clientes`, `old_lead_mensagens`, `old_canais_conectados` (antecipado do dia +14; o dump das 10:42 tem as quatro);
+  - schemas `backup` e `evolution` (`backup.dump`, `evolution.dump`);
+  - `followups_gerados` e a régua de follow-up; `v_inventario_veiculo`;
+  - `campanhas_fidelidade`, `lista_espera`, `solicitacoes_marketing` (e as telas);
+  - o tenant 3 (Imobiliária) inteiro, por `hard_delete_empresa(3)`;
+  - 8 índices nunca usados que não cobrem FK.
+- **Lista de morte — o que fica, e até quando:**
+  - as 18 colunas de `empresas` com `COMMENT 'obsoleta'`: próxima leva;
+  - `v_orfaos_chat_midia`: sem leitor no código, próxima leva;
+  - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11;
+  - `segmentos_config`, `complementos_empresa`, `lead_atribuicoes`: **ficam**, o código lê (menu, ZapIntel/`ponte-vendas`, distribuição);
+  - ~89 índices nunca usados que cobrem FK: ficam.
+- **Toda view nova ou recriada leva `with (security_invoker = true)`.** O `create or replace view` sem a opção a apaga, e a view passa a ignorar a RLS (furo de 20/10, 2 min 44 s; ver o 06). O banco recusa (event trigger `exigir_security_invoker`) e o build também (`npm run check:views`).
 - **Views de compatibilidade:** sair conforme as telas migram para o core.
   - Regra: uma view só cai quando `grep -rn "from('<nome>')" app components lib hooks supabase/functions` volta vazio.
   - Ordem natural: as 37 views simples de módulo (renomear as chamadas para `vendas_vendas`, `estoque_produtos` etc.) → `canais_conectados` → `clientes` → `lead_mensagens` → `leads`.
