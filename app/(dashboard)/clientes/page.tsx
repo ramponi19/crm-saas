@@ -3,6 +3,7 @@ import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import ClientesView, { type ClienteImob } from './components/clientes-view'
+import { comNome } from '@/lib/sem-nome'
 
 /**
  * Clientes.
@@ -30,7 +31,7 @@ export default async function ClientesPage() {
     .eq('empresa_id', empresaId)
     .order('nome')
 
-  const clientes = clientesRaw ?? []
+  const clientes = (clientesRaw ?? []).map(comNome)
 
   // Varejo segue exatamente como estava — nenhuma consulta extra, nenhum risco.
   if (!imob) return <ClientesView clientes={clientes} />

@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import GarantiaView from './components/garantia-view'
 import type { VendaTermo } from './components/termos-view'
+import { comNomeDoCliente } from '@/lib/sem-nome'
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
@@ -113,7 +114,7 @@ export default async function GarantiaPage() {
 
   return (
     <GarantiaView
-      garantias={garantias ?? []}
+      garantias={(garantias ?? []).map(comNomeDoCliente)}
       termos={termos}
       documentos={documentos}
       empresaId={empresaId!}

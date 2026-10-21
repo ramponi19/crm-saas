@@ -65,7 +65,8 @@ async function aindaOrfaos(nomes) {
 }
 
 /**
- * A lista sai da VIEW, não da tabela de backup.
+ * A lista sai da VIEW `storage_orfaos` (a mesma da retenção; até 21/10/2026 era
+ * `v_orfaos_chat_midia`, que saiu), não da tabela de backup.
  *
  * O schema `backup` não é exposto pela API REST — de propósito: tabela de
  * auditoria não deve ser legível por cliente nenhum. E ler a fonte viva é
@@ -74,7 +75,7 @@ async function aindaOrfaos(nomes) {
  * em que a decisão foi tomada.
  */
 const { data: lista, error } = await db
-  .from('v_orfaos_chat_midia').select('name, bytes')
+  .from('storage_orfaos').select('name, bytes')
   .not('name', 'like', '%/avatares/%')
   .order('bytes', { ascending: false })
 if (error) { console.error('não consegui ler a lista:', error.message); process.exit(1) }

@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import AssistenciaView from './components/assistencia-view'
+import { comNomeDoCliente } from '@/lib/sem-nome'
 
 export default async function AssistenciaPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -17,5 +18,5 @@ export default async function AssistenciaPage() {
       .eq('ativo', true)
       .order('nome'),
   ])
-  return <AssistenciaView ordens={ordens ?? []} servicos={(servicos ?? []) as never} />
+  return <AssistenciaView ordens={(ordens ?? []).map(comNomeDoCliente)} servicos={(servicos ?? []) as never} />
 }

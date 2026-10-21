@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import FinanceiroView from '@/app/(dashboard)/financeiro/components/financeiro-view'
+import { comNomeDoCliente } from '@/lib/sem-nome'
 
 export const metadata = { title: 'Financeiro' }
 
@@ -14,5 +15,5 @@ export default async function AdminFinanceiroPage() {
       .order('created_at', { ascending: false })
       .limit(200),
   ])
-  return <FinanceiroView lancamentos={lancamentos ?? []} categorias={[]} cobrancas={cobrancas ?? []} empresaId={empresaId!} />
+  return <FinanceiroView lancamentos={lancamentos ?? []} categorias={[]} cobrancas={(cobrancas ?? []).map(comNomeDoCliente)} empresaId={empresaId!} />
 }

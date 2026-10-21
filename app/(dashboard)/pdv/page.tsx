@@ -5,6 +5,7 @@ import { Topbar } from '@/components/layout/topbar'
 import PDVView from './components/pdv-view'
 import type { EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import type { Tables } from '@/types/database'
+import { comNome } from '@/lib/sem-nome'
 
 export const metadata = { title: 'PDV' }
 
@@ -222,7 +223,7 @@ export default async function PDVPage() {
         <PDVView
           itensDisponiveis={itens}
           reservas={reservas}
-          clientes={clientes ?? []}
+          clientes={(clientes ?? []).map(comNome)}
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
           segmento={empresa?.segmento ?? null}

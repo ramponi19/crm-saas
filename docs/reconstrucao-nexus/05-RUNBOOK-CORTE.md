@@ -145,9 +145,11 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - `campanhas_fidelidade`, `lista_espera`, `solicitacoes_marketing` (e as telas);
   - o tenant 3 (Imobiliária) inteiro, por `hard_delete_empresa(3)`;
   - 8 índices nunca usados que não cobrem FK.
+- **Etapa 0 (branch `feat/etapa-0`, deploy em 22/10 à noite):**
+  - `v_orfaos_chat_midia` (migração 20261021003300; o script manual de órfãos passou a ler `storage_orfaos`). Pode rodar antes do deploy.
+  - `types/database.ts` agora é uma sobreposição de `types/database.gerado.ts` (saída crua do `supabase gen types`): as 37 views de módulo do core são tipadas como a tabela que espelham (`types/views-espelho.ts`, gerado de `supabase/testes/views_espelho.sql` por `scripts/tipos-espelho.mjs`). Regerar os dois quando o schema mudar.
 - **Lista de morte — o que fica, e até quando:**
   - as 18 colunas de `empresas` com `COMMENT 'obsoleta'`: próxima leva;
-  - `v_orfaos_chat_midia`: sem leitor no código, próxima leva;
   - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11;
   - `segmentos_config`, `complementos_empresa`, `lead_atribuicoes`: **ficam**, o código lê (menu, ZapIntel/`ponte-vendas`, distribuição);
   - ~89 índices nunca usados que cobrem FK: ficam.
@@ -161,11 +163,3 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
     - o ramo "legado" de `lib/realtime/tabelas.ts`, que passa a ler `negocios`/`mensagens` direto e deixa de reler pelas views;
     - a variável `NEXT_PUBLIC_DB_CORE`.
 - **`mensagem_registrar`:** fica. A Edge continua gravando por ela, e o corpo é a versão B.
-
-## Supabase local (`supabase start`) — desde 21/10/2026
-
-- **O que é:** Docker Desktop + `npx supabase start` na raiz do repo sobe Postgres, Auth, PostgREST, Storage e Realtime locais e aplica `supabase/migrations` num banco limpo. Desde 21/10 o resultado é **igual à produção** no `public` (103 tabelas, 46 views, 375 índices, 179 políticas, 71 gatilhos, RLS, 82 funções ignorando ``, EXECUTE, 422 grants de tabela e 12 por coluna) e fora dele (5 buckets, 13 políticas de storage, a de `realtime.messages`, publicação com 7 tabelas, 2 jobs do cron, `ops`, extensões, event triggers). Comparação feita por catálogo, sem dado.
-- **Para poupar memória:** `npx supabase start -x imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor`. Portas padrão 543xx: não sobe junto com o PostgREST/gateway da cópia (54322/54323). Desligar com `npx supabase stop --no-backup`; a VM do Docker só devolve a memória fechando o Docker Desktop.
-- **Dados para teste:** `pg_dump --data-only --disable-triggers -n public` da cópia (sem as tabelas que já saíram) + `auth.users` à parte, carregados como `supabase_admin` (com `on_auth_user_created` desligado durante a carga). JWT de teste: HS256 com o segredo local que o `supabase start` imprime.
-- **⚠ NUNCA `supabase link` + `supabase db push` (ou `migration repair`) contra a produção.** O histórico de migrações da produção guarda o horário em que o MCP aplicou cada uma, não o nome do arquivo; a CLI acharia todas pendentes. Migração em produção continua pelo `apply_migration` do MCP.
-- **Por que valeu:** pegou antes do deploy a troca de texto da `20261021003500` que não casava com CRLF (o psql do Windows mascarava) e o `check-views` que quebraria o build com SQL dinâmico.

@@ -4,6 +4,7 @@ import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 import type { NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
 import FinanceiroView from './components/financeiro-view'
+import { comNomeDoCliente } from '@/lib/sem-nome'
 
 export default async function FinanceiroPage() {
   const { role } = await requireEmpresaRole(['owner', 'admin'])
@@ -134,7 +135,7 @@ export default async function FinanceiroPage() {
     <FinanceiroView
       lancamentos={lancamentos ?? []}
       categorias={[]}
-      cobrancas={cobrancas ?? []}
+      cobrancas={(cobrancas ?? []).map(comNomeDoCliente)}
       empresaId={empresaId!}
       faturamentoVendas={faturamentoVendas}
       qtdVendas={(vendasMes ?? []).length}

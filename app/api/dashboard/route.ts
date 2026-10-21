@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { escopoDoUsuario, aplicarEscopo } from '@/lib/escopo'
+import { SEM_NOME } from '@/lib/sem-nome'
 
 function getPeriodStarts(): Record<string, Date> {
   const now = new Date()
@@ -101,7 +102,7 @@ export async function GET() {
     .filter((u): u is { id: string; nome: string } => Boolean(u?.id))
 
   // Maps para lookup rápido
-  const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string }) => [c.id, c.nome]))
+  const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string | null }) => [c.id, c.nome ?? SEM_NOME]))
   const vendedorMap = Object.fromEntries(vendedores.map((u: { id: string; nome: string }) => [u.id, u.nome]))
   const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string | null; meta_vendas_valor: number | null }) => [m.usuario_id, m.meta_vendas_valor]))
 

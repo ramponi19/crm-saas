@@ -106,7 +106,7 @@ export function AutomacoesCard() {
         etapa_slug: etapaSlug || null,
         horas: gatilho === 'parado_x_horas' ? Math.max(1, Number(horas) || 48) : null,
         acao,
-        config: config as Json,
+        config: config as NonNullable<Json>,
         ativo: true,
       })
       if (error) throw new Error(error.message)

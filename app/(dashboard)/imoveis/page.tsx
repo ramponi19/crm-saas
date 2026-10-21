@@ -3,6 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { normalizarSegmento } from '@/lib/segmentos'
 import type { ChaveDoImovel } from './imoveis-view'
 import ImoveisView from './imoveis-view'
+import { comNome } from '@/lib/sem-nome'
 
 export const metadata = { title: 'Imóveis' }
 
@@ -53,7 +54,7 @@ export default async function ImoveisPage() {
   return (
     <ImoveisView
       inicial={imoveis ?? []}
-      proprietarios={proprietarios ?? []}
+      proprietarios={(proprietarios ?? []).map(comNome)}
       equipe={equipe}
       empresaId={empresaId}
       slug={empresa?.slug ?? ''}

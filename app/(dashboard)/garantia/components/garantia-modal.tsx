@@ -6,6 +6,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
+import { comNome } from '@/lib/sem-nome'
 
 interface Garantia {
   id?: number
@@ -82,7 +83,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
   useEffect(() => {
     if (!empresaId) return
-    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(data ?? []))
+    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
     supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
   }, [empresaId])
 

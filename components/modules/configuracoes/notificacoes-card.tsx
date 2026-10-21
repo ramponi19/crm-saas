@@ -51,7 +51,7 @@ export function NotificacoesCard() {
     setLoading(true)
     const { error } = await supabase
       .from('notificacao_prefs')
-      .upsert({ usuario_id: userId, prefs: prefs as unknown as Json }, { onConflict: 'usuario_id' })
+      .upsert({ usuario_id: userId, prefs: prefs as unknown as NonNullable<Json> }, { onConflict: 'usuario_id' })
     setLoading(false)
     if (error) { notify.bad('Erro ao salvar preferências'); return }
     notify.ok('Preferências de notificação salvas')

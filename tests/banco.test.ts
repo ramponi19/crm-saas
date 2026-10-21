@@ -48,7 +48,7 @@ describe('banco (BANCO=1)', { skip: !ligado && 'defina BANCO=1 para rodar' }, ()
   })
 
   test('nada sensível exposto à chave pública', async () => {
-    for (const t of ['leads', 'lead_mensagens', 'zapintel_lead_perfil', 'zapintel_venda_lead', 'zapintel_midia_retida', 'v_orfaos_chat_midia', 'assistente_config']) {
+    for (const t of ['leads', 'lead_mensagens', 'zapintel_lead_perfil', 'zapintel_venda_lead', 'zapintel_midia_retida', 'storage_orfaos', 'assistente_config']) {
       const { data } = await anon.from(t).select('*').limit(1)
       assert.equal((data ?? []).length, 0, `${t} não pode devolver linhas ao anônimo`)
     }

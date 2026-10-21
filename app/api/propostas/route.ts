@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     empresa_id: empresaId,
     cliente_nome: (body.cliente_nome ?? '').trim(),
     lead_id: body.lead_id ?? null,
-    itens: itens as unknown as Json,
+    itens: itens as unknown as NonNullable<Json>,
     observacoes: body.observacoes?.trim() || null,
     total,
     status: 'rascunho',

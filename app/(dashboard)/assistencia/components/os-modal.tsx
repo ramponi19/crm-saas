@@ -7,6 +7,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
+import { comNome } from '@/lib/sem-nome'
 
 interface Cobranca {
   id: number
@@ -225,7 +226,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   useEffect(() => {
     if (!empresaId) return
-    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(data ?? []))
+    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
     supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
     supabase.from('servicos_reparo').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
   }, [empresaId])
