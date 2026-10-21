@@ -350,7 +350,7 @@ echo "== painel executivo (19/08) =="
 # Padroes escolhidos para NAO casarem com comentario: sao trechos de codigo
 # executavel (chamada, chave de objeto, expressao), nunca prosa minha.
 v "executivo exige dono ou admin"     "app/(dashboard)/executivo/page.tsx" "await requireEmpresaRole(.'owner', 'admin'.)"
-v "executivo trava por capacidade"    "app/(dashboard)/executivo/page.tsx" "cfgSeg.capacidades.comissaoPorNegocio) redirect"
+v "executivo trava por capacidade"    "app/(dashboard)/executivo/page.tsx" "cfgSeg.capacidades.comissaoPorNegocio) return <VitrineDoModulo"
 v "executivo no menu e opcional"      "lib/menu.ts" "href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true"
 v "icone do executivo no mapa"        "components/layout/menu-icons.ts" "Landmark,"
 v "comissao respeita papel vago"      "lib/comissao-imob.ts" "temCaptador ? arredonda"
@@ -538,6 +538,15 @@ v "stripe reconcilia num lugar so"      "app/api/superadmin/sync-stripe/route.ts
 v "cron usa a mesma reconciliacao"      "app/api/cron/[job]/route.ts" "reconciliarAssinaturas(supabase)"
 v "previews do superadmin num lugar so" "app/api/superadmin/laboratorio/preview/route.ts" "entrarNaEmpresaDePreview(null)"
 v "relatorio conta lucro so com custo"  "components/modules/relatorios/relatorios-view.tsx" "resultadoDasVendas("
+# 21/10/2026 (etapa 0, 2.5): modulo desligado = vitrine (rewrite), nao redirect;
+# a trava passa a somar o que o superadmin liga por empresa.
+v "modulo desligado vira vitrine"       "proxy.ts" "NextResponse.rewrite(new URL(`/vitrine${modulo}`"
+v "trava ve a liberacao por empresa"    "proxy.ts" "camadasDoMenu(menu?.itens).superadmin?.habilitados"
+v "agenda sem capacidade mostra vitrine" "app/(dashboard)/agenda/page.tsx" "<VitrineDoModulo href=\"/agenda\" />"
+v "executivo sem capacidade vitrine"    "app/(dashboard)/executivo/page.tsx" "<VitrineDoModulo href=\"/executivo\" />"
+v "vitrine diz que numero e exemplo"    "components/modulos/vitrine.tsx" "Números de exemplo"
+v "pedido so de dono ou admin"          "app/api/modulos/pedido/route.ts" "requireOwnerOrAdminApi()"
+v "ativar so do superadmin"             "app/api/modulos/ativar/route.ts" "requireSuperAdminApi()"
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
@@ -44,7 +44,8 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   const cfgSeg = SEGMENTOS[normalizarSegmento(empresa?.segmento)]
   // Capacidade, não nome de segmento: outra vertical que tenha negócio fechado por
   // imóvel liga a mesma flag e herda a tela.
-  if (!cfgSeg.capacidades.comissaoPorNegocio) redirect('/dashboard')
+  // Sem a capacidade, a vitrine (etapa 0) em vez do dashboard.
+  if (!cfgSeg.capacidades.comissaoPorNegocio) return <VitrineDoModulo href="/executivo" />
 
   const { tipo } = await searchParams
   const filtro: Filtro = tipo === 'venda' || tipo === 'locacao' ? tipo : 'ambos'

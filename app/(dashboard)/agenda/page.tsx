@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import AgendaView from './agenda-view'
@@ -24,7 +25,9 @@ export default async function AgendaPage() {
    * precisaria editar esta página. Quem marca compromisso é quem declara
    * `agendaVisitas` ou `agendaClinica`.
    */
-  if (!cap.agendaVisitas && !cap.agendaClinica) redirect('/dashboard')
+  // Sem a capacidade, a vitrine (etapa 0) — não o dashboard: quem abriu fica
+  // sabendo o que é a Agenda e que o segmento dele ainda não a tem.
+  if (!cap.agendaVisitas && !cap.agendaClinica) return <VitrineDoModulo href="/agenda" />
 
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')

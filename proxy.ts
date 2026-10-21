@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { moduloDaRota } from '@/lib/menu'
-import { segOverrideDoPreset, type PresetRow } from '@/lib/empresa-config'
+import { segOverrideDoPreset, camadasDoMenu, type PresetRow } from '@/lib/empresa-config'
+import { temVitrine } from '@/lib/modulos-vitrine'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -254,13 +255,28 @@ export async function proxy(request: NextRequest) {
     // trava olha o segmento da empresa (inclusive a de preview, quando ele está
     // impersonando): sem esta saída, o laboratório barraria justamente quem está
     // fazendo a página.
+    //
+    // EXCETO nos módulos com vitrine (etapa 0): ali o superadmin vê o mesmo que o
+    // dono, e é da vitrine que ele liga o módulo. São módulos prontos, não
+    // construção — o motivo da passagem livre não se aplica a eles.
+    const vitrine = temVitrine(modulo)
     const { data: eu } = await supabase.from('usuarios').select('is_super_admin').eq('id', user!.id).maybeSingle()
-    if (eu?.is_super_admin) return supabaseResponse
+    if (eu?.is_super_admin && !vitrine) return supabaseResponse
 
     const habilitados = await modulosHabilitados(supabase)
     // habilitados === null => não deu para saber. Passa direto: derrubar o CRM
     // inteiro por uma consulta que falhou é muito pior do que uma tela a mais.
     if (habilitados && !habilitados.has(modulo)) {
+      /**
+       * MÓDULO DESLIGADO = VITRINE, NÃO REDIRECT (etapa 0). Agenda, Executivo e
+       * Gestão de Leads mostram o que fazem e o botão de ativar, no mesmo
+       * endereço. Os demais módulos seguem caindo no dashboard com o aviso.
+       */
+      if (vitrine) {
+        const destino = NextResponse.rewrite(new URL(`/vitrine${modulo}`, request.url))
+        supabaseResponse.cookies.getAll().forEach((c) => destino.cookies.set(c))
+        return destino
+      }
       const url = new URL('/dashboard', request.url)
       url.searchParams.set('indisponivel', modulo)
       return NextResponse.redirect(url)
@@ -294,7 +310,15 @@ async function modulosHabilitados(
     const lista = segOverrideDoPreset(preset as PresetRow | null)?.habilitados
     if (!Array.isArray(lista) || lista.length === 0) return null
 
-    const habilitados = new Set(lista)
+    /**
+     * + o que o superadmin ligou SÓ PARA ESTA EMPRESA (empresa_menu.itens.superadmin
+     * .habilitados) — a mesma camada 3 do menu. Sem isto, o módulo ligado por
+     * empresa aparecia no menu e a trava barrava a rota (etapa 0, achado ao fazer
+     * o "Ativar" da vitrine).
+     */
+    const { data: menu } = await supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
+    const porEmpresa = camadasDoMenu(menu?.itens).superadmin?.habilitados ?? []
+    const habilitados = new Set([...lista, ...porEmpresa])
     cacheModulos.set(empresaId as number, { habilitados, expira: Date.now() + TTL_MODULOS_MS })
     return habilitados
   } catch {

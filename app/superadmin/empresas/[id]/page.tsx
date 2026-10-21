@@ -11,6 +11,7 @@ import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
+import { VITRINES } from '@/lib/modulos-vitrine'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -78,6 +79,13 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   // Complemento pago (ZapIntel): módulo 'inteligencia' de empresa_modulos, que já
   // veio com as camadas (era complementos_empresa até 21/10/2026).
   const zapintelLigado = moduloLigado(camadas.modulos, MODULO_INTELIGENCIA)
+
+  // Pedidos de módulo feitos pelo dono na vitrine (etapa 0, 2.5). Ativar é
+  // entrar na empresa e clicar "Ativar" na própria vitrine.
+  const { data: pedidosRaw } = await svc.from('modulo_pedidos')
+    .select('id, modulo, pedido_em, usuario:usuarios!modulo_pedidos_pedido_por_fkey(nome)')
+    .eq('empresa_id', empresaId).is('atendido_em', null).order('pedido_em')
+  const pedidos = (pedidosRaw ?? []) as unknown as Array<{ id: number; modulo: string; pedido_em: string; usuario: { nome: string | null } | null }>
 
   // Usuários membros
   const { data: membrosRaw } = await svc
@@ -170,6 +178,20 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           )
         })}
       </div>
+
+      {pedidos.length > 0 && (
+        <Card title={`Pedidos de módulo (${pedidos.length})`} className="mb-5">
+          <div className="flex flex-col gap-2">
+            {pedidos.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                <Badge tone="warn">{VITRINES[p.modulo]?.nome ?? p.modulo}</Badge>
+                <span className="text-ink-2">pedido por {p.usuario?.nome ?? 'alguém da loja'} em {fmtData(p.pedido_em)}</span>
+              </div>
+            ))}
+            <p className="mt-1 text-[11.5px] text-ink-3">Para ativar: entre na empresa e abra o módulo — a vitrine tem o botão &quot;Ativar&quot;.</p>
+          </div>
+        </Card>
+      )}
 
       {/* Saúde da conta */}
       <Card title="Cobrança & atividade" className="mb-5">

@@ -2381,6 +2381,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"modulo_pedidos": {
+                  Row: {
+                    "atendido_em": string | null,"atendido_por": string | null,"empresa_id": number,"id": number,"modulo": string,"pedido_em": string,"pedido_por": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id": number,"id"?: never,"modulo": string,"pedido_em"?: string,"pedido_por"?: string | null
+                  }
+                  Update: {
+                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id"?: number,"id"?: never,"modulo"?: string,"pedido_em"?: string,"pedido_por"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "modulo_pedidos_atendido_por_fkey"
+      columns: ["atendido_por"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "modulo_pedidos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "modulo_pedidos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "v_empresas_plano"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "modulo_pedidos_pedido_por_fkey"
+      columns: ["pedido_por"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"motivos_perda": {
                   Row: {
                     "ativo": boolean,"created_at": string,"empresa_id": number,"id": number,"label": string,"ordem": number
