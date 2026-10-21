@@ -20,6 +20,7 @@ import { join } from 'node:path'
 
 const DIR = process.argv[2] ?? 'supabase/migrations'
 const estado = new Map() // view -> { invoker: boolean, onde: string }
+const dinamicas = new Set() // migrações com view criada por SQL dinâmico (não avaliáveis aqui)
 
 const semComentarios = (sql) => sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 const nome = (n) => n.replace(/"/g, '').replace(/^public\./i, '').toLowerCase()
@@ -29,6 +30,16 @@ for (const arq of readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()) {
   const sql = semComentarios(readFileSync(join(DIR, arq), 'utf8'))
   const re = /\b(create\s+(?:or\s+replace\s+)?(?:temp(?:orary)?\s+)?(?:recursive\s+)?view|alter\s+view(?:\s+if\s+exists)?|drop\s+view(?:\s+if\s+exists)?)\s+((?:"?public"?\.)?"?[a-z_][a-z0-9_]*"?(?:\s*,\s*(?:"?public"?\.)?"?[a-z_][a-z0-9_]*"?)*)([\s\S]*?)(?:;|\bas\b)/gi
   for (const m of sql.matchAll(re)) {
+    /**
+     * SQL DINÂMICO (`format('create view public.%I ...')`): o nome só existe na hora de
+     * rodar, e este leitor de texto não tem como saber qual view é. Sem isto, o regex lia
+     * "public" como nome de view e o build falhava — aconteceu com a 20261021000050, que
+     * traz o script do corte (as 37 views de módulo saem de format). Fica de fora daqui;
+     * quem garante esses casos é o banco: a 20261021002900 liga a opção em toda view de
+     * public e instala o event trigger `exigir_security_invoker`, que recusa o resto. No
+     * `supabase start` local dá para conferir em pg_class.reloptions (45 de 45 em 21/10).
+     */
+    if (/^\s*\.\s*%/.test(m[3])) { dinamicas.add(arq); continue }
     const verbo = m[1].toLowerCase()
     const nomes = m[2].split(',').map((s) => s.trim())
     // só public: nome qualificado com outro schema fica de fora; sem schema, é public
@@ -55,3 +66,4 @@ if (sem.length) {
   process.exit(1)
 }
 console.log(`✓ views: ${estado.size} em public, todas com security_invoker`)
+if (dinamicas.size) console.log(`  (SQL dinâmico não avaliado aqui; garantido no banco pela 20261021002900 e pelo event trigger: ${[...dinamicas].join(', ')})`)
