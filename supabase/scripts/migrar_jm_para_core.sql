@@ -240,6 +240,8 @@ begin
     and (select count(*) from empresa_menu) = migracao.o('empresas')
     and (select count(*) from empresa_dados_contrato) = migracao.o('empresas'),
     format('%s empresas; branding/menu/dados_contrato uma linha por empresa', (select count(*) from empresas)));
+  -- ETAPA 0 (22/10/2026): segmentos_config saiu (20261022000100). Esta checagem só vale no corte;
+  -- a equivalente hoje é scripts/comparar-menu.mts (menu idêntico lido do legado e do core).
   perform migracao.afirmar(1, 'presets', (select count(*) from presets_onboarding) = migracao.o('segmentos_config'),
     format('%s presets (segmentos_config: %s)', (select count(*) from presets_onboarding), migracao.o('segmentos_config')));
   select string_agg(modulo, ', ' order by modulo) into v_jm from empresa_modulos where empresa_id = 1 and ativo;

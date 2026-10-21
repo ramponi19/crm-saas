@@ -13,8 +13,7 @@ import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { normalizarSegmento, SEGMENTOS } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import type { MenuOverridesSuperadmin, MenuOverrideRow, MenuConfigDono, SegOverride } from '@/lib/menu'
-import type { ModuloPlano } from '@/lib/plano'
+import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
@@ -40,7 +39,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; segmento?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; modulos_override?: unknown; menu_override?: unknown; menu_config?: unknown; permissoes?: unknown } | null = null
+  let empresa: { nome: string; plano?: string | null; segmento?: string | null; preset_onboarding?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
   let empresaId: number | undefined
@@ -49,7 +48,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes')
+      .select('nome, plano, segmento, preset_onboarding, wl_cor, wl_logo_url, wl_menu, permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -60,7 +59,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, segmento, wl_cor, wl_logo_url, wl_menu, modulos_override, menu_override, menu_config, permissoes)')
+      .select('role, empresa:empresas(id, nome, plano, segmento, preset_onboarding, wl_cor, wl_logo_url, wl_menu, permissoes)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -73,7 +72,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; segmento: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; modulos_override: unknown; menu_override: unknown; menu_config: unknown; permissoes: unknown } | null
+      empresa: { nome: string; plano: string | null; segmento: string | null; preset_onboarding: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -104,33 +103,16 @@ export default async function DashboardLayout({
     .eq('ativo', true)
     .eq('kanban_status', 'novo')
 
-  // Camadas 3 (override do superadmin) e 4 (config do dono) do resolverMenu.
-  const mo = (empresa?.menu_override ?? null) as MenuOverrideRow | null
   // Enforcement de permissão do papel: esconde itens que o papel não pode ver.
   const perms = permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null)
   const permHidden: string[] = []
   if (!perms.verFinanceiro) permHidden.push('/financeiro')
   if (!perms.verRelatorios) permHidden.push('/relatorios')
-  const menuOverrides: MenuOverridesSuperadmin = {
-    modulos: (empresa?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
-    hidden: [...(mo?.hidden ?? []), ...permHidden],
-    labels: mo?.labels,
-    habilitados: mo?.habilitados,
-  }
-  const menuConfig = (empresa?.menu_config ?? undefined) as MenuConfigDono | undefined
 
-  // Camada 1 dinâmica: config do segmento vinda de segmentos_config (fallback = estático).
-  const { data: segCfg } = await supabase
-    .from('segmentos_config')
-    .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados, menu_layout')
-    .eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
-  const segOverride: SegOverride | undefined = segCfg ? {
-    hiddenHrefs: (segCfg.hidden_hrefs ?? []) as string[],
-    labelOverrides: (segCfg.label_overrides ?? {}) as Record<string, string>,
-    modulosExtra: (segCfg.modulos_extra ?? []) as { href: string; label: string; icon: string }[],
-    habilitados: (segCfg.modulos_habilitados ?? undefined) as string[] | undefined,
-    menuLayout: (segCfg.menu_layout ?? undefined) as Record<string, string[]> | undefined,
-  } : undefined
+  // Camadas do resolverMenu, lidas do core (presets_onboarding, empresa_menu,
+  // empresa_modulos) — ver lib/empresa-config.ts.
+  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
+  const { overrides: menuOverrides, configDono: menuConfig, segOverride, rotulos } = camadasParaMenu(cfg, permHidden)
 
   return (
     <EmpresaProvider>
@@ -192,7 +174,7 @@ export default async function DashboardLayout({
             Mesma precedência do menu: segmento, depois superadmin, depois o dono —
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
-          <RotulosProvider valor={{ ...(segOverride?.labelOverrides ?? {}), ...(mo?.labels ?? {}), ...(menuConfig?.labels ?? {}) }}>
+          <RotulosProvider valor={rotulos}>
             <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
           </RotulosProvider>
         </div>

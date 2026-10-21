@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
+import { gravarCamadaMenu } from '@/lib/empresa-config'
 
 /**
  * Nada é fixo — e a lista vazia aqui é intencional.
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
   const menu_config = { hidden, labels, ordem }
 
   const service = createServiceClient()
-  const { error } = await service.from('empresas').update({ menu_config: menu_config as never }).eq('id', empresaId)
+  // A camada do dono em empresa_menu.itens.dono (era empresas.menu_config até 21/10/2026).
+  const { error } = await gravarCamadaMenu(service, empresaId, 'dono', menu_config)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

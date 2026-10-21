@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { resolverMenu, type MenuConfigDono, type MenuOverrideRow } from '@/lib/menu'
+import { resolverMenu } from '@/lib/menu'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
-import type { ModuloPlano } from '@/lib/plano'
+import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
 
 // Rota neutra pós-login: decide o destino conforme o papel do usuário.
 // Super admin → painel global; dono/admin da empresa → painel de administração;
@@ -41,7 +41,7 @@ export default async function EntrarPage() {
   // Saúde: a Agenda é a tela inicial do segmento (consultas do dia).
   const { data: emp } = await supabase
     .from('empresas')
-    .select('segmento, plano, permissoes, menu_config, menu_override, modulos_override')
+    .select('segmento, preset_onboarding, plano, permissoes')
     .eq('id', vinculo.empresa_id).maybeSingle()
   // Tela inicial do segmento (clínica abre a agenda, não o dashboard). Vem do
   // contrato: um segmento novo declara a sua sem tocar nesta rota.
@@ -59,30 +59,18 @@ export default async function EntrarPage() {
    * sobrou. Sem nenhum item visível (menu todo oculto), cai no /dashboard: é
    * melhor abrir algo do que deixar o login sem destino.
    */
-  const { data: segCfg } = await supabase
-    .from('segmentos_config')
-    .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados')
-    .eq('chave', emp?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
-
-  const mo = (emp?.menu_override ?? null) as MenuOverrideRow | null
+  const cfg = await carregarConfigEmpresa(supabase, vinculo.empresa_id, emp?.preset_onboarding ?? null)
+  const { overrides, configDono, segOverride } = camadasParaMenu(cfg)
   const grupos = resolverMenu({
     segmento: normalizarSegmento(emp?.segmento),
     plano: emp?.plano ?? undefined,
     role: vinculo.role ?? 'vendedor',
     isSuperAdmin: false,
-    overrides: {
-      modulos: (emp?.modulos_override ?? undefined) as Partial<Record<ModuloPlano, boolean>> | undefined,
-      hidden: mo?.hidden ?? [],
-      labels: mo?.labels,
-      habilitados: mo?.habilitados,
-    },
-    configDono: (emp?.menu_config ?? undefined) as MenuConfigDono | undefined,
-    segOverride: segCfg ? {
-      hiddenHrefs: (segCfg.hidden_hrefs ?? []) as string[],
-      labelOverrides: (segCfg.label_overrides ?? {}) as Record<string, string>,
-      modulosExtra: (segCfg.modulos_extra ?? []) as { href: string; label: string; icon: string }[],
-      habilitados: (segCfg.modulos_habilitados ?? undefined) as string[] | undefined,
-    } : undefined,
+    overrides,
+    configDono,
+    // Sem a ordem do superadmin, como sempre foi aqui: o primeiro item de quem
+    // entra não muda com a troca de fonte (21/10/2026).
+    segOverride: segOverride ? { ...segOverride, menuLayout: undefined } : undefined,
   })
   const primeiro = grupos.flatMap((g) => g.items).find((i) => !i.locked)?.href
   redirect(primeiro ?? '/dashboard')

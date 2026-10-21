@@ -112,6 +112,8 @@ export async function POST(req: Request) {
       slug,
       plano: planoId,
       segmento: normalizarSegmento(body.segmento),
+      // O menu lê o preset desde 21/10/2026; os 7 segmentos do código têm preset.
+      preset_onboarding: normalizarSegmento(body.segmento),
       status: 'ativo',
       cnpj: body.cnpj || null,
       telefone: body.telefone || null,

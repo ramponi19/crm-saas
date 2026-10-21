@@ -26,7 +26,7 @@ export async function POST() {
 
   if (!empresa) {
     const { data: nova, error } = await svc.from('empresas').insert({
-      nome: 'Laboratório', slug: PREVIEW_SLUG, segmento: 'varejo', status: 'ativo', demo: true,
+      nome: 'Laboratório', slug: PREVIEW_SLUG, segmento: 'varejo', preset_onboarding: 'varejo', status: 'ativo', demo: true,
     } as never).select('id').single()
     if (error || !nova) {
       return NextResponse.json({ error: `Falha ao preparar o laboratório: ${error?.message ?? '—'}` }, { status: 500 })

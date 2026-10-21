@@ -5,6 +5,7 @@ import { moduloDoSegmento, SEGMENTOS, normalizarSegmento } from '@/lib/segmentos
 import { imoveisCaptadosPorPessoa } from '@/lib/captacao-imob'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import { RankingView, type MetaUi, type MembroOpt } from './ranking-view'
+import { segOverrideDoPreset, type PresetRow } from '@/lib/empresa-config'
 
 export const metadata = { title: 'Ranking & Metas' }
 
@@ -25,19 +26,19 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const [{ data: vinculo }, { data: usuario }, { data: empresa }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento, preset_onboarding').eq('id', empresaId).maybeSingle(),
   ])
 
   /**
    * A config do BANCO manda, com o código como reserva.
    *
-   * `segmentos_config.modulos_extra` é o que o `resolverMenu` usa para montar o menu.
+   * Os extras do preset (presets_onboarding, era segmentos_config até 21/10/2026) são o que o `resolverMenu` usa para montar o menu.
    * Se esta trava olhasse só o código, bastaria alguém mexer no banco para o item
    * sumir do menu e a página seguir aberta — ou o contrário, item levando a redirect.
    */
-  const { data: segCfg } = await supabase.from('segmentos_config')
-    .select('modulos_extra').eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
-  const extrasBanco = segCfg?.modulos_extra as { href?: string }[] | null | undefined
+  const { data: preset } = await supabase.from('presets_onboarding')
+    .select('chave, rotulos').eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
+  const extrasBanco = segOverrideDoPreset(preset as PresetRow | null)?.modulosExtra as { href?: string }[] | null | undefined
   const isAdmin = !!(usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin')
 
   /**

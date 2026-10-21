@@ -10,7 +10,8 @@ import {
 } from '@/components/modules/orcamentos/orcamento-editor-modal'
 import { TrocaModal, type UnidadeEstoque } from '@/components/modules/orcamentos/troca-modal'
 import type { ValoresDoModelo } from '@/components/modules/orcamentos/avaliar-aparelho'
-import { temHrefLiberado, HREF_COTACAO_TROCA, type MenuOverrideRow } from '@/lib/menu'
+import { temHrefLiberado, HREF_COTACAO_TROCA } from '@/lib/menu'
+import { camadasDoMenu } from '@/lib/empresa-config'
 import { chaveLinha } from '@/lib/troca-modelos'
 
 interface Orc {
@@ -86,7 +87,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
         .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
         .eq('lead_id', leadId).order('created_at', { ascending: false }),
       empresaId
-        ? supabase.from('empresas').select('menu_override').eq('id', empresaId).maybeSingle()
+        ? supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
         : Promise.resolve({ data: null }),
     ])
 
@@ -95,7 +96,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
       const c = Array.isArray(o.troca_cotacoes) ? o.troca_cotacoes[0] : o.troca_cotacoes
       return { ...o, total: Number(o.total) || 0, valor_devolver: Number(o.valor_devolver) || 0, numero_cotacao: c?.numero ?? null }
     }))
-    setTrocaLiberada(temHrefLiberado((emp?.menu_override ?? null) as MenuOverrideRow | null, HREF_COTACAO_TROCA))
+    setTrocaLiberada(temHrefLiberado(camadasDoMenu(emp?.itens).superadmin, HREF_COTACAO_TROCA))
     setCarregou(true)
   }, [leadId, supabase])
   useEffect(() => { carregar() }, [carregar])

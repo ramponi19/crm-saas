@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { moduloDaRota } from '@/lib/menu'
+import { segOverrideDoPreset, type PresetRow } from '@/lib/empresa-config'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -279,14 +280,16 @@ async function modulosHabilitados(
     const cached = cacheModulos.get(empresaId as number)
     if (cached && cached.expira > Date.now()) return cached.habilitados
 
+    // A lista do segmento mora no preset (presets_onboarding.rotulos._menu) desde
+    // 21/10/2026 — ver lib/empresa-config.ts. Mesma lista, mesma regra.
     const { data: empresa } = await supabase
-      .from('empresas').select('segmento').eq('id', empresaId).single()
-    const { data: seg } = await supabase
-      .from('segmentos_config').select('modulos_habilitados')
-      .eq('chave', empresa?.segmento ?? 'varejo').eq('ativo', true).maybeSingle()
+      .from('empresas').select('preset_onboarding').eq('id', empresaId).single()
+    const { data: preset } = await supabase
+      .from('presets_onboarding').select('chave, rotulos')
+      .eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
 
     // Segmento sem lista configurada não é motivo para bloquear nada.
-    const lista = seg?.modulos_habilitados as string[] | null | undefined
+    const lista = segOverrideDoPreset(preset as PresetRow | null)?.habilitados
     if (!Array.isArray(lista) || lista.length === 0) return null
 
     const habilitados = new Set(lista)

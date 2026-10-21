@@ -2855,20 +2855,6 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
-                },"segmentos_config": {
-                  Row: {
-                    "ativo": boolean,"chave": string,"created_at": string,"descricao": string | null,"hidden_hrefs": NonNullable<Json>,"label": string,"label_overrides": NonNullable<Json>,"menu_layout": NonNullable<Json>,"modulos_extra": NonNullable<Json>,"modulos_habilitados": Json | null,"ordem": number
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "ativo"?: boolean,"chave": string,"created_at"?: string,"descricao"?: string | null,"hidden_hrefs"?: NonNullable<Json>,"label": string,"label_overrides"?: NonNullable<Json>,"menu_layout"?: NonNullable<Json>,"modulos_extra"?: NonNullable<Json>,"modulos_habilitados"?: Json | null,"ordem"?: number
-                  }
-                  Update: {
-                    "ativo"?: boolean,"chave"?: string,"created_at"?: string,"descricao"?: string | null,"hidden_hrefs"?: NonNullable<Json>,"label"?: string,"label_overrides"?: NonNullable<Json>,"menu_layout"?: NonNullable<Json>,"modulos_extra"?: NonNullable<Json>,"modulos_habilitados"?: Json | null,"ordem"?: number
-                  }
-                  Relationships: [
-                    
-                  ]
                 },"stripe_eventos": {
                   Row: {
                     "empresa_id": number | null,"id": string,"payload": Json | null,"processado_em": string | null,"tipo": string

@@ -501,13 +501,12 @@ v "menu rola ate o item ativo"         "components/layout/nav-rolavel.tsx" "scro
 v "aviso de conteudo escondido"        "components/layout/nav-rolavel.tsx" "cortado.abaixo"
 v "item ativo marcado no CRM"          "components/layout/sidebar.tsx" "data-ativo={isActive || undefined}"
 v "rodape nao encolhe"                 "components/layout/sidebar.tsx" "shrink-0 px-3 py-2.5"
-v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "segmentos_config"
-# 21/10/2026: tarefas tem duas chaves para negocios desde o corte; embed sem o
-# nome da chave e PGRST201 (lista vazia, criar tarefa falha calado).
-n "lista de tarefas sem embed ambiguo"   "app/(dashboard)/tarefas/page.tsx" "leads(nome)"
-n "criar tarefa sem embed ambiguo"      "app/(dashboard)/tarefas/tarefas-view.tsx" "leads(nome)"
-n "painel imob sem embed ambiguo"       "app/(dashboard)/dashboard/dashboard-imob.tsx" "vencimento, leads(nome)"
-n "follow-ups do painel sem ambiguo"    "components/modules/dashboard/dashboard-view.tsx" "vencimento, leads(nome)"
+v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "carregarConfigEmpresa(supabase, empresaId"
+# 21/10/2026: o segmento e as camadas vem do core (lib/empresa-config.ts); o menu
+# do CRM, a trava de rota e esta tela leem a mesma funcao.
+v "menu le as camadas do core"         "app/(dashboard)/layout.tsx" "carregarConfigEmpresa(supabase"
+v "trava le o preset"                  "proxy.ts" "presets_onboarding"
+v "superadmin nao apaga habilitados"   "app/api/superadmin/empresas/[id]/overrides/route.ts" "PRESERVA o que existe"
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

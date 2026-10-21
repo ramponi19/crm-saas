@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { temHrefLiberado, HREF_COTACAO_TROCA, type MenuOverrideRow } from '@/lib/menu'
+import { temHrefLiberado, HREF_COTACAO_TROCA } from '@/lib/menu'
+import { camadasDoMenu } from '@/lib/empresa-config'
 
 /**
  * Reexportado para as telas de servidor que só falam com este módulo.
@@ -20,6 +21,7 @@ export { HREF_COTACAO_TROCA }
 export async function cotacaoDeTrocaLiberada(): Promise<boolean> {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   if (!empresaId) return false
-  const { data } = await supabase.from('empresas').select('menu_override').eq('id', empresaId).maybeSingle()
-  return temHrefLiberado((data?.menu_override ?? null) as MenuOverrideRow | null, HREF_COTACAO_TROCA)
+  // A camada do superadmin mora em empresa_menu.itens.superadmin desde 21/10/2026.
+  const { data } = await supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
+  return temHrefLiberado(camadasDoMenu(data?.itens).superadmin, HREF_COTACAO_TROCA)
 }

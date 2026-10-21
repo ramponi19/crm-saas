@@ -11,6 +11,7 @@ import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa } from '@/lib/empresa-config'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -71,6 +72,9 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
     .single()
 
   if (!empresa) notFound()
+
+  // Camadas de menu e módulos forçados: do core desde 21/10/2026 (lib/empresa-config.ts).
+  const camadas = await carregarConfigEmpresa(svc, empresaId, empresa.preset_onboarding ?? null)
 
   // Complemento pago (ZapIntel): estado na tabela autocontida
   // complementos_empresa, lida via client do complemento (fora dos tipos do CRM).
@@ -233,8 +237,8 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
       <div className="mb-5">
         <ControleEmpresa
           empresaId={empresaId}
-          modulosInit={(empresa.modulos_override ?? null) as Record<string, boolean> | null}
-          menuOverrideInit={(empresa.menu_override ?? null) as { hidden?: string[]; labels?: Record<string, string> } | null}
+          modulosInit={(camadas.forcados ?? null) as Record<string, boolean> | null}
+          menuOverrideInit={camadas.superadmin}
           items={resolverMenu({ segmento: normalizarSegmento(empresa.segmento), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
             .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
           limiteUsuariosInit={empresa.limite_usuarios ?? 0}

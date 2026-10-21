@@ -22,19 +22,21 @@ export async function POST(_req: Request, { params }: { params: Promise<{ chave:
   const svc = createServiceClient()
 
   // Segmento precisa existir na config
-  const { data: seg } = await svc.from('segmentos_config').select('chave, label').eq('chave', chave).maybeSingle()
-  if (!seg) return NextResponse.json({ error: 'Segmento não encontrado' }, { status: 404 })
+  const { data: preset } = await svc.from('presets_onboarding').select('chave, nome').eq('chave', chave).maybeSingle()
+  if (!preset) return NextResponse.json({ error: 'Segmento não encontrado' }, { status: 404 })
+  const seg = { chave: preset.chave, label: preset.nome }
 
   // Uma única empresa de preview (reutilizada); troca o segmento dela p/ o escolhido.
+  // O menu lê preset_onboarding (21/10/2026): as duas colunas andam juntas.
   let { data: empresa } = await svc.from('empresas').select('id').eq('slug', PREVIEW_SLUG).maybeSingle()
   if (!empresa) {
     const { data: nova, error } = await svc.from('empresas').insert({
-      nome: `Preview · ${seg.label}`, slug: PREVIEW_SLUG, segmento: chave, status: 'ativo', demo: true,
+      nome: `Preview · ${seg.label}`, slug: PREVIEW_SLUG, segmento: chave, preset_onboarding: chave, status: 'ativo', demo: true,
     } as never).select('id').single()
     if (error || !nova) return NextResponse.json({ error: `Falha ao preparar preview: ${error?.message ?? '—'}` }, { status: 500 })
     empresa = nova
   } else {
-    await svc.from('empresas').update({ segmento: chave, nome: `Preview · ${seg.label}` } as never).eq('id', empresa.id)
+    await svc.from('empresas').update({ segmento: chave, preset_onboarding: chave, nome: `Preview · ${seg.label}` } as never).eq('id', empresa.id)
   }
 
   // Inicia a impersonação (mesma RPC do fluxo de impersonar empresa)

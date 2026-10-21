@@ -1,6 +1,7 @@
 import { requireSuperAdminApi, logSuperAdminAction } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
+import { presetDoSegmento, segmentoDoPreset, type SegmentoRow } from '@/lib/empresa-config'
 
 function slugify(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)
@@ -38,9 +39,11 @@ export async function POST(req: Request) {
    * campo, a tela precisa mandá-lo explicitamente vazio — que é o que "salvar" deve
    * exigir de quem quer apagar configuração.
    */
-  const { data: atual } = await svc.from('segmentos_config')
-    .select('hidden_hrefs, label_overrides, modulos_extra, modulos_habilitados, menu_layout, descricao, ordem, ativo')
-    .eq('chave', chave).maybeSingle()
+  // Desde 21/10/2026 o segmento mora em presets_onboarding; a linha de sempre
+  // (o formato que esta tela edita) entra e sai por lib/empresa-config.ts.
+  const { data: presetAtual } = await svc.from('presets_onboarding')
+    .select('chave, nome, descricao, rotulos, ativo').eq('chave', chave).maybeSingle()
+  const atual = presetAtual ? segmentoDoPreset(presetAtual as Parameters<typeof segmentoDoPreset>[0]) : null
 
   const manter = <T,>(vindo: T | undefined, noBanco: unknown, vazio: T): T =>
     vindo !== undefined ? vindo : ((noBanco ?? vazio) as T)
@@ -58,7 +61,8 @@ export async function POST(req: Request) {
     ativo: b.ativo !== undefined ? b.ativo : (atual?.ativo ?? true),
   }
 
-  const { error } = await svc.from('segmentos_config').upsert(row, { onConflict: 'chave' })
+  const { error } = await svc.from('presets_onboarding')
+    .upsert({ ...presetDoSegmento(row as unknown as SegmentoRow), updated_at: new Date().toISOString() }, { onConflict: 'chave' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await logSuperAdminAction({ adminUserId: auth.userId, acao: b.novo ? 'criar_segmento' : 'editar_segmento', detalhes: { chave } })

@@ -146,7 +146,9 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - o tenant 3 (Imobiliária) inteiro, por `hard_delete_empresa(3)`;
   - 8 índices nunca usados que não cobrem FK.
 - **Etapa 0 (branch `feat/etapa-0`, deploy em 22/10 à noite):**
+  - **Ordem do deploy:** (1) as migrações `20261021003xxx` (sincronizam o legado nas tabelas do core; não apagam nada e o app de hoje segue funcionando); (2) o deploy do app; (3) as migrações `20261022000xxx` (os DROPs), só com o app novo no ar. Volta de (3) = restaurar só a tabela/coluna do dump tirado antes, nunca restore completo.
   - `v_orfaos_chat_midia` (migração 20261021003300; o script manual de órfãos passou a ler `storage_orfaos`). Pode rodar antes do deploy.
+  - `segmentos_config` (1.1): sincronização 20261021003200, drop 20261022000100. O menu, a trava de rota, o `entrar`, o `meu-menu`, o ranking e as telas de Segmentos/Laboratório do superadmin leem `presets_onboarding` + `empresa_menu.itens.{superadmin,dono}` + `empresa_modulos.config.forcado` por `lib/empresa-config.ts`. Quem grava `empresas.segmento` grava `preset_onboarding` junto. Teste: `scripts/comparar-menu.mts` (menu idêntico por empresa, loja e papel).
   - `types/database.ts` agora é uma sobreposição de `types/database.gerado.ts` (saída crua do `supabase gen types`): as 37 views de módulo do core são tipadas como a tabela que espelham (`types/views-espelho.ts`, gerado de `supabase/testes/views_espelho.sql` por `scripts/tipos-espelho.mjs`). Regerar os dois quando o schema mudar.
 - **Lista de morte — o que fica, e até quando:**
   - as 18 colunas de `empresas` com `COMMENT 'obsoleta'`: próxima leva;

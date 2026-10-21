@@ -161,14 +161,14 @@ export interface MenuConfigDono {
  */
 export const CHAVE_GRUPOS = '__grupos'
 
-/** Config do segmento vinda do banco (segmentos_config) — sobrepõe o SEGMENTOS estático. */
+/** Config do segmento vinda do banco (presets_onboarding.rotulos, era segmentos_config até 21/10/2026) — sobrepõe o SEGMENTOS estático. */
 export interface SegOverride {
   hiddenHrefs?: string[]
   labelOverrides?: Record<string, string>
   modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]
   /** Opt-in: hrefs habilitados neste segmento (novo modelo). Se presente, tem precedência. */
   habilitados?: string[]
-  /** Ordem do menu definida pelo superadmin na tela de Segmentos (segmentos_config.menu_layout). */
+  /** Ordem do menu definida pelo superadmin na tela de Segmentos (presets_onboarding.rotulos._menu.menu_layout). */
   menuLayout?: Record<string, string[]>
 }
 
