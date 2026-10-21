@@ -413,3 +413,10 @@ Nada chegou ao Sentry (o erro era engolido pela tela). Achado na Etapa 0, testan
 - Criada pela tela, em Mogi, a tarefa "TESTE DEPLOY 21/10 — apagar" (lead Lucas Ramponi): aviso "Tarefa criada", apareceu na lista com o nome do lead (A fazer 9 → 10) e **não** apareceu em Jaguariúna. Apagada pela tela; conferido no banco: 0 linhas de teste restantes.
 - "Listar e criar tarefa" entrou no smoke de todo deploy (05, passo f).
 
+## 9. C2S desligada (21/10, ~14h)
+
+- **Por quê:** a C2S chamava `/api/webhook/c2s/<slug>` da imobiliária (tenant 3, apagado em 20/10) ~556 vezes por dia; cada chamada subia uma função da Vercel, abria o Supabase e devolvia 404. Nenhuma empresa usa a integração.
+- **Do lado da C2S:** a assinatura (3 gatilhos, feita em 24/08 pela API, com o token da conta da imobiliária) foi desfeita com `POST https://api.contact2sale.com/integration/api/unsubscribe`, um por gatilho, rodado pelo Lucas no terminal dele com o token da conta C2S (autorizado por ele; o token não passou pela conversa nem foi gravado). Conferência antes (`GET /company`): HTTP 200, conta da imobiliária. Resposta: `on_create_lead`, `on_update_lead` e `on_close_lead` → HTTP 200 `{"success":true,"message":"Unsubscribed successfully"}`.
+- **Do nosso lado (feat/navegacao, deploy de 21/10 à noite):** a rota saiu e o 404 vem estático, sem função nem middleware; o "assinar" da tela recusa (409). Religar = restaurar a rota antes de tirar o bloqueio.
+- **Conferir:** em Observability → Functions, `/api/webhook/c2s/[slug]` deve zerar (a C2S parou de chamar; e depois do deploy, mesmo que chamasse, não haveria função).
+
