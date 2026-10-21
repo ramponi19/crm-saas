@@ -98,7 +98,7 @@ Enquanto o build do e2 não fica pronto, o código antigo roda sobre o banco nov
 
 ### (f) Smoke, nesta ordem
 
-> **Vale para TODO deploy, não só para o corte.** Os passos 1 e 8 são o mínimo de qualquer deploy; os demais quando o deploy mexe no que eles cobrem.
+> **Vale para TODO deploy, não só para o corte.** Os passos 1, 8 e 9 (p) são o mínimo de qualquer deploy; os demais quando o deploy mexe no que eles cobrem.
 
 1. **Login** com o dono da JM.
 2. **Funil com os mesmos cards:**
@@ -110,6 +110,7 @@ Enquanto o build do e2 não fica pronto, o código antigo roda sobre o banco nov
 6. **`/api/whatsapp/send`:** chamar como o PDV/OS chama (o mesmo teste do passo A). A mensagem chega e aparece na conversa do lead.
 7. *(extra)* **ZapIntel:** o dashboard atualiza sozinho quando chega mensagem (gatilho `zapintel_ao_vivo` em `mensagens`).
 8. **Listar e criar tarefa (todo deploy, desde 21/10):** abrir `/tarefas` nas DUAS lojas (Mogi Guaçu e Jaguariúna) — a lista aparece, com o nome do lead; criar pela tela uma tarefa "TESTE DEPLOY <data> — apagar" numa loja, conferir que aparece só nela, e apagar. Por quê: de 20/10 a 21/10 a lista veio vazia e criar tarefa falhou calado (embed ambíguo, PGRST201) — nenhum teste olhava tarefas (06, seção 8).
+9. **(p) Mídia do chat em cache (desde 21/10):** com o DevTools do Edge aberto na aba Rede (filtro `midia`, *sem* marcar "Desativar cache"), abrir uma conversa com fotos, sair para outra conversa e voltar nela em menos de 8 min. Na **segunda** abertura nenhum `/api/midia` vai à rede: a coluna Tamanho mostra `(cache de disco)` ou `(cache de memória)`. Se aparecer `302` de novo, o `Cache-Control: private, max-age=480` não chegou (conferir o cabeçalho na primeira abertura). Por quê: com `no-store` cada redesenho do chat subia a função, ~125 ms de CPU por arquivo (152 chamadas em 12 h, 3º lugar da Vercel em 21/10).
 
 ---
 
@@ -183,10 +184,10 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
     - a variável `NEXT_PUBLIC_DB_CORE`.
 - **`mensagem_registrar`:** fica. A Edge continua gravando por ela, e o corpo é a versão B.
 
-## Supabase local (`supabase start`) — desde 21/10/2026
-
-- **O que é:** Docker Desktop + `npx supabase start` na raiz do repo sobe Postgres, Auth, PostgREST, Storage e Realtime locais e aplica `supabase/migrations` num banco limpo. Desde 21/10 o resultado é **igual à produção** no `public` (103 tabelas, 46 views, 375 índices, 179 políticas, 71 gatilhos, RLS, 82 funções ignorando ``, EXECUTE, 422 grants de tabela e 12 por coluna) e fora dele (5 buckets, 13 políticas de storage, a de `realtime.messages`, publicação com 7 tabelas, 2 jobs do cron, `ops`, extensões, event triggers). Comparação feita por catálogo, sem dado.
-- **Para poupar memória:** `npx supabase start -x imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor`. Portas padrão 543xx: não sobe junto com o PostgREST/gateway da cópia (54322/54323). Desligar com `npx supabase stop --no-backup`; a VM do Docker só devolve a memória fechando o Docker Desktop.
-- **Dados para teste:** `pg_dump --data-only --disable-triggers -n public` da cópia (sem as tabelas que já saíram) + `auth.users` à parte, carregados como `supabase_admin` (com `on_auth_user_created` desligado durante a carga). JWT de teste: HS256 com o segredo local que o `supabase start` imprime.
-- **⚠ NUNCA `supabase link` + `supabase db push` (ou `migration repair`) contra a produção.** O histórico de migrações da produção guarda o horário em que o MCP aplicou cada uma, não o nome do arquivo; a CLI acharia todas pendentes. Migração em produção continua pelo `apply_migration` do MCP.
+## Supabase local (`supabase start`) — desde 21/10/2026
+
+- **O que é:** Docker Desktop + `npx supabase start` na raiz do repo sobe Postgres, Auth, PostgREST, Storage e Realtime locais e aplica `supabase/migrations` num banco limpo. Desde 21/10 o resultado é **igual à produção** no `public` (103 tabelas, 46 views, 375 índices, 179 políticas, 71 gatilhos, RLS, 82 funções ignorando ``, EXECUTE, 422 grants de tabela e 12 por coluna) e fora dele (5 buckets, 13 políticas de storage, a de `realtime.messages`, publicação com 7 tabelas, 2 jobs do cron, `ops`, extensões, event triggers). Comparação feita por catálogo, sem dado.
+- **Para poupar memória:** `npx supabase start -x imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor`. Portas padrão 543xx: não sobe junto com o PostgREST/gateway da cópia (54322/54323). Desligar com `npx supabase stop --no-backup`; a VM do Docker só devolve a memória fechando o Docker Desktop.
+- **Dados para teste:** `pg_dump --data-only --disable-triggers -n public` da cópia (sem as tabelas que já saíram) + `auth.users` à parte, carregados como `supabase_admin` (com `on_auth_user_created` desligado durante a carga). JWT de teste: HS256 com o segredo local que o `supabase start` imprime.
+- **⚠ NUNCA `supabase link` + `supabase db push` (ou `migration repair`) contra a produção.** O histórico de migrações da produção guarda o horário em que o MCP aplicou cada uma, não o nome do arquivo; a CLI acharia todas pendentes. Migração em produção continua pelo `apply_migration` do MCP.
 - **Por que valeu:** pegou antes do deploy a troca de texto da `20261021003500` que não casava com CRLF (o psql do Windows mascarava) e o `check-views` que quebraria o build com SQL dinâmico.
