@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:nucleo && npm run check:avisos && next build",
+    "build": "npm run check:nucleo && npm run check:avisos && npm run check:views && next build",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
@@ -12,7 +12,8 @@
     "types:gen": "supabase gen types typescript --project-id guiuzbcqkvelqcuogxtd > types/database.ts",
     "db:sync": "npm run types:gen && npm run type-check",
     "check:nucleo": "node scripts/check-nucleo.mjs",
-    "check": "npm run check:nucleo && npm run check:avisos && npm run type-check && npm run check:edge",
+    "check": "npm run check:nucleo && npm run check:avisos && npm run check:views && npm run type-check && npm run check:edge",
+    "check:views": "node scripts/check-views.mjs",
     "check:avisos": "node scripts/check-avisos.mjs",
     "check:edge": "deno check --no-lock \"supabase/functions/*/index.ts\""
   },
