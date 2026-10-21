@@ -38,12 +38,20 @@ export async function POST(req: Request) {
       .select('id, origem, valor_estimado, responsavel_id, filial_id')
       .eq('empresa_id', empresaId).eq('ativo', true).is('responsavel_id', null).limit(500)
 
+    // Um lead que falha não para os outros; a falha volta contada (antes o erro da
+    // gravação nem era conferido e o lead contava como distribuído).
     let distribuidos = 0
+    let falhas = 0
     for (const l of leads ?? []) {
-      const r = await distribuirExistente(svc, empresaId, l)
-      if (r) distribuidos++
+      try {
+        const r = await distribuirExistente(svc, empresaId, l)
+        if (r) distribuidos++
+      } catch (e) {
+        falhas++
+        console.error('[leads/distribuir]', e instanceof Error ? e.message : e)
+      }
     }
-    return NextResponse.json({ ok: true, distribuidos })
+    return NextResponse.json({ ok: falhas === 0, distribuidos, falhas })
   }
 
   return NextResponse.json({ error: 'Nada a distribuir' }, { status: 400 })

@@ -73,7 +73,7 @@ export async function escolherResponsavel(svc: Db, empresaId: number, lead: Lead
   return null
 }
 
-/** Atribui um lead JÁ existente (esteira/Meta) e registra em lead_atribuicoes. */
+/** Atribui um lead JÁ existente (esteira/Meta) e registra 'distribuir' no negocio_historico. */
 export async function distribuirExistente(
   svc: Db, empresaId: number,
   lead: { id: number; origem?: string | null; valor_estimado?: number | null; responsavel_id?: string | null; filial_id?: number | null },
@@ -91,11 +91,11 @@ export async function distribuirExistente(
   // `responsavel_desde` é o marco do prazo de devolução. Sem gravá-lo, um lead
   // ANTIGO distribuído agora seria medido pela data de criação e nasceria com o
   // prazo já estourado — devolvido no primeiro ciclo, sem ninguém ter falhado.
-  await svc.from('leads')
-    .update({ responsavel_id: escolhido, responsavel_desde: new Date().toISOString() })
-    .eq('id', lead.id)
-  await svc.from('lead_atribuicoes').insert({
-    empresa_id: empresaId, lead_id: lead.id, de_responsavel: null, para_responsavel: escolhido, por_usuario: null, acao: 'distribuir',
-  })
+  // negocio_atribuir grava o marco e registra 'distribuir' no negocio_historico
+  // (até 21/10/2026 o registro ia para lead_atribuicoes, à parte).
+  const { error } = await svc.rpc('negocio_atribuir' as never, {
+    p_negocio: lead.id, p_responsavel: escolhido, p_acao: 'distribuir', p_por: null,
+  } as never)
+  if (error) throw new Error(`distribuir lead ${lead.id}: ${error.message}`)
   return escolhido
 }

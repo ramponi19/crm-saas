@@ -1745,6 +1745,8 @@ begin
     format('%s eventos (superadmin_logs com empresa: %s; sem empresa, fora: %s)', (select count(*) from eventos where tipo like 'superadmin.%'),
            migracao.o('superadmin_logs_com_empresa'), migracao.o('superadmin_logs_sem_empresa')));
   perform migracao.afirmar(9, 'eventos de atribuição',
+    -- ETAPA 0 (22/10/2026): lead_atribuicoes saiu (20261022000300); as atribuições passaram a ser só
+    -- negocio_historico (gatilho + negocio_atribuir). Esta checagem só vale no corte.
     (select count(*) from eventos where tipo like 'negocio.%') = migracao.o('lead_atribuicoes'),
     format('%s eventos (lead_atribuicoes: %s)', (select count(*) from eventos where tipo like 'negocio.%'), migracao.o('lead_atribuicoes')));
 end $$;

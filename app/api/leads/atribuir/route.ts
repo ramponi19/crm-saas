@@ -1,4 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
 /**
@@ -43,19 +44,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
   }
 
-  // Marca quando a responsabilidade começou — é a base do prazo de devolução à
-  // esteira. Sem isto, assumir um lead antigo herdaria a data de criação e ele
-  // seria devolvido no primeiro ciclo, sem ninguém ter falhado. Soltar (novo =
-  // null) limpa o marco.
-  const { error } = await supabase.from('leads')
-    .update({ responsavel_id: novo, responsavel_desde: novo ? new Date().toISOString() : null })
-    .eq('id', body.leadId)
+  // A troca e o registro numa transação só (negocio_atribuir): o responsável muda,
+  // `responsavel_desde` marca o início do prazo de devolução à esteira (soltar
+  // limpa o marco), e o negocio_historico grava a AÇÃO (pegar, devolver...) e quem
+  // pediu. Até 21/10/2026 o detalhe ia para lead_atribuicoes, à parte, e o erro
+  // daquele insert não era conferido. O lead já foi lido acima pela sessão do
+  // usuário (RLS); a função roda pelo servidor, que já conferiu o papel.
+  const { error } = await createServiceClient().rpc('negocio_atribuir' as never, {
+    p_negocio: body.leadId, p_responsavel: novo, p_acao: body.acao, p_por: user.id,
+  } as never)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  await supabase.from('lead_atribuicoes').insert({
-    empresa_id: empresaId, lead_id: body.leadId,
-    de_responsavel: atual, para_responsavel: novo, por_usuario: user.id, acao: body.acao,
-  })
 
   return NextResponse.json({ ok: true, responsavel_id: novo })
 }

@@ -2191,50 +2191,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"lead_atribuicoes": {
-                  Row: {
-                    "acao": string,"created_at": string,"de_responsavel": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"lead_id": number,"para_responsavel": string | null,"por_usuario": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "acao": string,"created_at"?: string,"de_responsavel"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"lead_id": number,"para_responsavel"?: string | null,"por_usuario"?: string | null
-                  }
-                  Update: {
-                    "acao"?: string,"created_at"?: string,"de_responsavel"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"lead_id"?: number,"para_responsavel"?: string | null,"por_usuario"?: string | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "lead_atribuicoes_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_atribuicoes_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_atribuicoes_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_atribuicoes_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_atribuicoes_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"mensagens": {
                   Row: {
                     "canal_id": number | null,"contato_id": number,"conteudo": string,"conversa_id": number,"created_at": string,"direcao": string,"empresa_id": number,"erro_envio": string | null,"external_id": string | null,"filial_id": number | null,"id": number,"lida": boolean,"midia_retida_em": string | null,"midia_url": string | null,"origem": string | null,"status_em": string | null,"status_entrega": string | null,"tipo": string,"transcricao": string | null,"updated_at": string,"usuario_id": string | null
@@ -5770,6 +5726,9 @@ isOneToOne: false
                            },
 "mensagem_registrar":
 { Args: { "p_canal_id": number,"p_dados": Json,"p_empresa": number,"p_external_id": string }; Returns: number
+                           },
+"negocio_atribuir":
+{ Args: { "p_acao": string,"p_negocio": number,"p_por"?: string,"p_responsavel": string }; Returns: undefined
                            },
 "rate_limit_bump":
 { Args: { "p_chave": string,"p_janela": string }; Returns: number

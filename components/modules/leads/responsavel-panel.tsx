@@ -6,10 +6,14 @@ import { UserPlus, UserMinus, ArrowLeftRight, History } from 'lucide-react'
 import { Button, Select, Badge, notify } from '@/components/ui'
 import type { Usuario } from './types'
 
-interface HistItem { acao: string; de_responsavel: string | null; para_responsavel: string | null; created_at: string }
+interface HistItem { acao: string; de_responsavel: string | null; para_responsavel: string | null; em: string }
+
+/** As linhas de posse com ação detalhada (as que lead_atribuicoes tinha). A troca genérica do gatilho ('atribuicao') fica de fora, como antes. */
+const ACOES_DE_POSSE = ['pegar', 'devolver', 'transferir', 'atribuir', 'distribuir']
 
 const ACAO_LABEL: Record<string, string> = {
   pegar: 'pegou', devolver: 'devolveu à esteira', transferir: 'transferiu', atribuir: 'atribuiu',
+  distribuir: 'distribuído', atribuicao: 'responsável alterado',
 }
 
 /**
@@ -44,9 +48,10 @@ export function ResponsavelPanel({ leadId, usuarios, responsavel, onChange }: {
   const nome = (id: string | null) => usuarios.find(u => u.id === id)?.nome ?? '—'
 
   const carregarHist = useCallback(async () => {
-    const { data } = await supabase.from('lead_atribuicoes')
-      .select('acao, de_responsavel, para_responsavel, created_at')
-      .eq('lead_id', leadId).order('created_at', { ascending: false }).limit(8)
+    // negocio_historico do core desde 21/10/2026 (era lead_atribuicoes).
+    const { data } = await supabase.from('negocio_historico')
+      .select('acao, de_responsavel, para_responsavel, em')
+      .eq('negocio_id', leadId).in('acao', ACOES_DE_POSSE).order('em', { ascending: false }).limit(8)
     setHist(((data ?? []) as HistItem[]))
   }, [supabase, leadId])
 
@@ -126,8 +131,8 @@ export function ResponsavelPanel({ leadId, usuarios, responsavel, onChange }: {
             {hist.map((h, i) => (
               <div key={i} className="text-[11.5px] text-ink-3">
                 <span className="text-ink-2">{ACAO_LABEL[h.acao] ?? h.acao}</span>
-                {h.acao === 'transferir' || h.acao === 'atribuir' ? ` → ${nome(h.para_responsavel)}` : ''}
-                {' · '}{new Date(h.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {['transferir', 'atribuir', 'distribuir', 'atribuicao'].includes(h.acao) ? ` → ${nome(h.para_responsavel)}` : ''}
+                {' · '}{new Date(h.em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </div>
             ))}
           </div>
