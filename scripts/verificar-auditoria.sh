@@ -519,6 +519,7 @@ v "card mostra sem custo lancado"       "components/modules/dashboard/dashboard-
 n "lista de tarefas sem embed ambiguo"   "app/(dashboard)/tarefas/page.tsx" "leads(nome)"
 n "criar tarefa sem embed ambiguo"      "app/(dashboard)/tarefas/tarefas-view.tsx" "leads(nome)"
 n "painel imob sem embed ambiguo"       "app/(dashboard)/dashboard/dashboard-imob.tsx" "vencimento, leads(nome)"
+n "follow-ups do painel sem ambiguo"    "components/modules/dashboard/dashboard-view.tsx" "vencimento, leads(nome)"
 # 21/10/2026 (etapa 0, 2.4): Simular parcela, Check IMEI e FIPE sao ferramentas,
 # nao itens de menu; moram em Orcamentos/Estoque/Avaliacoes e abrem pelo Cmd+K.
 v "ferramenta nao entra no menu"        "lib/menu.ts" "if (item.ferramenta) {"
