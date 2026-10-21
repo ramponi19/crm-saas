@@ -99,7 +99,7 @@ interface LeadComConversa {
    * E o unico caminho ate o lead de Instagram, que nao tem telefone no
    * cadastro (3 em 384): o `origem_id` dele e o id do Instagram. Vem filtrado
    * contra chave Pix, CPF e o numero da propria loja — ver o cabecalho de
-   * `supabase/funcoes/zapintel_leads_com_conversa.sql`, onde as tres
+   * `supabase/migrations/20261022001000_zapintel_le_o_core.sql`, onde as tres
    * armadilhas estao documentadas com o numero de cada uma.
    */
   telefone_no_texto: string | null
