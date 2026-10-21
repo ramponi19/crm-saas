@@ -694,5 +694,6 @@ v "principal calculado uma vez"         "supabase/migrations/20261022001000_zapi
 v "loja casada por igualdade (hash)"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "coalesce(p.filial_id, -1) = coalesce(m.filial_id, -1)"
 v "helpers fechados para a api"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "  from public, anon, authenticated;"
 v "seql calculado uma vez"              "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "SEQL as materialized (select lead_id"
+v "estatistica da loja nos negocios"    "supabase/migrations/20261022001100_zapintel_estatisticas.sql" "negocios_loja_stx on (coalesce(filial_id, 0))"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"
