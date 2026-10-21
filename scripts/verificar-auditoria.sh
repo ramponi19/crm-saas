@@ -501,7 +501,7 @@ v "setas existem ao lado do arraste"   "components/layout/menu-ordenavel.tsx" "a
 v "menu rola ate o item ativo"         "components/layout/nav-rolavel.tsx" "scrollIntoView({ block: .nearest. })"
 v "aviso de conteudo escondido"        "components/layout/nav-rolavel.tsx" "cortado.abaixo"
 v "item ativo marcado no CRM"          "components/layout/sidebar.tsx" "data-ativo={isActive || undefined}"
-v "rodape nao encolhe"                 "components/layout/sidebar.tsx" "shrink-0 px-3 py-2.5"
+v "rodape nao encolhe"                 "components/layout/sidebar.tsx" "shrink-0 px-2 py-2"
 v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "carregarConfigEmpresa(supabase, empresaId"
 # 21/10/2026: o segmento e as camadas vem do core (lib/empresa-config.ts); o menu
 # do CRM, a trava de rota e esta tela leem a mesma funcao.
@@ -566,12 +566,16 @@ v "ativar so do superadmin"             "app/api/modulos/ativar/route.ts" "requi
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"
-echo "== menu sem separadores (20/08) =="
-# O dono tirou os cabecalhos de grupo: o menu e uma lista corrida.
-n "sidebar nao desenha grupo"          "components/layout/sidebar.tsx" "grupos.map((group)"
-n "gaveta do celular tambem nao"       "components/layout/mobile-topbar.tsx" "grupos.map((g)"
-n "folha Mais tambem nao"              "components/layout/bottom-nav.tsx" "grupos.map((g)"
-v "sidebar usa a lista plana"          "components/layout/sidebar.tsx" "resolverMenuPlano({"
+echo "== menu em grupos com verbo (21/10; substitui a lista corrida de 20/08) =="
+# Os grupos de 20/08 (Hoje/Comercial/Operacao) sairam porque so repetiam o nome do
+# item. Os de agora dizem o que se faz ali e SO REPARTEM a lista final: as camadas e a
+# ordem do dono continuam em resolverMenuPlano (scripts/comparar-menu-agrupado.mts).
+v "sidebar desenha os grupos novos"    "components/layout/sidebar.tsx" "resolverMenuAgrupado({"
+v "gaveta do celular nos mesmos grupos" "components/layout/mobile-topbar.tsx" "resolverMenuAgrupado({"
+v "grupo so reparte a lista final"     "lib/menu.ts" "return agruparMenu(achatarMenu(grupos, ordemPlana(input))"
+v "menu recolhe em trilho"             "components/layout/sidebar.tsx" "recolhido ? 'w-\[56px\]' : 'w-\[216px\]'"
+v "rodape fixo com notificacoes"       "components/layout/sidebar.tsx" "new Event('notificacoes:abrir')"
+v "sino abre pelo rodape"              "components/layout/topbar.tsx" "window.addEventListener('notificacoes:abrir', abrir)"
 # Href salvo que nao existe mais e ignorado; item novo entra no fim, nao desaparece.
 v "ordem plana tolera href sumido"     "lib/menu.ts" "if (!usados.has(item.href)) saida.push(item)"
 echo "== proprietario e um cliente (21/08) =="

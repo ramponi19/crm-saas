@@ -173,6 +173,20 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
 
   const totalNaoLidas = notifs.reduce((s, n) => s + n.nao_lidas, 0)
 
+  /**
+   * O rodapé do menu tem "Notificações" (21/10/2026), mas o sino continua MORANDO
+   * aqui: é aqui que está a assinatura de tempo real. O menu só pede para abrir e
+   * escuta o total para acender o ponto — sem uma segunda assinatura nem consulta.
+   */
+  useEffect(() => {
+    const abrir = () => setNotifOpen(true)
+    window.addEventListener('notificacoes:abrir', abrir)
+    return () => window.removeEventListener('notificacoes:abrir', abrir)
+  }, [])
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('notificacoes:total', { detail: totalNaoLidas }))
+  }, [totalNaoLidas])
+
   return (
     <header suppressHydrationWarning className="z-10 flex h-[52px] shrink-0 items-center gap-3 border-b border-line-soft bg-card/90 px-5 backdrop-blur-md">
       <span className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-ink">{titulo}</span>

@@ -539,9 +539,100 @@ export function achatarMenu(grupos: MenuGroup[], ordem?: string[]): MenuItem[] {
  * o menu aplicava e a barra do topo não.
  */
 export function resolverMenuPlano(input: ResolverMenuInput): MenuItem[] {
-  const grupos = resolverMenu(input)
-  const ordem = input.configDono?.ordem?.[CHAVE_ORDEM]
+  return achatarMenu(resolverMenu(input), ordemPlana(input))
+}
+
+/** A ordem plana que vale para esta entrada: dono > superadmin (segmento no banco) > código. */
+function ordemPlana(input: ResolverMenuInput): string[] | undefined {
+  return input.configDono?.ordem?.[CHAVE_ORDEM]
     ?? input.segOverride?.menuLayout?.[CHAVE_ORDEM]
     ?? SEGMENTOS[input.segmento]?.menuLayout?.[CHAVE_ORDEM]
-  return achatarMenu(grupos, ordem)
+}
+
+/**
+ * MENU EM GRUPOS COM VERBO DE NEGÓCIO (navegação nova, 21/10/2026).
+ *
+ * Volta a ter grupo — mas não os de antes. "Hoje / Comercial / Operação" eram
+ * gavetas do catálogo e o dono os tirou em 20/08/2026 porque só repetiam o nome
+ * do item. Estes dizem o que se FAZ ali (relatório 02, item 5: Leads no mesmo
+ * nível de "Simular parcela" era o sintoma), abrem e fecham, e o menu inteiro
+ * recolhe para um trilho de ícones.
+ *
+ * NADA DO CÁLCULO MUDA. As camadas (maturidade, opt-in do segmento, ocultos,
+ * papel, plano, rótulos, ordem do dono) continuam em `resolverMenuPlano`; isto só
+ * reparte a lista final. Dentro do grupo a ordem é a da lista; a ordem dos
+ * grupos é a do primeiro item de cada um — então quem arrastou o Chat para o
+ * topo em /admin/meu-menu vê "Comunicação" em primeiro, sem configuração nova.
+ *
+ * No máximo 9 entradas de topo: são 8 grupos, e o que não tem item some.
+ */
+export type GrupoMenuId = 'inicio' | 'comunicacao' | 'pipeline' | 'vendas' | 'estoque' | 'posvenda' | 'automacoes' | 'insights'
+
+export const GRUPOS_MENU: { id: GrupoMenuId; label: string; icon: string }[] = [
+  { id: 'inicio', label: 'Início', icon: 'House' },
+  { id: 'comunicacao', label: 'Comunicação', icon: 'MessageSquare' },
+  { id: 'pipeline', label: 'Pipeline', icon: 'Target' },
+  { id: 'vendas', label: 'Vendas', icon: 'ShoppingBag' },
+  { id: 'estoque', label: 'Estoque', icon: 'Boxes' },
+  { id: 'posvenda', label: 'Pós-venda', icon: 'ShieldCheck' },
+  { id: 'automacoes', label: 'Automações', icon: 'Zap' },
+  { id: 'insights', label: 'Insights', icon: 'BarChart3' },
+]
+
+/**
+ * Em que grupo mora cada tela. Mapeamento antigo → novo documentado no 05.
+ * Ferramentas (Simular parcela, Check IMEI, FIPE) não entram: não são menu.
+ */
+export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
+  '/dashboard': 'inicio', '/tarefas': 'inicio', '/agenda': 'inicio',
+  '/chat': 'comunicacao',
+  '/leads': 'pipeline', '/clientes': 'pipeline', '/fila': 'pipeline', '/gestao-leads': 'pipeline',
+  '/orcamentos': 'vendas', '/propostas': 'vendas', '/pdv': 'vendas', '/historico': 'vendas',
+  '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',
+  '/estoque': 'estoque', '/catalogo': 'estoque', '/compras': 'estoque', '/imoveis': 'estoque', '/cardapio': 'estoque',
+  '/garantia': 'posvenda', '/assistencia': 'posvenda',
+  '/executivo': 'insights', '/relatorios': 'insights', '/financeiro': 'insights', '/ranking': 'insights',
+}
+
+/**
+ * Módulo extra de segmento que não está no mapa acima cai pelo grupo ANTIGO que
+ * ele declara (`modulosExtra[].grupo`): é a única pista que o segmento dá.
+ */
+const GRUPO_DO_LEGADO: Record<string, GrupoMenuId> = {
+  Hoje: 'inicio', Comercial: 'pipeline', 'Operação': 'vendas', 'Gestão': 'insights',
+  'Imóveis': 'estoque', 'Veículos': 'vendas', Food: 'vendas',
+}
+
+export interface GrupoNav {
+  id: GrupoMenuId
+  label: string
+  icon: string
+  itens: MenuItem[]
+}
+
+/**
+ * Reparte a lista final em grupos. Pura: `grupoDe` diz o grupo de cada href
+ * (padrão = `GRUPO_DO_HREF`, e o que não está lá vai para Vendas).
+ */
+export function agruparMenu(itens: MenuItem[], grupoDe: (href: string) => GrupoMenuId = (h) => GRUPO_DO_HREF[h] ?? 'vendas'): GrupoNav[] {
+  const porId = new Map<GrupoMenuId, GrupoNav>()
+  for (const item of itens) {
+    const id = grupoDe(item.href)
+    let g = porId.get(id)
+    if (!g) {
+      const def = GRUPOS_MENU.find((x) => x.id === id)!
+      g = { ...def, itens: [] }
+      porId.set(id, g) // Map guarda a ordem de inserção = ordem do primeiro item
+    }
+    g.itens.push(item)
+  }
+  return [...porId.values()]
+}
+
+/** O menu como a sidebar desenha agora: a lista final, repartida em grupos. */
+export function resolverMenuAgrupado(input: ResolverMenuInput): GrupoNav[] {
+  const grupos = resolverMenu(input)
+  const legado = new Map(grupos.flatMap((g) => g.items.map((i) => [i.href, g.label] as const)))
+  return agruparMenu(achatarMenu(grupos, ordemPlana(input)), (href) =>
+    GRUPO_DO_HREF[href] ?? GRUPO_DO_LEGADO[legado.get(href) ?? ''] ?? 'vendas')
 }

@@ -196,3 +196,34 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
 - **Dados para teste:** `pg_dump --data-only --disable-triggers -n public` da cópia (sem as tabelas que já saíram) + `auth.users` à parte, carregados como `supabase_admin` (com `on_auth_user_created` desligado durante a carga). JWT de teste: HS256 com o segredo local que o `supabase start` imprime.
 - **⚠ NUNCA `supabase link` + `supabase db push` (ou `migration repair`) contra a produção.** O histórico de migrações da produção guarda o horário em que o MCP aplicou cada uma, não o nome do arquivo; a CLI acharia todas pendentes. Migração em produção continua pelo `apply_migration` do MCP.
 - **Por que valeu:** pegou antes do deploy a troca de texto da `20261021003500` que não casava com CRLF (o psql do Windows mascarava) e o `check-views` que quebraria o build com SQL dinâmico.
+
+## Navegação nova (branch `feat/navegacao`, depois do deploy de 21/10)
+
+> **O deploy da noite de 21/10 sai do `deploy/noite-20261021` (= `ef06a07`), não da ponta da branch.** Os commits da navegação ficam por cima e sobem num deploy próprio.
+
+### A.1 — Menu em grupos com verbo
+
+- **O que muda:** a sidebar (e a gaveta do celular) deixa de ser uma lista corrida e passa a ter até 8 grupos — Início, Comunicação, Pipeline, Vendas, Estoque, Pós-venda, Automações, Insights. Grupo de um item só vira o próprio item (sem gaveta). Grupos abrem e fecham; o grupo da tela atual fica sempre aberto; o menu inteiro recolhe para um trilho de ícones (botão ao lado do logo). Rodapé fixo: Configurações (por enquanto `/admin`, só dono/admin), Ajuda (abre o assistente), Notificações (abre o painel do sino do topo, com o ponto aceso quando há não lidas) e a conta (nome com a ausência, sair). O estado (recolhido, grupos fechados) fica no navegador (`nexus_menu_v1`).
+- **O que NÃO muda:** quais itens aparecem, rótulos, cadeados e ordem — tudo continua saindo de `resolverMenuPlano` (empresa_modulos, empresa_menu, presets). `resolverMenuAgrupado` só reparte a lista final. Dentro do grupo, a ordem é a da lista; os grupos aparecem na ordem do primeiro item de cada um, então a ordem arrastada em "Menu do CRM" continua mandando. Módulo desligado não aparece (não está na lista).
+- **Teste:** `npx tsx scripts/comparar-menu-agrupado.mts <menu-core.json>` contra a foto da cópia (`supabase/testes/menu_foto_core.sql`): **15/15 iguais** (JM lojas 3 e 6 + Preview loja 1, × dono, admin, vendedor, técnico, superadmin) — mesmos itens, mesma ordem relativa, no máximo 9 entradas. `tests/menu-agrupado.test.ts` faz o mesmo para todos os segmentos do código (imobiliária, saúde, food, veículos) e confere que todo item do catálogo tem grupo.
+- **Como fica a JM (todos os papéis):** Início [Dashboard, Tarefas] · Chat · Pipeline [Leads, Clientes] · Vendas [Orçamentos, PDV, Histórico] · Estoque [Estoque, Produtos] — 10 itens em 5 entradas.
+
+| Tela | Grupo antigo (catálogo, sem cabeçalho desde 20/08) | Grupo novo |
+|---|---|---|
+| Dashboard, Tarefas, Agenda | Hoje | Início |
+| Chat | Hoje | Comunicação |
+| Leads, Clientes, Fila do dia, Gestão de Leads | Comercial | Pipeline |
+| Orçamentos, Propostas | Comercial | Vendas |
+| PDV, Histórico, Financiamento | Operação | Vendas |
+| Avaliações (veículos) | Veículos | Vendas |
+| Cozinha (KDS) | Food | Vendas |
+| Estoque, Produtos, Compras | Operação | Estoque |
+| Imóveis | Imóveis | Estoque |
+| Cardápio | Food | Estoque |
+| Garantia, Assistência | Operação | Pós-venda |
+| Executivo, Relatórios, Financeiro | Gestão | Insights |
+| Metas e Ranking (extra da imobiliária) | Gestão | Insights |
+| Simular parcela, Check IMEI, Consulta FIPE | — (ferramentas, fora do menu desde a etapa 0) | — |
+| Extra de segmento sem grupo no mapa | o que ele declarar | pelo grupo antigo: Hoje→Início, Comercial→Pipeline, Operação/Veículos/Food→Vendas, Imóveis→Estoque, Gestão→Insights |
+
+Automações não tem item na A.1 (as telas de automação ainda estão no `/admin`); o grupo some enquanto estiver vazio.
