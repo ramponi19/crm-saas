@@ -1,3 +1,8 @@
+-- ⚠ SUPERADA EM 21/10/2026 — NÃO REAPLICAR ESTE ARQUIVO.
+-- A versão em vigor está em supabase/migrations/20261022001000_zapintel_le_o_core.sql (lê negocios e
+-- mensagens direto; este arquivo lê as views leads/lead_mensagens, que custavam até 200 s por chamada
+-- depois do corte). O texto abaixo fica como histórico das regras e das decisões.
+--
 -- INSIGHTS DO ZAPINTEL: POR QUE A LOJA VENDE E POR QUE PERDE.
 --
 -- Aplicada no banco em 14/10/2026.

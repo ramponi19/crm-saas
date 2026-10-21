@@ -1,3 +1,8 @@
+-- ⚠ SUPERADA EM 21/10/2026 — NÃO REAPLICAR ESTE ARQUIVO.
+-- A versão em vigor está em supabase/migrations/20261022001000_zapintel_le_o_core.sql (lê negocios e
+-- mensagens direto; este arquivo lê as views leads/lead_mensagens, que custavam até 200 s por chamada
+-- depois do corte). O texto abaixo fica como histórico das regras e das decisões.
+--
 -- ATENDIMENTO: COMO A LOJA ATENDE NO WHATSAPP E NO INSTAGRAM.
 --
 -- Aplicada no banco em 15/10/2026. Substitui as telas Performance I e II.

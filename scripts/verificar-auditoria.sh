@@ -686,5 +686,13 @@ v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts
 v "messaging_type so no caminho FB"   "supabase/functions/webhook-leads/index.ts" "const corpoEnvio = viaInstagram"
 v "retorno do IG vai pro login"       "proxy.ts" "/api/canais/instagram/retorno"
 
+echo "== zapintel le o core (21/10) =="
+# Desde o corte o ZapIntel lia as views leads/lead_mensagens, que calculam o principal
+# linha a linha: insights 74 s, conversa_calc 200 s na copia (06, secao 10).
+n "zapintel nao le as views do corte"   "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "\(from\|join\) \(public\.\)\?\(leads\|lead_mensagens\) "
+v "principal calculado uma vez"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "select distinct on (n.contato_id, n.filial_id) n.id"
+v "loja casada por igualdade (hash)"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "coalesce(p.filial_id, -1) = coalesce(m.filial_id, -1)"
+v "helpers fechados para a api"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "  from public, anon, authenticated;"
+v "seql calculado uma vez"              "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "SEQL as materialized (select lead_id"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

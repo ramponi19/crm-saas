@@ -464,3 +464,31 @@ A cópia (máquina local) é 3–5× mais rápida que o banco free: o dashboard 
 3. **`zapintel_dashboard` (1,2 s):** espalhado — `MODELOS` (300 ms), `zapintel_turnos` (243 ms), várias agregações de `lead_mensagens` da empresa inteira, e subconsulta por lead dentro de laço (fila e `SIL`).
 
 **Causa de fundo:** as duas views calculam o negócio principal de cada contato e loja **linha a linha**. Para a tela de um lead isso é barato (conserto de 20/10); para uma tela da empresa inteira — que é o ZapIntel — vira varredura em laço, e as estimativas ficam erradas a ponto de o planejador escolher o pior plano. Além disso, toda função filtra `coalesce(filial_id, 0) = any (lojas)`, uma expressão sem estatística: o Postgres chuta 0,5% por loja (36 negócios estimados onde há 2.386).
+
+### O conserto (branch `fix/zapintel-core`; migrações `20261022001000` e `20261022001100`, aplicar DEPOIS dos drops da Etapa 0)
+
+- **`20261022001000_zapintel_le_o_core.sql`:** três helpers SQL (`zapintel_principal`, `zapintel_mensagens`, `zapintel_negocios`) leem `negocios`, `mensagens`, `contatos` e `funil_etapas` direto, com a MESMA regra das views (principal = por contato e loja, o ativo mais novo), calculada uma vez em conjunto (DISTINCT ON) e casada por igualdade (`coalesce(filial_id, -1)`, que permite hash join; IS NOT DISTINCT FROM não permite). As 11 funções do ZapIntel passam a ler deles; nas buscas por um lead dentro de laço (fila, silêncio, modelo, largadas), onde a linha já é o principal, leem `mensagens` pelo contato e loja (índice `mensagens_contato_idx`). Ajustes só de plano: `SEQL` materializado e o bloco `venda` do conversa_calc agregando antes de juntar; `F` do atendimento embutido. Helpers fechados para anon/authenticated; dono `postgres`.
+- **`20261022001100_zapintel_estatisticas.sql`:** estatística das expressões `coalesce(filial_id, 0)` (negocios e mensagens) e do `ativo` do negócio, e ANALYZE. O EXPLAIN não pediu índice: pediu estatística (36 negócios estimados → 2.386 reais). Lock SHARE UPDATE EXCLUSIVE, não bloqueia leitura nem escrita.
+- **`supabase/funcoes/zapintel_*.sql`** ficaram marcados "SUPERADA — não reaplicar" (reaplicar um deles traria a view de volta).
+
+**Resultado idêntico:** numa transação só na cópia `crm_zap_antes` (o `now()` fica parado, então as janelas "últimos N dias" não andam), as 15 chamadas rodaram com as funções de hoje, a migração foi aplicada ali mesmo, as 15 rodaram de novo, e rollback. **13 idênticas; 2 (atendimento, rede e loja 3) com os mesmos elementos em outra ordem** no `cobertura` — `jsonb_agg` sem ORDER BY, que a tela lê num Map por dia e hora. Além disso, linha a linha: `zapintel_mensagens(e)` = primeiro ramo de `lead_mensagens` e `zapintel_negocios(e)` = `leads` nas colunas usadas, para as duas empresas (0 diferenças; 80.839 mensagens e 2.528 negócios da JM). Script `scratchpad/zapcore/mesmo-instante.sh`.
+
+**Tempos na cópia** (mediana de 3 rodadas, dono da JM; antes = 2ª rodada da medição do diagnóstico):
+
+| RPC | Antes | Depois |
+|---|---|---|
+| zapintel_conversa_calc (30 dias) | 200,0 s | **2,75 s** |
+| zapintel_insights (tudo) | 134,2 s | 0,34 s |
+| zapintel_insights (30 dias) | 74,3 s | 0,51 s |
+| zapintel_dashboard | 1,42 s | 0,50 s |
+| zapintel_atendimento (30 dias) | 1,28 s | 0,42 s |
+| zapintel_atendimento (loja 3) | 1,14 s | 0,35 s |
+| zapintel_leads_com_conversa | 0,47 s | 0,56 s |
+| zapintel_turnos (30 dias) | 0,48 s | 0,21 s |
+| zapintel_analises_pendentes | 0,47 s | 0,27 s |
+| zapintel_posvenda | 0,20 s | 0,43 s |
+| zapintel_leads_lista | 0,27 s | 0,18 s |
+| zapintel_dashboard_lista | 0,28 s | 0,16–0,17 s |
+| zapintel_resumo | 0,31 s | 0,13 s |
+
+**Acima de 1 s, só o `zapintel_conversa_calc` (2,75 s)**, e é trabalho real, não plano ruim: autoria por janela e regex de gíria sobre 16 mil mensagens (montar o `E` custa ~1,2 s). Ele não é chamado pela tela no dia a dia: o job `zapintel-conversa-aquecer` grava o cache (teto de 120 s, que estourava) e a tela lê o cache (`zapintel_conversa`). Quem ainda chama ao vivo é o botão de recalcular — na produção (3–5× mais lenta) deve ficar perto dos 8 s; acompanhar. `posvenda` e `leads_com_conversa` subiram alguns centésimos e ficam bem abaixo de 1 s; na produção, de 0,2–0,5 s para algo perto de 1–2 s no pior caso — conferir no pgss depois do deploy.
