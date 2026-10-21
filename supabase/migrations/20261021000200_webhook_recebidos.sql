@@ -30,6 +30,9 @@ alter table ops.webhook_recebidos enable row level security;
 revoke all on ops.webhook_recebidos from public, anon, authenticated;
 
 -- Devolve TRUE quando o corpo já foi recebido nas últimas 24 h (é reenvio: não processar).
+-- Dois reenvios idênticos chegando juntos: só um grava; o outro é tratado como reenvio
+-- (on conflict do nothing + returning). O comentário fica fora do corpo para a função
+-- sair idêntica à da produção, que foi aplicada sem ele.
 create or replace function public.webhook_reenvio(p_hash text, p_tamanho integer, p_conta text, p_gravar boolean)
   returns boolean
   language plpgsql security definer
@@ -50,7 +53,6 @@ begin
   insert into ops.webhook_recebidos (hash, canal_id, tamanho) values (p_hash, v_canal, p_tamanho)
   on conflict (hash) do nothing
   returning true into v_novo;
-  -- Dois reenvios idênticos chegando juntos: só um grava; o outro é tratado como reenvio.
   return coalesce(not v_novo, true);
 end $$;
 

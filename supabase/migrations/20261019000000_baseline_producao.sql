@@ -12815,15 +12815,16 @@ BEGIN
 END $$;
 
 --
--- Job do pg_cron em produção (cron.job, jobid 1 em 19/10/2026).
+-- Job do pg_cron em produção (jobid 1 em 19/10/2026).
 --
-DO $$
-BEGIN
-  IF to_regclass('cron.job') IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'zapintel-conversa-aquecer') THEN
-    INSERT INTO cron.job (schedule, command, nodename, nodeport, database, username, active, jobname)
-    VALUES ('0 5 * * *',
-            'select public.zapintel_conversa_aquecer(e.empresa_id) from public.complementos_empresa e where e.zapintel_ativo',
-            'localhost', 5432, 'postgres', 'postgres', true, 'zapintel-conversa-aquecer');
-  END IF;
-END $$;
+-- Reescrito em 21/10/2026 para o banco montado só pelas migrações (supabase start):
+-- a versão anterior fazia `IF to_regclass('cron.job') IS NOT NULL AND NOT EXISTS
+-- (SELECT ... FROM cron.job ...)` — o PL/pgSQL planeja a expressão inteira, então
+-- sem pg_cron dava "relation cron.job does not exist" antes da proteção agir; e o
+-- INSERT direto em cron.job dá "permission denied" para quem não é dono da tabela.
+-- cron.schedule pelo nome é idempotente (atualiza o job se já existir).
+-- Não muda a produção: o histórico de lá não tem este arquivo (ver o 05).
+--
+create extension if not exists pg_cron;
+select cron.schedule('zapintel-conversa-aquecer', '0 5 * * *',
+  'select public.zapintel_conversa_aquecer(e.empresa_id) from public.complementos_empresa e where e.zapintel_ativo');
