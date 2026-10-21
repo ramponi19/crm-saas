@@ -13,7 +13,7 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
     .eq('token', token).maybeSingle()
   if (!orc) notFound()
 
-  const { data: empresa } = await svc.from('empresas').select('nome, wl_cor, wl_logo_url').eq('id', orc.empresa_id).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url)').eq('id', orc.empresa_id).maybeSingle()
 
   const dados: OrcamentoPublico = {
     token,

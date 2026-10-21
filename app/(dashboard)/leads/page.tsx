@@ -85,7 +85,7 @@ export default async function LeadsPage() {
      * arquivado. Ver a migração `contar_nao_lidas_no_banco`.
      */
     supabase.from('v_leads_nao_lidas').select('lead_id, nao_lidas').eq('empresa_id', empresaId),
-    supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).single(),
+    supabase.from('empresas').select('segmento:preset_onboarding, permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),

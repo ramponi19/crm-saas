@@ -13,7 +13,7 @@ export default async function MenuPublicoPage({ params }: { params: Promise<{ sl
   const svc = createServiceClient()
 
   const { data: empresa } = await svc
-    .from('empresas').select('id, nome, wl_logo_url, wl_cor, wl_whatsapp, segmento').eq('slug', slug).maybeSingle()
+    .from('empresas').select('id, nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp), segmento:preset_onboarding').eq('slug', slug).maybeSingle()
   if (!empresa) notFound()
   // Ver a nota em /agendar: cardápio é de quem trabalha com comanda.
   if (!SEGMENTOS[normalizarSegmento(empresa.segmento)].capacidades.usaComanda) notFound()

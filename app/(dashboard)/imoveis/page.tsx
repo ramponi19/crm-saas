@@ -10,7 +10,7 @@ export const metadata = { title: 'Imóveis' }
 export default async function ImoveisPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento, slug').eq('id', empresaId).single()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding, slug').eq('id', empresaId).single()
   if (normalizarSegmento(empresa?.segmento) !== 'imobiliaria') redirect('/dashboard')
 
   const [{ data: imoveis }, { data: proprietarios }, { data: equipeRaw }, { data: chavesRaw }] = await Promise.all([

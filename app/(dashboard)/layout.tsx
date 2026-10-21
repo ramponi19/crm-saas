@@ -48,7 +48,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, plano, segmento, preset_onboarding, wl_cor, wl_logo_url, wl_menu, permissoes')
+      .select('nome, plano, segmento:preset_onboarding, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -59,7 +59,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, segmento, preset_onboarding, wl_cor, wl_logo_url, wl_menu, permissoes)')
+      .select('role, empresa:empresas(id, nome, plano, segmento:preset_onboarding, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()

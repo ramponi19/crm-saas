@@ -19,7 +19,7 @@ export default async function RelatoriosPage({ searchParams }: {
 }) {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).single()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).single()
 
   // Mesma capacidade do dashboard: a vertical traz as próprias telas de leitura.
   if (SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.telasProprias) {

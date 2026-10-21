@@ -21,7 +21,7 @@ async function getConfigs() {
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
-    supabase.from('empresas').select('segmento, slug').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento:preset_onboarding, slug').eq('id', empresaId).maybeSingle(),
     // Status dos canais: a fonte é canais_conectados (o que o chat e o envio usam).
     // Chave de serviço porque a RLS de canais_conectados exige vínculo em
     // empresa_usuarios, que o superadmin impersonando não tem (a tela mostrava tudo

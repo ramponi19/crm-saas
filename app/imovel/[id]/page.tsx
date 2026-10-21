@@ -17,7 +17,7 @@ async function getImovel(id: number) {
   if (!imovel) return null
   const { data: empresa } = await svc
     .from('empresas')
-    .select('nome, wl_cor, wl_logo_url, wl_whatsapp, telefone')
+    .select('nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_whatsapp:whatsapp), telefone')
     .eq('id', imovel.empresa_id)
     // A empresa existe (é chave estrangeira), mas esta é página PÚBLICA: derrubar a
     // vitrine do imóvel por causa da marca faltando é o pior dos dois resultados.

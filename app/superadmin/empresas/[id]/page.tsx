@@ -66,7 +66,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
   const { data: empresa } = await svc
     .from('empresas')
-    .select('*')
+    .select('*, segmento:preset_onboarding')
     .eq('id', empresaId)
     .single()
 
@@ -227,7 +227,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaNome={empresa.nome}
           planoAtual={empresa.plano}
           statusAtual={empresa.status}
-          segmentoAtual={empresa.segmento}
+          segmentoAtual={normalizarSegmento(empresa.segmento)}
         />
       </div>
 

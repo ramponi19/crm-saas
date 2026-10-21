@@ -9,7 +9,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id, nome, wl_logo_url, wl_cor, segmento').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor), segmento:preset_onboarding').eq('slug', slug).maybeSingle()
   if (!empresa) notFound()
   // Mesma regra da rota /api/agendar: quem não tem agenda não tem formulário de
   // agendamento. Sem isto o visitante preenchia o formulário e tomava erro no fim.

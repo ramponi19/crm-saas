@@ -111,13 +111,12 @@ export async function POST(req: Request) {
       nome: nomeEmpresa,
       slug,
       plano: planoId,
-      segmento: normalizarSegmento(body.segmento),
-      // O menu lê o preset desde 21/10/2026; os 7 segmentos do código têm preset.
+      // O segmento da empresa é o preset (empresas.segmento saiu em 22/10/2026);
+      // os 7 segmentos do código têm preset.
       preset_onboarding: normalizarSegmento(body.segmento),
       status: 'ativo',
       cnpj: body.cnpj || null,
       telefone: body.telefone || null,
-      wl_whatsapp: body.telefone || null,
       trial_ends_at: trialEnds,
       limite_usuarios: planoRow?.limite_usuarios ?? null,
       limite_leads: planoRow?.limite_leads ?? null,
@@ -129,6 +128,12 @@ export async function POST(req: Request) {
     console.error('[register] criar empresa:', empErr?.message)
     return NextResponse.json({ error: 'Não foi possível criar a empresa. Tente novamente.' }, { status: 500 })
   }
+
+  // White-label da empresa: o WhatsApp de contato nasce igual ao telefone, como era
+  // em empresas.wl_whatsapp (empresa_branding desde 22/10/2026). Falhar aqui não
+  // impede o cadastro: o dono preenche em "Minha empresa".
+  const { error: brErr } = await svc.from('empresa_branding').insert({ empresa_id: empresa.id, whatsapp: body.telefone || null })
+  if (brErr) console.error('[register] branding:', brErr.message)
 
   // rollback completo: evita órfãos em qualquer falha após criar a empresa
   const rollback = async () => {

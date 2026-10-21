@@ -62,7 +62,7 @@ export function AutomacoesCard() {
       const id = await empresaAtualId(supabase)
       if (!id) return
       setEmpresaId(id)
-      const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', id).maybeSingle()
+      const { data: emp } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', id).maybeSingle()
       setSegmento(emp?.segmento ?? null)
       const { data: et } = await supabase
         .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', id).eq('ativo', true).order('ordem')

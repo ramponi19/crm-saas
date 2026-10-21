@@ -26,7 +26,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const [{ data: vinculo }, { data: usuario }, { data: empresa }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('segmento, preset_onboarding').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento:preset_onboarding, preset_onboarding').eq('id', empresaId).maybeSingle(),
   ])
 
   /**

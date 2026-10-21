@@ -44,7 +44,7 @@ export default async function FinanceiroPage() {
    * Aditivo: o livro-caixa acima continua igual para todos. A imobiliária ganha uma
    * aba a mais, e nenhum outro segmento paga por ela (a consulta nem roda).
    */
-  const { data: empresaSeg } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
+  const { data: empresaSeg } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   const cfgSeg = SEGMENTOS[normalizarSegmento(empresaSeg?.segmento)]
   let negociosComissao: NegocioComissao[] = []
   let taxasComissao: TaxasComissao | null = null

@@ -182,7 +182,7 @@ function camposFaltantesLoja(loja: ContratoLoja, modelo: ModeloContrato): string
 export async function emitirContrato(supabase: Client, input: EmitirContratoInput): Promise<ContratoEmitido> {
   const [empRes, cliRes, garantiaLoja, modelo] = await Promise.all([
     supabase.from('empresas')
-      .select('nome, cnpj, telefone, wl_logo_url, email, cep, endereco, numero, complemento, bairro, cidade, estado, representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix')
+      .select('nome, cnpj, telefone, ...empresa_branding(wl_logo_url:logo_url), email, cep, endereco, numero, complemento, bairro, cidade, estado, ...empresa_dados_contrato(representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix)')
       .eq('id', input.empresaId).maybeSingle(),
     input.clienteId
       ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()

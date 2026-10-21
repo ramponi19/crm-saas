@@ -36,7 +36,7 @@ export default async function OrcamentosPage() {
 
   const [{ data }, { data: emp }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
     soMeus ? baseOrc.eq('usuario_id', user.id) : baseOrc,
-    supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle(),
     supabase.from('inventario_unidades')
       .select('id, preco_venda, condicao, produtos!produto_id(nome)')
       .eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true).limit(300),

@@ -21,12 +21,12 @@ export default async function AparenciaPage() {
   const isAdmin = usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin'
   if (!isAdmin) redirect('/dashboard')
 
-  const { data: emp } = await supabase.from('empresas').select('wl_menu').eq('id', empresaId).single()
+  const { data: emp } = await supabase.from('empresas').select('...empresa_branding(wl_menu:sidebar)').eq('id', empresaId).single()
 
   return (
     <>
       <Topbar title="Aparência" />
-      <AparenciaView initial={(emp?.wl_menu ?? null) as WlMenu | null} />
+      <AparenciaView initial={((emp?.wl_menu as WlMenu | null)?.preset ? emp?.wl_menu : null) as WlMenu | null} />
     </>
   )
 }

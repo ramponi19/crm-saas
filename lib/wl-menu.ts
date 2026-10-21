@@ -78,8 +78,9 @@ export function resolveTheme(wlMenu: WlMenu | null | undefined, wlCor?: string |
       dark: isDarkHex(wlMenu.fundo),
     }
   }
-  // Sem wl_menu mas com wl_cor legado → deriva um custom claro com o accent do tenant.
-  if (!wlMenu && wlCor && /^#[0-9a-fA-F]{3,6}$/.test(wlCor)) {
+  // Sem wl_menu (nulo ou {} — empresa_branding.sidebar nasce {}) mas com wl_cor legado →
+  // deriva um custom claro com o accent do tenant.
+  if (!wlMenu?.preset && wlCor && /^#[0-9a-fA-F]{3,6}$/.test(wlCor)) {
     return { bg: CLARA.bg, text: CLARA.text, activeBg: 'rgba(46,92,230,.08)', activeText: wlCor, dark: false }
   }
   return CLARA

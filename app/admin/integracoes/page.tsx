@@ -15,7 +15,7 @@ export default async function IntegracoesPage() {
   const svc = createServiceClient()
 
   const [{ data: empresa }, token, { data: importCfg }, cfgC2S, entradaC2S, { data: eventosC2S }] = await Promise.all([
-    supabase.from('empresas').select('slug, segmento').eq('id', empresaId).single(),
+    supabase.from('empresas').select('slug, segmento:preset_onboarding').eq('id', empresaId).single(),
     getOrCreatePortalToken(svc, empresaId),
     svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'import_imoveis').maybeSingle(),
     /**

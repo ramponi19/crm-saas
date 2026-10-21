@@ -14,7 +14,7 @@ export default async function AgendaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   const cap = SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades
   /**
    * Gate por CAPACIDADE, não por nome de segmento.

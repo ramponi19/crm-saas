@@ -19,7 +19,7 @@ export default async function MeuMenuPage() {
   const [{ data: vinculo }, { data: usuario }, { data: emp }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('segmento, preset_onboarding, plano').eq('id', empresaId).single(),
+    supabase.from('empresas').select('segmento:preset_onboarding, preset_onboarding, plano').eq('id', empresaId).single(),
   ])
   const role = vinculo?.role ?? 'owner'
   const isAdmin = usuario?.is_super_admin || role === 'owner' || role === 'admin'

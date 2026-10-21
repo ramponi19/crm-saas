@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const svc = createServiceClient()
   const db = svc as unknown as SupabaseClient
 
-  const { data: empresa } = await db.from('empresas').select('*').eq('id', empresaId).maybeSingle()
+  const { data: empresa } = await db.from('empresas').select('*, segmento:preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_slogan:slogan, wl_whatsapp:whatsapp, wl_menu:sidebar), ...empresa_dados_contrato(representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix)').eq('id', empresaId).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
   const entries: ZipEntry[] = []

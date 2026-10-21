@@ -16,7 +16,7 @@ export default async function PropostaPublicaPage({ params }: { params: Promise<
   const svc = createServiceClient()
   const { data } = await svc
     .from('propostas')
-    .select('cliente_nome, itens, observacoes, total, status, created_at, empresa:empresas(nome, wl_logo_url, wl_cor, wl_whatsapp)')
+    .select('cliente_nome, itens, observacoes, total, status, created_at, empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
     .eq('token', token)
     .maybeSingle()
 

@@ -21,7 +21,7 @@ import { comNome } from '@/lib/sem-nome'
 export default async function ClientesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   const cap = SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades
   const imob = !!cap.clienteComPipeline
 

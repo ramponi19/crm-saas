@@ -101,7 +101,7 @@ export function EmpresaProvider({ children }: { children: ReactNode }) {
       if (!id) { setLoading(false); return false }
 
       const { data: emp } = await supabase
-        .from('empresas').select('*').eq('id', id).maybeSingle()
+        .from('empresas').select('*, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_slogan:slogan, wl_whatsapp:whatsapp), ...empresa_dados_contrato(representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix)').eq('id', id).maybeSingle()
 
       if (emp) {
         setEmpresa(emp as unknown as Empresa)

@@ -155,6 +155,10 @@ begin
   update empresas e set preset_onboarding = e.segmento
    where e.preset_onboarding is null and exists (select 1 from presets_onboarding p where p.chave = e.segmento);
 
+  -- ETAPA 0 (22/10/2026): as 18 colunas de empresas lidas aqui (segmento, wl_*, representante_*,
+  -- banco_*, menu_override, menu_config, modulos_override) saíram (20261022000400) — este passo só
+  -- roda no corte. A checagem 'empresas' (uma linha por empresa em branding/menu/dados_contrato)
+  -- segue valendo; as equivalentes hoje são scripts/comparar-empresa.mts e comparar-contrato.mts.
   insert into empresa_branding (empresa_id, cor, logo_url, slogan, whatsapp, sidebar)
   select id, wl_cor, wl_logo_url, wl_slogan, wl_whatsapp, coalesce(wl_menu, '{}'::jsonb) from empresas
   on conflict (empresa_id) do nothing;

@@ -96,7 +96,7 @@ export async function POST(req: Request) {
   if (comDados) {
     const [acesso, { data: empresa }, { data: visiveis }, { data: lojasRaw }] = await Promise.all([
       acessoDoUsuario(supabase, empresaId, user.id),
-      supabase.from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle(),
+      supabase.from('empresas').select('nome, segmento:preset_onboarding').eq('id', empresaId).maybeSingle(),
       supabase.rpc('filiais_visiveis'),
       supabase.from('filiais').select('id, nome, cidade').eq('empresa_id', empresaId),
     ])
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
   if (!apiKey) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
   // Contexto do segmento p/ respostas mais úteis.
-  const { data: emp } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
+  const { data: emp } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   let systemText = systemPrompt((emp as { segmento?: string | null } | null)?.segmento ?? null, cfg?.system_extra ?? null)
   if (body.contexto) systemText += `\n\nContexto: o usuário está na tela "${String(body.contexto).slice(0, 60)}".`
 

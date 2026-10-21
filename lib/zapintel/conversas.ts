@@ -153,7 +153,7 @@ export async function carregarConversas(
 ): Promise<Conversas> {
   const indisponivel: DadoIndisponivel[] = []
   const { data: empresa, error: erroEmpresa } = await db
-    .from('empresas').select('nome, segmento').eq('id', empresaId).maybeSingle()
+    .from('empresas').select('nome, segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   if (erroEmpresa) indisponivel.push('empresa')
 
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'

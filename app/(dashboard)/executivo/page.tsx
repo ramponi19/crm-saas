@@ -40,7 +40,7 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
   const cfgSeg = SEGMENTOS[normalizarSegmento(empresa?.segmento)]
   // Capacidade, não nome de segmento: outra vertical que tenha negócio fechado por
   // imóvel liga a mesma flag e herda a tela.

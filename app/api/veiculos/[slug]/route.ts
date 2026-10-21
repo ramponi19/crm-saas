@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   }
   if (!slugValido(slug)) return vazio
 
-  const { data: empresa } = await svc.from('empresas').select('id, nome, segmento').eq('slug', slug).eq('status', 'ativo').maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, nome, segmento:preset_onboarding').eq('slug', slug).eq('status', 'ativo').maybeSingle()
   if (!empresa) return vazio
 
   /**

@@ -27,7 +27,7 @@ export default async function GestaoLeadsPage() {
 
   const [{ data: vinculo }, { data: empresa }, { data: usuarioLogado }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
-    supabase.from('empresas').select('segmento, permissoes').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento:preset_onboarding, permissoes').eq('id', empresaId).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
   ])
   const role = vinculo?.role ?? ''

@@ -34,9 +34,11 @@ export async function POST(req: Request) {
     }
   }
 
-  // Verificado o papel em código; grava via service client (evita depender da RLS de UPDATE de empresas).
+  // Verificado o papel em código; grava via service client em empresa_branding.sidebar
+  // (era empresas.wl_menu até 22/10/2026). Sem configuração = {} (a coluna não aceita nulo).
   const service = createServiceClient()
-  const { error } = await service.from('empresas').update({ wl_menu: wl as never }).eq('id', empresaId)
+  const { error } = await service.from('empresa_branding')
+    .upsert({ empresa_id: empresaId, sidebar: (wl ?? {}) as never, updated_at: new Date().toISOString() }, { onConflict: 'empresa_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })

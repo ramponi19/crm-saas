@@ -35,7 +35,7 @@ export default async function MetricasPage() {
   const [{ data: empresas }, { data: planos }] = await Promise.all([
     supabase
       .from('empresas')
-      .select('id, nome, plano, status, segmento, created_at, limite_usuarios, limite_leads')
+      .select('id, nome, plano, status, segmento:preset_onboarding, created_at, limite_usuarios, limite_leads')
       .neq('demo', true),
     supabase.from('planos_config').select('id, preco_centavos'),
   ])

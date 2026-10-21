@@ -57,7 +57,7 @@ export default async function PDVPage() {
       .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
-    supabase.from('empresas').select('segmento').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle(),
     // Referência de preço do aparelho recebido em troca + a tolerância da loja.
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),

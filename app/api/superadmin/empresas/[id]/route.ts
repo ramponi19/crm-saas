@@ -69,7 +69,7 @@ export async function POST(
       if (!(acao.segmento in SEGMENTOS)) {
         return NextResponse.json({ error: 'Segmento inválido' }, { status: 400 })
       }
-      update = { segmento: acao.segmento, preset_onboarding: acao.segmento }
+      update = { preset_onboarding: acao.segmento }
       logAcao = 'alterar_segmento'
       logDetalhes = { segmento: acao.segmento }
       break

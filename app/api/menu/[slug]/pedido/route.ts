@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id, segmento').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, segmento:preset_onboarding').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
 
   // Cardápio é de quem trabalha com comanda. Sem esta guarda, dava para mandar

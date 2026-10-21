@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento').eq('id', empresaId!).maybeSingle()
+  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId!).maybeSingle()
 
   // ── Loja de veículos ──
   // `matchVeiculo`: casa o interesse com unidade de veículo em vez de imóvel.

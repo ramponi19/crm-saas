@@ -8,7 +8,7 @@ async function getSite(slug: string) {
   const svc = createServiceClient()
   const { data: empresa } = await svc
     .from('empresas')
-    .select('id, nome, segmento, wl_cor, wl_logo_url, wl_slogan, wl_whatsapp, telefone')
+    .select('id, nome, segmento:preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_slogan:slogan, wl_whatsapp:whatsapp), telefone')
     .eq('slug', slug)
     .maybeSingle()
   if (!empresa) return null
