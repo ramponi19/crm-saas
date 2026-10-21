@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft } from 'lucide-react'
+import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface SearchResult {
@@ -29,6 +29,8 @@ const ACOES: Acao[] = [
   { id: 'go-clientes', label: 'Ir para Clientes', icon: Users, run: (r) => r.push('/clientes') },
   { id: 'go-pdv', label: 'Ir para PDV', icon: ScanBarcode, run: (r) => r.push('/pdv') },
   { id: 'go-estoque', label: 'Ir para Estoque', icon: Boxes, run: (r) => r.push('/estoque') },
+  // O assistente abre pelo mesmo evento do menu (o robô flutuante saiu na etapa 0).
+  { id: 'assistente', label: 'Perguntar ao assistente', icon: MessageSquareText, run: () => window.dispatchEvent(new Event('assistente:abrir')) },
 ]
 
 const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }

@@ -47,8 +47,8 @@ export async function POST() {
     if (n.tarefasHoje) linhas.push(`Concluir **${n.tarefasHoje}** tarefa(s) de hoje.`)
     if (n.visitasHoje) linhas.push(`Preparar **${n.visitasHoje}** visita(s)/compromisso(s) de hoje (**Agenda**).`)
     const roteiro = linhas.length
-      ? `Bom dia! Seu roteiro:\n${linhas.map((l, i) => `${i + 1}. ${l}`).join('\n')}`
-      : 'Bom dia! Você está em dia — nenhuma pendência urgente. Que tal prospectar novos leads? 🚀'
+      ? `Roteiro de hoje:\n${linhas.map((l, i) => `${i + 1}. ${l}`).join('\n')}`
+      : 'Nenhuma pendência urgente agora.'
     return NextResponse.json({ roteiro, counts: n })
   }
 

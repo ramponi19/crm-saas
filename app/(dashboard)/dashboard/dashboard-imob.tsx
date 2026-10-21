@@ -183,7 +183,6 @@ export default async function DashboardImob() {
   const ultimosClientes = (ultimosClientesRaw ?? []) as ClienteRow[]
   const ultimosImoveis = (ultimosImoveisRaw ?? []) as ImovelRow[]
 
-  const primeiroNome = (usuario?.nome ?? '').split(' ')[0] || 'corretor'
   const recentes = leads.slice(0, 6)
 
   return (
@@ -192,12 +191,6 @@ export default async function DashboardImob() {
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1100px] space-y-4">
-
-          {/* Header */}
-          <div>
-            <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">Olá, {primeiroNome}.</h1>
-            <p className="mt-0.5 text-[13px] text-ink-2">Aqui está {isGestor ? 'a operação da equipe' : 'sua operação'} hoje.</p>
-          </div>
 
           {/* Funil — uma caixa por etapa, na ordem em que o negócio anda.
               Os indicadores que existiam aqui em cima (leads novos, visitas

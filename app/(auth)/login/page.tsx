@@ -13,8 +13,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-8 rounded-card border border-line bg-card p-7">
-          <h1 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Bem-vindo de volta</h1>
-          <p className="mt-1 text-[13px] text-ink-2">Entre para acessar sua operação.</p>
+          <h1 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Entrar</h1>
           <div className="mt-6">
             <LoginForm />
           </div>

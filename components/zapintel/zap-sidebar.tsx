@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Users, Lightbulb, MessageSquare, ShoppingBag, Headset, ArrowLeft, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Lightbulb, MessageSquare, MessageSquareText, ShoppingBag, Headset, ArrowLeft, Menu, X } from "lucide-react";
 import { useLeads } from "@/hooks/zapintel/useLeads";
 
 const NAV = [
@@ -61,6 +61,15 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
     document.addEventListener("keydown", tecla);
     return () => document.removeEventListener("keydown", tecla);
   }, [aberta]);
+  // O assistente abre por aqui (o robô flutuante saiu na etapa 0); o número de
+  // análises pendentes, que era o selo do robô, chega pelo evento do assistente.
+  const [pendentes, setPendentes] = useState(0);
+  useEffect(() => {
+    const ouvir = (e: Event) => setPendentes(Number((e as CustomEvent<number>).detail) || 0);
+    window.addEventListener("assistente:pendentes", ouvir);
+    return () => window.removeEventListener("assistente:pendentes", ouvir);
+  }, []);
+
   return (
     <>
     <style>{`
@@ -163,6 +172,16 @@ export function ZapSidebar({ empresaNome = "Minha empresa" }: { empresaNome?: st
           ) : "Lendo as conversas…"}
         </div>
       </div>
+      <button onClick={() => window.dispatchEvent(new Event("assistente:abrir"))}
+        aria-label={pendentes ? `Assistente — ${pendentes} leads com nova análise disponível` : "Assistente"}
+        style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: "none", cursor: "pointer", fontSize: 12, color: "var(--dim)", textAlign: "left" }}>
+        <MessageSquareText size={15} /> Assistente
+        {pendentes > 0 && (
+          <span style={{ marginLeft: "auto", minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "#ea580c", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center" }}>
+            {pendentes > 99 ? "99+" : pendentes}
+          </span>
+        )}
+      </button>
       <Link href="/dashboard" prefetch={false} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, textDecoration: "none", fontSize: 12, color: "var(--dim)" }}>
         <ArrowLeft size={15} /> Voltar ao CRM
       </Link>

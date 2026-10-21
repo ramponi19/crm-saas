@@ -168,10 +168,11 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
     }
   }, [])
 
-  function alternar() {
-    if (!aberto) setAberturas((n) => n + 1)
-    setAberto(!aberto)
-  }
+  // O número de análises pendentes vai para o item "Assistente" do menu do ZapIntel.
+  useEffect(() => {
+    if (zi) window.dispatchEvent(new CustomEvent('assistente:pendentes', { detail: pendentes }))
+  }, [zi, pendentes])
+
   function limpar() { setMsgs([]); try { localStorage.removeItem(STORE_KEY) } catch { /* ignore */ } }
   async function copiar(i: number, texto: string) {
     try { await navigator.clipboard.writeText(texto); setCopiado(i); setTimeout(() => setCopiado(null), 1500) } catch { /* ignore */ }
@@ -252,29 +253,22 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
 
   const streaming = loading && msgs[msgs.length - 1]?.role === 'model' && !!msgs[msgs.length - 1]?.text
 
+  /**
+   * SEM ROBÔ FLUTUANTE (etapa 0, 21/10/2026).
+   *
+   * O botão redondo no canto de toda tela saiu: é o vício "cara de IA" que o
+   * 02 aponta. O painel fica, e abre pelo evento `assistente:abrir` — o item
+   * "Assistente" do menu, a ação no ⌘K e os botões do ZapIntel disparam o mesmo
+   * evento. O número de análises pendentes, que era o selo do robô, vai para o
+   * menu do ZapIntel pelo evento `assistente:pendentes`.
+   */
   return (
     <>
-      <button
-        onClick={alternar}
-        aria-label={zi && pendentes ? `Assistente — ${pendentes} leads com nova análise disponível` : 'Assistente'}
-        title={zi && pendentes ? `${pendentes} leads com conversa nova desde a última análise` : 'Assistente'}
-        data-print-hide
-        className={cn('fixed bottom-5 right-5 z-40 grid place-items-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95', cheio)}
-        style={{ width: 52, height: 52 }}
-      >
-        {aberto ? <X size={22} strokeWidth={2} /> : <Bot size={24} strokeWidth={2} />}
-        {!aberto && zi && pendentes > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-[22px] min-w-[22px] place-items-center rounded-full border-2 border-white bg-[#ea580c] px-1.5 text-[11px] font-extrabold tabular-nums">
-            {pendentes > 99 ? '99+' : pendentes}
-          </span>
-        )}
-      </button>
-
       {/* No ZapIntel o bloco das análises existe mesmo fechado: é ele que
-          alimenta o número do robô. Escondido, não ocupa nada. */}
+          alimenta o número do menu. Escondido, não ocupa nada. */}
       {zi && (
         <div
-          className={cn('fixed bottom-[84px] right-5 z-40 flex w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-card border border-line bg-card shadow-xl', !aberto && 'hidden')}
+          className={cn('fixed bottom-5 right-5 z-40 flex w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-card border border-line bg-card shadow-xl', !aberto && 'hidden')}
           style={{ height: 'min(600px, calc(100dvh - 120px))' }}
         >
           <Cabecalho zi onLimpar={msgs.length ? limpar : undefined} onFechar={() => setAberto(false)} />
@@ -283,7 +277,7 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
         </div>
       )}
       {!zi && aberto && (
-        <div className="fixed bottom-[84px] right-5 z-40 flex w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-card border border-line bg-card shadow-xl" style={{ height: 'min(600px, calc(100dvh - 120px))' }}>
+        <div className="fixed bottom-5 right-5 z-40 flex w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-card border border-line bg-card shadow-xl" style={{ height: 'min(600px, calc(100dvh - 120px))' }}>
           <Cabecalho onLimpar={msgs.length ? limpar : undefined} onFechar={() => setAberto(false)} />
           {corpo()}
         </div>

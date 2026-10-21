@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, ShieldAlert, Lock, MessageSquareText } from 'lucide-react'
 import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
 import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
 import { MENU_ICONS } from './menu-icons'
@@ -183,6 +183,11 @@ export function Sidebar({
             {userName.slice(0, 2).toUpperCase()}
           </span>
           <AusenciaPopover userName={userName} userRole={userRole} nomeClasse={strong} papelClasse={faint} />
+          {/* O assistente abre daqui e do ⌘K: o robô flutuante saiu (etapa 0). */}
+          <button aria-label="Assistente" title="Assistente" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)}
+            onClick={() => window.dispatchEvent(new Event('assistente:abrir'))}>
+            <MessageSquareText size={15} strokeWidth={1.7} />
+          </button>
           {isEmpresaAdmin && (
             <Link href="/admin" aria-label="Administração" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)}>
               <Settings size={15} strokeWidth={1.7} />

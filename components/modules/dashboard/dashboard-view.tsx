@@ -39,16 +39,11 @@ const PERIOD_LABELS: Record<string, string> = {
 }
 
 /**
- * Hora e data em fuso FIXO: a página é desenhada no servidor (UTC) e depois no
- * navegador (São Paulo). Sem fuso, 9 horas por dia a saudação saía diferente nos
- * dois lados — e de 21h à meia-noite também a data —, e o React acusava o #418.
+ * Datas em fuso FIXO: a página é desenhada no servidor (UTC) e depois no
+ * navegador (São Paulo). Sem fuso, de 21h à meia-noite a data saía diferente
+ * nos dois lados, e o React acusava o #418.
  */
 const FUSO = 'America/Sao_Paulo'
-
-function saudacao() {
-  const h = Number(new Intl.DateTimeFormat('pt-BR', { hour: 'numeric', hourCycle: 'h23', timeZone: FUSO }).format(new Date()))
-  return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
-}
 
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 
@@ -264,7 +259,6 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
 export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const {} = useEmpresa()
   const router = useRouter()
-  const [userName, setUserName] = useState<string | null>(null)
   const [activePeriod, setActivePeriod] = useState('mes')
   const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
   const [faturamentoMensal, setFaturamentoMensal] = useState<Array<{ mes: string; total: number }>>([])
@@ -277,21 +271,6 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   })
   const [vendasRecentes, setVendasRecentes] = useState<VendaRecente[]>(initialData.vendasRecentes)
   const [topVendedores, setTopVendedores] = useState<Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>>([])
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data }) => {
-      const user = data.user
-      if (!user) return
-      const { data: perfil } = await supabase.from('usuarios').select('nome').eq('id', user.id).single()
-      if (perfil?.nome) setUserName(perfil.nome.trim().split(' ')[0])
-      else {
-        const meta = user.user_metadata
-        const name: string | undefined = meta?.nome ?? meta?.full_name ?? meta?.name
-        setUserName(name ? name.split(' ')[0] : (user.email?.split('@')[0] ?? null))
-      }
-    })
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -327,15 +306,8 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
       <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-bg px-4 py-5 scrollbar-thin sm:px-6 sm:py-6">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
-          {/* Header */}
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-[22px] font-bold tracking-[-0.03em] text-ink">{saudacao()}{userName ? `, ${userName}` : ''}.</h1>
-              <p className="mt-0.5 text-[13px] text-ink-2">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FUSO })}
-                {globais.leadsNovos > 0 && <> — <span className="font-medium text-ink">{globais.leadsNovos}</span> leads aguardam primeira resposta.</>}
-              </p>
-            </div>
+          {/* O painel abre no conteúdo: sem saudação, sem frase de abertura (etapa 0). */}
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex gap-2">
               <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => router.push('/relatorios')}>Exportar</Button>
               <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>

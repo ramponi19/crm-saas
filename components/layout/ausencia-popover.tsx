@@ -61,7 +61,7 @@ export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }:
         notify.ok('Você está ausente',
           j.liberados ? `${j.liberados} lead(s) liberado(s) para a equipe atender.` : 'Você não recebe novos leads enquanto estiver assim.')
       } else {
-        notify.ok('Bem-vindo de volta', 'Você voltou a receber leads.')
+        notify.ok('Ausência encerrada', 'Você voltou a receber leads.')
       }
       router.refresh()
     } finally { setSalvando(false) }
