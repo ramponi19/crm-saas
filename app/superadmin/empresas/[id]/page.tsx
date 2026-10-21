@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { rastrDb } from '@/lib/rastreamento/db'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import { ControleEmpresa } from '@/components/superadmin/controle-empresa'
 import { AddonsEmpresa } from '@/components/superadmin/addons-empresa'
@@ -11,7 +10,7 @@ import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
-import { carregarConfigEmpresa } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -76,10 +75,9 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   // Camadas de menu e módulos forçados: do core desde 21/10/2026 (lib/empresa-config.ts).
   const camadas = await carregarConfigEmpresa(svc, empresaId, empresa.preset_onboarding ?? null)
 
-  // Complemento pago (ZapIntel): estado na tabela autocontida
-  // complementos_empresa, lida via client do complemento (fora dos tipos do CRM).
-  const { data: addon } = await rastrDb()
-    .from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle()
+  // Complemento pago (ZapIntel): módulo 'inteligencia' de empresa_modulos, que já
+  // veio com as camadas (era complementos_empresa até 21/10/2026).
+  const zapintelLigado = moduloLigado(camadas.modulos, MODULO_INTELIGENCIA)
 
   // Usuários membros
   const { data: membrosRaw } = await svc
@@ -250,7 +248,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
       <div className="mb-5">
         <AddonsEmpresa
           empresaId={empresaId}
-          zapintelInit={!!(addon as { zapintel_ativo?: boolean } | null)?.zapintel_ativo}
+          zapintelInit={zapintelLigado}
         />
       </div>
 

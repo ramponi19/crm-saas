@@ -7,6 +7,7 @@ import { rodarRetencao } from '@/lib/storage/retencao'
 import { montarPonte, gravarPonte } from '@/lib/zapintel/ponte'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -151,7 +152,7 @@ export async function GET(
          * atualiza, e nunca mexe numa ligação confirmada à mão.
          */
         const { data: ativas, error } = await supabase
-          .from('complementos_empresa').select('empresa_id').eq('zapintel_ativo', true)
+          .from('empresa_modulos').select('empresa_id').eq('modulo', MODULO_INTELIGENCIA).eq('ativo', true)
         if (error) throw error
         const resultado: { empresa: number; vendas: number; gravadas: number }[] = []
         for (const { empresa_id } of (ativas ?? []) as { empresa_id: number }[]) {

@@ -76,6 +76,19 @@ export function modulosForcados(rows: ModuloRow[] | null | undefined): Partial<R
   return algum ? fora : undefined
 }
 
+/**
+ * O ZapIntel é o módulo `inteligencia` em empresa_modulos (origem addon). Até
+ * 21/10/2026 era a tabela à parte complementos_empresa (zapintel_ativo).
+ */
+export const MODULO_INTELIGENCIA = 'inteligencia'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function inteligenciaLigada(db: SupabaseClient<any>, empresaId: number): Promise<boolean> {
+  const { data } = await db.from('empresa_modulos').select('ativo')
+    .eq('empresa_id', empresaId).eq('modulo', MODULO_INTELIGENCIA).maybeSingle()
+  return !!(data as { ativo?: boolean } | null)?.ativo
+}
+
 /** Módulo ligado para a empresa: linha ativa em empresa_modulos. */
 export function moduloLigado(rows: ModuloRow[] | null | undefined, modulo: string): boolean {
   return (rows ?? []).some((r) => r.modulo === modulo && r.ativo)

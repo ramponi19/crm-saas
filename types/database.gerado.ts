@@ -781,32 +781,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"complementos_empresa": {
-                  Row: {
-                    "atualizado_em": string,"criado_em": string,"empresa_id": number,"zapintel_ativo": boolean
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "atualizado_em"?: string,"criado_em"?: string,"empresa_id": number,"zapintel_ativo"?: boolean
-                  }
-                  Update: {
-                    "atualizado_em"?: string,"criado_em"?: string,"empresa_id"?: number,"zapintel_ativo"?: boolean
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "tracker_addons_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: true
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "tracker_addons_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: true
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"configuracoes_sistema": {
                   Row: {
                     "chave": string,"empresa_id": number,"id": number,"updated_at": string | null,"valor": Json | null

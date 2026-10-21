@@ -50,7 +50,7 @@ begin
   if v_emp is null then raise exception 'sem empresa' using errcode = '42501'; end if;
 
   if not coalesce(v_super, false) and not exists (
-    select 1 from complementos_empresa where empresa_id = v_emp and zapintel_ativo
+    select 1 from empresa_modulos where empresa_id = v_emp and modulo = 'inteligencia' and ativo
   ) then
     raise exception 'ZapIntel não está ativo para esta empresa' using errcode = '42501';
   end if;

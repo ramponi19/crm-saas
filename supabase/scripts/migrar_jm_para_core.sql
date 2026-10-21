@@ -203,6 +203,8 @@ begin
    group by x.empresa_id, x.modulo
   on conflict (empresa_id, modulo) do nothing;
 
+  -- ETAPA 0 (22/10/2026): complementos_empresa saiu (20261022000200); a 20261021003400 copiou
+  -- também as empresas desligadas (ativo = false). A checagem 'modulos da JM' segue valendo.
   insert into empresa_modulos (empresa_id, modulo, origem, instalado_em, ativo)
   select c.empresa_id, 'inteligencia', 'addon', c.criado_em, true
     from complementos_empresa c where c.zapintel_ativo

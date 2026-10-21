@@ -7,6 +7,7 @@ import Providers from './providers'
 import { ZapSidebar } from '@/components/zapintel/zap-sidebar'
 import { PreviewBanner } from '@/components/zapintel/preview-banner'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
+import { inteligenciaLigada } from '@/lib/empresa-config'
 
 export const metadata = { title: 'ZapIntel' }
 
@@ -20,16 +21,16 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { userId, empresaId } = await zapintelEmpresa()
-  // Status do add-on na tabela própria do complemento (complementos_empresa), não em
-  // empresas — mantém o módulo removível sem alterar o schema do CRM.
-  const [{ data: usuario }, { data: empresa }, { data: addon }, papelOk] = await Promise.all([
+  // O complemento é o módulo 'inteligencia' de empresa_modulos (era a tabela à parte
+  // complementos_empresa até 21/10/2026) — lib/empresa-config.ts.
+  const [{ data: usuario }, { data: empresa }, addon, papelOk] = await Promise.all([
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     rastrDb().from('empresas').select('nome').eq('id', empresaId).single(),
-    rastrDb().from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
+    inteligenciaLigada(rastrDb(), empresaId),
     zapintelPapelPermitido(userId, empresaId),
   ])
 
-  const liberado = !!usuario?.is_super_admin || !!(addon as { zapintel_ativo?: boolean })?.zapintel_ativo
+  const liberado = !!usuario?.is_super_admin || addon
   const previewAtivo = !!usuario?.is_super_admin && Number((await cookies()).get('nexus_preview_empresa')?.value) === empresaId
   // Empresa com o complemento, mas papel sem acesso (vendedor, técnico): o
   // ZapIntel é do dono, do admin e do superadmin — lib/zapintel/quem-usa.ts.

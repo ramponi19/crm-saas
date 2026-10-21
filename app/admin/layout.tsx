@@ -5,6 +5,7 @@ import { NotificationProvider } from '@/components/layout/notification-provider'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { rastrDb } from '@/lib/rastreamento/db'
+import { inteligenciaLigada } from '@/lib/empresa-config'
 
 /**
  * Área de Administração do DONO (owner/admin), escopada ao tenant.
@@ -15,12 +16,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { userId, empresaId, role } = await requireEmpresaRole(['owner', 'admin'])
 
   const supabase = await createClient()
-  const [{ data: usuario }, { data: empresa }, { data: addon }] = await Promise.all([
+  const [{ data: usuario }, { data: empresa }, zapintelAtivo] = await Promise.all([
     supabase.from('usuarios').select('nome, email').eq('id', userId).single(),
     supabase.from('empresas').select('nome').eq('id', empresaId).single(),
     // Atalho do complemento ZapIntel: só aparece quando o
-    // add-on está ativo. Status vem da tabela própria do complemento, não do CRM.
-    rastrDb().from('complementos_empresa').select('zapintel_ativo').eq('empresa_id', empresaId).maybeSingle(),
+    // add-on está ativo: módulo 'inteligencia' de empresa_modulos (lib/empresa-config.ts).
+    inteligenciaLigada(rastrDb(), empresaId),
   ])
   const impersonation = await getImpersonation()
 
@@ -30,8 +31,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         userName={usuario?.nome ?? usuario?.email ?? 'Administrador'}
         empresaNome={empresa?.nome ?? 'Minha empresa'}
         role={role}
-        impersonationNome={impersonation?.nome ?? null}
-        zapintelAtivo={!!(addon as { zapintel_ativo?: boolean })?.zapintel_ativo}
+        impersonationNome={impersonation?.nome ?? null}
+        zapintelAtivo={zapintelAtivo}
       >
         {children}
       </AdminShell>

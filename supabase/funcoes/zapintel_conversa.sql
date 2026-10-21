@@ -472,5 +472,5 @@ create extension if not exists pg_cron;
 select cron.schedule(
   'zapintel-conversa-aquecer',
   '0 5 * * *',
-  $$select public.zapintel_conversa_aquecer(e.empresa_id) from public.complementos_empresa e where e.zapintel_ativo$$
+  $$select public.zapintel_conversa_aquecer(m.empresa_id) from public.empresa_modulos m where m.modulo = 'inteligencia' and m.ativo$$
 );
