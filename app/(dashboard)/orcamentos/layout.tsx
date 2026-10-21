@@ -29,13 +29,9 @@ export default async function OrcamentosLayout({ children }: { children: React.R
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Orçamentos" />
-      {/* Sem a cotação liberada, não há o que escolher: uma faixa de abas com
-          uma aba só é ruído. A tela fica como sempre foi. */}
-      {cotacao && (
-        <div className="shrink-0 px-4 sm:px-6">
-          <AbasOrcamentos />
-        </div>
-      )}
+      {/* As abas se escondem sozinhas quando sobraria uma só (sem cotação e sem
+          Simular parcela liberada) — ver abas.tsx. */}
+      <AbasOrcamentos cotacao={cotacao} />
       {children}
     </div>
   )

@@ -69,7 +69,6 @@ const AREA_DE_VERTICAL = [
   'app/(dashboard)/cardapio/',
   'app/(dashboard)/kds/',
   'app/(dashboard)/avaliacoes/',
-  'app/(dashboard)/consulta-fipe/',
   'app/imob/',
   'app/landing/',
   'app/para/',

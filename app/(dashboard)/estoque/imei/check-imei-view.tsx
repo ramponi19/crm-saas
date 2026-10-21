@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ScanSearch, ExternalLink, ShieldCheck, ShieldAlert, HelpCircle, Copy, Check } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, ScanSearch, ExternalLink, ShieldCheck, ShieldAlert, HelpCircle, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { cn } from '@/lib/utils'
@@ -127,10 +128,14 @@ export function CheckImeiView({ consultas }: { consultas: ConsultaImei[] }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-bg">
-      <Topbar eyebrow="OPERAÇÃO" title="Check IMEI" />
+      <Topbar title="Check IMEI" />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
         <div className="mx-auto max-w-[820px] space-y-5">
+          {/* Mora em Estoque desde a etapa 0: é onde o aparelho entra. */}
+          <Link href="/estoque" className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-ink-2 hover:text-ink">
+            <ArrowLeft size={14} strokeWidth={1.7} /> Estoque
+          </Link>
           <Card title="Consultar aparelho">
             <div className="space-y-4">
               <div>

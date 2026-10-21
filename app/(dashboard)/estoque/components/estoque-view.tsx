@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck, ArrowLeftRight } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck, ArrowLeftRight, ScanSearch } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
 import { cn, formatCurrency } from '@/lib/utils'
 import UnidadeModal from './unidade-modal'
 import { Topbar } from '@/components/layout/topbar'
@@ -160,6 +162,8 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
   const isVeiculo = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaPlaca
   const [tab, setTab] = useState<Tab>('lista')
+  const router = useRouter()
+  const imei = useFerramenta('/check-imei')
   const [itens, setItens] = useState<Unidade[]>(itensInit)
   const [search, setSearch] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
@@ -440,7 +444,14 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
       <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
-          <Tabs items={TABS} value={tab} onValueChange={(v) => setTab(v as Tab)} />
+          {/* Check IMEI é aba de Estoque desde a etapa 0 (saiu do menu lateral): é
+              aqui que o aparelho entra. A aba leva à tela dela, /estoque/imei, que
+              tem o histórico de consultas carregado no servidor. */}
+          <Tabs
+            items={imei ? [...TABS, { value: 'imei', label: <span className="flex items-center gap-2"><ScanSearch size={14} strokeWidth={1.7} />{imei.label}</span> }] : TABS}
+            value={tab}
+            onValueChange={(v) => (v === 'imei' && imei ? router.push(imei.rota) : setTab(v as Tab))}
+          />
 
           {/* ── DASHBOARD ── */}
           {tab === 'dashboard' && (
@@ -1096,7 +1107,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
                       return (
                         <span className="text-[11.5px] text-warn">
                           IMEI não consultado na base de aparelhos impedidos.{' '}
-                          <a href="/check-imei" target="_blank" rel="noopener" className="font-medium underline">Consultar agora</a>
+                          <a href="/estoque/imei" target="_blank" rel="noopener" className="font-medium underline">Consultar agora</a>
                         </span>
                       )
                     }

@@ -514,6 +514,20 @@ n "pagina do painel nao le a view"      "app/(dashboard)/dashboard/page.tsx" "fr
 n "rota do painel nao le a view"        "app/api/dashboard/route.ts" "from('leads')"
 n "card nao divide lucro por receita"   "components/modules/dashboard/dashboard-view.tsx" "lucro / receita"
 v "card mostra sem custo lancado"       "components/modules/dashboard/dashboard-view.tsx" "sem custo lançado"
+# 21/10/2026: tarefas tem duas chaves para negocios desde o corte; embed sem o
+# nome da chave e PGRST201 (lista vazia, criar tarefa falha calado).
+n "lista de tarefas sem embed ambiguo"   "app/(dashboard)/tarefas/page.tsx" "leads(nome)"
+n "criar tarefa sem embed ambiguo"      "app/(dashboard)/tarefas/tarefas-view.tsx" "leads(nome)"
+n "painel imob sem embed ambiguo"       "app/(dashboard)/dashboard/dashboard-imob.tsx" "vencimento, leads(nome)"
+# 21/10/2026 (etapa 0, 2.4): Simular parcela, Check IMEI e FIPE sao ferramentas,
+# nao itens de menu; moram em Orcamentos/Estoque/Avaliacoes e abrem pelo Cmd+K.
+v "ferramenta nao entra no menu"        "lib/menu.ts" "if (item.ferramenta) {"
+v "trava conhece a rota da ferramenta"  "lib/menu.ts" "pathname.startsWith(i.ferramenta.rota +"
+v "parcela e aba de orcamentos"         "app/(dashboard)/orcamentos/abas.tsx" "useFerramenta('/simular-parcela')"
+v "imei e aba do estoque"               "app/(dashboard)/estoque/components/estoque-view.tsx" "useFerramenta('/check-imei')"
+v "fipe mora em avaliacoes"             "app/(dashboard)/avaliacoes/avaliacoes-view.tsx" "useFerramenta('/consulta-fipe')"
+v "cmd+k abre as ferramentas"           "components/layout/command-palette.tsx" "useFerramentas()"
+v "endereco antigo responde 308"        "next.config.ts" "destination: '/estoque/imei', permanent: true"
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

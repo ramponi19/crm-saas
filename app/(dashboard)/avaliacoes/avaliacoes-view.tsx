@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Trash2, ClipboardCheck, Car } from 'lucide-react'
 import { Card, Button, Input, Textarea, Select, Badge, Modal, EmptyState, notify } from '@/components/ui'
 import { FipePicker } from '@/components/modules/veiculos/fipe-picker'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
 
 export interface Veiculo {
   categoria?: string; marca?: string; modelo?: string; versao?: string
@@ -36,6 +37,7 @@ const vazioVeiculo: Veiculo = { categoria: '', marca: '', modelo: '', versao: ''
 
 export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads: { id: number; nome: string | null }[] }) {
   const router = useRouter()
+  const fipe = useFerramenta('/consulta-fipe')
   const [editando, setEditando] = useState<Avaliacao | 'nova' | null>(null)
   const [veiculo, setVeiculo] = useState<Veiculo>(vazioVeiculo)
   const [leadId, setLeadId] = useState('')
@@ -110,7 +112,9 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[1000px] space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {/* Consulta FIPE avulsa: ferramenta desta tela desde a etapa 0 (saiu do menu). */}
+          {fipe && <Button variant="outline" icon={<Car size={15} strokeWidth={1.7} />} onClick={() => router.push(fipe.rota)}>{fipe.label}</Button>}
           <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => abrir('nova')}>Nova avaliação</Button>
         </div>
 

@@ -34,6 +34,14 @@ const nextConfig: NextConfig = {
       { source: '/zapintel/comparar', destination: '/zapintel/insights', permanent: false },
       { source: '/zapintel/linguagem', destination: '/zapintel/insights', permanent: false },
       { source: '/zapintel/relatorio', destination: '/zapintel/insights', permanent: false },
+      /**
+       * ETAPA 0 (21/10/2026) — ferramentas que saíram do menu e foram morar dentro
+       * da tela onde se usam. 308 (permanente): o endereço novo é definitivo.
+       * REMOVER EM 21/11/2026 — está na lista de morte do 05-RUNBOOK-CORTE.md.
+       */
+      { source: '/simular-parcela', destination: '/orcamentos/parcela', permanent: true },
+      { source: '/check-imei', destination: '/estoque/imei', permanent: true },
+      { source: '/consulta-fipe', destination: '/avaliacoes/fipe', permanent: true },
     ]
   },
 }

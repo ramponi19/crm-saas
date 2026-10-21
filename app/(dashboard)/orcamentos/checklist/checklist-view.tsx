@@ -154,7 +154,7 @@ export function ChecklistView({ corteBateria }: { corteBateria: number }) {
                             já tem a tela que faz isso. Mandar o vendedor
                             procurar no menu é perder o momento. */}
                         {it.n === 24 && (
-                          <Link href="/check-imei"
+                          <Link href="/estoque/imei"
                             className="mt-1.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:underline">
                             <ScanSearch size={13} strokeWidth={1.8} /> Consultar IMEI aqui <ArrowRight size={12} strokeWidth={2} />
                           </Link>

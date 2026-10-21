@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
 import { RotulosProvider } from '@/components/layout/rotulos-context'
+import { FerramentasProvider } from '@/components/layout/ferramentas-context'
+import { resolverFerramentas } from '@/lib/menu'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
@@ -113,6 +115,13 @@ export default async function DashboardLayout({
   // empresa_modulos) — ver lib/empresa-config.ts.
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
   const { overrides: menuOverrides, configDono: menuConfig, segOverride, rotulos } = camadasParaMenu(cfg, permHidden)
+  // Ferramentas fora do menu (Simular parcela, Check IMEI, FIPE): mesmas camadas do
+  // menu, entregues às telas-casa e ao ⌘K.
+  const ferramentas = resolverFerramentas({
+    segmento: normalizarSegmento(empresa?.segmento), plano, role,
+    isSuperAdmin: usuario?.is_super_admin ?? false,
+    overrides: menuOverrides, configDono: menuConfig, segOverride,
+  }).map(({ href, label, rota }) => ({ href, label, rota }))
 
   return (
     <EmpresaProvider>
@@ -175,7 +184,9 @@ export default async function DashboardLayout({
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
           <RotulosProvider valor={rotulos}>
-            <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+            <FerramentasProvider valor={ferramentas}>
+              <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+            </FerramentasProvider>
           </RotulosProvider>
         </div>
       </div>

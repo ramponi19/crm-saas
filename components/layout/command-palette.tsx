@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText } from 'lucide-react'
+import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText, Calculator, ScanSearch, Car, Wrench } from 'lucide-react'
+import { useFerramentas } from './ferramentas-context'
 import { createClient } from '@/lib/supabase/client'
 
 interface SearchResult {
@@ -32,6 +33,11 @@ const ACOES: Acao[] = [
   // O assistente abre pelo mesmo evento do menu (o robô flutuante saiu na etapa 0).
   { id: 'assistente', label: 'Perguntar ao assistente', icon: MessageSquareText, run: () => window.dispatchEvent(new Event('assistente:abrir')) },
 ]
+
+/** Ícone de cada ferramenta (as que saíram do menu lateral na etapa 0). */
+const ICONE_FERRAMENTA: Record<string, typeof Plus> = {
+  '/simular-parcela': Calculator, '/check-imei': ScanSearch, '/consulta-fipe': Car,
+}
 
 const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', estoque: 'Estoque' }
 
@@ -164,8 +170,15 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     return () => { if (timer.current) clearTimeout(timer.current) }
   }, [query])
 
+  // As ferramentas liberadas para esta empresa entram como ação: é o caminho
+  // delas fora da tela-casa, já que não estão mais no menu.
+  const ferramentas = useFerramentas()
+  const acoes: Acao[] = [
+    ...ACOES,
+    ...ferramentas.map((f) => ({ id: f.href, label: f.label, icon: ICONE_FERRAMENTA[f.href] ?? Wrench, run: (r: ReturnType<typeof useRouter>) => r.push(f.rota) })),
+  ]
   const acoesFiltradas = query.trim().length >= 2
-    ? ACOES.filter((a) => a.label.toLowerCase().includes(query.toLowerCase()))
+    ? acoes.filter((a) => a.label.toLowerCase().includes(query.toLowerCase()))
     : ACOES.slice(0, 3)
   const flat = [...acoesFiltradas.map((a) => ({ kind: 'acao' as const, a })), ...results.map((r) => ({ kind: 'result' as const, r }))]
 

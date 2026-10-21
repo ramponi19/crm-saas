@@ -43,6 +43,13 @@ export interface MenuItemBase {
   opcional?: boolean
   /** Ausente = producao (o normal). */
   status?: StatusModulo
+  /**
+   * FERRAMENTA, não área (etapa 0, 21/10/2026). Não entra no menu lateral: mora
+   * dentro de outra tela (`rota`) e abre pelo ⌘K. O `href` continua sendo a
+   * identidade do MÓDULO — é ele que o segmento e o superadmin liberam —, então a
+   * liberação por empresa não mudou de forma; só o lugar onde a tela aparece.
+   */
+  ferramenta?: { rota: string }
 }
 
 export interface MenuGroupBase {
@@ -213,6 +220,11 @@ export function hrefsBase(): string[] {
  * incluí-las numa lista de exceções.
  */
 export function moduloDaRota(pathname: string): string | null {
+  // Ferramenta mora DENTRO de outra tela: /orcamentos/parcela é o módulo
+  // /simular-parcela, não /orcamentos. Vem antes da raiz por isso.
+  const ferramenta = CATALOGO.flatMap((g) => g.items)
+    .find((i) => i.ferramenta && (pathname === i.ferramenta.rota || pathname.startsWith(i.ferramenta.rota + '/')))
+  if (ferramenta) return ferramenta.href
   const raiz = '/' + (pathname.split('/')[1] ?? '')
   if (NUCLEO.has(raiz)) return null // núcleo nunca é bloqueado
   return CATALOGO.flatMap((g) => g.items).some((i) => i.href === raiz) ? raiz : null
@@ -268,10 +280,11 @@ export const CATALOGO: MenuGroupBase[] = [
     items: [
       { href: '/pdv', label: 'PDV', icon: 'ScanBarcode' },
       { href: '/historico', label: 'Histórico', icon: 'ReceiptText' },
-      { href: '/simular-parcela', label: 'Simular parcela', icon: 'Calculator' },
+      // Ferramentas (etapa 0): fora do menu, dentro da tela onde se usa, e no ⌘K.
+      { href: '/simular-parcela', label: 'Simular parcela', icon: 'Calculator', ferramenta: { rota: '/orcamentos/parcela' } },
       { href: '/estoque', label: 'Estoque', icon: 'Boxes' },
       // Só faz sentido onde se vende aparelho — opcional, como a FIPE em veículos.
-      { href: '/check-imei', label: 'Check IMEI', icon: 'ScanSearch', opcional: true },
+      { href: '/check-imei', label: 'Check IMEI', icon: 'ScanSearch', opcional: true, ferramenta: { rota: '/estoque/imei' } },
       { href: '/catalogo', label: 'Produtos', icon: 'Smartphone' },
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
@@ -290,7 +303,7 @@ export const CATALOGO: MenuGroupBase[] = [
     label: 'Veículos',
     items: [
       { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck', opcional: true },
-      { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car', opcional: true },
+      { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car', opcional: true, ferramenta: { rota: '/avaliacoes/fipe' } },
     ],
   },
   {
@@ -323,6 +336,21 @@ export const CATALOGO: MenuGroupBase[] = [
 ]
 
 export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
+  return resolver(input).grupos
+}
+
+/**
+ * As FERRAMENTAS que este usuário pode abrir, já com o rótulo da empresa.
+ *
+ * Passam pelas mesmas camadas do menu (maturidade, opt-in, ocultos, papel,
+ * plano) — só não viram item lateral. Quem pergunta: a tela-casa de cada uma
+ * (aba ou botão) e o ⌘K.
+ */
+export function resolverFerramentas(input: ResolverMenuInput): Array<MenuItem & { rota: string }> {
+  return resolver(input).ferramentas
+}
+
+function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas: Array<MenuItem & { rota: string }> } {
   const { segmento, plano, role, isSuperAdmin, overrides, configDono, segOverride } = input
   const seg = SEGMENTOS[segmento]
   const isAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
@@ -348,6 +376,7 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   }
 
   const out: MenuGroup[] = []
+  const ferramentas: Array<MenuItem & { rota: string }> = []
   for (const g of CATALOGO) {
     const items: MenuItem[] = []
     for (const item of g.items) {
@@ -364,6 +393,10 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
       if (forcado === false) continue // superadmin bloqueou explicitamente
       const locked = !!item.modulo && !isSuperAdmin && forcado !== true && !planoTemAcesso(plano, item.modulo)
 
+      if (item.ferramenta) {
+        if (!locked) ferramentas.push({ ...item, label: labels[item.href] ?? item.label, locked, rota: item.ferramenta.rota })
+        continue
+      }
       items.push({ ...item, label: labels[item.href] ?? item.label, locked })
     }
     if (items.length > 0) out.push({ label: g.label, items })
@@ -457,7 +490,7 @@ export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
     out.sort((a, b) => posicao(a.label) - posicao(b.label))
   }
 
-  return out.filter((g) => g.items.length > 0)
+  return { grupos: out.filter((g) => g.items.length > 0), ferramentas }
 }
 
 /**
