@@ -507,6 +507,13 @@ v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "carregarCo
 v "menu le as camadas do core"         "app/(dashboard)/layout.tsx" "carregarConfigEmpresa(supabase"
 v "trava le o preset"                  "proxy.ts" "presets_onboarding"
 v "superadmin nao apaga habilitados"   "app/api/superadmin/empresas/[id]/overrides/route.ts" "PRESERVA o que existe"
+# 21/10/2026 (etapa 0, 2.1): o painel le o core por lib/painel/metricas.ts, e o
+# lucro so existe onde ha custo lancado (antes: 'margem de 100%' sem custo).
+v "painel conta lucro so com custo"     "lib/painel/metricas.ts" "comCusto.length"
+n "pagina do painel nao le a view"      "app/(dashboard)/dashboard/page.tsx" "from('vendas')"
+n "rota do painel nao le a view"        "app/api/dashboard/route.ts" "from('leads')"
+n "card nao divide lucro por receita"   "components/modules/dashboard/dashboard-view.tsx" "lucro / receita"
+v "card mostra sem custo lancado"       "components/modules/dashboard/dashboard-view.tsx" "sem custo lançado"
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

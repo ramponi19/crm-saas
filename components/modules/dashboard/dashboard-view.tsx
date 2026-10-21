@@ -13,9 +13,10 @@ import { OnboardingCard } from './onboarding-card'
 import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
 import { createClient } from '@/lib/supabase/client'
+import { meusFollowUps, type ResultadoVendas } from '@/lib/painel/metricas'
 
 interface Kpis {
-  receitaMes: number; lucroMes: number; qtdVendasMes: number; ticketMedio: number
+  mes: ResultadoVendas
   totalClientes: number; leadsAtivos: number; leadsNovos: number
   estoqueDisponivel: number; assistenciasAbertas: number
 }
@@ -32,7 +33,6 @@ interface DashboardData {
   funilLeads: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number }
   porCanal?: Record<string, number>
 }
-interface PeriodKpis { receita: number; lucro: number; qtdVendas: number; ticketMedio: number }
 
 const PERIOD_LABELS: Record<string, string> = {
   hoje: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', mes: 'este mês', ano: 'este ano',
@@ -88,6 +88,31 @@ function DonutCanais({ counts }: { counts: Record<string, number> }) {
         ))}
       </div>
     </div>
+  )
+}
+
+// ── Lucro bruto ──
+/**
+ * Lucro e margem só com custo lançado (etapa 0). A venda sem custo entrava com
+ * custo 0 e o card dizia "margem de 100%" — número que parece calculado e não
+ * é. O custo nasce na unidade do estoque e o PDV o copia para a venda; é lá
+ * que se lança.
+ */
+function LucroBruto({ lucro, margem, semCusto, qtdVendas }: Pick<ResultadoVendas, 'lucro' | 'margem' | 'semCusto' | 'qtdVendas'>) {
+  const lancar = <Link href="/estoque" className="text-accent hover:underline">lançar custo no estoque</Link>
+  if (lucro === null) {
+    return (
+      <StatCard bare label="Lucro bruto" value={<span className="text-ink-3">—</span>}
+        delta={qtdVendas ? <>sem custo lançado · {lancar}</> : 'sem vendas no período'} deltaTone="neutral" />
+    )
+  }
+  return (
+    <StatCard bare label="Lucro bruto" value={<AnimatedCurrency value={lucro} />}
+      delta={<>
+        margem de {margem}%
+        {semCusto > 0 && <span className="block font-medium text-ink-3">{semCusto} de {qtdVendas} {qtdVendas === 1 ? 'venda' : 'vendas'} sem custo · {lancar}</span>}
+      </>}
+      deltaTone={(margem ?? 0) >= 0 ? 'ok' : 'bad'} />
   )
 }
 
@@ -219,13 +244,7 @@ function FollowupsCard() {
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user
       if (!user) { setLoaded(true); return }
-      const { data: rows } = await supabase
-        .from('tarefas').select('id, titulo, vencimento, leads!tarefas_lead_id_fkey(nome)')
-        .eq('concluida', false).eq('responsavel_id', user.id)
-        .order('vencimento', { nullsFirst: false }).limit(6)
-      type Row = { id: number; titulo: string; vencimento: string | null; leads: { nome: string | null } | { nome: string | null }[] | null }
-      const one = (r: Row['leads']) => (Array.isArray(r) ? r[0] ?? null : r)
-      setTarefas(((rows ?? []) as unknown as Row[]).map((t) => ({ id: t.id, titulo: t.titulo, vencimento: t.vencimento, lead_nome: one(t.leads)?.nome ?? null })))
+      setTarefas(await meusFollowUps(supabase, user.id, 6))
       setLoaded(true)
     })
   }, [])
@@ -260,7 +279,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
   const {} = useEmpresa()
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
-  const [periodsData, setPeriodsData] = useState<Record<string, PeriodKpis> | null>(null)
+  const [periodsData, setPeriodsData] = useState<Record<string, ResultadoVendas> | null>(null)
   const [faturamentoMensal, setFaturamentoMensal] = useState<Array<{ mes: string; total: number }>>([])
   const [globais, setGlobais] = useState({
     totalClientes: initialData.kpis.totalClientes,
@@ -288,12 +307,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
     return () => { cancelled = true }
   }, [])
 
-  const cur = periodsData?.[activePeriod]
-  const receita = cur?.receita ?? initialData.kpis.receitaMes
-  const lucro = cur?.lucro ?? initialData.kpis.lucroMes
-  const qtdVendas = cur?.qtdVendas ?? initialData.kpis.qtdVendasMes
-  const ticketMedio = cur?.ticketMedio ?? initialData.kpis.ticketMedio
-  const margem = receita > 0 ? Math.round((lucro / receita) * 100) : 0
+  const { receita, lucro, margem, semCusto, qtdVendas, ticketMedio } = periodsData?.[activePeriod] ?? initialData.kpis.mes
   const periodLabel = PERIOD_LABELS[activePeriod] ?? 'este mês'
 
   const spark = faturamentoMensal.slice(-7).map((m) => m.total)
@@ -319,7 +333,7 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
           {/* KPIs */}
           <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
             <StatCard bare label={`Vendas · ${periodLabel}`} value={<AnimatedCurrency value={receita} />} spark={sparkNorm} />
-            <StatCard bare label="Lucro bruto" value={<AnimatedCurrency value={lucro} />} delta={`margem de ${margem}%`} deltaTone={margem >= 0 ? 'ok' : 'bad'} />
+            <LucroBruto lucro={lucro} margem={margem} semCusto={semCusto} qtdVendas={qtdVendas} />
             <StatCard bare label="Ticket médio" value={<AnimatedCurrency value={ticketMedio} />} delta="por venda fechada" deltaTone="neutral" />
             <StatCard bare label="Vendas fechadas" value={<AnimatedInt value={qtdVendas} />} delta="no período" deltaTone="neutral" />
           </div>

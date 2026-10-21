@@ -1,17 +1,10 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { escopoDoUsuario, aplicarEscopo } from '@/lib/escopo'
-import { SEM_NOME } from '@/lib/sem-nome'
-
-function getPeriodStarts(): Record<string, Date> {
-  const now = new Date()
-  const hoje = new Date(now); hoje.setHours(0, 0, 0, 0)
-  const d7 = new Date(now); d7.setDate(d7.getDate() - 7); d7.setHours(0, 0, 0, 0)
-  const d30 = new Date(now); d30.setDate(d30.getDate() - 30); d30.setHours(0, 0, 0, 0)
-  const mes = new Date(now.getFullYear(), now.getMonth(), 1)
-  const ano = new Date(now.getFullYear(), 0, 1)
-  return { hoje, '7d': d7, '30d': d30, mes, ano }
-}
+import { escopoDoUsuario } from '@/lib/escopo'
+import {
+  vendasDesde, vendasRecentes, contagensDoPainel, equipeEMetas,
+  resultadoDasVendas, concluidas, inicioDosPeriodos, type ResultadoVendas,
+} from '@/lib/painel/metricas'
 
 export async function GET() {
   const supabase = await createClient()
@@ -28,124 +21,46 @@ export async function GET() {
    * SOBRESCREVE tudo. Enquanto só a página estava escopada, o vendedor via o
    * faturamento da loja inteira — a correção estava no lugar que não aparece.
    *
-   * Mesma lição do resto do app: dado calculado em dois lugares precisa da
-   * mesma regra nos dois, ou o que vale é sempre o que você esqueceu.
+   * Desde a etapa 0 as duas leem as mesmas consultas, de `lib/painel/metricas.ts`.
    */
   const escopo = await escopoDoUsuario(supabase, empresaId)
 
-  const starts = getPeriodStarts()
+  const starts = inicioDosPeriodos()
   const inicio12m = new Date()
   inicio12m.setMonth(inicio12m.getMonth() - 12)
   inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
 
-  // Vendas do ano com cliente e produto via inventario_unidades
-  const { data: vendasRaw } = await aplicarEscopo(
-    supabase
-      .from('vendas')
-      .select('id, valor_venda, lucro, data_venda, canal_venda, forma_pagamento, status, cliente_id, vendedor_id, produtos!produto_id(nome)')
-      .eq('empresa_id', empresaId)
-      .not('status', 'in', '("encomenda","pendente_entrega")')
-      .gte('data_venda', inicio12m.toISOString()),
-    escopo, 'vendedor_id',
-  )
-
-  type VendaRow = {
-    id: number; valor_venda: number; lucro: number | null; data_venda: string | null
-    canal_venda: string | null; forma_pagamento: string | null; status: string | null
-    cliente_id: number | null; vendedor_id: string | null
-    produtos: { nome: string | null } | { nome: string | null }[] | null
-  }
-  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(v => ({
-    id: v.id,
-    valor_venda: v.valor_venda,
-    lucro: v.lucro,
-    data_venda: v.data_venda,
-    canal_venda: v.canal_venda,
-    forma_pagamento: v.forma_pagamento,
-    status: v.status,
-    cliente_id: v.cliente_id,
-    vendedor_id: v.vendedor_id,
-    produto_nome: (Array.isArray(v.produtos) ? v.produtos[0]?.nome : v.produtos?.nome) ?? null,
-  }))
-
-  // IDs únicos para joins
-  const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter((id): id is number => id != null))]
-
   const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-  const [
-    { data: clientes },
-    { count: totalClientes },
-    { count: leadsAtivos },
-    { count: leadsNovos },
-    { count: estoqueDisponivel },
-    { count: assistenciasAbertas },
-    { data: vendedoresRaw },
-    { data: metasRaw },
-  ] = await Promise.all([
-    clienteIds.length
-      ? supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).in('id', clienteIds)
-      : Promise.resolve({ data: [] }),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    aplicarEscopo(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
-    aplicarEscopo(supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
-    supabase.from('inventario_unidades').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
-    supabase.from('garantias_assistencias').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
-    supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(id, nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('empresa_id', empresaId).eq('mes_ano', mesAtual),
+  const [vendas, recentes, contagens, { vendedores, metaPorUsuario }] = await Promise.all([
+    vendasDesde(supabase, empresaId, escopo, inicio12m),
+    vendasRecentes(supabase, empresaId, escopo, 6),
+    contagensDoPainel(supabase, empresaId, escopo),
+    equipeEMetas(supabase, empresaId, mesAtual),
   ])
 
-  // Normaliza vendedores (vêm via empresa_usuarios -> usuarios)
-  type EmpresaUsuarioRow = { usuarios: { id: string; nome: string } | { id: string; nome: string }[] | null }
-  const vendedores = ((vendedoresRaw ?? []) as unknown as EmpresaUsuarioRow[])
-    .map(eu => (Array.isArray(eu.usuarios) ? eu.usuarios[0] : eu.usuarios))
-    .filter((u): u is { id: string; nome: string } => Boolean(u?.id))
-
-  // Maps para lookup rápido
-  const clienteMap = Object.fromEntries((clientes ?? []).map((c: { id: number; nome: string | null }) => [c.id, c.nome ?? SEM_NOME]))
-  const vendedorMap = Object.fromEntries(vendedores.map((u: { id: string; nome: string }) => [u.id, u.nome]))
-  const metaMap     = Object.fromEntries((metasRaw ?? []).map((m: { usuario_id: string | null; meta_vendas_valor: number | null }) => [m.usuario_id, m.meta_vendas_valor]))
-
-  // KPIs por período (só concluídas)
-  const concluidas = vendas.filter(v => v.status === 'concluida')
-  const periods: Record<string, { receita: number; lucro: number; qtdVendas: number; ticketMedio: number }> = {}
+  // KPIs por período (só concluídas). Lucro e margem só onde há custo lançado.
+  const fechadas = concluidas(vendas)
+  const periods: Record<string, ResultadoVendas> = {}
   for (const [key, start] of Object.entries(starts)) {
     const startMs = start.getTime()
-    const f = concluidas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= startMs)
-    const receita = f.reduce((s, v) => s + (Number(v.valor_venda) || 0), 0)
-    const lucro   = f.reduce((s, v) => s + (Number(v.lucro) || 0), 0)
-    const qtd     = f.length
-    periods[key]  = { receita, lucro, qtdVendas: qtd, ticketMedio: qtd > 0 ? receita / qtd : 0 }
+    periods[key] = resultadoDasVendas(fechadas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= startMs))
   }
 
   // Faturamento mensal 12 meses
   const monthlyMap: Record<string, number> = {}
-  concluidas.forEach(v => {
+  fechadas.forEach(v => {
     if (!v.data_venda) return
     const d = new Date(v.data_venda)
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    monthlyMap[k] = (monthlyMap[k] ?? 0) + (Number(v.valor_venda) || 0)
+    monthlyMap[k] = (monthlyMap[k] ?? 0) + v.valor_venda
   })
   const faturamentoMensal = Object.entries(monthlyMap).map(([mes, total]) => ({ mes, total })).sort((a, b) => a.mes.localeCompare(b.mes))
 
-  // Vendas recentes (últimas 6) com nomes
-  const recentes = [...vendas]
-    .sort((a, b) => new Date(b.data_venda ?? 0).getTime() - new Date(a.data_venda ?? 0).getTime())
-    .slice(0, 6)
-    .map(v => ({
-      id: v.id,
-      valor_venda: Number(v.valor_venda),
-      data_venda: v.data_venda,
-      canal_venda: v.canal_venda,
-      forma_pagamento: v.forma_pagamento,
-      status: v.status,
-      cliente_nome: v.cliente_id ? (clienteMap[v.cliente_id] ?? null) : null,
-      produto_nome: v.produto_nome ?? null,
-    }))
-
   // Top vendedores do mês com meta
   const inicioMes = starts.mes.getTime()
-  const vendasMes = concluidas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
+  const vendasMes = fechadas.filter(v => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
+  const vendedorMap = Object.fromEntries(vendedores.map((u) => [u.id, u.nome]))
   const vendedorStats: Record<string, { nome: string; total: number; qtd: number; meta: number | null }> = {}
 
   /**
@@ -158,13 +73,13 @@ export async function GET() {
   const paraRanking = escopo.soMeu && escopo.userId
     ? vendedores.filter((u) => u.id === escopo.userId)
     : vendedores
-  ;paraRanking.forEach((u: { id: string; nome: string }) => {
-    vendedorStats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaMap[u.id] ?? null }
+  ;paraRanking.forEach((u) => {
+    vendedorStats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaPorUsuario[u.id] ?? null }
   })
   vendasMes.forEach(v => {
     if (!v.vendedor_id) return
     if (!vendedorStats[v.vendedor_id]) vendedorStats[v.vendedor_id] = { nome: vendedorMap[v.vendedor_id] ?? 'Vendedor', total: 0, qtd: 0, meta: null }
-    vendedorStats[v.vendedor_id].total += Number(v.valor_venda) || 0
+    vendedorStats[v.vendedor_id].total += v.valor_venda
     vendedorStats[v.vendedor_id].qtd   += 1
   })
 
@@ -177,15 +92,11 @@ export async function GET() {
   // Distribuição por canal — só vendas concluídas (o donut antes usava as 6
   // recentes, incluindo canceladas/encomendas).
   const porCanal: Record<string, number> = {}
-  for (const v of concluidas) { const c = v.canal_venda ?? 'loja_fisica'; porCanal[c] = (porCanal[c] ?? 0) + 1 }
+  for (const v of fechadas) { const c = v.canal_venda ?? 'loja_fisica'; porCanal[c] = (porCanal[c] ?? 0) + 1 }
 
+  const { funil: _funil, ...globais } = contagens
   return NextResponse.json({
-    periods, faturamentoMensal, porCanal,
-    globais: {
-      totalClientes: totalClientes ?? 0, leadsAtivos: leadsAtivos ?? 0,
-      leadsNovos: leadsNovos ?? 0, estoqueDisponivel: estoqueDisponivel ?? 0,
-      assistenciasAbertas: assistenciasAbertas ?? 0,
-    },
+    periods, faturamentoMensal, porCanal, globais,
     vendasRecentes: recentes,
     topVendedores,
   })
