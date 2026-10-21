@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { LinkDeMenu } from '@/components/layout/link-de-menu'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { NavRolavel } from '@/components/layout/nav-rolavel'
@@ -91,13 +91,13 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
             direto com a cor da marca. */}
         {zapintelAtivo && (
           <div className="mb-1.5">
-            <Link href="/zapintel" onClick={onNavigate}
+            <LinkDeMenu href="/zapintel" onClick={onNavigate}
               className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold transition-colors hover:opacity-90"
               style={{ background: 'rgba(124,92,252,0.10)', color: '#6d28d9' }}>
               <MessageSquareText size={16} strokeWidth={1.7} className="shrink-0" />
               <span className="flex-1 truncate">ZapIntel</span>
               <ArrowUpRight size={14} strokeWidth={1.7} className="shrink-0 opacity-70" />
-            </Link>
+            </LinkDeMenu>
           </div>
         )}
         {navGroups.map((group) => (
@@ -109,22 +109,22 @@ export function AdminShell({ userName = 'Administrador', empresaNome = 'Minha em
                 const isActive = exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
                 const Icon = item.icon
                 return (
-                  <Link key={item.href} href={item.href} onClick={onNavigate}
+                  <LinkDeMenu key={item.href} href={item.href} onClick={onNavigate}
                     data-ativo={isActive || undefined}
                     className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
                       isActive ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
                     <Icon size={16} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
                     <span className="flex-1 truncate">{item.label}</span>
-                  </Link>
+                  </LinkDeMenu>
                 )
               })}
             </div>
           </div>
         ))}
         <div className="mt-4 border-t border-line-soft pt-3">
-          <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold text-accent transition-colors hover:bg-accent-soft">
+          <LinkDeMenu href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-semibold text-accent transition-colors hover:bg-accent-soft">
             <ArrowUpRight size={16} strokeWidth={1.7} className="shrink-0" /><span className="flex-1 truncate">Acessar o CRM</span>
-          </Link>
+          </LinkDeMenu>
         </div>
       </NavRolavel>
       <div className="shrink-0 border-t border-line-soft px-3 py-2.5">

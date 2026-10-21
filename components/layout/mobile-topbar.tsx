@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { LinkDeMenu } from '@/components/layout/link-de-menu'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -85,25 +85,25 @@ export function MobileTopbar({
                   const Icon = MENU_ICONS[it.icon] ?? LayoutDashboard
                   const badge = it.badge === 'leads' ? leadsCount : it.badge === 'garantia' ? garantiasCount : 0
                   return (
-                    <Link key={it.href} href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href} onClick={() => setOpen(false)}
+                    <LinkDeMenu key={it.href} href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href} onClick={() => setOpen(false)}
                       className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-medium transition-colors',
                         isActive(it.href) ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
                       <Icon size={16} strokeWidth={1.7} className="shrink-0 opacity-90" />
                       <span className="flex-1 truncate">{it.label}</span>
                       {badge > 0 && <span className="num rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">{badge}</span>}
                       {it.locked && <Lock size={12} strokeWidth={1.8} className="text-ink-3" />}
-                    </Link>
+                    </LinkDeMenu>
                   )
                 })}
               </div>
 
               {isEmpresaAdmin && (
                 <div className="mt-3 border-t border-line-soft pt-3">
-                  <Link href="/admin" onClick={() => setOpen(false)}
+                  <LinkDeMenu href="/admin" onClick={() => setOpen(false)}
                     className="flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-semibold text-accent transition-colors hover:bg-accent-soft">
                     <Settings size={16} strokeWidth={1.7} className="shrink-0" />
                     <span className="flex-1 truncate">Administração</span>
-                  </Link>
+                  </LinkDeMenu>
                 </div>
               )}
             </nav>

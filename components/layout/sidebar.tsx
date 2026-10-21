@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { LinkDeMenu } from '@/components/layout/link-de-menu'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -135,7 +135,7 @@ export function Sidebar({
             const badge = item.locked ? 0 : badgeCount(item.badge)
 
             return (
-              <Link
+              <LinkDeMenu
                 key={item.href}
                 href={href}
                 data-ativo={isActive || undefined}
@@ -161,17 +161,17 @@ export function Sidebar({
                 ) : badge > 0 ? (
                   <span className="num text-[10px] font-semibold" style={isActive ? undefined : { opacity: 0.7 }}>{badge}</span>
                 ) : null}
-              </Link>
+              </LinkDeMenu>
             )
           })}
         </div>
 
         {isSuperAdmin && (
           <div className="mt-4 pt-3" style={{ borderTop: '1px solid color-mix(in srgb, var(--sb-text) 12%, transparent)' }}>
-            <Link href="/superadmin" className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[7px] text-[12.5px] font-semibold text-[#7C5CFF]', HOVER)}>
+            <LinkDeMenu href="/superadmin" className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[7px] text-[12.5px] font-semibold text-[#7C5CFF]', HOVER)}>
               <ShieldAlert size={15} strokeWidth={1.7} className="shrink-0" />
               <span className="flex-1 truncate">Painel da plataforma</span>
-            </Link>
+            </LinkDeMenu>
           </div>
         )}
       </NavRolavel>
@@ -189,9 +189,9 @@ export function Sidebar({
             <MessageSquareText size={15} strokeWidth={1.7} />
           </button>
           {isEmpresaAdmin && (
-            <Link href="/admin" aria-label="Administração" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)}>
+            <LinkDeMenu href="/admin" aria-label="Administração" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)}>
               <Settings size={15} strokeWidth={1.7} />
-            </Link>
+            </LinkDeMenu>
           )}
           <button aria-label="Sair" className={cn('grid h-7 w-7 place-items-center rounded-control transition-colors', HOVER)} onClick={handleLogout}>
             <LogOut size={15} strokeWidth={1.7} />

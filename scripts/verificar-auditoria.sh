@@ -534,6 +534,15 @@ v "endereco antigo responde 308"        "next.config.ts" "destination: '/estoque
 # 21/10/2026: monitor de uptime em /api/saude (sem banco, fora do matcher do proxy).
 v "saude nao toca no banco"            "app/api/saude/route.ts" "export function GET()"
 v "saude fora do matcher do proxy"     "proxy.ts" "|monitoring|api/saude|api/webhook/|"
+# 21/10/2026: CPU da Vercel. /api/midia deixa o navegador guardar o redirect (8 < 10 min
+# da assinatura); os menus laterais so pre-carregam com mouse/toque/foco no item.
+v "midia: navegador guarda o redirect"  "app/api/midia/route.ts" "'Cache-Control', \`private, max-age="
+v "midia: cache menor que a assinatura" "app/api/midia/route.ts" "const CACHE_S = 480"
+v "menu so pre-carrega com intencao"    "components/layout/link-de-menu.tsx" "prefetch={intencao ? null : false}"
+n "menu sem prefetch de viewport"       "components/layout/sidebar.tsx" "from 'next/link'"
+n "menu sem prefetch de viewport"       "components/layout/mobile-topbar.tsx" "from 'next/link'"
+n "menu sem prefetch de viewport"       "components/admin/admin-shell.tsx" "from 'next/link'"
+n "menu sem prefetch de viewport"       "components/superadmin/superadmin-shell.tsx" "from 'next/link'"
 # 21/10/2026 (etapa 0, 2.3): duplicadas num lugar so. Relatorios/Financeiro = CRM;
 # Integracoes = /admin/integracoes; codigo copiado de stripe e preview vira funcao.
 v "admin/relatorios responde 308"       "next.config.ts" "source: '/admin/relatorios', destination: '/relatorios', permanent: true"

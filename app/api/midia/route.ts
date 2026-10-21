@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 // Responde com redirect para uma URL assinada de 600 s gerada aqui, nunca
 // com a URL pública (que, com o bucket privado, não abre). Ver lib/storage/midia.ts.
 const VALIDADE_S = 600
+const CACHE_S = 480
 
 export async function GET(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor', 'tecnico', 'member'])
@@ -21,7 +22,11 @@ export async function GET(req: Request) {
   if (error || !data?.signedUrl) return naoAchou
 
   const res = NextResponse.redirect(data.signedUrl, 302)
-  // A assinatura vence em 10 min: o navegador não pode guardar o redirect.
-  res.headers.set('Cache-Control', 'private, no-store')
+  // O navegador guarda o redirect por 8 min (21/10/2026): reabrir a conversa não
+  // sobe a função de novo — antes era `no-store` e cada redesenho do chat pedia
+  // de novo, ~125 ms de CPU por arquivo. 8 < 10 min da assinatura: o redirect
+  // guardado nunca aponta para uma URL vencida. `private` = só o navegador de
+  // quem pediu guarda; a CDN da Vercel não (a resposta depende da sessão).
+  res.headers.set('Cache-Control', `private, max-age=${CACHE_S}`)
   return res
 }

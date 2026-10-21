@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { LinkDeMenu } from '@/components/layout/link-de-menu'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { NavRolavel } from '@/components/layout/nav-rolavel'
@@ -54,14 +54,14 @@ export function SuperAdminShell({ userName = 'Super Admin', children }: { userNa
             const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/')
             const Icon = item.icon
             return (
-              <Link key={item.href} href={item.href} onClick={onNavigate}
+              <LinkDeMenu key={item.href} href={item.href} onClick={onNavigate}
                 data-ativo={isActive || undefined}
                 style={isActive ? { color: ADMIN_COR } : undefined}
                 className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-[9px] text-[13px] font-medium transition-colors',
                   isActive ? 'bg-[#6D28D9]/[0.10] font-semibold' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
                 <Icon size={16} strokeWidth={1.7} className={cn('shrink-0', !isActive && 'opacity-85')} />
                 <span className="flex-1 truncate">{item.label}</span>
-              </Link>
+              </LinkDeMenu>
             )
           })}
         </div>
