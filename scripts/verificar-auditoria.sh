@@ -246,7 +246,7 @@ v "prompt monta a loja em runtime"   "app/zapintel/api/sugestao/route.ts" "de \$
 n "dashboard nao chama IA sozinho"   "components/zapintel/painel-ao-vivo.tsx" "zapintel/api/dia"
 v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "assistente:perguntar"
 # Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
-v "ao vivo tem teto de ritmo"        "hooks/zapintel/useRpcAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+v "ao vivo tem teto de ritmo"        "hooks/zapintel/ritmo.ts" "export const INTERVALO_MINIMO = 20_000"
 # Insights (14/10/2026): das análises e das vendas, no banco; nada do motor de palavras.
 v "insights le do banco"             "app/zapintel/insights/page.tsx" "useRpcAoVivo<Insights>(\"zapintel_insights\""
 n "insights sem chamou pelo nome"    "app/zapintel/insights/page.tsx" "calledByName"
@@ -695,5 +695,10 @@ v "loja casada por igualdade (hash)"    "supabase/migrations/20261022001000_zapi
 v "helpers fechados para a api"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "  from public, anon, authenticated;"
 v "seql calculado uma vez"              "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "SEQL as materialized (select lead_id"
 v "estatistica da loja nos negocios"    "supabase/migrations/20261022001100_zapintel_estatisticas.sql" "negocios_loja_stx on (coalesce(filial_id, 0))"
+# O resumo do menu so muda com mensagem: no maximo a cada 30 s, nunca em segundo plano.
+v "resumo so com mensagem e 30 s"       "hooks/zapintel/useLeads.tsx" '{ eventos: \["mensagens"\], intervaloMinimo: 30_000 }'
+v "aviso que nao muda nao reconsulta"   "hooks/zapintel/useRpcAoVivo.ts" "if (!avisoRefaz(evento?.event"
+v "volta de aba respeita o teto"        "hooks/zapintel/ritmo.ts" "return Math.max(0, ultimaConsulta + intervalo - agora)"
+v "hook usa a regra do teste"           "hooks/zapintel/useRpcAoVivo.ts" "esperaDaVolta(Date.now(), ultimaConsulta.current, intervalo)"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

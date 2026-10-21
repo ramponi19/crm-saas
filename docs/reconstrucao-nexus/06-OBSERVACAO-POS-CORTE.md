@@ -492,3 +492,11 @@ A cópia (máquina local) é 3–5× mais rápida que o banco free: o dashboard 
 | zapintel_resumo | 0,31 s | 0,13 s |
 
 **Acima de 1 s, só o `zapintel_conversa_calc` (2,75 s)**, e é trabalho real, não plano ruim: autoria por janela e regex de gíria sobre 16 mil mensagens (montar o `E` custa ~1,2 s). Ele não é chamado pela tela no dia a dia: o job `zapintel-conversa-aquecer` grava o cache (teto de 120 s, que estourava) e a tela lê o cache (`zapintel_conversa`). Quem ainda chama ao vivo é o botão de recalcular — na produção (3–5× mais lenta) deve ficar perto dos 8 s; acompanhar. `posvenda` e `leads_com_conversa` subiram alguns centésimos e ficam bem abaixo de 1 s; na produção, de 0,2–0,5 s para algo perto de 1–2 s no pior caso — conferir no pgss depois do deploy.
+
+### O resumo do menu sob demanda (hooks/zapintel)
+
+`zapintel_resumo` (o menu do ZapIntel: conversas, mensagens, leads por loja) era a RPC mais chamada do ZapIntel na produção (78 em 24 h, média 1,7 s) porque toda aba o refazia a cada aviso do canal — de mensagem, de ficha refeita e de venda —, até uma vez a cada 20 s. Agora: **só com aviso de mensagem, no máximo a cada 30 s por aba, nunca com a aba em segundo plano, e ao voltar para a aba só depois que o teto passou** (antes consultava na hora). As outras telas ao vivo seguem como estavam (20 s, todo aviso).
+
+A regra saiu para `hooks/zapintel/ritmo.ts` e o hook a usa; `tests/zapintel-ritmo.test.ts` simula com ela 3 abas por 10 minutos (uma mensagem a cada 15 s, ~240/h; uma ficha refeita por minuto; a aba 3 escondida do minuto 2 ao 8): **antes 75 consultas (31 + 31 + 13), depois 50 (21 + 21 + 8)**, nenhuma com a aba escondida, nunca duas em menos de 30 s.
+
+**Não medido no navegador:** a medição com 3 abas reais contra o Supabase local (Realtime de verdade) não coube na memória da máquina em 21/10 (Docker + next dev + 3 abas com 1,9 GB livres). Fica para quando houver folga; o número acima é da simulação da regra, não do navegador. Depois do deploy, o pgss da produção dá a prova real (chamadas de zapintel_resumo por hora com a loja aberta).

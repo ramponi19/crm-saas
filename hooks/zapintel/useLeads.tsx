@@ -58,7 +58,14 @@ interface Resumo {
 
 export function LeadProvider({ children, empresa }: { children: ReactNode; empresa: number | null }) {
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
-  const { dados: resumo, aoVivo } = useRpcAoVivo<Resumo>("zapintel_resumo", { p_empresa: empresa }, empresa);
+  /**
+   * O RESUMO SÓ ANDA COM MENSAGEM, E NO MÁXIMO A CADA 30 s (21/10/2026). Ele
+   * monta o menu (conversas, mensagens, leads por loja) e custava ~1,7 s no banco
+   * a cada aviso — inclusive de ficha refeita e de venda, que não mudam nada aqui.
+   * Com a aba em segundo plano não consulta (regra do useRpcAoVivo).
+   */
+  const { dados: resumo, aoVivo } = useRpcAoVivo<Resumo>("zapintel_resumo", { p_empresa: empresa }, empresa,
+    { eventos: ["mensagens"], intervaloMinimo: 30_000 });
 
   const valor: Contexto = {
     lojas: resumo?.lojas ?? [],
