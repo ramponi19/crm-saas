@@ -97,7 +97,12 @@ begin
   v_para := 'select a.negocio_id lead_id, a.em, a.para_responsavel dono
     from negocio_historico a join L on L.id = a.negocio_id where a.empresa_id = v_emp
      and a.acao in (''pegar'', ''devolver'', ''transferir'', ''atribuir'', ''distribuir'')';
+  -- O trecho procurado tem duas linhas e vem DESTE arquivo: num checkout Windows ele chega
+  -- com CRLF (o psql do Windows converte ao ler; o do Linux e a CLI do Supabase não). Achado
+  -- no `supabase start` local em 21/10: sem normalizar os três, a troca não casava.
   v_def := replace(v_def, E'\r\n', E'\n');
+  v_de := replace(v_de, E'\r\n', E'\n');
+  v_para := replace(v_para, E'\r\n', E'\n');
   if (length(v_def) - length(replace(v_def, v_de, ''))) / length(v_de) <> 1 then
     raise exception 'zapintel_conversa_calc: esperava 1 leitura de lead_atribuicoes';
   end if;
