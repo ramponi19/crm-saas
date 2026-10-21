@@ -45,7 +45,7 @@ interface Atendimento {
   retomar: { total: number; itens: Item[] };
 }
 
-/** `zapintel_conversa` — supabase/funcoes/zapintel_conversa.sql. */
+/** `zapintel_conversa` — supabase/migrations/20261022001000_zapintel_le_o_core.sql. */
 interface LinhaConversa {
   tipo: "geral" | "loja" | "vendedor"; id: string | null; nome: string | null; loja: string | null;
   mensagens: number; conversas: number; vendas: number; palavrasPorMsg: number | null;
@@ -371,7 +371,7 @@ function ForaDoHorario({ d }: { d: Atendimento }) {
  * e *"da para deixar pronto por vendedor e no geral"*. Tudo vem de
  * `zapintel_conversa`, que diz quem escreveu cada mensagem da loja (CRM,
  * apresentação no áudio, dono do lead) — ver o cabeçalho de
- * supabase/funcoes/zapintel_conversa.sql.
+ * supabase/migrations/20261022001000_zapintel_le_o_core.sql.
  *
  * NÃO É AO VIVO, de propósito: a conta leva ~5 s em 30 dias, e com a página
  * carregando as outras consultas ela passou do limite de 8 s do banco (testado

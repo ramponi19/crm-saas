@@ -91,16 +91,16 @@ n "ficha sem ha 0 dias"             "lib/zapintel/ficha.ts" "não voltou — há
 # 15/10/2026: como a loja conversa, por vendedor (apresentacao no audio + Pegar lead)
 v "conversa le o banco"             "app/zapintel/atendimento/page.tsx" "rpc(\"zapintel_conversa\""
 n "atendimento sem cartao antigo"   "app/zapintel/atendimento/page.tsx" "function Vendedor("
-v "autor pela apresentacao"         "supabase/funcoes/zapintel_conversa.sql" "aqui (e|eh) (o|a)"
-v "resposta nao reroda por linha"   "supabase/funcoes/zapintel_conversa.sql" "RESP as materialized"
-v "venda sem lead nulo"             "supabase/funcoes/zapintel_conversa.sql" "z.lead_id is not null"
+v "autor pela apresentacao"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "aqui (e|eh) (o|a)"
+v "resposta nao reroda por linha"   "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "RESP as materialized"
+v "venda sem lead nulo"             "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "z.lead_id is not null"
 v "audio quebrado sai"              "scripts/transcrever-audios.py" "def descartar(linha)"
 v "pasta temporaria sai no erro"    "scripts/transcrever-audios.py" "atexit.register(shutil.rmtree"
 v "busca acha lead pelo numero"    "components/layout/command-palette.tsx" "buscar_lead_por_numero"
 v "busca por numero respeita a loja" "supabase/funcoes/buscar_lead_por_numero.sql" "or l.filial_id is null or l.filial_id = any (v_vis))"
 v "posvenda le do banco"            "app/zapintel/posvenda/page.tsx" "useRpcAoVivo<PosVenda>(\"zapintel_posvenda\""
 n "posvenda sem promessa de brinde" "app/zapintel/posvenda/page.tsx" "ganha um brinde"
-v "funil interno fora do zapintel"  "supabase/funcoes/zapintel_turnos.sql" "zapintel_funil_interno(l.funil_id)"
+v "funil interno fora do zapintel"  "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "zapintel_funil_interno(l.funil_id)"
 v "robo conta as novas sem analise" "components/zapintel/robo-analises.tsx" "desatualizadas.length + semAnalise.length"
 v "lead troca de funil"             "app/api/leads/mover/route.ts" "funilId"
 v "sugestao exige sessao"           "app/zapintel/api/sugestao/route.ts" "zapintelAcesso()"
@@ -118,7 +118,7 @@ v "retencao falha guardando"        "lib/storage/retencao.ts" "nao consegui conf
 v "retencao so apaga url limpa"     "lib/storage/retencao.ts" "alvos.filter((a) => limpas.has(a.mensagemId))"
 n "chave do gemini fora da url"     "lib/zapintel/ia.ts" "?key="
 v "resposta velha descartada"       "hooks/zapintel/useRpcAoVivo.ts" "if (chave !== chaveAtual.current) return;"
-v "turnos sem horario por linha"    "supabase/funcoes/zapintel_turnos.sql" "HH as materialized ("
+v "turnos sem horario por linha"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "HH as materialized ("
 # -- fechamento tecnico (15/10/2026, fase 2) -----------------------------------
 n "preview nao muda por GET"        "app/api/zapintel/preview/route.ts" "searchParams.get('empresa')"
 v "preview confere a origem"        "app/api/zapintel/preview/route.ts" "if (!mesmaOrigem(req))"
@@ -148,7 +148,7 @@ v "canal unico por empresa"         "hooks/zapintel/useRpcAoVivo.ts" "ouvirZapin
 # mao. Estes checks guardam as decisoes que a medicao obrigou.
 v "ponte casa por telefone"          "lib/zapintel/ponte.ts" "chaveTelefone"
 n "ponte nao casa por nome"          "lib/zapintel/ponte.ts" "like .%. || lower"
-v "ponte so olha lead COM conversa"  "supabase/funcoes/zapintel_leads_com_conversa.sql" "join public.lead_mensagens"
+v "ponte so olha lead COM conversa"  "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "join public.zapintel_mensagens(p_empresa) m"
 v "ponte pagina a funcao tambem"     "lib/zapintel/ponte.ts" "buscarTudo<LeadComConversa>"
 v "ponte guarda como e confianca"    "lib/zapintel/ponte.ts" "confianca: candidatos.length > 1"
 v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
@@ -162,12 +162,12 @@ v "confirmacao manual nao e desfeita" "lib/zapintel/ponte.ts" "protegidos.has"
 # `5200 * 0.3` da ação #02 morava no page.tsx da tela antiga — fora de lib/.
 n "atendimento sem ticket inventado" "app/zapintel/atendimento/page.tsx" "5200"
 v "atendimento le do banco"          "app/zapintel/atendimento/page.tsx" "useRpcAoVivo<Atendimento>(\"zapintel_atendimento\""
-v "atendimento fechado para anon"    "supabase/funcoes/zapintel_atendimento.sql" "revoke all on function public.zapintel_atendimento"
+v "atendimento fechado para anon"    "supabase/migrations/20261020000000_revoke_rpc.sql" "grant execute on function public.zapintel_atendimento(p_dias integer, p_filial bigint, p_empresa bigint) to authenticated;"
 # Tempo de resposta: UMA conta para dashboard e Atendimento (15/10/2026). O
 # dashboard tinha regra própria (seg–sáb 8h–20h) e os números não batiam.
-v "dashboard usa a conta comum"      "supabase/funcoes/zapintel_dashboard.sql" "from zapintel_turnos(v_emp"
-v "atendimento usa a conta comum"    "supabase/funcoes/zapintel_atendimento.sql" "from zapintel_turnos(v_emp"
-n "dashboard sem horario proprio"    "supabase/funcoes/zapintel_dashboard.sql" "between 8 and 19"
+v "dashboard usa a conta comum"      "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "from zapintel_turnos(v_emp"
+v "atendimento usa a conta comum"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "from zapintel_turnos(v_emp"
+n "dashboard sem horario proprio"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "between 8 and 19"
 n "card sem a regra antiga"          "components/zapintel/painel-ao-vivo.tsx" "seg a sáb, 8h–20h"
 v "endereco antigo redireciona"      "next.config.ts" "destination: '/zapintel/atendimento'"
 v "a IA do zapintel usa a do CRM"    "lib/zapintel/ia.ts" "GEMINI_API_KEY"
@@ -183,7 +183,7 @@ v "sem venda a tela nao inventa"     "components/zapintel/painel-ao-vivo.tsx" "s
 v "ficha relata, nao escolhe frase"   "lib/zapintel/ficha.ts" "montarRelato"
 v "silencio exige conversa viva"      "lib/zapintel/ficha.ts" "> 86_400_000) return null"
 v "midia nao conta como fala"         "lib/zapintel/ficha.ts" "function ehFala"
-v "retomada nao conta como sumico"    "supabase/funcoes/zapintel_dashboard.sql" "interval '20 hours'"
+v "retomada nao conta como sumico"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "interval '20 hours'"
 v "a tela diz precedeu, nao causou"   "components/zapintel/painel-ao-vivo.tsx" "Mostra onde olhar, não o que culpar"
 v "a ficha chega com a conversa"      "app/zapintel/api/conversa/route.ts" "montarFicha"
 # -- recalibracao da classificacao (10/10/2026) ----------------------------
@@ -207,9 +207,9 @@ v "o lead carrega os fatos do CRM"   "lib/zapintel/montar.ts" "kanbanStatus: ban
 # leads, o numero da loja do lado `enviada`, e formato (DDD + 9 + 8 digitos).
 v "ponte usa telefone do texto"      "lib/zapintel/ponte.ts" "chaveTelefone(l.telefone_no_texto)"
 n "origem_id nao vira chave"         "lib/zapintel/ponte.ts" "chaveTelefone(l.origem_id)"
-v "so a fala do cliente"             "supabase/funcoes/zapintel_leads_com_conversa.sql" "direcao = .recebida."
-v "numero repetido nao e de cliente" "supabase/funcoes/zapintel_leads_com_conversa.sql" "count(distinct id) > 2"
-v "exige formato de celular"         "supabase/funcoes/zapintel_leads_com_conversa.sql" "between 11 and 99"
+v "so a fala do cliente"             "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "direcao = .recebida."
+v "numero repetido nao e de cliente" "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "count(distinct id) > 2"
+v "exige formato de celular"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "between 11 and 99"
 v "proxy sai antes de abrir o supabase" "proxy.ts" "SEM_SESSAO.some"
 # O matcher corta ANTES de acordar o proxy; SEM_SESSAO corta depois. Os dois
 # existem, nesta ordem. O terceiro check e o que mais importa: matcher montado
@@ -246,12 +246,13 @@ v "prompt monta a loja em runtime"   "app/zapintel/api/sugestao/route.ts" "de \$
 n "dashboard nao chama IA sozinho"   "components/zapintel/painel-ao-vivo.tsx" "zapintel/api/dia"
 v "resumo do dia so quando pedem"    "components/zapintel/painel-ao-vivo.tsx" "assistente:perguntar"
 # Ao vivo sem pulso (14/10/2026): o banco avisa, a tela consulta com teto.
-v "ao vivo tem teto de ritmo"        "hooks/zapintel/useRpcAoVivo.ts" "INTERVALO_MINIMO = 20_000"
+v "ao vivo tem teto de ritmo"        "hooks/zapintel/ritmo.ts" "export const INTERVALO_MINIMO = 20_000"
 # Insights (14/10/2026): das análises e das vendas, no banco; nada do motor de palavras.
 v "insights le do banco"             "app/zapintel/insights/page.tsx" "useRpcAoVivo<Insights>(\"zapintel_insights\""
 n "insights sem chamou pelo nome"    "app/zapintel/insights/page.tsx" "calledByName"
 n "insights sem atendente do texto"  "app/zapintel/insights/page.tsx" "sellerDistribution"
-v "insights fechado para anon"       "supabase/funcoes/zapintel_insights.sql" "revoke all on function public.zapintel_insights"
+v "insights fechado para anon"       "supabase/migrations/20261020000000_revoke_rpc.sql" "grant execute on function public.zapintel_insights(p_dias integer, p_filial bigint, p_empresa bigint) to authenticated;"
+v "rpc de public fechadas para anon"  "supabase/migrations/20261020000000_revoke_rpc.sql" "revoke execute on all functions in schema public from public, anon, authenticated;"
 v "lista de leads usa o ao vivo"     "app/zapintel/leads/page.tsx" "useRpcAoVivo<Lista>(\"zapintel_leads_lista\""
 v "aviso ao vivo nao derruba webhook" "supabase/funcoes/zapintel_ao_vivo.sql" "exception when others"
 v "conversas fechadas para anon"     "supabase/funcoes/seguranca_20261014.sql" "revoke all on function public.zapintel_conversas"
@@ -700,5 +701,19 @@ v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts
 v "messaging_type so no caminho FB"   "supabase/functions/webhook-leads/index.ts" "const corpoEnvio = viaInstagram"
 v "retorno do IG vai pro login"       "proxy.ts" "/api/canais/instagram/retorno"
 
+echo "== zapintel le o core (21/10) =="
+# Desde o corte o ZapIntel lia as views leads/lead_mensagens, que calculam o principal
+# linha a linha: insights 74 s, conversa_calc 200 s na copia (06, secao 10).
+n "zapintel nao le as views do corte"   "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "\(from\|join\) \(public\.\)\?\(leads\|lead_mensagens\) "
+v "principal calculado uma vez"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "select distinct on (n.contato_id, n.filial_id) n.id"
+v "loja casada por igualdade (hash)"    "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "coalesce(p.filial_id, -1) = coalesce(m.filial_id, -1)"
+v "helpers fechados para a api"         "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "  from public, anon, authenticated;"
+v "seql calculado uma vez"              "supabase/migrations/20261022001000_zapintel_le_o_core.sql" "SEQL as materialized (select lead_id"
+v "estatistica da loja nos negocios"    "supabase/migrations/20261022001100_zapintel_estatisticas.sql" "negocios_loja_stx on (coalesce(filial_id, 0))"
+# O resumo do menu so muda com mensagem: no maximo a cada 30 s, nunca em segundo plano.
+v "resumo so com mensagem e 30 s"       "hooks/zapintel/useLeads.tsx" '{ eventos: \["mensagens"\], intervaloMinimo: 30_000 }'
+v "aviso que nao muda nao reconsulta"   "hooks/zapintel/useRpcAoVivo.ts" "if (!avisoRefaz(evento?.event"
+v "volta de aba respeita o teto"        "hooks/zapintel/ritmo.ts" "return Math.max(0, ultimaConsulta + intervalo - agora)"
+v "hook usa a regra do teste"           "hooks/zapintel/useRpcAoVivo.ts" "esperaDaVolta(Date.now(), ultimaConsulta.current, intervalo)"
 echo
 echo "RESULTADO: $ok ok, $falha falha(s)"

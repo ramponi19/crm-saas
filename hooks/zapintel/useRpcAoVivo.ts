@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "./canalZapintel";
+import { INTERVALO_MINIMO, avisoRefaz, esperaDaVolta, esperaDoAviso } from "./ritmo";
 
 /**
  * UMA CONSULTA AO BANCO QUE SE ATUALIZA SOZINHA — SEM PULSO E SEM VERCEL.
@@ -29,11 +30,26 @@ import { ouvirZapintel } from "./canalZapintel";
  *
  * Consultam na hora, sem teto — foi a pessoa que pediu. Enquanto a resposta
  * não chega, `carregando` fica verdadeiro e os dados velhos continuam na tela.
+ *
+ * ══ OPÇÕES POR CONSULTA (21/10/2026) ════════════════════════════════════════
+ *
+ * `eventos`: a quais avisos esta consulta reage (padrão: todos). O resumo do
+ * menu só muda com mensagem — ficha refeita e venda registrada o recalculavam à
+ * toa. `intervaloMinimo`: o teto de ritmo desta consulta (padrão 20 s).
+ *
+ * Aba que volta do segundo plano também respeita o teto: antes reconsultava na
+ * hora, e quem alternava de aba fazia uma consulta por volta.
  */
-const RESPIRO = 2500;
-const INTERVALO_MINIMO = 20_000;
+export interface OpcoesAoVivo {
+  /** Avisos que disparam nova consulta ("mensagens", "analises", "vendas"). Ausente = todos. */
+  eventos?: string[];
+  /** Mínimo entre duas consultas desta aba, em ms. Ausente = 20 s. */
+  intervaloMinimo?: number;
+}
 
-export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, empresa: number | null) {
+export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, empresa: number | null, opcoes: OpcoesAoVivo = {}) {
+  const intervalo = opcoes.intervaloMinimo ?? INTERVALO_MINIMO;
+  const eventosAceitos = opcoes.eventos?.join(",") ?? null;
   const chave = JSON.stringify(params);
   const [dados, setDados] = useState<T | null>(null);
   const [chaveDosDados, setChaveDosDados] = useState<string | null>(null);
@@ -115,9 +131,11 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       const agora = Date.now();
       setUltimoAviso(agora);
       if (evento?.event === "mensagens") setMensagemAvisada(agora);
+      // Aviso que não muda esta consulta não a refaz (ver `eventos`).
+      if (!avisoRefaz(evento?.event, eventosAceitos ? eventosAceitos.split(",") : null)) return;
       if (timer.current) clearTimeout(timer.current);
       // O que vier por último: o respiro da rajada, ou o fim do intervalo mínimo.
-      const espera = Math.max(RESPIRO, ultimaConsulta.current + INTERVALO_MINIMO - agora);
+      const espera = esperaDoAviso(agora, ultimaConsulta.current, intervalo);
       timer.current = setTimeout(() => { if (ativo) buscar(); }, espera);
     };
     // O canal é compartilhado entre as consultas ao vivo da tela (o menu e a
@@ -140,14 +158,19 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       if (timer.current) clearTimeout(timer.current);
       sair();
     };
-  }, [supabase, empresaDoCanal, buscar]);
+  }, [supabase, empresaDoCanal, buscar, intervalo, eventosAceitos]);
 
-  // Aba escondida não consulta; ao voltar, se ficou algo para trás, consulta.
+  // Aba escondida não consulta; ao voltar, se ficou algo para trás, consulta —
+  // dentro do teto: se a última consulta foi há menos que o intervalo, espera o resto.
   useEffect(() => {
-    const voltar = () => { if (!document.hidden && atrasado.current) buscar(); };
+    const voltar = () => {
+      if (document.hidden || !atrasado.current) return;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(buscar, esperaDaVolta(Date.now(), ultimaConsulta.current, intervalo));
+    };
     document.addEventListener("visibilitychange", voltar);
     return () => document.removeEventListener("visibilitychange", voltar);
-  }, [buscar]);
+  }, [buscar, intervalo]);
 
   const tentarDeNovo = useCallback(() => { setErro(null); setTentativa((n) => n + 1); }, []);
 

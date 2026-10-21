@@ -420,3 +420,90 @@ Nada chegou ao Sentry (o erro era engolido pela tela). Achado na Etapa 0, testan
 - **Do nosso lado (feat/navegacao, deploy de 21/10 à noite):** a rota saiu e o 404 vem estático, sem função nem middleware; o "assinar" da tela recusa (409). Religar = restaurar a rota antes de tirar o bloqueio.
 - **Conferir:** em Observability → Functions, `/api/webhook/c2s/[slug]` deve zerar (a C2S parou de chamar; e depois do deploy, mesmo que chamasse, não haveria função).
 
+## 10. ZapIntel: "a consulta demorou demais" o dia inteiro desde o corte (diagnóstico de 21/10)
+
+**Sintoma:** as telas do ZapIntel mostram "a consulta demorou demais, tente em instantes" o dia inteiro desde o corte de 20/10. O papel `authenticated` tem `statement_timeout = 8s`; o que passa disso é cancelado.
+
+### Produção — pg_stat_statements (só leitura, Q2 canônica com `max`)
+
+Janela: do zeramento de 20/10 16:07:17 até 21/10 16:50 (`D:\Nexus-Copia\saude\pgss-20261021-1650.json`, 693 entradas). A Q2 ganhou o campo `max` nesta foto (é o novo canônico, ver o LEIA-ME). Recorte em node: tudo com `zapintel` no texto, por tempo médio.
+
+| Consulta | Papel | Chamadas | Média | Máximo | Lê de |
+|---|---|---|---|---|---|
+| zapintel_dashboard (rpc) | authenticated | 19 | 4,1 s | **7,95 s** | views `leads` + `lead_mensagens` |
+| zapintel_leads_com_conversa (rpc) | service_role | 9 | 2,9 s | 3,83 s | views |
+| zapintel_analises_pendentes (rpc) | service_role | 7 | 2,5 s | 4,71 s | views |
+| zapintel_resumo (rpc) | authenticated | 78 | 1,7 s | 6,62 s | views |
+| zapintel_escopo (rpc) | authenticated | 16 | 58 ms | 339 ms | tabelas próprias |
+| zapintel_lead_perfil (leitura e gravação) | service_role | 846 | 2–11 ms | 332 ms | tabela própria |
+| zapintel_venda_lead, midia_retida, zapintel_ativo | service_role | 35 | ≤ 33 ms | 50 ms | tabelas próprias |
+
+**Quantas passaram de 8 s: o pg_stat_statements não diz.** Consulta cancelada por `statement_timeout` termina em erro e não entra no pgss — o `max` acima é sempre de quem terminou. Por isso o dado mais forte é o que FALTA: `zapintel_dashboard_lista`, `zapintel_leads_lista`, `zapintel_insights`, `zapintel_posvenda`, `zapintel_atendimento` e `zapintel_conversa` têm **zero chamadas terminadas** em 24 h. Ou ninguém abriu (improvável para o dono, o dia todo), ou toda chamada morreu nos 8 s. O dashboard terminou 19 vezes, com máximo de 7,95 s: encostado no teto.
+
+O job `zapintel-conversa-aquecer` (que prepara o "Como a loja conversa") rodou 1 vez no período e **falhou por statement timeout aos 120 s** (`cron.job_run_details`). Sem ele, o cache não se atualiza e a tela calcula na hora — e também morre.
+
+**Todas as RPCs pesadas leem pelas views de compatibilidade `leads` e `lead_mensagens`.** Nenhuma lê `negocios`, `mensagens` ou `contatos` direto. (O "clientes" de insights e posvenda é chave do JSON, não a view `clientes`.)
+
+### Na cópia (crm_zap = crm_etapa0, o estado da produção depois da Etapa 0), como o dono da JM, sem o teto
+
+2ª rodada de cada chamada, cache quente (`scratchpad/zapcore/bench.sh`):
+
+| RPC | Tempo |
+|---|---|
+| zapintel_conversa_calc (30 dias) | **200,0 s** |
+| zapintel_insights (tudo) | **134,2 s** |
+| zapintel_insights (30 dias) | **74,3 s** |
+| zapintel_dashboard | 1,42 s |
+| zapintel_atendimento (30 dias / loja 3) | 1,28 s / 1,14 s |
+| zapintel_turnos (30 dias) | 0,48 s |
+| zapintel_analises_pendentes | 0,47 s |
+| zapintel_leads_com_conversa | 0,47 s |
+| zapintel_resumo | 0,31 s |
+| zapintel_dashboard_lista / leads_lista | 0,27–0,28 s |
+| zapintel_posvenda | 0,20 s |
+
+A cópia (máquina local) é 3–5× mais rápida que o banco free: o dashboard dá 1,4 s aqui e 4,1 s de média lá — por isso, lá, ele raspa nos 8 s e insights e conversa nunca terminam.
+
+### EXPLAIN ANALYZE das 3 piores (auto_explain com `log_nested_statements`, como o dono da JM, na cópia)
+
+1. **`zapintel_insights` (76,7 s):** quase tudo no `PEDIU` (clientes a quem a loja pediu indicação). Ele junta `lead_mensagens` com 150 clientes, e para **cada** cliente o plano faz duas varreduras sequenciais completas de `mensagens` — uma por ramo do UNION da view (o do principal e o "sem negócio", com NOT EXISTS). 150 × 2 × 80 mil linhas. O `lead_id` da view é calculado (subconsulta correlacionada por mensagem), então nenhum índice serve.
+2. **`zapintel_conversa_calc` (216,9 s):** 155 s num nested loop do `E` que varre o CTE `MT` (16 mil mensagens) **17.356 vezes**, e mais 28 s igual no `SEQ`. A causa é a estimativa: sobre a view, o planejador acha que `MT` tem 5 linhas (são 40 mil), `AUT` 1 (são 17 mil) e `L` 24 (são 2.314) — e escolhe laço onde devia escolher hash.
+3. **`zapintel_dashboard` (1,2 s):** espalhado — `MODELOS` (300 ms), `zapintel_turnos` (243 ms), várias agregações de `lead_mensagens` da empresa inteira, e subconsulta por lead dentro de laço (fila e `SIL`).
+
+**Causa de fundo:** as duas views calculam o negócio principal de cada contato e loja **linha a linha**. Para a tela de um lead isso é barato (conserto de 20/10); para uma tela da empresa inteira — que é o ZapIntel — vira varredura em laço, e as estimativas ficam erradas a ponto de o planejador escolher o pior plano. Além disso, toda função filtra `coalesce(filial_id, 0) = any (lojas)`, uma expressão sem estatística: o Postgres chuta 0,5% por loja (36 negócios estimados onde há 2.386).
+
+### O conserto (branch `fix/zapintel-core`; migrações `20261022001000` e `20261022001100`, aplicar DEPOIS dos drops da Etapa 0)
+
+- **`20261022001000_zapintel_le_o_core.sql`:** três helpers SQL (`zapintel_principal`, `zapintel_mensagens`, `zapintel_negocios`) leem `negocios`, `mensagens`, `contatos` e `funil_etapas` direto, com a MESMA regra das views (principal = por contato e loja, o ativo mais novo), calculada uma vez em conjunto (DISTINCT ON) e casada por igualdade (`coalesce(filial_id, -1)`, que permite hash join; IS NOT DISTINCT FROM não permite). As 11 funções do ZapIntel passam a ler deles; nas buscas por um lead dentro de laço (fila, silêncio, modelo, largadas), onde a linha já é o principal, leem `mensagens` pelo contato e loja (índice `mensagens_contato_idx`). Ajustes só de plano: `SEQL` materializado e o bloco `venda` do conversa_calc agregando antes de juntar; `F` do atendimento embutido. Helpers fechados para anon/authenticated; dono `postgres`.
+- **`20261022001100_zapintel_estatisticas.sql`:** estatística das expressões `coalesce(filial_id, 0)` (negocios e mensagens) e do `ativo` do negócio, e ANALYZE. O EXPLAIN não pediu índice: pediu estatística (36 negócios estimados → 2.386 reais). Lock SHARE UPDATE EXCLUSIVE, não bloqueia leitura nem escrita.
+- **`supabase/funcoes/zapintel_*.sql`** das 11 funções foram apagados (eram a fonte de 15/10, com as views; reaplicar um deles traria a lentidão de volta). Os grants delas estão na `20261020000000_revoke_rpc.sql`.
+
+**Resultado idêntico:** numa transação só na cópia `crm_zap_antes` (o `now()` fica parado, então as janelas "últimos N dias" não andam), as 15 chamadas rodaram com as funções de hoje, a migração foi aplicada ali mesmo, as 15 rodaram de novo, e rollback. **13 idênticas; 2 (atendimento, rede e loja 3) com os mesmos elementos em outra ordem** no `cobertura` — `jsonb_agg` sem ORDER BY, que a tela lê num Map por dia e hora. Além disso, linha a linha: `zapintel_mensagens(e)` = primeiro ramo de `lead_mensagens` e `zapintel_negocios(e)` = `leads` nas colunas usadas, para as duas empresas (0 diferenças; 80.839 mensagens e 2.528 negócios da JM). Script `scratchpad/zapcore/mesmo-instante.sh`.
+
+**Tempos na cópia** (mediana de 3 rodadas, dono da JM; antes = 2ª rodada da medição do diagnóstico):
+
+| RPC | Antes | Depois |
+|---|---|---|
+| zapintel_conversa_calc (30 dias) | 200,0 s | **2,75 s** |
+| zapintel_insights (tudo) | 134,2 s | 0,34 s |
+| zapintel_insights (30 dias) | 74,3 s | 0,51 s |
+| zapintel_dashboard | 1,42 s | 0,50 s |
+| zapintel_atendimento (30 dias) | 1,28 s | 0,42 s |
+| zapintel_atendimento (loja 3) | 1,14 s | 0,35 s |
+| zapintel_leads_com_conversa | 0,47 s | 0,56 s |
+| zapintel_turnos (30 dias) | 0,48 s | 0,21 s |
+| zapintel_analises_pendentes | 0,47 s | 0,27 s |
+| zapintel_posvenda | 0,20 s | 0,43 s |
+| zapintel_leads_lista | 0,27 s | 0,18 s |
+| zapintel_dashboard_lista | 0,28 s | 0,16–0,17 s |
+| zapintel_resumo | 0,31 s | 0,13 s |
+
+**Acima de 1 s, só o `zapintel_conversa_calc` (2,75 s)**, e é trabalho real, não plano ruim: autoria por janela e regex de gíria sobre 16 mil mensagens (montar o `E` custa ~1,2 s). Ele não é chamado pela tela no dia a dia: o job `zapintel-conversa-aquecer` grava o cache (teto de 120 s, que estourava) e a tela lê o cache (`zapintel_conversa`). Quem ainda chama ao vivo é o botão de recalcular — na produção (3–5× mais lenta) deve ficar perto dos 8 s; acompanhar. `posvenda` e `leads_com_conversa` subiram alguns centésimos e ficam bem abaixo de 1 s; na produção, de 0,2–0,5 s para algo perto de 1–2 s no pior caso — conferir no pgss depois do deploy.
+
+### O resumo do menu sob demanda (hooks/zapintel)
+
+`zapintel_resumo` (o menu do ZapIntel: conversas, mensagens, leads por loja) era a RPC mais chamada do ZapIntel na produção (78 em 24 h, média 1,7 s) porque toda aba o refazia a cada aviso do canal — de mensagem, de ficha refeita e de venda —, até uma vez a cada 20 s. Agora: **só com aviso de mensagem, no máximo a cada 30 s por aba, nunca com a aba em segundo plano, e ao voltar para a aba só depois que o teto passou** (antes consultava na hora). As outras telas ao vivo seguem como estavam (20 s, todo aviso).
+
+A regra saiu para `hooks/zapintel/ritmo.ts` e o hook a usa; `tests/zapintel-ritmo.test.ts` simula com ela 3 abas por 10 minutos (uma mensagem a cada 15 s, ~240/h; uma ficha refeita por minuto; a aba 3 escondida do minuto 2 ao 8): **antes 75 consultas (31 + 31 + 13), depois 50 (21 + 21 + 8)**, nenhuma com a aba escondida, nunca duas em menos de 30 s.
+
+**Não medido no navegador:** a medição com 3 abas reais contra o Supabase local (Realtime de verdade) não coube na memória da máquina em 21/10 (Docker + next dev + 3 abas com 1,9 GB livres). Fica para quando houver folga; o número acima é da simulação da regra, não do navegador. Depois do deploy, o pgss da produção dá a prova real (chamadas de zapintel_resumo por hora com a loja aberta).

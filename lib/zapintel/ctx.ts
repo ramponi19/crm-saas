@@ -55,7 +55,7 @@ export async function zapintelEmpresa(): Promise<{ userId: string; empresaId: nu
  * 15/10/2026 filtravam só pela empresa: um vendedor de Mogi abria a ficha de um
  * lead de Jaguariúna pelo número, e uma empresa SEM o ZapIntel ligado disparava
  * análise paga. As telas não tinham esse furo porque cada função do banco passa
- * por `zapintel_escopo` (supabase/funcoes/zapintel_dashboard.sql): ZapIntel
+ * por `zapintel_escopo` (supabase/migrations/20261022001000_zapintel_le_o_core.sql): ZapIntel
  * ativo para a empresa, dono/admin/superadmin veem todas as lojas (mais "sem
  * loja" = 0), vendedor só as dele. Aqui a rota pergunta à mesma função — duas
  * regras para a mesma coisa só servem para divergir.
