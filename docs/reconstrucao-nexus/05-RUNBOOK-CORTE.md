@@ -173,11 +173,15 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11;
   - **Redirects 308 da Etapa 0 (`next.config.ts`), no ar desde 21/10 19:03: REMOVER EM 21/11/2026** — `/simular-parcela` → `/orcamentos/parcela`, `/check-imei` → `/estoque/imei`, `/consulta-fipe` → `/avaliacoes/fipe` (2.4), `/admin/relatorios` → `/relatorios`, `/admin/financeiro` → `/financeiro` e `/admin/configuracoes?aba=integracoes` → `/admin/integracoes` (2.3). Conferidos os 6 com curl no smoke. Depois de 21/11, link salvo antigo cai no 404;
   - pedido de teste nº 1 em `modulo_pedidos` (JM, `/agenda`, smoke (e) de 21/10 19:07): atender ou apagar pelo superadmin;
+  - **Redirects 308 do /admin (navegação nova, A.2, `next.config.ts`): REMOVER EM 21/11/2026** — todo `/admin/*` e as abas `?aba=` de `/admin/configuracoes` (tabela na seção "Navegação nova"). NÃO entra no prazo o mapa `LEGADO_ADMIN` do `proxy.ts`: `/canais` é o `redirect_uri` registrado no app da Meta e tem de continuar levando a Integrações;
   - **`/api/metas` e `/api/ranking/metas`: ficam.** Gravam em tabelas diferentes (`metas_comissoes` × `metas`). Critério para sair: **unificar na tela de metas, fase F** — uma tabela, uma rota (decisão do Lucas, 21/10);
   - ~89 índices nunca usados que cobrem FK: ficam.
 - **Para o módulo Vendas (anotado em 21/10, decisão do Lucas):**
   - **Lançar custo em venda já feita:** não existe tela (só na encomenda). O custo nasce na unidade do estoque e o PDV copia para a venda; venda feita sem custo fica sem lucro para sempre. Fica para o módulo Vendas.
   - **Defeito do PDV — canal "encomenda":** 34 das 37 vendas dos últimos 12 meses da JM estão com `canal_venda = 'encomenda'` (na cópia), e o donut "Vendas por canal" do painel mostra "encomenda 100%". Encomenda é tipo de venda, não canal: o PDV grava o lugar errado. O painel mostra como está até o módulo Vendas corrigir a origem.
+  - **Visão geral com faturamento R$ 0,00 × painel:** a Visão geral (o antigo `/admin`, hoje `/visao-geral` em Insights) mostra "Faturamento no mês R$ 0,00 · 0 vendas concluídas" enquanto o painel mostra R$ 122.262,00 em 15 vendas no mesmo mês (cópia, 21/10). Já era assim antes da navegação nova (foto `navegacao-antes-3-admin.png`): a Visão geral não lê pelo `lib/painel/metricas.ts`. Fica para o módulo Vendas (anotado em 21/10, decisão do Lucas).
+- **Para o módulo Estoque (anotado em 21/10, decisão do Lucas):**
+  - **"Nova marca" leva a Configurações sem cadastro:** no Catálogo, aba Marcas, o botão "Nova marca" abre Configurações (antes `/admin/configuracoes`, hoje `/configuracoes`), onde não existe cadastro de marca — o botão não leva a lugar nenhum útil. Defeito anterior à navegação nova.
 - **Toda view nova ou recriada leva `with (security_invoker = true)`.** O `create or replace view` sem a opção a apaga, e a view passa a ignorar a RLS (furo de 20/10, 2 min 44 s; ver o 06). O banco recusa (event trigger `exigir_security_invoker`) e o build também (`npm run check:views`).
 - **Views de compatibilidade:** sair conforme as telas migram para o core.
   - Regra: uma view só cai quando `grep -rn "from('<nome>')" app components lib hooks supabase/functions` volta vazio.
@@ -227,3 +231,31 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
 | Extra de segmento sem grupo no mapa | o que ele declarar | pelo grupo antigo: Hoje→Início, Comercial→Pipeline, Operação/Veículos/Food→Vendas, Imóveis→Estoque, Gestão→Insights |
 
 Automações não tem item na A.1 (as telas de automação ainda estão no `/admin`); o grupo some enquanto estiver vazio.
+
+### A.2 — Configurações numa tela, o /admin fora
+
+- **O que muda:** o /admin (19 itens) e as 12 abas de /admin/configuracoes viram **uma tela**, `/configuracoes`, dentro do CRM, com menu lateral próprio em 4 seções. O menu principal recolhe sozinho em trilho ali (abrir vale só ali). Cada item é a tela de antes, com o componente de antes (as abas: `ConfiguracoesView` com `aba` fixa, sem a barra). Nada de funcionalidade nova. Decisões do Lucas (21/10): Perfil e IA só com o que existe; leituras do /admin em Insights; motor de vendas dividido entre Automações (menu) e Área de trabalho.
+- **Quem vê:** Perfil é de todo mundo (o "Configurações" do rodapé agora aparece para todos); o resto só dono/admin — guarda no layout dos grupos `configuracoes/(admin)` e `(gestao)`, como o layout do /admin fazia (várias telas não conferem o papel sozinhas). Seção sem item não aparece.
+- **Itens novos no menu principal (só dono/admin):** Insights ganha Visão geral (`/visao-geral`), Conversão (`/conversao`), Meta da empresa (`/metas`); Automações ganha Cadências (`/cadencias`), Distribuição (`/distribuicao`), Lead scoring (`/scoring`), Modelos (`/modelos`), Respostas e assinatura (`/respostas`), Gatilhos (`/automacoes`). Marcados `sempreLiberado` (o /admin não dependia do opt-in do segmento nem da trava) e `donoNaoOculta` (o /admin não se ocultava). Relatórios e Financeiro também ganharam `donoNaoOculta`: a JM os tinha ocultado do menu do CRM e chegava neles só pelo /admin. A tela Menu do CRM não lista esses itens (o botão não faria nada). O ocultar do superadmin e as permissões do papel continuam valendo.
+- **Teste:** `MSYS_NO_PATHCONV=1 npx tsx scripts/comparar-menu-agrupado.mts <menu-core.json> --foto=<menu-a1.json> --novos=...` (a foto é a lista de cada combinação gravada com o lib da A.1, commit `b82fe19`, por `--gravar`). Sem `--novos`: 9 de 15 diferentes — dono, admin e superadmin nas 3 lojas; **vendedor e técnico idênticos**. Com a diferença declarada: 15/15. **Diferença esperada:** JM (lojas 3 e 6) +11 itens para dono/admin/superadmin (Relatórios, Financeiro, Visão geral, Conversão, Meta da empresa, Cadências, Distribuição, Lead scoring, Modelos, Respostas e assinatura, Gatilhos; 10 → 21 itens em 7 entradas); Preview +9 (já tinha Relatórios e Financeiro; 17 → 26 itens em 8 entradas).
+
+| Antes | Agora |
+|---|---|
+| `/admin` (Visão geral) | `/visao-geral` — Insights |
+| `/admin/conversao`, `/admin/metas` | `/conversao`, `/metas` — Insights |
+| `/admin/cadencias`, `/admin/distribuicao`, `/admin/scoring`, `/admin/modelos` | `/cadencias`, `/distribuicao`, `/scoring`, `/modelos` — Automações |
+| `/admin/configuracoes?aba=automacoes` | `/automacoes` (Gatilhos) — Automações |
+| `/admin/configuracoes?aba=modelos` | `/respostas` (Respostas e assinatura) — Automações |
+| `/admin/configuracoes?aba=notificacoes` | `/configuracoes/perfil` — Perfil (com a Ausência) |
+| `/admin/empresa`, `/admin/filiais`, `/admin/aparencia`, `/admin/meu-menu` | `/configuracoes/empresa`, `/lojas`, `/aparencia`, `/menu` — Área de trabalho › Empresa |
+| `/admin/equipe`, `/admin/permissoes` | `/configuracoes/usuarios`, `/permissoes` — Área de trabalho › Usuários |
+| `/admin/funil`; abas `funis`, `sla`, `motivos`, `horario` (+ `agendamento` da saúde) | `/configuracoes/funil` (Etapas do funil), `/funis`, `/sla`, `/motivos`, `/horario`, `/agendamento` — Área de trabalho › Vendas e atendimento |
+| abas `pagamentos`, `taxas`, `troca`, `contrato`, `dados` (+ `cardapio` do food); `/admin/contrato` | `/configuracoes/pagamentos`, `/taxas`, `/troca`, `/contrato`, `/dados`, `/cardapio`; `/configuracoes/documentos` — Área de trabalho › Loja |
+| `/admin/planos` (+ `/sucesso`) | `/configuracoes/faturamento` (+ `/sucesso`) — Área de trabalho › Faturamento |
+| (atalho do ZapIntel no /admin) | IA › ZapIntel (só com o add-on ligado) |
+| `/admin/integracoes`, `/admin/canais`; abas `portais`/`veiculos-portais` | `/configuracoes/integracoes`, `/configuracoes/portais` — Integrações e canais |
+| CRM antigo `/canais`, `/funil`, `/meu-menu`, `/permissoes`, `/aparencia`, `/empresa`, `/planos`, `/equipe` (proxy) | direto para o destino novo (antes passavam pelo /admin) |
+
+- **Não existe hoje e ficou de fora** (sem funcionalidade nova): idioma, trocar senha, configuração do assistente para o lojista, "formatos" (data/moeda). Dois defeitos antigos achados no caminho foram anotados para os módulos Vendas e Estoque (seção "Depois do corte").
+- **No deploy:** (1) os links que saem do sistema já apontam para o endereço novo — Stripe (`success_url`, `cancel_url`, `return_url` do portal), retorno do Instagram; sessão de Stripe aberta antes do deploy volta pelo 308 de `/admin/planos/sucesso`, com o `session_id`. (2) O `redirect_uri` da Meta é `/canais`: o proxy troca só o caminho, a `?code=` passa (testado: `/canais?code=` → `/configuracoes/integracoes?code=`). (3) Smoke: abrir Configurações como dono e como vendedor (vendedor só vê Perfil), uma seção de cada grupo, `/admin` → Visão geral, `/admin/configuracoes?aba=horario` → Horário.
+

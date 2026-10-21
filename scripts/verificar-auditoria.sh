@@ -502,7 +502,7 @@ v "menu rola ate o item ativo"         "components/layout/nav-rolavel.tsx" "scro
 v "aviso de conteudo escondido"        "components/layout/nav-rolavel.tsx" "cortado.abaixo"
 v "item ativo marcado no CRM"          "components/layout/sidebar.tsx" "data-ativo={isActive || undefined}"
 v "rodape nao encolhe"                 "components/layout/sidebar.tsx" "shrink-0 px-2 py-2"
-v "meu menu ve a config do segmento"   "app/admin/meu-menu/page.tsx" "carregarConfigEmpresa(supabase, empresaId"
+v "meu menu ve a config do segmento"   "app/(dashboard)/configuracoes/(admin)/menu/page.tsx" "carregarConfigEmpresa(supabase, empresaId"
 # 21/10/2026: o segmento e as camadas vem do core (lib/empresa-config.ts); o menu
 # do CRM, a trava de rota e esta tela leem a mesma funcao.
 v "menu le as camadas do core"         "app/(dashboard)/layout.tsx" "carregarConfigEmpresa(supabase"
@@ -578,6 +578,23 @@ v "rodape fixo com notificacoes"       "components/layout/sidebar.tsx" "new Even
 v "sino abre pelo rodape"              "components/layout/topbar.tsx" "window.addEventListener('notificacoes:abrir', abrir)"
 # Href salvo que nao existe mais e ignorado; item novo entra no fim, nao desaparece.
 v "ordem plana tolera href sumido"     "lib/menu.ts" "if (!usados.has(item.href)) saida.push(item)"
+echo "== configuracoes numa tela, /admin fora (21/10) =="
+# Dois menus para parametrizar a loja viraram um. Configuracao em /configuracoes;
+# leitura em Insights; automacao em Automacoes (decisao do Lucas). Ver o 05.
+if [ ! -e "app/admin" ]; then printf "  ok    %s
+" "nao existe mais app/admin"; ok=$((ok+1)); else printf "  FALHA %s
+" "app/admin voltou"; falha=$((falha+1)); fi
+v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx" "secoesDeConfiguracoes({ isAdmin, abasDoSegmento, zapintel })"
+v "configuracoes so dono ou admin"     "app/(dashboard)/configuracoes/(admin)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
+v "insights e automacoes so dono/admin" "app/(dashboard)/(gestao)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
+v "o /admin responde 308"              "next.config.ts" "{ source: '/admin', destination: '/visao-geral', permanent: true },"
+v "abas antigas vao para a secao"      "next.config.ts" "...Object.entries(DESTINO_DA_ABA).map"
+v "veio do /admin o dono nao oculta"   "lib/menu.ts" "!PROTEGIDOS.has(h) && !DONO_NAO_OCULTA.has(h)"
+v "tela do menu sem botao que nao age" "app/(dashboard)/configuracoes/(admin)/menu/page.tsx" ".filter((i) => donoPodeOcultar(i.href))"
+v "stripe volta para faturamento"      "app/api/stripe/checkout/route.ts" "/configuracoes/faturamento/sucesso?session_id="
+v "retorno do instagram em integracoes" "app/api/canais/instagram/retorno/route.ts" "/configuracoes/integracoes?"
+v "perfil e de todo mundo"             "lib/configuracoes-menu.ts" "if (!isAdmin) return .perfil."
+
 echo "== proprietario e um cliente (21/08) =="
 n "nao existe mais tela paralela"      "lib/menu.ts" "href: '/proprietarios'"
 n "segmento nao declara a tela"        "lib/segmentos.ts" "href: '/proprietarios'"
@@ -605,17 +622,17 @@ if [ ! -e "app/api/webhook/c2s/[slug]/route.ts" ]; then printf "  ok    %s\n" "w
 v "c2s nao assina endereco que da 404"  "app/api/admin/c2s/route.ts" "A integração com o C2S está desligada no Nexus."
 v "webhook e rota publica"            "proxy.ts" "startsWith('/api/webhook/')"
 v "token deles entra cifrado"         "app/api/admin/c2s/route.ts" "cifrarToken(t)"
-v "token deles nunca volta pra tela"  "app/admin/integracoes/page.tsx" "temToken: !!cfgC2S.token"
+v "token deles nunca volta pra tela"  "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "temToken: !!cfgC2S.token"
 v "valida token antes de guardar"     "app/api/admin/c2s/route.ts" "const teste = await testarToken(t)"
 v "avisa do um-endpoint-por-token"    "app/api/admin/c2s/route.ts" "um endereço por token"
 v "recusa assinar endereco local"    "app/api/admin/c2s/route.ts" "if (local) {"
 v "guarda a url que foi assinada"    "app/api/admin/c2s/route.ts" "url_assinada: feitos.length ? url"
-v "tela e rota usam a mesma conta"   "app/admin/integracoes/page.tsx" "basePublica(hostReq"
+v "tela e rota usam a mesma conta"   "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "basePublica(hostReq"
 v "tela mostra divergencia de url"   "components/modules/integracoes/c2s-card.tsx" "estado.urlAssinada !== estado.urlWebhook"
 
 echo "== filiais (24/08) =="
 v "limite do plano conta a empresa"  "lib/limites.ts" "const svc = createServiceClient()"
-v "uso do plano usa total da rede"   "app/admin/page.tsx" "const leadsDaRede = rede?.total"
+v "uso do plano usa total da rede"   "app/(dashboard)/(gestao)/visao-geral/page.tsx" "const leadsDaRede = rede?.total"
 v "consolidado le fora da RLS"       "lib/filiais-consulta.ts" "eq('empresa_id', empresaId)"
 v "seletor some com uma loja so"     "components/layout/seletor-filial.tsx" "if (filiais.length < 2) return null"
 v "vendedor nao troca de loja"       "components/layout/seletor-filial.tsx" "if (!podeTrocar) {"
@@ -625,14 +642,17 @@ v "matriz unica troca em ordem"      "app/api/admin/filiais/route.ts" "eq('matri
 v "desativar solta quem estava nela" "app/api/admin/filiais/route.ts" "eq('filial_id', b.id)"
 v "selecao valida a empresa"         "app/api/filial/selecionar/route.ts" "eq('empresa_id', empresaId).eq('ativo', true)"
 v "loja da pessoa e validada"        "app/api/equipe/atualizar-usuario/route.ts" "Loja não encontrada nesta empresa"
-v "campo de loja so no /admin"       "app/admin/equipe/page.tsx" "filiais={(filiais ?? "
+v "campo de loja so no /admin"       "app/(dashboard)/configuracoes/(admin)/usuarios/page.tsx" "filiais={(filiais ?? "
 v "CRM nao apaga a loja ao salvar"   "app/(dashboard)/equipe/components/equipe-view.tsx" "...(escolheLoja ?"
 v "canal pode ser de uma loja"       "app/api/canais/[id]/route.ts" "filial_id: filialId ?? null"
 v "canal valida a loja da empresa"   "app/api/canais/[id]/route.ts" "Loja nao encontrada nesta empresa."
 v "tela explica canal da rede"       "components/modules/canais/canais-view.tsx" "Toda a rede"
 v "campo de loja do canal so com 2"  "components/modules/canais/canais-view.tsx" "lojas.length >= 2"
-v "retorno da meta preserva o code"   "app/admin/canais/page.tsx" "const q = query.toString()"
-v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx" "replaceState({}, '', '/admin/integracoes')"
+# /canais e o redirect_uri da Meta: a query (?code=) tem de chegar em Integracoes.
+# Desde 21/10 o proxy so troca o caminho (a query passa) e o /admin/canais e 308.
+v "retorno da meta preserva o code"   "proxy.ts" "url.pathname = LEGADO_ADMIN.legado. + p.slice(legado.length)"
+v "canais da meta vai p/ integracoes"  "proxy.ts" "'/canais': '/configuracoes/integracoes',"
+v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx" "replaceState({}, '', '/configuracoes/integracoes')"
 v "canal novo nasce na loja atual"    "app/api/canais/meta/route.ts" "update({ filial_id: loja })"
 v "reconexao nao mexe na loja"        "app/api/canais/meta/route.ts" "if (existia.has(l.tipo"
 v "numero novo nasce na loja atual"   "app/api/canais/whatsapp/route.ts" "loja != null && !jaExistia"
@@ -675,7 +695,7 @@ v "contrato descreve pagamento dividido" "lib/contrato-emitir.ts" "vendas_pagame
 v "pagamento dividido vira texto"        "lib/contrato-modelo.ts" "descreverPagamentos"
 v "banco e campo de mesclagem"        "lib/contrato-modelo.ts" "loja.banco"
 v "avisa se faltar banco no cadastro" "lib/contrato-emitir.ts" "Chave PIX"
-v "minha empresa pede os dados"       "app/admin/empresa/empresa-config-view.tsx" "banco_pix"
+v "minha empresa pede os dados"       "app/(dashboard)/configuracoes/(admin)/empresa/empresa-config-view.tsx" "banco_pix"
 v "online vem da tabela acessos"      "lib/presenca.ts" "is('saida', null)"
 v "janela do online tolera 1 pulso"   "lib/presenca.ts" "JANELA_ONLINE_MIN = 10"
 v "equipe mostra online"              "app/(dashboard)/equipe/components/equipe-view.tsx" "online.has(u.id)"
@@ -691,7 +711,7 @@ v "cron ainda exige o segredo"       "app/api/cron/[job]/route.ts" "verificarCro
 v "cron sabe renovar token"          "app/api/cron/[job]/route.ts" "renovarTokensInstagram"
 v "renova antes de vencer"           "lib/canais/renovacao.ts" "DIAS_DE_ANTECEDENCIA"
 v "token vencido vira expirado"      "lib/canais/renovacao.ts" "expirado"
-v "integracoes tenta renovar tambem" "app/admin/integracoes/page.tsx" "renovarTokensInstagram"
+v "integracoes tenta renovar tambem" "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "renovarTokensInstagram"
 v "avisa so perto de vencer"         "components/modules/canais/canais-view.tsx" "DIAS_PARA_ALARMAR"
 n "instagram nao oferece mais 2 botoes" "components/modules/canais/canais-view.tsx" "Conectar sem Página"
 v "reconectar segue o caminho do canal" "components/modules/canais/canais-view.tsx" "c.via === 'instagram' ? conectarInstagramSemPagina"

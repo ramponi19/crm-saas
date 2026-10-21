@@ -45,8 +45,6 @@ export function MobileTopbar({
   const grupos = resolverMenuAgrupado({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   const iniciais = (empresaNome ?? userName).slice(0, 2).toUpperCase()
-  // A parametrização vive em /admin — o menu do CRM só precisa da porta de entrada.
-  const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
 
   async function handleLogout() {
     // Fecha o registro de uso ANTES do signOut: depois dele não há mais sessão
@@ -90,7 +88,7 @@ export function MobileTopbar({
                   const Icon = MENU_ICONS[it.icon] ?? LayoutDashboard
                   const badge = it.badge === 'leads' ? leadsCount : it.badge === 'garantia' ? garantiasCount : 0
                   return (
-                    <LinkDeMenu key={it.href} href={it.locked ? `/admin/planos?upgrade=${it.modulo}` : it.href} onClick={() => setOpen(false)}
+                    <LinkDeMenu key={it.href} href={it.locked ? `/configuracoes/faturamento?upgrade=${it.modulo}` : it.href} onClick={() => setOpen(false)}
                       className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-medium transition-colors',
                         isActive(it.href) ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-2 hover:bg-line-soft hover:text-ink')}>
                       <Icon size={16} strokeWidth={1.7} className="shrink-0 opacity-90" />
@@ -103,15 +101,14 @@ export function MobileTopbar({
               </div>
               ))}
 
-              {isEmpresaAdmin && (
-                <div className="mt-3 border-t border-line-soft pt-3">
-                  <LinkDeMenu href="/admin" onClick={() => setOpen(false)}
-                    className="flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-semibold text-accent transition-colors hover:bg-accent-soft">
-                    <Settings size={16} strokeWidth={1.7} className="shrink-0" />
-                    <span className="flex-1 truncate">Administração</span>
-                  </LinkDeMenu>
-                </div>
-              )}
+              {/* Configurações é de todo mundo (o Perfil); o resto da tela só abre para dono/admin. */}
+              <div className="mt-3 border-t border-line-soft pt-3">
+                <LinkDeMenu href="/configuracoes" onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-semibold text-accent transition-colors hover:bg-accent-soft">
+                  <Settings size={16} strokeWidth={1.7} className="shrink-0" />
+                  <span className="flex-1 truncate">Configurações</span>
+                </LinkDeMenu>
+              </div>
             </nav>
             <button onClick={handleLogout} className="flex shrink-0 items-center gap-2.5 border-t border-line-soft px-4 py-3 text-[13px] font-medium text-ink-2 hover:text-ink">
               <LogOut size={16} strokeWidth={1.7} /> Sair

@@ -102,7 +102,7 @@ export function UsoEquipe({ sessoes, resumo, dias }: {
           wrapperClassName="w-[170px]"
           label="Período"
           value={String(dias)}
-          onChange={(e) => router.push(`/admin/equipe?tab=uso&dias=${e.target.value}`)}
+          onChange={(e) => router.push(`/configuracoes/usuarios?tab=uso&dias=${e.target.value}`)}
         >
           <option value="7">Últimos 7 dias</option>
           <option value="14">Últimos 14 dias</option>

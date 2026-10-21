@@ -61,11 +61,19 @@ export function Sidebar({
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { recolhido, fechados, alternarRecolhido, alternarGrupo } = useMenuEstado()
+  const { recolhido: recolhidoGuardado, fechados, alternarRecolhido, alternarGrupo } = useMenuEstado()
+  /**
+   * Em Configurações o menu vira trilho sozinho (como no Kommo): a tela tem o menu
+   * lateral dela e precisa da largura. Abrir ali vale só ali — não mexe na escolha
+   * guardada para o resto do CRM.
+   */
+  const emConfiguracoes = pathname.startsWith('/configuracoes')
+  const [abertoNaConfig, setAbertoNaConfig] = useState(false)
+  const recolhido = emConfiguracoes ? !abertoNaConfig : recolhidoGuardado
+  const alternar = emConfiguracoes ? () => setAbertoNaConfig((v) => !v) : alternarRecolhido
 
   const { total: chatNaoLidas } = useChatNaoLidas()
   const t = theme ?? resolveTheme(null)
-  const isEmpresaAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
   /**
    * GRUPOS COM VERBO (21/10/2026) — ver `resolverMenuAgrupado` em lib/menu.ts.
    * De 20/08 a 21/10 foi uma lista só, sem cabeçalho (os grupos de então só
@@ -105,7 +113,7 @@ export function Sidebar({
   function desenharItem(item: MenuItem, recuo?: boolean) {
     const Icon = MENU_ICONS[item.icon] ?? LayoutDashboard
     const isActive = ativo(item)
-    const href = item.locked ? `/admin/planos?upgrade=${item.modulo}` : item.href
+    const href = item.locked ? `/configuracoes/faturamento?upgrade=${item.modulo}` : item.href
     const badge = item.locked ? 0 : badgeCount(item.badge)
     return (
       <LinkDeMenu
@@ -196,7 +204,7 @@ export function Sidebar({
         {/* Recolher fica ao lado do logo (como no Kommo): é onde o olho procura. */}
         <button
           type="button"
-          onClick={alternarRecolhido}
+          onClick={alternar}
           aria-label={recolhido ? 'Abrir menu' : 'Recolher menu'}
           title={recolhido ? 'Abrir menu' : 'Recolher menu'}
           className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-control transition-colors', faint, HOVER)}
@@ -273,12 +281,14 @@ export function Sidebar({
       {/* Rodapé fixo: Configurações, Ajuda, Notificações e a conta. */}
       <div className="shrink-0 px-2 py-2" style={{ borderTop: LINHA, color: 'var(--sb-text)' }}>
         <div className="space-y-px">
-          {isEmpresaAdmin && (
-            <LinkDeMenu href="/admin" title={recolhido ? 'Configurações' : undefined} aria-label="Configurações" className={rodapeClasse}>
-              <Settings size={15} strokeWidth={1.7} className="shrink-0 opacity-85" />
-              {!recolhido && <span className="flex-1 truncate text-left">Configurações</span>}
-            </LinkDeMenu>
-          )}
+          {/* Para todo mundo: o Perfil (notificações, ausência) é de cada um; o resto
+              de Configurações só aparece para dono/admin (lib/configuracoes-menu.ts). */}
+          <LinkDeMenu href="/configuracoes" title={recolhido ? 'Configurações' : undefined} aria-label="Configurações"
+            className={cn(rodapeClasse, emConfiguracoes && 'font-semibold')}
+            style={emConfiguracoes ? { background: 'var(--sb-active-bg)', color: 'var(--sb-active-text)' } : undefined}>
+            <Settings size={15} strokeWidth={1.7} className="shrink-0 opacity-85" />
+            {!recolhido && <span className="flex-1 truncate text-left">Configurações</span>}
+          </LinkDeMenu>
           {/* Ajuda = o assistente (também no ⌘K): responde "como faço" e consulta o sistema. */}
           <button type="button" title={recolhido ? 'Ajuda' : undefined} aria-label="Ajuda" className={rodapeClasse}
             onClick={() => window.dispatchEvent(new Event('assistente:abrir'))}>

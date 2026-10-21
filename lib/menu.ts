@@ -50,6 +50,21 @@ export interface MenuItemBase {
    * liberação por empresa não mudou de forma; só o lugar onde a tela aparece.
    */
   ferramenta?: { rota: string }
+  /**
+   * VEIO DO /admin (navegação nova, 21/10/2026). O menu do /admin não dependia do
+   * opt-in do segmento nem da trava de rota: dono e admin sempre tinham Cadências,
+   * Conversão, Visão geral... Com o /admin dentro do menu único, estes itens
+   * continuam assim — liberados sempre (ainda só para quem `adminOnly` deixa).
+   */
+  sempreLiberado?: boolean
+  /**
+   * O "ocultar" do dono (Menu do CRM) não tira este item. Era do menu do /admin,
+   * que não se ocultava; e a JM tinha ocultado Relatórios, Financeiro, Conversão e
+   * Metas do menu do CRM quando eles moravam nos dois lugares — sem esta marca, o
+   * dono perderia o único caminho até eles. O "ocultar" do superadmin e as
+   * permissões do papel continuam valendo.
+   */
+  donoNaoOculta?: boolean
 }
 
 export interface MenuGroupBase {
@@ -206,6 +221,10 @@ const PROTEGIDOS = new Set<string>()
 // Núcleo: sempre habilitado, independente do opt-in do segmento.
 const NUCLEO = new Set(['/dashboard', '/leads', '/clientes'])
 
+/** Itens marcados `sempreLiberado` / `donoNaoOculta` (preenchidos depois do CATALOGO). */
+let SEMPRE: Set<string> = new Set()
+let DONO_NAO_OCULTA: Set<string> = new Set()
+
 /** Hrefs do catálogo que NÃO são opcionais (base comum a todo segmento). */
 export function hrefsBase(): string[] {
   return CATALOGO.flatMap((g) => g.items).filter((i) => !i.opcional).map((i) => i.href)
@@ -226,7 +245,7 @@ export function moduloDaRota(pathname: string): string | null {
     .find((i) => i.ferramenta && (pathname === i.ferramenta.rota || pathname.startsWith(i.ferramenta.rota + '/')))
   if (ferramenta) return ferramenta.href
   const raiz = '/' + (pathname.split('/')[1] ?? '')
-  if (NUCLEO.has(raiz)) return null // núcleo nunca é bloqueado
+  if (NUCLEO.has(raiz) || SEMPRE.has(raiz)) return null // núcleo e o que veio do /admin nunca são bloqueados
   return CATALOGO.flatMap((g) => g.items).some((i) => i.href === raiz) ? raiz : null
 }
 
@@ -319,8 +338,12 @@ export const CATALOGO: MenuGroupBase[] = [
       // Painel do dono da vertical: opcional (fora de hrefsBase), então nenhum
       // segmento herda por acidente — só quem tem '/executivo' na lista habilitada.
       { href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true },
-      { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true },
-      { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true },
+      { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true, donoNaoOculta: true },
+      { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true, donoNaoOculta: true },
+      // Leituras que moravam no /admin (21/10/2026): agora em Insights.
+      { href: '/visao-geral', label: 'Visão geral', icon: 'Building2', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/conversao', label: 'Conversão', icon: 'Filter', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/metas', label: 'Meta da empresa', icon: 'Gauge', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
       /**
        * Equipe, Conversão e Meta da empresa SAÍRAM daqui (21/08/2026).
        *
@@ -330,10 +353,35 @@ export const CATALOGO: MenuGroupBase[] = [
        */
     ],
   },
-  // O antigo grupo "Sistema" (canais, funil, cadências, permissões, aparência,
-  // configurações, empresa, planos…) saiu do CRM: é parametrização do DONO e
-  // vive em /admin (app/admin/*), fora do menu operacional do funcionário.
+  {
+    /**
+     * O motor de vendas que morava no /admin (21/10/2026), decisão do Lucas: o
+     * que AGE sozinho (cadências, distribuição, scoring, modelos, gatilhos) vira
+     * Automações no menu; etapas do funil, SLA, motivos e horário são
+     * configuração e foram para /configuracoes.
+     */
+    label: 'Automações',
+    items: [
+      { href: '/cadencias', label: 'Cadências', icon: 'Repeat', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/distribuicao', label: 'Distribuição', icon: 'Split', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/scoring', label: 'Lead scoring', icon: 'Flame', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/modelos', label: 'Modelos', icon: 'MessageSquareText', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/respostas', label: 'Respostas e assinatura', icon: 'MessageSquare', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+      { href: '/automacoes', label: 'Gatilhos', icon: 'Zap', adminOnly: true, sempreLiberado: true, donoNaoOculta: true },
+    ],
+  },
+  // O resto do antigo grupo "Sistema" (canais, funil, permissões, aparência,
+  // empresa, planos…) é parametrização do DONO e vive em /configuracoes
+  // (lib/configuracoes-menu.ts), fora do menu operacional do funcionário.
 ]
+
+SEMPRE = new Set(CATALOGO.flatMap((g) => g.items).filter((i) => i.sempreLiberado).map((i) => i.href))
+DONO_NAO_OCULTA = new Set(CATALOGO.flatMap((g) => g.items).filter((i) => i.donoNaoOculta).map((i) => i.href))
+
+/** O dono pode ocultar este item no Menu do CRM? (a tela não oferece o botão para o que não obedeceria) */
+export function donoPodeOcultar(href: string): boolean {
+  return !DONO_NAO_OCULTA.has(href)
+}
 
 export function resolverMenu(input: ResolverMenuInput): MenuGroup[] {
   return resolver(input).grupos
@@ -359,6 +407,7 @@ function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas:
   // com fallback derivado da config estática. O núcleo sempre entra.
   const habilitados = new Set<string>(segOverride?.habilitados ?? habilitadosDerivados(seg))
   NUCLEO.forEach((h) => habilitados.add(h))
+  SEMPRE.forEach((h) => habilitados.add(h))
   // Camada 3 (positiva): o superadmin liga um módulo para ESTA empresa, sem
   // passar pelo segmento — que é compartilhado entre tenants. Ver
   // `MenuOverridesSuperadmin.habilitados`.
@@ -367,7 +416,7 @@ function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas:
   const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
 
   // Camadas 3 (superadmin) + 4 (dono): ocultar dentro do habilitado + renomear.
-  const donoHidden = (configDono?.hidden ?? []).filter((h) => !PROTEGIDOS.has(h))
+  const donoHidden = (configDono?.hidden ?? []).filter((h) => !PROTEGIDOS.has(h) && !DONO_NAO_OCULTA.has(h))
   const hidden = new Set<string>([...(overrides?.hidden ?? []), ...donoHidden])
   const labels: Record<string, string> = {
     ...segLabels,
@@ -592,6 +641,9 @@ export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/estoque': 'estoque', '/catalogo': 'estoque', '/compras': 'estoque', '/imoveis': 'estoque', '/cardapio': 'estoque',
   '/garantia': 'posvenda', '/assistencia': 'posvenda',
   '/executivo': 'insights', '/relatorios': 'insights', '/financeiro': 'insights', '/ranking': 'insights',
+  '/visao-geral': 'insights', '/conversao': 'insights', '/metas': 'insights',
+  '/cadencias': 'automacoes', '/distribuicao': 'automacoes', '/scoring': 'automacoes',
+  '/modelos': 'automacoes', '/respostas': 'automacoes', '/automacoes': 'automacoes',
 }
 
 /**

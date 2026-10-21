@@ -16,8 +16,10 @@ import { cn } from '@/lib/utils'
  * cliente esperando sem saber. Desligar só volta a receber distribuição: nada é
  * puxado de volta, senão dois vendedores achariam que o lead é seu.
  */
-export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }: {
+export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse, embutido = false }: {
   userName: string; userRole: string; nomeClasse: string; papelClasse: string
+  /** Em Configurações › Perfil (21/10/2026): o mesmo painel, aberto na página, sem o gatilho. */
+  embutido?: boolean
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -67,6 +69,29 @@ export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }:
     } finally { setSalvando(false) }
   }
 
+  const painel = (
+    <div className={embutido ? 'max-w-[420px]' : 'absolute bottom-full left-0 z-50 mb-2 w-[248px] rounded-card border border-line bg-card p-3 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]'}>
+      <div className="mb-2 flex items-center gap-2">
+        <Coffee size={15} strokeWidth={1.8} className="text-ink-2" />
+        <span className="text-[13px] font-semibold text-ink">Almoço / ausência</span>
+      </div>
+      <p className="mb-3 text-[11.5px] leading-relaxed text-ink-2">
+        {ausente
+          ? 'As conversas com cliente esperando foram para a esteira. Ao voltar, você recebe novos leads — as liberadas seguem com quem pegou.'
+          : 'Ao ativar, só as conversas com cliente esperando resposta vão para a esteira. As que você já respondeu continuam suas.'}
+      </p>
+      <button type="button" onClick={alternar} disabled={salvando}
+        className="flex w-full items-center justify-between rounded-control border border-line p-2.5 transition-colors hover:bg-bg disabled:opacity-60">
+        <span className="text-[12.5px] font-medium text-ink">{ausente ? 'Estou de volta' : 'Entrar em ausência'}</span>
+        <span className={cn('grid h-[22px] w-[38px] flex-none items-center rounded-full px-[3px] transition-colors', ausente ? 'bg-warn' : 'bg-ink/15')}>
+          <span className={cn('block h-4 w-4 rounded-full bg-white transition-transform', ausente && 'translate-x-4')} />
+        </span>
+      </button>
+    </div>
+  )
+
+  if (embutido) return painel
+
   return (
     <div className="relative min-w-0 flex-1" ref={caixa}>
       <button type="button" onClick={() => setAberto((a) => !a)}
@@ -78,26 +103,7 @@ export function AusenciaPopover({ userName, userRole, nomeClasse, papelClasse }:
         </div>
       </button>
 
-      {aberto && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[248px] rounded-card border border-line bg-card p-3 shadow-[0_16px_40px_-16px_rgba(21,24,28,0.28)]">
-          <div className="mb-2 flex items-center gap-2">
-            <Coffee size={15} strokeWidth={1.8} className="text-ink-2" />
-            <span className="text-[13px] font-semibold text-ink">Almoço / ausência</span>
-          </div>
-          <p className="mb-3 text-[11.5px] leading-relaxed text-ink-2">
-            {ausente
-              ? 'As conversas com cliente esperando foram para a esteira. Ao voltar, você recebe novos leads — as liberadas seguem com quem pegou.'
-              : 'Ao ativar, só as conversas com cliente esperando resposta vão para a esteira. As que você já respondeu continuam suas.'}
-          </p>
-          <button type="button" onClick={alternar} disabled={salvando}
-            className="flex w-full items-center justify-between rounded-control border border-line p-2.5 transition-colors hover:bg-bg disabled:opacity-60">
-            <span className="text-[12.5px] font-medium text-ink">{ausente ? 'Estou de volta' : 'Entrar em ausência'}</span>
-            <span className={cn('grid h-[22px] w-[38px] flex-none items-center rounded-full px-[3px] transition-colors', ausente ? 'bg-warn' : 'bg-ink/15')}>
-              <span className={cn('block h-4 w-4 rounded-full bg-white transition-transform', ausente && 'translate-x-4')} />
-            </span>
-          </button>
-        </div>
-      )}
+      {aberto && painel}
     </div>
   )
 }

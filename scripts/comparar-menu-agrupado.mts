@@ -1,7 +1,7 @@
 /**
  * O MENU EM GRUPOS TEM OS MESMOS ITENS DO MENU PLANO, SÓ REAGRUPADOS (navegação, 21/10/2026).
  *
- *   npx tsx scripts/comparar-menu-agrupado.mts <menu-core.json> [--novos=/a,/b]
+ *   npx tsx scripts/comparar-menu-agrupado.mts <menu-core.json> [--novos=/a,/b] [--foto=antes.json | --gravar=antes.json]
  *
  * A foto é a mesma do comparar-menu (supabase/testes/menu_foto_core.sql na
  * cópia). Para cada empresa, loja e papel — as 15 combinações —, monta a entrada
@@ -15,6 +15,12 @@
  * traz Automações e Insights do /admin): eles podem aparecer no agrupado sem
  * existir na lista antiga, e o script os mostra à parte. Sai com 1 se algo mais
  * mudar.
+ *
+ * `--gravar` guarda a lista de cada combinação (rodar com o lib de ANTES da
+ * mudança); `--foto` compara com essa lista em vez da lista do lib atual — é o
+ * que pega item que a mudança fez aparecer ou sumir.
+ *
+ * No Git Bash, rodar com MSYS_NO_PATHCONV=1: senão `--novos=/x` vira caminho do Windows.
  */
 import fs from 'node:fs'
 import { resolverMenuPlano, resolverMenuAgrupado, type ResolverMenuInput } from '../lib/menu'
@@ -28,7 +34,10 @@ type Core = {
 }
 
 const cores = JSON.parse(fs.readFileSync(process.argv[2], 'utf8').trim()) as Core[]
-const novos = new Set((process.argv.find((a) => a.startsWith('--novos='))?.slice(8) ?? '').split(',').filter(Boolean))
+const arg = (nome: string) => process.argv.find((a) => a.startsWith(`--${nome}=`))?.slice(nome.length + 3)
+const novos = new Set((arg('novos') ?? '').split(',').filter(Boolean))
+const foto: Record<string, string[]> | null = arg('foto') ? JSON.parse(fs.readFileSync(arg('foto')!, 'utf8')) : null
+const gravar: Record<string, string[]> = {}
 // A lista antiga é a de ANTES da mudança em teste: `ANTES_SEM` tira dela os hrefs novos
 // (com --novos, o resolverMenuPlano de hoje já os conhece).
 const PAPEIS = [
@@ -60,7 +69,9 @@ for (const e of cores) {
       comparados++
       const quem = `empresa ${e.id} · loja ${loja} · ${superadmin ? 'superadmin' : role}`
       const ent = entrada(e, role, superadmin)
-      const plano = resolverMenuPlano(ent).map(chave).filter((k) => !novos.has(k.split('|')[0]))
+      const atual = resolverMenuPlano(ent).map(chave)
+      gravar[quem] = atual
+      const plano = (foto ? foto[quem] ?? [] : atual).filter((k) => !novos.has(k.split('|')[0]))
       const grupos = resolverMenuAgrupado(ent)
       const agrupado = grupos.flatMap((g) => g.itens.map(chave))
       const acrescentados = agrupado.filter((k) => novos.has(k.split('|')[0]))
@@ -85,4 +96,5 @@ for (const e of cores) {
   }
 }
 console.log(`\n${comparados} menus comparados, ${falhas} diferentes`)
+if (arg('gravar')) fs.writeFileSync(arg('gravar')!, JSON.stringify(gravar, null, 1))
 process.exit(falhas ? 1 : 0)

@@ -32,6 +32,11 @@ interface Props {
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
   segmento?: string | null
   slug?: string | null
+  /**
+   * Aba fixa: a tela de Configurações (navegação nova, 21/10/2026) mostra cada aba
+   * como seção própria, com o menu lateral dela no lugar desta barra de abas.
+   */
+  aba?: string
 }
 
 
@@ -53,7 +58,7 @@ const TABS = [
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ taxas, segmento, slug }: Props) {
+export function ConfiguracoesView({ taxas, segmento, slug, aba: abaFixa }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
@@ -66,7 +71,8 @@ export function ConfiguracoesView({ taxas, segmento, slug }: Props) {
    * lá (next.config.ts).
    */
   const params = useSearchParams()
-  const [aba, setAba]       = useState(params.get('aba') || 'pagamentos')
+  const [abaEscolhida, setAba] = useState(params.get('aba') || 'pagamentos')
+  const aba = abaFixa ?? abaEscolhida
   /**
    * As abas extra vêm do contrato, não de uma cascata de `if`.
    *
@@ -199,8 +205,8 @@ export function ConfiguracoesView({ taxas, segmento, slug }: Props) {
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-6 py-6 scrollbar-thin">
       <div className="mx-auto max-w-[980px] space-y-4">
 
-        {/* Tabs */}
-        <Tabs
+        {/* Tabs (só quando a tela não fixou a aba) */}
+        {!abaFixa && <Tabs
           items={tabs.map(({ id, label, Icon }) => ({
             value: id,
             label: (
@@ -211,7 +217,7 @@ export function ConfiguracoesView({ taxas, segmento, slug }: Props) {
           }))}
           value={aba}
           onValueChange={setAba}
-        />
+        />}
 
         {/* ── MEIOS DE PAGAMENTO ── */}
         {aba === 'pagamentos' && <MeiosPagamentoCard />}

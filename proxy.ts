@@ -18,21 +18,26 @@ const TTL_MODULOS_MS = 60_000
 const cacheModulos = new Map<number, { habilitados: Set<string>; expira: number }>()
 
 /**
- * Telas de parametrização que saíram do CRM e passaram a viver em /admin
- * (o antigo grupo "Sistema" da sidebar). Mantemos o redirect para não quebrar
- * links salvos, retorno do Stripe e URLs antigas.
+ * Endereços do CRM de ANTES do /admin (o antigo grupo "Sistema" da sidebar, até
+ * 21/08/2026) → onde a tela mora hoje. Desde a navegação nova (21/10/2026) o
+ * /admin também saiu: Configurações (/configuracoes/*), Insights e Automações no
+ * menu. O destino é o final, sem passar pelo /admin (que só tem 308, no
+ * next.config.ts). Cadências, Distribuição, Scoring, Modelos, Conversão e Metas
+ * voltaram a ser rotas do CRM e saíram daqui.
+ *
+ * ⚠ `/canais` é o `redirect_uri` registrado no app da Meta: a query (`?code=`)
+ * tem de passar — e passa, porque só o caminho é trocado.
  */
-const LEGADO_ADMIN = [
-  '/canais', '/modelos', '/funil', '/cadencias', '/distribuicao', '/scoring',
-  '/meu-menu', '/permissoes', '/aparencia', '/configuracoes', '/empresa', '/planos',
-  /**
-   * Saíram do menu do CRM em 21/08/2026 e passaram a viver só no /admin: são
-   * leitura e definição de GESTÃO, não ferramenta de quem atende. Ficam na lista
-   * para que link salvo, favorito e atalho antigo caiam no painel em vez de abrir
-   * a mesma tela por uma porta que não existe mais no menu.
-   */
-  '/equipe', '/conversao', '/metas',
-]
+const LEGADO_ADMIN: Record<string, string> = {
+  '/canais': '/configuracoes/integracoes',
+  '/funil': '/configuracoes/funil',
+  '/meu-menu': '/configuracoes/menu',
+  '/permissoes': '/configuracoes/permissoes',
+  '/aparencia': '/configuracoes/aparencia',
+  '/empresa': '/configuracoes/empresa',
+  '/planos': '/configuracoes/faturamento',
+  '/equipe': '/configuracoes/usuarios',
+}
 
 /**
  * ROTAS QUE NÃO PRECISAM DE SESSÃO — E QUE POR ISSO NEM ABREM O SUPABASE.
@@ -202,15 +207,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/entrar', request.url))
   }
 
-  // Rotas antigas do grupo "Sistema" → /admin/... (preserva a query string).
+  // Rotas antigas do grupo "Sistema" → onde moram hoje (preserva a query string).
   if (user) {
     const p = request.nextUrl.pathname
-    const legado = LEGADO_ADMIN.find((h) => p === h || p.startsWith(h + '/'))
+    const legado = Object.keys(LEGADO_ADMIN).find((h) => p === h || p.startsWith(h + '/'))
     if (legado) {
       const url = request.nextUrl.clone()
-      url.pathname = `/admin${p}`
-      // 308 desde a etapa 0: a mudança é definitiva (as telas vivem no /admin
-      // desde 21/08/2026) — o navegador pode lembrar do endereço novo.
+      url.pathname = LEGADO_ADMIN[legado] + p.slice(legado.length)
+      // 308: a mudança é definitiva — o navegador pode lembrar do endereço novo.
       return NextResponse.redirect(url, 308)
     }
   }

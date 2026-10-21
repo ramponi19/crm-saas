@@ -26,7 +26,7 @@ export function OnboardingCard() {
       const n = await primeirosPassos(supabase)
       setPassos([
         { key: 'prod', label: 'Cadastre seus produtos', href: '/produtos', feito: n.produtos >= 3 },
-        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/admin/canais', feito: n.whatsapp >= 1 },
+        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/configuracoes/integracoes', feito: n.whatsapp >= 1 },
         { key: 'lead', label: 'Registre seu primeiro lead', href: '/leads', feito: n.leads >= 1 },
         { key: 'venda', label: 'Faça uma venda no PDV', href: '/pdv', feito: n.vendas >= 1 },
       ])

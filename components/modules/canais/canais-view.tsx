@@ -351,7 +351,7 @@ export function CanaisView({ appId }: { appId: string }) {
     const ok = u.searchParams.get('ig_ok')
     const erro = u.searchParams.get('ig_erro')
     if (!ok && !erro) return
-    window.history.replaceState({}, '', '/admin/integracoes')
+    window.history.replaceState({}, '', '/configuracoes/integracoes')
     if (erro) notify.bad('Instagram nao conectou', erro)
     else notify.ok('Instagram conectado', ok !== '1' ? '@' + ok : undefined)
     buscar()
@@ -378,7 +378,7 @@ export function CanaisView({ appId }: { appId: string }) {
     // Limpa o codigo da barra de endereco, para um F5 nao tentar reusar um codigo
     // ja gasto. Aponta para /admin/integracoes, que e onde a tela vive: apontar
     // para /admin/canais deixava o endereco visivel sendo um redirecionamento.
-    window.history.replaceState({}, '', '/admin/integracoes')
+    window.history.replaceState({}, '', '/configuracoes/integracoes')
 
     if (erroMeta) {
       registrar('retorno_erro', { erro: erroMeta, canal: tipo })

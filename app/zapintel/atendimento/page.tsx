@@ -180,7 +180,7 @@ function Cartao({ icone, titulo, sub, acao, largo, children }: {
 function TempoDeResposta({ d }: { d: Atendimento }) {
   return (
     <Cartao largo icone={<Clock size={15} />} titulo="Tempo de resposta no horário da loja"
-      sub={<>Quanto o cliente espera quando fala com a loja aberta ({descreverHorario(d.horario)}{!d.horarioConfigurado && " — horário padrão"}). <Link href="/admin/configuracoes?aba=horario" className="at-link">ajustar horário</Link></>}>
+      sub={<>Quanto o cliente espera quando fala com a loja aberta ({descreverHorario(d.horario)}{!d.horarioConfigurado && " — horário padrão"}). <Link href="/configuracoes/horario" className="at-link">ajustar horário</Link></>}>
       {d.resposta.length === 0 ? <p className="at-vazio">Nenhuma mensagem de cliente no horário da loja neste período.</p> : (
         <div className="at-resp">
           {d.resposta.map((r) => {

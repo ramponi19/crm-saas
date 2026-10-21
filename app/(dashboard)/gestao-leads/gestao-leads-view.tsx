@@ -301,7 +301,7 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <Link href="/admin/cadencias" className="text-[12.5px] font-semibold text-accent hover:underline">
+                  <Link href="/cadencias" className="text-[12.5px] font-semibold text-accent hover:underline">
                     {reativacao.ativo ? 'Ajustar' : 'Configurar'} →
                   </Link>
                   {podeExecutar && reativacao.ativo && (
@@ -356,7 +356,7 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
                           {sugestoes.length === 0 ? (
                             <p className="text-[12.5px] text-ink-2">
                               Nenhum texto cadastrado ainda. Escreva os seus em{' '}
-                              <Link href="/admin/configuracoes?aba=modelos" className="font-semibold text-accent hover:underline">Configurações → Modelos</Link>
+                              <Link href="/respostas" className="font-semibold text-accent hover:underline">Automações → Respostas e assinatura</Link>
                               {' '}— o sistema não escreve a mensagem no seu lugar.
                             </p>
                           ) : (

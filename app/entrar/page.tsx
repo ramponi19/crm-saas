@@ -33,9 +33,9 @@ export default async function EntrarPage() {
 
   if (!vinculo) redirect('/register')
 
-  // Dono/admin abrem direto no painel de administração; demais no CRM.
+  // Dono/admin abrem direto na Visão geral (era o /admin até 21/10/2026); demais no CRM.
   if (vinculo.role === 'owner' || vinculo.role === 'admin') {
-    redirect('/admin')
+    redirect('/visao-geral')
   }
 
   // Saúde: a Agenda é a tela inicial do segmento (consultas do dia).

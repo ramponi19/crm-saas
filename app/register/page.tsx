@@ -145,8 +145,8 @@ export default function RegisterPage() {
       if (signErr) throw new Error(signErr.message)
 
       markSessionActive()
-      // Novo cadastro cria o dono (owner) → abre direto no painel de administração.
-      router.push('/admin')
+      // Novo cadastro cria o dono (owner) → abre direto na Visão geral.
+      router.push('/visao-geral')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {

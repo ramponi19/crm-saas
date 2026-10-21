@@ -21,7 +21,7 @@ import { COOKIE_STATE } from '../iniciar/route'
 
 const voltar = (base: string, params: Record<string, string>) => {
   const p = new URLSearchParams(params)
-  return NextResponse.redirect(`${base}/admin/integracoes?${p.toString()}`)
+  return NextResponse.redirect(`${base}/configuracoes/integracoes?${p.toString()}`)
 }
 
 export async function GET(req: Request) {

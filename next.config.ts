@@ -3,6 +3,7 @@ import type { NextConfig } from 'next'
 // para de funcionar na v11 do SDK. Avisava a cada build e a cada boot do
 // servidor — ruído que ensina a ignorar aviso de build.
 import { withSentryConfig } from '@sentry/nextjs/config'
+import { DESTINO_DA_ABA } from './lib/configuracoes-menu'
 
 /**
  * REGIÃO DO SERVIDOR: `regions: ["gru1"]` em `vercel.json` (São Paulo).
@@ -51,12 +52,43 @@ const nextConfig: NextConfig = {
        */
       { source: '/admin/relatorios', destination: '/relatorios', permanent: true },
       { source: '/admin/financeiro', destination: '/financeiro', permanent: true },
-      {
+      /**
+       * NAVEGAÇÃO NOVA (21/10/2026) — o /admin inteiro saiu. Mesmo prazo: REMOVER EM
+       * 21/11/2026 (lista de morte do 05). Configuração foi para /configuracoes;
+       * leitura para Insights; automação para Automações. A query passa adiante
+       * (`?code=` do retorno da Meta em /admin/canais, `?tab=uso` da equipe,
+       * `?session_id=` do Stripe em /admin/planos/sucesso).
+       */
+      // As abas antigas de /admin/configuracoes, cada uma para a seção que virou.
+      ...Object.entries(DESTINO_DA_ABA).map(([aba, destination]) => ({
         source: '/admin/configuracoes',
-        has: [{ type: 'query', key: 'aba', value: 'integracoes' }],
-        destination: '/admin/integracoes',
+        has: [{ type: 'query' as const, key: 'aba', value: aba }],
+        destination,
         permanent: true,
-      },
+      })),
+      { source: '/admin/configuracoes', destination: '/configuracoes/pagamentos', permanent: true },
+      { source: '/admin', destination: '/visao-geral', permanent: true },
+      { source: '/admin/conversao', destination: '/conversao', permanent: true },
+      { source: '/admin/metas', destination: '/metas', permanent: true },
+      { source: '/admin/cadencias', destination: '/cadencias', permanent: true },
+      { source: '/admin/distribuicao', destination: '/distribuicao', permanent: true },
+      { source: '/admin/scoring', destination: '/scoring', permanent: true },
+      { source: '/admin/modelos', destination: '/modelos', permanent: true },
+      { source: '/admin/equipe', destination: '/configuracoes/usuarios', permanent: true },
+      { source: '/admin/funil', destination: '/configuracoes/funil', permanent: true },
+      { source: '/admin/contrato/:id', destination: '/configuracoes/documentos/:id', permanent: true },
+      { source: '/admin/contrato', destination: '/configuracoes/documentos', permanent: true },
+      { source: '/admin/integracoes', destination: '/configuracoes/integracoes', permanent: true },
+      { source: '/admin/canais', destination: '/configuracoes/integracoes', permanent: true },
+      { source: '/admin/permissoes', destination: '/configuracoes/permissoes', permanent: true },
+      { source: '/admin/meu-menu', destination: '/configuracoes/menu', permanent: true },
+      { source: '/admin/aparencia', destination: '/configuracoes/aparencia', permanent: true },
+      { source: '/admin/empresa', destination: '/configuracoes/empresa', permanent: true },
+      { source: '/admin/filiais', destination: '/configuracoes/lojas', permanent: true },
+      { source: '/admin/planos/sucesso', destination: '/configuracoes/faturamento/sucesso', permanent: true },
+      { source: '/admin/planos', destination: '/configuracoes/faturamento', permanent: true },
+      // Qualquer outro endereço do /admin que alguém tenha guardado.
+      { source: '/admin/:resto*', destination: '/configuracoes', permanent: true },
     ]
   },
 }

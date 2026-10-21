@@ -51,7 +51,7 @@ export function TermometroLeads({ leads, config }: { leads: LeadScoreInput[]; co
     <div className="rounded-card border border-line bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-[14px] font-semibold tracking-[-0.01em] text-ink">Termômetro de leads</h3>
-        <Link href="/admin/scoring" className="shrink-0 text-[12px] font-semibold text-accent hover:underline">
+        <Link href="/scoring" className="shrink-0 text-[12px] font-semibold text-accent hover:underline">
           Ajustar pontuação →
         </Link>
       </div>
