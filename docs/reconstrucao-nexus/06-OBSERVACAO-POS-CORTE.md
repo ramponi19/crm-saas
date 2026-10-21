@@ -385,3 +385,31 @@ Ao abrir o card 3548 em Jaguariúna, o formulário mostrou **"alteração não s
 - **(b) reenvio em menos de 1 s:** não houve reenvio real da Meta nas janelas da noite. A Edge v66 grava os hashes (23 em `ops.webhook_recebidos` às 21:2x). Conferir amanhã numa janela de 15 min.
 - **POSTs reais do C2S levando 404:** a rota responde 404; os POSTs do C2S não foram conferidos (o MCP da Vercel está sem acesso ao time, 403).
 - **Instagram de Jaguariúna (canal 25):** a busca de perfil às 20:14 deu "session invalidated because the user changed their password", mas o envio funciona (resposta às 20:37 com ✓). Acompanhar.
+
+## 8. Hotfix das tarefas (21/10, deploy próprio às 09:53)
+
+### O defeito
+O corte (20/10, `migrar_jm_para_core.sql`, passo da linha 559) deu a `tarefas` a coluna `negocio_id` com chave para `negocios`, ao lado de `lead_id`, que já apontava para lá. Com duas chaves para a mesma tabela, o embed `leads(nome)` ficou ambíguo e o PostgREST passou a responder **PGRST201** em quatro pontos:
+
+- `/tarefas`: a lista vinha **vazia** — a página ignora o `error` e mostra lista nenhuma;
+- criar tarefa pela tela: o insert com `select('*, leads(nome)')` falha **inteiro**, nenhuma linha gravada;
+- painel: o card "Meus follow-ups" sumia; painel da imobiliária: o bloco de tarefas sumia.
+
+Nada chegou ao Sentry (o erro era engolido pela tela). Achado na Etapa 0, testando o painel na cópia.
+
+**Retrato em produção:** tarefas criadas por dia — 17/10: 2; 19/10: 4; **20/10: 0; 21/10 até o conserto: 0**. Ninguém conseguiu criar tarefa pela tela por cerca de 1 dia e meio.
+
+### O conserto
+`leads!tarefas_lead_id_fkey(nome)` nos quatro pontos (commit `eb9a485` em main, cherry-pick do `5fc4b39` da `feat/etapa-0` mais o card do painel, que na main ainda tinha o embed antigo). Varredura: das tabelas com 2+ chaves para a mesma tabela, só `tarefas` e `cadencia_inscricoes` ganharam a segunda no corte, e `cadencia_inscricoes` não tem embed de leads no código.
+
+### O deploy
+- Gate: tsc 0, testes 151/151, build ok (avisos no teto de 41), verificador 468 ok (5 falhas antigas da IA do ZapIntel).
+- IOwait antes do push: 3,5% (última meia hora entre 3% e 11%, um pico isolado de 27,9% às 09:43, já passado). Regra: < 20%.
+- Push 09:50:59 → Vercel pronto 09:53:17.
+
+### Teste em produção (dono da JM)
+- `/tarefas` em **Mogi Guaçu**: 8 atrasadas, 9 a fazer, 20 concluídas, com o nome do lead.
+- `/tarefas` em **Jaguariúna**: 1 atrasada, 4 a fazer, 5 concluídas, com o nome do lead.
+- Criada pela tela, em Mogi, a tarefa "TESTE DEPLOY 21/10 — apagar" (lead Lucas Ramponi): aviso "Tarefa criada", apareceu na lista com o nome do lead (A fazer 9 → 10) e **não** apareceu em Jaguariúna. Apagada pela tela; conferido no banco: 0 linhas de teste restantes.
+- "Listar e criar tarefa" entrou no smoke de todo deploy (05, passo f).
+

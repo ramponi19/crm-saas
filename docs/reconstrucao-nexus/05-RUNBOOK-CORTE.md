@@ -97,6 +97,9 @@ Enquanto o build do e2 não fica pronto, o código antigo roda sobre o banco nov
 **Total esperado:** a + b ≈ 3 min; d ≈ 1–2 min em produção; e ≈ 4–5 min de build; f ≈ 5 min. **≈ 13–15 min.**
 
 ### (f) Smoke, nesta ordem
+
+> **Vale para TODO deploy, não só para o corte.** Os passos 1 e 8 são o mínimo de qualquer deploy; os demais quando o deploy mexe no que eles cobrem.
+
 1. **Login** com o dono da JM.
 2. **Funil com os mesmos cards:**
    - rodar `psql "$con" -X -q -A -t -f supabase/scripts/corte/foto-funil.sql -o funil-depois.txt` e depois `fc funil-antes.txt funil-depois.txt`: tem de dar **igual**. Na cópia foram 17 linhas iguais antes do corte, depois do corte e depois da volta.
@@ -106,6 +109,7 @@ Enquanto o build do e2 não fica pronto, o código antigo roda sobre o banco nov
 5. **2ª via de contrato:** reimprimir um contrato existente.
 6. **`/api/whatsapp/send`:** chamar como o PDV/OS chama (o mesmo teste do passo A). A mensagem chega e aparece na conversa do lead.
 7. *(extra)* **ZapIntel:** o dashboard atualiza sozinho quando chega mensagem (gatilho `zapintel_ao_vivo` em `mensagens`).
+8. **Listar e criar tarefa (todo deploy, desde 21/10):** abrir `/tarefas` nas DUAS lojas (Mogi Guaçu e Jaguariúna) — a lista aparece, com o nome do lead; criar pela tela uma tarefa "TESTE DEPLOY <data> — apagar" numa loja, conferir que aparece só nela, e apagar. Por quê: de 20/10 a 21/10 a lista veio vazia e criar tarefa falhou calado (embed ambíguo, PGRST201) — nenhum teste olhava tarefas (06, seção 8).
 
 ---
 
@@ -156,13 +160,18 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - **Ferramentas fora do menu (2.4):** Simular parcela → aba `/orcamentos/parcela`; Check IMEI → `/estoque/imei` (aba de Estoque); Consulta FIPE → `/avaliacoes/fipe` (botão em Avaliações); as três no ⌘K. O módulo liberado continua o mesmo href (`/simular-parcela`, `/check-imei`, `/consulta-fipe`) — `moduloDaRota` traduz a rota nova. Sem migração.
   - **Duplicadas num lugar só (2.3):** Relatórios e Financeiro ficam no CRM (`/relatorios`, `/financeiro`; `/admin/relatorios` e `/admin/financeiro` apagados, 308); Integrações fica em `/admin/integracoes` (a aba de Configurações saiu; `?aba=integracoes` responde 308); os redirects antigos do proxy (`/conversao`, `/equipe`, `/metas`, grupo Sistema) passam a 308. Código copiado virou função: `reconciliarAssinaturas` (cron × botão do superadmin) e `entrarNaEmpresaDePreview` (laboratório × preview de segmento). Relatórios passa a contar lucro só com custo, como o painel. Sem migração.
   - **Vitrine de módulo desligado (2.5):** migrações `20261021003700_modulo_pedidos.sql` (tabela nova, RLS sem política, só service_role) e `20261021003710_modulo_pedidos_idx.sql` (índice parcial CONCURRENTLY — rodar FORA de transação). Rodam antes do deploy. O proxy reescreve `/agenda`, `/executivo` e `/gestao-leads` para `/vitrine/<modulo>` quando desligados; Agenda e Executivo mostram a mesma vitrine quando o segmento não tem a tela. "Ativar": superadmin liga (camada `empresa_menu.itens.superadmin.habilitados`), dono/admin abre pedido (aparece na tela da empresa no superadmin). A trava passou a somar a liberação por empresa — antes o módulo ligado só para uma empresa aparecia no menu e era barrado na rota. O superadmin perde a passagem livre só nesses três módulos.
-  - **Fora da numeração — tarefas (5fc4b39):** `leads(nome)` em `tarefas` ficou ambíguo desde o corte (lead_id e negocio_id apontam para negocios; PGRST201): lista de /tarefas vazia e criar tarefa falhando. Corrigido com a chave nomeada. Candidato a ir antes do deploy.
+  - **Fora da numeração — tarefas (5fc4b39): JÁ EM PRODUÇÃO desde 21/10 09:53, como `eb9a485`** (deploy próprio; ver o 06, seção 8). Na entrega da Etapa 0, **pular o 5fc4b39** no cherry-pick: o conteúdo já está em main (só o `verificar-auditoria.sh` difere, por ordem de regras).
+  - **Decisão do Lucas (21/10) sobre o 1.3:** o Atendimento conta só a distribuição EXPLÍCITA (`pegar`, `devolver`, `transferir`, `atribuir`, `distribuir`), como antes; as trocas genéricas `atribuicao` do gatilho não entram. É o que o código da branch já faz.
   - `types/database.ts` agora é uma sobreposição de `types/database.gerado.ts` (saída crua do `supabase gen types`): as 37 views de módulo do core são tipadas como a tabela que espelham (`types/views-espelho.ts`, gerado de `supabase/testes/views_espelho.sql` por `scripts/tipos-espelho.mjs`). Regerar os dois quando o schema mudar.
 - **Lista de morte — o que fica, e até quando:**
   - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11;
   - `segmentos_config`, `complementos_empresa`, `lead_atribuicoes` e as 18 colunas de `empresas`: saem na Etapa 0 (acima); até o deploy de 22/10 seguem em produção, e a volta dos drops é o dump daquela noite;
   - **Redirects 308 da Etapa 0 (`next.config.ts`): REMOVER EM 21/11/2026** — `/simular-parcela`, `/check-imei`, `/consulta-fipe` (2.4) e as rotas duplicadas do 2.3. Depois disso, link salvo antigo cai no 404;
+  - **`/api/metas` e `/api/ranking/metas`: ficam.** Gravam em tabelas diferentes (`metas_comissoes` × `metas`). Critério para sair: **unificar na tela de metas, fase F** — uma tabela, uma rota (decisão do Lucas, 21/10);
   - ~89 índices nunca usados que cobrem FK: ficam.
+- **Para o módulo Vendas (anotado em 21/10, decisão do Lucas):**
+  - **Lançar custo em venda já feita:** não existe tela (só na encomenda). O custo nasce na unidade do estoque e o PDV copia para a venda; venda feita sem custo fica sem lucro para sempre. Fica para o módulo Vendas.
+  - **Defeito do PDV — canal "encomenda":** 34 das 37 vendas dos últimos 12 meses da JM estão com `canal_venda = 'encomenda'` (na cópia), e o donut "Vendas por canal" do painel mostra "encomenda 100%". Encomenda é tipo de venda, não canal: o PDV grava o lugar errado. O painel mostra como está até o módulo Vendas corrigir a origem.
 - **Toda view nova ou recriada leva `with (security_invoker = true)`.** O `create or replace view` sem a opção a apaga, e a view passa a ignorar a RLS (furo de 20/10, 2 min 44 s; ver o 06). O banco recusa (event trigger `exigir_security_invoker`) e o build também (`npm run check:views`).
 - **Views de compatibilidade:** sair conforme as telas migram para o core.
   - Regra: uma view só cai quando `grep -rn "from('<nome>')" app components lib hooks supabase/functions` volta vazio.
