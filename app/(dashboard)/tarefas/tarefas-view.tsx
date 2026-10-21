@@ -44,7 +44,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
       responsavel_id: form.responsavel_id || meuId,
       descricao: form.descricao || null,
     }
-    const { data, error } = await supabase.from('tarefas').insert(payload).select('*, leads(nome)').single()
+    const { data, error } = await supabase.from('tarefas').insert(payload).select('*, leads!tarefas_lead_id_fkey(nome)').single()
     setLoading(false)
     if (error) { notify.bad(error.message); return }
     const d = data as unknown as (Tables<'tarefas'> & { leads: { nome: string | null } | null })

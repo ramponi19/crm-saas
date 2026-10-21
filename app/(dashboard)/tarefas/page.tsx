@@ -15,7 +15,10 @@ export default async function TarefasPage() {
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user!.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')
 
-  let q = supabase.from('tarefas').select('*, leads(nome)').eq('empresa_id', empresaId)
+  // A chave vai NOMEADA: desde o corte (20/10) tarefas tem lead_id e negocio_id
+  // apontando para negocios, e o embed de leads sem a chave ficou ambíguo (PGRST201) —
+  // a lista vinha vazia e criar tarefa falhava, sem erro na tela.
+  let q = supabase.from('tarefas').select('*, leads!tarefas_lead_id_fkey(nome)').eq('empresa_id', empresaId)
   if (!isGestor) q = q.eq('responsavel_id', user!.id)
 
   const [{ data: tarefasRaw }, { data: leads }, { data: membros }] = await Promise.all([

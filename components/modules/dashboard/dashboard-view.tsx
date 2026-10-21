@@ -225,7 +225,7 @@ function FollowupsCard() {
       const user = data.user
       if (!user) { setLoaded(true); return }
       const { data: rows } = await supabase
-        .from('tarefas').select('id, titulo, vencimento, leads(nome)')
+        .from('tarefas').select('id, titulo, vencimento, leads!tarefas_lead_id_fkey(nome)')
         .eq('concluida', false).eq('responsavel_id', user.id)
         .order('vencimento', { nullsFirst: false }).limit(6)
       type Row = { id: number; titulo: string; vencimento: string | null; leads: { nome: string | null } | { nome: string | null }[] | null }

@@ -98,7 +98,7 @@ export default async function DashboardImob() {
     .eq('empresa_id', empresaId).eq('ativo', true)
   if (!isGestor) cq = cq.eq('responsavel_id', user.id)
 
-  let tq = supabase.from('tarefas').select('id, titulo, vencimento, leads(nome)')
+  let tq = supabase.from('tarefas').select('id, titulo, vencimento, leads!tarefas_lead_id_fkey(nome)')
     .eq('empresa_id', empresaId).eq('concluida', false).order('vencimento', { nullsFirst: false }).limit(8)
   if (!isGestor) tq = tq.eq('responsavel_id', user.id)
 
