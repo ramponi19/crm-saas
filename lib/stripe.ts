@@ -79,3 +79,36 @@ export async function stripeStatusToPlano(
   }
   return { plano: 'free', status: 'suspenso', stripe_status: stripeStatus }
 }
+
+// ─── Reconciliar assinaturas Stripe → empresas ──────────────
+/**
+ * Atualiza plano/status das empresas com assinatura, corrigindo o que um
+ * webhook perdido deixou para trás. UM lugar só: o cron diário (`sync-stripe`)
+ * e o botão do superadmin rodavam cópias do mesmo laço (etapa 0, 21/10/2026).
+ * Quem chama decide a autenticação; aqui é só o trabalho.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function reconciliarAssinaturas(supabase: any): Promise<{ atualizadas: number; erros: string[] }> {
+  const stripe = getStripe()
+  const { data: empresas, error } = await supabase
+    .from('empresas')
+    .select('id, stripe_subscription_id')
+    .not('stripe_subscription_id', 'is', null)
+  if (error) throw error
+
+  let atualizadas = 0
+  const erros: string[] = []
+  for (const emp of (empresas ?? []) as Array<{ id: number; stripe_subscription_id: string }>) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(emp.stripe_subscription_id)
+      const priceId = sub.items.data[0]?.price?.id ?? null
+      const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
+      await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+      atualizadas++
+    } catch (err) {
+      // Assinatura cancelada ou inválida: segue para a próxima.
+      erros.push(`empresa ${emp.id}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  return { atualizadas, erros }
+}

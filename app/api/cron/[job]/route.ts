@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
+import { reconciliarAssinaturas } from '@/lib/stripe'
 import { atualizarReferencia } from '@/lib/fipe'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { rodarRetencao } from '@/lib/storage/retencao'
@@ -77,23 +77,7 @@ export async function GET(
         if (!process.env.STRIPE_SECRET_KEY) {
           return NextResponse.json({ ok: true, job, nota: 'Stripe não configurado' })
         }
-        const stripe = getStripe()
-        const { data: empresas, error: eErr } = await supabase
-          .from('empresas')
-          .select('id, stripe_subscription_id')
-          .not('stripe_subscription_id', 'is', null)
-        if (eErr) throw eErr
-
-        let atualizadas = 0
-        for (const emp of empresas ?? []) {
-          try {
-            const sub = await stripe.subscriptions.retrieve(emp.stripe_subscription_id as string)
-            const priceId = sub.items.data[0]?.price?.id ?? null
-            const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
-            await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
-            atualizadas++
-          } catch { /* assinatura cancelada ou inválida — ignora */ }
-        }
+        const { atualizadas } = await reconciliarAssinaturas(supabase)
         return NextResponse.json({ ok: true, job, atualizadas })
       }
 

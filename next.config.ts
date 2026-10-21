@@ -42,6 +42,21 @@ const nextConfig: NextConfig = {
       { source: '/simular-parcela', destination: '/orcamentos/parcela', permanent: true },
       { source: '/check-imei', destination: '/estoque/imei', permanent: true },
       { source: '/consulta-fipe', destination: '/avaliacoes/fipe', permanent: true },
+      /**
+       * ETAPA 0, 2.3 — telas duplicadas ficam num lugar só (mesmo prazo: 21/11/2026).
+       * Relatórios e Financeiro: a definitiva é a do CRM (a do /admin importava a
+       * mesma página, e o Financeiro de lá saía sem categorias). Integrações: a
+       * definitiva é /admin/integracoes (a aba de Configurações era um cartão de
+       * status apontando para ela).
+       */
+      { source: '/admin/relatorios', destination: '/relatorios', permanent: true },
+      { source: '/admin/financeiro', destination: '/financeiro', permanent: true },
+      {
+        source: '/admin/configuracoes',
+        has: [{ type: 'query', key: 'aba', value: 'integracoes' }],
+        destination: '/admin/integracoes',
+        permanent: true,
+      },
     ]
   },
 }

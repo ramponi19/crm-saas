@@ -528,6 +528,16 @@ v "imei e aba do estoque"               "app/(dashboard)/estoque/components/esto
 v "fipe mora em avaliacoes"             "app/(dashboard)/avaliacoes/avaliacoes-view.tsx" "useFerramenta('/consulta-fipe')"
 v "cmd+k abre as ferramentas"           "components/layout/command-palette.tsx" "useFerramentas()"
 v "endereco antigo responde 308"        "next.config.ts" "destination: '/estoque/imei', permanent: true"
+# 21/10/2026 (etapa 0, 2.3): duplicadas num lugar so. Relatorios/Financeiro = CRM;
+# Integracoes = /admin/integracoes; codigo copiado de stripe e preview vira funcao.
+v "admin/relatorios responde 308"       "next.config.ts" "source: '/admin/relatorios', destination: '/relatorios', permanent: true"
+v "admin/financeiro responde 308"       "next.config.ts" "source: '/admin/financeiro', destination: '/financeiro', permanent: true"
+n "configuracoes sem aba integracoes"   "components/modules/configuracoes/configuracoes-view.tsx" "id: 'integracoes'"
+v "legado do admin e permanente"        "proxy.ts" "NextResponse.redirect(url, 308)"
+v "stripe reconcilia num lugar so"      "app/api/superadmin/sync-stripe/route.ts" "reconciliarAssinaturas("
+v "cron usa a mesma reconciliacao"      "app/api/cron/[job]/route.ts" "reconciliarAssinaturas(supabase)"
+v "previews do superadmin num lugar so" "app/api/superadmin/laboratorio/preview/route.ts" "entrarNaEmpresaDePreview(null)"
+v "relatorio conta lucro so com custo"  "components/modules/relatorios/relatorios-view.tsx" "resultadoDasVendas("
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { Plug, Percent, Timer, Save, Link as LinkIcon, Copy, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, FileText, ArrowLeftRight } from 'lucide-react'
+import { Percent, Timer, Save, Link as LinkIcon, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, FileText, ArrowLeftRight } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
-import { Card, Input, Button, Badge, Tabs, notify } from '@/components/ui'
+import { Card, Input, Button, Tabs, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
 import { AssinaturaCard } from './assinatura-card'
@@ -28,7 +27,6 @@ import type { Json } from '@/types/database'
 
 interface Props {
   /** Canais ativos em canais_conectados, por tipo (sem token: ele não sai do servidor). */
-  canaisAtivos: { whatsapp: number; instagram: number; messenger: number }
   dadosLoja: unknown
   preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
@@ -36,10 +34,8 @@ interface Props {
   slug?: string | null
 }
 
-const WEBHOOK_URL = 'https://guiuzbcqkvelqcuogxtd.supabase.co/functions/v1/webhook-leads'
 
 const TABS = [
-  { id: 'integracoes', label: 'Integrações',     Icon: Plug    },
   { id: 'pagamentos',  label: 'Meios de pagamento', Icon: Wallet },
   { id: 'taxas',       label: 'Taxas',            Icon: Percent },
   { id: 'sla',         label: 'SLA atendimento',  Icon: Timer   },
@@ -54,30 +50,23 @@ const TABS = [
   { id: 'dados',       label: 'Dados',            Icon: Download },
 ]
 
-type Provider = 'oficial' | 'meta'
-
-interface IntegracaoCanal {
-  id: string
-  nome: string
-  color: string
-  ativo: boolean
-  desc: string
-  provider: Provider
-  svg: React.ReactNode
-}
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ canaisAtivos, taxas, segmento, slug }: Props) {
+export function ConfiguracoesView({ taxas, segmento, slug }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
    * Sem isso, qualquer tela que mande o lojista "editar os textos de mensagem" o
-   * deixava em Integrações, procurando um campo que está a doze abas de distância —
+   * deixava na primeira aba, procurando um campo que está a doze abas de distância —
    * foi o que aconteceu com o link da Gestão de Leads.
+   *
+   * Integrações SAIU daqui (etapa 0): era um cartão de status apontando para
+   * /admin/integracoes, onde o conector mora. `?aba=integracoes` responde 308 para
+   * lá (next.config.ts).
    */
   const params = useSearchParams()
-  const [aba, setAba]       = useState(params.get('aba') || 'integracoes')
+  const [aba, setAba]       = useState(params.get('aba') || 'pagamentos')
   /**
    * As abas extra vêm do contrato, não de uma cascata de `if`.
    *
@@ -195,31 +184,6 @@ export function ConfiguracoesView({ canaisAtivos, taxas, segmento, slug }: Props
     } finally { setSavingSLA(false) }
   }
 
-  const integracoes: IntegracaoCanal[] = [
-    {
-      id: 'whatsapp', nome: 'WhatsApp', color: '#25D366', provider: 'oficial',
-      ativo: canaisAtivos.whatsapp > 0,
-      desc: canaisAtivos.whatsapp ? `Meta Cloud API · ${canaisAtivos.whatsapp} número(s) conectado(s)` : 'Meta Cloud API · conecte em Canais',
-      svg: <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.66-.61-2.93-1.27-4.85-4.22-5-4.42-.15-.2-1.2-1.59-1.2-3.03 0-1.44.76-2.15 1.02-2.44.27-.29.59-.37.79-.37.2 0 .39 0 .57.01.18.01.43-.07.67.51.24.6.83 2.04.9 2.19.07.15.12.32.02.51-.09.2-.14.32-.27.49-.14.17-.29.38-.41.51-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.2.68-.79.86-1.06.18-.27.36-.22.61-.13.25.09 1.58.74 1.86.88.27.14.46.2.52.31.07.12.07.66-.17 1.34z" fill="currentColor"/>,
-    },
-    {
-      id: 'instagram', nome: 'Instagram Direct', color: '#E1487B', provider: 'meta',
-      ativo: canaisAtivos.instagram > 0,
-      desc: canaisAtivos.instagram ? `Meta · ${canaisAtivos.instagram} conta(s) conectada(s)` : 'Meta · conecte a conta @ comercial em Canais',
-      svg: <><rect x="2" y="2" width="20" height="20" rx="5.5" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.3" fill="currentColor"/></>,
-    },
-    {
-      id: 'messenger', nome: 'Messenger', color: '#3B9BFF', provider: 'meta',
-      ativo: canaisAtivos.messenger > 0,
-      desc: canaisAtivos.messenger ? `Meta · ${canaisAtivos.messenger} página(s) conectada(s)` : 'Meta · conecte a página do Facebook em Canais',
-      svg: <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.19.16.14.26.35.27.57l.05 1.78c.02.57.6.94 1.12.71l1.99-.88c.17-.07.36-.09.53-.04 1.91.53 3.92.5 5.81-.07C20.36 19.85 22 16.04 22 11.7 22 6.13 17.64 2 12 2z" fill="currentColor"/>,
-    },
-  ]
-
-  function copyWebhook() {
-    navigator.clipboard?.writeText(WEBHOOK_URL)
-    notify.ok('URL do webhook copiada!')
-  }
 
   // Taxas 1-18
   const maxParc = Math.max(18, ...taxas.map(t => t.parcelas ?? 1))
@@ -248,54 +212,6 @@ export function ConfiguracoesView({ canaisAtivos, taxas, segmento, slug }: Props
           value={aba}
           onValueChange={setAba}
         />
-
-        {/* ── INTEGRAÇÕES ──
-            Conectar canal saiu daqui e virou a tela /canais, que usa o fluxo
-            oficial da Meta (um clique, sem colar token). Este card virou ponte:
-            manter o formulário antigo criaria duas verdades para a mesma coisa —
-            e a antiga grava em chaves que o recebedor novo já não lê. */}
-        {aba === 'integracoes' && (
-          <Card title="Canais de atendimento">
-            <p className="-mt-0.5 mb-[18px] text-[12.5px] text-ink-2">
-              WhatsApp, Instagram e Messenger agora se conectam em{' '}
-              <strong className="text-ink">Sistema → Canais</strong>, pelo fluxo oficial da Meta:
-              você autoriza numa janela e pronto — sem copiar token nem preencher nada.
-              No WhatsApp, o número continua funcionando no seu celular.
-            </p>
-            <div className="flex flex-col gap-3">
-              {integracoes.map(i => (
-                <div key={i.id} className="flex items-center gap-3.5 rounded-card border border-line bg-raised px-4 py-3.5">
-                  <svg width={28} height={28} viewBox="0 0 24 24" className="flex-none" style={{ color: i.color }}>{i.svg}</svg>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold text-ink">{i.nome}</div>
-                    <div className="text-[11.5px] text-ink-2">{i.desc}</div>
-                  </div>
-                  <Badge tone={i.ativo ? 'ok' : 'neutro'} dot>{i.ativo ? 'Conectado' : 'Inativo'}</Badge>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href="/admin/canais">
-                <Button icon={<Plug size={15} strokeWidth={1.7} />}>Abrir Canais</Button>
-              </Link>
-            </div>
-            <div className="mt-4 rounded-card border border-line bg-raised px-4 py-3.5">
-              <div className="mb-2 flex items-center gap-2">
-                <LinkIcon size={16} strokeWidth={1.7} className="text-ink-3" />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">URL do webhook</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-line bg-bg px-3 py-2 text-[12px] text-ink-2">
-                  {WEBHOOK_URL}
-                </code>
-                <Button variant="outline" size="sm" icon={<Copy size={14} strokeWidth={1.7} />} onClick={copyWebhook}>Copiar</Button>
-              </div>
-              <p className="mt-2 text-[11px] text-ink-3">
-                Token de verificação: <strong className="text-ink-2">configurado na Edge</strong> (variável WEBHOOK_VERIFY_TOKEN). Não fica no banco.
-              </p>
-            </div>
-          </Card>
-        )}
 
         {/* ── MEIOS DE PAGAMENTO ── */}
         {aba === 'pagamentos' && <MeiosPagamentoCard />}

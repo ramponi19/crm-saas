@@ -23,8 +23,10 @@ const navGroups = [
     label: 'Administração',
     items: [
       { href: '/admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
-      { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
-      { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
+      // Relatórios e Financeiro abrem a tela do CRM: era a mesma página em dois
+      // endereços (etapa 0); /admin/relatorios e /admin/financeiro respondem 308.
+      { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+      { href: '/financeiro', label: 'Financeiro', icon: Wallet },
       { href: '/admin/equipe', label: 'Equipe', icon: UserCog },
       { href: '/admin/conversao', label: 'Conversão', icon: Filter },
       { href: '/admin/metas', label: 'Meta da empresa', icon: Gauge },

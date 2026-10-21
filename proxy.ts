@@ -206,7 +206,9 @@ export async function proxy(request: NextRequest) {
     if (legado) {
       const url = request.nextUrl.clone()
       url.pathname = `/admin${p}`
-      return NextResponse.redirect(url)
+      // 308 desde a etapa 0: a mudança é definitiva (as telas vivem no /admin
+      // desde 21/08/2026) — o navegador pode lembrar do endereço novo.
+      return NextResponse.redirect(url, 308)
     }
   }
 

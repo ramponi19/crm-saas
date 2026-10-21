@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Card, StatCard, Table, Badge, Tabs, Button, Input, Select, EmptyState, type Column } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
+import { resultadoDasVendas, temCusto } from '@/lib/painel/metricas'
 
 interface Venda {
   id: number
@@ -89,7 +90,8 @@ function exportCSV(rows: Venda[]) {
       v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
-      v.valor_venda, v.desconto_valor ?? 0, v.lucro ?? 0,
+      // Sem custo lançado o lucro fica em branco: a coluna gerada daria o preço cheio.
+      v.valor_venda, v.desconto_valor ?? 0, temCusto({ valor_custo: v.valor_custo ?? null }) ? (v.lucro ?? 0) : '',
       v.troca_pendente ? 'sim' : 'nao',
     ])
   )
@@ -195,7 +197,6 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const kpis = useMemo(() => {
     const conc     = vendasFiltradas.filter(v => v.status === 'concluida')
     const receita  = conc.reduce((s, v) => s + v.valor_venda, 0)
-    const lucro    = conc.reduce((s, v) => s + (v.lucro ?? 0), 0)
     const qtd      = conc.length
     const ticket   = qtd > 0 ? receita / qtd : 0
     const descontos = conc.reduce((s, v) => s + (v.desconto_valor ?? 0), 0)
@@ -207,12 +208,14 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
      * onde não há informação de margem nenhuma — e número que parece calculado é
      * pior que número ausente, porque ninguém desconfia dele.
      */
-    const semCusto = conc.filter(v => !(Number(v.valor_custo) > 0)).length
+    // Desde a etapa 0 o lucro segue a regra do painel (lib/painel/metricas.ts):
+    // soma SÓ as vendas com custo lançado; sem nenhuma, não há número.
+    const { lucro, semCusto } = resultadoDasVendas(conc.map(v => ({ valor_venda: v.valor_venda, valor_custo: v.valor_custo ?? null })))
     return [
       { label: 'Total vendas', value: formatCurrency(receita) },
       {
         label: 'Lucro total',
-        value: formatCurrency(lucro),
+        value: lucro === null ? '—' : formatCurrency(lucro),
         aviso: semCusto > 0 ? `${semCusto} de ${qtd} sem custo lançado` : undefined,
       },
       { label: 'Ticket médio', value: formatCurrency(ticket) },
@@ -263,7 +266,9 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
       ),
     },
     { key: 'desc', header: 'Desc.', align: 'right', className: 'num', hideOnMobile: true, render: v => <span className="text-bad">{v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}</span> },
-    { key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: v => <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> },
+    { key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: v => !temCusto({ valor_custo: v.valor_custo ?? null })
+      ? <span className="text-ink-3" title="Sem custo lançado">—</span>
+      : <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> },
   ]
 
   const lancCols: Column<Lancamento>[] = [
