@@ -13,26 +13,14 @@ import { OnboardingCard } from './onboarding-card'
 import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
 import { createClient } from '@/lib/supabase/client'
-import { meusFollowUps, type ResultadoVendas } from '@/lib/painel/metricas'
+import { meusFollowUps, type ResultadoVendas, type DadosPainel, type FunilDoPainel } from '@/lib/painel/metricas'
 
-interface Kpis {
-  mes: ResultadoVendas
-  totalClientes: number; leadsAtivos: number; leadsNovos: number
-  estoqueDisponivel: number; assistenciasAbertas: number
-}
-interface VendaRecente {
-  id: number; valor_venda: number; forma_pagamento: string | null
-  canal_venda: string | null; data_venda: string | null; status: string | null
-  cliente_nome?: string | null; produto_nome?: string | null
-}
-interface DashboardData {
-  kpis: Kpis
-  vendasRecentes: VendaRecente[]
-  leadsRecentes: Array<{ id: number; nome: string | null; kanban_status: string | null; created_at: string | null }>
-  topProdutos: Array<{ nome: string; qtd: number }>
-  funilLeads: { novo: number; em_contato: number; negociando: number; convertido: number; perdido: number }
-  porCanal?: Record<string, number>
-}
+/**
+ * Tudo vem pronto do servidor (lib/painel/metricas.ts → painelCompleto), inclusive
+ * os outros períodos: desde 21/10/2026 o painel não chama mais /api/dashboard ao
+ * abrir — era a mesma conta feita duas vezes, em CPU da Vercel.
+ */
+type DashboardData = DadosPainel
 
 const PERIOD_LABELS: Record<string, string> = {
   hoje: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', mes: 'este mês', ano: 'este ano',
@@ -138,7 +126,7 @@ function TopProdutos({ produtos }: { produtos: Array<{ nome: string; qtd: number
 }
 
 // ── Funil de leads ──
-function FunilLeads({ funil }: { funil: DashboardData['funilLeads'] }) {
+function FunilLeads({ funil }: { funil: FunilDoPainel }) {
   const rows = [
     { label: 'Novos leads', val: funil.novo, cls: 'bg-ink-3' },
     { label: 'Em contato', val: funil.em_contato, cls: 'bg-ink-2' },
@@ -275,39 +263,13 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
   cancelada: 'bad', devolvido: 'neutro',
 }
 
-export function DashboardView({ data: initialData }: { data: DashboardData }) {
+export function DashboardView({ data }: { data: DashboardData }) {
   const {} = useEmpresa()
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
-  const [periodsData, setPeriodsData] = useState<Record<string, ResultadoVendas> | null>(null)
-  const [faturamentoMensal, setFaturamentoMensal] = useState<Array<{ mes: string; total: number }>>([])
-  const [globais, setGlobais] = useState({
-    totalClientes: initialData.kpis.totalClientes,
-    leadsAtivos: initialData.kpis.leadsAtivos,
-    leadsNovos: initialData.kpis.leadsNovos,
-    estoqueDisponivel: initialData.kpis.estoqueDisponivel,
-    assistenciasAbertas: initialData.kpis.assistenciasAbertas,
-  })
-  const [vendasRecentes, setVendasRecentes] = useState<VendaRecente[]>(initialData.vendasRecentes)
-  const [topVendedores, setTopVendedores] = useState<Array<{ id: string; nome: string; total: number; qtd: number; meta: number | null }>>([])
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/dashboard')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (cancelled || !json) return
-        setPeriodsData(json.periods)
-        setGlobais(json.globais)
-        setVendasRecentes(json.vendasRecentes)
-        if (json.faturamentoMensal) setFaturamentoMensal(json.faturamentoMensal)
-        if (json.topVendedores) setTopVendedores(json.topVendedores)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
-  const { receita, lucro, margem, semCusto, qtdVendas, ticketMedio } = periodsData?.[activePeriod] ?? initialData.kpis.mes
+  const { faturamentoMensal, vendasRecentes, topVendedores, contagens: globais } = data
+  const resultado: ResultadoVendas = data.periods[activePeriod] ?? data.periods.mes
+  const { receita, lucro, margem, semCusto, qtdVendas, ticketMedio } = resultado
   const periodLabel = PERIOD_LABELS[activePeriod] ?? 'este mês'
 
   const spark = faturamentoMensal.slice(-7).map((m) => m.total)
@@ -364,14 +326,14 @@ export function DashboardView({ data: initialData }: { data: DashboardData }) {
               <AreaChart data={faturamentoMensal} />
             </Card>
             <Card title="Vendas por canal">
-              <DonutCanais counts={initialData.porCanal ?? {}} />
+              <DonutCanais counts={data.porCanal} />
             </Card>
           </div>
 
           {/* Produtos + Funil + Alertas */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card title="Produtos mais vendidos"><TopProdutos produtos={initialData.topProdutos} /></Card>
-            <Card title="Funil de leads"><FunilLeads funil={initialData.funilLeads} /></Card>
+            <Card title="Produtos mais vendidos"><TopProdutos produtos={data.topProdutos} /></Card>
+            <Card title="Funil de leads"><FunilLeads funil={globais.funil} /></Card>
             <Card title="Alertas"><Alertas estoqueDisponivel={globais.estoqueDisponivel} leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} /></Card>
           </div>
 

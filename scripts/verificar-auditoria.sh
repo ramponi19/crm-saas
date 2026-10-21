@@ -511,7 +511,9 @@ v "superadmin nao apaga habilitados"   "app/api/superadmin/empresas/[id]/overrid
 # lucro so existe onde ha custo lancado (antes: 'margem de 100%' sem custo).
 v "painel conta lucro so com custo"     "lib/painel/metricas.ts" "comCusto.length"
 n "pagina do painel nao le a view"      "app/(dashboard)/dashboard/page.tsx" "from('vendas')"
-n "rota do painel nao le a view"        "app/api/dashboard/route.ts" "from('leads')"
+# 21/10/2026: o painel calcula uma vez, no servidor; /api/dashboard saiu.
+v "painel calcula uma vez so"           "app/(dashboard)/dashboard/page.tsx" "return painelCompleto(supabase, empresaId, escopo)"
+n "painel nao refaz a conta no navegador" "components/modules/dashboard/dashboard-view.tsx" "fetch('/api/dashboard')"
 n "card nao divide lucro por receita"   "components/modules/dashboard/dashboard-view.tsx" "lucro / receita"
 v "card mostra sem custo lancado"       "components/modules/dashboard/dashboard-view.tsx" "sem custo lançado"
 # 21/10/2026: tarefas tem duas chaves para negocios desde o corte; embed sem o

@@ -11,6 +11,8 @@ import { SEM_NOME } from '@/lib/sem-nome'
  * consultas, sobre as views de compatibilidade (`vendas`, `leads`, `clientes`,
  * `inventario_unidades`, `garantias_assistencias`). Duas cópias da mesma conta
  * já deram vazamento antes (o escopo do vendedor, ver `lib/escopo.ts`).
+ * Desde 21/10/2026 a rota não existe mais: a página chama `painelCompleto`, no fim
+ * deste arquivo, uma vez só (era a mesma conta feita duas vezes por abertura).
  *
  * Agora cada número tem UMA consulta, escrita aqui, contra as tabelas do core:
  *
@@ -262,4 +264,98 @@ export async function primeirosPassos(db: Db) {
     db.from('vendas_vendas').select('id', head),
   ])
   return { produtos: produtos.count ?? 0, whatsapp: whatsapp.count ?? 0, leads: leads.count ?? 0, vendas: vendas.count ?? 0 }
+}
+
+// ── O painel inteiro, numa ida só ─────────────────────────────────────────
+
+export interface VendedorDoPainel { id: string; nome: string; total: number; qtd: number; meta: number | null }
+
+export interface DadosPainel {
+  /** Resultado por período (hoje, 7d, 30d, mês, ano) — só vendas concluídas. */
+  periods: Record<string, ResultadoVendas>
+  faturamentoMensal: Array<{ mes: string; total: number }>
+  /** Donut: vendas concluídas DO MÊS por canal. */
+  porCanal: Record<string, number>
+  topProdutos: Array<{ nome: string; qtd: number }>
+  topVendedores: VendedorDoPainel[]
+  vendasRecentes: VendaRecente[]
+  contagens: ContagensDoPainel
+}
+
+/**
+ * TUDO o que o painel mostra, calculado UMA vez, no servidor (21/10/2026).
+ *
+ * Antes eram duas execuções por abertura: a página montava os números do mês e,
+ * já no navegador, o painel chamava /api/dashboard, que refazia tudo lendo 12 meses
+ * de vendas — CPU ativa da Vercel em dobro, no plano com teto de 4 h/mês. A rota
+ * saiu; a página chama esta função e entrega pronto, inclusive os outros períodos
+ * (a troca Hoje/7 dias/Mês/Ano é só escolher qual mostrar).
+ */
+export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo): Promise<DadosPainel> {
+  const starts = inicioDosPeriodos()
+  const inicio12m = new Date()
+  inicio12m.setMonth(inicio12m.getMonth() - 12)
+  inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
+  const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
+
+  const [vendas, recentes, contagens, { vendedores, metaPorUsuario }] = await Promise.all([
+    vendasDesde(db, empresaId, escopo, inicio12m),
+    vendasRecentes(db, empresaId, escopo, 6),
+    contagensDoPainel(db, empresaId, escopo),
+    equipeEMetas(db, empresaId, mesAtual),
+  ])
+
+  // KPIs por período (só concluídas). Lucro e margem só onde há custo lançado.
+  const fechadas = concluidas(vendas)
+  const periods: Record<string, ResultadoVendas> = {}
+  for (const [key, start] of Object.entries(starts)) {
+    const startMs = start.getTime()
+    periods[key] = resultadoDasVendas(fechadas.filter((v) => v.data_venda && new Date(v.data_venda).getTime() >= startMs))
+  }
+
+  // Faturamento mensal, 12 meses.
+  const porMes: Record<string, number> = {}
+  for (const v of fechadas) {
+    if (!v.data_venda) continue
+    const d = new Date(v.data_venda)
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    porMes[k] = (porMes[k] ?? 0) + v.valor_venda
+  }
+  const faturamentoMensal = Object.entries(porMes).map(([mes, total]) => ({ mes, total })).sort((a, b) => a.mes.localeCompare(b.mes))
+
+  // O mês: produtos, canais e ranking.
+  const inicioMes = starts.mes.getTime()
+  const vendasMes = fechadas.filter((v) => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
+
+  const produtoCount: Record<string, number> = {}
+  for (const v of vendasMes) if (v.produto_nome) produtoCount[v.produto_nome] = (produtoCount[v.produto_nome] ?? 0) + 1
+  const topProdutos = Object.entries(produtoCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([nome, qtd]) => ({ nome, qtd }))
+
+  const porCanal: Record<string, number> = {}
+  for (const v of vendasMes) { const c = v.canal_venda ?? 'loja_fisica'; porCanal[c] = (porCanal[c] ?? 0) + 1 }
+
+  /**
+   * Quem não pode ver resultado de outros aparece SOZINHO no ranking.
+   *
+   * Filtrar só as vendas não bastaria: a lista era montada a partir de todos os
+   * usuários da empresa, então o vendedor continuaria vendo o nome e a meta dos
+   * colegas (com total zerado, o que é pior — parece que ninguém vendeu).
+   */
+  const vendedorMap = Object.fromEntries(vendedores.map((u) => [u.id, u.nome]))
+  const stats: Record<string, Omit<VendedorDoPainel, 'id'>> = {}
+  const paraRanking = escopo.soMeu && escopo.userId ? vendedores.filter((u) => u.id === escopo.userId) : vendedores
+  for (const u of paraRanking) stats[u.id] = { nome: u.nome, total: 0, qtd: 0, meta: metaPorUsuario[u.id] ?? null }
+  for (const v of vendasMes) {
+    if (!v.vendedor_id) continue
+    if (!stats[v.vendedor_id]) stats[v.vendedor_id] = { nome: vendedorMap[v.vendedor_id] ?? 'Vendedor', total: 0, qtd: 0, meta: null }
+    stats[v.vendedor_id].total += v.valor_venda
+    stats[v.vendedor_id].qtd += 1
+  }
+  const topVendedores = Object.entries(stats)
+    .map(([id, s]) => ({ id, ...s }))
+    .filter((v) => v.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+
+  return { periods, faturamentoMensal, porCanal, topProdutos, topVendedores, vendasRecentes: recentes, contagens }
 }
