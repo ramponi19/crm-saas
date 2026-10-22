@@ -39,6 +39,12 @@ export interface ModuloManifesto {
   /** Contratado à parte (o ZapIntel): sempre por pedido, nunca pelo botão do dono. */
   addon?: boolean
   emPreparacao?: boolean
+  /**
+   * Seções de Configurações que o módulo traz (ids do menu de Configurações):
+   * existem quando o módulo está ligado para a empresa. Até 22/10/2026 vinham de
+   * uma lista por vertical; agora quem as tem é o módulo.
+   */
+  abasConfiguracoes?: string[]
 }
 
 export const GRUPOS_MODULO: { id: GrupoModulo; label: string }[] = [
@@ -59,7 +65,7 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'O que cada vendedor precisa fazer hoje: retornos, tarefas e leads esperando resposta.' },
   { chave: 'gestao_leads', href: '/gestao-leads', nome: 'Gestão de Leads', grupo: 'pipeline',
     frase: 'Mostra o lead que parou — sem resposta, sem próximo passo — e quem precisa cobrar, antes que ele esfrie.' },
-  { chave: 'agenda', href: '/agenda', nome: 'Agenda', grupo: 'pipeline', emPreparacao: true,
+  { chave: 'agenda', href: '/agenda', nome: 'Agenda', grupo: 'pipeline', emPreparacao: true, abasConfiguracoes: ['agendamento'],
     frase: 'Visitas e atendimentos marcados num calendário só, com o lead e o responsável de cada horário.' },
 
   { chave: 'orcamentos', href: '/orcamentos', nome: 'Orçamentos', grupo: 'vendas',
@@ -74,7 +80,7 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Quanto fica cada parcela com as taxas da sua maquininha e do link de pagamento.' },
   { chave: 'simular_financiamento', href: '/simular-financiamento', nome: 'Financiamento', grupo: 'vendas', emPreparacao: true,
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
-  { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true,
+  { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, abasConfiguracoes: ['veiculos-portais'],
     frase: 'Vistoria do veículo na troca, com fotos, avarias e o valor oferecido.' },
   { chave: 'consulta_fipe', href: '/consulta-fipe', nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
     frase: 'O valor de referência do veículo na tabela FIPE, dentro da avaliação.' },
@@ -87,9 +93,9 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Pedido de compra ao fornecedor e a entrada da mercadoria no estoque.' },
   { chave: 'check_imei', href: '/check-imei', nome: 'Check IMEI', grupo: 'estoque',
     frase: 'Consulta o IMEI antes de comprar ou vender um aparelho.' },
-  { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true,
+  { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['portais'],
     frase: 'A carteira de imóveis com fotos, chaves e proprietários.' },
-  { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true,
+  { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
     frase: 'O cardápio com preços e o pedido do cliente pelo celular.' },
   { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true,
     frase: 'A tela da cozinha com os pedidos na ordem em que entraram.' },
@@ -117,6 +123,14 @@ export const MODULOS: ModuloManifesto[] = [
  * esperar o minuto do cache. Os outros usuários da loja seguem com o minuto.
  */
 export const COOKIE_VERSAO_MODULOS = 'nx_mod'
+
+/** Todas as seções de Configurações que pertencem a algum módulo. */
+export const ABAS_DE_MODULO: string[] = MODULOS.flatMap((m) => m.abasConfiguracoes ?? [])
+
+/** As seções de Configurações dos módulos ligados (`ligados` = endereços, como no menu). */
+export function abasDosModulos(ligados: Set<string>): string[] {
+  return MODULOS.filter((m) => ligados.has(m.href)).flatMap((m) => m.abasConfiguracoes ?? [])
+}
 
 /** O módulo pela chave de empresa_modulos. */
 export function moduloPorChave(chave: string): ModuloManifesto | undefined {

@@ -11,7 +11,8 @@
  * Insights, e as automações (cadências, distribuição, scoring, modelos, gatilhos)
  * para o grupo Automações do menu principal — ver lib/menu.ts. Decisão do Lucas.
  *
- * Pura: quem chama diz o papel, o segmento e se o ZapIntel está ligado.
+ * Pura: quem chama diz o papel, as seções que os módulos ligados trazem
+ * (`abasDosModulos`, core/modulos.ts) e se o ZapIntel está ligado.
  * Seção sem item não aparece (Perfil e IA só mostram o que existe hoje).
  */
 
@@ -43,13 +44,13 @@ export const DESTINO_DA_ABA: Record<string, string> = {
   integracoes: '/configuracoes/integracoes',
 }
 
-export function secoesDeConfiguracoes({ isAdmin, abasDoSegmento, zapintel }: {
+export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
   isAdmin: boolean
-  /** ids de `SEGMENTOS[seg].abasExtraConfiguracoes` (portais, cardapio, agendamento...) */
-  abasDoSegmento: string[]
+  /** Seções dos módulos ligados para a empresa (portais, cardapio, agendamento...). */
+  abasDosModulos: string[]
   zapintel: boolean
 }): SecaoConfig[] {
-  const tem = (id: string) => abasDoSegmento.includes(id)
+  const tem = (id: string) => abasDosModulos.includes(id)
   const perfil: SecaoConfig = {
     id: 'perfil', label: 'Perfil',
     // Idioma e senha não existem como tela hoje: ficam de fora até existirem.

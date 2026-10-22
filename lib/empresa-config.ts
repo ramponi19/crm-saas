@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
 import { moduloPorChave } from '@/core/modulos'
+import { hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
+import { normalizarSegmento } from '@/lib/segmentos'
 
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DO CORE, NUM LUGAR SÓ.
@@ -248,4 +250,27 @@ export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: 
     modulos: rows,
     forcados: modulosForcados(rows),
   }
+}
+
+/**
+ * OS MÓDULOS LIGADOS PARA A EMPRESA — a pergunta que o código novo faz no lugar
+ * de "qual é o segmento?" (22/10/2026, zero-segmento no código novo).
+ *
+ * Endereços ligados pelas camadas de sempre (preset, superadmin, Central de
+ * Módulos), a mesma conta do menu e da trava. O preset é lido AQUI, no adaptador
+ * de presets_onboarding, e em nenhum outro lugar do código novo.
+ */
+export function ligadosDaEmpresa(cfg: ConfigEmpresa): Set<string> {
+  const { overrides, segOverride, instalados } = camadasParaMenu(cfg)
+  return hrefsHabilitados({ segmento: normalizarSegmento(cfg.preset), overrides, segOverride, instalados })
+}
+
+/** A entrada do resolvedor do menu para esta empresa, sem o chamador tocar no preset. */
+export function entradaDoMenu(
+  cfg: ConfigEmpresa,
+  quem: { plano?: string; role: string; isSuperAdmin: boolean },
+  permHidden: string[] = [],
+): ResolverMenuInput {
+  const { overrides, configDono, segOverride, instalados } = camadasParaMenu(cfg, permHidden)
+  return { segmento: normalizarSegmento(cfg.preset), ...quem, overrides, configDono, segOverride, instalados }
 }

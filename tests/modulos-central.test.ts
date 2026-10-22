@@ -10,10 +10,10 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MODULOS, moduloPorChave, moduloPorHref } from '@/core/modulos'
+import { ABAS_DE_MODULO, MODULOS, abasDosModulos, moduloPorChave, moduloPorHref } from '@/core/modulos'
 import { estadoDoModulo, tilesDaCentral, type EntradaCentral } from '@/lib/modulos-central'
 import { CATALOGO, hrefsHabilitados, hrefsLigados, resolverMenuPlano } from '@/lib/menu'
-import { instaladosDoManifesto, type ModuloRow } from '@/lib/empresa-config'
+import { instaladosDoManifesto, ligadosDaEmpresa, type ConfigEmpresa, type ModuloRow } from '@/lib/empresa-config'
 
 const VAREJO = ['/dashboard', '/leads', '/clientes', '/tarefas', '/orcamentos', '/pdv', '/historico', '/estoque', '/catalogo', '/financeiro', '/relatorios']
 const entrada = (e: Partial<EntradaCentral> = {}): EntradaCentral => ({ ligados: new Set(VAREJO), plano: 'pro', ativos: new Set(), ...e })
@@ -74,4 +74,17 @@ test('as linhas do corte em empresa_modulos não mudam o menu de hoje', () => {
   assert.deepEqual(Object.keys(instalados).sort(), ['/assistencia', '/estoque', '/financeiro', '/zapintel'])
   const ent = { segmento: 'varejo' as const, plano: 'pro', role: 'owner', isSuperAdmin: false, segOverride: { habilitados: [...VAREJO, '/assistencia'] } }
   assert.deepEqual(resolverMenuPlano({ ...ent, instalados }), resolverMenuPlano(ent))
+})
+
+test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo ligado', () => {
+  const linhas: ModuloRow[] = [{ modulo: 'gestao_leads', ativo: true, config: {} }, { modulo: 'pdv', ativo: false, config: {} }]
+  const cfg: ConfigEmpresa = {
+    preset: 'varejo', segOverride: { habilitados: VAREJO }, superadmin: { habilitados: ['/fila'] }, dono: undefined,
+    modulos: linhas, forcados: undefined,
+  }
+  const antiga = hrefsHabilitados({ segmento: 'varejo', segOverride: { habilitados: VAREJO }, overrides: { habilitados: ['/fila'] }, instalados: instaladosDoManifesto(linhas) })
+  assert.deepEqual([...ligadosDaEmpresa(cfg)].sort(), [...antiga].sort())
+  assert.deepEqual(abasDosModulos(new Set(['/imoveis', '/agenda'])).sort(), ['agendamento', 'portais'])
+  assert.deepEqual(abasDosModulos(new Set(VAREJO)), [])
+  assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'portais', 'veiculos-portais'])
 })

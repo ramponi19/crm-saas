@@ -3,7 +3,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { ConfiguracoesView } from '@/components/modules/configuracoes/configuracoes-view'
 import { semSegredos } from '@/lib/segredos'
 import { notFound } from 'next/navigation'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { ABAS_DE_MODULO, abasDosModulos } from '@/core/modulos'
 
 /**
  * UMA ABA DA ANTIGA /admin/configuracoes COMO SEÇÃO PRÓPRIA (navegação nova, 21/10/2026).
@@ -14,6 +15,9 @@ import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
  * a mesma que a página antiga fazia.
  *
  * Quem protege é o layout do grupo (só dono/admin), como o /admin fazia.
+ *
+ * Seção de módulo (portais, cardápio, agendamento) só existe com o módulo que a
+ * traz ligado para a empresa (22/10/2026; core/modulos.ts).
  */
 async function carregar() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -29,8 +33,9 @@ async function carregar() {
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
-    supabase.from('empresas').select('segmento:preset_onboarding, slug').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('preset_onboarding, slug').eq('id', empresaId).maybeSingle(),
   ])
+  const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null))
 
   // Token, secret, key e senha não vão para o navegador (lib/segredos.ts).
   const ler = (chave: string) => semSegredos(configs?.find(d => d.chave === chave)?.valor ?? null).valor
@@ -38,8 +43,8 @@ async function carregar() {
   return {
     dadosLoja: ler('dados_loja'),
     preferencias: ler('preferencias'),
-    segmento: empresa?.segmento ?? null,
     slug: empresa?.slug ?? null,
+    ligados,
     taxas: ((taxas ?? []) as Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>).map(t => ({
       forma_pagamento: t.forma_pagamento,
       bandeira: t.bandeira,
@@ -50,13 +55,11 @@ async function carregar() {
 }
 
 export async function SecaoConfiguracoes({ aba, titulo }: { aba: string; titulo: string }) {
-  const dados = await carregar()
-  // Portais da imobiliária e da loja de veículos são abas diferentes no mesmo lugar.
-  const seg = normalizarSegmento(dados.segmento)
-  const abaReal = aba === 'portais' && seg === 'concessionaria' ? 'veiculos-portais' : aba
-  // Aba de segmento (portais, cardápio, agendamento) só existe onde o segmento a declara.
-  const DE_SEGMENTO = ['portais', 'veiculos-portais', 'cardapio', 'agendamento']
-  if (DE_SEGMENTO.includes(abaReal) && !SEGMENTOS[seg].abasExtraConfiguracoes.some((a) => a.id === abaReal)) notFound()
+  const { ligados, ...dados } = await carregar()
+  const abas = abasDosModulos(ligados)
+  // Portais de imóveis e de veículos moram no mesmo endereço: vale o do módulo ligado.
+  const abaReal = aba === 'portais' && !abas.includes('portais') && abas.includes('veiculos-portais') ? 'veiculos-portais' : aba
+  if (ABAS_DE_MODULO.includes(abaReal) && !abas.includes(abaReal)) notFound()
   return (
     <>
       <Topbar title={titulo} />

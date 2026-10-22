@@ -8,7 +8,6 @@ import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle } f
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { C2SCard, type EstadoC2S, type EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
@@ -36,8 +35,10 @@ function UrlLinha({ label, url, onCopy }: { label: string; url: string; onCopy: 
   )
 }
 
-export default function IntegracoesView({ slug, segmento, token, feedUrlInicial, ultimaImportacao, appId, c2s, eventosC2S = [] }: {
-  slug: string; segmento: string; token: string; feedUrlInicial: string; ultimaImportacao: string | null
+export default function IntegracoesView({ slug, portais, token, feedUrlInicial, ultimaImportacao, appId, c2s, eventosC2S = [] }: {
+  slug: string; token: string; feedUrlInicial: string; ultimaImportacao: string | null
+  /** O módulo Imóveis está ligado: mostra portais, site e importação. */
+  portais: boolean
   /** App ID da Meta — público, roda no navegador dentro do conector oficial. */
   appId: string
   /** Contact2Sale: estado da ligação (sem o token deles) e últimos eventos. */
@@ -95,9 +96,8 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
 });
 </script>`
 
-  // Portais e site: capacidade. Concessionária também publica em portal, e um dia
-  // vai querer isto — sem editar esta tela.
-  const isImob = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.integraPortais
+  // Portais e site: com o módulo Imóveis ligado (quem decide é o módulo, não a vertical).
+  const isImob = portais
 
   return (
     <div className="flex h-full flex-col">

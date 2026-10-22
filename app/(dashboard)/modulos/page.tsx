@@ -2,10 +2,9 @@ import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getEmpresaRole } from '@/lib/owner'
-import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
-import { CATALOGO, donoPodeOcultar, hrefsHabilitados } from '@/lib/menu'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { CATALOGO, donoPodeOcultar } from '@/lib/menu'
 import { tilesDaCentral } from '@/lib/modulos-central'
-import { normalizarSegmento } from '@/lib/segmentos'
 import { Topbar } from '@/components/layout/topbar'
 import { CentralModulos } from '@/components/modulos/central-modulos'
 
@@ -34,10 +33,9 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
       .eq('empresa_id', empresaId).is('atendido_em', null),
   ])
   const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
-  const { overrides, segOverride, instalados } = camadasParaMenu(cfg)
 
   const tiles = tilesDaCentral({
-    ligados: hrefsHabilitados({ segmento: normalizarSegmento(empresa?.preset_onboarding), overrides, segOverride, instalados }),
+    ligados: ligadosDaEmpresa(cfg),
     plano: empresa?.plano ?? undefined,
     forcados: cfg.forcados,
     ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)),

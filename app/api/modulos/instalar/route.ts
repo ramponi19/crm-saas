@@ -2,10 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { COOKIE_VERSAO_MODULOS, moduloPorChave } from '@/core/modulos'
-import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
-import { hrefsHabilitados } from '@/lib/menu'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { estadoDoModulo } from '@/lib/modulos-central'
-import { normalizarSegmento } from '@/lib/segmentos'
 
 /**
  * INSTALAR / DESINSTALAR UM MÓDULO PELA CENTRAL (22/10/2026).
@@ -34,9 +32,8 @@ export async function POST(req: Request) {
   const svc = createServiceClient()
   const { data: empresa } = await svc.from('empresas').select('plano, preset_onboarding').eq('id', ctx.empresaId).maybeSingle()
   const cfg = await carregarConfigEmpresa(svc, ctx.empresaId, empresa?.preset_onboarding ?? null)
-  const { overrides, segOverride, instalados } = camadasParaMenu(cfg)
   const estado = estadoDoModulo(modulo, {
-    ligados: hrefsHabilitados({ segmento: normalizarSegmento(empresa?.preset_onboarding), overrides, segOverride, instalados }),
+    ligados: ligadosDaEmpresa(cfg),
     plano: empresa?.plano ?? undefined,
     forcados: cfg.forcados,
     ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)),

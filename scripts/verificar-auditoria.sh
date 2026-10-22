@@ -593,7 +593,10 @@ echo "== configuracoes numa tela, /admin fora (21/10) =="
 if [ ! -e "app/admin" ]; then printf "  ok    %s
 " "nao existe mais app/admin"; ok=$((ok+1)); else printf "  FALHA %s
 " "app/admin voltou"; falha=$((falha+1)); fi
-v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx" "secoesDeConfiguracoes({ isAdmin, abasDoSegmento, zapintel })"
+v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx" "secoesDeConfiguracoes({ isAdmin, abasDosModulos: abasDosModulos(ligadosDaEmpresa(cfg)), zapintel })"
+# 22/10/2026 (zero-segmento): secao de modulo existe quando o modulo esta ligado, nao pelo segmento.
+v "secao de modulo pelo modulo ligado"  "components/modules/configuracoes/secao-configuracoes.tsx" "ABAS_DE_MODULO.includes(abaReal) && !abas.includes(abaReal)"
+v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "ligadosDaEmpresa("
 v "configuracoes so dono ou admin"     "app/(dashboard)/configuracoes/(admin)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 v "insights e automacoes so dono/admin" "app/(dashboard)/(gestao)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 v "o /admin responde 308"              "next.config.ts" "{ source: '/admin', destination: '/visao-geral', permanent: true },"

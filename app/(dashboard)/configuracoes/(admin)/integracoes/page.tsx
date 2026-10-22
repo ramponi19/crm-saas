@@ -6,6 +6,7 @@ import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { getOrCreatePortalToken } from '@/lib/portal-token'
 import { basePublica, carregarConfig, getOrCreateTokenEntrada } from '@/lib/c2s'
 import type { EstadoC2S, EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import IntegracoesView from './integracoes-view'
 
 export const metadata = { title: 'Integrações' }
@@ -15,7 +16,7 @@ export default async function IntegracoesPage() {
   const svc = createServiceClient()
 
   const [{ data: empresa }, token, { data: importCfg }, cfgC2S, entradaC2S, { data: eventosC2S }] = await Promise.all([
-    supabase.from('empresas').select('slug, segmento:preset_onboarding').eq('id', empresaId).single(),
+    supabase.from('empresas').select('slug, preset_onboarding').eq('id', empresaId).single(),
     getOrCreatePortalToken(svc, empresaId),
     svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'import_imoveis').maybeSingle(),
     /**
@@ -47,6 +48,9 @@ export default async function IntegracoesPage() {
     catch (e) { console.error('[integracoes] renovação de token falhou:', e) }
   })
 
+  // Portais e site do imóvel: quando o módulo Imóveis está ligado para a empresa (22/10/2026).
+  const portais = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)).has('/imoveis')
+
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 
   /**
@@ -64,7 +68,7 @@ export default async function IntegracoesPage() {
   return (
     <IntegracoesView
       slug={empresa?.slug ?? ''}
-      segmento={empresa?.segmento ?? ''}
+      portais={portais}
       token={token}
       feedUrlInicial={cfg?.feed_url ?? ''}
       ultimaImportacao={cfg?.ultima_importacao ?? null}

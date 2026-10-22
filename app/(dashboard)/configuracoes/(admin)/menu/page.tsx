@@ -2,8 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { resolverMenuPlano, donoPodeOcultar, type MenuItem } from '@/lib/menu'
-import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa, entradaDoMenu } from '@/lib/empresa-config'
 import { MeuMenuView } from './meu-menu-view'
 
 export const metadata = { title: 'Meu menu' }
@@ -19,20 +18,19 @@ export default async function MeuMenuPage() {
   const [{ data: vinculo }, { data: usuario }, { data: emp }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('segmento:preset_onboarding, preset_onboarding, plano').eq('id', empresaId).single(),
+    supabase.from('empresas').select('preset_onboarding, plano').eq('id', empresaId).single(),
   ])
   const role = vinculo?.role ?? 'owner'
   const isAdmin = usuario?.is_super_admin || role === 'owner' || role === 'admin'
   if (!isAdmin) redirect('/dashboard')
 
   /**
-   * A CONFIG DO SEGMENTO precisa entrar aqui também — senão esta tela lista itens
-   * que o segmento desligou e não lista os que ele acrescenta ("Metas e Ranking"
-   * da imobiliária sumia daqui). Desde 21/10/2026 vem do core, como o menu:
-   * lib/empresa-config.ts.
+   * As MESMAS camadas do menu entram aqui (preset, superadmin, Central de Módulos)
+   * — senão esta tela lista itens que a empresa não tem e esquece os que ela ganhou
+   * ("Metas e Ranking" da imobiliária sumia daqui). Montadas por
+   * lib/empresa-config.ts (`entradaDoMenu`), que é quem lê o preset.
    */
   const camadas = await carregarConfigEmpresa(supabase, empresaId, emp?.preset_onboarding ?? null)
-  const { overrides, segOverride, instalados } = camadasParaMenu(camadas)
   const cfg = camadas.dono ?? null
 
   /**
@@ -41,8 +39,7 @@ export default async function MeuMenuPage() {
    * reexibi-lo. Por isso `configDono` entra só com a ordem.
    */
   const itens: MenuItem[] = resolverMenuPlano({
-    segmento: normalizarSegmento(emp?.segmento), plano: emp?.plano ?? undefined,
-    role, isSuperAdmin: false, overrides, segOverride, instalados,
+    ...entradaDoMenu(camadas, { plano: emp?.plano ?? undefined, role, isSuperAdmin: false }),
     configDono: { ordem: cfg?.ordem },
   })
     // O que veio do /admin (Insights e Automações de gestão) o dono não oculta: a

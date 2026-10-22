@@ -1,8 +1,8 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getEmpresaRole } from '@/lib/owner'
-import { inteligenciaLigada } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, inteligenciaLigada, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { rastrDb } from '@/lib/rastreamento/db'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { abasDosModulos } from '@/core/modulos'
 import { secoesDeConfiguracoes } from '@/lib/configuracoes-menu'
 import { ConfiguracoesNav } from '@/components/configuracoes/configuracoes-nav'
 
@@ -13,6 +13,9 @@ import { ConfiguracoesNav } from '@/components/configuracoes/configuracoes-nav'
  * lateral próprio; ver lib/configuracoes-menu.ts. Perfil é de todo mundo; o
  * resto é só dono/admin, e quem barra é o layout do grupo `(admin)`, como o
  * layout do /admin barrava.
+ *
+ * As seções de módulo (portais, cardápio, agendamento) aparecem quando o módulo
+ * que as traz está ligado para a empresa (22/10/2026; core/modulos.ts).
  */
 export default async function ConfiguracoesLayout({ children }: { children: React.ReactNode }) {
   const [supabase, empresaId, role] = await Promise.all([createClient(), getEmpresaId(), getEmpresaRole()])
@@ -21,8 +24,8 @@ export default async function ConfiguracoesLayout({ children }: { children: Reac
     supabase.from('empresas').select('preset_onboarding').eq('id', empresaId ?? 0).maybeSingle(),
     isAdmin && empresaId ? inteligenciaLigada(rastrDb(), empresaId) : Promise.resolve(false),
   ])
-  const abasDoSegmento = SEGMENTOS[normalizarSegmento(empresa?.preset_onboarding)].abasExtraConfiguracoes.map((a) => a.id)
-  const secoes = secoesDeConfiguracoes({ isAdmin, abasDoSegmento, zapintel })
+  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
+  const secoes = secoesDeConfiguracoes({ isAdmin, abasDosModulos: abasDosModulos(ligadosDaEmpresa(cfg)), zapintel })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
