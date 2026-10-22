@@ -1,6 +1,27 @@
 // deno test --no-lock supabase/functions/webhook-leads/reenvio.test.ts
 import { assert, assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, tamanhoCorpo } from "./reenvio.ts";
+import { chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
+
+Deno.test("mesmo Direct: só a primeira entrega processa; a chave leva o prefixo mid:", async () => {
+  const chamadas: unknown[] = [];
+  const vistos = new Set<string>();
+  const rpc = (fn: string, args: Record<string, unknown>) => {
+    chamadas.push([fn, args]);
+    const novo = !vistos.has(String(args.p_mid));
+    vistos.add(String(args.p_mid));
+    return Promise.resolve({ data: novo, error: null });
+  };
+  assertEquals(await primeiraEntrega(rpc, "m1", "1784"), true);
+  assertEquals(await primeiraEntrega(rpc, "m1", "1784"), false);
+  assertEquals(await primeiraEntrega(rpc, "m2", "1784"), true);
+  assertEquals(chamadas[0], ["webhook_mid_novo", { p_mid: "m1", p_conta: "1784" }]);
+  assertEquals(chaveMid("m1"), "mid:m1");
+});
+
+Deno.test("mesmo Direct: erro de banco processa (duplicar é melhor que perder)", async () => {
+  const fora = () => Promise.resolve({ data: null, error: { message: "PGRST002" } });
+  assertEquals(await primeiraEntrega(fora, "m1", null), true);
+});
 
 Deno.test("hash é do corpo exato: um byte diferente muda tudo", async () => {
   const a = await hashCorpo('{"a":1}');

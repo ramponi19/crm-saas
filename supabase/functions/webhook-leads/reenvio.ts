@@ -51,6 +51,26 @@ export async function jaRecebido(
   return data === true;
 }
 
+/** Chave do Direct em ops.webhook_recebidos (a mesma tabela do hash, prefixo próprio). */
+export const chaveMid = (mid: string) => `mid:${mid}`;
+
+/**
+ * O MESMO DIRECT EM DUAS ENTREGAS (22/10/2026): é a primeira vez que este mid chega?
+ *
+ * O Instagram entrega o mesmo Direct pelos dois conectores (Página e login do Instagram),
+ * com corpos diferentes — o hash não pega. As duas requisições criavam cada uma o seu
+ * contato e o seu negócio (6509/6510, 6528/6529, 6555/6556). webhook_mid_novo guarda o
+ * mid por 60 s e devolve TRUE só para a primeira entrega.
+ *
+ * Erro de banco devolve TRUE (processar): duplicar ainda é melhor do que perder a
+ * mensagem, e o banco também trava a identidade (migração 20261023000200).
+ */
+export async function primeiraEntrega(rpc: Rpc, mid: string, conta: string | null): Promise<boolean> {
+  const { data, error } = await rpc("webhook_mid_novo", { p_mid: mid, p_conta: conta });
+  if (error) { console.error("webhook_mid_novo:", error.message); return true; }
+  return data !== false;
+}
+
 /**
  * Esquece o hash de um pacote que NÃO foi processado (erro de banco no meio), para
  * que o reenvio da Meta seja processado em vez de descartado. Melhor esforço: se o
