@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Badge, Button, ConfirmDialog, notify } from '@/components/ui'
 import { MENU_ICONS } from '@/components/layout/menu-icons'
 import { GRUPOS_MODULO } from '@/core/modulos'
@@ -23,7 +24,11 @@ import { cn } from '@/lib/utils'
  * `?m=<chave>` (a vitrine de módulo desligado aponta para cá) rola até o tile e o
  * destaca.
  */
-export interface TileComIcone extends TileModulo { icone: string }
+export interface TileComIcone extends TileModulo {
+  icone: string
+  /** Instalado, mas escondido em Configurações › Menu do CRM. */
+  foraDoMenu: boolean
+}
 
 const dia = (iso: string) =>
   new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -100,10 +105,16 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-[14px] font-semibold tracking-[-0.01em] text-ink">{t.nome}</h3>
                             {e.tipo === 'instalado' && <Badge tone="ok" dot>Instalado</Badge>}
-                            {e.tipo === 'pago' && <Badge tone="acc">Pago {e.onde}</Badge>}
+                            {e.tipo === 'pago' && <Badge tone="acc">Pago · {e.onde}</Badge>}
                             {e.tipo === 'preparacao' && <Badge>Em preparação</Badge>}
                           </div>
                           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">{t.frase}</p>
+                          {t.foraDoMenu && (
+                            <p className="mt-1 text-[11.5px] text-ink-3">
+                              Fora do menu: escondido em{' '}
+                              {podeMudar ? <Link href="/configuracoes/menu" className="underline hover:text-ink">Menu do CRM</Link> : 'Menu do CRM'}.
+                            </p>
+                          )}
                         </div>
                       </div>
 

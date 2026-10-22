@@ -3,7 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getEmpresaRole } from '@/lib/owner'
 import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
-import { CATALOGO, hrefsHabilitados } from '@/lib/menu'
+import { CATALOGO, donoPodeOcultar, hrefsHabilitados } from '@/lib/menu'
 import { tilesDaCentral } from '@/lib/modulos-central'
 import { normalizarSegmento } from '@/lib/segmentos'
 import { Topbar } from '@/components/layout/topbar'
@@ -44,9 +44,16 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
     pedidos: Object.fromEntries((pedidosRaw ?? []).map((p) => [p.modulo, p.pedido_em])),
   })
 
-  // O ícone do tile é o do item no menu (o ZapIntel não é item: raio).
+  // O ícone do tile é o do item no menu (o ZapIntel não é item: raio). Instalado
+  // mas escondido em "Menu do CRM" (pelo dono ou pelo superadmin) é dito no tile:
+  // senão "instalado" e "não está no menu" parecem contradição.
   const iconeDoMenu = new Map(CATALOGO.flatMap((g) => g.items).map((i) => [i.href, i.icon]))
-  const comIcone = tiles.map((t) => ({ ...t, icone: iconeDoMenu.get(t.href) ?? 'Zap' }))
+  // Mesma regra do menu: o "esconder" do dono não vale para o que ele não pode ocultar.
+  const escondidos = new Set([...(cfg.dono?.hidden ?? []).filter(donoPodeOcultar), ...(cfg.superadmin?.hidden ?? [])])
+  const comIcone = tiles.map((t) => ({
+    ...t, icone: iconeDoMenu.get(t.href) ?? 'Zap',
+    foraDoMenu: t.estado.tipo === 'instalado' && escondidos.has(t.href),
+  }))
 
   return (
     <>
