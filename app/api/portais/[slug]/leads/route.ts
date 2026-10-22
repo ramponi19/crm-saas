@@ -10,7 +10,7 @@ import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
  * lead no CRM, liga ao imóvel via clientListingId (código) e distribui pela
  * roleta. 100% isolado do webhook da Meta.
  *
- * URL: /api/portais/{slug}/leads?token={token}
+ * URL: /api/portais/{slug}/leads, com `Authorization: Bearer {token}` (só cabeçalho desde 22/10/2026).
  * Controle por HTTP status (Grupo OLX reenviar se não-2xx).
  */
 
@@ -29,7 +29,7 @@ function pick(obj: any, ...keys: string[]) {
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const token = tokenDaRequisicao(req, 'portais/leads')
+  const token = tokenDaRequisicao(req)
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()

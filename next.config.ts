@@ -3,7 +3,6 @@ import type { NextConfig } from 'next'
 // para de funcionar na v11 do SDK. Avisava a cada build e a cada boot do
 // servidor — ruído que ensina a ignorar aviso de build.
 import { withSentryConfig } from '@sentry/nextjs/config'
-import { DESTINO_DA_ABA } from './lib/configuracoes-menu'
 
 /**
  * REGIÃO DO SERVIDOR: `regions: ["gru1"]` em `vercel.json` (São Paulo).
@@ -44,51 +43,14 @@ const nextConfig: NextConfig = {
       { source: '/check-imei', destination: '/estoque/imei', permanent: true },
       { source: '/consulta-fipe', destination: '/avaliacoes/fipe', permanent: true },
       /**
-       * ETAPA 0, 2.3 — telas duplicadas ficam num lugar só (mesmo prazo: 21/11/2026).
-       * Relatórios e Financeiro: a definitiva é a do CRM (a do /admin importava a
-       * mesma página, e o Financeiro de lá saía sem categorias). Integrações: a
-       * definitiva é /admin/integracoes (a aba de Configurações era um cartão de
-       * status apontando para ela).
+       * O /ADMIN E OS DUPLICADOS DA ETAPA 0 SAÍRAM (22/10/2026, decisão do Lucas).
+       *
+       * Os 308 de /admin/* (navegação nova) e de /admin/relatorios, /admin/financeiro e
+       * /admin/configuracoes?aba=integracoes (Etapa 0, 2.3) iam até 21/11 e caíram antes
+       * do prazo: endereço do /admin agora dá 404. Nenhum link do sistema aponta para
+       * lá, e os que saem do sistema (Stripe, retorno do Instagram) já usam o endereço
+       * novo. O /canais (retorno da Meta) não é /admin: segue no proxy.ts.
        */
-      { source: '/admin/relatorios', destination: '/relatorios', permanent: true },
-      { source: '/admin/financeiro', destination: '/financeiro', permanent: true },
-      /**
-       * NAVEGAÇÃO NOVA (21/10/2026) — o /admin inteiro saiu. Mesmo prazo: REMOVER EM
-       * 21/11/2026 (lista de morte do 05). Configuração foi para /configuracoes;
-       * leitura para Insights; automação para Automações. A query passa adiante
-       * (`?code=` do retorno da Meta em /admin/canais, `?tab=uso` da equipe,
-       * `?session_id=` do Stripe em /admin/planos/sucesso).
-       */
-      // As abas antigas de /admin/configuracoes, cada uma para a seção que virou.
-      ...Object.entries(DESTINO_DA_ABA).map(([aba, destination]) => ({
-        source: '/admin/configuracoes',
-        has: [{ type: 'query' as const, key: 'aba', value: aba }],
-        destination,
-        permanent: true,
-      })),
-      { source: '/admin/configuracoes', destination: '/configuracoes/pagamentos', permanent: true },
-      { source: '/admin', destination: '/visao-geral', permanent: true },
-      { source: '/admin/conversao', destination: '/conversao', permanent: true },
-      { source: '/admin/metas', destination: '/metas', permanent: true },
-      { source: '/admin/cadencias', destination: '/cadencias', permanent: true },
-      { source: '/admin/distribuicao', destination: '/distribuicao', permanent: true },
-      { source: '/admin/scoring', destination: '/scoring', permanent: true },
-      { source: '/admin/modelos', destination: '/modelos', permanent: true },
-      { source: '/admin/equipe', destination: '/configuracoes/usuarios', permanent: true },
-      { source: '/admin/funil', destination: '/configuracoes/funil', permanent: true },
-      { source: '/admin/contrato/:id', destination: '/configuracoes/documentos/:id', permanent: true },
-      { source: '/admin/contrato', destination: '/configuracoes/documentos', permanent: true },
-      { source: '/admin/integracoes', destination: '/configuracoes/integracoes', permanent: true },
-      { source: '/admin/canais', destination: '/configuracoes/integracoes', permanent: true },
-      { source: '/admin/permissoes', destination: '/configuracoes/permissoes', permanent: true },
-      { source: '/admin/meu-menu', destination: '/configuracoes/menu', permanent: true },
-      { source: '/admin/aparencia', destination: '/configuracoes/aparencia', permanent: true },
-      { source: '/admin/empresa', destination: '/configuracoes/empresa', permanent: true },
-      { source: '/admin/filiais', destination: '/configuracoes/lojas', permanent: true },
-      { source: '/admin/planos/sucesso', destination: '/configuracoes/faturamento/sucesso', permanent: true },
-      { source: '/admin/planos', destination: '/configuracoes/faturamento', permanent: true },
-      // Qualquer outro endereço do /admin que alguém tenha guardado.
-      { source: '/admin/:resto*', destination: '/configuracoes', permanent: true },
     ]
   },
 }

@@ -11,8 +11,9 @@ import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs'
 
 /**
  * Tira da URL os parâmetros que carregam credencial (`token`, `access_token`,
- * `hub.verify_token`). Portais, site da imobiliária e C2S ainda mandam o token na
- * query (lib/token-externo.ts), e a URL vai inteira no evento e nos breadcrumbs.
+ * `hub.verify_token`). Desde 22/10/2026 o token dos portais e do site só vale no
+ * cabeçalho (lib/token-externo.ts), mas um parceiro com configuração antiga pode
+ * seguir mandando `?token=` — e a URL vai inteira no evento e nos breadcrumbs.
  */
 const PARAM_SECRETO = /([?&])(token|access_token|hub\.verify_token)=[^&#\s]*(&?)/gi
 export function semTokenNaUrl(texto: string): string {

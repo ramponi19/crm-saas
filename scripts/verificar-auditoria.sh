@@ -546,8 +546,8 @@ n "menu sem prefetch de viewport"       "components/admin/admin-shell.tsx" "from
 n "menu sem prefetch de viewport"       "components/superadmin/superadmin-shell.tsx" "from 'next/link'"
 # 21/10/2026 (etapa 0, 2.3): duplicadas num lugar so. Relatorios/Financeiro = CRM;
 # Integracoes = /admin/integracoes; codigo copiado de stripe e preview vira funcao.
-v "admin/relatorios responde 308"       "next.config.ts" "source: '/admin/relatorios', destination: '/relatorios', permanent: true"
-v "admin/financeiro responde 308"       "next.config.ts" "source: '/admin/financeiro', destination: '/financeiro', permanent: true"
+# 22/10/2026 (decisao do Lucas): os 308 do /admin e dos duplicados sairam antes de 21/11 — /admin da 404.
+n "admin sem redirecionamento"         "next.config.ts" "source: '/admin"
 n "configuracoes sem aba integracoes"   "components/modules/configuracoes/configuracoes-view.tsx" "id: 'integracoes'"
 v "legado do admin e permanente"        "proxy.ts" "NextResponse.redirect(url, 308)"
 v "stripe reconcilia num lugar so"      "app/api/superadmin/sync-stripe/route.ts" "reconciliarAssinaturas("
@@ -601,8 +601,8 @@ v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/i
 v "build reprova segmento novo"         "package.json" "npm run check:segmento && next build"
 v "configuracoes so dono ou admin"     "app/(dashboard)/configuracoes/(admin)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 v "insights e automacoes so dono/admin" "app/(dashboard)/(gestao)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
-v "o /admin responde 308"              "next.config.ts" "{ source: '/admin', destination: '/visao-geral', permanent: true },"
-v "abas antigas vao para a secao"      "next.config.ts" "...Object.entries(DESTINO_DA_ABA).map"
+n "abas do /admin sem redirecionamento" "next.config.ts" "DESTINO_DA_ABA"
+v "abas antigas de configuracoes ainda" "app/(dashboard)/configuracoes/page.tsx" "redirect(DESTINO_DA_ABA"
 v "veio do /admin o dono nao oculta"   "lib/menu.ts" "!PROTEGIDOS.has(h) && !DONO_NAO_OCULTA.has(h)"
 v "tela do menu sem botao que nao age" "app/(dashboard)/configuracoes/(admin)/menu/page.tsx" ".filter((i) => donoPodeOcultar(i.href))"
 v "stripe volta para faturamento"      "app/api/stripe/checkout/route.ts" "/configuracoes/faturamento/sucesso?session_id="
@@ -633,16 +633,18 @@ echo "== contact2sale (21/08) =="
 # apagado em 20/10; a C2S seguia chamando: 556 invocacoes/dia para devolver 404). Sem a
 # rota, o 404 vem da pagina estatica (_not-found) pela CDN, sem funcao nem middleware.
 if [ ! -e "app/api/webhook/c2s/[slug]/route.ts" ]; then printf "  ok    %s\n" "webhook do c2s fora (404 estatico)"; ok=$((ok+1)); else printf "  FALHA %s\n" "webhook do c2s voltou sem religar a integracao"; falha=$((falha+1)); fi
-v "c2s nao assina endereco que da 404"  "app/api/admin/c2s/route.ts" "A integração com o C2S está desligada no Nexus."
 v "webhook e rota publica"            "proxy.ts" "startsWith('/api/webhook/')"
-v "token deles entra cifrado"         "app/api/admin/c2s/route.ts" "cifrarToken(t)"
-v "token deles nunca volta pra tela"  "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "temToken: !!cfgC2S.token"
-v "valida token antes de guardar"     "app/api/admin/c2s/route.ts" "const teste = await testarToken(t)"
-v "avisa do um-endpoint-por-token"    "app/api/admin/c2s/route.ts" "um endereço por token"
-v "recusa assinar endereco local"    "app/api/admin/c2s/route.ts" "if (local) {"
-v "guarda a url que foi assinada"    "app/api/admin/c2s/route.ts" "url_assinada: feitos.length ? url"
-v "tela e rota usam a mesma conta"   "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "basePublica(hostReq"
-v "tela mostra divergencia de url"   "components/modules/integracoes/c2s-card.tsx" "estado.urlAssinada !== estado.urlWebhook"
+# 22/10/2026: o C2S saiu de vez (tela, API de gestao e lib) e a tela de Integracoes
+# deixou de criar token (portal e entrada do C2S) a cada visita.
+for arq in lib/c2s.ts app/api/admin/c2s/route.ts components/modules/integracoes/c2s-card.tsx; do
+  if [ ! -e "$arq" ]; then printf "  ok    %s\n" "c2s fora: $arq"; ok=$((ok+1)); else printf "  FALHA %s\n" "c2s voltou: $arq"; falha=$((falha+1)); fi
+done
+n "integracoes nao cria token portal" "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "getOrCreatePortalToken"
+n "integracoes nao cria token c2s"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "getOrCreateTokenEntrada"
+n "url de portal sem token"           "app/(dashboard)/configuracoes/(admin)/integracoes/integracoes-view.tsx" "?token="
+n "token so no cabecalho"             "lib/token-externo.ts" "searchParams.get('token')"
+n "aviso token-na-url saiu"           "lib/token-externo.ts" "token-na-url"
+n "portal nao le token em texto"      "lib/portal-token.ts" "from('configuracoes_sistema')"
 
 echo "== filiais (24/08) =="
 v "limite do plano conta a empresa"  "lib/limites.ts" "const svc = createServiceClient()"
@@ -663,7 +665,7 @@ v "canal valida a loja da empresa"   "app/api/canais/[id]/route.ts" "Loja nao en
 v "tela explica canal da rede"       "components/modules/canais/canais-view.tsx" "Toda a rede"
 v "campo de loja do canal so com 2"  "components/modules/canais/canais-view.tsx" "lojas.length >= 2"
 # /canais e o redirect_uri da Meta: a query (?code=) tem de chegar em Integracoes.
-# Desde 21/10 o proxy so troca o caminho (a query passa) e o /admin/canais e 308.
+# Desde 21/10 o proxy so troca o caminho (a query passa); desde 22/10 o /admin/canais da 404.
 v "retorno da meta preserva o code"   "proxy.ts" "url.pathname = LEGADO_ADMIN.legado. + p.slice(legado.length)"
 v "canais da meta vai p/ integracoes"  "proxy.ts" "'/canais': '/configuracoes/integracoes',"
 v "endereco limpo aponta pra tela"    "components/modules/canais/canais-view.tsx" "replaceState({}, '', '/configuracoes/integracoes')"

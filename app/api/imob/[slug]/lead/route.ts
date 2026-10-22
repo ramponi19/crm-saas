@@ -11,7 +11,7 @@ import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
  * Cria o lead (origem 'site'), liga ao imóvel por código e distribui pela roleta.
  * Autenticado por token (mesmo token dos portais). Isolado da integração Meta.
  *
- * URL: /api/imob/{slug}/lead?token={token}
+ * URL: /api/imob/{slug}/lead, com `Authorization: Bearer {token}` (só cabeçalho desde 22/10/2026).
  */
 
 const CORS = {
@@ -26,7 +26,7 @@ export function OPTIONS() {
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const token = tokenDaRequisicao(req, 'imob/lead')
+  const token = tokenDaRequisicao(req)
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   /**
    * Teto por origem, ANTES de conferir o token.
    *
-   * O token protege a rota, mas ele viaja na URL de um formulário que roda no
+   * O token protege a rota, mas ele viaja no código de um formulário que roda no
    * navegador do visitante (o site da imobiliária é outro domínio) — quem abre o
    * código-fonte da página lê o token. A partir daí é lead atrás de lead entrando
    * na roleta e consumindo o limite do plano.

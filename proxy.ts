@@ -24,8 +24,8 @@ const cacheModulos = new Map<string, { habilitados: Set<string>; expira: number 
  * Endereços do CRM de ANTES do /admin (o antigo grupo "Sistema" da sidebar, até
  * 21/08/2026) → onde a tela mora hoje. Desde a navegação nova (21/10/2026) o
  * /admin também saiu: Configurações (/configuracoes/*), Insights e Automações no
- * menu. O destino é o final, sem passar pelo /admin (que só tem 308, no
- * next.config.ts). Cadências, Distribuição, Scoring, Modelos, Conversão e Metas
+ * menu. O destino é o final, sem passar pelo /admin (que desde 22/10/2026 dá 404:
+ * os 308 de lá saíram). Cadências, Distribuição, Scoring, Modelos, Conversão e Metas
  * voltaram a ser rotas do CRM e saíram daqui.
  *
  * ⚠ `/canais` é o `redirect_uri` registrado no app da Meta: a query (`?code=`)
@@ -130,9 +130,8 @@ export async function proxy(request: NextRequest) {
                         request.nextUrl.pathname.startsWith('/api/planos-publicos') ||
                         request.nextUrl.pathname.startsWith('/api/register') ||
                         request.nextUrl.pathname.startsWith('/api/portais/') ||
-                        // Webhook do Contact2Sale: parceiro nao tem sessao, e a
-                        // autenticacao e o token secreto na propria URL — mesmo
-                        // desenho do webhook dos portais.
+                        // Webhooks de parceiro (Stripe, Meta): quem chama nao tem
+                        // sessao; cada rota confere a propria assinatura ou token.
                         request.nextUrl.pathname.startsWith('/api/webhook/') ||
                         /**
                          * ⚠️ OS CRONS NUNCA RODARAM. Descoberto em 01/09/2026.

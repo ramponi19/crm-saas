@@ -8,7 +8,6 @@ import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle } f
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
-import { C2SCard, type EstadoC2S, type EventoIntegracao } from '@/components/modules/integracoes/c2s-card'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
   return (
@@ -35,23 +34,25 @@ function UrlLinha({ label, url, onCopy }: { label: string; url: string; onCopy: 
   )
 }
 
-export default function IntegracoesView({ slug, portais, token, feedUrlInicial, ultimaImportacao, appId, c2s, eventosC2S = [] }: {
-  slug: string; token: string; feedUrlInicial: string; ultimaImportacao: string | null
+export default function IntegracoesView({ slug, portais, feedUrlInicial, ultimaImportacao, appId }: {
+  slug: string; feedUrlInicial: string; ultimaImportacao: string | null
   /** O módulo Imóveis está ligado: mostra portais, site e importação. */
   portais: boolean
   /** App ID da Meta — público, roda no navegador dentro do conector oficial. */
   appId: string
-  /** Contact2Sale: estado da ligação (sem o token deles) e últimos eventos. */
-  c2s?: EstadoC2S
-  eventosC2S?: EventoIntegracao[]
 }) {
   const origin = useOrigem()
   const base = origin
 
+  /**
+   * Endereços SEM token (22/10/2026): o token vai no cabeçalho
+   * `Authorization: Bearer`, nunca na URL, e nasce na instalação do módulo Imóveis
+   * (cifrado em empresa_segredos — primeira migração da viagem).
+   */
   const feedUrl = `${base}/api/portais/${slug}`
-  const leadsUrl = `${base}/api/portais/${slug}/leads?token=${token}`
+  const leadsUrl = `${base}/api/portais/${slug}/leads`
   const siteUrl = `${base}/imob/${slug}`
-  const formEndpoint = `${base}/api/imob/${slug}/lead?token=${token}`
+  const formEndpoint = `${base}/api/imob/${slug}/lead`
 
   const [importUrl, setImportUrl] = useState(feedUrlInicial)
   const [importando, setImportando] = useState(false)
@@ -90,7 +91,7 @@ export default function IntegracoesView({ slug, portais, token, feedUrlInicial, 
 document.getElementById('apice-lead').addEventListener('submit', async function (e) {
   e.preventDefault();
   const dados = Object.fromEntries(new FormData(this).entries());
-  await fetch('${formEndpoint}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
+  await fetch('${formEndpoint}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer SEU_TOKEN' }, body: JSON.stringify(dados) });
   alert('Recebemos seu contato! Em breve retornaremos.');
   this.reset();
 });
@@ -119,10 +120,6 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
             </IntegracaoCard>
 
             {isImob && (<>
-            {/* Contact2Sale: por onde a imobiliária recebe lead hoje. Vem antes do
-                resto porque é a fonte que já está em produção na operação dela. */}
-            {c2s && <C2SCard estado={c2s} eventos={eventosC2S} />}
-
             {/* Importar imóveis do site */}
             <IntegracaoCard icon={DownloadCloud} titulo="Conectar seu site (importar imóveis)" desc="Seu site continua o dono dos imóveis; o CRM importa o acervo do XML que ele já gera pros portais.">
               <label className="mb-1.5 block text-[12px] font-medium text-ink-2">URL do feed XML de imóveis</label>
@@ -142,7 +139,7 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
                 <UrlLinha label="ENVIAR IMÓVEIS →" url={feedUrl} onCopy={() => copiar(feedUrl, 'URL do feed copiada!')} />
                 <UrlLinha label="← RECEBER LEADS" url={leadsUrl} onCopy={() => copiar(leadsUrl, 'URL de leads copiada!')} />
               </div>
-              <p className="mt-2 text-[11.5px] text-ink-3">No Canal Pro (Grupo OLX): cole a 1ª em “integração de imóveis” e a 2ª em “receber leads no CRM”.</p>
+              <p className="mt-2 text-[11.5px] text-ink-3">No Canal Pro (Grupo OLX): cole a 1ª em “integração de imóveis” e a 2ª em “receber leads no CRM”. Os leads chegam com o token do módulo Imóveis no cabeçalho <code>Authorization: Bearer</code>, nunca na URL.</p>
             </IntegracaoCard>
 
             {/* Formulário do site */}
