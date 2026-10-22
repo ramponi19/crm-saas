@@ -169,10 +169,12 @@ def main() -> int:
             bruto = r.read()
             return json.loads(bruto) if bruto else None
 
-    # O índice `idx_lead_mensagens_audio_pendente` existe exatamente para esta
-    # consulta — alguém já tinha desenhado este trabalho antes, junto com a
-    # coluna `transcricao`, e nunca o escreveu.
-    filtro = ("lead_mensagens?select=id,midia_url&tipo=eq.audio"
+    # Desde o corte do core (20/10/2026) `lead_mensagens` é view sobre a tabela
+    # `mensagens`: o script lê e grava na tabela (22/10/2026). O índice que
+    # existia para esta consulta (`idx_lead_mensagens_audio_pendente`) era da
+    # tabela antiga; em `mensagens` não há índice próprio — com ~80 mil linhas a
+    # varredura custa dezenas de ms, e um índice parcial fica para a viagem.
+    filtro = ("mensagens?select=id,midia_url&tipo=eq.audio"
               "&transcricao=is.null&midia_url=not.is.null&order=id.asc")
     if args.empresa:
         filtro += f"&empresa_id=eq.{args.empresa}"
@@ -235,7 +237,7 @@ def main() -> int:
         CRM", que é a verdade), depois o arquivo, pela API do Storage — nunca
         por SQL. `transcricao` continua nula: não houve escuta.
         """
-        rest("PATCH", f"lead_mensagens?id=eq.{linha['id']}",
+        rest("PATCH", f"mensagens?id=eq.{linha['id']}",
              {"midia_url": None}, {"Prefer": "return=minimal"})
         marca = "/storage/v1/object/public/chat-midia/"
         if marca in linha["midia_url"]:
@@ -289,7 +291,7 @@ def main() -> int:
 
             # Áudio sem fala vira string vazia, NÃO fica nulo: nulo significa
             # "ainda não tentei", e o script rodaria nele para sempre.
-            rest("PATCH", f"lead_mensagens?id=eq.{linha['id']}",
+            rest("PATCH", f"mensagens?id=eq.{linha['id']}",
                  {"transcricao": texto}, {"Prefer": "return=minimal"})
             gravou_nesta_leva += 1
             if texto:
