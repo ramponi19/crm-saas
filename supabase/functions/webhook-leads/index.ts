@@ -24,7 +24,7 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, tamanhoCorpo } from "./reenvio.ts";
+import { chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1882,6 +1882,9 @@ serve(async (req: Request) => {
     return ok();
   }
 
+  /** Directs registrados como "já recebidos" nesta requisição — esquecidos se o banco cair. */
+  const midsDesta: string[] = [];
+
   try {
     if (objeto === "whatsapp_business_account") {
       for (const entry of (body.entry as Record<string, unknown>[] ?? [])) {
@@ -2083,6 +2086,18 @@ serve(async (req: Request) => {
 
           const message = m.message as Record<string, unknown> | undefined;
           const mid = message?.mid as string | undefined;
+          /**
+           * O MESMO DIRECT PELOS DOIS CONECTORES (22/10/2026): a segunda entrega para
+           * aqui, antes de baixar mídia e de procurar o lead. Sem isto as duas criavam
+           * cada uma o seu contato e o seu negócio — ver primeiraEntrega em reenvio.ts.
+           */
+          if (mid && !message?.is_echo) {
+            if (!(await primeiraEntrega(rpc, mid, (entry?.id as string | undefined) ?? null))) {
+              console.log(`Direct repetido ignorado (segunda entrega): ${tipo} ${mid}`);
+              continue;
+            }
+            midsDesta.push(mid);
+          }
           const midia = await extrairMidiaMeta(canal, message);
 
           if (message?.is_echo) {
@@ -2125,6 +2140,8 @@ serve(async (req: Request) => {
     if (e instanceof ErroDeBanco) {
       console.error("banco indisponível — 500 para a Meta reenviar:", e.message);
       if (grande) await esquecer(rpc, hash);
+      // O reenvio da Meta traz os mesmos mids: sem esquecê-los, seria tomado por segunda entrega.
+      for (const m of midsDesta) await esquecer(rpc, chaveMid(m));
       return new Response("banco indisponivel", { status: 500, headers: cors });
     }
     // 200 mesmo em erro: 5xx faz a Meta reenviar em loop, e um evento problemático
