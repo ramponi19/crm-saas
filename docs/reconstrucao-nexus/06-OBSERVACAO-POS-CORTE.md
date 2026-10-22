@@ -569,3 +569,55 @@ Nenhuma tela com "tente em instantes". O recalcular ficou entre o da cópia (2,7
 - O "Última mensagem há N min" do dashboard do ZapIntel não conta a conversa do Lucas (lead no funil interno "Time JM"), por desenho; os contadores de mensagens contam.
 - A conferência do Supabase local (103/46/82) ficou para trás: produção agora tem 101 tabelas, 45 views, 86 funções, 195 MB.
 - Foto de saúde final (21:38, `D:\Nexus-Copia\saude\pgdb-20261021-2138.json`): 195 MB, deadlocks 0, mensagens na última hora — canal 15: 1 recebida / 2 enviadas (os testes do smoke), 26: 1/0, 28: 2/0. Docker Desktop fechado.
+
+## 12. 22/10: deploy de dia da `feat/modulos` e noite (view de não lidas + corrida de identidade)
+
+### Parte 0 — máquina
+- 15,8 GB de RAM; a máquina reiniciou às 05:54 e não havia sobra para encerrar. `%USERPROFILE%\.wslconfig` com `memory=4GB` e `processors=2`. Docker só sobe com o IDE fechado e desce ao fim de cada teste (às 19:00 estava desligado).
+
+### Parte 1 — observação (só leitura; fotos em `D:\Nexus-Copia\saude`, base do dia `pgss-20261022-0600.json`)
+
+| hora | banco | IOwait | ZapIntel | observação |
+|---|---|---|---|---|
+| 08:32 | 196 MB | máx 10,5% (07:33–08:32) | dashboard 10× 2,82 s | — |
+| 10:52 | 197 MB | máx 18,0% às 10:25 | dashboard 6× 3,57 s desde 08:32 | painel: memória comprometida 1,72 GB de 1,4 GB ("Severe"), swap 653 MB |
+| 11:29 | 197 MB | pico 17,3% às 11:18 (smoke abrindo `/leads`) | dashboard 4× 3,43 s | deploy de dia no ar desde 11:13, sem 5xx |
+| 12:32 | 197 MB | 22,1% às 11:42 (consultas de duplicados em produção) | nenhuma chamada 11:29→12:32 | — |
+| 18:20 | 199 MB | tarde 12:00–18:12: média 4,0%, mediana 2,6%, máx 23,0% às 16:44 (único ponto > 20%), 0 > 30% | dia: dashboard 20× 3,17 s (máx 7,95 s), resumo 13× 2,39 s, análises pendentes 17× 2,50 s | `xact_rollback` +5.300 entre 12:32 e 18:20 (manhã +1.000), origem não identificada |
+
+- **Mensagens do dia:** WhatsApp Mogi (15) 517 recebidas / 711 enviadas (226 áudios); WhatsApp Jaguariúna (28) 153 / 132; Instagram Mogi (26) 21 / 27; Instagram Jaguariúna (25) 1 / 1. Deadlocks 0 o dia todo.
+- **ZapIntel desde o deploy de 21/10 19:03** (contra `pgss-20261021-1650.json`, a última foto antes; inclui 16:50–19:03 de 21/10): dashboard 26× 3,56 s, resumo 24× 2,18 s (sob demanda: 06–08:32 4, 08:32–10:52 6, 10:52–11:29 3, tarde 0), análises pendentes 21× 2,52 s, leads com conversa 9× 3,43 s, conversa 2× 4,87 s, atendimento 2× 2,18 s, insights 1× 1,38 s, lead_perfil 469× ~0 s. **O dashboard passa de 3 s quando usado** (1ª abertura no smoke: 4,57 s; 2ª: 2,58 s).
+- **Vercel:** CPU ativa das 12 h até 08h ≈ 66 s (21/10: 147 s). `GET /` 783 chamadas / 36 s = o monitor 10350616 do Sentry (SentryUptimeBot, a cada 60 s), desativado pelo Lucas às ~07:50; último `GET /` dele às 07:49:20. `/api/webhook/c2s` ausente. O CRM fica sem monitor de disponibilidade até a Etapa Plataforma (05).
+- **v_leads_nao_lidas** (1.2): na cópia, 2,05 s → 76 ms; era o pico de 72% de IOwait de 21/10 19:16. Corrigida à noite (abaixo).
+
+### Deploy de dia da `feat/modulos` (40bf3a4, push 11:09, READY 11:13, loja aberta, só aplicação)
+- IOwait 3,2% antes; Docker desligado. Smoke (a)–(g) nas duas lojas, dono e vendedor (conta Meta Reviewer): menu em grupos e trilho; Configurações (vendedor só Perfil); 308 do `/admin` e `/canais?code=` → Integrações com o código; Central de Módulos (instalar e desinstalar Gestão de Leads como dono; vendedor sem botões, instalação pela API 403); painel; funil (`nexus/funil-depois-20261022-modulos.png`); 2ª via; tarefas nas duas lojas; mídia em cache; `/api/saude` 200; anon 0 / authenticated 22. WhatsApp: o "Teste" do Lucas chegou nas duas lojas e as três respostas (conversa nas duas lojas pela edge `webhook-leads?action=send` e `/api/whatsapp/send` 200) foram entregues. A raiz `/rest/v1/` passou a aceitar só `service_role`.
+
+### Noite (seção "Noite de 22/10/2026" do 05)
+
+| item | horário | resultado |
+|---|---|---|
+| 1. View de não lidas | 18:04–18:16 | merge `ef66933` com gate; aplicada 18:14; idêntica (1.278 leads, 13.921 não lidas, mesma assinatura); 52 ms no banco; `/leads` com o modal 3,1 s (quente) |
+| 2. Corrida de identidade | 18:14–18:20 | merge `1939cc1` com gate; aplicada 18:20; 6 negócios fundidos, `contato_fusoes` 212 → 215; só `service_role` executa as 4 funções |
+| 3. Edge `webhook-leads` | 18:20–18:49 | versão 67 (CLI, `--use-api`, `verify_jwt` desligado); Direct de teste 18:48: 1 contato, 1 mensagem, negócio existente reaproveitado; log: "Direct repetido ignorado (segunda entrega)" |
+| 4. Conferências | 18:49–18:52 | (a) anon 0 / authenticated 22; (b) 6 fundidos + 3 fusões; (c) `webhook_mid_novo` só `service_role`; (d) sino × view divergem em 8 de 1.278 leads → item da Inbox única no 05 |
+| 5. Volta | — | não foi necessária |
+| 6. Leitura | 18:52–19:00 | tabela abaixo |
+
+**Item 6 — conexões, memória, ZapIntel (só leitura):**
+
+| o quê | valor |
+|---|---|
+| `max_connections` | 60 (3 reservadas ao superusuário) |
+| em uso | 31 (22 de cliente, todas `idle`; 0 `idle in transaction`) |
+| PostgREST (`authenticator`) | 11 conexões diretas (locais, sem pooler); a mais antiga ociosa há 55 dias (pool desde o último restart) |
+| Realtime | 7 (cluster externo; replicação, assinaturas, RLS) |
+| Pooler (`pgbouncer`) | 1 conexão de autenticação; nenhum cliente da aplicação entra por ele (o app fala com a API, não com o banco) |
+| outros | Storage 1, `postgres_exporter` 1, `pg_net` 1, `supabase_admin` sem nome 1 (ociosa há 12 h), MCP 1 |
+| memória (24 h; o painel não devolve 7 dias no plano gratuito — só a última hora) | RAM 408 MB; usada 179–269 MB (média 230); swap 602–766 MB (média 664, máx 22/10 13:53); comprometida 1.628–1.925 MB (média 1.711) para capacidade de 1,4 GB — acima o dia inteiro |
+
+### Fica anotado
+- `xact_rollback` subiu ~5.300 na tarde de 22/10 (cerca de 15 por minuto) sem causa identificada; não aparece no `pg_stat_statements` (que só conta o que termina). Investigar antes de culpar alguém.
+- Memória comprometida acima da capacidade o dia inteiro, com ~660 MB de swap: o plano gratuito está no limite (ver o 05, Etapa Plataforma).
+- ZapIntel acima de 3 s na primeira abertura do dashboard.
+- Pedido de teste nº 1 em `modulo_pedidos` (Agenda da JM) ainda lá.

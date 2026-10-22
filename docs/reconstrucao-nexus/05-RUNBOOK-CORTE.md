@@ -169,10 +169,17 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - **Fora da numeração — tarefas (5fc4b39): JÁ EM PRODUÇÃO desde 21/10 09:53, como `eb9a485`** (deploy próprio; ver o 06, seção 8). Na entrega da Etapa 0, **pular o 5fc4b39** no cherry-pick: o conteúdo já está em main (só o `verificar-auditoria.sh` difere, por ordem de regras).
   - **Decisão do Lucas (21/10) sobre o 1.3:** o Atendimento conta só a distribuição EXPLÍCITA (`pegar`, `devolver`, `transferir`, `atribuir`, `distribuir`), como antes; as trocas genéricas `atribuicao` do gatilho não entram. É o que o código da branch já faz.
   - `types/database.ts` agora é uma sobreposição de `types/database.gerado.ts` (saída crua do `supabase gen types`): as 37 views de módulo do core são tipadas como a tabela que espelham (`types/views-espelho.ts`, gerado de `supabase/testes/views_espelho.sql` por `scripts/tipos-espelho.mjs`). Regerar os dois quando o schema mudar.
+- **O que mudou em 22/10 (deploy de dia 11:13 e noite 18:04–19:00; volta de cada um na seção "Noite de 22/10/2026"):**
+  - **Deploy de aplicação da `feat/modulos` (`40bf3a4`, 11:13, sem migração):** menu em grupos, Configurações numa tela, Central de Módulos, check-segmento no build. Os 308 do `/admin` entraram no ar aqui (prazo abaixo).
+  - **`v_leads_nao_lidas` lê do core** (`20261023000100`, 18:14): `negocios` + `mensagens`, sem passar pelas views `leads` e `lead_mensagens` — elas perderam este leitor. Resultado idêntico em produção (1.278 leads, mesma assinatura); 52 ms no banco.
+  - **Corrida de identidade** (`20261023000200`, 18:20): trava de identidade em `compat_leads_iud` e `mensagem_registrar`; `core_negocio_do_canal` com 7 parâmetros (os chamadores de 4 e 5 seguem valendo) e origem no negócio novo; `webhook_mid_novo`; 6 negócios fundidos (3 pares gêmeos de 20–21/10 e 3 herdados do corte). Edge `webhook-leads` versão 67 (18:20): descarta a segunda entrega do mesmo Direct — confirmado no Direct de teste das 18:48.
+  - **Views de compatibilidade que zeraram leitor hoje: nenhuma.** A `v_leads_nao_lidas` deixou de ler `leads`/`lead_mensagens`, mas as duas seguem lidas pelo app (`grep` da regra abaixo não volta vazio). Nenhuma migração de drop pendente.
 - **Lista de morte — o que fica, e até quando:**
   - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11;
+  - **Chaves `mid:` em `ops.webhook_recebidos`:** cada uma vive 60 s (a própria `webhook_mid_novo` apaga as vencidas); nada a limpar à mão;
+  - **Volta da noite de 22/10:** `supabase/scripts/volta/volta-corrida-identidade.sql` e `D:\Nexus-Copia\noite\volta-v-leads-nao-lidas.sql` — guardar até a próxima limpeza; a fusão de dados não volta;
   - **Redirects 308 da Etapa 0 (`next.config.ts`), no ar desde 21/10 19:03: REMOVER EM 21/11/2026** — `/simular-parcela` → `/orcamentos/parcela`, `/check-imei` → `/estoque/imei`, `/consulta-fipe` → `/avaliacoes/fipe` (2.4), `/admin/relatorios` → `/relatorios`, `/admin/financeiro` → `/financeiro` e `/admin/configuracoes?aba=integracoes` → `/admin/integracoes` (2.3). Conferidos os 6 com curl no smoke. Depois de 21/11, link salvo antigo cai no 404;
-  - pedido de teste nº 1 em `modulo_pedidos` (JM, `/agenda`, smoke (e) de 21/10 19:07): atender ou apagar pelo superadmin;
+  - pedido de teste nº 1 em `modulo_pedidos` (JM, `/agenda`, smoke (e) de 21/10 19:07): atender ou apagar pelo superadmin — **ainda lá em 22/10** (o recusar do superadmin apaga e registra em `superadmin_logs`);
   - **Redirects 308 do /admin (navegação nova, A.2, `next.config.ts`): REMOVER EM 21/11/2026** — todo `/admin/*` e as abas `?aba=` de `/admin/configuracoes` (tabela na seção "Navegação nova"). NÃO entra no prazo o mapa `LEGADO_ADMIN` do `proxy.ts`: `/canais` é o `redirect_uri` registrado no app da Meta e tem de continuar levando a Integrações;
   - **`/api/metas` e `/api/ranking/metas`: ficam.** Gravam em tabelas diferentes (`metas_comissoes` × `metas`). Critério para sair: **unificar na tela de metas, fase F** — uma tabela, uma rota (decisão do Lucas, 21/10);
   - ~89 índices nunca usados que cobrem FK: ficam.
@@ -192,6 +199,61 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
     - o ramo "legado" de `lib/realtime/tabelas.ts`, que passa a ler `negocios`/`mensagens` direto e deixa de reler pelas views;
     - a variável `NEXT_PUBLIC_DB_CORE`.
 - **`mensagem_registrar`:** fica. A Edge continua gravando por ela, e o corpo é a versão B.
+
+## Noite de 22/10/2026 (depois das 18h, loja fechada, IOwait abaixo de 20%)
+
+**Prompt das 18h:** "executar a seção Noite de 22/10/2026 do 05, itens 1 a 7, na ordem" (decisão do Lucas, 22/10). Resultado e tempo de cada item antes do seguinte; qualquer falha = parar e avisar.
+
+Migrações pelo `apply_migration` do MCP, uma por vez, com `GET /rest/v1/` (anon) respondendo e nenhum 5xx entre elas.
+
+**O repositório continua recriando a produção do zero:** nenhuma migração vai para a produção sem estar antes na `main` local, e os arquivos entram na `main` na mesma ordem em que são aplicados (`20261023000100` → `20261023000200`). Assim `supabase start` num banco limpo segue chegando ao mesmo estado da produção. O push da `main` (item 7) leva as duas branches e o commit de docs por cima.
+
+1. **View de não lidas** — merge da `fix/nao-lidas-core` (`9fb16f4`) na `main` local, com gate completo (tsc, testes, verificador, núcleo, avisos, check-views, build; next dev e Edge do Playwright encerrados); depois aplicar `20261023000100_v_leads_nao_lidas_core.sql` **do arquivo que está na `main`**. Conferir: mesmas colunas e tipos, `security_invoker`, grants mantidos; abrir `/leads` com o modal.
+2. **Corrida de identidade** — merge da `fix/corrida-identidade` (`7593932`) na `main` local, com gate completo; depois aplicar `20261023000200_corrida_identidade.sql` do arquivo da `main`.
+3. **Edge `webhook-leads` republicada** com o `index.ts` e o `reenvio.ts` **da `main`** já com o merge do item 2 (a publicada em 22/10 era a versão 66, idêntica à `main` antes do merge — é a volta). Um Direct de teste do Lucas pelo Instagram: 1 lead, 1 mensagem.
+4. **Conferências depois de aplicar:**
+   - (a) anon 0 / authenticated 22 (funções do `public` executáveis);
+   - (b) 6 eventos `negocio.fundido` e 3 linhas novas em `contato_fusoes` (6509/6510, 6528/6529, 6555/6556; herdados 617/983, 1777/3607, 4237/4301);
+   - (c) `webhook_mid_novo` existe, só `service_role` executa;
+   - (d) **sino × view de não lidas, só leitura** (pedido do Lucas, 22/10): na cópia, 4 leads divergem entre o contador `leads.msgs_nao_lidas` (o que o sino lê) e a `v_leads_nao_lidas` — **970, 2059, 2468 e 4542** — com as funções antigas ou novas e com a view antiga ou nova (não é desta noite). Conferir em produção, como dono da JM, depois do item 1 (com a view antiga cada leitura custa ~1,7 s): esses quatro e quantos outros. Consulta: a do sino em `supabase/testes/contratos_e_sino.sql`, lead a lead (`full join` da view com `leads where ativo and msgs_nao_lidas > 0`). **Se divergirem, anotar como item da Inbox única (item 2 da viagem): o sino novo lê `conversas` direto**, e o contador espelho sai junto com `lead_mensagens`.
+5. **Volta**, se algo falhar sem conserto em 5 min: `supabase/scripts/volta/volta-corrida-identidade.sql` + Edge da main (versão 66); a view volta pela definição antiga (`pg_get_viewdef` de 22/10, guardada em `D:/Nexus-Copia/noite/volta-v-leads-nao-lidas.sql`). A fusão de dados não volta (registrada em `contato_fusoes` e `eventos`).
+6. **Leitura, sem alteração nenhuma:**
+   - (a) `pg_stat_activity` agrupado por `application_name` e `state`: quantas conexões de cada cliente (PostgREST, Realtime, Auth, Storage, pg_cron, MCP), quantas `idle` e há quanto tempo (`now() - state_change`), quantas `idle in transaction`;
+   - (b) `max_connections` (`show max_connections`) contra o total em uso;
+   - (c) quem entra pelo pooler e quem entra direto (`client_addr` / `application_name` do Supavisor contra os serviços internos);
+   - (d) conexões ociosas: as mais antigas e de quem são;
+   - (e) **memória e swap dos últimos 7 dias** pelo painel (Observability → Database, "Last 7 days": Memory usage, Swap, Memory commitment) — em 22/10 o painel marcava 1,72 GB comprometidos de 1,4 GB de capacidade ("Severe") e 653 MB de swap;
+   - (f) **ZapIntel desde 21/10 19:03** (o deploy do ZapIntel lendo o core): chamadas, média e máximo por RPC com `scratchpad/saude/zapintel-delta.mjs`, contra `pgss-20261021-1650.json` (a última foto antes do deploy) e contra a base do dia (`pgss-20261022-0600.json`); `zapintel_resumo` por janela de foto.
+   Só consultas de catálogo e a Q2 canônica do pgss (`D:\Nexus-Copia\saude\LEIA-ME-fotos.md`); nenhum log fora de janela de 15 min.
+7. **Fechamento:**
+   - 05: lista de morte (views que zeraram e a migração de drop pendente; os 308 do `/admin` com prazo 21/11; o que a noite mudou);
+   - 06: seção do dia, com os números das Partes 0 e 1 (máquina, fotos de saúde, ZapIntel, Vercel/monitor), do deploy de dia da `feat/modulos` (11:13), e dos itens 1 a 6 desta noite;
+   - commit de docs **por cima da `main`** que já tem os merges dos itens 1 e 2; push da `main` (leva as duas branches e os docs; a Vercel publica — conferir READY e `/api/saude` 200);
+   - foto de saúde final (Q1, Q2, IOwait) e Docker fechado.
+
+## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
+
+Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
+
+**0. ZERO-SEGMENTO** (antes de qualquer tela). Ponto de partida medido em 22/10 (`scratchpad/segmento-grep.md`): 520 ocorrências em app/, components/ e lib/ — **152 condicionais, 126 leituras, 40 textos e 202 comentários**; os 91 pontos "morre" do 03 deveriam ter saído com a Etapa 0 e não saíram. Desde 22/10 o build reprova segmento em código novo (`scripts/check-segmento.mjs`; exceções em `scripts/segmento-excecoes.json`, 88 arquivos, 720 ocorrências, a lista só encolhe). Eliminar pela classificação do inventário:
+- (a) o que decide **tela ou funcionalidade** vira "módulo ligado" (`ligadosDaEmpresa` / `empresa_modulos`, core.modulo_ligado);
+- (b) o que decide **campo** vira `campos_personalizados`;
+- (c) o que decide **rótulo** vira `empresa_menu` / preset;
+- (d) **telas que só existem para um segmento** — `/imoveis`, `/ranking`, cardápio, `/agendar`, `/menu`, `/imob`, feed de veículos — viram telas de módulo, visíveis quando o módulo está ligado para a empresa, qualquer que seja ela. **A Agenda perde qualquer dependência de segmento** e passa a funcionar para qualquer empresa, lendo o core; as telas que hoje só existem para imobiliária/saúde viram a tela única do módulo (decisão do Lucas, 22/10: até lá o tile da Agenda fica "Em preparação", sem botão, e nenhum texto da Central fala em segmento). O mesmo vale para os outros módulos marcados `emPreparacao` em `core/modulos.ts`;
+- (e) **"mesma rota, tela diferente"** — `/dashboard`, `/relatorios`, `/clientes`, `/financeiro`, `/entrar`, `/api/match` — vira uma tela só, com seções condicionadas a módulo;
+- (f) `lib/segmentos.ts` e `app/superadmin/segmentos` morrem; o preset de onboarding é o único lugar que conhece a palavra, lido uma vez no `/register`; os 202 comentários também saem.
+- Ao fim, a lista de exceções do check-segmento fica só com `presets_onboarding` e `register`.
+
+**1. Card do lead com campos personalizados** — derruba a view `leads`. **Resolve pela raiz o pico de 72% de IOwait** (21/10 19:16): a abertura de `/leads?lead=` lê a lista inteira pela view e a `v_leads_nao_lidas` (2,05 s e ~1,2 GB de blocos por abertura na cópia: o planejador estima 1 linha onde há 11 mil e cruza 19 milhões de pares). Proposta medida e NÃO aplicada (`scratchpad/leads/proposta-nao-lidas.sql`): não lidas contadas sobre `mensagens` + principal por contato e loja (DISTINCT ON, como os helpers do ZapIntel) — 76 ms, resultado idêntico (916 leads, 0 diferenças). Pode sair antes do card, como migração própria, se o pico voltar.
+
+**2. Inbox única** WhatsApp + Instagram + Messenger — derruba `lead_mensagens` e o sino antigo.
+- **O sino novo lê `conversas` direto** (decisão do Lucas, 22/10). Motivo medido na noite de 22/10 (item 4d, só leitura, empresa 1): o contador espelho `leads.msgs_nao_lidas` (o que o sino lê hoje) e a `v_leads_nao_lidas` divergem em **8 de 1.278 leads** — 970 (view 87 / sino 65), 2059 (20/10), 2468 (14/—), 3982 (18/—), 4542 (39/57), 5714 (34/56), 6314 (—/14), 6339 (—/10). Os pares (2059 com 6339, por exemplo) indicam contatos com negócio nas duas lojas: a view e o contador repartem as mensagens entre os negócios de jeitos diferentes. Na cópia, os mesmos quatro primeiros já divergiam com as funções e a view antigas — não veio da noite de 22/10. O contador espelho sai junto com `lead_mensagens`.
+
+**3. "Automatize" no funil** — cadências por etapa.
+
+**Etapa Plataforma** (etapa 8 do 02-COMPARACAO-E-PLANO): **monitor de disponibilidade criado de propósito, apontando para /api/saude, com alerta para o Matheus.** Origem (22/10/2026): o único monitor era o 10350616 do Sentry ("Uptime Monitoring for https://crm-saas-beta.vercel.app", projeto `nexus-crm`, sem dono, criado pelo próprio Sentry — o Lucas nunca criou monitor), batendo em `GET /` a cada 60 s (`SentryUptimeBot/1.0`, EUA): ~1.440 chamadas/dia, ~72 s de CPU/dia na Vercel (36 s em 12 h, 55% da CPU do projeto) e uma leitura de `planos_config` no Supabase por chamada. Decisão do Lucas: desativar (status disabled, sem apagar, para manter o histórico). Desativado pelo Lucas no painel do Sentry às ~07:50 de 22/10 (a API do Sentry devolveu 500 duas vezes pelo MCP); último `GET /` do SentryUptimeBot no log da Vercel às 07:49:20, nenhum de 07:50 a 07:54. Hoje o CRM fica SEM monitor de disponibilidade até esta etapa.
+
+**Primeira migração da viagem:** `modulo_pedidos` ganha `status` (`pendente`/`atendido`/`recusado`) e o "Recusar" do superadmin deixa de apagar (decisão do Lucas, 22/10; até lá recusar apaga e registra em `superadmin_logs`).
 
 ## Supabase local (`supabase start`) — desde 21/10/2026
 
