@@ -62,7 +62,7 @@ export default function Testimonial() {
           </div>
         </figcaption>
 
-        {/* mais vozes — por segmento */}
+        {/* mais vozes — por tipo de loja */}
         <div data-stagger className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {MAIS.map((m) => (
             <div key={m.nome} className="rounded-card border border-line bg-card p-5">

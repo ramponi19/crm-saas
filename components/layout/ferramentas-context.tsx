@@ -12,7 +12,7 @@ import { createContext, useContext, type ReactNode } from 'react'
  * as camadas (`resolverFerramentas`) e só passa adiante, sem consulta nova.
  */
 export interface Ferramenta {
-  /** Identidade do módulo (o que o segmento libera): '/simular-parcela'… */
+  /** Identidade do módulo (o endereço que o libera): '/simular-parcela'… */
   href: string
   label: string
   /** Onde a tela mora agora: '/orcamentos/parcela'… */

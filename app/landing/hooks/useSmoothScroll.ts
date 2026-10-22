@@ -39,7 +39,7 @@ export function useSmoothScroll(enabled = true) {
 
     // Recalcula posições dos ScrollTriggers depois que fontes/imagens assentam.
     // Sem isso, o pin da LeadStory muda a altura do documento e os reveals abaixo
-    // (ex.: cards de Segmentos) podem ficar presos invisíveis / abrir buracos.
+    // (ex.: cards da seção de tipos de loja) podem ficar presos invisíveis / abrir buracos.
     const refresh = () => ScrollTrigger.refresh()
     const ready = document.fonts?.ready ?? Promise.resolve()
     ready.then(() => requestAnimationFrame(refresh))

@@ -1,0 +1,357 @@
+{
+  "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Ao fim da viagem (05, Parte 4, item zero) sobram só presets_onboarding e register.",
+  "arquivos": {
+    "app/(dashboard)/agenda/agenda-view.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/(dashboard)/agenda/page.tsx": {
+      "motivo": "inventario",
+      "teto": 13
+    },
+    "app/(dashboard)/clientes/components/clientes-view.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/(dashboard)/clientes/page.tsx": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "app/(dashboard)/dashboard/dashboard-imob.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/(dashboard)/dashboard/page.tsx": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/(dashboard)/dashboard/termometro-leads.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/(dashboard)/estoque/components/estoque-view.tsx": {
+      "motivo": "inventario",
+      "teto": 13
+    },
+    "app/(dashboard)/estoque/components/unidade-modal.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/(dashboard)/estoque/page.tsx": {
+      "motivo": "inventario",
+      "teto": 6
+    },
+    "app/(dashboard)/executivo/page.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/(dashboard)/financeiro/components/financeiro-view.tsx": {
+      "motivo": "inventario",
+      "teto": 4
+    },
+    "app/(dashboard)/financeiro/page.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/(dashboard)/gestao-leads/page.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/(dashboard)/imoveis/page.tsx": {
+      "motivo": "inventario",
+      "teto": 5
+    },
+    "app/(dashboard)/layout.tsx": {
+      "motivo": "inventario",
+      "teto": 22
+    },
+    "app/(dashboard)/leads/page.tsx": {
+      "motivo": "inventario",
+      "teto": 11
+    },
+    "app/(dashboard)/orcamentos/orcamentos-view.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/(dashboard)/orcamentos/page.tsx": {
+      "motivo": "inventario",
+      "teto": 6
+    },
+    "app/(dashboard)/pdv/components/pdv-view.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/(dashboard)/pdv/page.tsx": {
+      "motivo": "inventario",
+      "teto": 3
+    },
+    "app/(dashboard)/ranking/page.tsx": {
+      "motivo": "inventario",
+      "teto": 16
+    },
+    "app/(dashboard)/ranking/ranking-view.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/(dashboard)/relatorios/page.tsx": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "app/(dashboard)/tarefas/page.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/agendar/[slug]/page.tsx": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/api/agendar/[slug]/route.ts": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "app/api/assistente/route.ts": {
+      "motivo": "inventario",
+      "teto": 11
+    },
+    "app/api/match/lead/[id]/route.ts": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "app/api/menu-config/route.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/api/menu/[slug]/pedido/route.ts": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/api/ranking/metas/route.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/api/register/route.ts": {
+      "motivo": "register",
+      "teto": 12
+    },
+    "app/api/superadmin/empresas/[id]/exportar/route.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/api/superadmin/empresas/[id]/route.ts": {
+      "motivo": "inventario",
+      "teto": 12
+    },
+    "app/api/superadmin/laboratorio/preview/route.ts": {
+      "motivo": "inventario",
+      "teto": 3
+    },
+    "app/api/superadmin/segmentos/[chave]/preview/route.ts": {
+      "motivo": "inventario",
+      "teto": 4
+    },
+    "app/api/superadmin/segmentos/route.ts": {
+      "motivo": "inventario",
+      "teto": 11
+    },
+    "app/api/veiculos/[slug]/route.ts": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/entrar/page.tsx": {
+      "motivo": "inventario",
+      "teto": 13
+    },
+    "app/imob/[slug]/page.tsx": {
+      "motivo": "inventario",
+      "teto": 6
+    },
+    "app/landing/data.ts": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/landing/Landing.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/landing/Sections.tsx": {
+      "motivo": "inventario",
+      "teto": 5
+    },
+    "app/landing/sections/FinalCta.tsx": {
+      "motivo": "inventario",
+      "teto": 4
+    },
+    "app/landing/sections/Hero.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/landing/sections/Modules.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/landing/sections/ProductStage.tsx": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "app/landing/sections/Segments.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/layout.tsx": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/manifest.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "app/menu/[slug]/page.tsx": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "app/para/[segmento]/page.tsx": {
+      "motivo": "inventario",
+      "teto": 10
+    },
+    "app/register/page.tsx": {
+      "motivo": "register",
+      "teto": 9
+    },
+    "app/superadmin/empresas/[id]/page.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/superadmin/laboratorio/laboratorio-view.tsx": {
+      "motivo": "inventario",
+      "teto": 12
+    },
+    "app/superadmin/laboratorio/page.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "app/superadmin/metricas/page.tsx": {
+      "motivo": "inventario",
+      "teto": 14
+    },
+    "app/superadmin/segmentos/page.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "app/superadmin/segmentos/segmentos-view.tsx": {
+      "motivo": "inventario",
+      "teto": 25
+    },
+    "app/zapintel/api/sugestao/route.ts": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "components/layout/mobile-topbar.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "components/layout/rotulos-context.tsx": {
+      "motivo": "inventario",
+      "teto": 3
+    },
+    "components/layout/sidebar.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "components/layout/topbar.tsx": {
+      "motivo": "inventario",
+      "teto": 3
+    },
+    "components/modules/configuracoes/automacoes-card.tsx": {
+      "motivo": "inventario",
+      "teto": 11
+    },
+    "components/modules/configuracoes/configuracoes-view.tsx": {
+      "motivo": "inventario",
+      "teto": 11
+    },
+    "components/modules/leads/lead-acoes-panel.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "components/modules/leads/lead-modal.tsx": {
+      "motivo": "inventario",
+      "teto": 18
+    },
+    "components/modules/leads/leads-view.tsx": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "components/modules/leads/paineis-vertical.tsx": {
+      "motivo": "inventario",
+      "teto": 5
+    },
+    "components/modules/leads/types.ts": {
+      "motivo": "inventario",
+      "teto": 8
+    },
+    "components/modules/relatorios/relatorios-imob-view.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "components/superadmin/acoes-empresa.tsx": {
+      "motivo": "inventario",
+      "teto": 21
+    },
+    "components/superadmin/superadmin-shell.tsx": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "lib/assistente/chat-dados.ts": {
+      "motivo": "inventario",
+      "teto": 7
+    },
+    "lib/captacao-imob.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "lib/empresa-config.ts": {
+      "motivo": "presets_onboarding",
+      "teto": 21
+    },
+    "lib/estoque-campos.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "lib/match-veiculos.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    },
+    "lib/menu.ts": {
+      "motivo": "inventario",
+      "teto": 55
+    },
+    "lib/motivos-perda.ts": {
+      "motivo": "inventario",
+      "teto": 12
+    },
+    "lib/ranking.ts": {
+      "motivo": "inventario",
+      "teto": 2
+    },
+    "lib/segmentos.ts": {
+      "motivo": "inventario",
+      "teto": 48
+    },
+    "lib/superadmin-preview.ts": {
+      "motivo": "presets_onboarding",
+      "teto": 17
+    },
+    "lib/zapintel/conversas.ts": {
+      "motivo": "inventario",
+      "teto": 9
+    },
+    "lib/zapintel/papel.ts": {
+      "motivo": "inventario",
+      "teto": 6
+    },
+    "lib/zapintel/ponte.ts": {
+      "motivo": "inventario",
+      "teto": 1
+    }
+  }
+}

@@ -12,7 +12,7 @@ import { leadParaIA, mascararDadosPessoais } from '@/lib/zapintel/mascara'
  * mensagem só. Marcar ELA é a diferença entre "esta conversa travou em preço"
  * e "foi aqui, nesta frase, e faz 6 dias".
  *
- * É o que as ferramentas do segmento mostram na vitrine delas, e nós temos a
+ * É o que as ferramentas do mercado mostram na vitrine delas, e nós temos a
  * matéria-prima: `indiceDaFalaQueEncerrou` (a regra das 24 h) e as datas.
  *
  * ══ O QUE ESTE MÓDULO NÃO FAZ ══════════════════════════════════════════════
@@ -210,8 +210,8 @@ export function contextoDaSugestao(original: Lead, t: Travou, f?: Ficha): string
     `Cliente: ${a.contact}`,
     `Situação: ${t.rotulo} (${t.detalhe})`,
     /**
-     * O QUE ELE PROCUROU — e por que esta linha vale mais que o ramo do
-     * segmento.
+     * O QUE ELE PROCUROU — e por que esta linha vale mais que o ramo da
+     * vertical.
      *
      * Medido em produção em 13/10/2026: sem ela, a IA escrevia "ainda tenho
      * suas PEÇAS separadinhas aqui" e "garantir aquele ITEM" para clientes que

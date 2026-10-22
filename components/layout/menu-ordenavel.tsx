@@ -13,7 +13,7 @@ import { CHAVE_ORDEM } from '@/lib/menu'
 import { cn } from '@/lib/utils'
 
 /**
- * Reordenar o menu arrastando — a mesma peça para o superadmin (por segmento) e
+ * Reordenar o menu arrastando — a mesma peça para o superadmin (por preset) e
  * para o dono (por empresa).
  *
  * Até 20/08/2026 a ordem do menu só existia em código: mudar a sequência de uma

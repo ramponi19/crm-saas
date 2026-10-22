@@ -9,7 +9,7 @@ import type { Lead, RawMessage } from '@/types/zapintel'
  * por que não trazer onde está, como foi ou está sendo a conversa? Exemplo:
  * procura por iPhone 18 com celular na troca, vendedor não respondeu mais."
  *
- * É o mesmo princípio que as ferramentas do segmento chamam de revisar trechos
+ * É o mesmo princípio que as ferramentas do mercado chamam de revisar trechos
  * em vez de médias — "seu monólogo mais longo foi de 6 minutos, vamos ver"
  * ensina; "abaixe seu talk ratio" não ensina nada.
  *
