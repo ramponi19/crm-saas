@@ -8,8 +8,13 @@
 -- grave: um teste passaria localmente e falharia (ou o contrário) na produção.
 --
 -- Copiado da produção em 21/10/2026 (privilégios de tabela e por coluna de anon e
--- authenticated). Cada par (tabela, papel) é zerado e regravado; resultado igual ao da
--- produção, e aplicado lá não muda nada.
+-- authenticated). Cada par (tabela, papel) é zerado e regravado.
+--
+-- Aplicada na produção em 21/10/2026 18:48, ela NÃO foi sem efeito: o `revoke all` também tirou
+-- o MAINTAIN (privilégio do PG17 — VACUUM/ANALYZE/REINDEX/REFRESH/LOCK) que o padrão do Supabase
+-- dava a anon e authenticated nas 25 tabelas da lista (planos_config não tinha), e a lista abaixo
+-- não o devolve. Decisão do Lucas: fica removido — nenhum papel da API precisa dele. Fora isso,
+-- igual (comparação por aclexplode contra o dump das 18:41). Ver o 06, seção 11.
 
 do $$
 declare

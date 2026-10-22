@@ -507,3 +507,65 @@ A cópia (máquina local) é 3–5× mais rápida que o banco free: o dashboard 
 A regra saiu para `hooks/zapintel/ritmo.ts` e o hook a usa; `tests/zapintel-ritmo.test.ts` simula com ela 3 abas por 10 minutos (uma mensagem a cada 15 s, ~240/h; uma ficha refeita por minuto; a aba 3 escondida do minuto 2 ao 8): **antes 75 consultas (31 + 31 + 13), depois 50 (21 + 21 + 8)**, nenhuma com a aba escondida, nunca duas em menos de 30 s.
 
 **Não medido no navegador:** a medição com 3 abas reais contra o Supabase local (Realtime de verdade) não coube na memória da máquina em 21/10 (Docker + next dev + 3 abas com 1,9 GB livres). Fica para quando houver folga; o número acima é da simulação da regra, não do navegador. Depois do deploy, o pgss da produção dá a prova real (chamadas de zapintel_resumo por hora com a loja aberta).
+
+## 11. Noite de 21/10: Etapa 0 + ZapIntel em produção (18:24 → 21:30, loja fechada)
+
+**Ponteiro:** `ec10dd5` = `deploy/noite-20261021` (`ef06a07`) com a `fix/zapintel-core` por cima (merge; gate verde). Push `eb9a485..ec10dd5` para a main às 19:01:25 (avanço direto, 27 commits, todos do Lucas); Vercel READY às 19:03:45 (`crm-saas-qaxmrwp0c`, build de ~2 min); `/api/saude` respondeu `versao: ec10dd5`.
+
+### Seguro e migrações
+
+| Hora | Passo | Resultado |
+|---|---|---|
+| 18:24 | foto de saúde (só Postgres) | 196 MB, deadlocks 0, IOwait 1,9% |
+| 18:41 | dump do `public` (`dumps/2026-10-22-etapa0/public.dump`) | 22,4 MB, 18,3 s, leitura de verificação ok (1.972 itens); `funil-antes.txt` |
+| 18:47 | 20261021003150 | sem efeito (impressão digital de privilégios idêntica) |
+| 18:48 | 20261021003155 | **não era sem efeito:** tirou o privilégio `MAINTAIN` (PG17) de anon e authenticated em 25 tabelas — o padrão do Supabase dá, a migração faz `revoke all` e regrava só o que a produção listava. Decisão do Lucas: **fica removido** (ninguém da API precisa de VACUUM/ANALYZE/REINDEX); comentário da migração corrigido |
+| 18:52 | 003200 (menu), 003300 (`v_orfaos_chat_midia`) | ok |
+| 18:53 | 003400 (inteligência no core) | as 2 empresas em `empresa_modulos('inteligencia')`; o job `zapintel-conversa-aquecer` lê de lá |
+| 18:55 | 003500 (posse no histórico) | 1.066 linhas de posse antes e depois; 503 `atribuicao` viraram a ação detalhada (500 `distribuir`, 3 `pegar`); as 691 de `lead_atribuicoes` com par; nenhuma função lê a tabela |
+| 18:56 | 003600 (empresa no core) | dados já iguais (0 diferenças); leitura de `empresa_dados_contrato` aberta a membro; `zapintel_resumo` lê `preset_onboarding` |
+| 18:57 | 003700 + 003710 (pelo operador, fora de transação, 1,0 s) | tabela vazia, RLS sem política; índice único válido |
+| 19:01–19:03 | push + deploy | READY |
+| 19:04–21:18 | smoke (a)–(p) | todos ok (abaixo) |
+| 21:19–21:21 | 20261022000100, 000200, 000300, 000400 (drops) | ok; antes de cada um, nenhuma função, view ou job citava a tabela/coluna (a única citação de `segmento` é a chave do JSON do `zapintel_resumo`) |
+| 21:27 | 20261022001000 (ZapIntel lê o core) | ok; **23/23 funções `zapintel_*` idênticas** à referência (md5 do corpo e da assinatura, referência tirada aplicando o arquivo na cópia com rollback) |
+| 21:27 | 20261022001100 (estatísticas) | ok |
+
+API conferida depois de cada migração (5 leituras anônimas → 401/42501 em ~0,1–0,5 s, `/auth/v1/health` 200): nenhum 5xx a noite toda. IOwait: máximo 2,3% nas migrações de sincronização e 9,5% nos drops. **Pico de 72% às 19:16** (amostra de 2 min), durante o smoke: coincidiu com 3 aberturas seguidas da tela de Leads com modal (quadro com 1.760 leads; a última abertura passou de 10 s); nenhum job acima de 1 s no período; voltou a 2,8% às 19:18. Vale medir a tela de Leads à parte.
+
+**Armadilha da conferência por md5:** o psql do Windows lê o arquivo em modo texto e grava o corpo das funções com CRLF; o MCP grava com LF. A referência só bateu normalizando (`replace(prosrc, E'\r\n', E'\n')`). Mesmo efeito que pegou a troca de texto da 003500 no `supabase start`.
+
+### Pós-deploy, antes dos drops
+
+- `comparar-menu`: **15/15 iguais** (fotos legado × core da produção, conferidas por md5; a foto legada foi tirada depois da 003200, que não toca nenhuma das fontes dela).
+- `zapintel_acesso`: **15 ok** depois das sincronizações e de novo depois dos drops e da 001000.
+- `comparar-empresa` / `comparar-contrato`: os scripts precisam de JWT assinado (só existe na cópia) e o de contrato grava uma emissão nova. Em produção, o equivalente pelo banco: leitura legado × core com a RLS de verdade (`role authenticated` + claims) para dono, admin e vendedor da JM e dono da empresa 5 — **4/4 iguais**, cada um vê só a própria empresa, e o vendedor passou a ver representante e banco. E a 2ª via real no smoke (h): **byte a byte igual ao arquivado** (contrato 84, SHA-256).
+- `check-views` ok; anon 0 / authenticated 22.
+
+### As 25 checagens do script do corte: não servem mais em produção
+
+Rodadas pelo Lucas às ~21:36 (`psql -X -v ON_ERROR_STOP=1 -f supabase/scripts/migrar_jm_para_core.sql`): passos 0 e 1 pulados como esperado, e a **checagem 1 "empresas" falhou** — compara com a foto do corte (`migracao.o('empresas')` = 3) e a produção tem 2, porque o tenant 3 foi apagado na limpeza de 20/10. A regra que ela protege está de pé (2 empresas, 2 linhas em `empresa_branding`, `empresa_menu` e `empresa_dados_contrato`). Mais adiante cairia também a 10 ("old_* intactas"): as quatro `old_*` saíram em 20/10. O `BEGIN` do script desfez tudo; `migracao.checagens` continua com as 29 linhas do corte. **O script é instrumento do corte: compara contagens de 20/10 e não acompanha as limpezas depois dele.** As "25 checagens ok" da preparação eram da cópia, que ainda tinha as `old_*` e o tenant 3. O que elas cobrem foi provado na noite por outros caminhos (menu 15/15, zapintel_acesso 15, legado × core 4/4, funil, 2ª via, views, 0/22). **Pendente (fora da noite):** separar as checagens que seguem valendo num script só de leitura, sem passos e sem comparar com a foto do corte.
+
+### Smoke (Mogi Guaçu e Jaguariúna, dono da JM)
+
+(a) sessão do dono já aberta no Edge do chrome-devtools · (b) lucro e margem "sem custo lançado" nas duas lojas; funil 448 (Mogi) e 605 (Jaguariúna) = banco (o 441 do roteiro era de outro momento); "Meus follow-ups" só aparece com tarefa aberta (o dono tinha 0 — some por desenho) · (c) as ferramentas fora do menu; Simular parcela e Check IMEI no ⌘K e dentro de Orçamentos e Estoque; **FIPE não aparece para a JM** — é opcional de veículos/imobiliária e o varejo nunca a liberou · (d) 6 endereços antigos → 308 · (e) "Ativar" da Agenda gravou `modulo_pedidos` nº 1 · (f) 20 telas sem saudação nem botão flutuante · (g) funil igual, menos o lead 6553 (WhatsApp, 18:51, depois da foto) · (h) recebida "Teste" 21:13:22; resposta pelo modal 21:17:49 → `entregue`; `/api/whatsapp/send` 200 em 2,5 s; 2ª via idêntica · (i) tarefa criada, listada e apagada nas duas lojas · (j) 0/22 · (k) entradas iguais e tema resolvido = tela (preset `clara` usa o azul do sistema; sem logo) · (l) mensagem saiu às 21:17:49 e o dashboard do ZapIntel recarregou no mesmo segundo (826 → 827 enviadas) · (m) 5 trocas de período, 0 requisições · (n) `/api/saude` 200 sem banco · (o) C2S 404 estático · (p) 2ª abertura da conversa (13 fotos) servida do cache do navegador: mesma hora e mesmo token assinado da 1ª.
+
+### ZapIntel em produção — antes × depois (tempo da RPC no navegador, dono da JM)
+
+| Tela / RPC | Antes (21/10, ~21:15, funções antigas) | Depois (21:28–21:30) |
+|---|---|---|
+| Insights, período todo (`zapintel_insights`) | passava de 8 s → "tente em instantes" (134 s na cópia) | **1,64 s** |
+| Dashboard (`zapintel_dashboard`) | 6,3–7,9 s | **1,01 s** |
+| Lista de leads (`zapintel_leads_lista`) | — | **0,47 s** |
+| Atendimento (`zapintel_atendimento`) | — | **1,10 s** |
+| Menu (`zapintel_resumo`) | 4,2–5,7 s | 0,28–1,06 s |
+| Botão "recalcular" (`zapintel_conversa` → `conversa_calc`, 30 dias) | passava de 8 s (200 s na cópia) | **5,3 s** |
+
+Nenhuma tela com "tente em instantes". O recalcular ficou entre o da cópia (2,75 s) e o teto de 8 s, como previsto; é o único que vale acompanhar.
+
+### Fica anotado
+
+- Pedido de teste nº 1 em `modulo_pedidos` (Agenda da JM): atender ou apagar pelo superadmin.
+- O "Última mensagem há N min" do dashboard do ZapIntel não conta a conversa do Lucas (lead no funil interno "Time JM"), por desenho; os contadores de mensagens contam.
+- A conferência do Supabase local (103/46/82) ficou para trás: produção agora tem 101 tabelas, 45 views, 86 funções, 195 MB.
+- Foto de saúde final (21:38, `D:\Nexus-Copia\saude\pgdb-20261021-2138.json`): 195 MB, deadlocks 0, mensagens na última hora — canal 15: 1 recebida / 2 enviadas (os testes do smoke), 26: 1/0, 28: 2/0. Docker Desktop fechado.
