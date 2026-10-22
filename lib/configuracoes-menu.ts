@@ -65,6 +65,9 @@ export function secoesDeConfiguracoes({ isAdmin, abasDoSegmento, zapintel }: {
         { href: '/configuracoes/lojas', label: 'Lojas' },
         { href: '/configuracoes/aparencia', label: 'Aparência' },
         { href: '/configuracoes/menu', label: 'Menu do CRM' },
+        // A Central mora fora de /configuracoes (a equipe também vê a grade), mas o
+        // dono a procura aqui, junto do Menu do CRM.
+        { href: '/modulos', label: 'Central de módulos' },
       ] },
       { label: 'Usuários', itens: [
         { href: '/configuracoes/usuarios', label: 'Usuários' },

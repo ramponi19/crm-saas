@@ -1,11 +1,9 @@
-import type { SegmentoConfig } from '@/lib/segmentos'
-
 /**
  * MÓDULO DESLIGADO = VITRINE, NÃO REDIRECT (etapa 0, 21/10/2026).
  *
  * Quem abria /agenda numa loja sem o módulo caía no dashboard com uma faixa
  * amarela — e não ficava sabendo o que perdia. Agora a rota mostra o que o
- * módulo faz e o botão de ativar (components/modulos/vitrine.tsx).
+ * módulo faz e leva ao tile dele na Central de Módulos (22/10/2026).
  *
  * Arquivo só de dados, sem import de tela: o proxy lê `temVitrine` a cada rota.
  *
@@ -18,12 +16,6 @@ export interface VitrineModulo {
   /** Uma frase: o que o módulo faz, no idioma do balcão. */
   frase: string
   numeros: [NumeroIlustrativo, NumeroIlustrativo, NumeroIlustrativo]
-  /**
-   * Capacidades do segmento que a TELA exige (basta uma). Sem nenhuma delas,
-   * ligar o módulo não basta — a página não existe para o segmento — e a
-   * vitrine diz isso em vez de oferecer um "Ativar" que não entrega nada.
-   */
-  exige?: Array<keyof SegmentoConfig['capacidades']>
 }
 
 interface NumeroIlustrativo { valor: string; rotulo: string }
@@ -36,9 +28,7 @@ export const VITRINES: Record<string, VitrineModulo> = {
       { valor: '6', rotulo: 'compromissos no dia' },
       { valor: '2', rotulo: 'aguardando confirmação do cliente' },
       { valor: '14h', rotulo: 'próximo horário livre da equipe' },
-    ],
-    exige: ['agendaVisitas', 'agendaClinica'],
-  },
+    ],  },
   '/executivo': {
     nome: 'Executivo',
     frase: 'O painel do dono: quanto entrou, quanto ainda vai entrar, quem está produzindo e de onde vêm os negócios que fecham.',
@@ -46,9 +36,7 @@ export const VITRINES: Record<string, VitrineModulo> = {
       { valor: 'R$ 412 mil', rotulo: 'vendido no mês' },
       { valor: 'R$ 38 mil', rotulo: 'de comissão a receber' },
       { valor: '23%', rotulo: 'dos fechamentos vieram do mesmo canal' },
-    ],
-    exige: ['comissaoPorNegocio'],
-  },
+    ],  },
   '/gestao-leads': {
     nome: 'Gestão de Leads',
     frase: 'Mostra o lead que parou — sem resposta, sem próximo passo — e quem precisa cobrar, antes que ele esfrie.',

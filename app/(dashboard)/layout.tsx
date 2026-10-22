@@ -114,13 +114,13 @@ export default async function DashboardLayout({
   // Camadas do resolverMenu, lidas do core (presets_onboarding, empresa_menu,
   // empresa_modulos) — ver lib/empresa-config.ts.
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
-  const { overrides: menuOverrides, configDono: menuConfig, segOverride, rotulos } = camadasParaMenu(cfg, permHidden)
+  const { overrides: menuOverrides, configDono: menuConfig, segOverride, instalados, rotulos } = camadasParaMenu(cfg, permHidden)
   // Ferramentas fora do menu (Simular parcela, Check IMEI, FIPE): mesmas camadas do
   // menu, entregues às telas-casa e ao ⌘K.
   const ferramentas = resolverFerramentas({
     segmento: normalizarSegmento(empresa?.segmento), plano, role,
     isSuperAdmin: usuario?.is_super_admin ?? false,
-    overrides: menuOverrides, configDono: menuConfig, segOverride,
+    overrides: menuOverrides, configDono: menuConfig, segOverride, instalados,
   }).map(({ href, label, rota }) => ({ href, label, rota }))
 
   return (
@@ -158,6 +158,7 @@ export default async function DashboardLayout({
           overrides={menuOverrides}
           configDono={menuConfig}
           segOverride={segOverride}
+          instalados={instalados}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {/* Cabeçalho mobile: ☰ no canto abre o menu completo em gaveta (só no celular). */}
@@ -173,6 +174,7 @@ export default async function DashboardLayout({
             overrides={menuOverrides}
             configDono={menuConfig}
             segOverride={segOverride}
+            instalados={instalados}
           />
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}

@@ -8,7 +8,7 @@ import { NavRolavel } from '@/components/layout/nav-rolavel'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, LineChart, ScrollText, ShieldCheck, LogOut,
-  ShieldAlert, CreditCard, Layers, Megaphone, Car, Menu, X, Sparkles, FlaskConical,
+  ShieldAlert, CreditCard, Layers, Megaphone, Car, Menu, X, Sparkles, FlaskConical, Inbox,
 } from 'lucide-react'
 
 const ADMIN_COR = '#6D28D9'
@@ -16,6 +16,7 @@ const ADMIN_COR = '#6D28D9'
 const navItems = [
   { href: '/superadmin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
   { href: '/superadmin/empresas', label: 'Empresas', icon: Building2 },
+  { href: '/superadmin/pedidos', label: 'Pedidos de módulo', icon: Inbox },
   { href: '/superadmin/segmentos', label: 'Segmentos', icon: Layers },
   { href: '/superadmin/laboratorio', label: 'Laboratório', icon: FlaskConical },
   { href: '/superadmin/fipe', label: 'Tabela FIPE', icon: Car },

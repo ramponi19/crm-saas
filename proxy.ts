@@ -1,8 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { moduloDaRota } from '@/lib/menu'
-import { segOverrideDoPreset, camadasDoMenu, type PresetRow } from '@/lib/empresa-config'
+import { moduloDaRota, hrefsLigados } from '@/lib/menu'
+import { segOverrideDoPreset, camadasDoMenu, instaladosDoManifesto, type PresetRow, type ModuloRow } from '@/lib/empresa-config'
 import { temVitrine } from '@/lib/modulos-vitrine'
+import { COOKIE_VERSAO_MODULOS } from '@/core/modulos'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -15,7 +16,9 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions }
  * clique) não é.
  */
 const TTL_MODULOS_MS = 60_000
-const cacheModulos = new Map<number, { habilitados: Set<string>; expira: number }>()
+// A chave leva a versão do cookie COOKIE_VERSAO_MODULOS (core/modulos.ts): quem
+// instalou ou desinstalou na Central vê a rota certa na hora; os outros, no minuto.
+const cacheModulos = new Map<string, { habilitados: Set<string>; expira: number }>()
 
 /**
  * Endereços do CRM de ANTES do /admin (o antigo grupo "Sistema" da sidebar, até
@@ -269,7 +272,7 @@ export async function proxy(request: NextRequest) {
     const { data: eu } = await supabase.from('usuarios').select('is_super_admin').eq('id', user!.id).maybeSingle()
     if (eu?.is_super_admin && !vitrine) return supabaseResponse
 
-    const habilitados = await modulosHabilitados(supabase)
+    const habilitados = await modulosHabilitados(supabase, request.cookies.get(COOKIE_VERSAO_MODULOS)?.value ?? '')
     // habilitados === null => não deu para saber. Passa direto: derrubar o CRM
     // inteiro por uma consulta que falhou é muito pior do que uma tela a mais.
     if (habilitados && !habilitados.has(modulo)) {
@@ -296,12 +299,14 @@ export async function proxy(request: NextRequest) {
 async function modulosHabilitados(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  versao: string,
 ): Promise<Set<string> | null> {
   try {
     const { data: empresaId } = await supabase.rpc('get_empresa_id')
     if (!empresaId) return null
 
-    const cached = cacheModulos.get(empresaId as number)
+    const chave = `${empresaId}:${versao}`
+    const cached = cacheModulos.get(chave)
     if (cached && cached.expira > Date.now()) return cached.habilitados
 
     // A lista do segmento mora no preset (presets_onboarding.rotulos._menu) desde
@@ -322,10 +327,15 @@ async function modulosHabilitados(
      * empresa aparecia no menu e a trava barrava a rota (etapa 0, achado ao fazer
      * o "Ativar" da vitrine).
      */
-    const { data: menu } = await supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
+    const [{ data: menu }, { data: modulos }] = await Promise.all([
+      supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle(),
+      // + a Central de Módulos: instalado entra, desinstalado sai (a mesma camada do menu).
+      supabase.from('empresa_modulos').select('modulo, ativo, config').eq('empresa_id', empresaId),
+    ])
     const porEmpresa = camadasDoMenu(menu?.itens).superadmin?.habilitados ?? []
-    const habilitados = new Set([...lista, ...porEmpresa])
-    cacheModulos.set(empresaId as number, { habilitados, expira: Date.now() + TTL_MODULOS_MS })
+    const habilitados = hrefsLigados([...lista, ...porEmpresa], instaladosDoManifesto(modulos as ModuloRow[] | null))
+    if (cacheModulos.size > 500) cacheModulos.clear() // uma chave por versão: não deixa crescer sem fim
+    cacheModulos.set(chave, { habilitados, expira: Date.now() + TTL_MODULOS_MS })
     return habilitados
   } catch {
     return null

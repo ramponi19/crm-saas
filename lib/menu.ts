@@ -203,6 +203,13 @@ export interface ResolverMenuInput {
   configDono?: MenuConfigDono
   /** Camada 1 dinâmica: config do segmento do banco (fallback = SEGMENTOS estático). */
   segOverride?: SegOverride
+  /**
+   * Camada do dono, a Central de Módulos (22/10/2026): `href → instalado?`, de
+   * `empresa_modulos` pelo manifesto (`instaladosDoManifesto`). `true` liga o
+   * módulo nesta empresa; `false` tira — inclusive o que o plano ou o
+   * superadmin ligaram. Ausente = não diz nada. Núcleo e itens fixos não saem.
+   */
+  instalados?: Record<string, boolean>
 }
 
 /**
@@ -398,20 +405,44 @@ export function resolverFerramentas(input: ResolverMenuInput): Array<MenuItem & 
   return resolver(input).ferramentas
 }
 
+/**
+ * Os módulos LIGADOS para a empresa, antes de papel, ocultos e plano: o que o
+ * menu pode mostrar e a trava de rota deixa abrir. Uma regra só para o menu, a
+ * Central de Módulos ("instalado?") e o proxy (`hrefsLigados`).
+ */
+export function hrefsHabilitados(input: Pick<ResolverMenuInput, 'segmento' | 'overrides' | 'segOverride' | 'instalados'>): Set<string> {
+  // Camada 1 (opt-in): módulos habilitados do segmento — do banco (segOverride)
+  // com fallback derivado da config estática. O núcleo sempre entra.
+  const habilitados = new Set<string>(input.segOverride?.habilitados ?? habilitadosDerivados(SEGMENTOS[input.segmento]))
+  // Camada 3 (positiva): o superadmin liga um módulo para ESTA empresa, sem
+  // passar pelo segmento — que é compartilhado entre tenants. Ver
+  // `MenuOverridesSuperadmin.habilitados`.
+  return hrefsLigados([...habilitados, ...(input.overrides?.habilitados ?? [])], input.instalados)
+}
+
+/**
+ * A camada da Central por cima de uma lista já ligada (segmento + superadmin):
+ * instalado entra, desinstalado sai; núcleo e itens fixos ficam sempre. O proxy
+ * usa esta parte direto, porque monta a lista de base sem o SEGMENTOS estático.
+ */
+export function hrefsLigados(base: Iterable<string>, instalados?: Record<string, boolean>): Set<string> {
+  const habilitados = new Set<string>(base)
+  for (const [href, ligado] of Object.entries(instalados ?? {})) {
+    if (ligado) habilitados.add(href)
+    else habilitados.delete(href)
+  }
+  NUCLEO.forEach((h) => habilitados.add(h))
+  SEMPRE.forEach((h) => habilitados.add(h))
+  return habilitados
+}
+
 function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas: Array<MenuItem & { rota: string }> } {
   const { segmento, plano, role, isSuperAdmin, overrides, configDono, segOverride } = input
   const seg = SEGMENTOS[segmento]
   const isAdmin = isSuperAdmin || role === 'owner' || role === 'admin'
 
-  // Camada 1 (opt-in): módulos habilitados do segmento — do banco (segOverride)
-  // com fallback derivado da config estática. O núcleo sempre entra.
-  const habilitados = new Set<string>(segOverride?.habilitados ?? habilitadosDerivados(seg))
-  NUCLEO.forEach((h) => habilitados.add(h))
-  SEMPRE.forEach((h) => habilitados.add(h))
-  // Camada 3 (positiva): o superadmin liga um módulo para ESTA empresa, sem
-  // passar pelo segmento — que é compartilhado entre tenants. Ver
-  // `MenuOverridesSuperadmin.habilitados`.
-  ;(overrides?.habilitados ?? []).forEach((h) => habilitados.add(h))
+  // Camadas 1 e 3 (segmento, superadmin) + a da Central (instalados).
+  const habilitados = hrefsHabilitados(input)
 
   const segLabels = segOverride?.labelOverrides ?? seg.labelOverrides
 

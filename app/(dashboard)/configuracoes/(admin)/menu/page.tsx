@@ -32,7 +32,7 @@ export default async function MeuMenuPage() {
    * lib/empresa-config.ts.
    */
   const camadas = await carregarConfigEmpresa(supabase, empresaId, emp?.preset_onboarding ?? null)
-  const { overrides, segOverride } = camadasParaMenu(camadas)
+  const { overrides, segOverride, instalados } = camadasParaMenu(camadas)
   const cfg = camadas.dono ?? null
 
   /**
@@ -42,7 +42,7 @@ export default async function MeuMenuPage() {
    */
   const itens: MenuItem[] = resolverMenuPlano({
     segmento: normalizarSegmento(emp?.segmento), plano: emp?.plano ?? undefined,
-    role, isSuperAdmin: false, overrides, segOverride,
+    role, isSuperAdmin: false, overrides, segOverride, instalados,
     configDono: { ordem: cfg?.ordem },
   })
     // O que veio do /admin (Insights e Automações de gestão) o dono não oculta: a

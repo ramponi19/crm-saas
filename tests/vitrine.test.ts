@@ -3,15 +3,15 @@
  *
  * O proxy reescreve para a vitrine só os módulos que têm uma (lib/modulos-vitrine.ts);
  * o resto continua caindo no dashboard com o aviso. Aqui se garante que os três
- * estão lá, que cada um traz os 3 números, e que a capacidade exigida existe em
- * algum segmento — senão o "Ativar" nunca ficaria disponível para ninguém.
+ * estão lá, que cada um traz os 3 números, e que cada vitrine aponta para um tile da
+ * Central de Módulos (22/10/2026) — senão o botão "Ver na Central" cairia no vazio.
  *
  *   npm test
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { VITRINES, temVitrine } from '@/lib/modulos-vitrine'
-import { SEGMENTOS } from '@/lib/segmentos'
+import { moduloPorHref } from '@/core/modulos'
 import { moduloDaRota } from '@/lib/menu'
 
 test('os três módulos têm vitrine; os outros não', () => {
@@ -27,10 +27,6 @@ test('cada vitrine é um módulo que a trava conhece, com 3 números', () => {
   }
 })
 
-test('a capacidade exigida existe em algum segmento', () => {
-  for (const [href, v] of Object.entries(VITRINES)) {
-    for (const cap of v.exige ?? []) {
-      assert.ok(Object.values(SEGMENTOS).some((s) => s.capacidades[cap]), `${href}: ninguém declara ${cap}`)
-    }
-  }
+test('cada vitrine aponta para um tile do manifesto', () => {
+  for (const href of Object.keys(VITRINES)) assert.ok(moduloPorHref(href), `${href} sem módulo em core/modulos.ts`)
 })

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText, Calculator, ScanSearch, Car, Wrench } from 'lucide-react'
+import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText, Calculator, ScanSearch, Car, Wrench, LayoutGrid } from 'lucide-react'
 import { useFerramentas } from './ferramentas-context'
 import { createClient } from '@/lib/supabase/client'
 
@@ -32,6 +32,8 @@ const ACOES: Acao[] = [
   { id: 'go-estoque', label: 'Ir para Estoque', icon: Boxes, run: (r) => r.push('/estoque') },
   // O assistente abre pelo mesmo evento do menu (o robô flutuante saiu na etapa 0).
   { id: 'assistente', label: 'Perguntar ao assistente', icon: MessageSquareText, run: () => window.dispatchEvent(new Event('assistente:abrir')) },
+  // Central de módulos (22/10/2026): a equipe também abre (vê a grade, sem botões).
+  { id: 'modulos', label: 'Central de módulos', icon: LayoutGrid, run: (r) => r.push('/modulos') },
 ]
 
 /** Ícone de cada ferramenta (as que saíram do menu lateral na etapa 0). */

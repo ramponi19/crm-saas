@@ -12,3 +12,8 @@ export function planoTemAcesso(plano: Plano | string | undefined, modulo: Modulo
   if (!plano) return false
   return (MATRIZ[modulo] as string[]).includes(plano)
 }
+
+/** O plano mais barato que inclui o recurso (a Central de Módulos diz "no plano X"). */
+export function planoMinimo(modulo: ModuloPlano): Plano {
+  return MATRIZ[modulo][0]
+}

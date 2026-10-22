@@ -562,7 +562,16 @@ v "agenda sem capacidade mostra vitrine" "app/(dashboard)/agenda/page.tsx" "<Vit
 v "executivo sem capacidade vitrine"    "app/(dashboard)/executivo/page.tsx" "<VitrineDoModulo href=\"/executivo\" />"
 v "vitrine diz que numero e exemplo"    "components/modulos/vitrine.tsx" "Números de exemplo"
 v "pedido so de dono ou admin"          "app/api/modulos/pedido/route.ts" "requireOwnerOrAdminApi()"
-v "ativar so do superadmin"             "app/api/modulos/ativar/route.ts" "requireSuperAdminApi()"
+# 22/10/2026 (Central de Modulos): o dono instala por empresa_modulos; a vitrine
+# aponta para o tile; o superadmin atende/recusa pedido (o "Ativar" da vitrine saiu).
+v "instalar so de dono ou admin"        "app/api/modulos/instalar/route.ts" "requireOwnerOrAdminApi()"
+v "trava de plano no servidor"          "app/api/modulos/instalar/route.ts" "estado.tipo === 'pago'"
+v "atender pedido so do superadmin"     "app/api/superadmin/modulos/pedidos/[id]/route.ts" "requireSuperAdminApi()"
+v "recusar fica no log"                 "app/api/superadmin/modulos/pedidos/[id]/route.ts" "acao: 'recusar_pedido_modulo'"
+v "trava ve a central de modulos"       "proxy.ts" "instaladosDoManifesto(modulos"
+v "menu ve a central de modulos"        "lib/empresa-config.ts" "instalados: instaladosDoManifesto(cfg.modulos)"
+v "vitrine aponta para o tile"          "components/modulos/vitrine.tsx" "/modulos?m="
+n "vitrine sem ativar proprio"          "components/modulos/vitrine.tsx" "api/modulos/ativar"
 # A rota descartava /dashboard do ocultar e a tela oferecia o botao: o dono
 # salvava e nada acontecia.
 n "sem protegido fantasma na rota"     "app/api/menu-config/route.ts" "PROTEGIDOS = ../dashboard"

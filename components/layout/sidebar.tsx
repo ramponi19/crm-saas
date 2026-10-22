@@ -39,6 +39,8 @@ interface SidebarProps {
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
   segOverride?: SegOverride
+  /** Camada da Central de Módulos (href → instalado?). */
+  instalados?: Record<string, boolean>
 }
 
 export function Sidebar({
@@ -56,6 +58,7 @@ export function Sidebar({
   overrides,
   configDono,
   segOverride,
+  instalados,
 }: SidebarProps) {
   const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
@@ -80,7 +83,7 @@ export function Sidebar({
    * repetiam o nome do item). Itens, rótulos, cadeados e ordem continuam saindo
    * das mesmas camadas; só a repartição é nova.
    */
-  const grupos = resolverMenuAgrupado({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride })
+  const grupos = resolverMenuAgrupado({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride, instalados })
 
   // O sino mora no topo (com o tempo real dele); o rodapé só abre e mostra o ponto.
   const [temNotificacao, setTemNotificacao] = useState(false)

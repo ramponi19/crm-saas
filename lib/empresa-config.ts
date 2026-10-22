@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin, SegOverride } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
+import { moduloPorChave } from '@/core/modulos'
 
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DO CORE, NUM LUGAR SÓ.
@@ -94,6 +95,22 @@ export function moduloLigado(rows: ModuloRow[] | null | undefined, modulo: strin
   return (rows ?? []).some((r) => r.modulo === modulo && r.ativo)
 }
 
+/**
+ * A camada da Central de Módulos para o menu e a trava: `href → instalado?`, só
+ * das linhas cuja chave está no manifesto (core/modulos.ts). As linhas do corte
+ * que não são módulo de menu (`vendas`, `avaliacao`) ficam de fora; as que são
+ * (`estoque`, `financeiro`, `assistencia`) vieram ativas, e ativo só confirma o
+ * que o segmento já ligava — o menu de hoje não muda.
+ */
+export function instaladosDoManifesto(rows: ModuloRow[] | null | undefined): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const r of rows ?? []) {
+    const m = moduloPorChave(r.modulo)
+    if (m) out[m.href] = r.ativo
+  }
+  return out
+}
+
 export interface ConfigEmpresa {
   preset: string | null
   segOverride: SegOverride | undefined
@@ -108,9 +125,11 @@ export interface ConfigEmpresa {
  * são os itens que o PAPEL não pode ver (financeiro, relatórios), somados aos
  * ocultos do superadmin — exatamente como o layout fazia.
  */
-export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'segOverride' | 'superadmin' | 'dono' | 'forcados'>, permHidden: string[] = []) {
+export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'segOverride' | 'superadmin' | 'dono' | 'forcados'> & Partial<Pick<ConfigEmpresa, 'modulos'>>, permHidden: string[] = []) {
   const mo = cfg.superadmin
   return {
+    /** Camada da Central de Módulos (empresa_modulos pelo manifesto). */
+    instalados: instaladosDoManifesto(cfg.modulos),
     overrides: {
       modulos: cfg.forcados,
       hidden: [...(mo?.hidden ?? []), ...permHidden],
