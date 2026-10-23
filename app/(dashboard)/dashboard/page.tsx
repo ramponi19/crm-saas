@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import { escopoDoUsuario } from '@/lib/escopo'
 import { painelCompleto } from '@/lib/painel/metricas'
 import DashboardImob from './dashboard-imob'
@@ -25,10 +25,10 @@ async function getDashboardData() {
 export default async function DashboardPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   // `maybeSingle`: empresa ausente cai no dashboard padrão em vez de lançar.
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  // `telasProprias`: a vertical tem dashboard próprio. Concessionária vai querer
-  // o dela, e aí liga a capacidade em vez de acrescentar outro `if` aqui.
-  if (SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.telasProprias) {
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  // `telasProprias`: o preset tem dashboard próprio (pelo adaptador, sem consulta a
+  // mais). Uma tela só com seções por módulo é a regra (e) do 05, ainda por fazer.
+  if (capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).telasProprias) {
     return <DashboardImob />
   }
   const data = await getDashboardData()

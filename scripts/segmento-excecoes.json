@@ -17,10 +17,6 @@
       "motivo": "inventario",
       "teto": 2
     },
-    "app/(dashboard)/dashboard/page.tsx": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/(dashboard)/dashboard/termometro-leads.tsx": {
       "motivo": "inventario",
       "teto": 1
