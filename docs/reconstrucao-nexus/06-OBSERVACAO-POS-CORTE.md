@@ -621,3 +621,21 @@ Nenhuma tela com "tente em instantes". O recalcular ficou entre o da cópia (2,7
 - Memória comprometida acima da capacidade o dia inteiro, com ~660 MB de swap: o plano gratuito está no limite (ver o 05, Etapa Plataforma).
 - ZapIntel acima de 3 s na primeira abertura do dashboard.
 - Pedido de teste nº 1 em `modulo_pedidos` (Agenda da JM) ainda lá.
+
+## 13. 22/10 à noite: /admin dá 404, token dos portais só no cabeçalho, C2S fora (`fd605f8`)
+
+- **Deploy só de aplicação**, loja fechada: push 19:24, READY 19:28 (main `fd605f8`, sobre `15a62c4`). Gate verde (build com 191 páginas — a API de gestão do C2S saiu —, TSC, 171/171, verificador 539 ok com as 5 falhas antigas do ZapIntel).
+- **(a)** Os 308 de `/admin/*` e dos duplicados da Etapa 0 (`/admin/relatorios`, `/admin/financeiro`, `?aba=integracoes`) saíram antes de 21/11 (decisão do Lucas): `/admin`, `/admin/configuracoes` e `/admin/relatorios` dão 404 logado, nas duas lojas. Ficam os 308 das ferramentas (`/simular-parcela` etc., até 21/11) e o `LEGADO_ADMIN` do proxy (`/canais`, retorno da Meta).
+- **(b)** As rotas de portais (`/api/portais/{slug}/leads`) e do site (`/api/imob/{slug}/lead`) só aceitam `Authorization: Bearer`; `?token=` e o aviso `[token-na-url]` saíram. A tela de Integrações criava, a cada visita e para qualquer empresa, o token de portal e o de entrada do Contact2Sale, em texto — por isso a JM e a Preview tinham os dois sem nunca terem usado. O C2S saiu de vez (cartão, `app/api/admin/c2s`, `lib/c2s.ts`). Sem `empresa_segredos` (primeira migração da viagem), nenhuma empresa tem token de portal: as duas rotas respondem 401 com e sem `?token=`.
+- **Apagado de `configuracoes_sistema`** (21:3x, depois do READY; as quatro sem alteração desde agosto, então estão no dump `dumps/2026-10-22-etapa0/public.dump` de 21/10 18:41 — é a volta):
+
+  | chave | empresa | última alteração |
+  |---|---|---|
+  | `portal_leads` | 1 — JM Store Importados | 02/07/2026 17:31 |
+  | `contact2sale` | 1 — JM Store Importados | 27/08/2026 10:28 |
+  | `portal_leads` | 5 — Preview · Loja | 28/08/2026 10:27 |
+  | `contact2sale` | 5 — Preview · Loja | 28/08/2026 10:27 |
+
+  Abrir Integrações nas duas lojas depois disso não recriou nenhuma (0 linhas de token). Os eventos antigos do C2S em `integracao_eventos` ficam (histórico).
+- **Smoke:** dono nas duas lojas (painel, Configurações, Integrações sem C2S, Relatórios); `/admin` 404; portal e site sem `Bearer` → 401; `/api/saude` 200; WhatsApp entrando depois do deploy (Jaguariúna 20:34, Mogi 21:05, respostas 21:09).
+- **Volta:** Instant Rollback na Vercel para `15a62c4`; as quatro linhas, pelo dump de 21/10 (só elas, nunca restore completo).
