@@ -201,10 +201,6 @@
       "motivo": "inventario",
       "teto": 3
     },
-    "components/modules/configuracoes/automacoes-card.tsx": {
-      "motivo": "inventario",
-      "teto": 11
-    },
     "components/modules/configuracoes/configuracoes-view.tsx": {
       "motivo": "inventario",
       "teto": 11

@@ -5,7 +5,7 @@ import { Plus, Trash2, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import type { Json } from '@/types/database'
 
 interface Automacao {
@@ -36,7 +36,8 @@ const ACAO_LABEL: Record<string, string> = {
 export function AutomacoesCard() {
   const supabase = createClient()
   const [empresaId, setEmpresaId] = useState<number | null>(null)
-  const [segmento, setSegmento] = useState<string | null>(null)
+  // Bloco de veículos: capacidade do preset (lib/empresa-config.ts).
+  const [comVeiculos, setComVeiculos] = useState(false)
   const [etapas, setEtapas] = useState<Etapa[]>([])
   const [lista, setLista] = useState<Automacao[]>([])
   const [salvando, setSalvando] = useState(false)
@@ -62,8 +63,8 @@ export function AutomacoesCard() {
       const id = await empresaAtualId(supabase)
       if (!id) return
       setEmpresaId(id)
-      const { data: emp } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', id).maybeSingle()
-      setSegmento(emp?.segmento ?? null)
+      const { data: emp } = await supabase.from('empresas').select('preset_onboarding').eq('id', id).maybeSingle()
+      setComVeiculos(!!capacidadesDoPreset({ preset: emp?.preset_onboarding ?? null }).automacoesVeiculo)
       const { data: et } = await supabase
         .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', id).eq('ativo', true).order('ordem')
       setEtapas(((et ?? []) as Etapa[]))
@@ -161,7 +162,7 @@ export function AutomacoesCard() {
 
   return (
     <div className="space-y-5">
-      {SEGMENTOS[normalizarSegmento(segmento)].capacidades.automacoesVeiculo && (
+      {comVeiculos && (
         <Card>
           <div className="flex flex-wrap items-center gap-3">
             <Zap size={18} strokeWidth={1.7} className="flex-none text-accent" />
