@@ -53,10 +53,6 @@
       "motivo": "inventario",
       "teto": 2
     },
-    "app/(dashboard)/imoveis/page.tsx": {
-      "motivo": "inventario",
-      "teto": 5
-    },
     "app/(dashboard)/leads/page.tsx": {
       "motivo": "inventario",
       "teto": 9

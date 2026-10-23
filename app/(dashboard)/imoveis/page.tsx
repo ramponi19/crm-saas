@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import type { ChaveDoImovel } from './imoveis-view'
 import ImoveisView from './imoveis-view'
 import { comNome } from '@/lib/sem-nome'
@@ -10,8 +10,11 @@ export const metadata = { title: 'Imóveis' }
 export default async function ImoveisPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding, slug').eq('id', empresaId).single()
-  if (normalizarSegmento(empresa?.segmento) !== 'imobiliaria') redirect('/dashboard')
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding, slug').eq('id', empresaId).single()
+  // Tela do módulo Imóveis: abre onde ele está ligado, qualquer que seja a empresa
+  // (até 22/10 a pergunta era "é imobiliária?" — os mesmos casos, medido no local).
+  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  if (!ligadosDaEmpresa(cfg).has('/imoveis')) redirect('/dashboard')
 
   const [{ data: imoveis }, { data: proprietarios }, { data: equipeRaw }, { data: chavesRaw }] = await Promise.all([
     supabase.from('imoveis').select('*').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
