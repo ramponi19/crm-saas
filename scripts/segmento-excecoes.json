@@ -67,7 +67,7 @@
     },
     "app/(dashboard)/leads/page.tsx": {
       "motivo": "inventario",
-      "teto": 11
+      "teto": 9
     },
     "app/(dashboard)/orcamentos/orcamentos-view.tsx": {
       "motivo": "inventario",
@@ -263,15 +263,11 @@
     },
     "components/modules/leads/lead-acoes-panel.tsx": {
       "motivo": "inventario",
-      "teto": 9
-    },
-    "components/modules/leads/lead-modal.tsx": {
-      "motivo": "inventario",
-      "teto": 18
+      "teto": 1
     },
     "components/modules/leads/leads-view.tsx": {
       "motivo": "inventario",
-      "teto": 9
+      "teto": 7
     },
     "components/modules/leads/paineis-vertical.tsx": {
       "motivo": "inventario",
@@ -303,7 +299,7 @@
     },
     "lib/empresa-config.ts": {
       "motivo": "presets_onboarding",
-      "teto": 17
+      "teto": 16
     },
     "lib/estoque-campos.ts": {
       "motivo": "inventario",

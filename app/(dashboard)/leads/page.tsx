@@ -1,7 +1,8 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/leads/types'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { normalizarSegmento } from '@/lib/segmentos'
+import { perfilDoLead, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
 import { devolverLeadsSemResposta } from '@/lib/esteira'
@@ -178,13 +179,14 @@ export default async function LeadsPage() {
       usuarios={usuariosMapped}
       empresaId={empresaId}
       segmento={normalizarSegmento(empresa?.segmento)}
+      perfil={perfilDoLead({ preset: empresa?.segmento ?? null })}
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
       funis={(funisRaw ?? []) as Funil[]}
       scoreConfig={scoreConfig}
       restringe={restringe}
       meuId={user?.id}
-      equipeLabel={SEGMENTOS[normalizarSegmento(empresa?.segmento)].equipeLabel ?? 'Vendedor'}
+      equipeLabel={vocabulario({ preset: empresa?.segmento ?? null }).equipe}
     />
   )
 }

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { CheckSquare, Square, Plus, CalendarPlus, Loader2, Clock } from 'lucide-react'
 import { Input, Button, IconButton, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
@@ -19,13 +18,12 @@ const fmt = (s: string | null) => s
  * segmentos) e, para imobiliária, agendamento rápido de visita. Auto-contido —
  * busca e grava direto no Supabase com o usuário logado como responsável.
  */
-export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
-  leadId: number; empresaId: number; segmento?: string | null
+export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
+  leadId: number; empresaId: number
+  /** Bloco de visitas (perfil do lead, lib/empresa-config.ts). */
+  agendaVisitas?: boolean
 }) {
   const supabase = createClient()
-  // Painel de visitas: capacidade, não identidade. Qualquer vertical que agende
-  // visita liga `agendaVisitas` e ganha isto sem editar este arquivo.
-  const isImob = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.agendaVisitas
 
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [visitas, setVisitas] = useState<Visita[]>([])
@@ -45,7 +43,7 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
     async function load() {
       const [t, v] = await Promise.all([
         supabase.from('tarefas').select('*').eq('lead_id', leadId).order('concluida').order('vencimento', { nullsFirst: false }),
-        isImob
+        agendaVisitas
           ? supabase.from('visitas').select('*').eq('lead_id', leadId).order('data_hora', { ascending: true })
           : Promise.resolve({ data: [] }),
       ])
@@ -156,7 +154,7 @@ export function LeadAcoesPanel({ leadId, empresaId, segmento }: {
         className="num text-ink-3" title="Prazo (opcional)" />
 
       {/* agendar visita (imob) */}
-      {isImob && (
+      {agendaVisitas && (
         <div className="mt-2">
           {!visForm ? (
             <button onClick={() => setVisForm(true)}

@@ -15,12 +15,15 @@ import { NewLeadModal } from './new-lead-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { ScoreConfigProvider } from './score-config-context'
 import { DEFAULT_SCORE_CONFIG, type ScoreConfig } from '@/lib/lead-score'
+import type { PerfilDoLead } from '@/lib/empresa-config'
 
 interface LeadsViewProps {
   initialLeads: Lead[]
   usuarios: Usuario[]
   empresaId: number
   segmento?: string | null
+  /** O que o card do lead mostra além do comum (lib/empresa-config.ts → perfilDoLead). */
+  perfil: PerfilDoLead
   /** Etapas vindas de funil_etapas (banco). Fallback = constante do segmento. */
   funilEtapas?: KanbanColumn[]
   /** Motivos de perda configurados da empresa (Fase 4.2). */
@@ -59,7 +62,7 @@ function porMensagemRecente(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => quando(b) - quando(a))
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, segmento, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -387,7 +390,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, funilEt
           lead={selectedLead}
           usuarios={usuarios}
           columns={columns}
-          segmento={segmento}
+          perfil={perfil}
           // Sem esta lista o modal de perda abriria vazio ("nenhum motivo
           // cadastrado") justamente onde agora se marca Perdido — e sem erro
           // algum na tela, que é o pior jeito de faltar dado.

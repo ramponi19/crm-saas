@@ -3,7 +3,7 @@ import type { CamadaBase, MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadm
 import type { ModuloPlano } from '@/lib/plano'
 import { moduloPorChave } from '@/core/modulos'
 import { habilitadosDoMolde, hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { SEGMENTOS, normalizarSegmento, type PainelDoLead } from '@/lib/segmentos'
 
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DO CORE, NUM LUGAR SÓ.
@@ -55,6 +55,11 @@ export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | unde
   }
 }
 
+/** O molde estático de um preset; preset desconhecido ou vazio = varejo. */
+function moldeDoPreset(preset: string | null | undefined) {
+  return SEGMENTOS[normalizarSegmento(preset)]
+}
+
 /**
  * A CAMADA 1 DO MENU, PRONTA: a linha do preset sobre o molde estático com que
  * a empresa nasceu (o cadastro de presets em lib/segmentos.ts).
@@ -72,7 +77,7 @@ export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | unde
  *   - ordem: rasa, grupo a grupo — o que o superadmin editou vence o molde.
  */
 export function camadaBase(lido: CamadaBase | undefined, preset: string | null): CamadaBase {
-  const molde = SEGMENTOS[normalizarSegmento(preset)]
+  const molde = moldeDoPreset(preset)
   return {
     habilitados: lido?.habilitados ?? habilitadosDoMolde(molde),
     labelOverrides: lido?.labelOverrides ?? molde.labelOverrides,
@@ -132,7 +137,7 @@ export function moduloLigado(rows: ModuloRow[] | null | undefined, modulo: strin
  * das linhas cuja chave está no manifesto (core/modulos.ts). As linhas do corte
  * que não são módulo de menu (`vendas`, `avaliacao`) ficam de fora; as que são
  * (`estoque`, `financeiro`, `assistencia`) vieram ativas, e ativo só confirma o
- * que o segmento já ligava — o menu de hoje não muda.
+ * que o preset já ligava — o menu de hoje não muda.
  */
 export function instaladosDoManifesto(rows: ModuloRow[] | null | undefined): Record<string, boolean> {
   const out: Record<string, boolean> = {}
@@ -305,4 +310,43 @@ export function entradaDoMenu(
 ): ResolverMenuInput {
   const { overrides, configDono, base, instalados } = camadasParaMenu(cfg, permHidden)
   return { ...quem, overrides, configDono, base, instalados }
+}
+
+/**
+ * O QUE O CARD DO LEAD MOSTRA ALÉM DO COMUM (23/10/2026).
+ *
+ * O modal perguntava quem a empresa é e ia buscar no cadastro de presets o
+ * rótulo do campo de interesse e os painéis. A resposta é a mesma de antes — sai
+ * do molde do preset —, só que perguntada aqui: o modal recebe o perfil pronto.
+ * Quando o card ganhar campos personalizados (05, item 1), é esta função que
+ * passa a ler `campos_personalizados`, e nenhuma tela muda.
+ *
+ *   paineis        painéis próprios, na ordem declarada (negócio, match...)
+ *   interesse      rótulo do campo "produto" do lead
+ *   textoLivre     item vive em tabela própria (imóvel, veículo): campo de texto,
+ *                  sem o autocomplete do catálogo
+ *   agendaVisitas  bloco de visitas no painel de ações
+ */
+export interface PerfilDoLead {
+  paineis: PainelDoLead[]
+  interesse: string
+  agendaVisitas: boolean
+  textoLivre: boolean
+}
+
+export type { PainelDoLead }
+
+export function perfilDoLead(cfg: Pick<ConfigEmpresa, 'preset'>): PerfilDoLead {
+  const m = moldeDoPreset(cfg.preset)
+  return {
+    paineis: m.paineisDoLead,
+    interesse: m.interesseLabel,
+    agendaVisitas: !!m.capacidades.agendaVisitas,
+    textoLivre: m.paineisDoLead.length > 0,
+  }
+}
+
+/** Como a empresa chama quem atende ("Corretor" na imobiliária). Padrão "Vendedor". */
+export function vocabulario(cfg: Pick<ConfigEmpresa, 'preset'>): { equipe: string } {
+  return { equipe: moldeDoPreset(cfg.preset).equipeLabel ?? 'Vendedor' }
 }

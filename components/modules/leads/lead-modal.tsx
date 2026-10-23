@@ -14,7 +14,7 @@ import { TABELAS, filtroMensagensDoLead, leadsDaLinha } from '@/lib/realtime/tab
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
 import { PaineisDaVertical } from './paineis-vertical'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import type { PerfilDoLead } from '@/lib/empresa-config'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadOrcamentoPanel } from './lead-orcamento-panel'
@@ -32,7 +32,8 @@ interface LeadModalProps {
   lead: Lead
   usuarios: Usuario[]
   columns: KanbanColumn[]
-  segmento?: string | null
+  /** O que este card mostra além do comum (lib/empresa-config.ts → perfilDoLead). */
+  perfil: PerfilDoLead
   /**
    * Motivos de perda. Necessários AQUI porque agora dá para marcar Perdido pelo
    * próprio modal — antes ele recusava e mandava arrastar o card no quadro.
@@ -402,15 +403,14 @@ function AudioChat({ url }: { url: string }) {
   )
 }
 
-export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onClose, onUpdate }: LeadModalProps) {
-  /**
-   * O que ESTE segmento pede — em vez de o modal testar quem ele é.
+export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClose, onUpdate }: LeadModalProps) {
+  /*
+   * O perfil chega pronto — o modal não pergunta quem a empresa é.
    *
    * Antes havia cinco comparações aqui (rótulo do campo de interesse e três
-   * painéis de vertical). Acrescentar uma vertical exigia editar este arquivo, que
-   * é o mais disputado do projeto: em 13/08 duas frentes colidiram nele.
+   * painéis próprios). Acrescentar um tipo de negócio exigia editar este arquivo,
+   * que é o mais disputado do projeto: em 13/08 duas frentes colidiram nele.
    */
-  const cfgSegmento = SEGMENTOS[normalizarSegmento(segmento)]
   const supabase = createClient()
   const { empresa } = useEmpresa()
   const router = useRouter()
@@ -1334,14 +1334,13 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             {salvarAqui('tel')}
             <Input label="Instagram" value={form.ig} onChange={(e) => set('ig', e.target.value)} placeholder="@usuario" />
             {salvarAqui('ig')}
-            {/* O rótulo e o TIPO de campo vêm do contrato, não de um `if` por
-                segmento. Vertical com catálogo no CRM (varejo, assistência) ganha
-                o autocomplete de produto; vertical cujo item vive em tabela
-                própria (imóvel, veículo) recebe texto livre. */}
-            {cfgSegmento.paineisDoLead.length > 0 ? (
-              <Input label={cfgSegmento.interesseLabel} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
+            {/* O rótulo e o TIPO de campo vêm do perfil, não de um `if` na tela.
+                Quem vende do catálogo do CRM ganha o autocomplete de produto;
+                quem tem o item em tabela própria (imóvel, veículo) recebe texto livre. */}
+            {perfil.textoLivre ? (
+              <Input label={perfil.interesse} value={form.produto} onChange={(e) => set('produto', e.target.value)} />
             ) : (
-              <ProdutoAutocomplete label={cfgSegmento.interesseLabel} value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
+              <ProdutoAutocomplete label={perfil.interesse} value={form.produto} onChange={(v) => set('produto', v)} onSelect={(p) => set('produto', p.nome)} />
             )}
             {salvarAqui('produto')}
             {/* Escolher a etapa MOVE o card na hora — não espera "Salvar".
@@ -1364,16 +1363,16 @@ export function LeadModal({ lead, usuarios, columns, segmento, motivos = [], onC
             <Textarea label="Observações" rows={3} value={form.obs} onChange={(e) => set('obs', e.target.value)} placeholder="Contexto, anotações…" />
             {salvarAqui('obs')}
 
-            {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} segmento={segmento} />}
+            {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} agendaVisitas={perfil.agendaVisitas} />}
             <ResponsavelPanel
               leadId={lead.id}
               usuarios={usuarios}
               responsavel={lead.responsavel_id}
               onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
             />
-            {/* Painéis da vertical, na ordem que o segmento declarou. Acrescentar
-                uma vertical não abre mais este arquivo. */}
-            <PaineisDaVertical nomes={cfgSegmento.paineisDoLead} leadId={lead.id} />
+            {/* Painéis próprios, na ordem que o perfil declara. Acrescentar um
+                painel não abre mais este arquivo. */}
+            <PaineisDaVertical nomes={perfil.paineis} leadId={lead.id} />
             <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
             <LeadChamadasPanel leadId={lead.id} />
             <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />
