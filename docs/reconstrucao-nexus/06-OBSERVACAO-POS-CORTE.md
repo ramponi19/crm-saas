@@ -639,3 +639,13 @@ Nenhuma tela com "tente em instantes". O recalcular ficou entre o da cópia (2,7
   Abrir Integrações nas duas lojas depois disso não recriou nenhuma (0 linhas de token). Os eventos antigos do C2S em `integracao_eventos` ficam (histórico).
 - **Smoke:** dono nas duas lojas (painel, Configurações, Integrações sem C2S, Relatórios); `/admin` 404; portal e site sem `Bearer` → 401; `/api/saude` 200; WhatsApp entrando depois do deploy (Jaguariúna 20:34, Mogi 21:05, respostas 21:09).
 - **Volta:** Instant Rollback na Vercel para `15a62c4`; as quatro linhas, pelo dump de 21/10 (só elas, nunca restore completo).
+
+### Depois da seção 13 (22/10, 21:5x)
+- **Pedido de teste nº 1 (`modulo_pedidos`, JM, `/agenda`, smoke de 21/10 19:07) apagado** como o "Recusar" do superadmin faz, numa transação só, pelo MCP: registro 97 em `superadmin_logs` (`recusar_pedido_modulo`, empresa 1, módulo `/agenda`, 21:55:35, `via` = MCP a pedido do Lucas). `modulo_pedidos`: 0 pedidos, 0 pendentes.
+- **Os 308 das ferramentas da Etapa 0 também saíram** (`/simular-parcela`, `/check-imei`, `/consulta-fipe` → 404); `/simular-parcela` e afins seguem só como identidade do módulo. Deploy só de aplicação, smoke curto (abaixo, no commit do deploy).
+- **Rollbacks da tarde (+5.300 entre 12:32 e 18:20): causa NÃO identificada.** Por janela de foto: 06:00–08:32 +9 · 08:32–10:52 +972 · 10:52–12:32 +26 · 12:32–18:20 +5.300 · 18:20–21:50 +7 (parou à noite). Descartado, com número:
+  - erro de comando: o log do Postgres registra erro de API (os 6 `42501` provocados às 18:13 aparecem), e as amostras de 15 min às 13:00, 14:00, 15:00, 16:30 e 17:30 têm 0–1 erro;
+  - `ROLLBACK` explícito: +261 no `pg_stat_statements` no período (service_role 224, Auth 31, autenticador 6);
+  - `realtime.authorize`: 0 chamadas no período; `pg_cron`: nenhuma execução desde as 06:00; transcrição de áudio: 21 gravadas à tarde;
+  - tráfego da API: 14:00–14:15 tem ~200 requisições, todas 2xx (menos que os 15 rollbacks/min da média).
+  O que acompanha a rajada é o volume de requisições da `service_role` sem consulta correspondente nas estatísticas (36,7/min de manhã, 15,7/min na janela calma, 21,8/min à tarde). Sem dano visível: nenhum erro, nenhuma perda de mensagem ou divergência ligada a ela. Próximo passo (só leitura): foto do `xact_rollback` a cada 5 min no expediente de 23/10; no primeiro salto, `pg_stat_activity` e o log de 15 min daquele intervalo.

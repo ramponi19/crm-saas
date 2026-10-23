@@ -35,21 +35,16 @@ const nextConfig: NextConfig = {
       { source: '/zapintel/linguagem', destination: '/zapintel/insights', permanent: false },
       { source: '/zapintel/relatorio', destination: '/zapintel/insights', permanent: false },
       /**
-       * ETAPA 0 (21/10/2026) — ferramentas que saíram do menu e foram morar dentro
-       * da tela onde se usam. 308 (permanente): o endereço novo é definitivo.
-       * REMOVER EM 21/11/2026 — está na lista de morte do 05-RUNBOOK-CORTE.md.
-       */
-      { source: '/simular-parcela', destination: '/orcamentos/parcela', permanent: true },
-      { source: '/check-imei', destination: '/estoque/imei', permanent: true },
-      { source: '/consulta-fipe', destination: '/avaliacoes/fipe', permanent: true },
-      /**
-       * O /ADMIN E OS DUPLICADOS DA ETAPA 0 SAÍRAM (22/10/2026, decisão do Lucas).
+       * OS 308 DA ETAPA 0 E DO /ADMIN SAÍRAM TODOS (22/10/2026, decisão do Lucas).
        *
-       * Os 308 de /admin/* (navegação nova) e de /admin/relatorios, /admin/financeiro e
-       * /admin/configuracoes?aba=integracoes (Etapa 0, 2.3) iam até 21/11 e caíram antes
-       * do prazo: endereço do /admin agora dá 404. Nenhum link do sistema aponta para
-       * lá, e os que saem do sistema (Stripe, retorno do Instagram) já usam o endereço
-       * novo. O /canais (retorno da Meta) não é /admin: segue no proxy.ts.
+       * Iam até 21/11 e caíram antes do prazo: /admin/* (navegação nova), os duplicados
+       * da 2.3 (/admin/relatorios, /admin/financeiro, ?aba=integracoes) e as ferramentas
+       * da 2.4 (/simular-parcela → /orcamentos/parcela, /check-imei → /estoque/imei,
+       * /consulta-fipe → /avaliacoes/fipe). Os endereços antigos dão 404. Nenhum link do
+       * sistema aponta para eles: `/simular-parcela` e afins seguem só como IDENTIDADE
+       * do módulo (o que a Central e o plano ligam), e a navegação vai para a rota da
+       * ferramenta (`ferramenta.rota` no catálogo do menu). O /canais (retorno da Meta)
+       * não é /admin: segue no proxy.ts.
        */
     ]
   },

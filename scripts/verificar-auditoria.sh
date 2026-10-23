@@ -531,7 +531,7 @@ v "parcela e aba de orcamentos"         "app/(dashboard)/orcamentos/abas.tsx" "u
 v "imei e aba do estoque"               "app/(dashboard)/estoque/components/estoque-view.tsx" "useFerramenta('/check-imei')"
 v "fipe mora em avaliacoes"             "app/(dashboard)/avaliacoes/avaliacoes-view.tsx" "useFerramenta('/consulta-fipe')"
 v "cmd+k abre as ferramentas"           "components/layout/command-palette.tsx" "useFerramentas()"
-v "endereco antigo responde 308"        "next.config.ts" "destination: '/estoque/imei', permanent: true"
+n "endereco antigo da ferramenta sem 308" "next.config.ts" "source: '/check-imei'"
 # 21/10/2026: monitor de uptime em /api/saude (sem banco, fora do matcher do proxy).
 v "saude nao toca no banco"            "app/api/saude/route.ts" "export function GET()"
 v "saude fora do matcher do proxy"     "proxy.ts" "|monitoring|api/saude|api/webhook/|"
