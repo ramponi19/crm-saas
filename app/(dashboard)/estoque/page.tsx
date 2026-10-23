@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import { getEmpresaRole } from '@/lib/owner'
 import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
@@ -32,7 +32,7 @@ export default async function EstoquePage() {
     // produto, para não digitar variante à mão.
     supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
-    supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).single(),
+    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).single(),
     // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
     // ninguem lembra o nome completo, mas tem o telefone na mao.
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
@@ -129,7 +129,7 @@ export default async function EstoquePage() {
       tabelaPrecos={(tabelaRaw ?? []) as unknown as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
       fornecedores={(fornecedoresRaw ?? []) as { id: number; nome_fantasia: string }[]}
       empresaId={empresaId!}
-      segmento={normalizarSegmento(empresa?.segmento)}
+      usaPlaca={!!capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).usaPlaca}
       filiais={filiais}
       podeTransferir={separacaoAtiva(filiais) && (papel === 'owner' || papel === 'admin')}
     />

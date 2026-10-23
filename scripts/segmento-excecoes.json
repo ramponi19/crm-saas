@@ -21,17 +21,9 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/(dashboard)/estoque/components/estoque-view.tsx": {
-      "motivo": "inventario",
-      "teto": 13
-    },
     "app/(dashboard)/estoque/components/unidade-modal.tsx": {
       "motivo": "inventario",
       "teto": 1
-    },
-    "app/(dashboard)/estoque/page.tsx": {
-      "motivo": "inventario",
-      "teto": 6
     },
     "app/(dashboard)/financeiro/components/financeiro-view.tsx": {
       "motivo": "inventario",

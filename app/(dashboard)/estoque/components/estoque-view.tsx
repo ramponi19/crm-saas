@@ -15,7 +15,6 @@ import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   Modal, type Column, BuscaSelect } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
-import { SEGMENTOS, normalizarSegmento, type Segmento } from '@/lib/segmentos'
 
 export interface Unidade {
   id: number
@@ -53,7 +52,7 @@ export interface Unidade {
   filial_id?: number | null
   filial_nome?: string | null
   created_at: string | null
-  // Veículos (segmento concessionaria)
+  // Veículos (quem usa placa)
   placa: string | null
   chassi: string | null
   renavam: string | null
@@ -81,7 +80,8 @@ interface Props {
   tabelaPrecos: TabelaPrecoRef[]
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
-  segmento: Segmento
+  /** Placa, chassi, renavam, km e ano no item (capacidade do preset, pela página). */
+  usaPlaca?: boolean
   filiais: FilialOpt[]
   /** Falso em empresa de uma loja, e para quem não é dono nem admin. */
   podeTransferir: boolean
@@ -157,10 +157,10 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, segmento, filiais, podeTransferir }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, usaPlaca = false, filiais, podeTransferir }: Props) {
   // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
-  const isVeiculo = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaPlaca
+  const isVeiculo = usaPlaca
   const [tab, setTab] = useState<Tab>('lista')
   const router = useRouter()
   const imei = useFerramenta('/check-imei')
@@ -795,7 +795,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
   /**
    * Campos de identificação do item, decididos pela CATEGORIA do produto. Sem
    * produto escolhido ainda, mostra o genérico — assim a tela nunca fica muda.
-   * Veículo vem do segmento porque ali a categoria é o próprio negócio.
+   * Veículo vem da capacidade `usaPlaca` porque ali a categoria é o próprio negócio.
    */
   const produtoSel = produtos.find(p => p.id === Number(form.produto_id)) ?? null
   const campos = useMemo(
@@ -925,7 +925,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
      * ESCRITA DUPLA, de propósito e por tempo limitado.
      *
      * Os campos de veículo saíram de `inventario_unidades` para `veiculo_dados`
-     * (Fase 3 do isolamento por segmento). As colunas antigas continuam recebendo
+     * (Fase 3 do isolamento por vertical). As colunas antigas continuam recebendo
      * porque a listagem e a busca ainda leem delas em vários pontos; a tabela nova
      * passa a receber também, para que o dado de hoje já esteja no lugar certo
      * quando a leitura migrar.
