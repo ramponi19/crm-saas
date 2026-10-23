@@ -1,13 +1,9 @@
 {
   "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Ao fim da viagem (05, Parte 4, item zero) sobram só presets_onboarding e register.",
   "arquivos": {
-    "app/(dashboard)/agenda/agenda-view.tsx": {
-      "motivo": "inventario",
-      "teto": 9
-    },
     "app/(dashboard)/agenda/page.tsx": {
       "motivo": "inventario",
-      "teto": 13
+      "teto": 1
     },
     "app/(dashboard)/clientes/components/clientes-view.tsx": {
       "motivo": "inventario",

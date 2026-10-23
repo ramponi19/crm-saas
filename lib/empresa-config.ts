@@ -350,3 +350,16 @@ export function perfilDoLead(cfg: Pick<ConfigEmpresa, 'preset'>): PerfilDoLead {
 export function vocabulario(cfg: Pick<ConfigEmpresa, 'preset'>): { equipe: string } {
   return { equipe: moldeDoPreset(cfg.preset).equipeLabel ?? 'Vendedor' }
 }
+
+/**
+ * O QUE O MOLDE DO PRESET DIZ QUE A EMPRESA FAZ — para o que ainda não tem módulo
+ * próprio (23/10/2026): placa e chassi no estoque, comanda no PDV, vocabulário de
+ * clínica na agenda, bloco de veículos nas automações, tela inicial depois do
+ * login. O que já tem módulo (Imóveis, Executivo, Cardápio, Agenda) pergunta
+ * `ligadosDaEmpresa(cfg).has(href)`, não isto.
+ */
+export type Capacidades = ReturnType<typeof moldeDoPreset>['capacidades']
+
+export function capacidadesDoPreset(cfg: Pick<ConfigEmpresa, 'preset'>): Capacidades {
+  return moldeDoPreset(cfg.preset).capacidades
+}

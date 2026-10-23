@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { Topbar } from '@/components/layout/topbar'
 import { Plus, Clock, MapPin, Phone, CalendarDays, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
@@ -41,7 +40,7 @@ const stInfo = (s: string) => STATUS.find(x => x.v === s) ?? STATUS[0]
 /**
  * Tipos de compromisso.
  *
- * Os valores são os do banco (`visitas_tipo_check`); o RÓTULO muda por segmento,
+ * Os valores são os do banco (`visitas_tipo_check`); o RÓTULO muda na clínica,
  * porque na clínica "visita" se chama consulta. `vistoria` existe só onde há imóvel
  * — é etapa do funil imobiliário, entre contrato e entrega de chaves, e até agora
  * não havia como distingui-la de uma visita comum.
@@ -96,14 +95,14 @@ const faixa = (inicio: string, fim: string | null) => {
 /** Valor para `datetime-local`, que não aceita fuso — tem de ser hora local. */
 const paraCampo = (d: Date) => `${chaveLocal(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
-export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios, empresaId, meuId, isGestor, segmento }: {
+export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios, empresaId, meuId, isGestor, clinica = false }: {
   inicial: Visita[]; leads: Opt[]; clientes: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]
-  empresaId: number; meuId: string; isGestor: boolean; segmento?: string | null
+  empresaId: number; meuId: string; isGestor: boolean
+  /** Vocabulário de clínica: consulta, paciente, profissional (capacidade do preset). */
+  clinica?: boolean
 }) {
   const supabase = createClient()
-  // Os rótulos da agenda (consulta/paciente/profissional) são o comportamento;
-  // saúde é só quem o usa hoje.
-  const isSaude = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.agendaClinica
+  const isSaude = clinica
   const TIPOS = isSaude ? TIPOS_SAUDE : TIPOS_IMOB
   const rotuloTipo = (v: string | null) => TIPOS.find(t => t.v === v)?.l ?? TIPOS[0].l
   const L = {

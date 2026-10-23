@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset, carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import AgendaView from './agenda-view'
 import type { Tables } from '@/types/database'
 
@@ -15,19 +15,17 @@ export default async function AgendaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cap = SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
   /**
-   * Gate por CAPACIDADE, não por nome de segmento.
+   * Gate pelo MÓDULO, não por quem a empresa é (zero-segmento, 23/10/2026).
    *
-   * A versão anterior comparava o NOME do segmento (imobiliária ou saúde), o acoplamento que a
-   * arquitetura de segmentos existe para evitar: uma locadora com agenda de visitas
-   * precisaria editar esta página. Quem marca compromisso é quem declara
-   * `agendaVisitas` ou `agendaClinica`.
+   * Até 22/10 a página perguntava se o preset declarava agenda de visitas ou de
+   * clínica; os presets que declaravam são exatamente os que ligam /agenda, então
+   * a pergunta agora é a da Central: o módulo Agenda está ligado? Desligado, a
+   * vitrine (etapa 0) — não o dashboard: quem abriu fica sabendo o que é a Agenda.
    */
-  // Sem a capacidade, a vitrine (etapa 0) — não o dashboard: quem abriu fica
-  // sabendo o que é a Agenda e que o segmento dele ainda não a tem.
-  if (!cap.agendaVisitas && !cap.agendaClinica) return <VitrineDoModulo href="/agenda" />
+  if (!ligadosDaEmpresa(cfg).has('/agenda')) return <VitrineDoModulo href="/agenda" />
 
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')
@@ -79,7 +77,7 @@ export default async function AgendaPage() {
       empresaId={empresaId}
       meuId={user.id}
       isGestor={isGestor}
-      segmento={empresa?.segmento ?? null}
+      clinica={!!capacidadesDoPreset(cfg).agendaClinica}
     />
   )
 }
