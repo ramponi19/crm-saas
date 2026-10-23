@@ -16,7 +16,6 @@ import { diagnosticar } from '@/lib/encomendas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { camposDaCategoria } from '@/lib/estoque-campos'
 import {
   referenciaDaTroca, avaliarTroca, textoDoAceite, TOLERANCIA_PADRAO,
@@ -56,7 +55,7 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; segmento?: string | null; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
+interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; usaComanda?: boolean; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /**
  * Aparelho entregue na troca. `valor` fica string porque vem de <input>.
@@ -93,10 +92,10 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, segmento, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
-  // Comanda é comportamento (mesa/balcão), não segmento: bar, cafeteria e
-  // qualquer atendimento por mesa usam o mesmo campo.
-  const isFood = !!SEGMENTOS[normalizarSegmento(segmento)].capacidades.usaComanda
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
+  // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
+  // por mesa usam o mesmo campo. Vem pronta da página (capacidadesDoPreset).
+  const isFood = usaComanda
   const [comanda, setComanda] = useState('')
   // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
   const [agora] = useState(() => Date.now())

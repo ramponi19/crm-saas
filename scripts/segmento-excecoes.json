@@ -53,14 +53,6 @@
       "motivo": "inventario",
       "teto": 6
     },
-    "app/(dashboard)/pdv/components/pdv-view.tsx": {
-      "motivo": "inventario",
-      "teto": 9
-    },
-    "app/(dashboard)/pdv/page.tsx": {
-      "motivo": "inventario",
-      "teto": 3
-    },
     "app/(dashboard)/ranking/page.tsx": {
       "motivo": "inventario",
       "teto": 16
