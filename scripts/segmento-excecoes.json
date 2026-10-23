@@ -61,10 +61,6 @@
       "motivo": "inventario",
       "teto": 5
     },
-    "app/(dashboard)/layout.tsx": {
-      "motivo": "inventario",
-      "teto": 13
-    },
     "app/(dashboard)/leads/page.tsx": {
       "motivo": "inventario",
       "teto": 9

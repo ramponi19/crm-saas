@@ -13,9 +13,8 @@ import { resolverFerramentas } from '@/lib/menu'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
-import { normalizarSegmento, SEGMENTOS } from '@/lib/segmentos'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, camadasParaMenu, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
@@ -41,7 +40,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; segmento?: string | null; preset_onboarding?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
+  let empresa: { nome: string; plano?: string | null; preset_onboarding?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
   let empresaId: number | undefined
@@ -50,7 +49,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, plano, segmento:preset_onboarding, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
+      .select('nome, plano, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -61,7 +60,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, segmento:preset_onboarding, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
+      .select('role, empresa:empresas(id, nome, plano, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -74,7 +73,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; segmento: string | null; preset_onboarding: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
+      empresa: { nome: string; plano: string | null; preset_onboarding: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -137,7 +136,7 @@ export default async function DashboardLayout({
         <Sidebar
           userName={usuario?.nome ?? user.email ?? 'Usuário'}
           /*
-            "Vendedor" vira o nome que o segmento usa — "Corretor" na imobiliária.
+            "Vendedor" vira o nome que a empresa usa — "Corretor" na imobiliária.
             O ranking já chamava a mesma pessoa de corretor: sem isto, o rodapé do
             menu e a tabela do placar discordavam sobre o cargo de quem está logado.
           */
@@ -145,7 +144,7 @@ export default async function DashboardLayout({
             role === 'owner' ? 'Proprietário'
               : role === 'admin' ? 'Administrador'
               : role === 'tecnico' ? 'Técnico'
-              : (SEGMENTOS[normalizarSegmento(empresa?.segmento)].equipeLabel ?? 'Vendedor')
+              : vocabulario(cfg).equipe
           }
           userEmpresa={empresa?.nome}
           leadsCount={leadsCount ?? 0}
@@ -179,8 +178,8 @@ export default async function DashboardLayout({
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <LimiteBanner />
           {/*
-            Os rótulos do segmento chegam à barra do topo de cada tela.
-            Mesma precedência do menu: segmento, depois superadmin, depois o dono —
+            Os rótulos da empresa chegam à barra do topo de cada tela.
+            Mesma precedência do menu: preset, depois superadmin, depois o dono —
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
           <RotulosProvider valor={rotulos}>
