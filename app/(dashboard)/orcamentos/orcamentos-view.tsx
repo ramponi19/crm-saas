@@ -31,7 +31,6 @@ export function OrcamentosView({
   trocaLiberada = false, valoresTroca = {}, bonusSeminovo = 0, corteBateria = 80,
 }: {
   orcamentosIniciais: Orcamento[]
-  segmento?: string
   unidades?: UnidadeOpt[]
   tabelaPrecos?: PrecoRef[]
   /** Módulo de cotação ligado nesta empresa — libera o Upgrade/Downgrade. */
@@ -42,7 +41,7 @@ export function OrcamentosView({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  // Era um ternário com o MESMO valor nos dois lados — comparava o segmento e
+  // Era um ternário com o MESMO valor nos dois lados — comparava a vertical e
   // devolvia 'assistencia' de qualquer forma. A intenção original se perdeu; fica
   // a constante, que é o que o código sempre fez.
   const tipoPadrao = 'assistencia'

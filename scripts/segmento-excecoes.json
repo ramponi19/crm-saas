@@ -37,14 +37,6 @@
       "motivo": "inventario",
       "teto": 9
     },
-    "app/(dashboard)/orcamentos/orcamentos-view.tsx": {
-      "motivo": "inventario",
-      "teto": 2
-    },
-    "app/(dashboard)/orcamentos/page.tsx": {
-      "motivo": "inventario",
-      "teto": 6
-    },
     "app/(dashboard)/ranking/page.tsx": {
       "motivo": "inventario",
       "teto": 16

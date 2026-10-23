@@ -1,6 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { normalizarSegmento } from '@/lib/segmentos'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { chaveLinha } from '@/lib/troca-modelos'
@@ -34,9 +33,8 @@ export default async function OrcamentosPage() {
     .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, cliente_id, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, valor_devolver, acerto, observacoes, token, created_at')
     .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(200)
 
-  const [{ data }, { data: emp }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
+  const [{ data }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
     soMeus ? baseOrc.eq('usuario_id', user.id) : baseOrc,
-    supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle(),
     supabase.from('inventario_unidades')
       .select('id, preco_venda, condicao, produtos!produto_id(nome)')
       .eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true).limit(300),
@@ -90,7 +88,6 @@ export default async function OrcamentosPage() {
   return (
     <OrcamentosView
       orcamentosIniciais={orcamentos}
-      segmento={normalizarSegmento(emp?.segmento)}
       unidades={unidades}
       tabelaPrecos={tabelaPrecos}
       trocaLiberada={trocaLiberada}
