@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 import type { NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
 import FinanceiroView from './components/financeiro-view'
@@ -39,18 +39,20 @@ export default async function FinanceiroPage() {
   const faturamentoVendas = (vendasMes ?? []).reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)
 
   /**
-   * Comissão por negócio — só para o segmento que declara a capacidade.
+   * Comissão por negócio — só com o módulo Imóveis ligado (a comissão é de cada
+   * negócio imobiliário; até 22/10 era a capacidade `comissaoPorNegocio` do
+   * preset, os mesmos casos).
    *
-   * Aditivo: o livro-caixa acima continua igual para todos. A imobiliária ganha uma
-   * aba a mais, e nenhum outro segmento paga por ela (a consulta nem roda).
+   * Aditivo: o livro-caixa acima continua igual para todos. Quem tem o módulo ganha
+   * uma aba a mais, e quem não tem não paga por ela (a consulta nem roda).
    */
-  const { data: empresaSeg } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cfgSeg = SEGMENTOS[normalizarSegmento(empresaSeg?.segmento)]
+  const { data: empresaPreset } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresaPreset?.preset_onboarding ?? null)
   let negociosComissao: NegocioComissao[] = []
   let taxasComissao: TaxasComissao | null = null
   let equipeComissao: { id: string; nome: string }[] = []
 
-  if (cfgSeg.capacidades.comissaoPorNegocio) {
+  if (ligadosDaEmpresa(cfg).has('/imoveis')) {
     const [{ data: negRaw }, { data: taxaRow }] = await Promise.all([
       supabase.from('negocios_imobiliarios')
         .select('id, tipo, valor, status, assinado_em, created_at, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, cashback_percentual, comissao_status, comissao_paga_em, comissao_aprovada_em, origem, cliente_nome, imovel_codigo, imovel_id, lead_id, cliente_id, corretor_id, captador_id')
