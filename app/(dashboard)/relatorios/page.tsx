@@ -4,7 +4,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/relatorios/relatorios-imob-view'
 import { exigirPlano } from '@/lib/acesso'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Relatórios' }
@@ -12,17 +12,17 @@ export const metadata = { title: 'Relatórios' }
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
-// Roteador único de relatórios por segmento (imobiliária → relatório imob;
+// Roteador único de relatórios (preset com telas próprias → relatório imob;
 // demais → BI genérico, plan-gated). Substitui a rota órfã /relatorios-imob.
 export default async function RelatoriosPage({ searchParams }: {
   searchParams: Promise<{ de?: string; ate?: string; corretor?: string }>
 }) {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).single()
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).single()
 
   // Mesma capacidade do dashboard: a vertical traz as próprias telas de leitura.
-  if (SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades.telasProprias) {
+  if (capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).telasProprias) {
     return (
       <>
         <Topbar title="Relatórios" />
