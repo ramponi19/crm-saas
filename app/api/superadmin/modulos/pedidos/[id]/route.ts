@@ -3,6 +3,7 @@ import { requireSuperAdminApi, logSuperAdminAction } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { moduloPorHref } from '@/core/modulos'
 import { carregarConfigEmpresa, gravarModulosForcados } from '@/lib/empresa-config'
+import { aoInstalarModulo } from '@/lib/modulos-instalacao'
 
 /**
  * O SUPERADMIN ATENDE OU RECUSA UM PEDIDO DE MÓDULO (22/10/2026).
@@ -11,10 +12,10 @@ import { carregarConfigEmpresa, gravarModulosForcados } from '@/lib/empresa-conf
  *            camada da Central) e fecha o pedido. Recurso de plano (Relatórios =
  *            `bi`) também ganha o forçado do superadmin, senão o item ficaria com
  *            cadeado. Módulo em preparação não se atende: não há tela para entregar.
- *   recusar  APAGA o pedido e registra em superadmin_logs quem, quando, qual módulo
- *            e qual empresa (decisão do Lucas, 22/10/2026: modulo_pedidos não tem
- *            coluna de status e hoje não há migração; na primeira migração da
- *            viagem ganha `status` e recusar deixa de apagar — ver o 05).
+ *   recusar  marca o pedido como 'recusado' (recusado_em, recusado_por) e registra em
+ *            superadmin_logs quem, quando, qual módulo e qual empresa. Até a primeira
+ *            migração da viagem (23/10/2026) recusar APAGAVA o pedido — modulo_pedidos
+ *            não tinha status; agora o histórico fica.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireSuperAdminApi()
@@ -26,15 +27,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const svc = createServiceClient()
   const { data: pedido } = await svc.from('modulo_pedidos')
-    .select('id, empresa_id, modulo, pedido_em, pedido_por, atendido_em').eq('id', Number(id)).maybeSingle()
+    .select('id, empresa_id, modulo, pedido_em, pedido_por, status').eq('id', Number(id)).maybeSingle()
   if (!pedido) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
-  if (pedido.atendido_em) return NextResponse.json({ error: 'Pedido já atendido' }, { status: 409 })
+  if (pedido.status !== 'pendente') return NextResponse.json({ error: `Pedido já ${pedido.status}` }, { status: 409 })
 
   const modulo = moduloPorHref(pedido.modulo)
   const detalhes = { pedido_id: pedido.id, modulo: pedido.modulo, pedido_em: pedido.pedido_em, pedido_por: pedido.pedido_por }
 
   if (acao === 'recusar') {
-    const { error } = await svc.from('modulo_pedidos').delete().eq('id', pedido.id)
+    const { error } = await svc.from('modulo_pedidos')
+      .update({ status: 'recusado', recusado_em: new Date().toISOString(), recusado_por: ctx.userId }).eq('id', pedido.id)
     if (error) return NextResponse.json({ error: 'Não foi possível recusar.' }, { status: 500 })
     await logSuperAdminAction({ adminUserId: ctx.userId, empresaId: pedido.empresa_id, acao: 'recusar_pedido_modulo', detalhes })
     return NextResponse.json({ ok: true })
@@ -60,7 +62,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (r.error) return NextResponse.json({ error: 'Instalou, mas não liberou o recurso do plano.' }, { status: 500 })
   }
 
-  await svc.from('modulo_pedidos').update({ atendido_em: agora, atendido_por: ctx.userId }).eq('id', pedido.id)
+  await svc.from('modulo_pedidos').update({ status: 'atendido', atendido_em: agora, atendido_por: ctx.userId }).eq('id', pedido.id)
   await logSuperAdminAction({ adminUserId: ctx.userId, empresaId: pedido.empresa_id, acao: 'atender_pedido_modulo', detalhes })
+  const preparo = await aoInstalarModulo(svc, pedido.empresa_id, modulo.chave)
+  if (preparo.error) {
+    return NextResponse.json({ ok: true, aviso: `${modulo.nome} foi instalado, mas não terminou de preparar. Reinstale pela Central da empresa.` })
+  }
   return NextResponse.json({ ok: true })
 }

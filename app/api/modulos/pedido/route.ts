@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   if (estado.tipo !== 'pago') return NextResponse.json({ error: `${modulo.nome} não precisa de pedido.` }, { status: 409 })
 
   const { data: aberto } = await svc.from('modulo_pedidos').select('pedido_em')
-    .eq('empresa_id', ctx.empresaId).eq('modulo', modulo.href).is('atendido_em', null).maybeSingle()
+    .eq('empresa_id', ctx.empresaId).eq('modulo', modulo.href).eq('status', 'pendente').maybeSingle()
   if (aberto) return NextResponse.json({ ok: true, pedido_em: aberto.pedido_em, ja_havia: true })
 
   const { data, error } = await svc.from('modulo_pedidos')

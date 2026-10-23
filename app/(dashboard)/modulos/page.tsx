@@ -30,7 +30,7 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
     supabase.from('empresas').select('plano, preset_onboarding').eq('id', empresaId).maybeSingle(),
     // Pedidos só pela chave de serviço (RLS fechada), filtrados pela empresa da sessão.
     createServiceClient().from('modulo_pedidos').select('modulo, pedido_em')
-      .eq('empresa_id', empresaId).is('atendido_em', null),
+      .eq('empresa_id', empresaId).eq('status', 'pendente'),
   ])
   const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
 
