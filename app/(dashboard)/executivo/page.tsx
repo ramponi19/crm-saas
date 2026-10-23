@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Badge } from '@/components/ui'
@@ -18,8 +18,8 @@ export const metadata = { title: 'Executivo' }
  * quanto de locação, quanto ainda deve entrar, quem está produzindo, de onde vêm os
  * leads que fecham e quais imóveis o mercado procura.
  *
- * Só dono e admin (`requireEmpresaRole`), e só no segmento que declara a capacidade
- * — a rota também é filtrada pelo `modulos_habilitados` no middleware.
+ * Só dono e admin (`requireEmpresaRole`), e só com o módulo Executivo ligado — a
+ * rota também é filtrada pela trava de módulos do proxy.
  *
  * ALTERNADOR por querystring, de propósito: `?tipo=venda|locacao` mantém a página
  * inteira no servidor, sem estado de cliente, e o link fica compartilhável — o
@@ -40,12 +40,11 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cfgSeg = SEGMENTOS[normalizarSegmento(empresa?.segmento)]
-  // Capacidade, não nome de segmento: outra vertical que tenha negócio fechado por
-  // imóvel liga a mesma flag e herda a tela.
-  // Sem a capacidade, a vitrine (etapa 0) em vez do dashboard.
-  if (!cfgSeg.capacidades.comissaoPorNegocio) return <VitrineDoModulo href="/executivo" />
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  // O módulo Executivo está ligado? Desligado, a vitrine (etapa 0). Até 22/10 a
+  // pergunta era a capacidade `comissaoPorNegocio` do preset — os mesmos casos.
+  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  if (!ligadosDaEmpresa(cfg).has('/executivo')) return <VitrineDoModulo href="/executivo" />
 
   const { tipo } = await searchParams
   const filtro: Filtro = tipo === 'venda' || tipo === 'locacao' ? tipo : 'ambos'

@@ -37,10 +37,6 @@
       "motivo": "inventario",
       "teto": 6
     },
-    "app/(dashboard)/executivo/page.tsx": {
-      "motivo": "inventario",
-      "teto": 9
-    },
     "app/(dashboard)/financeiro/components/financeiro-view.tsx": {
       "motivo": "inventario",
       "teto": 4
