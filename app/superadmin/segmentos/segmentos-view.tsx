@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Eye } from 'lucide-react'
 import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/components/ui'
 import { CATALOGO, resolverMenuPlano } from '@/lib/menu'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { camadaBase } from '@/lib/empresa-config'
 import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 
 export interface SegmentoRow {
@@ -99,15 +99,14 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
    */
   const menuDoSegmento = form
     ? resolverMenuPlano({
-        segmento: normalizarSegmento(form.chave),
         role: 'owner',
         isSuperAdmin: false,
-        segOverride: {
+        base: camadaBase({
           habilitados: Array.from(new Set([...TRAVADOS, ...form.habilitados])),
           labelOverrides: form.labels,
           modulosExtra: form.extras.length ? form.extras : undefined,
           menuLayout: form.menu_layout,
-        },
+        }, form.chave),
       })
     : []
 

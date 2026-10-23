@@ -63,7 +63,7 @@
     },
     "app/(dashboard)/layout.tsx": {
       "motivo": "inventario",
-      "teto": 22
+      "teto": 13
     },
     "app/(dashboard)/leads/page.tsx": {
       "motivo": "inventario",
@@ -159,7 +159,7 @@
     },
     "app/entrar/page.tsx": {
       "motivo": "inventario",
-      "teto": 13
+      "teto": 10
     },
     "app/imob/[slug]/page.tsx": {
       "motivo": "inventario",
@@ -219,7 +219,7 @@
     },
     "app/superadmin/empresas/[id]/page.tsx": {
       "motivo": "inventario",
-      "teto": 9
+      "teto": 6
     },
     "app/superadmin/laboratorio/laboratorio-view.tsx": {
       "motivo": "inventario",
@@ -239,23 +239,15 @@
     },
     "app/superadmin/segmentos/segmentos-view.tsx": {
       "motivo": "inventario",
-      "teto": 25
+      "teto": 21
     },
     "app/zapintel/api/sugestao/route.ts": {
-      "motivo": "inventario",
-      "teto": 9
-    },
-    "components/layout/mobile-topbar.tsx": {
       "motivo": "inventario",
       "teto": 9
     },
     "components/layout/rotulos-context.tsx": {
       "motivo": "inventario",
       "teto": 3
-    },
-    "components/layout/sidebar.tsx": {
-      "motivo": "inventario",
-      "teto": 9
     },
     "components/layout/topbar.tsx": {
       "motivo": "inventario",
@@ -311,7 +303,7 @@
     },
     "lib/empresa-config.ts": {
       "motivo": "presets_onboarding",
-      "teto": 21
+      "teto": 17
     },
     "lib/estoque-campos.ts": {
       "motivo": "inventario",
@@ -320,10 +312,6 @@
     "lib/match-veiculos.ts": {
       "motivo": "inventario",
       "teto": 1
-    },
-    "lib/menu.ts": {
-      "motivo": "inventario",
-      "teto": 55
     },
     "lib/motivos-perda.ts": {
       "motivo": "inventario",

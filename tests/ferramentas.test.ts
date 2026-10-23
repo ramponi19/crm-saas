@@ -24,26 +24,26 @@ test('a trava reconhece a rota nova como o módulo da ferramenta', () => {
   assert.equal(moduloDaRota('/orcamentos/cotacao'), '/orcamentos')
 })
 
-const base: ResolverMenuInput = {
-  segmento: 'varejo', role: 'owner', isSuperAdmin: false,
-  segOverride: { habilitados: ['/orcamentos', '/estoque', '/simular-parcela', '/check-imei'] },
+const entrada: ResolverMenuInput = {
+  role: 'owner', isSuperAdmin: false,
+  base: { habilitados: ['/orcamentos', '/estoque', '/simular-parcela', '/check-imei'] },
 }
 
 test('ferramenta liberada não vira item de menu, mas é entregue às telas', () => {
-  const hrefs = resolverMenu(base).flatMap((g) => g.items.map((i) => i.href))
+  const hrefs = resolverMenu(entrada).flatMap((g) => g.items.map((i) => i.href))
   assert.ok(hrefs.includes('/estoque'))
   assert.ok(!hrefs.includes('/check-imei'))
   assert.ok(!hrefs.includes('/simular-parcela'))
-  const f = resolverFerramentas(base)
+  const f = resolverFerramentas(entrada)
   assert.deepEqual(f.map((x) => [x.href, x.rota]).sort(), [['/check-imei', '/estoque/imei'], ['/simular-parcela', '/orcamentos/parcela']])
 })
 
 test('ferramenta não liberada não aparece em lugar nenhum', () => {
-  const f = resolverFerramentas({ ...base, segOverride: { habilitados: ['/orcamentos', '/estoque'] } })
+  const f = resolverFerramentas({ ...entrada, base: { habilitados: ['/orcamentos', '/estoque'] } })
   assert.equal(f.length, 0)
 })
 
 test('o rótulo da empresa vale também para a ferramenta', () => {
-  const f = resolverFerramentas({ ...base, configDono: { labels: { '/check-imei': 'Consultar IMEI' } } })
+  const f = resolverFerramentas({ ...entrada, configDono: { labels: { '/check-imei': 'Consultar IMEI' } } })
   assert.equal(f.find((x) => x.href === '/check-imei')?.label, 'Consultar IMEI')
 })

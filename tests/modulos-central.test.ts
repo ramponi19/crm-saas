@@ -47,9 +47,9 @@ test('estado: preparação, pago, instalado e disponível', () => {
 })
 
 test('camada instalados: instalar liga, desinstalar tira, núcleo fica', () => {
-  const base = hrefsHabilitados({ segmento: 'varejo', segOverride: { habilitados: VAREJO } })
+  const base = hrefsHabilitados({ base: { habilitados: VAREJO } })
   assert.ok(!base.has('/gestao-leads'))
-  const com = hrefsHabilitados({ segmento: 'varejo', segOverride: { habilitados: VAREJO }, instalados: { '/gestao-leads': true, '/pdv': false } })
+  const com = hrefsHabilitados({ base: { habilitados: VAREJO }, instalados: { '/gestao-leads': true, '/pdv': false } })
   assert.ok(com.has('/gestao-leads'))
   assert.ok(!com.has('/pdv'))
   // Núcleo e o que veio do /admin não saem nem desinstalados.
@@ -58,7 +58,7 @@ test('camada instalados: instalar liga, desinstalar tira, núcleo fica', () => {
 })
 
 test('o menu reflete: Gestão de Leads instalada aparece, PDV desinstalado some', () => {
-  const ent = { segmento: 'varejo' as const, plano: 'pro', role: 'owner', isSuperAdmin: false, segOverride: { habilitados: VAREJO } }
+  const ent = { plano: 'pro', role: 'owner', isSuperAdmin: false, base: { habilitados: VAREJO } }
   const antes = resolverMenuPlano(ent).map((i) => i.href)
   const depois = resolverMenuPlano({ ...ent, instalados: { '/gestao-leads': true, '/pdv': false } }).map((i) => i.href)
   assert.ok(!antes.includes('/gestao-leads') && depois.includes('/gestao-leads'))
@@ -72,17 +72,17 @@ test('as linhas do corte em empresa_modulos não mudam o menu de hoje', () => {
   const instalados = instaladosDoManifesto(linhas)
   // Só o que é módulo de menu entra (vendas/avaliacao não; o ZapIntel não é item do menu).
   assert.deepEqual(Object.keys(instalados).sort(), ['/assistencia', '/estoque', '/financeiro', '/zapintel'])
-  const ent = { segmento: 'varejo' as const, plano: 'pro', role: 'owner', isSuperAdmin: false, segOverride: { habilitados: [...VAREJO, '/assistencia'] } }
+  const ent = { plano: 'pro', role: 'owner', isSuperAdmin: false, base: { habilitados: [...VAREJO, '/assistencia'] } }
   assert.deepEqual(resolverMenuPlano({ ...ent, instalados }), resolverMenuPlano(ent))
 })
 
 test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo ligado', () => {
   const linhas: ModuloRow[] = [{ modulo: 'gestao_leads', ativo: true, config: {} }, { modulo: 'pdv', ativo: false, config: {} }]
   const cfg: ConfigEmpresa = {
-    preset: 'varejo', segOverride: { habilitados: VAREJO }, superadmin: { habilitados: ['/fila'] }, dono: undefined,
+    preset: 'varejo', presetLido: { habilitados: VAREJO }, superadmin: { habilitados: ['/fila'] }, dono: undefined,
     modulos: linhas, forcados: undefined,
   }
-  const antiga = hrefsHabilitados({ segmento: 'varejo', segOverride: { habilitados: VAREJO }, overrides: { habilitados: ['/fila'] }, instalados: instaladosDoManifesto(linhas) })
+  const antiga = hrefsHabilitados({ base: { habilitados: VAREJO }, overrides: { habilitados: ['/fila'] }, instalados: instaladosDoManifesto(linhas) })
   assert.deepEqual([...ligadosDaEmpresa(cfg)].sort(), [...antiga].sort())
   assert.deepEqual(abasDosModulos(new Set(['/imoveis', '/agenda'])).sort(), ['agendamento', 'portais'])
   assert.deepEqual(abasDosModulos(new Set(VAREJO)), [])

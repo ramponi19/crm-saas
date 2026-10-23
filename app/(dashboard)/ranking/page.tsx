@@ -5,7 +5,7 @@ import { moduloDoSegmento, SEGMENTOS, normalizarSegmento } from '@/lib/segmentos
 import { imoveisCaptadosPorPessoa } from '@/lib/captacao-imob'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import { RankingView, type MetaUi, type MembroOpt } from './ranking-view'
-import { segOverrideDoPreset, type PresetRow } from '@/lib/empresa-config'
+import { menuDoPreset, type PresetRow } from '@/lib/empresa-config'
 
 export const metadata = { title: 'Ranking & Metas' }
 
@@ -38,7 +38,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
    */
   const { data: preset } = await supabase.from('presets_onboarding')
     .select('chave, rotulos').eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
-  const extrasBanco = segOverrideDoPreset(preset as PresetRow | null)?.modulosExtra as { href?: string }[] | null | undefined
+  const extrasBanco = menuDoPreset(preset as PresetRow | null)?.modulosExtra as { href?: string }[] | null | undefined
   const isAdmin = !!(usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin')
 
   /**

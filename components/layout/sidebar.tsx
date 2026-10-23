@@ -10,8 +10,7 @@ import {
   LayoutDashboard, Settings, LogOut, ShieldAlert, Lock, CircleHelp, Bell,
   ChevronDown, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
-import { resolverMenuAgrupado, type MenuItem, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
-import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
+import { resolverMenuAgrupado, type MenuItem, type MenuOverridesSuperadmin, type MenuConfigDono, type CamadaBase } from '@/lib/menu'
 import { MENU_ICONS } from './menu-icons'
 import { NavRolavel } from './nav-rolavel'
 import { AusenciaPopover } from './ausencia-popover'
@@ -33,12 +32,12 @@ interface SidebarProps {
   isSuperAdmin?: boolean
   role?: string
   plano?: string
-  segmento?: Segmento
   /** Tema da sidebar (white-label). Default = clara. */
   theme?: SidebarTheme
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
-  segOverride?: SegOverride
+  /** Camada 1 do menu, pronta (lib/empresa-config.ts → camadaBase). */
+  base?: CamadaBase
   /** Camada da Central de Módulos (href → instalado?). */
   instalados?: Record<string, boolean>
 }
@@ -53,14 +52,12 @@ export function Sidebar({
   isSuperAdmin = false,
   role = 'owner',
   plano,
-  segmento = 'varejo',
   theme,
   overrides,
   configDono,
-  segOverride,
+  base,
   instalados,
 }: SidebarProps) {
-  const seg = normalizarSegmento(segmento)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -83,7 +80,7 @@ export function Sidebar({
    * repetiam o nome do item). Itens, rótulos, cadeados e ordem continuam saindo
    * das mesmas camadas; só a repartição é nova.
    */
-  const grupos = resolverMenuAgrupado({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride, instalados })
+  const grupos = resolverMenuAgrupado({ plano, role, isSuperAdmin, overrides, configDono, base, instalados })
 
   // O sino mora no topo (com o tempo real dele); o rodapé só abre e mostra o ponto.
   const [temNotificacao, setTemNotificacao] = useState(false)

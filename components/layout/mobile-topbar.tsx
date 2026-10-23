@@ -7,8 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { Menu, X, LayoutDashboard, LogOut, Lock, Settings } from 'lucide-react'
-import { resolverMenuAgrupado, type MenuOverridesSuperadmin, type MenuConfigDono, type SegOverride } from '@/lib/menu'
-import { normalizarSegmento, type Segmento } from '@/lib/segmentos'
+import { resolverMenuAgrupado, type MenuOverridesSuperadmin, type MenuConfigDono, type CamadaBase } from '@/lib/menu'
 import { MENU_ICONS } from './menu-icons'
 
 interface Props {
@@ -20,10 +19,10 @@ interface Props {
   isSuperAdmin?: boolean
   role?: string
   plano?: string
-  segmento?: Segmento
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
-  segOverride?: SegOverride
+  /** Camada 1 do menu, pronta (lib/empresa-config.ts → camadaBase). */
+  base?: CamadaBase
   /** Camada da Central de Módulos (href → instalado?). */
   instalados?: Record<string, boolean>
 }
@@ -35,16 +34,15 @@ interface Props {
  */
 export function MobileTopbar({
   empresaNome, empresaLogo = null, userName = 'Usuário', leadsCount = 0, garantiasCount = 0,
-  isSuperAdmin = false, role = 'owner', plano, segmento = 'varejo', overrides, configDono, segOverride, instalados,
+  isSuperAdmin = false, role = 'owner', plano, overrides, configDono, base, instalados,
 }: Props) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const seg = normalizarSegmento(segmento)
   // Os mesmos grupos da sidebar (21/10/2026); aqui como cabeçalho, sem gaveta:
   // na tela do celular a lista inteira já cabe rolando.
-  const grupos = resolverMenuAgrupado({ segmento: seg, plano, role, isSuperAdmin, overrides, configDono, segOverride, instalados })
+  const grupos = resolverMenuAgrupado({ plano, role, isSuperAdmin, overrides, configDono, base, instalados })
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   const iniciais = (empresaNome ?? userName).slice(0, 2).toUpperCase()
 

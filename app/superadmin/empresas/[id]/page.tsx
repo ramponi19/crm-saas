@@ -10,7 +10,7 @@ import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
 import { normalizarSegmento } from '@/lib/segmentos'
-import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
+import { camadaBase, carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 
@@ -259,7 +259,8 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaId={empresaId}
           modulosInit={(camadas.forcados ?? null) as Record<string, boolean> | null}
           menuOverrideInit={camadas.superadmin}
-          items={resolverMenu({ segmento: normalizarSegmento(empresa.segmento), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
+          /* Só o molde do preset, sem a linha do banco por cima — como sempre foi aqui. */
+          items={resolverMenu({ base: camadaBase(undefined, camadas.preset), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
             .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
           limiteUsuariosInit={empresa.limite_usuarios ?? 0}
           limiteLeadsInit={empresa.limite_leads ?? 0}

@@ -14,16 +14,15 @@
  * loja existe para o teste dizer isso com números em vez de supor.
  */
 import fs from 'node:fs'
-import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type MenuOverrideRow, type SegOverride } from '../lib/menu'
-import { normalizarSegmento } from '../lib/segmentos'
+import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type MenuOverrideRow, type CamadaBase } from '../lib/menu'
 import { permsDoPapel, type PermissoesMap } from '../lib/permissoes'
-import { camadasDoMenu, camadasParaMenu, modulosForcados, segOverrideDoPreset, type ModuloRow, type PresetRow } from '../lib/empresa-config'
+import { camadaBase, camadasDoMenu, camadasParaMenu, modulosForcados, menuDoPreset, type ModuloRow, type PresetRow } from '../lib/empresa-config'
 import type { ModuloPlano } from '../lib/plano'
 
 type Legado = {
   id: number; segmento: string | null; plano: string | null; permissoes: unknown; lojas: number[]
   menu_override: MenuOverrideRow | null; menu_config: MenuConfigDono | null; modulos_override: Record<string, boolean> | null
-  seg: { hidden_hrefs: string[] | null; label_overrides: Record<string, string> | null; modulos_extra: SegOverride['modulosExtra'] | null; modulos_habilitados: string[] | null; menu_layout: Record<string, string[]> | null } | null
+  seg: { hidden_hrefs: string[] | null; label_overrides: Record<string, string> | null; modulos_extra: CamadaBase['modulosExtra'] | null; modulos_habilitados: string[] | null; menu_layout: Record<string, string[]> | null } | null
 }
 type Core = {
   id: number; preset: string | null; plano: string | null; permissoes: unknown; lojas: number[]
@@ -54,21 +53,20 @@ function entradaLegado(e: Legado, role: string, superadmin: boolean) {
     labels: mo?.labels, habilitados: mo?.habilitados,
   }
   const s = e.seg
-  const segOverride: SegOverride | undefined = s ? {
+  const lido: CamadaBase | undefined = s ? {
     hiddenHrefs: s.hidden_hrefs ?? [], labelOverrides: s.label_overrides ?? {}, modulosExtra: s.modulos_extra ?? [],
     habilitados: s.modulos_habilitados ?? undefined, menuLayout: s.menu_layout ?? undefined,
   } : undefined
-  return { segmento: normalizarSegmento(e.segmento), plano: e.plano ?? undefined, role, isSuperAdmin: superadmin,
-    overrides, configDono: e.menu_config ?? undefined, segOverride }
+  return { base: camadaBase(lido, e.segmento), plano: e.plano ?? undefined, role, isSuperAdmin: superadmin,
+    overrides, configDono: e.menu_config ?? undefined }
 }
 
 /** O que o layout monta agora: a MESMA camadasParaMenu de lib/empresa-config.ts. */
 function entradaCore(e: Core, role: string, superadmin: boolean) {
   const { superadmin: mo, dono } = camadasDoMenu(e.itens)
-  const cfg = { segOverride: segOverrideDoPreset(e.preset_row), superadmin: mo, dono, forcados: modulosForcados(e.modulos) }
-  const { overrides, configDono, segOverride } = camadasParaMenu(cfg, permHidden(role, e.permissoes))
-  return { segmento: normalizarSegmento(e.preset), plano: e.plano ?? undefined, role, isSuperAdmin: superadmin,
-    overrides, configDono, segOverride }
+  const cfg = { preset: e.preset, presetLido: menuDoPreset(e.preset_row), superadmin: mo, dono, forcados: modulosForcados(e.modulos) }
+  const { overrides, configDono, base } = camadasParaMenu(cfg, permHidden(role, e.permissoes))
+  return { base, plano: e.plano ?? undefined, role, isSuperAdmin: superadmin, overrides, configDono }
 }
 
 const fmt = (itens: ReturnType<typeof resolverMenuPlano>) => itens.map((i) => `${i.href}|${i.label}${i.locked ? '|🔒' : ''}`)

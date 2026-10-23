@@ -60,18 +60,18 @@ export default async function EntrarPage() {
    * melhor abrir algo do que deixar o login sem destino.
    */
   const cfg = await carregarConfigEmpresa(supabase, vinculo.empresa_id, emp?.preset_onboarding ?? null)
-  const { overrides, configDono, segOverride, instalados } = camadasParaMenu(cfg)
+  // Sem a ordem do superadmin, como sempre foi aqui: o primeiro item de quem
+  // entra não muda com a troca de fonte (21/10/2026). O molde continua por baixo.
+  const semOrdemDoBanco = { ...cfg, presetLido: cfg.presetLido && { ...cfg.presetLido, menuLayout: undefined } }
+  const { overrides, configDono, base, instalados } = camadasParaMenu(semOrdemDoBanco)
   const grupos = resolverMenu({
-    segmento: normalizarSegmento(emp?.segmento),
     plano: emp?.plano ?? undefined,
     role: vinculo.role ?? 'vendedor',
     isSuperAdmin: false,
     overrides,
     configDono,
     instalados,
-    // Sem a ordem do superadmin, como sempre foi aqui: o primeiro item de quem
-    // entra não muda com a troca de fonte (21/10/2026).
-    segOverride: segOverride ? { ...segOverride, menuLayout: undefined } : undefined,
+    base,
   })
   const primeiro = grupos.flatMap((g) => g.items).find((i) => !i.locked)?.href
   redirect(primeiro ?? '/dashboard')

@@ -15,7 +15,7 @@
 import fs from 'node:fs'
 import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { hrefsHabilitados } from '@/lib/menu'
-import { segOverrideDoPreset, type PresetRow } from '@/lib/empresa-config'
+import { camadaBase, menuDoPreset, type PresetRow } from '@/lib/empresa-config'
 import { abasDosModulos } from '@/core/modulos'
 
 /**
@@ -30,7 +30,7 @@ let falhas = 0
 for (const p of presets) {
   const seg = normalizarSegmento(p.chave)
   const antes = new Set(SEGMENTOS[seg].abasExtraConfiguracoes.map((a) => a.id))
-  const ligados = hrefsHabilitados({ segmento: seg, segOverride: segOverrideDoPreset(p) })
+  const ligados = hrefsHabilitados({ base: camadaBase(menuDoPreset(p), p.chave) })
   const depois = new Set(abasDosModulos(ligados))
   const difs = [
     ...[...depois].filter((a) => !antes.has(a)).map((a) => `+${a}`),

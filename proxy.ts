@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { moduloDaRota, hrefsLigados } from '@/lib/menu'
-import { segOverrideDoPreset, camadasDoMenu, instaladosDoManifesto, type PresetRow, type ModuloRow } from '@/lib/empresa-config'
+import { menuDoPreset, camadasDoMenu, instaladosDoManifesto, type PresetRow, type ModuloRow } from '@/lib/empresa-config'
 import { temVitrine } from '@/lib/modulos-vitrine'
 import { COOKIE_VERSAO_MODULOS } from '@/core/modulos'
 
@@ -317,7 +317,7 @@ async function modulosHabilitados(
       .eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
 
     // Segmento sem lista configurada não é motivo para bloquear nada.
-    const lista = segOverrideDoPreset(preset as PresetRow | null)?.habilitados
+    const lista = menuDoPreset(preset as PresetRow | null)?.habilitados
     if (!Array.isArray(lista) || lista.length === 0) return null
 
     /**

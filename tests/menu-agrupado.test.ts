@@ -12,6 +12,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { agruparMenu, resolverMenuAgrupado, resolverMenuPlano, GRUPO_DO_HREF, CATALOGO, type ResolverMenuInput } from '@/lib/menu'
 import { SEGMENTOS, type Segmento } from '@/lib/segmentos'
+import { camadaBase } from '@/lib/empresa-config'
 
 const PAPEIS: Array<Pick<ResolverMenuInput, 'role' | 'isSuperAdmin'>> = [
   { role: 'owner', isSuperAdmin: false }, { role: 'admin', isSuperAdmin: false },
@@ -22,7 +23,7 @@ const PAPEIS: Array<Pick<ResolverMenuInput, 'role' | 'isSuperAdmin'>> = [
 test('todo segmento e papel: mesmos itens, mesma ordem, no máximo 9 entradas', () => {
   for (const segmento of Object.keys(SEGMENTOS) as Segmento[]) {
     for (const p of PAPEIS) {
-      const entrada: ResolverMenuInput = { segmento, plano: 'pro', ...p }
+      const entrada: ResolverMenuInput = { base: camadaBase(undefined, segmento), plano: 'pro', ...p }
       const plano = resolverMenuPlano(entrada).map((i) => i.href)
       const grupos = resolverMenuAgrupado(entrada)
       const agrupado = grupos.flatMap((g) => g.itens.map((i) => i.href))
@@ -39,7 +40,7 @@ test('todo segmento e papel: mesmos itens, mesma ordem, no máximo 9 entradas', 
 })
 
 test('o Ranking da imobiliária (extra, grupo antigo "Gestão") cai em Insights', () => {
-  const grupos = resolverMenuAgrupado({ segmento: 'imobiliaria', role: 'owner', isSuperAdmin: false })
+  const grupos = resolverMenuAgrupado({ base: camadaBase(undefined, 'imobiliaria'), role: 'owner', isSuperAdmin: false })
   const insights = grupos.find((g) => g.id === 'insights')
   assert.ok(insights?.itens.some((i) => i.href === '/ranking'))
 })

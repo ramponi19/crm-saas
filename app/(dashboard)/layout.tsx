@@ -114,13 +114,13 @@ export default async function DashboardLayout({
   // Camadas do resolverMenu, lidas do core (presets_onboarding, empresa_menu,
   // empresa_modulos) — ver lib/empresa-config.ts.
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
-  const { overrides: menuOverrides, configDono: menuConfig, segOverride, instalados, rotulos } = camadasParaMenu(cfg, permHidden)
+  const { overrides: menuOverrides, configDono: menuConfig, base, instalados, rotulos } = camadasParaMenu(cfg, permHidden)
   // Ferramentas fora do menu (Simular parcela, Check IMEI, FIPE): mesmas camadas do
   // menu, entregues às telas-casa e ao ⌘K.
   const ferramentas = resolverFerramentas({
-    segmento: normalizarSegmento(empresa?.segmento), plano, role,
+    plano, role,
     isSuperAdmin: usuario?.is_super_admin ?? false,
-    overrides: menuOverrides, configDono: menuConfig, segOverride, instalados,
+    overrides: menuOverrides, configDono: menuConfig, base, instalados,
   }).map(({ href, label, rota }) => ({ href, label, rota }))
 
   return (
@@ -153,11 +153,10 @@ export default async function DashboardLayout({
           isSuperAdmin={usuario?.is_super_admin ?? false}
           role={role}
           plano={plano}
-          segmento={normalizarSegmento(empresa?.segmento)}
           theme={resolveTheme(empresa?.wl_menu as WlMenu | null, empresa?.wl_cor)}
           overrides={menuOverrides}
           configDono={menuConfig}
-          segOverride={segOverride}
+          base={base}
           instalados={instalados}
         />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -166,14 +165,13 @@ export default async function DashboardLayout({
             empresaNome={empresa?.nome}
             empresaLogo={empresa?.wl_logo_url ?? null}
             userName={usuario?.nome ?? user.email ?? 'Usuário'}
-            segmento={normalizarSegmento(empresa?.segmento)}
             plano={plano}
             role={role}
             isSuperAdmin={usuario?.is_super_admin ?? false}
             leadsCount={leadsCount ?? 0}
             overrides={menuOverrides}
             configDono={menuConfig}
-            segOverride={segOverride}
+            base={base}
             instalados={instalados}
           />
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>

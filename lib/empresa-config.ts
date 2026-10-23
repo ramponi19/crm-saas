@@ -1,9 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin, SegOverride } from '@/lib/menu'
+import type { CamadaBase, MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
 import { moduloPorChave } from '@/core/modulos'
-import { hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { habilitadosDoMolde, hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DO CORE, NUM LUGAR SÓ.
@@ -14,12 +14,12 @@ import { normalizarSegmento } from '@/lib/segmentos'
  * `empresa_menu`, `empresa_modulos` —, mas ninguém lia nem gravava nelas: o
  * que o superadmin e o dono mudavam depois de 20/10 ia só para o legado.
  *
- * O formato que o menu recebe NÃO muda (SegOverride, MenuOverrideRow,
- * MenuConfigDono): troca a fonte, a tela fica igual. Os mapeamentos são puros e
- * exportados para o teste que compara o menu antes e depois
- * (scripts/comparar-menu.mts).
+ * O menu recebe a camada base PRONTA (`CamadaBase`, montada por `camadaBase`
+ * com o banco e o molde estático já resolvidos), mais MenuOverrideRow e
+ * MenuConfigDono. Os mapeamentos são puros e exportados para o teste que compara
+ * o menu antes e depois (scripts/comparar-menu.mts).
  *
- *   presets_onboarding.rotulos      rótulos do segmento + `_menu` com as quatro listas
+ *   presets_onboarding.rotulos      rótulos do preset + `_menu` com as quatro listas
  *   empresa_menu.itens.superadmin   { hidden, labels, habilitados }  (era menu_override)
  *   empresa_menu.itens.dono         { hidden, labels, ordem }        (era menu_config)
  *   empresa_modulos.config.forcado  liga/desliga módulo de plano      (era modulos_override)
@@ -37,8 +37,12 @@ interface MenuDoPreset {
   menu_layout?: Record<string, string[]> | null
 }
 
-/** A camada do segmento, no formato que o menu sempre recebeu de segmentos_config. */
-export function segOverrideDoPreset(p: PresetRow | null | undefined): SegOverride | undefined {
+/**
+ * O que a linha do preset diz, CRU: sem o molde estático por baixo. A trava de
+ * rota (proxy.ts), o ranking e o laboratório leem só isto; o menu recebe
+ * `camadaBase`, que junta esta leitura ao molde.
+ */
+export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | undefined {
   if (!p) return undefined
   const { _menu, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset }
   const m = _menu ?? {}
@@ -48,6 +52,32 @@ export function segOverrideDoPreset(p: PresetRow | null | undefined): SegOverrid
     modulosExtra: m.modulos_extra ?? [],
     habilitados: m.modulos_habilitados ?? undefined,
     menuLayout: m.menu_layout ?? undefined,
+  }
+}
+
+/**
+ * A CAMADA 1 DO MENU, PRONTA: a linha do preset sobre o molde estático com que
+ * a empresa nasceu (o cadastro de presets em lib/segmentos.ts).
+ *
+ * Até 22/10/2026 esta mescla morava dentro de lib/menu.ts, que recebia o nome da
+ * vertical e ia buscar o molde sozinho. As regras são as mesmas, cada uma no seu
+ * campo:
+ *   - módulos ligados: a lista do banco; sem lista, o catálogo comum menos os
+ *     ocultos do molde, mais os extras dele;
+ *   - rótulos: os do banco quando há linha; sem linha, os do molde;
+ *   - extras: LISTA VAZIA DO BANCO NÃO É "NENHUM EXTRA" — É "NÃO CONFIGURADO".
+ *     Com `modulos_extra = []` (o estado real da imobiliária em 20/08/2026) o
+ *     array vazio vencia o molde e derrubava "Metas e Ranking" do menu — e, junto,
+ *     o acesso do corretor à tela. Para TIRAR um extra existe `hidden_hrefs`;
+ *   - ordem: rasa, grupo a grupo — o que o superadmin editou vence o molde.
+ */
+export function camadaBase(lido: CamadaBase | undefined, preset: string | null): CamadaBase {
+  const molde = SEGMENTOS[normalizarSegmento(preset)]
+  return {
+    habilitados: lido?.habilitados ?? habilitadosDoMolde(molde),
+    labelOverrides: lido?.labelOverrides ?? molde.labelOverrides,
+    modulosExtra: lido?.modulosExtra?.length ? lido.modulosExtra : (molde.modulosExtra ?? []),
+    menuLayout: { ...(molde.menuLayout ?? {}), ...(lido?.menuLayout ?? {}) },
   }
 }
 
@@ -115,7 +145,8 @@ export function instaladosDoManifesto(rows: ModuloRow[] | null | undefined): Rec
 
 export interface ConfigEmpresa {
   preset: string | null
-  segOverride: SegOverride | undefined
+  /** A linha do preset, crua (`menuDoPreset`); `camadasParaMenu` junta o molde. */
+  presetLido: CamadaBase | undefined
   superadmin: MenuOverrideRow | null
   dono: MenuConfigDono | undefined
   modulos: ModuloRow[]
@@ -127,8 +158,9 @@ export interface ConfigEmpresa {
  * são os itens que o PAPEL não pode ver (financeiro, relatórios), somados aos
  * ocultos do superadmin — exatamente como o layout fazia.
  */
-export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'segOverride' | 'superadmin' | 'dono' | 'forcados'> & Partial<Pick<ConfigEmpresa, 'modulos'>>, permHidden: string[] = []) {
+export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'preset' | 'presetLido' | 'superadmin' | 'dono' | 'forcados'> & Partial<Pick<ConfigEmpresa, 'modulos'>>, permHidden: string[] = []) {
   const mo = cfg.superadmin
+  const base = camadaBase(cfg.presetLido, cfg.preset)
   return {
     /** Camada da Central de Módulos (empresa_modulos pelo manifesto). */
     instalados: instaladosDoManifesto(cfg.modulos),
@@ -139,9 +171,9 @@ export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'segOverride' | 'supera
       habilitados: mo?.habilitados,
     } satisfies MenuOverridesSuperadmin,
     configDono: cfg.dono,
-    segOverride: cfg.segOverride,
-    /** Mesma precedência do menu: segmento, superadmin, dono. */
-    rotulos: { ...(cfg.segOverride?.labelOverrides ?? {}), ...(mo?.labels ?? {}), ...(cfg.dono?.labels ?? {}) } as Record<string, string>,
+    base,
+    /** Mesma precedência do menu: base, superadmin, dono. */
+    rotulos: { ...(base.labelOverrides ?? {}), ...(mo?.labels ?? {}), ...(cfg.dono?.labels ?? {}) } as Record<string, string>,
   }
 }
 
@@ -244,7 +276,7 @@ export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: 
   const rows = (modulos ?? []) as ModuloRow[]
   return {
     preset,
-    segOverride: segOverrideDoPreset(p as PresetRow | null),
+    presetLido: menuDoPreset(p as PresetRow | null),
     superadmin,
     dono,
     modulos: rows,
@@ -261,8 +293,8 @@ export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: 
  * de presets_onboarding, e em nenhum outro lugar do código novo.
  */
 export function ligadosDaEmpresa(cfg: ConfigEmpresa): Set<string> {
-  const { overrides, segOverride, instalados } = camadasParaMenu(cfg)
-  return hrefsHabilitados({ segmento: normalizarSegmento(cfg.preset), overrides, segOverride, instalados })
+  const { overrides, base, instalados } = camadasParaMenu(cfg)
+  return hrefsHabilitados({ overrides, base, instalados })
 }
 
 /** A entrada do resolvedor do menu para esta empresa, sem o chamador tocar no preset. */
@@ -271,6 +303,6 @@ export function entradaDoMenu(
   quem: { plano?: string; role: string; isSuperAdmin: boolean },
   permHidden: string[] = [],
 ): ResolverMenuInput {
-  const { overrides, configDono, segOverride, instalados } = camadasParaMenu(cfg, permHidden)
-  return { segmento: normalizarSegmento(cfg.preset), ...quem, overrides, configDono, segOverride, instalados }
+  const { overrides, configDono, base, instalados } = camadasParaMenu(cfg, permHidden)
+  return { ...quem, overrides, configDono, base, instalados }
 }
