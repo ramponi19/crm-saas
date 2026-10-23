@@ -127,7 +127,7 @@
     },
     "app/api/register/route.ts": {
       "motivo": "register",
-      "teto": 12
+      "teto": 10
     },
     "app/api/superadmin/empresas/[id]/exportar/route.ts": {
       "motivo": "inventario",
@@ -304,10 +304,6 @@
     "lib/match-veiculos.ts": {
       "motivo": "inventario",
       "teto": 1
-    },
-    "lib/motivos-perda.ts": {
-      "motivo": "inventario",
-      "teto": 12
     },
     "lib/ranking.ts": {
       "motivo": "inventario",

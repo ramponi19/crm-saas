@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizarSegmento } from '@/lib/segmentos'
-import { motivosDoSegmento } from '@/lib/motivos-perda'
+import { motivosDoPreset } from '@/lib/motivos-perda'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
    * derrubar um cadastro inteiro por causa de uma lista de apoio seria pior.
    */
   const { error: motErr } = await svc.from('motivos_perda').insert(
-    motivosDoSegmento(body.segmento).map((label, i) => ({
+    motivosDoPreset(body.segmento).map((label, i) => ({
       empresa_id: empresa.id, label, ordem: i, ativo: true,
     })),
   )

@@ -1,7 +1,6 @@
-import type { Segmento } from './segmentos'
-
 /**
- * Motivos de perda que cada segmento recebe ao nascer.
+ * Motivos de perda com que a empresa nasce, pelo preset de onboarding escolhido
+ * no cadastro (/register — o único chamador).
  *
  * POR QUE ISTO EXISTE: marcar lead como perdido EXIGE motivo (é o que mantém o
  * relatório de perdas confiável). Só que empresa nova nascia sem nenhum motivo
@@ -17,7 +16,7 @@ import type { Segmento } from './segmentos'
  * o modelo", "sumiu" —, escritos como o vendedor fala, não como um relatório
  * gostaria de ler.
  */
-export const MOTIVOS_POR_SEGMENTO: Record<string, string[]> = {
+export const MOTIVOS_POR_PRESET: Record<string, string[]> = {
   varejo: [
     'Preço / achou caro',
     'Condição de pagamento',
@@ -76,8 +75,8 @@ export const MOTIVOS_POR_SEGMENTO: Record<string, string[]> = {
   ],
 }
 
-/** Lista do segmento, caindo no varejo quando o segmento não tem a sua. */
-export function motivosDoSegmento(segmento: Segmento | string | null | undefined): string[] {
-  const chave = (segmento ?? '').trim().toLowerCase()
-  return MOTIVOS_POR_SEGMENTO[chave] ?? MOTIVOS_POR_SEGMENTO.varejo
+/** Lista do preset, caindo no varejo quando o preset não tem a sua. */
+export function motivosDoPreset(preset: string | null | undefined): string[] {
+  const chave = (preset ?? '').trim().toLowerCase()
+  return MOTIVOS_POR_PRESET[chave] ?? MOTIVOS_POR_PRESET.varejo
 }
