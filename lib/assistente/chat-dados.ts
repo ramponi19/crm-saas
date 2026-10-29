@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { mensagemDoProvedor } from '@/lib/assistente-erros'
 import type { Acesso } from './acesso'
+import { negocioDoPreset } from './negocio'
 import { executar, FERRAMENTAS, ROTULO } from './ferramentas'
 
 /**
@@ -46,18 +47,8 @@ export const MODELO_CHAT_PADRAO = 'claude-sonnet-5-5'
 
 export interface Turno { role: 'user' | 'model'; text: string }
 
-const SEGMENTO: Record<string, string> = {
-  varejo: 'loja de varejo/celulares (PDV, estoque, produtos, garantia, assistência, orçamentos)',
-  assistencia: 'assistência técnica (ordens de serviço, garantia, orçamentos)',
-  servicos: 'prestador de serviços',
-  imobiliaria: 'imobiliária (imóveis, proprietários, chaves, visitas na Agenda)',
-  saude: 'clínica/saúde (agendamento de consultas na Agenda)',
-  food: 'restaurante/food (cardápio, cozinha/KDS)',
-  concessionaria: 'loja de veículos (avaliações, consulta FIPE, financiamento)',
-}
-
 function instrucoes(o: {
-  empresa: string; segmento: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null
+  empresa: string; preset: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null
 }): string {
   const agora = new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -69,7 +60,7 @@ function instrucoes(o: {
     !o.acesso.verFinanceiro && 'não vê custo, lucro nem margem',
   ].filter(Boolean)
 
-  return `Você é o assistente do Nexus CRM da empresa "${o.empresa}", uma ${SEGMENTO[o.segmento ?? ''] ?? 'pequena empresa'}.
+  return `Você é o assistente do Nexus CRM da empresa "${o.empresa}", uma ${negocioDoPreset(o.preset) ?? 'pequena empresa'}.
 Agora é ${agora} (horário de Brasília).
 Quem está perguntando: ${o.acesso.nome} (papel: ${o.acesso.papel || 'não identificado'}).
 Lojas que essa pessoa enxerga: ${o.lojas.length ? o.lojas.join(', ') : 'uma loja'}.
@@ -100,7 +91,7 @@ export function respostaDoChat(o: {
   turnos: Turno[]
   modelo: string
   empresa: string
-  segmento: string | null
+  preset: string | null
   lojas: string[]
   tela: string | null
   extra: string | null
@@ -114,7 +105,7 @@ export function respostaDoChat(o: {
   // e entre perguntas da mesma pessoa. Cache neles.
   const system: Anthropic.TextBlockParam[] = [{
     type: 'text',
-    text: instrucoes({ empresa: o.empresa, segmento: o.segmento, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra }),
+    text: instrucoes({ empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra }),
     cache_control: { type: 'ephemeral' },
   }]
   const tools: Anthropic.Tool[] = FERRAMENTAS.map((t, i) =>

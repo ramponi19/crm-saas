@@ -6,21 +6,12 @@ import { melhorModelo } from '@/lib/assistente-modelos'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { acessoDoUsuario } from '@/lib/assistente/acesso'
 import { respostaDoChat, MODELO_CHAT_PADRAO, type Turno } from '@/lib/assistente/chat-dados'
+import { negocioDoPreset } from '@/lib/assistente/negocio'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
-const SEGMENTO_CTX: Record<string, string> = {
-  varejo: 'loja de varejo/celulares (PDV, estoque, produtos, garantia, assistência, orçamentos)',
-  assistencia: 'assistência técnica (ordens de serviço, garantia, orçamentos)',
-  servicos: 'prestador de serviços',
-  imobiliaria: 'imobiliária (imóveis, proprietários, chaves, visitas na Agenda)',
-  saude: 'clínica/saúde (agendamento de consultas na Agenda)',
-  food: 'restaurante/food (cardápio, cozinha/KDS)',
-  concessionaria: 'loja de veículos (avaliações, consulta FIPE, financiamento)',
-}
-
-function systemPrompt(segmento: string | null, extra: string | null): string {
-  const ctx = SEGMENTO_CTX[segmento ?? ''] ?? 'pequeno negócio'
+function systemPrompt(preset: string | null, extra: string | null): string {
+  const ctx = negocioDoPreset(preset) ?? 'pequeno negócio'
   return `Você é o assistente do Nexus, um CRM. Esta empresa é uma ${ctx}. Você faz DUAS coisas:
 
 1) AJUDA DE USO — orienta onde encontrar telas e como executar tarefas (vender no PDV, lançar orçamento, cadastrar produto/lead/cliente, gerar contrato, ver relatórios, etc.).
@@ -96,7 +87,7 @@ export async function POST(req: Request) {
   if (comDados) {
     const [acesso, { data: empresa }, { data: visiveis }, { data: lojasRaw }] = await Promise.all([
       acessoDoUsuario(supabase, empresaId, user.id),
-      supabase.from('empresas').select('nome, segmento:preset_onboarding').eq('id', empresaId).maybeSingle(),
+      supabase.from('empresas').select('nome, preset_onboarding').eq('id', empresaId).maybeSingle(),
       supabase.rpc('filiais_visiveis'),
       supabase.from('filiais').select('id, nome, cidade').eq('empresa_id', empresaId),
     ])
@@ -114,7 +105,7 @@ export async function POST(req: Request) {
       turnos: alternados(mensagens),
       modelo,
       empresa: (empresa?.nome as string | undefined) ?? 'Empresa',
-      segmento: (empresa?.segmento as string | null | undefined) ?? null,
+      preset: (empresa?.preset_onboarding as string | null | undefined) ?? null,
       lojas,
       tela: body.contexto ? String(body.contexto).slice(0, 60) : null,
       extra: cfg?.system_extra ?? null,
@@ -127,9 +118,9 @@ export async function POST(req: Request) {
   }
   if (!apiKey) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
-  // Contexto do segmento p/ respostas mais úteis.
-  const { data: emp } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  let systemText = systemPrompt((emp as { segmento?: string | null } | null)?.segmento ?? null, cfg?.system_extra ?? null)
+  // Contexto do negócio p/ respostas mais úteis.
+  const { data: emp } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  let systemText = systemPrompt((emp as { preset_onboarding?: string | null } | null)?.preset_onboarding ?? null, cfg?.system_extra ?? null)
   if (body.contexto) systemText += `\n\nContexto: o usuário está na tela "${String(body.contexto).slice(0, 60)}".`
 
   try {

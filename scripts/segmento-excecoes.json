@@ -37,10 +37,6 @@
       "motivo": "inventario",
       "teto": 8
     },
-    "app/api/assistente/route.ts": {
-      "motivo": "inventario",
-      "teto": 11
-    },
     "app/api/match/lead/[id]/route.ts": {
       "motivo": "inventario",
       "teto": 8
@@ -184,10 +180,6 @@
     "components/superadmin/superadmin-shell.tsx": {
       "motivo": "inventario",
       "teto": 2
-    },
-    "lib/assistente/chat-dados.ts": {
-      "motivo": "inventario",
-      "teto": 7
     },
     "lib/captacao-imob.ts": {
       "motivo": "inventario",
