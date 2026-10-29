@@ -29,10 +29,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/api/match/lead/[id]/route.ts": {
-      "motivo": "inventario",
-      "teto": 8
-    },
     "app/api/menu-config/route.ts": {
       "motivo": "inventario",
       "teto": 1
