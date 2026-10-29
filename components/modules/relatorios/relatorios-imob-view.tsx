@@ -111,7 +111,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
     color: e.cor ?? '#7FB0E8',
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
   }))
-  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns('imobiliaria')
+  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns()
   const fechamentoId = ganhoColId(colunas)
 
   const imoveisDisp = I.filter((i) => i.status === 'disponivel')

@@ -39,7 +39,7 @@
     },
     "app/api/register/route.ts": {
       "motivo": "register",
-      "teto": 6
+      "teto": 2
     },
     "app/api/superadmin/empresas/[id]/exportar/route.ts": {
       "motivo": "inventario",
@@ -105,7 +105,7 @@
       "motivo": "inventario",
       "teto": 10
     },
-    "app/register/page.tsx": {
+    "app/register/register-form.tsx": {
       "motivo": "register",
       "teto": 6
     },

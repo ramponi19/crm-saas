@@ -21,10 +21,7 @@ import { comNome } from '@/lib/sem-nome'
 export default async function ClientesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: empresa }, cfg] = await Promise.all([
-    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle(),
-    carregarConfigEmpresa(supabase, empresaId ?? 0),
-  ])
+  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)
   const imob = !!capacidades(cfg).clienteComPipeline
 
   const { data: clientesRaw } = await supabase
@@ -65,7 +62,7 @@ export default async function ClientesPage() {
     color: '#7FB0E8',
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
   }))
-  const etapas = doBanco.length > 0 ? doBanco : getKanbanColumns(empresa?.preset_onboarding ?? null)
+  const etapas = doBanco.length > 0 ? doBanco : getKanbanColumns()
 
   const equipe = ((membrosRaw ?? []) as unknown as Array<{ usuario_id: string; usuarios: Embed<{ nome: string | null }> }>)
     .map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))

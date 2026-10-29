@@ -393,7 +393,7 @@ n "superadmin nao edita funil morto"    "app/superadmin/segmentos/segmentos-view
 n "rota de segmentos nao grava seed"    "app/api/superadmin/segmentos/route.ts" "funil_seed"
 n "segmentos.ts nao declara funil"      "lib/segmentos.ts" "funil: ["
 v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
-v "padrao do codigo tem Aprovados"      "components/modules/leads/types.ts" "label: 'Aprovados'"
+v "funil da imob tem Aprovados"        "supabase/migrations/20261029000100_presets_completos.sql" '"label":"Aprovados"'
 
 echo "== gestao de leads (20/08) =="
 v "faixa de atraso tem fonte unica"    "lib/lead-parado.ts" "export function gravidadeDoAtraso"

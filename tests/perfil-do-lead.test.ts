@@ -53,3 +53,20 @@ test('clínica: tela inicial na Agenda e a Agenda falando de consulta e paciente
   assert.equal(cfg.vocabulario.agenda?.novo, 'Nova consulta')
   assert.equal(empresaNascidaCom('imobiliaria').telaInicial, null)
 })
+
+test('o funil de partida vem do preset: imobiliária com o dela, o resto com o padrão', async () => {
+  const { KANBAN_COLUMNS } = await import('@/components/modules/leads/types')
+  const ids = (p: string) => (PRESETS[p].etapas as { id: string }[]).map((e) => e.id)
+  assert.deepEqual(ids('imobiliaria'), ['novo', 'contato', 'credito', 'aprovado', 'visita_agendada', 'proposta', 'contrato', 'vistoria', 'entrega_chaves', 'fechamento', 'perdido'])
+  for (const p of ['varejo', 'assistencia', 'servicos', 'saude', 'food', 'concessionaria']) {
+    assert.deepEqual(ids(p), KANBAN_COLUMNS.map((c) => c.id), p)
+  }
+})
+
+test('só a loja de veículos nasce com o campo placa no item', () => {
+  for (const [p, linha] of Object.entries(PRESETS)) {
+    const placa = (linha.campos as { entidade: string; chave: string; modulo_dono: string }[]).find((c) => c.chave === 'placa')
+    if (p === 'concessionaria') assert.deepEqual([placa?.entidade, placa?.modulo_dono], ['item', 'estoque'])
+    else assert.equal(placa, undefined, p)
+  }
+})

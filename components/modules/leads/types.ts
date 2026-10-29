@@ -91,41 +91,14 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
  * a operação dele não usa. Isto é o ponto de partida, não a regra.
  */
 /**
- * Rótulos e ordem revistos em 19/08/2026 com o dono da imobiliária.
+ * Colunas do kanban quando a empresa ainda não tem etapas no banco: o funil padrão.
  *
- * O fluxo dele analisa e APROVA o cadastro antes de levar o cliente para visitar
- * (na locação, é a análise cadastral que decide se vale ocupar a agenda do
- * corretor). Por isso "Em Análise" e "Aprovados" vêm antes de "Em Visita", e não
- * depois da proposta, como estava.
- *
- * Os IDS são os slugs antigos de propósito: `leads.kanban_status` guarda o slug, e
- * vários pontos usam 'novo' como padrão. Trocar o rótulo não pode mexer na
- * identidade da etapa nem no lead que está nela.
+ * O funil com que cada preset nasce (o da imobiliária, com análise de crédito e
+ * entrega de chaves) mora em presets_onboarding.etapas e é gravado em funil_etapas
+ * no cadastro (lib/presets.ts, 29/10/2026). Este fallback não sabe quem a empresa é.
  */
-const KANBAN_IMOBILIARIA: KanbanColumn[] = [
-  { id: 'novo',            label: 'Lead novo',         color: '#7FB0E8' },
-  { id: 'contato',         label: 'Atendimento',       color: '#C6A86A' },
-  { id: 'credito',         label: 'Em Análise',        color: '#FB923C' },
-  { id: 'aprovado',        label: 'Aprovados',         color: '#22D3EE' },
-  { id: 'visita_agendada', label: 'Em Visita',         color: '#A78BFA' },
-  { id: 'proposta',        label: 'Em Proposta',       color: '#F4B740', tipo: 'negociacao' },
-  { id: 'contrato',        label: 'Contratos',         color: '#6366F1' },
-  { id: 'vistoria',        label: 'Vistoria',          color: '#2DD4BF' },
-  { id: 'entrega_chaves',  label: 'Entrega de chaves', color: '#A3E635' },
-  { id: 'fechamento',      label: 'Finalizado',        color: '#34D399', tipo: 'ganho' },
-  { id: 'perdido',         label: 'Perdido',           color: '#DC2626', tipo: 'perdido' },
-]
-
-const KANBAN_POR_PRESET: Record<string, KanbanColumn[]> = {
-  imobiliaria: KANBAN_IMOBILIARIA,
-}
-
-/**
- * Colunas do kanban quando a empresa ainda não tem etapas no banco: o funil com
- * que o preset de onboarding nasce (fallback = funil padrão).
- */
-export function getKanbanColumns(preset?: string | null): KanbanColumn[] {
-  return (preset && KANBAN_POR_PRESET[preset]) || KANBAN_COLUMNS
+export function getKanbanColumns(): KanbanColumn[] {
+  return KANBAN_COLUMNS
 }
 
 /** Id da etapa "ganho" (convertido/fechamento) do conjunto de colunas. */

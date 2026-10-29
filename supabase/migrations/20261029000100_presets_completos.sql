@@ -11,6 +11,7 @@
 --      etapas             o funil de partida (imobiliária: o dela; os outros: o padrão)
 --      campos             campos personalizados de partida (veículos: placa do item)
 --      motivos_perda      já estavam iguais aos do código; não mudam
+--      nome               o rótulo que o cadastro mostra ("Varejo / Loja"), que vinha do código
 --
 -- 2) As empresas que já existem recebem em empresa_menu.itens.base a base do preset
 --    com que nasceram — a mesma conta que o app fazia em cada request. Depois disto o
@@ -67,6 +68,18 @@ update public.presets_onboarding set
   campos = $j$[{"entidade":"item","chave":"placa","rotulo":"Placa","tipo":"texto","modulo_dono":"estoque"}]$j$::jsonb,
   updated_at = now()
 where chave = 'concessionaria';
+
+-- O nome do preset é o rótulo que o cadastro mostra (era o do molde no código).
+update public.presets_onboarding set nome = case chave
+    when 'varejo' then 'Varejo / Loja'
+    when 'assistencia' then 'Assistência técnica'
+    when 'servicos' then 'Serviços / Prestadores'
+    when 'imobiliaria' then 'Imobiliária'
+    when 'saude' then 'Saúde / Clínica'
+    when 'food' then 'Food / Restaurante'
+    when 'concessionaria' then 'Loja de veículos'
+  end
+where chave in ('varejo', 'assistencia', 'servicos', 'imobiliaria', 'saude', 'food', 'concessionaria');
 
 insert into public.empresa_menu (empresa_id, itens)
 select e.id,

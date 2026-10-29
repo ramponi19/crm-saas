@@ -11,4 +11,15 @@ update public.presets_onboarding set rotulos = $j${"_menu":{"ordem":4,"menu_layo
 update public.presets_onboarding set rotulos = $j${"_menu":{"ordem":5,"menu_layout":{},"hidden_hrefs":[],"modulos_extra":[],"modulos_habilitados":["/aparencia","/cadencias","/canais","/cardapio","/catalogo","/chat","/clientes","/compras","/configuracoes","/dashboard","/distribuicao","/empresa","/estoque","/fila","/financeiro","/funil","/historico","/kds","/leads","/marketing","/meu-menu","/modelos","/orcamentos","/pdv","/permissoes","/planos","/produtos","/propostas","/ranking","/relatorios","/scoring","/tarefas"]}}$j$::jsonb, etapas = $j$[]$j$::jsonb, campos = $j$[]$j$::jsonb, updated_at = now() where chave = 'food';
 update public.presets_onboarding set rotulos = $j${"_menu":{"ordem":6,"menu_layout":{},"hidden_hrefs":["/pdv","/compras","/simular-parcela"],"modulos_extra":[{"href":"/avaliacoes","icon":"ClipboardCheck","label":"Avaliações"},{"href":"/consulta-fipe","icon":"Car","label":"Consulta FIPE"},{"href":"/simular-financiamento","icon":"Calculator","label":"Financiamento"}],"modulos_habilitados":["/aparencia","/assistencia","/avaliacoes","/cadencias","/canais","/catalogo","/chat","/clientes","/compras","/configuracoes","/consulta-fipe","/dashboard","/distribuicao","/empresa","/estoque","/fila","/financeiro","/funil","/garantia","/historico","/leads","/marketing","/meu-menu","/modelos","/orcamentos","/pdv","/permissoes","/planos","/produtos","/propostas","/ranking","/relatorios","/scoring","/simular-financiamento","/tarefas"]},"/produtos":"Veículos","/assistencia":"Oficina"}$j$::jsonb, etapas = $j$[]$j$::jsonb, campos = $j$[]$j$::jsonb, updated_at = now() where chave = 'concessionaria';
 
+update public.presets_onboarding set nome = case chave
+    when 'varejo' then 'Loja'
+    when 'assistencia' then 'Assistência técnica'
+    when 'servicos' then 'Serviços'
+    when 'imobiliaria' then 'Imobiliária'
+    when 'saude' then 'Saúde'
+    when 'food' then 'Restaurante'
+    when 'concessionaria' then 'Loja de veículos'
+  end
+where chave in ('varejo', 'assistencia', 'servicos', 'imobiliaria', 'saude', 'food', 'concessionaria');
+
 update public.empresa_menu set itens = itens - 'base', updated_at = now() where itens ? 'base';

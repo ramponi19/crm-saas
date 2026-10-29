@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { normalizarPreset } from '@/lib/empresa-config'
-import { motivosDoPreset } from '@/lib/motivos-perda'
+import { aplicarPreset, lerPreset } from '@/lib/presets'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
@@ -104,6 +103,15 @@ export async function POST(req: Request) {
   const slug = slugDaEmpresa(nomeEmpresa, userId)
   const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
+  // O preset escolhido (presets_onboarding): a ficha de partida da empresa. É o
+  // único lugar do app, fora das ferramentas do superadmin, que o lê.
+  const preset = await lerPreset(svc, body.segmento)
+  if (!preset) {
+    await svc.auth.admin.deleteUser(userId)
+    console.error('[register] nenhum preset ativo no banco')
+    return NextResponse.json({ error: 'Não foi possível criar a empresa. Tente novamente.' }, { status: 500 })
+  }
+
   // 2) empresa
   const { data: empresa, error: empErr } = await svc
     .from('empresas')
@@ -111,9 +119,9 @@ export async function POST(req: Request) {
       nome: nomeEmpresa,
       slug,
       plano: planoId,
-      // O segmento escolhido no cadastro é o preset (empresas.segmento saiu em
-      // 22/10/2026); os 7 presets do código têm linha em presets_onboarding.
-      preset_onboarding: normalizarPreset(body.segmento),
+      // Só o registro de qual preset foi usado no cadastro: nada no app lê isto
+      // para decidir tela (29/10/2026).
+      preset_onboarding: preset.chave,
       status: 'ativo',
       cnpj: body.cnpj || null,
       telefone: body.telefone || null,
@@ -165,21 +173,20 @@ export async function POST(req: Request) {
   }
 
   /**
-   * 5) motivos de perda do segmento.
+   * 5) o preset vira da empresa: base do menu (tela inicial e vocabulário juntos),
+   * módulos, campos de partida, funil e motivos de perda (lib/presets.ts).
    *
-   * Marcar lead como perdido EXIGE motivo, e a empresa nascia sem nenhum: o
-   * vendedor arrastava o card, o modal abria vazio mandando "configurar em
-   * Configurações" e a ação morria. Campo obrigatório sem opção é porta trancada.
-   *
-   * Não bloqueia o cadastro se falhar — a loja consegue cadastrar à mão depois, e
-   * derrubar um cadastro inteiro por causa de uma lista de apoio seria pior.
+   * Os motivos importam desde o primeiro dia: marcar lead como perdido EXIGE
+   * motivo, e empresa nascida sem nenhum deixava o modal de perda vazio — porta
+   * trancada. Só a base derruba o cadastro se falhar (sem ela o menu cai para o
+   * núcleo); o resto vai para o log e a loja completa à mão.
    */
-  const { error: motErr } = await svc.from('motivos_perda').insert(
-    motivosDoPreset(body.segmento).map((label, i) => ({
-      empresa_id: empresa.id, label, ordem: i, ativo: true,
-    })),
-  )
-  if (motErr) console.error('[register] motivos de perda não semeados:', motErr.message)
+  const { error: presetErr } = await aplicarPreset(svc, empresa.id, preset)
+  if (presetErr) {
+    await rollback()
+    console.error('[register] aplicar preset:', presetErr)
+    return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
+  }
 
   // 6) e-mail de boas-vindas (não-bloqueante: nunca falha o cadastro).
   const { subject, html } = emailBoasVindas(nomeUsuario, nomeEmpresa)

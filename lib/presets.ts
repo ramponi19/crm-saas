@@ -1,4 +1,6 @@
-import type { BaseGravada, Vocabulario } from '@/lib/empresa-config'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { gravarCamadaMenu, type BaseGravada, type Vocabulario } from '@/lib/empresa-config'
+import { MODULOS } from '@/core/modulos'
 import type { Json } from '@/types/database'
 
 /**
@@ -92,4 +94,101 @@ export function presetDoEditavel(s: PresetEditavel) {
       ...(s.vocabulario ? { _vocabulario: s.vocabulario as Json } : {}),
     },
   }
+}
+
+/** A linha inteira do preset, como o cadastro usa. */
+export interface PresetCompleto {
+  chave: string
+  nome: string
+  rotulos: Record<string, unknown> | null
+  etapas: { id: string; label: string; color?: string; tipo?: string }[] | null
+  campos: { entidade: string; chave: string; rotulo: string; tipo: string; modulo_dono?: string | null }[] | null
+  motivos_perda: string[] | null
+}
+
+/** Preset que vale quando a escolha não existe (ou está desativada). */
+export const PRESET_PADRAO = 'varejo'
+
+/** Os presets ativos, na ordem do cadastro, para os botões do /register. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function lerPresets(db: SupabaseClient<any>): Promise<{ chave: string; nome: string }[]> {
+  const { data } = await db.from('presets_onboarding').select('chave, nome, rotulos').eq('ativo', true)
+  return ((data ?? []) as { chave: string; nome: string; rotulos: { _menu?: MenuDoPreset } | null }[])
+    .map((p) => ({ chave: p.chave, nome: p.nome, ordem: p.rotulos?._menu?.ordem ?? 0 }))
+    .sort((a, b) => a.ordem - b.ordem || a.chave.localeCompare(b.chave))
+    .map(({ chave, nome }) => ({ chave, nome }))
+}
+
+/** A linha do preset escolhido; escolha desconhecida ou desativada = o padrão. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function lerPreset(db: SupabaseClient<any>, chave: string | null | undefined): Promise<PresetCompleto | null> {
+  const campos = 'chave, nome, rotulos, etapas, campos, motivos_perda'
+  if (chave) {
+    const { data } = await db.from('presets_onboarding').select(campos).eq('chave', chave).eq('ativo', true).maybeSingle()
+    if (data) return data as PresetCompleto
+  }
+  const { data } = await db.from('presets_onboarding').select(campos).eq('chave', PRESET_PADRAO).maybeSingle()
+  return (data as PresetCompleto | null) ?? null
+}
+
+/** Probabilidade de fechamento por tipo de etapa (a mesma conta de /api/funil). */
+const PROB_POR_TIPO: Record<string, number> = { ganho: 100, perdido: 0, negociacao: 60, normal: 25 }
+
+/**
+ * COPIA O PRESET PARA A EMPRESA NOVA — o único momento em que ele vale.
+ *
+ *   empresa_menu.itens.base  base do menu, tela inicial e vocabulário (obrigatório:
+ *                            sem ele o menu da empresa cai para o núcleo)
+ *   empresa_modulos          os módulos do manifesto que a base liga
+ *   campos_personalizados    os campos de partida (veículos: placa do item)
+ *   funis + funil_etapas     o funil de partida, como funil padrão
+ *   motivos_perda            os motivos de partida
+ *
+ * Devolve o erro da base (o cadastro desfaz tudo se ela falhar); os demais só
+ * vão para o log — a loja consegue cadastrar à mão depois, e derrubar o cadastro
+ * por uma lista de apoio seria pior.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, preset: PresetCompleto): Promise<{ error: string | null }> {
+  const base = baseDoPreset(preset.rotulos)
+  const { error: errBase } = await gravarCamadaMenu(db, empresaId, 'base', base)
+  if (errBase) return { error: `base do menu: ${errBase.message}` }
+
+  const avisar = (onde: string, e: { message: string } | null) => { if (e) console.error(`[preset] ${onde}:`, e.message) }
+
+  const ligados = new Set(base.habilitados ?? [])
+  const modulos = MODULOS.filter((m) => ligados.has(m.href)).map((m) => ({ empresa_id: empresaId, modulo: m.chave, origem: 'plano', ativo: true }))
+  if (modulos.length) {
+    const { error } = await db.from('empresa_modulos').upsert(modulos, { onConflict: 'empresa_id,modulo', ignoreDuplicates: true })
+    avisar('módulos', error)
+  }
+
+  const campos = (preset.campos ?? []).map((c, i) => ({
+    empresa_id: empresaId, entidade: c.entidade, chave: c.chave, rotulo: c.rotulo, tipo: c.tipo,
+    modulo_dono: c.modulo_dono ?? null, ordem: i, ativo: true,
+  }))
+  if (campos.length) {
+    const { error } = await db.from('campos_personalizados').upsert(campos, { onConflict: 'empresa_id,entidade,chave', ignoreDuplicates: true })
+    avisar('campos', error)
+  }
+
+  const etapas = preset.etapas ?? []
+  if (etapas.length) {
+    const { data: funil, error } = await db.from('funis').insert({ empresa_id: empresaId, nome: 'Funil principal', padrao: true }).select('id').single()
+    avisar('funil', error)
+    if (funil) {
+      const { error: errEt } = await db.from('funil_etapas').insert(etapas.map((e, i) => {
+        const tipo = e.tipo ?? 'normal'
+        return { empresa_id: empresaId, funil_id: funil.id, slug: e.id, label: e.label, cor: e.color ?? '#9199A3', tipo, ordem: i, ativo: true, probabilidade: PROB_POR_TIPO[tipo] ?? 25 }
+      }))
+      avisar('etapas', errEt)
+    }
+  }
+
+  const motivos = preset.motivos_perda ?? []
+  if (motivos.length) {
+    const { error } = await db.from('motivos_perda').insert(motivos.map((label, i) => ({ empresa_id: empresaId, label, ordem: i, ativo: true })))
+    avisar('motivos de perda', error)
+  }
+  return { error: null }
 }

@@ -137,7 +137,7 @@ export default async function DashboardImob() {
     color: e.cor,
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
   })) as KanbanColumn[]
-  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns('imobiliaria')
+  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns()
 
   type VisitaRow = { id: number; data_hora: string; status: string; leads: Embed<{ nome: string | null }>; imoveis: Embed<{ codigo: string | null; titulo: string | null }> }
   type TarefaRow = { id: number; titulo: string; vencimento: string | null; leads: Embed<{ nome: string | null }> }

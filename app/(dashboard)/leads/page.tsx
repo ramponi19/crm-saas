@@ -85,7 +85,7 @@ export default async function LeadsPage() {
      * arquivado. Ver a migração `contar_nao_lidas_no_banco`.
      */
     supabase.from('v_leads_nao_lidas').select('lead_id, nao_lidas').eq('empresa_id', empresaId),
-    supabase.from('empresas').select('preset_onboarding, permissoes').eq('id', empresaId).single(),
+    supabase.from('empresas').select('permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),
@@ -93,7 +93,7 @@ export default async function LeadsPage() {
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Etapas do funil vindas do banco (fallback = funil de partida do preset, na view).
+  // Etapas do funil vindas do banco (fallback = funil padrão, na view).
   type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number; funil_id: number | null; campos_obrigatorios: unknown }
   const funilEtapas: KanbanColumn[] = ((etapasRaw ?? []) as EtapaRow[]).map((e) => ({
     id: e.slug,
@@ -178,7 +178,6 @@ export default async function LeadsPage() {
       initialLeads={leadsVisiveis}
       usuarios={usuariosMapped}
       empresaId={empresaId}
-      preset={empresa?.preset_onboarding ?? null}
       perfil={perfilDoLead(cfg)}
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
