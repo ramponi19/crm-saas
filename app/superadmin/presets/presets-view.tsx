@@ -7,7 +7,7 @@ import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/compone
 import { CATALOGO, resolverMenuPlano } from '@/lib/menu'
 import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 
-export interface SegmentoRow {
+export interface PresetLinha {
   chave: string
   label: string
   descricao: string | null
@@ -35,7 +35,7 @@ interface FormState {
   extras: { href: string; label: string; icon: string }[]  // só para o preview da ordem
 }
 
-function fromRow(s: SegmentoRow): FormState {
+function fromRow(s: PresetLinha): FormState {
   return {
     novo: false, chave: s.chave, label: s.label, descricao: s.descricao ?? '', ordem: String(s.ordem), ativo: s.ativo,
     habilitados: arr(s.modulos_habilitados), labels: obj(s.label_overrides),
@@ -45,7 +45,7 @@ function fromRow(s: SegmentoRow): FormState {
 }
 const EMPTY: FormState = { novo: true, chave: '', label: '', descricao: '', ordem: '99', ativo: true, habilitados: [], labels: {}, menu_layout: {}, extras: [] }
 
-export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
+export function PresetsView({ initial }: { initial: PresetLinha[] }) {
   const router = useRouter()
   const [form, setForm] = useState<FormState | null>(null)
   const [saving, setSaving] = useState(false)
@@ -55,10 +55,10 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   async function preview(chave: string) {
     setPreviewing(chave)
     try {
-      const res = await fetch(`/api/superadmin/segmentos/${chave}/preview`, { method: 'POST' })
+      const res = await fetch(`/api/superadmin/presets/${chave}/preview`, { method: 'POST' })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error ?? 'Falha ao abrir o preview')
-      // Recarga INTEIRA de propósito: entrar no preview de outro segmento troca o
+      // Recarga INTEIRA de propósito: entrar no preview de outro preset troca o
       // contexto do tenant, e `router.push` manteria cache e estado do anterior.
       // eslint-disable-next-line react-hooks/immutability, @next/next/no-location-assign-relative-destination
       window.location.href = '/dashboard'
@@ -87,16 +87,16 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
   }
 
   /**
-   * O MENU DESTE SEGMENTO, resolvido aqui na tela.
+   * O MENU DESTE PRESET, resolvido aqui na tela.
    *
    * Usa o MESMO `resolverMenu` que o CRM usa, alimentado com o formulário em
-   * edição — então a lista que se arrasta é o menu que o segmento vai gerar, e não
+   * edição — então a lista que se arrasta é o menu que o preset vai gerar, e não
    * uma cópia da lista de checkboxes que precisa ser conferida de cabeça.
    *
    * É a base com que uma empresa nova nasce com este preset (o cadastro copia a
    * linha para empresa_menu.itens.base): sem molde por baixo desde 29/10/2026.
    */
-  const menuDoSegmento = form
+  const menuDoPreset = form
     ? resolverMenuPlano({
         role: 'owner',
         isSuperAdmin: false,
@@ -116,7 +116,7 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
     try {
       // Núcleo sempre incluído nos habilitados.
       const habilitados = Array.from(new Set([...TRAVADOS, ...form.habilitados]))
-      const res = await fetch('/api/superadmin/segmentos', {
+      const res = await fetch('/api/superadmin/presets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           novo: form.novo, chave: form.chave, label: form.label, descricao: form.descricao,
@@ -232,8 +232,8 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
                 o estado interno do arrastável nasce da lista e não se atualizava.
               */}
               <MenuOrdenavel
-                key={menuDoSegmento.map((i) => i.href).join('|')}
-                itens={menuDoSegmento.map((i) => ({ href: i.href, label: i.label, icon: i.icon }))}
+                key={menuDoPreset.map((i) => i.href).join('|')}
+                itens={menuDoPreset.map((i) => ({ href: i.href, label: i.label, icon: i.icon }))}
                 onChange={(menu_layout) => setForm((f) => (f ? { ...f, menu_layout } : f))}
               />
             </div>

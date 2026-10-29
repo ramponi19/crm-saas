@@ -30,7 +30,7 @@ export async function POST(req: Request) {
    * SALVAR É REMENDO, NÃO SUBSTITUIÇÃO.
    *
    * Antes o `row` trazia `?? []` em todo campo que a tela não manda — e a tela de
-   * Segmentos manda apenas label, descrição, ordem, ativo, rótulos e módulos
+   * presets manda apenas label, descrição, ordem, ativo, rótulos e módulos
    * ligados. Resultado: cada salvamento zerava `hidden_hrefs` e `modulos_extra`
    * em silêncio. Foi exatamente assim que a imobiliária ficou com
    * `modulos_extra = []` e perdeu "Metas e Ranking" do menu (achado em 20/08/2026).
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
    * campo, a tela precisa mandá-lo explicitamente vazio — que é o que "salvar" deve
    * exigir de quem quer apagar configuração.
    */
-  // Desde 21/10/2026 o segmento mora em presets_onboarding; a linha de sempre
+  // A linha de sempre
   // (o formato que esta tela edita) entra e sai por lib/presets.ts.
   const { data: presetAtual } = await svc.from('presets_onboarding')
     .select('chave, nome, descricao, rotulos, ativo').eq('chave', chave).maybeSingle()
@@ -68,6 +68,6 @@ export async function POST(req: Request) {
     .upsert({ ...presetDoEditavel(row as unknown as PresetEditavel), updated_at: new Date().toISOString() }, { onConflict: 'chave' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await logSuperAdminAction({ adminUserId: auth.userId, acao: b.novo ? 'criar_segmento' : 'editar_segmento', detalhes: { chave } })
+  await logSuperAdminAction({ adminUserId: auth.userId, acao: b.novo ? 'criar_preset' : 'editar_preset', detalhes: { chave } })
   return NextResponse.json({ ok: true, chave })
 }

@@ -135,26 +135,37 @@ export async function lerPreset(db: SupabaseClient<any>, chave: string | null | 
 const PROB_POR_TIPO: Record<string, number> = { ganho: 100, perdido: 0, negociacao: 60, normal: 25 }
 
 /**
- * COPIA O PRESET PARA A EMPRESA NOVA — o único momento em que ele vale.
+ * COPIA O PRESET PARA A EMPRESA — no cadastro (empresa nova) e no preview do
+ * superadmin (a empresa de demonstração, com `substituir`).
  *
  *   empresa_menu.itens.base  base do menu, tela inicial e vocabulário (obrigatório:
  *                            sem ele o menu da empresa cai para o núcleo)
  *   empresa_modulos          os módulos do manifesto que a base liga
  *   campos_personalizados    os campos de partida (veículos: placa do item)
- *   funis + funil_etapas     o funil de partida, como funil padrão
- *   motivos_perda            os motivos de partida
+ *   funis + funil_etapas     o funil de partida, como funil padrão (se não houver)
+ *   motivos_perda            os motivos de partida (se não houver)
+ *
+ * `substituir` (só o preview): antes de gravar, tira os módulos do manifesto e
+ * os campos de módulo (modulo_dono preenchido) que o preset anterior deixou —
+ * senão prever a imobiliária depois da loja de veículos mostraria as duas.
  *
  * Devolve o erro da base (o cadastro desfaz tudo se ela falhar); os demais só
  * vão para o log — a loja consegue cadastrar à mão depois, e derrubar o cadastro
  * por uma lista de apoio seria pior.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, preset: PresetCompleto): Promise<{ error: string | null }> {
+export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, preset: PresetCompleto, { substituir = false } = {}): Promise<{ error: string | null }> {
   const base = baseDoPreset(preset.rotulos)
   const { error: errBase } = await gravarCamadaMenu(db, empresaId, 'base', base)
   if (errBase) return { error: `base do menu: ${errBase.message}` }
 
   const avisar = (onde: string, e: { message: string } | null) => { if (e) console.error(`[preset] ${onde}:`, e.message) }
+
+  if (substituir) {
+    const doManifesto = MODULOS.filter((m) => !m.addon).map((m) => m.chave)
+    avisar('limpar módulos', (await db.from('empresa_modulos').delete().eq('empresa_id', empresaId).in('modulo', doManifesto)).error)
+    avisar('limpar campos', (await db.from('campos_personalizados').delete().eq('empresa_id', empresaId).not('modulo_dono', 'is', null)).error)
+  }
 
   const ligados = new Set(base.habilitados ?? [])
   const modulos = MODULOS.filter((m) => ligados.has(m.href)).map((m) => ({ empresa_id: empresaId, modulo: m.chave, origem: 'plano', ativo: true }))
@@ -173,7 +184,8 @@ export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, 
   }
 
   const etapas = preset.etapas ?? []
-  if (etapas.length) {
+  const { count: funisJa } = await db.from('funis').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId)
+  if (etapas.length && !funisJa) {
     const { data: funil, error } = await db.from('funis').insert({ empresa_id: empresaId, nome: 'Funil principal', padrao: true }).select('id').single()
     avisar('funil', error)
     if (funil) {
@@ -186,9 +198,17 @@ export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, 
   }
 
   const motivos = preset.motivos_perda ?? []
-  if (motivos.length) {
+  const { count: motivosJa } = await db.from('motivos_perda').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId)
+  if (motivos.length && !motivosJa) {
     const { error } = await db.from('motivos_perda').insert(motivos.map((label, i) => ({ empresa_id: empresaId, label, ordem: i, ativo: true })))
     avisar('motivos de perda', error)
   }
   return { error: null }
+}
+
+/** A linha do preset pela chave, ativo ou não (o preview do superadmin mostra qualquer um). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function lerPresetParaPreview(db: SupabaseClient<any>, chave: string): Promise<PresetCompleto | null> {
+  const { data } = await db.from('presets_onboarding').select('chave, nome, rotulos, etapas, campos, motivos_perda').eq('chave', chave).maybeSingle()
+  return (data as PresetCompleto | null) ?? null
 }

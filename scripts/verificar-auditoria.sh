@@ -389,8 +389,8 @@ n "filtro nao exige equipe montada"    "components/modules/leads/leads-view.tsx"
 v "esteira e responsavel exclusivos"   "components/modules/leads/leads-view.tsx" "if (responsavelId) return leadsDoFunilBase.filter"
 
 echo "== funil: uma verdade so (19/08) =="
-n "superadmin nao edita funil morto"    "app/superadmin/segmentos/segmentos-view.tsx" "funil_seed"
-n "rota de segmentos nao grava seed"    "app/api/superadmin/segmentos/route.ts" "funil_seed"
+n "superadmin nao edita funil morto"    "app/superadmin/presets/presets-view.tsx" "funil_seed"
+n "rota de presets nao grava seed"      "app/api/superadmin/presets/route.ts" "funil_seed"
 n "segmentos.ts nao declara funil"      "lib/segmentos.ts" "funil: ["
 v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
 v "funil da imob tem Aprovados"        "supabase/migrations/20261029000100_presets_completos.sql" '"label":"Aprovados"'
@@ -486,9 +486,9 @@ v "executivo ignora imovel nulo"       "app/(dashboard)/executivo/page.tsx" "fil
 echo "== menu configuravel e rolagem (20/08) =="
 # Salvar segmento zerava hidden_hrefs e modulos_extra: era ?? [] em campo que a
 # tela nem manda. Foi como a imobiliaria perdeu os extras do menu.
-v "salvar segmento nao zera campo"     "app/api/superadmin/segmentos/route.ts" "SALVAR É REMENDO"
-v "campo ausente conserva o banco"     "app/api/superadmin/segmentos/route.ts" "vindo !== undefined ? vindo"
-v "ordem do menu tem coluna"           "app/superadmin/segmentos/segmentos-view.tsx" "menu_layout: form.menu_layout"
+v "salvar preset nao zera campo"       "app/api/superadmin/presets/route.ts" "SALVAR É REMENDO"
+v "campo ausente conserva o banco"     "app/api/superadmin/presets/route.ts" "vindo !== undefined ? vindo"
+v "ordem do menu tem coluna"           "app/superadmin/presets/presets-view.tsx" "menu_layout: form.menu_layout"
 v "ordem em camadas no resolvedor"     "lib/menu.ts" "configDono?.ordem ?? {}"
 v "chave dos grupos e unica"           "lib/menu.ts" "CHAVE_GRUPOS = "
 v "dono salva a ordem"                 "app/api/menu-config/route.ts" "body.ordem ?? {}"

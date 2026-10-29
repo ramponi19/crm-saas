@@ -17,7 +17,7 @@ const navItems = [
   { href: '/superadmin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
   { href: '/superadmin/empresas', label: 'Empresas', icon: Building2 },
   { href: '/superadmin/pedidos', label: 'Pedidos de módulo', icon: Inbox },
-  { href: '/superadmin/segmentos', label: 'Segmentos', icon: Layers },
+  { href: '/superadmin/presets', label: 'Segmentos', icon: Layers },
   { href: '/superadmin/laboratorio', label: 'Laboratório', icon: FlaskConical },
   { href: '/superadmin/fipe', label: 'Tabela FIPE', icon: Car },
   { href: '/superadmin/metricas', label: 'Métricas', icon: LineChart },

@@ -49,14 +49,6 @@
       "motivo": "inventario",
       "teto": 3
     },
-    "app/api/superadmin/segmentos/[chave]/preview/route.ts": {
-      "motivo": "inventario",
-      "teto": 4
-    },
-    "app/api/superadmin/segmentos/route.ts": {
-      "motivo": "inventario",
-      "teto": 4
-    },
     "app/landing/data.ts": {
       "motivo": "inventario",
       "teto": 7
@@ -117,13 +109,13 @@
       "motivo": "inventario",
       "teto": 7
     },
-    "app/superadmin/segmentos/page.tsx": {
-      "motivo": "inventario",
-      "teto": 6
+    "app/superadmin/presets/page.tsx": {
+      "motivo": "presets_onboarding",
+      "teto": 1
     },
-    "app/superadmin/segmentos/segmentos-view.tsx": {
-      "motivo": "inventario",
-      "teto": 21
+    "app/superadmin/presets/presets-view.tsx": {
+      "motivo": "presets_onboarding",
+      "teto": 9
     },
     "app/zapintel/api/sugestao/route.ts": {
       "motivo": "inventario",
@@ -143,7 +135,7 @@
     },
     "components/superadmin/superadmin-shell.tsx": {
       "motivo": "inventario",
-      "teto": 2
+      "teto": 1
     },
     "lib/captacao-imob.ts": {
       "motivo": "inventario",
@@ -168,10 +160,6 @@
     "lib/segmentos.ts": {
       "motivo": "inventario",
       "teto": 48
-    },
-    "lib/superadmin-preview.ts": {
-      "motivo": "presets_onboarding",
-      "teto": 17
     },
     "lib/zapintel/ponte.ts": {
       "motivo": "inventario",
