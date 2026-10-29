@@ -351,7 +351,7 @@ echo "== painel executivo (19/08) =="
 # Padroes escolhidos para NAO casarem com comentario: sao trechos de codigo
 # executavel (chamada, chave de objeto, expressao), nunca prosa minha.
 v "executivo exige dono ou admin"     "app/(dashboard)/executivo/page.tsx" "await requireEmpresaRole(.'owner', 'admin'.)"
-v "executivo trava por capacidade"    "app/(dashboard)/executivo/page.tsx" "cfgSeg.capacidades.comissaoPorNegocio) return <VitrineDoModulo"
+v "executivo trava por modulo ligado"  "app/(dashboard)/executivo/page.tsx" "ligadosDaEmpresa(cfg).has('/executivo')) return <VitrineDoModulo"
 v "executivo no menu e opcional"      "lib/menu.ts" "href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true"
 v "icone do executivo no mapa"        "components/layout/menu-icons.ts" "Landmark,"
 v "comissao respeita papel vago"      "lib/comissao-imob.ts" "temCaptador ? arredonda"
@@ -363,7 +363,7 @@ v "resolverMenu injeta extras"        "lib/menu.ts" "if (noCatalogo.has(ex.href)
 v "extra escolhe o grupo"             "lib/menu.ts" "const grupo = ex.grupo ?? 'Operação'"
 v "ranking e extra da imobiliaria"    "lib/segmentos.ts" "href: '/ranking', label: 'Metas e Ranking'"
 v "ranking abre por segmento"         "app/(dashboard)/ranking/page.tsx" "if (!isAdmin && !abertoAoTime) redirect"
-v "trava do ranking le o banco"       "app/(dashboard)/ranking/page.tsx" "extrasBanco.some"
+v "trava do ranking le o banco"       "app/(dashboard)/ranking/page.tsx" ".some((m) => m?.href === '/ranking')"
 v "captacao de imovel e modulo proprio" "lib/captacao-imob.ts" "imoveisCaptadosPorPessoa"
 # Sem '*' no padrao: no grep basico ele e quantificador, e a checagem passava a
 # exigir espacos onde o codigo tem "* 1" — o check falhava com o codigo certo.
@@ -371,19 +371,19 @@ v "ranking soma imovel captado"       "lib/ranking.ts" "+ l.imoveisCaptados"
 v "conversao segue sendo por lead"    "lib/ranking.ts" "l.conversao = l.captacoes > 0"
 
 echo "== agenda em calendario (19/08) =="
-v "agenda trava por capacidade"        "app/(dashboard)/agenda/page.tsx" "cap.agendaVisitas"
+v "agenda trava por modulo ligado"     "app/(dashboard)/agenda/page.tsx" "ligadosDaEmpresa(cfg).has('/agenda')) return <VitrineDoModulo"
 n "agenda nao olha nome de segmento"   "app/(dashboard)/agenda/page.tsx" "seg !== 'imobiliaria'"
 v "agenda usa dia LOCAL"               "app/(dashboard)/agenda/agenda-view.tsx" "const chaveLocal"
 v "agenda tem aba supervisao"          "app/(dashboard)/agenda/agenda-view.tsx" "aba === 'supervisao'"
 v "agenda avisa fim em outro dia"      "app/(dashboard)/agenda/agenda-view.tsx" "const faixa ="
 v "compromisso tem tipo e fim"         "app/(dashboard)/agenda/agenda-view.tsx" "participantes: form.participantes.trim"
-v "menu ordena por segmento"           "lib/menu.ts" "seg.menuLayout"
+v "menu ordena pela camada base"       "lib/menu.ts" "base?.menuLayout ?? {}"
 v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
 
 echo "== pipeline (19/08) =="
 v "pipeline filtra por responsavel"   "components/modules/leads/leads-view.tsx" "setResponsavelId(e.target.value)"
 v "palavra do filtro vem do segmento" "components/modules/leads/leads-view.tsx" "equipeLabel.toLowerCase()"
-v "pagina passa a palavra da equipe"  "app/(dashboard)/leads/page.tsx" "equipeLabel ?? 'Vendedor'"
+v "pagina passa a palavra da equipe"  "app/(dashboard)/leads/page.tsx" "equipeLabel={vocabulario({ preset: empresa?.preset_onboarding ?? null }).equipe}"
 v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "{!restringe && ("
 n "filtro nao exige equipe montada"    "components/modules/leads/leads-view.tsx" "restringe && usuarios.length > 1"
 v "esteira e responsavel exclusivos"   "components/modules/leads/leads-view.tsx" "if (responsavelId) return leadsDoFunilBase.filter"
@@ -434,7 +434,7 @@ v "os tres passos do modelo"           "app/(dashboard)/clientes/components/fund
 v "lista recarrega apos fundir"        "app/(dashboard)/clientes/components/clientes-view.tsx" "router.refresh()"
 
 echo "== rotulo do topo (20/08) =="
-v "topo respeita rotulo do segmento"   "components/layout/topbar.tsx" "const titulo = rotuloDoSegmento ?? title"
+v "topo respeita rotulo do menu"       "components/layout/topbar.tsx" "const titulo = rotuloDoMenu ?? title"
 v "layout passa os rotulos"            "app/(dashboard)/layout.tsx" "RotulosProvider valor="
 v "rotulo resolve pela raiz da rota"   "components/layout/rotulos-context.tsx" "const raiz = ./. + (pathname.split"
 
@@ -452,10 +452,10 @@ v "impressao esconde so os controles"  "components/modules/relatorios/relatorios
 echo "== metas e ranking (20/08) =="
 # Lista vazia no banco nao pode vencer a declaracao do codigo: com
 # modulos_extra = [] o item sumia do menu e o corretor caia no dashboard.
-v "extra vazio do banco cai no codigo" "lib/menu.ts" "segOverride?.modulosExtra?.length ?"
-v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "extrasBanco.length > 0"
+v "extra vazio do banco cai no codigo" "lib/empresa-config.ts" "lido?.modulosExtra?.length ?"
+v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "camadaBase(menuDoPreset("
 v "segmento nomeia quem vende"         "lib/segmentos.ts" "equipeLabel: .Corretor."
-v "menu e ranking usam o mesmo nome"   "app/(dashboard)/layout.tsx" "equipeLabel ?? .Vendedor."
+v "menu e ranking usam o mesmo nome"   "app/(dashboard)/layout.tsx" "vocabulario(cfg).equipe"
 v "coluna leva o nome do segmento"     "app/(dashboard)/ranking/ranking-view.tsx" "font-semibold\">{equipeLabel}"
 v "cabecalho da secao como no modelo"  "app/(dashboard)/ranking/ranking-view.tsx" "Ranking Completo"
 v "papel aparece ao lado do nome"      "app/(dashboard)/ranking/ranking-view.tsx" "papelDe(papeis.l.usuario_id., equipeLabel)"
