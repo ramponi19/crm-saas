@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { papelDoSegmento } from "@/lib/zapintel/papel";
+import { papelDoPreset } from "@/lib/zapintel/papel";
 import { useRpcAoVivo } from "./useRpcAoVivo";
 
 /**
@@ -77,7 +77,8 @@ export function LeadProvider({ children, empresa }: { children: ReactNode; empre
     ultimaMensagem: resumo?.ultimaMensagem ?? null,
     aoVivo,
     storeName: resumo?.empresaNome ?? "",
-    sellerName: papelDoSegmento(resumo?.segmento),
+    // A chave do JSON do zapintel_resumo continua `segmento` (é o preset).
+    sellerName: papelDoPreset(resumo?.segmento),
   };
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

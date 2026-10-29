@@ -159,7 +159,7 @@
     },
     "app/zapintel/api/sugestao/route.ts": {
       "motivo": "inventario",
-      "teto": 9
+      "teto": 3
     },
     "components/layout/rotulos-context.tsx": {
       "motivo": "inventario",
@@ -208,14 +208,6 @@
     "lib/superadmin-preview.ts": {
       "motivo": "presets_onboarding",
       "teto": 17
-    },
-    "lib/zapintel/conversas.ts": {
-      "motivo": "inventario",
-      "teto": 9
-    },
-    "lib/zapintel/papel.ts": {
-      "motivo": "inventario",
-      "teto": 6
     },
     "lib/zapintel/ponte.ts": {
       "motivo": "inventario",

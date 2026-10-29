@@ -127,8 +127,8 @@ export interface Conversas {
   /** Os leads como estão no CRM, por id — é daqui que sai a loja de cada um. */
   porId: Map<number, LeadBanco>
   nomeDaLoja: string
-  /** O segmento da empresa no CRM (`empresas.segmento`), cru. Ver `papel.ts`. */
-  segmento: string | null
+  /** O preset da empresa no CRM (`empresas.preset_onboarding`), cru. Ver `papel.ts`. */
+  preset: string | null
   /**
    * O que do CRM não deu para ler nesta carga (17/10/2026). Nas telas, o
    * padrão ("Loja", sem responsável) basta; no PROMPT da IA, padrão pareceria
@@ -153,11 +153,11 @@ export async function carregarConversas(
 ): Promise<Conversas> {
   const indisponivel: DadoIndisponivel[] = []
   const { data: empresa, error: erroEmpresa } = await db
-    .from('empresas').select('nome, segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
+    .from('empresas').select('nome, preset_onboarding').eq('id', empresaId).maybeSingle()
   if (erroEmpresa) indisponivel.push('empresa')
 
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
-  const segmento = (empresa as { segmento?: string | null } | null)?.segmento ?? null
+  const preset = (empresa as { preset_onboarding?: string | null } | null)?.preset_onboarding ?? null
 
   const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
     let q = db.from('leads')
@@ -205,7 +205,7 @@ export async function carregarConversas(
 
   const porId = new Map(leadsRaw.map((l) => [l.id, l]))
   if (!porId.size) {
-    return { analisados: [], porId, nomeDaLoja, segmento, indisponivel }
+    return { analisados: [], porId, nomeDaLoja, preset, indisponivel }
   }
 
   const alvo = [...porId.keys()]
@@ -230,5 +230,5 @@ export async function carregarConversas(
   // memória, sobre dado já carregado: milissegundos.
   msgs.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
 
-  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, segmento, indisponivel }
+  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, preset, indisponivel }
 }

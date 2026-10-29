@@ -76,7 +76,7 @@ v "aviso do banco lista os leads"   "supabase/funcoes/zapintel_ao_vivo.sql" "'le
 n "montar sem o motor de agosto"    "lib/zapintel/montar.ts" "classifyLead"
 n "vendedor nao sai do texto"       "lib/zapintel/montar.ts" "quemAtendeu("
 n "travamento sem objecao por palavra" "lib/zapintel/travou.ts" "OBJECOES"
-v "sugestao usa o papel do segmento" "app/zapintel/api/sugestao/route.ts" "papelDoSegmento(segmento)"
+v "sugestao usa o papel do preset" "app/zapintel/api/sugestao/route.ts" "papelDoPreset(preset)"
 v "conversa nao viaja para a tela"  "app/zapintel/api/conversa/route.ts" "messages: \[\]"
 v "ficha abre a conversa no CRM"    "app/zapintel/leads/[id]/page.tsx" "/leads?lead="
 n "ficha sem leitura automatica"    "app/zapintel/leads/[id]/page.tsx" "RegraAutomatica"

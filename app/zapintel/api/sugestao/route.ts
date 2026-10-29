@@ -5,7 +5,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { ondeTravou, contextoDaSugestao } from '@/lib/zapintel/travou'
 import { montarFicha } from '@/lib/zapintel/ficha'
-import { papelDoSegmento } from '@/lib/zapintel/papel'
+import { papelDoPreset } from '@/lib/zapintel/papel'
 import { perguntarIA } from '@/lib/zapintel/ia'
 
 /**
@@ -30,7 +30,7 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  * já morreram em 10/10. Aqui o contexto vem de onde ele mora:
  *
  *     nome da loja ..... `carregarConversas` (tabela `empresas`)
- *     papel ............ `papelDoSegmento(segmento)`: Vendedor, Corretor…
+ *     papel ............ `papelDoPreset(preset)`: Vendedor, Corretor…
  *
  * ══ POR QUE A IA NÃO PODE INVENTAR NÚMERO ══════════════════════════════════
  *
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a conversa de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, porId, nomeDaLoja: nomeDoCrm, segmento, indisponivel } = await carregarConversas(db, empresaId, [id])
+  const { analisados, porId, nomeDaLoja: nomeDoCrm, preset, indisponivel } = await carregarConversas(db, empresaId, [id])
   // Nome da empresa ilegível: o prompt não inventa um ("Loja"). Ver `contextoDoPerfil`.
   const nomeDaLoja = indisponivel.includes('empresa') ? 'a loja' : nomeDoCrm
   const lead = analisados[0]
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const papel = papelDoSegmento(segmento)
+  const papel = papelDoPreset(preset)
 
   /**
    * ⚠ O RAMO DO SEGMENTO SAIU DAQUI, e a razão está na tela.
