@@ -201,10 +201,6 @@
       "motivo": "inventario",
       "teto": 3
     },
-    "components/modules/configuracoes/configuracoes-view.tsx": {
-      "motivo": "inventario",
-      "teto": 11
-    },
     "components/modules/leads/lead-acoes-panel.tsx": {
       "motivo": "inventario",
       "teto": 1

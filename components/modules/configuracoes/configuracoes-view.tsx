@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Percent, Timer, Save, Link as LinkIcon, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, FileText, ArrowLeftRight } from 'lucide-react'
+import { Percent, Timer, Save, Wallet, MessageSquareText, Clock, Download, Bell, Ban, Zap, GitBranch, FileText, ArrowLeftRight } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 import { Card, Input, Button, Tabs, notify } from '@/components/ui'
 import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
@@ -30,7 +29,6 @@ interface Props {
   dadosLoja: unknown
   preferencias: unknown
   taxas: Array<{ forma_pagamento: string; bandeira: string | null; parcelas: number; percentual_taxa: number }>
-  segmento?: string | null
   slug?: string | null
   /**
    * Aba fixa: a tela de Configurações (navegação nova, 21/10/2026) mostra cada aba
@@ -58,7 +56,7 @@ const TABS = [
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ taxas, segmento, slug, aba: abaFixa }: Props) {
+export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
@@ -73,20 +71,14 @@ export function ConfiguracoesView({ taxas, segmento, slug, aba: abaFixa }: Props
   const params = useSearchParams()
   const [abaEscolhida, setAba] = useState(params.get('aba') || 'pagamentos')
   const aba = abaFixa ?? abaEscolhida
-  /**
-   * As abas extra vêm do contrato, não de uma cascata de `if`.
-   *
-   * Eram quatro comparações aqui (imobiliária, food, saúde, concessionária), e
-   * cada vertical nova acrescentava um degrau nessa escada — nesta tela, que todo
-   * segmento abre. Agora o segmento declara em `abasExtraConfiguracoes` o que quer.
-   *
-   * O ícone fica AQUI e não no contrato de propósito: `lib/segmentos.ts` é
-   * config, e importar componente de ícone ali o transformaria em código de tela.
+  /*
+   * As abas de módulo (portais, cardápio, agendamento) não passam mais por aqui:
+   * cada uma é uma seção de Configurações, que só existe com o módulo ligado
+   * (core/modulos.ts → abasDosModulos, 22/10/2026). O único chamador
+   * (SecaoConfiguracoes) sempre fixa a aba e nunca passou o preset, então a
+   * barra — quando aparece — é a das abas comuns.
    */
-  const extras = SEGMENTOS[normalizarSegmento(segmento)].abasExtraConfiguracoes
-  const tabs = extras.length
-    ? [...TABS, ...extras.map((e) => ({ ...e, Icon: LinkIcon }))]
-    : TABS
+  const tabs = TABS
   const [empresaId, setEmpresaId] = useState<number | null>(null)
 
   useEffect(() => {
