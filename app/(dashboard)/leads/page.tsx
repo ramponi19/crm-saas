@@ -1,7 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/leads/types'
-import { normalizarSegmento } from '@/lib/segmentos'
 import { perfilDoLead, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
@@ -86,14 +85,14 @@ export default async function LeadsPage() {
      * arquivado. Ver a migração `contar_nao_lidas_no_banco`.
      */
     supabase.from('v_leads_nao_lidas').select('lead_id, nao_lidas').eq('empresa_id', empresaId),
-    supabase.from('empresas').select('segmento:preset_onboarding, permissoes').eq('id', empresaId).single(),
+    supabase.from('empresas').select('preset_onboarding, permissoes').eq('id', empresaId).single(),
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Etapas do funil vindas do banco (fallback = constante do segmento, na view).
+  // Etapas do funil vindas do banco (fallback = funil de partida do preset, na view).
   type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number; funil_id: number | null; campos_obrigatorios: unknown }
   const funilEtapas: KanbanColumn[] = ((etapasRaw ?? []) as EtapaRow[]).map((e) => ({
     id: e.slug,
@@ -178,15 +177,15 @@ export default async function LeadsPage() {
       initialLeads={leadsVisiveis}
       usuarios={usuariosMapped}
       empresaId={empresaId}
-      segmento={normalizarSegmento(empresa?.segmento)}
-      perfil={perfilDoLead({ preset: empresa?.segmento ?? null })}
+      preset={empresa?.preset_onboarding ?? null}
+      perfil={perfilDoLead({ preset: empresa?.preset_onboarding ?? null })}
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
       funis={(funisRaw ?? []) as Funil[]}
       scoreConfig={scoreConfig}
       restringe={restringe}
       meuId={user?.id}
-      equipeLabel={vocabulario({ preset: empresa?.segmento ?? null }).equipe}
+      equipeLabel={vocabulario({ preset: empresa?.preset_onboarding ?? null }).equipe}
     />
   )
 }

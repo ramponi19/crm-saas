@@ -1,4 +1,4 @@
-// kanban_status agora é dinâmico (varia por segmento) — string livre.
+// kanban_status agora é dinâmico (varia por funil da empresa) — string livre.
 export type KanbanStatus = string
 
 export interface Lead {
@@ -79,7 +79,7 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
 ]
 
 /**
- * Funil imobiliário (segmento 'imobiliaria').
+ * Funil imobiliário (preset de onboarding 'imobiliaria').
  *
  * As três etapas depois do crédito — contrato, vistoria e entrega de chaves —
  * existem porque o negócio imobiliário NÃO acaba na proposta aceita: o contrato é
@@ -116,13 +116,16 @@ const KANBAN_IMOBILIARIA: KanbanColumn[] = [
   { id: 'perdido',         label: 'Perdido',           color: '#DC2626', tipo: 'perdido' },
 ]
 
-const KANBAN_POR_SEGMENTO: Record<string, KanbanColumn[]> = {
+const KANBAN_POR_PRESET: Record<string, KanbanColumn[]> = {
   imobiliaria: KANBAN_IMOBILIARIA,
 }
 
-/** Colunas do kanban conforme o segmento (fallback = funil padrão). */
-export function getKanbanColumns(segmento?: string | null): KanbanColumn[] {
-  return (segmento && KANBAN_POR_SEGMENTO[segmento]) || KANBAN_COLUMNS
+/**
+ * Colunas do kanban quando a empresa ainda não tem etapas no banco: o funil com
+ * que o preset de onboarding nasce (fallback = funil padrão).
+ */
+export function getKanbanColumns(preset?: string | null): KanbanColumn[] {
+  return (preset && KANBAN_POR_PRESET[preset]) || KANBAN_COLUMNS
 }
 
 /** Id da etapa "ganho" (convertido/fechamento) do conjunto de colunas. */

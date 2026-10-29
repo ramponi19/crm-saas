@@ -27,7 +27,7 @@ export default async function GestaoLeadsPage() {
 
   const [{ data: vinculo }, { data: empresa }, { data: usuarioLogado }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
-    supabase.from('empresas').select('segmento:preset_onboarding, permissoes').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('preset_onboarding, permissoes').eq('id', empresaId).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
   ])
   const role = vinculo?.role ?? ''
@@ -70,7 +70,7 @@ export default async function GestaoLeadsPage() {
     color: '#7FB0E8',
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
   }))
-  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns(empresa?.segmento ?? null)
+  const colunas = doBanco.length > 0 ? doBanco : getKanbanColumns(empresa?.preset_onboarding ?? null)
   const terminais = new Set(colunas.filter((c) => c.tipo === 'ganho' || c.tipo === 'perdido').map((c) => c.id))
 
   type Embed<T> = T | T[] | null

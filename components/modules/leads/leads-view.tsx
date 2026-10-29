@@ -21,10 +21,11 @@ interface LeadsViewProps {
   initialLeads: Lead[]
   usuarios: Usuario[]
   empresaId: number
-  segmento?: string | null
+  /** Preset de onboarding: só escolhe o funil de partida quando o banco não tem etapas. */
+  preset?: string | null
   /** O que o card do lead mostra além do comum (lib/empresa-config.ts → perfilDoLead). */
   perfil: PerfilDoLead
-  /** Etapas vindas de funil_etapas (banco). Fallback = constante do segmento. */
+  /** Etapas vindas de funil_etapas (banco). Fallback = funil de partida do preset. */
   funilEtapas?: KanbanColumn[]
   /** Motivos de perda configurados da empresa (Fase 4.2). */
   motivos?: Motivo[]
@@ -37,11 +38,11 @@ interface LeadsViewProps {
   /** ID do usuário logado (usado com `restringe` no realtime). */
   meuId?: string
   /**
-   * Como ESTE segmento chama quem atende. Padrão "Vendedor".
+   * Como ESTA empresa chama quem atende. Padrão "Vendedor".
    *
    * O filtro do funil dizia "Todos os corretores" em toda empresa — vocabulário de
    * imobiliária numa tela do núcleo, que a loja de celular lê como texto de outro
-   * sistema. Vem de fora porque a palavra é do segmento, não desta tela: o mesmo
+   * sistema. Vem de fora porque a palavra é da empresa, não desta tela: o mesmo
    * caminho que o Ranking já usa.
    */
   equipeLabel?: string
@@ -62,7 +63,7 @@ function porMensagemRecente(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => quando(b) - quando(a))
 }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, segmento, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
+export function LeadsView({ initialLeads, usuarios, empresaId, preset, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
   const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
@@ -124,8 +125,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, segmento, perfil,
 
   const columns = useMemo(() => {
     const doFunil = (funilEtapas ?? []).filter(c => funilId == null || c.funilId === funilId)
-    return doFunil.length > 0 ? doFunil : getKanbanColumns(segmento)
-  }, [funilEtapas, segmento, funilId])
+    return doFunil.length > 0 ? doFunil : getKanbanColumns(preset)
+  }, [funilEtapas, preset, funilId])
 
   const leadsDoFunilBase = useMemo(
     () => (funilId == null ? leads : leads.filter(l => (l.funil_id ?? funilPadrao) === funilId)),
