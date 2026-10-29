@@ -2,8 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { CreditCard, Power, CalendarClock, Eye, Shapes } from 'lucide-react'
-import { PRESETS_DO_CODIGO } from '@/lib/empresa-config'
+import { CreditCard, Power, CalendarClock, Eye } from 'lucide-react'
 import { Card, Button, Modal, Select, Input } from '@/components/ui'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
@@ -14,19 +13,17 @@ interface Props {
   empresaNome: string
   planoAtual: string
   statusAtual: string
-  presetAtual: string
 }
 
-type ModalTipo = 'plano' | 'status' | 'trial' | 'segmento' | null
+type ModalTipo = 'plano' | 'status' | 'trial' | null
 
 const MODAL_TITULO: Record<Exclude<ModalTipo, null>, string> = {
   plano: 'Trocar plano',
-  segmento: 'Trocar segmento',
   status: 'Alterar status',
   trial: 'Estender trial',
 }
 
-export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, presetAtual }: Props) {
+export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalTipo>(null)
   const [loading, setLoading] = useState(false)
@@ -36,7 +33,6 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
   const [novoPlano, setNovoPlano] = useState(planoAtual)
   const [novoStatus, setNovoStatus] = useState(statusAtual)
   const [diasTrial, setDiasTrial] = useState(14)
-  const [novoPreset, setNovoPreset] = useState(presetAtual)
 
   async function executar(body: Record<string, unknown>) {
     setLoading(true)
@@ -84,14 +80,12 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
 
   const botoes = [
     { tipo: 'plano' as const, label: 'Trocar plano', icon: CreditCard },
-    { tipo: 'segmento' as const, label: 'Trocar segmento', icon: Shapes },
     { tipo: 'status' as const, label: 'Alterar status', icon: Power },
     { tipo: 'trial' as const, label: 'Estender trial', icon: CalendarClock },
   ]
 
   function confirmar() {
     if (modal === 'plano') executar({ tipo: 'trocar_plano', plano: novoPlano })
-    if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoPreset })
     if (modal === 'status') executar({ tipo: 'alterar_status', status: novoStatus })
     if (modal === 'trial') executar({ tipo: 'estender_trial', dias: diasTrial })
   }
@@ -147,14 +141,6 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
           <Select label="Plano" value={novoPlano} onChange={e => setNovoPlano(e.target.value)}>
             {['free', 'starter', 'pro'].map(p => (
               <option key={p} value={p} className="capitalize">{p}</option>
-            ))}
-          </Select>
-        )}
-
-        {modal === 'segmento' && (
-          <Select label="Segmento" value={novoPreset} onChange={e => setNovoPreset(e.target.value)}>
-            {PRESETS_DO_CODIGO.map(({ chave, nome }) => (
-              <option key={chave} value={chave}>{nome}</option>
             ))}
           </Select>
         )}

@@ -45,10 +45,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/api/superadmin/empresas/[id]/route.ts": {
-      "motivo": "inventario",
-      "teto": 9
-    },
     "app/api/superadmin/laboratorio/preview/route.ts": {
       "motivo": "inventario",
       "teto": 3
@@ -145,10 +141,6 @@
       "motivo": "inventario",
       "teto": 2
     },
-    "components/superadmin/acoes-empresa.tsx": {
-      "motivo": "inventario",
-      "teto": 10
-    },
     "components/superadmin/superadmin-shell.tsx": {
       "motivo": "inventario",
       "teto": 2
@@ -159,7 +151,7 @@
     },
     "lib/empresa-config.ts": {
       "motivo": "presets_onboarding",
-      "teto": 7
+      "teto": 2
     },
     "lib/estoque-campos.ts": {
       "motivo": "inventario",

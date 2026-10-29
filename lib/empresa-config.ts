@@ -3,7 +3,6 @@ import type { CamadaBase, MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadm
 import type { ModuloPlano } from '@/lib/plano'
 import { capacidadesDosModulos, moduloPorChave, paineisDosModulos, type CapacidadesDoModulo, type PainelDoLead } from '@/core/modulos'
 import { hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DA EMPRESA, NUM LUGAR SÓ.
@@ -305,24 +304,3 @@ export function vocabulario(cfg: Pick<ConfigEmpresa, 'vocabulario'>): { equipe: 
   return { equipe: cfg.vocabulario.equipe ?? 'Vendedor' }
 }
 
-/**
- * TRANSITÓRIO (29/10/2026): a lista e a validação de presets do cadastro e do
- * superadmin, ainda pelo código. Saem quando o /register ler presets_onboarding
- * e a troca de preset sair da ficha da empresa.
- */
-const MOLDES = SEGMENTOS
-const chaveDoMolde = normalizarSegmento
-
-/** A chave do preset como o código a conhece; desconhecida ou vazia = varejo. */
-export function normalizarPreset(preset: string | null | undefined): string {
-  return chaveDoMolde(preset)
-}
-
-/** O preset existe no código? (troca de preset no superadmin). */
-export function presetConhecido(preset: string | null | undefined): boolean {
-  return !!preset && preset in MOLDES
-}
-
-/** Os presets do código, na ordem do cadastro, com o rótulo do molde. */
-export const PRESETS_DO_CODIGO: { chave: string; nome: string }[] =
-  Object.entries(MOLDES).map(([chave, m]) => ({ chave, nome: m.label }))

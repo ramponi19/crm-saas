@@ -2,16 +2,12 @@ import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { TrendingUp, AlertTriangle, Layers, Clock } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
-import { PRESETS_DO_CODIGO, normalizarPreset } from '@/lib/empresa-config'
+import { lerPresets, PRESET_PADRAO } from '@/lib/presets'
 
 const ROXO = '#6D28D9'
 
 // Fallback caso planos_config não tenha o plano (preços em reais/mês).
 const PRECO_FALLBACK: Record<string, number> = { free: 0, starter: 97, pro: 197 }
-
-const PRESET_LABEL: Record<string, string> = Object.fromEntries(
-  PRESETS_DO_CODIGO.map(({ chave, nome }) => [chave, nome])
-)
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -32,13 +28,16 @@ export default async function MetricasPage() {
   // A rota já é trancada em superadmin/layout (requireSuperAdmin).
   const supabase = createServiceClient()
 
-  const [{ data: empresas }, { data: planos }] = await Promise.all([
+  // Os nomes dos presets são da ferramenta de presets do superadmin (lib/presets.ts).
+  const [{ data: empresas }, { data: planos }, presets] = await Promise.all([
     supabase
       .from('empresas')
       .select('id, nome, plano, status, preset_onboarding, created_at, limite_usuarios, limite_leads')
       .neq('demo', true),
     supabase.from('planos_config').select('id, preco_centavos'),
+    lerPresets(supabase),
   ])
+  const PRESET_LABEL: Record<string, string> = Object.fromEntries(presets.map(({ chave, nome }) => [chave, nome]))
 
   const lista = empresas ?? []
   const hoje = new Date()
@@ -88,7 +87,8 @@ export default async function MetricasPage() {
   // 3) Empresas por segmento
   const segAgg = new Map<string, number>()
   lista.forEach(e => {
-    const seg = normalizarPreset(e.preset_onboarding)
+    // Preset que não existe mais conta como o padrão, como o cadastro faria.
+    const seg = e.preset_onboarding && PRESET_LABEL[e.preset_onboarding] ? e.preset_onboarding : PRESET_PADRAO
     segAgg.set(seg, (segAgg.get(seg) ?? 0) + 1)
   })
   const porSegmento = [...segAgg.entries()]

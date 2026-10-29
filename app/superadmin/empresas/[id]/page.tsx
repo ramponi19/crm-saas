@@ -9,7 +9,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
-import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA, normalizarPreset } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 
@@ -248,7 +248,6 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaNome={empresa.nome}
           planoAtual={empresa.plano}
           statusAtual={empresa.status}
-          presetAtual={normalizarPreset(empresa.preset_onboarding)}
         />
       </div>
 
