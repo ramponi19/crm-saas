@@ -67,7 +67,7 @@
     },
     "app/api/superadmin/empresas/[id]/route.ts": {
       "motivo": "inventario",
-      "teto": 12
+      "teto": 9
     },
     "app/api/superadmin/laboratorio/preview/route.ts": {
       "motivo": "inventario",

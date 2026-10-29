@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
-import { SEGMENTOS } from '@/lib/segmentos'
+import { presetConhecido } from '@/lib/empresa-config'
 import type { Database } from '@/types/database'
 
 type EmpresaUpdate = Database['public']['Tables']['empresas']['Update']
@@ -66,7 +66,7 @@ export async function POST(
       break
     }
     case 'alterar_segmento': {
-      if (!(acao.segmento in SEGMENTOS)) {
+      if (!presetConhecido(acao.segmento)) {
         return NextResponse.json({ error: 'Segmento inválido' }, { status: 400 })
       }
       update = { preset_onboarding: acao.segmento }
