@@ -141,10 +141,6 @@
       "motivo": "register",
       "teto": 9
     },
-    "app/superadmin/empresas/[id]/page.tsx": {
-      "motivo": "inventario",
-      "teto": 6
-    },
     "app/superadmin/laboratorio/laboratorio-view.tsx": {
       "motivo": "inventario",
       "teto": 12
@@ -183,7 +179,7 @@
     },
     "components/superadmin/acoes-empresa.tsx": {
       "motivo": "inventario",
-      "teto": 21
+      "teto": 10
     },
     "components/superadmin/superadmin-shell.tsx": {
       "motivo": "inventario",

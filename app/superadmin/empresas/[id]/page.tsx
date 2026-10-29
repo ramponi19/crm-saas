@@ -9,8 +9,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
-import { normalizarSegmento } from '@/lib/segmentos'
-import { camadaBase, carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
+import { camadaBase, carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA, normalizarPreset } from '@/lib/empresa-config'
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 
@@ -68,7 +67,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
   const { data: empresa } = await svc
     .from('empresas')
-    .select('*, segmento:preset_onboarding')
+    .select('*')
     .eq('id', empresaId)
     .single()
 
@@ -249,7 +248,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaNome={empresa.nome}
           planoAtual={empresa.plano}
           statusAtual={empresa.status}
-          segmentoAtual={normalizarSegmento(empresa.segmento)}
+          presetAtual={normalizarPreset(empresa.preset_onboarding)}
         />
       </div>
 

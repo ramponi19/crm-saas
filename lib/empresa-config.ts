@@ -55,10 +55,27 @@ export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | unde
   }
 }
 
+const MOLDES = SEGMENTOS
+const chaveDoMolde = normalizarSegmento
+
 /** O molde estático de um preset; preset desconhecido ou vazio = varejo. */
 function moldeDoPreset(preset: string | null | undefined) {
-  return SEGMENTOS[normalizarSegmento(preset)]
+  return MOLDES[chaveDoMolde(preset)]
 }
+
+/** A chave do preset como o código a conhece; desconhecida ou vazia = varejo. */
+export function normalizarPreset(preset: string | null | undefined): string {
+  return chaveDoMolde(preset)
+}
+
+/** O preset existe no código? (troca de preset no superadmin). */
+export function presetConhecido(preset: string | null | undefined): boolean {
+  return !!preset && preset in MOLDES
+}
+
+/** Os presets do código, na ordem do cadastro, com o rótulo do molde. */
+export const PRESETS_DO_CODIGO: { chave: string; nome: string }[] =
+  Object.entries(MOLDES).map(([chave, m]) => ({ chave, nome: m.label }))
 
 /**
  * A CAMADA 1 DO MENU, PRONTA: a linha do preset sobre o molde estático com que

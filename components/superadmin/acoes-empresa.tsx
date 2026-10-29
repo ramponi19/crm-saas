@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { CreditCard, Power, CalendarClock, Eye, Shapes } from 'lucide-react'
-import { SEGMENTOS_LISTA } from '@/lib/segmentos'
+import { PRESETS_DO_CODIGO } from '@/lib/empresa-config'
 import { Card, Button, Modal, Select, Input } from '@/components/ui'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
@@ -14,7 +14,7 @@ interface Props {
   empresaNome: string
   planoAtual: string
   statusAtual: string
-  segmentoAtual: string
+  presetAtual: string
 }
 
 type ModalTipo = 'plano' | 'status' | 'trial' | 'segmento' | null
@@ -26,7 +26,7 @@ const MODAL_TITULO: Record<Exclude<ModalTipo, null>, string> = {
   trial: 'Estender trial',
 }
 
-export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, segmentoAtual }: Props) {
+export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, presetAtual }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalTipo>(null)
   const [loading, setLoading] = useState(false)
@@ -36,7 +36,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
   const [novoPlano, setNovoPlano] = useState(planoAtual)
   const [novoStatus, setNovoStatus] = useState(statusAtual)
   const [diasTrial, setDiasTrial] = useState(14)
-  const [novoSegmento, setNovoSegmento] = useState(segmentoAtual)
+  const [novoPreset, setNovoPreset] = useState(presetAtual)
 
   async function executar(body: Record<string, unknown>) {
     setLoading(true)
@@ -91,7 +91,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
 
   function confirmar() {
     if (modal === 'plano') executar({ tipo: 'trocar_plano', plano: novoPlano })
-    if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoSegmento })
+    if (modal === 'segmento') executar({ tipo: 'alterar_segmento', segmento: novoPreset })
     if (modal === 'status') executar({ tipo: 'alterar_status', status: novoStatus })
     if (modal === 'trial') executar({ tipo: 'estender_trial', dias: diasTrial })
   }
@@ -152,9 +152,9 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual, 
         )}
 
         {modal === 'segmento' && (
-          <Select label="Segmento" value={novoSegmento} onChange={e => setNovoSegmento(e.target.value)}>
-            {SEGMENTOS_LISTA.map(({ id, config }) => (
-              <option key={id} value={id}>{config.label}</option>
+          <Select label="Segmento" value={novoPreset} onChange={e => setNovoPreset(e.target.value)}>
+            {PRESETS_DO_CODIGO.map(({ chave, nome }) => (
+              <option key={chave} value={chave}>{nome}</option>
             ))}
           </Select>
         )}
