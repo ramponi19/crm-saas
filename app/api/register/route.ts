@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { normalizarSegmento } from '@/lib/segmentos'
+import { normalizarPreset } from '@/lib/empresa-config'
 import { motivosDoPreset } from '@/lib/motivos-perda'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
@@ -111,9 +111,9 @@ export async function POST(req: Request) {
       nome: nomeEmpresa,
       slug,
       plano: planoId,
-      // O segmento da empresa é o preset (empresas.segmento saiu em 22/10/2026);
-      // os 7 segmentos do código têm preset.
-      preset_onboarding: normalizarSegmento(body.segmento),
+      // O segmento escolhido no cadastro é o preset (empresas.segmento saiu em
+      // 22/10/2026); os 7 presets do código têm linha em presets_onboarding.
+      preset_onboarding: normalizarPreset(body.segmento),
       status: 'ativo',
       cnpj: body.cnpj || null,
       telefone: body.telefone || null,

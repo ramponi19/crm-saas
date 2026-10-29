@@ -55,7 +55,7 @@
     },
     "app/api/register/route.ts": {
       "motivo": "register",
-      "teto": 10
+      "teto": 6
     },
     "app/api/superadmin/empresas/[id]/exportar/route.ts": {
       "motivo": "inventario",
