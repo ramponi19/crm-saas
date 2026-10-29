@@ -361,7 +361,7 @@ v "eficiencia por origem e historica" "app/(dashboard)/executivo/page.tsx" "qFec
 echo "== menu do segmento (19/08) =="
 v "resolverMenu injeta extras"        "lib/menu.ts" "if (noCatalogo.has(ex.href)) continue"
 v "extra escolhe o grupo"             "lib/menu.ts" "const grupo = ex.grupo ?? 'Operação'"
-v "ranking e extra da imobiliaria"    "lib/segmentos.ts" "href: '/ranking', label: 'Metas e Ranking'"
+v "ranking e extra da imobiliaria"    "supabase/migrations/20261029000100_presets_completos.sql" '"href":"/ranking","label":"Metas e Ranking"'
 v "ranking abre por segmento"         "app/(dashboard)/ranking/page.tsx" "if (!isAdmin && !abertoAoTime) redirect"
 v "trava do ranking le o banco"       "app/(dashboard)/ranking/page.tsx" ".some((m) => m?.href === '/ranking')"
 v "captacao de imovel e modulo proprio" "lib/captacao-imob.ts" "imoveisCaptadosPorPessoa"
@@ -378,7 +378,7 @@ v "agenda tem aba supervisao"          "app/(dashboard)/agenda/agenda-view.tsx" 
 v "agenda avisa fim em outro dia"      "app/(dashboard)/agenda/agenda-view.tsx" "const faixa ="
 v "compromisso tem tipo e fim"         "app/(dashboard)/agenda/agenda-view.tsx" "participantes: form.participantes.trim"
 v "menu ordena pela camada base"       "lib/menu.ts" "base?.menuLayout ?? {}"
-v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
+v "imob abre por dashboard e pipeline" "supabase/migrations/20261029000100_presets_completos.sql" '"menu_layout":{"Hoje":."/dashboard","/leads"'
 
 echo "== pipeline (19/08) =="
 v "pipeline filtra por responsavel"   "components/modules/leads/leads-view.tsx" "setResponsavelId(e.target.value)"
@@ -391,7 +391,7 @@ v "esteira e responsavel exclusivos"   "components/modules/leads/leads-view.tsx"
 echo "== funil: uma verdade so (19/08) =="
 n "superadmin nao edita funil morto"    "app/superadmin/presets/presets-view.tsx" "funil_seed"
 n "rota de presets nao grava seed"      "app/api/superadmin/presets/route.ts" "funil_seed"
-n "segmentos.ts nao declara funil"      "lib/segmentos.ts" "funil: ["
+n "preset nao declara funil_seed"      "supabase/migrations/20261029000100_presets_completos.sql" "funil_seed"
 v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
 v "funil da imob tem Aprovados"        "supabase/migrations/20261029000100_presets_completos.sql" '"label":"Aprovados"'
 
@@ -410,7 +410,7 @@ v "regiao vem do perfil de busca"      "app/(dashboard)/gestao-leads/page.tsx" "
 n "faixa nao usa opacidade sobre soft" "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "bg-warn-soft/"
 v "rodar reativacao recarrega numero"  "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "router.refresh()"
 v "texto da mensagem e da loja"        "app/(dashboard)/gestao-leads/page.tsx" "mensagens_templates"
-n "menu nao renomeia mais conversao"   "lib/segmentos.ts" "'/conversao': 'Gest"
+n "menu nao renomeia mais conversao"   "supabase/migrations/20261029000100_presets_completos.sql" '"/conversao":"Gest'
 
 echo "== cliente imobiliario (20/08) =="
 v "ficha imob por capacidade"          "app/(dashboard)/clientes/page.tsx" "clienteComPipeline"
@@ -454,7 +454,7 @@ echo "== metas e ranking (20/08) =="
 # modulos_extra = [] o item sumia do menu e o corretor caia no dashboard.
 v "extras da imobiliaria na base"     "supabase/migrations/20261029000100_presets_completos.sql" '"href":"/ranking","label":"Metas e Ranking","icon":"Trophy"'
 v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "const base = cfg.base"
-v "segmento nomeia quem vende"         "lib/segmentos.ts" "equipeLabel: .Corretor."
+v "preset nomeia quem vende"           "supabase/migrations/20261029000100_presets_completos.sql" '"equipe":"Corretor"'
 v "menu e ranking usam o mesmo nome"   "app/(dashboard)/layout.tsx" "vocabulario(cfg).equipe"
 v "coluna leva o nome do segmento"     "app/(dashboard)/ranking/ranking-view.tsx" "font-semibold\">{equipeLabel}"
 v "cabecalho da secao como no modelo"  "app/(dashboard)/ranking/ranking-view.tsx" "Ranking Completo"
@@ -611,7 +611,7 @@ v "perfil e de todo mundo"             "lib/configuracoes-menu.ts" "if (!isAdmin
 
 echo "== proprietario e um cliente (21/08) =="
 n "nao existe mais tela paralela"      "lib/menu.ts" "href: '/proprietarios'"
-n "segmento nao declara a tela"        "lib/segmentos.ts" "href: '/proprietarios'"
+n "preset nao declara a tela"          "supabase/migrations/20261029000100_presets_completos.sql" '"href":"/proprietarios"'
 v "rota antiga cai em clientes"        "proxy.ts" "'/proprietarios': '/clientes'"
 v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "from('clientes').select('id, nome, proprietario')"
 v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"

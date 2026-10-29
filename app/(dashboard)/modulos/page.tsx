@@ -18,7 +18,7 @@ export const metadata = { title: 'Central de módulos' }
  * propósito: a equipe também abre (vê a grade, sem botões); o dono chega por
  * Configurações › Área de trabalho e pelo ⌘K.
  *
- * Lê só tabelas do core: empresas, presets_onboarding, empresa_menu,
+ * Lê só tabelas do core: empresas, empresa_menu,
  * empresa_modulos e modulo_pedidos — nenhuma view de compatibilidade.
  */
 export default async function ModulosPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {

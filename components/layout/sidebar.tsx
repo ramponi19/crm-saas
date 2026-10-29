@@ -36,7 +36,7 @@ interface SidebarProps {
   theme?: SidebarTheme
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
-  /** Camada 1 do menu, pronta (lib/empresa-config.ts → camadaBase). */
+  /** Camada 1 do menu: a base da empresa (lib/empresa-config.ts). */
   base?: CamadaBase
   /** Camada da Central de Módulos (href → instalado?). */
   instalados?: Record<string, boolean>

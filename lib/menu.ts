@@ -188,9 +188,10 @@ export const CHAVE_GRUPOS = '__grupos'
  *
  * Até 22/10/2026 o menu recebia o nome da vertical e ia buscar sozinho a config
  * estática dela quando o banco não dizia nada — o menu sabia "quem a empresa é".
- * Agora quem monta esta camada é o adaptador do preset de onboarding
- * (`camadaBase`, lib/empresa-config.ts), com o banco e o fallback já resolvidos;
- * o menu só pergunta "este módulo está ligado?".
+ * De 22 a 29/10 quem montava esta camada era o adaptador, mesclando a linha do
+ * preset com um molde estático; desde 29/10/2026 ela é a base que o cadastro
+ * gravou na empresa (empresa_menu.itens.base, lida por lib/empresa-config.ts).
+ * O menu só pergunta "este módulo está ligado?".
  */
 export interface CamadaBase {
   hiddenHrefs?: string[]
@@ -209,7 +210,7 @@ export interface ResolverMenuInput {
   isSuperAdmin: boolean
   overrides?: MenuOverridesSuperadmin
   configDono?: MenuConfigDono
-  /** Camada 1: a base da empresa, montada por `camadaBase` (lib/empresa-config.ts). */
+  /** Camada 1: a base da empresa (empresa_menu.itens.base, por lib/empresa-config.ts). */
   base?: CamadaBase
   /**
    * Camada do dono, a Central de Módulos (22/10/2026): `href → instalado?`, de
@@ -262,17 +263,6 @@ export function moduloDaRota(pathname: string): string | null {
   const raiz = '/' + (pathname.split('/')[1] ?? '')
   if (NUCLEO.has(raiz) || SEMPRE.has(raiz)) return null // núcleo e o que veio do /admin nunca são bloqueados
   return CATALOGO.flatMap((g) => g.items).some((i) => i.href === raiz) ? raiz : null
-}
-
-/**
- * Deriva os módulos ligados de um molde sem lista própria (`modulos_habilitados`
- * ausente no banco): catálogo comum menos ocultos + extras. Quem chama é o
- * adaptador do preset (`camadaBase`); o menu recebe a lista pronta.
- */
-export function habilitadosDoMolde(molde: { hiddenHrefs: string[]; modulosExtra?: { href: string }[] }): string[] {
-  const base = hrefsBase().filter((h) => !molde.hiddenHrefs.includes(h))
-  const extras = (molde.modulosExtra ?? []).map((m) => m.href)
-  return [...base, ...extras]
 }
 
 /**
@@ -495,9 +485,9 @@ function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas:
    * eles não têm é `adminOnly`, porque tela que a base declara como sua é tela
    * do time dela. Quem depende de papel trava na própria página.
    *
-   * A regra "lista vazia do banco não é nenhum extra, é não configurado" (o
-   * ranking que sumiu da imobiliária em 20/08/2026) mora em `camadaBase`, onde a
-   * lista do banco encontra o molde.
+   * O ranking que sumiu da imobiliária em 20/08/2026 (lista vazia de extras no
+   * banco vencendo o molde) não volta: desde 29/10/2026 a base de cada empresa é
+   * gravada já completa no cadastro.
    */
   const noCatalogo = new Set(CATALOGO.flatMap((g) => g.items).map((i) => i.href))
   for (const ex of base?.modulosExtra ?? []) {
@@ -521,8 +511,8 @@ function resolver(input: ResolverMenuInput): { grupos: MenuGroup[]; ferramentas:
    *
    * Roda depois de tudo — opt-in, ocultos, papel e plano — para reordenar apenas o
    * que sobrou. As camadas, da mais genérica para a mais específica:
-   *   1. base        (`base.menuLayout`: o molde do preset sob o que o superadmin
-   *                   editou — a mescla dos dois é feita em `camadaBase`)
+   *   1. base        (`base.menuLayout`: a ordem com que a empresa nasceu, gravada
+   *                   pelo cadastro a partir do preset)
    *   2. dono        (`configDono.ordem`, arrastado em /admin/meu-menu)
    *
    * A mescla é RASA de propósito: quem declara "Hoje" manda em "Hoje" inteiro, e

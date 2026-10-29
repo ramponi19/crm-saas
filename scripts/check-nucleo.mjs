@@ -10,8 +10,8 @@
  * exatamente o que aconteceu em 13/08/2026, quando duas frentes colidiram em
  * lead-modal.tsx e cliente-modal.tsx.
  *
- * O jeito certo é o núcleo PERGUNTAR ao contrato (lib/segmentos.ts) o que fazer,
- * em vez de TESTAR quem é o segmento:
+ * O jeito certo é o núcleo PERGUNTAR à empresa o que ela tem ligado (lib/empresa-config.ts:
+ * módulos ligados, capacidades do manifesto, vocabulário), em vez de TESTAR quem é o segmento:
  *
  *    ✗  {segmento === 'imobiliaria' && <PainelDeMatch />}
  *    ✓  {cfg.paineisDoLead.includes('match') && <PainelDeMatch />}
@@ -51,10 +51,7 @@ const PADRAO = /segmento[^\n]{0,40}(===|!==)\s*['"](varejo|assistencia|servicos|
  * saber os segmentos e traduzi-los para o resto do sistema.
  */
 const CONTRATO = [
-  'lib/segmentos.ts',
   'lib/menu.ts',
-  'lib/motivos-perda.ts',
-  'lib/zapintel/segments/segments.ts',
 ]
 
 /**
@@ -80,7 +77,8 @@ const AREA_DE_VERTICAL = [
  */
 const DIVIDA = {
   // VAZIA — Fases 1 e 2 concluídas em 18/08/2026: as 21 comparações que existiam
-  // foram para o contrato (lib/segmentos.ts) como campos e capacidades.
+  // foram para o contrato como campos e capacidades — e, desde 29/10/2026, para os
+  // módulos ligados da empresa (core/modulos.ts + lib/empresa-config.ts).
   //
   // Manter assim. Acrescentar arquivo aqui é reabrir a porta que o plano fechou:
   // o núcleo volta a saber o nome das verticais e mexer numa passa a poder quebrar
@@ -156,7 +154,7 @@ if (piorou.length) {
   arquivo está em DIVIDA (scripts/check-nucleo.mjs) e existe para o problema não
   crescer por dentro justamente nos arquivos mais disputados.
 
-  Resolva pelo contrato (lib/segmentos.ts) — ver docs/PLANO-ISOLAMENTO-SEGMENTOS.md
+  Resolva pelos módulos ligados (lib/empresa-config.ts) — ver docs/PLANO-ISOLAMENTO-SEGMENTOS.md
 `)
   process.exit(1)
 }
@@ -171,7 +169,7 @@ if (novos.length) {
   Arquivo do núcleo não pode perguntar "é imobiliária?" — quem mexe numa vertical
   passaria a poder quebrar as outras.
 
-  Em vez de testar o segmento, pergunte ao contrato (lib/segmentos.ts) o que fazer:
+  Em vez de testar o segmento, pergunte à empresa (lib/empresa-config.ts) o que ela tem ligado:
 
     ✗  {segmento === 'imobiliaria' && <PainelDeMatch />}
     ✓  {cfg.paineisDoLead.includes('match') && <PainelDeMatch />}

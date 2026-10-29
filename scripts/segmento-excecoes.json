@@ -157,10 +157,6 @@
       "motivo": "inventario",
       "teto": 2
     },
-    "lib/segmentos.ts": {
-      "motivo": "inventario",
-      "teto": 48
-    },
     "lib/zapintel/ponte.ts": {
       "motivo": "inventario",
       "teto": 1
