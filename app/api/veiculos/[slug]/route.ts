@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
 
@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   }
   if (!slugValido(slug)) return vazio
 
-  const { data: empresa } = await svc.from('empresas').select('id, nome, segmento:preset_onboarding').eq('slug', slug).eq('status', 'ativo').maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, nome, preset_onboarding').eq('slug', slug).eq('status', 'ativo').maybeSingle()
   if (!empresa) return vazio
 
   /**
@@ -41,7 +41,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
    * celular, que não tem nada a ver com portal de veículo. Mesmo 404 do slug
    * inexistente: não confirma se a empresa existe.
    */
-  if (!SEGMENTOS[normalizarSegmento(empresa.segmento)].capacidades.usaPlaca) return vazio
+  if (!capacidadesDoPreset({ preset: empresa.preset_onboarding ?? null }).usaPlaca) return vazio
 
   const { data: unidades } = await svc.from('inventario_unidades')
     // `observacoes` NÃO entra: é a nota INTERNA da peça, e é lá que o CRM escreve

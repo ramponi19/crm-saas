@@ -61,10 +61,6 @@
       "motivo": "inventario",
       "teto": 11
     },
-    "app/api/veiculos/[slug]/route.ts": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/imob/[slug]/page.tsx": {
       "motivo": "inventario",
       "teto": 6
