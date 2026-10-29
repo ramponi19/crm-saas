@@ -151,7 +151,7 @@
     },
     "app/superadmin/metricas/page.tsx": {
       "motivo": "inventario",
-      "teto": 14
+      "teto": 7
     },
     "app/superadmin/segmentos/page.tsx": {
       "motivo": "inventario",

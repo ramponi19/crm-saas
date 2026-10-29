@@ -2,15 +2,15 @@ import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { TrendingUp, AlertTriangle, Layers, Clock } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
-import { SEGMENTOS_LISTA, normalizarSegmento } from '@/lib/segmentos'
+import { PRESETS_DO_CODIGO, normalizarPreset } from '@/lib/empresa-config'
 
 const ROXO = '#6D28D9'
 
 // Fallback caso planos_config não tenha o plano (preços em reais/mês).
 const PRECO_FALLBACK: Record<string, number> = { free: 0, starter: 97, pro: 197 }
 
-const SEG_LABEL: Record<string, string> = Object.fromEntries(
-  SEGMENTOS_LISTA.map(({ id, config }) => [id, config.label])
+const PRESET_LABEL: Record<string, string> = Object.fromEntries(
+  PRESETS_DO_CODIGO.map(({ chave, nome }) => [chave, nome])
 )
 
 function fmtBRL(v: number) {
@@ -35,7 +35,7 @@ export default async function MetricasPage() {
   const [{ data: empresas }, { data: planos }] = await Promise.all([
     supabase
       .from('empresas')
-      .select('id, nome, plano, status, segmento:preset_onboarding, created_at, limite_usuarios, limite_leads')
+      .select('id, nome, plano, status, preset_onboarding, created_at, limite_usuarios, limite_leads')
       .neq('demo', true),
     supabase.from('planos_config').select('id, preco_centavos'),
   ])
@@ -88,11 +88,11 @@ export default async function MetricasPage() {
   // 3) Empresas por segmento
   const segAgg = new Map<string, number>()
   lista.forEach(e => {
-    const seg = normalizarSegmento(e.segmento)
+    const seg = normalizarPreset(e.preset_onboarding)
     segAgg.set(seg, (segAgg.get(seg) ?? 0) + 1)
   })
   const porSegmento = [...segAgg.entries()]
-    .map(([seg, qtd]) => ({ seg, label: SEG_LABEL[seg] ?? seg, qtd }))
+    .map(([seg, qtd]) => ({ seg, label: PRESET_LABEL[seg] ?? seg, qtd }))
     .sort((a, b) => b.qtd - a.qtd)
   const maxSeg = Math.max(1, ...porSegmento.map(s => s.qtd))
 
