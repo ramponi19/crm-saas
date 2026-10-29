@@ -33,10 +33,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/api/menu/[slug]/pedido/route.ts": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/api/ranking/metas/route.ts": {
       "motivo": "inventario",
       "teto": 1
