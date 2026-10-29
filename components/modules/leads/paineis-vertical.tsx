@@ -1,6 +1,6 @@
 'use client'
 
-import type { PainelDoLead } from '@/lib/segmentos'
+import type { PainelDoLead } from '@/lib/empresa-config'
 import { LeadMatchPanel } from './lead-match-panel'
 import { LeadNegocioPanel } from './lead-negocio-panel'
 import { LeadInteressePanel } from './lead-interesse-panel'
@@ -11,14 +11,14 @@ import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
  *
  * ══ POR QUE ESTE ARQUIVO EXISTE ════════════════════════════════════════════
  *
- * O modal do lead tinha uma linha por painel, cada uma comparando o segmento com
- * o nome da vertical ("se for imobiliária, mostre o match; se for concessionária,
+ * O modal do lead tinha uma linha por painel, cada uma comparando a vertical da
+ * empresa com um nome ("se for imobiliária, mostre o match; se for concessionária,
  * mostre interesse e financiamento").
  *
  * Consequência prática: acrescentar uma vertical exigia EDITAR o modal do lead —
  * o arquivo mais disputado do projeto, onde duas frentes já colidiram em 13/08.
  *
- * Agora o segmento declara em `paineisDoLead` (lib/segmentos.ts) quais quer, e
+ * Agora o perfil do lead (`perfilDoLead`, lib/empresa-config.ts) diz quais quer, e
  * este mapa liga nome → componente. Uma vertical nova acrescenta um nome na
  * config; o modal não muda. Um painel novo entra aqui; o modal também não muda.
  *
@@ -33,7 +33,7 @@ export const PAINEIS_DO_LEAD: Record<PainelDoLead, (props: { leadId: number }) =
 }
 
 /**
- * Renderiza os painéis do segmento, na ordem declarada.
+ * Renderiza os painéis do perfil do lead, na ordem declarada.
  *
  * Nome desconhecido é IGNORADO em silêncio de propósito: o tipo `PainelDoLead` já
  * impede o erro em tempo de compilação, e um painel a menos não pode derrubar a

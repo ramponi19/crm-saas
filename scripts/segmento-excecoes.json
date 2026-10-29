@@ -177,10 +177,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "components/modules/leads/paineis-vertical.tsx": {
-      "motivo": "inventario",
-      "teto": 5
-    },
     "components/modules/relatorios/relatorios-imob-view.tsx": {
       "motivo": "inventario",
       "teto": 2
