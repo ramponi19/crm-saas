@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
 import { Check, ChevronRight, Eye, EyeOff } from 'lucide-react'
-import { SEGMENTOS_LISTA } from '@/lib/segmentos'
+import { PRESETS_DO_CODIGO } from '@/lib/empresa-config'
 import { Input, Button } from '@/components/ui'
 
 type Step = 'plano' | 'loja' | 'conta'
@@ -244,18 +244,18 @@ export default function RegisterPage() {
               <div>
                 <label className="mb-2 block text-[12px] font-medium text-ink-2">Segmento do negócio <span className="text-bad">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
-                  {SEGMENTOS_LISTA.map(({ id, config }) => (
+                  {PRESETS_DO_CODIGO.map(({ chave, nome }) => (
                     <button
-                      key={id}
+                      key={chave}
                       type="button"
-                      onClick={() => set('segmento', id)}
+                      onClick={() => set('segmento', chave)}
                       className={`rounded-control border p-3 text-left transition-colors ${
-                        form.segmento === id
+                        form.segmento === chave
                           ? 'border-accent bg-accent-soft'
                           : 'border-line hover:border-line-soft hover:bg-bg'
                       }`}
                     >
-                      <span className="text-[13px] font-semibold text-ink">{config.label}</span>
+                      <span className="text-[13px] font-semibold text-ink">{nome}</span>
                     </button>
                   ))}
                 </div>

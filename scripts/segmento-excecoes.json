@@ -135,7 +135,7 @@
     },
     "app/register/page.tsx": {
       "motivo": "register",
-      "teto": 9
+      "teto": 6
     },
     "app/superadmin/laboratorio/laboratorio-view.tsx": {
       "motivo": "inventario",
