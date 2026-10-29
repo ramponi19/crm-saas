@@ -10,6 +10,7 @@
  * presente em TODOS os segmentos — a lista `hiddenHrefs` só REMOVE o que não faz
  * sentido naquele segmento.
  */
+import type { PainelDoLead } from '@/core/modulos'
 
 export type Segmento =
   | 'varejo'
@@ -162,7 +163,7 @@ export interface SegmentoConfig {
  * É um tipo, e não string livre, de propósito: errar o nome viraria painel que
  * some sem erro nenhum — a pior falha, porque parece funcionar.
  */
-export type PainelDoLead = 'match-imoveis' | 'negocio-imovel' | 'interesse-veiculo' | 'financiamento'
+export type { PainelDoLead }
 
 export const SEGMENTO_PADRAO: Segmento = 'varejo'
 

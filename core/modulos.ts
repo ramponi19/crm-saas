@@ -23,6 +23,41 @@ import type { ModuloPlano } from '@/lib/plano'
  * vira módulo único na viagem — ver o 05, Parte 4).
  */
 
+/**
+ * Painéis próprios que um módulo põe no card do lead. É um tipo, e não string
+ * livre, de propósito: errar o nome viraria painel que some sem erro nenhum. Os
+ * componentes estão em components/modules/leads/paineis-vertical.tsx.
+ */
+export type PainelDoLead = 'match-imoveis' | 'negocio-imovel' | 'interesse-veiculo' | 'financiamento'
+
+/**
+ * O QUE UM MÓDULO FAZ NAS TELAS DOS OUTROS (29/10/2026, fim do molde por vertical).
+ *
+ * Ligado o módulo, a empresa ganha o comportamento; desligado, perde. Até aqui
+ * cada vertical declarava estas chaves no molde estático — agora quem as traz é
+ * o módulo, e a empresa tem o que os módulos ligados dela trazem.
+ */
+export interface CapacidadesDoModulo {
+  /** Painel de visitas e agendamento de visita no lead. */
+  agendaVisitas?: boolean
+  /** Dashboard e Relatórios próprios da vertical. */
+  telasProprias?: boolean
+  /** Integrações mostram portais e site além dos canais. */
+  integraPortais?: boolean
+  /** Financeiro ganha a aba de comissão por negócio (captador e vendedor). */
+  comissaoPorNegocio?: boolean
+  /** Cliente é a mesma pessoa do funil: a ficha mostra etapa, score e responsável. */
+  clienteComPipeline?: boolean
+  /** Ranking conta imóveis captados, além de leads. */
+  captacaoDeImovel?: boolean
+  /** Automações oferecem o bloco de veículos. */
+  automacoesVeiculo?: boolean
+  /** Match de interesse por veículo em vez de imóvel. */
+  matchVeiculo?: boolean
+  /** PDV pede número de comanda (mesa/balcão). */
+  usaComanda?: boolean
+}
+
 export type GrupoModulo = 'comunicacao' | 'pipeline' | 'vendas' | 'estoque' | 'posvenda' | 'insights' | 'inteligencia'
 
 export interface ModuloManifesto {
@@ -45,6 +80,10 @@ export interface ModuloManifesto {
    * uma lista por vertical; agora quem as tem é o módulo.
    */
   abasConfiguracoes?: string[]
+  /** O que o módulo liga nas outras telas (ver CapacidadesDoModulo). */
+  capacidades?: CapacidadesDoModulo
+  /** Painéis do card do lead, na ordem. */
+  paineisDoLead?: PainelDoLead[]
 }
 
 export const GRUPOS_MODULO: { id: GrupoModulo; label: string }[] = [
@@ -81,6 +120,7 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'simular_financiamento', href: '/simular-financiamento', nome: 'Financiamento', grupo: 'vendas', emPreparacao: true,
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
   { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, abasConfiguracoes: ['veiculos-portais'],
+    capacidades: { automacoesVeiculo: true, matchVeiculo: true }, paineisDoLead: ['interesse-veiculo', 'financiamento'],
     frase: 'Vistoria do veículo na troca, com fotos, avarias e o valor oferecido.' },
   { chave: 'consulta_fipe', href: '/consulta-fipe', nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
     frase: 'O valor de referência do veículo na tabela FIPE, dentro da avaliação.' },
@@ -94,8 +134,11 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'check_imei', href: '/check-imei', nome: 'Check IMEI', grupo: 'estoque',
     frase: 'Consulta o IMEI antes de comprar ou vender um aparelho.' },
   { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['portais'],
+    capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },
+    paineisDoLead: ['negocio-imovel', 'match-imoveis'],
     frase: 'A carteira de imóveis com fotos, chaves e proprietários.' },
   { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
+    capacidades: { usaComanda: true },
     frase: 'O cardápio com preços e o pedido do cliente pelo celular.' },
   { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true,
     frase: 'A tela da cozinha com os pedidos na ordem em que entraram.' },
@@ -130,6 +173,16 @@ export const ABAS_DE_MODULO: string[] = MODULOS.flatMap((m) => m.abasConfiguraco
 /** As seções de Configurações dos módulos ligados (`ligados` = endereços, como no menu). */
 export function abasDosModulos(ligados: Set<string>): string[] {
   return MODULOS.filter((m) => ligados.has(m.href)).flatMap((m) => m.abasConfiguracoes ?? [])
+}
+
+/** O que os módulos ligados trazem, somado (`ligados` = endereços, como no menu). */
+export function capacidadesDosModulos(ligados: Set<string>): CapacidadesDoModulo {
+  return Object.assign({}, ...MODULOS.filter((m) => ligados.has(m.href)).map((m) => m.capacidades ?? {}))
+}
+
+/** Os painéis do card do lead dos módulos ligados, na ordem do manifesto. */
+export function paineisDosModulos(ligados: Set<string>): PainelDoLead[] {
+  return MODULOS.filter((m) => ligados.has(m.href)).flatMap((m) => m.paineisDoLead ?? [])
 }
 
 /** O módulo pela chave de empresa_modulos. */
