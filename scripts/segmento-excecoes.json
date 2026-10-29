@@ -5,14 +5,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/(dashboard)/clientes/components/clientes-view.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/(dashboard)/clientes/page.tsx": {
-      "motivo": "inventario",
-      "teto": 8
-    },
     "app/(dashboard)/dashboard/dashboard-imob.tsx": {
       "motivo": "inventario",
       "teto": 2

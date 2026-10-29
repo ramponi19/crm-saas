@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
+import { capacidadesDoPreset } from '@/lib/empresa-config'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import ClientesView, { type ClienteImob } from './components/clientes-view'
@@ -21,9 +21,8 @@ import { comNome } from '@/lib/sem-nome'
 export default async function ClientesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('segmento:preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cap = SEGMENTOS[normalizarSegmento(empresa?.segmento)].capacidades
-  const imob = !!cap.clienteComPipeline
+  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
+  const imob = !!capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).clienteComPipeline
 
   const { data: clientesRaw } = await supabase
     .from('clientes')
@@ -63,7 +62,7 @@ export default async function ClientesPage() {
     color: '#7FB0E8',
     tipo: e.tipo === 'negociacao' || e.tipo === 'ganho' || e.tipo === 'perdido' ? e.tipo : undefined,
   }))
-  const etapas = doBanco.length > 0 ? doBanco : getKanbanColumns(empresa?.segmento ?? null)
+  const etapas = doBanco.length > 0 ? doBanco : getKanbanColumns(empresa?.preset_onboarding ?? null)
 
   const equipe = ((membrosRaw ?? []) as unknown as Array<{ usuario_id: string; usuarios: Embed<{ nome: string | null }> }>)
     .map((m) => ({ id: m.usuario_id, nome: one(m.usuarios)?.nome ?? '—' }))

@@ -58,7 +58,7 @@ export interface ClienteImob {
 
 interface Props {
   clientes: Cliente[]
-  /** Segmento em que cliente é a mesma pessoa do funil (`clienteComPipeline`). */
+  /** Preset em que cliente é a mesma pessoa do funil (`clienteComPipeline`). */
   imob?: boolean
   etapas?: { id: string; label: string; tipo: string | null }[]
   equipe?: { id: string; nome: string }[]
