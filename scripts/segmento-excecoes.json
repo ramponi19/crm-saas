@@ -173,10 +173,6 @@
       "motivo": "inventario",
       "teto": 3
     },
-    "components/layout/topbar.tsx": {
-      "motivo": "inventario",
-      "teto": 3
-    },
     "components/modules/leads/lead-acoes-panel.tsx": {
       "motivo": "inventario",
       "teto": 1

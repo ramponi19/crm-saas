@@ -38,13 +38,13 @@ const periods = [
 export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', onPeriodChange }: TopbarProps) {
   const router = useRouter()
   /**
-   * O nome que o segmento deu à tela vence o título escrito aqui dentro.
+   * O nome que o menu deu à tela vence o título escrito aqui dentro.
    *
    * Sem isto, renomear no menu deixava as duas metades da mesma página discordando:
    * "Pipeline" na lateral, "Leads" no topo.
    */
-  const rotuloDoSegmento = useRotuloDaRota()
-  const titulo = rotuloDoSegmento ?? title
+  const rotuloDoMenu = useRotuloDaRota()
+  const titulo = rotuloDoMenu ?? title
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<NotifLead[]>([])
   const [paletteOpen, setPaletteOpen] = useState(false)
