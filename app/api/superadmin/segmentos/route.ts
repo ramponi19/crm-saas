@@ -59,6 +59,9 @@ export async function POST(req: Request) {
     menu_layout: manter(b.menu_layout, atual?.menu_layout, {} as Record<string, string[]>) as never,
     ordem: Number.isFinite(b.ordem) ? b.ordem! : (atual?.ordem ?? 0),
     ativo: b.ativo !== undefined ? b.ativo : (atual?.ativo ?? true),
+    // A tela não edita tela inicial nem vocabulário: ficam como estão no banco.
+    tela_inicial: atual?.tela_inicial ?? null,
+    vocabulario: atual?.vocabulario ?? null,
   }
 
   const { error } = await svc.from('presets_onboarding')

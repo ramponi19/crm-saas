@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CamadaBase, MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
+import type { Json } from '@/types/database'
 import { moduloPorChave } from '@/core/modulos'
 import { habilitadosDoMolde, hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
 import { SEGMENTOS, normalizarSegmento, type PainelDoLead } from '@/lib/segmentos'
@@ -44,7 +45,8 @@ interface MenuDoPreset {
  */
 export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | undefined {
   if (!p) return undefined
-  const { _menu, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset }
+  const { _menu, _vocabulario: _voc, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset; _vocabulario?: unknown }
+  void _voc
   const m = _menu ?? {}
   return {
     hiddenHrefs: m.hidden_hrefs ?? [],
@@ -214,16 +216,20 @@ export interface SegmentoRow {
   menu_layout: Record<string, string[]> | null
   ordem: number
   ativo: boolean
+  /** Tela inicial e vocabulário do preset (29/10/2026): a tela não edita, mas salvar conserva. */
+  tela_inicial?: string | null
+  vocabulario?: Record<string, unknown> | null
 }
 
 export function segmentoDoPreset(p: { chave: string; nome: string; descricao: string | null; rotulos: Record<string, unknown> | null; ativo: boolean }): SegmentoRow {
-  const { _menu, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset & { ordem?: number } }
+  const { _menu, _vocabulario, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset & { ordem?: number; tela_inicial?: string }; _vocabulario?: Record<string, unknown> }
   const m = _menu ?? {}
   return {
     chave: p.chave, label: p.nome, descricao: p.descricao,
     hidden_hrefs: m.hidden_hrefs ?? [], label_overrides: labels as Record<string, string>,
     modulos_extra: m.modulos_extra ?? [], modulos_habilitados: m.modulos_habilitados ?? null,
     menu_layout: m.menu_layout ?? null, ordem: m.ordem ?? 0, ativo: p.ativo,
+    tela_inicial: m.tela_inicial ?? null, vocabulario: _vocabulario ?? null,
   }
 }
 
@@ -235,7 +241,9 @@ export function presetDoSegmento(s: SegmentoRow) {
       _menu: {
         hidden_hrefs: s.hidden_hrefs ?? [], modulos_habilitados: s.modulos_habilitados,
         modulos_extra: s.modulos_extra ?? [], menu_layout: s.menu_layout, ordem: s.ordem,
+        ...(s.tela_inicial ? { tela_inicial: s.tela_inicial } : {}),
       },
+      ...(s.vocabulario ? { _vocabulario: s.vocabulario as Json } : {}),
     },
   }
 }
