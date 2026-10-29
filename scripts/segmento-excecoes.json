@@ -101,10 +101,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/menu/[slug]/page.tsx": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/para/[segmento]/page.tsx": {
       "motivo": "inventario",
       "teto": 10
