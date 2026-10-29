@@ -30,8 +30,8 @@ export async function POST(req: Request) {
   if (!modulo || typeof instalar !== 'boolean') return NextResponse.json({ error: 'Módulo desconhecido' }, { status: 400 })
 
   const svc = createServiceClient()
-  const { data: empresa } = await svc.from('empresas').select('plano, preset_onboarding').eq('id', ctx.empresaId).maybeSingle()
-  const cfg = await carregarConfigEmpresa(svc, ctx.empresaId, empresa?.preset_onboarding ?? null)
+  const { data: empresa } = await svc.from('empresas').select('plano').eq('id', ctx.empresaId).maybeSingle()
+  const cfg = await carregarConfigEmpresa(svc, ctx.empresaId)
   const estado = estadoDoModulo(modulo, {
     ligados: ligadosDaEmpresa(cfg),
     plano: empresa?.plano ?? undefined,

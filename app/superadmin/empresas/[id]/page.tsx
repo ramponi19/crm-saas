@@ -9,7 +9,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Badge } from '@/components/ui'
 import { resolverMenu } from '@/lib/menu'
-import { camadaBase, carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA, normalizarPreset } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA, normalizarPreset } from '@/lib/empresa-config'
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 
@@ -74,7 +74,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   if (!empresa) notFound()
 
   // Camadas de menu e módulos forçados: do core desde 21/10/2026 (lib/empresa-config.ts).
-  const camadas = await carregarConfigEmpresa(svc, empresaId, empresa.preset_onboarding ?? null)
+  const camadas = await carregarConfigEmpresa(svc, empresaId)
 
   // Complemento pago (ZapIntel): módulo 'inteligencia' de empresa_modulos, que já
   // veio com as camadas (era complementos_empresa até 21/10/2026).
@@ -258,8 +258,8 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
           empresaId={empresaId}
           modulosInit={(camadas.forcados ?? null) as Record<string, boolean> | null}
           menuOverrideInit={camadas.superadmin}
-          /* Só o molde do preset, sem a linha do banco por cima — como sempre foi aqui. */
-          items={resolverMenu({ base: camadaBase(undefined, camadas.preset), plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
+          /* A base da empresa (empresa_menu.itens.base), sem as camadas do superadmin e do dono. */
+          items={resolverMenu({ base: camadas.base, plano: empresa.plano ?? undefined, role: 'owner', isSuperAdmin: true })
             .flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label })))}
           limiteUsuariosInit={empresa.limite_usuarios ?? 0}
           limiteLeadsInit={empresa.limite_leads ?? 0}

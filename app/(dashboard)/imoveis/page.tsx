@@ -10,10 +10,10 @@ export const metadata = { title: 'Imóveis' }
 export default async function ImoveisPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding, slug').eq('id', empresaId).single()
+  const { data: empresa } = await supabase.from('empresas').select('slug').eq('id', empresaId).single()
   // Tela do módulo Imóveis: abre onde ele está ligado, qualquer que seja a empresa
   // (até 22/10 a pergunta era "é imobiliária?" — os mesmos casos, medido no local).
-  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId)
   if (!ligadosDaEmpresa(cfg).has('/imoveis')) redirect('/dashboard')
 
   const [{ data: imoveis }, { data: proprietarios }, { data: equipeRaw }, { data: chavesRaw }] = await Promise.all([

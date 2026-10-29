@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import ClientesView, { type ClienteImob } from './components/clientes-view'
@@ -21,8 +21,11 @@ import { comNome } from '@/lib/sem-nome'
 export default async function ClientesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
-  const imob = !!capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).clienteComPipeline
+  const [{ data: empresa }, cfg] = await Promise.all([
+    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle(),
+    carregarConfigEmpresa(supabase, empresaId ?? 0),
+  ])
+  const imob = !!capacidades(cfg).clienteComPipeline
 
   const { data: clientesRaw } = await supabase
     .from('clientes')

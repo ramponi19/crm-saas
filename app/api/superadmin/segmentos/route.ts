@@ -1,7 +1,7 @@
 import { requireSuperAdminApi, logSuperAdminAction } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
-import { presetDoSegmento, segmentoDoPreset, type SegmentoRow } from '@/lib/empresa-config'
+import { editavelDoPreset, presetDoEditavel, type PresetEditavel } from '@/lib/presets'
 
 function slugify(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)
@@ -40,10 +40,10 @@ export async function POST(req: Request) {
    * exigir de quem quer apagar configuração.
    */
   // Desde 21/10/2026 o segmento mora em presets_onboarding; a linha de sempre
-  // (o formato que esta tela edita) entra e sai por lib/empresa-config.ts.
+  // (o formato que esta tela edita) entra e sai por lib/presets.ts.
   const { data: presetAtual } = await svc.from('presets_onboarding')
     .select('chave, nome, descricao, rotulos, ativo').eq('chave', chave).maybeSingle()
-  const atual = presetAtual ? segmentoDoPreset(presetAtual as Parameters<typeof segmentoDoPreset>[0]) : null
+  const atual = presetAtual ? editavelDoPreset(presetAtual as Parameters<typeof editavelDoPreset>[0]) : null
 
   const manter = <T,>(vindo: T | undefined, noBanco: unknown, vazio: T): T =>
     vindo !== undefined ? vindo : ((noBanco ?? vazio) as T)
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   }
 
   const { error } = await svc.from('presets_onboarding')
-    .upsert({ ...presetDoSegmento(row as unknown as SegmentoRow), updated_at: new Date().toISOString() }, { onConflict: 'chave' })
+    .upsert({ ...presetDoEditavel(row as unknown as PresetEditavel), updated_at: new Date().toISOString() }, { onConflict: 'chave' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await logSuperAdminAction({ adminUserId: auth.userId, acao: b.novo ? 'criar_segmento' : 'editar_segmento', detalhes: { chave } })

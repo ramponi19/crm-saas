@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { moduloDaRota, hrefsLigados } from '@/lib/menu'
-import { menuDoPreset, camadasDoMenu, instaladosDoManifesto, type PresetRow, type ModuloRow } from '@/lib/empresa-config'
+import { camadasDoMenu, instaladosDoManifesto, type ModuloRow } from '@/lib/empresa-config'
 import { temVitrine } from '@/lib/modulos-vitrine'
 import { COOKIE_VERSAO_MODULOS } from '@/core/modulos'
 
@@ -308,19 +308,11 @@ async function modulosHabilitados(
     const cached = cacheModulos.get(chave)
     if (cached && cached.expira > Date.now()) return cached.habilitados
 
-    // A lista do segmento mora no preset (presets_onboarding.rotulos._menu) desde
-    // 21/10/2026 — ver lib/empresa-config.ts. Mesma lista, mesma regra.
-    const { data: empresa } = await supabase
-      .from('empresas').select('preset_onboarding').eq('id', empresaId).single()
-    const { data: preset } = await supabase
-      .from('presets_onboarding').select('chave, rotulos')
-      .eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
-
-    // Segmento sem lista configurada não é motivo para bloquear nada.
-    const lista = menuDoPreset(preset as PresetRow | null)?.habilitados
-    if (!Array.isArray(lista) || lista.length === 0) return null
-
     /**
+     * A lista é a da BASE da empresa (empresa_menu.itens.base.habilitados), a mesma
+     * do menu: gravada no cadastro a partir do preset desde 29/10/2026 — duas
+     * consultas a menos por request do que quando a trava lia o preset.
+     *
      * + o que o superadmin ligou SÓ PARA ESTA EMPRESA (empresa_menu.itens.superadmin
      * .habilitados) — a mesma camada 3 do menu. Sem isto, o módulo ligado por
      * empresa aparecia no menu e a trava barrava a rota (etapa 0, achado ao fazer
@@ -331,7 +323,12 @@ async function modulosHabilitados(
       // + a Central de Módulos: instalado entra, desinstalado sai (a mesma camada do menu).
       supabase.from('empresa_modulos').select('modulo, ativo, config').eq('empresa_id', empresaId),
     ])
-    const porEmpresa = camadasDoMenu(menu?.itens).superadmin?.habilitados ?? []
+    const camadas = camadasDoMenu(menu?.itens)
+
+    // Empresa sem lista configurada não é motivo para bloquear nada.
+    const lista = camadas.base.habilitados
+    if (!Array.isArray(lista) || lista.length === 0) return null
+    const porEmpresa = camadas.superadmin?.habilitados ?? []
     const habilitados = hrefsLigados([...lista, ...porEmpresa], instaladosDoManifesto(modulos as ModuloRow[] | null))
     if (cacheModulos.size > 500) cacheModulos.clear() // uma chave por versão: não deixa crescer sem fim
     cacheModulos.set(chave, { habilitados, expira: Date.now() + TTL_MODULOS_MS })

@@ -24,8 +24,8 @@ export async function POST(req: Request) {
   if (!modulo) return NextResponse.json({ error: 'Módulo desconhecido' }, { status: 400 })
 
   const svc = createServiceClient()
-  const { data: empresa } = await svc.from('empresas').select('plano, preset_onboarding').eq('id', ctx.empresaId).maybeSingle()
-  const cfg = await carregarConfigEmpresa(svc, ctx.empresaId, empresa?.preset_onboarding ?? null)
+  const { data: empresa } = await svc.from('empresas').select('plano').eq('id', ctx.empresaId).maybeSingle()
+  const cfg = await carregarConfigEmpresa(svc, ctx.empresaId)
   // O estado do pago não depende do menu ligado: plano, forçados e o que está ativo bastam.
   const estado = estadoDoModulo(modulo, {
     ligados: new Set(), plano: empresa?.plano ?? undefined, forcados: cfg.forcados,

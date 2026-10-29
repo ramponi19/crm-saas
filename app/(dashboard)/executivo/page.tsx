@@ -40,10 +40,9 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
   // O módulo Executivo está ligado? Desligado, a vitrine (etapa 0). Até 22/10 a
   // pergunta era a capacidade `comissaoPorNegocio` do preset — os mesmos casos.
-  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId)
   if (!ligadosDaEmpresa(cfg).has('/executivo')) return <VitrineDoModulo href="/executivo" />
 
   const { tipo } = await searchParams

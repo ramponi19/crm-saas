@@ -16,7 +16,10 @@
 import fs from 'node:fs'
 import { resolverMenuPlano, type MenuOverridesSuperadmin, type MenuConfigDono, type MenuOverrideRow, type CamadaBase } from '../lib/menu'
 import { permsDoPapel, type PermissoesMap } from '../lib/permissoes'
-import { camadaBase, camadasDoMenu, camadasParaMenu, modulosForcados, menuDoPreset, type ModuloRow, type PresetRow } from '../lib/empresa-config'
+import { camadasDoMenu, camadasParaMenu, modulosForcados, type ModuloRow } from '../lib/empresa-config'
+import { baseDoPreset } from '../lib/presets'
+
+type PresetRow = { chave: string; rotulos: Record<string, unknown> | null }
 import type { ModuloPlano } from '../lib/plano'
 
 type Legado = {
@@ -57,14 +60,17 @@ function entradaLegado(e: Legado, role: string, superadmin: boolean) {
     hiddenHrefs: s.hidden_hrefs ?? [], labelOverrides: s.label_overrides ?? {}, modulosExtra: s.modulos_extra ?? [],
     habilitados: s.modulos_habilitados ?? undefined, menuLayout: s.menu_layout ?? undefined,
   } : undefined
-  return { base: camadaBase(lido, e.segmento), plano: e.plano ?? undefined, role, isSuperAdmin: superadmin,
+  // As fotos só têm varejo, com lista própria: o molde do varejo não somava nada
+  // (29/10/2026, o molde saiu do código).
+  const base: CamadaBase = { habilitados: lido?.habilitados, labelOverrides: lido?.labelOverrides ?? {}, modulosExtra: lido?.modulosExtra ?? [], menuLayout: lido?.menuLayout ?? {} }
+  return { base, plano: e.plano ?? undefined, role, isSuperAdmin: superadmin,
     overrides, configDono: e.menu_config ?? undefined }
 }
 
 /** O que o layout monta agora: a MESMA camadasParaMenu de lib/empresa-config.ts. */
 function entradaCore(e: Core, role: string, superadmin: boolean) {
-  const { superadmin: mo, dono } = camadasDoMenu(e.itens)
-  const cfg = { preset: e.preset, presetLido: menuDoPreset(e.preset_row), superadmin: mo, dono, forcados: modulosForcados(e.modulos) }
+  // A base que o cadastro gravaria a partir da linha do preset (lib/presets.ts).
+  const cfg = { ...camadasDoMenu({ ...((e.itens ?? {}) as object), base: baseDoPreset(e.preset_row?.rotulos) }), forcados: modulosForcados(e.modulos) }
   const { overrides, configDono, base } = camadasParaMenu(cfg, permHidden(role, e.permissoes))
   return { base, plano: e.plano ?? undefined, role, isSuperAdmin: superadmin, overrides, configDono }
 }

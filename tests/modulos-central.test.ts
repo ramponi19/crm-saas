@@ -79,7 +79,7 @@ test('as linhas do corte em empresa_modulos não mudam o menu de hoje', () => {
 test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo ligado', () => {
   const linhas: ModuloRow[] = [{ modulo: 'gestao_leads', ativo: true, config: {} }, { modulo: 'pdv', ativo: false, config: {} }]
   const cfg: ConfigEmpresa = {
-    preset: 'varejo', presetLido: { habilitados: VAREJO }, superadmin: { habilitados: ['/fila'] }, dono: undefined,
+    base: { habilitados: VAREJO, labelOverrides: {}, modulosExtra: [], menuLayout: {} }, telaInicial: null, vocabulario: {}, superadmin: { habilitados: ['/fila'] }, dono: undefined,
     modulos: linhas, forcados: undefined,
   }
   const antiga = hrefsHabilitados({ base: { habilitados: VAREJO }, overrides: { habilitados: ['/fila'] }, instalados: instaladosDoManifesto(linhas) })

@@ -40,7 +40,7 @@ export default async function DashboardLayout({
   const impersonation = await getImpersonation()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
-  let empresa: { nome: string; plano?: string | null; preset_onboarding?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
+  let empresa: { nome: string; plano?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
   let role = 'owner'
   let plano: string | undefined
   let empresaId: number | undefined
@@ -49,7 +49,7 @@ export default async function DashboardLayout({
     // Super admin impersonando: busca os dados da empresa impersonada diretamente.
     const { data: empImp } = await supabase
       .from('empresas')
-      .select('nome, plano, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
+      .select('nome, plano, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
       .eq('id', impersonation.empresaId)
       .single()
     empresa = empImp ?? { nome: impersonation.nome, wl_cor: null, wl_logo_url: null }
@@ -60,7 +60,7 @@ export default async function DashboardLayout({
     // Fluxo normal: usuário precisa de vínculo com uma empresa.
     const { data: vinculo } = await supabase
       .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
+      .select('role, empresa:empresas(id, nome, plano, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
       .eq('usuario_id', user.id)
       .eq('ativo', true)
       .single()
@@ -73,7 +73,7 @@ export default async function DashboardLayout({
 
     const vinculoTyped = vinculo as unknown as {
       role: string
-      empresa: { nome: string; plano: string | null; preset_onboarding: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
+      empresa: { nome: string; plano: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
     }
     empresa = vinculoTyped.empresa
     role = vinculoTyped.role
@@ -110,9 +110,9 @@ export default async function DashboardLayout({
   if (!perms.verFinanceiro) permHidden.push('/financeiro')
   if (!perms.verRelatorios) permHidden.push('/relatorios')
 
-  // Camadas do resolverMenu, lidas do core (presets_onboarding, empresa_menu,
+  // Camadas do resolverMenu, lidas das tabelas da empresa (empresa_menu,
   // empresa_modulos) — ver lib/empresa-config.ts.
-  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)
   const { overrides: menuOverrides, configDono: menuConfig, base, instalados, rotulos } = camadasParaMenu(cfg, permHidden)
   // Ferramentas fora do menu (Simular parcela, Check IMEI, FIPE): mesmas camadas do
   // menu, entregues às telas-casa e ao ⌘K.
@@ -179,7 +179,7 @@ export default async function DashboardLayout({
           <LimiteBanner />
           {/*
             Os rótulos da empresa chegam à barra do topo de cada tela.
-            Mesma precedência do menu: preset, depois superadmin, depois o dono —
+            Mesma precedência do menu: base, depois superadmin, depois o dono —
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
           <RotulosProvider valor={rotulos}>

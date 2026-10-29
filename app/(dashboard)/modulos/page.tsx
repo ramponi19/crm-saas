@@ -27,12 +27,12 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
   if (!empresaId || !papel) redirect('/login')
 
   const [{ data: empresa }, { data: pedidosRaw }] = await Promise.all([
-    supabase.from('empresas').select('plano, preset_onboarding').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('plano').eq('id', empresaId).maybeSingle(),
     // Pedidos só pela chave de serviço (RLS fechada), filtrados pela empresa da sessão.
     createServiceClient().from('modulo_pedidos').select('modulo, pedido_em')
       .eq('empresa_id', empresaId).is('atendido_em', null),
   ])
-  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId)
 
   const tiles = tilesDaCentral({
     ligados: ligadosDaEmpresa(cfg),

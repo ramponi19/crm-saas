@@ -4,7 +4,7 @@ import { calcularRanking, valorMetrica } from '@/lib/ranking'
 import { imoveisCaptadosPorPessoa } from '@/lib/captacao-imob'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import { RankingView, type MetaUi, type MembroOpt } from './ranking-view'
-import { camadaBase, capacidadesDoPreset, menuDoPreset, vocabulario, type PresetRow } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
 
 export const metadata = { title: 'Ranking & Metas' }
 
@@ -22,23 +22,17 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams
   const periodo = /^\d{4}-\d{2}$/.test(sp.periodo ?? '') ? sp.periodo! : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-  const [{ data: vinculo }, { data: usuario }, { data: empresa }] = await Promise.all([
+  /**
+   * A trava lê a MESMA base que monta o menu (empresa_menu.itens.base): os extras
+   * dela são o que o `resolverMenu` põe no menu. Se a trava olhasse outra fonte,
+   * o item poderia sumir do menu com a página aberta — ou levar a um redirect.
+   */
+  const [{ data: vinculo }, { data: usuario }, cfg] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle(),
+    carregarConfigEmpresa(supabase, empresaId),
   ])
-
-  /**
-   * A config do BANCO manda, com o código como reserva.
-   *
-   * Os extras do preset (presets_onboarding, desde 21/10/2026) são o que o `resolverMenu` usa para montar o menu.
-   * Se esta trava olhasse só o código, bastaria alguém mexer no banco para o item
-   * sumir do menu e a página seguir aberta — ou o contrário, item levando a redirect.
-   */
-  const { data: preset } = await supabase.from('presets_onboarding')
-    .select('chave, rotulos').eq('chave', empresa?.preset_onboarding ?? 'varejo').eq('ativo', true).maybeSingle()
-  const presetDaEmpresa = empresa?.preset_onboarding ?? null
-  const base = camadaBase(menuDoPreset(preset as PresetRow | null), presetDaEmpresa)
+  const base = cfg.base
   const isAdmin = !!(usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin')
 
   /**
@@ -50,7 +44,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
    * isolamento por vendedor existe para impedir.
    *
    * Na imobiliária o dono decidiu o contrário (19/08/2026): placar aberto ao time.
-   * Quem responde é `camadaBase` — a MESMA camada que monta o menu (o /ranking
+   * Quem responde é a base da empresa — a MESMA camada que monta o menu (o /ranking
    * declarado nos extras da base), para que o item nunca apareça levando a um
    * redirect nem exista tela sem porta.
    *
@@ -60,18 +54,18 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   /*
    * `modulos_extra = []` no banco é "não configurado", não "nenhum extra": o array
    * vazio — o estado real da imobiliária em 20/08/2026 — mandava todo corretor para
-   * o /dashboard. A regra mora em `camadaBase`, a mesma do menu.
+   * o /dashboard. Desde 29/10/2026 a base gravada já vem com os extras do preset.
    */
   const abertoAoTime = (base.modulosExtra ?? []).some((m) => m?.href === '/ranking')
   if (!isAdmin && !abertoAoTime) redirect('/dashboard')
 
   /**
-   * Captação de imóvel entra só onde o preset capta ativo.
+   * Captação de imóvel entra só onde o módulo Imóveis está ligado.
    *
    * A consulta é feita AQUI porque só esta página sabe disso; `calcularRanking`
    * recebe o número pronto e segue neutro. Quem não capta ativo nem paga a consulta.
    */
-  const captaImovel = !!capacidadesDoPreset({ preset: presetDaEmpresa }).captacaoDeImovel
+  const captaImovel = !!capacidades(cfg).captacaoDeImovel
   const janela = janelaDoPeriodo(periodo)
   const captacoesImovel = captaImovel
     ? await imoveisCaptadosPorPessoa(supabase, empresaId, janela.ini, janela.fim)
@@ -121,7 +115,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
       papeis={papeis}
       isAdmin={isAdmin}
       mostrarImoveis={captaImovel}
-      equipeLabel={vocabulario({ preset: presetDaEmpresa }).equipe}
+      equipeLabel={vocabulario(cfg).equipe}
     />
   )
 }

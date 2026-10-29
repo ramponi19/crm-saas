@@ -33,9 +33,9 @@ async function carregar() {
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),
-    supabase.from('empresas').select('preset_onboarding, slug').eq('id', empresaId).maybeSingle(),
+    supabase.from('empresas').select('slug').eq('id', empresaId).maybeSingle(),
   ])
-  const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null))
+  const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId))
 
   // Token, secret, key e senha não vão para o navegador (lib/segredos.ts).
   const ler = (chave: string) => semSegredos(configs?.find(d => d.chave === chave)?.valor ?? null).valor

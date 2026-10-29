@@ -311,8 +311,8 @@ v "agendar com teto"                "app/api/agendar/[slug]/route.ts" "excedeuLi
 v "pedido do cardapio com teto"     "app/api/menu/[slug]/pedido/route.ts" "excedeuLimite"
 v "lead do site imob com teto"      "app/api/imob/[slug]/lead/route.ts" "excedeuLimite"
 n "feed de veiculos sem nota interna" "app/api/veiculos/[slug]/route.ts" "preco_venda, observacoes"
-v "feed exige capacidade de veiculo"  "app/api/veiculos/[slug]/route.ts" "usaPlaca"
-v "agendar exige capacidade"          "app/api/agendar/[slug]/route.ts" "agendaClinica"
+v "feed exige o campo placa"          "app/api/veiculos/[slug]/route.ts" "campoAtivo(svc, empresa.id, 'item', 'placa')"
+v "agendar exige a agenda ligada"     "app/api/agendar/[slug]/route.ts" "ligadosDaEmpresa(await carregarConfigEmpresa(svc, empresa.id)).has('/agenda')"
 v "cardapio exige capacidade"         "app/api/menu/[slug]/pedido/route.ts" "usaComanda"
 v "OS aprovada com claim atomico"     "app/api/os/[token]/route.ts" "is('aprovado_em', null)"
 v "config de pagamento so admin"      "app/api/payments/config/route.ts" "requireEmpresaRoleApi"
@@ -371,7 +371,7 @@ v "ranking soma imovel captado"       "lib/ranking.ts" "+ l.imoveisCaptados"
 v "conversao segue sendo por lead"    "lib/ranking.ts" "l.conversao = l.captacoes > 0"
 
 echo "== agenda em calendario (19/08) =="
-v "agenda trava por modulo ligado"     "app/(dashboard)/agenda/page.tsx" "ligadosDaEmpresa(cfg).has('/agenda')) return <VitrineDoModulo"
+v "agenda trava por modulo ligado"     "app/(dashboard)/agenda/page.tsx" "if (!ligados.has('/agenda')) return <VitrineDoModulo"
 n "agenda nao olha nome de segmento"   "app/(dashboard)/agenda/page.tsx" "seg !== 'imobiliaria'"
 v "agenda usa dia LOCAL"               "app/(dashboard)/agenda/agenda-view.tsx" "const chaveLocal"
 v "agenda tem aba supervisao"          "app/(dashboard)/agenda/agenda-view.tsx" "aba === 'supervisao'"
@@ -383,7 +383,7 @@ v "imob abre por dashboard e pipeline" "lib/segmentos.ts" "menuLayout: { Hoje:"
 echo "== pipeline (19/08) =="
 v "pipeline filtra por responsavel"   "components/modules/leads/leads-view.tsx" "setResponsavelId(e.target.value)"
 v "palavra do filtro vem do segmento" "components/modules/leads/leads-view.tsx" "equipeLabel.toLowerCase()"
-v "pagina passa a palavra da equipe"  "app/(dashboard)/leads/page.tsx" "equipeLabel={vocabulario({ preset: empresa?.preset_onboarding ?? null }).equipe}"
+v "pagina passa a palavra da equipe"  "app/(dashboard)/leads/page.tsx" "equipeLabel={vocabulario(cfg).equipe}"
 v "filtro so para quem ve o colega"    "components/modules/leads/leads-view.tsx" "{!restringe && ("
 n "filtro nao exige equipe montada"    "components/modules/leads/leads-view.tsx" "restringe && usuarios.length > 1"
 v "esteira e responsavel exclusivos"   "components/modules/leads/leads-view.tsx" "if (responsavelId) return leadsDoFunilBase.filter"
@@ -452,8 +452,8 @@ v "impressao esconde so os controles"  "components/modules/relatorios/relatorios
 echo "== metas e ranking (20/08) =="
 # Lista vazia no banco nao pode vencer a declaracao do codigo: com
 # modulos_extra = [] o item sumia do menu e o corretor caia no dashboard.
-v "extra vazio do banco cai no codigo" "lib/empresa-config.ts" "lido?.modulosExtra?.length ?"
-v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "camadaBase(menuDoPreset("
+v "extras da imobiliaria na base"     "supabase/migrations/20261029000100_presets_completos.sql" '"href":"/ranking","label":"Metas e Ranking","icon":"Trophy"'
+v "acesso do time checa lista cheia"   "app/(dashboard)/ranking/page.tsx" "const base = cfg.base"
 v "segmento nomeia quem vende"         "lib/segmentos.ts" "equipeLabel: .Corretor."
 v "menu e ranking usam o mesmo nome"   "app/(dashboard)/layout.tsx" "vocabulario(cfg).equipe"
 v "coluna leva o nome do segmento"     "app/(dashboard)/ranking/ranking-view.tsx" "font-semibold\">{equipeLabel}"
@@ -506,7 +506,7 @@ v "meu menu ve a config do segmento"   "app/(dashboard)/configuracoes/(admin)/me
 # 21/10/2026: o segmento e as camadas vem do core (lib/empresa-config.ts); o menu
 # do CRM, a trava de rota e esta tela leem a mesma funcao.
 v "menu le as camadas do core"         "app/(dashboard)/layout.tsx" "carregarConfigEmpresa(supabase"
-v "trava le o preset"                  "proxy.ts" "presets_onboarding"
+v "trava le a base da empresa"         "proxy.ts" "camadas.base.habilitados"
 v "superadmin nao apaga habilitados"   "app/api/superadmin/empresas/[id]/overrides/route.ts" "PRESERVA o que existe"
 # 21/10/2026 (etapa 0, 2.1): o painel le o core por lib/painel/metricas.ts, e o
 # lucro so existe onde ha custo lancado (antes: 'margem de 100%' sem custo).
@@ -557,7 +557,7 @@ v "relatorio conta lucro so com custo"  "components/modules/relatorios/relatorio
 # 21/10/2026 (etapa 0, 2.5): modulo desligado = vitrine (rewrite), nao redirect;
 # a trava passa a somar o que o superadmin liga por empresa.
 v "modulo desligado vira vitrine"       "proxy.ts" "NextResponse.rewrite(new URL(`/vitrine${modulo}`"
-v "trava ve a liberacao por empresa"    "proxy.ts" "camadasDoMenu(menu?.itens).superadmin?.habilitados"
+v "trava ve a liberacao por empresa"    "proxy.ts" "camadas.superadmin?.habilitados"
 v "agenda sem capacidade mostra vitrine" "app/(dashboard)/agenda/page.tsx" "<VitrineDoModulo href=\"/agenda\" />"
 v "executivo sem capacidade vitrine"    "app/(dashboard)/executivo/page.tsx" "<VitrineDoModulo href=\"/executivo\" />"
 v "vitrine diz que numero e exemplo"    "components/modulos/vitrine.tsx" "Números de exemplo"

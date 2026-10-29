@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { campoAtivo } from '@/lib/empresa-config'
 import { getEmpresaRole } from '@/lib/owner'
 import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
@@ -13,7 +13,7 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function EstoquePage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, { data: empresa }, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }, { data: filiaisRaw }] = await Promise.all([
+  const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, comPlaca, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }, { data: filiaisRaw }] = await Promise.all([
     supabase
       .from('inventario_unidades')
       // NÃO dá para embutir o responsável aqui: `inventario_unidades.usuario_id`
@@ -32,7 +32,8 @@ export default async function EstoquePage() {
     // produto, para não digitar variante à mão.
     supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
-    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).single(),
+    // Estoque de veículos: a empresa tem o campo placa no item (criado pelo preset).
+    campoAtivo(supabase, empresaId ?? 0, 'item', 'placa'),
     // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
     // ninguem lembra o nome completo, mas tem o telefone na mao.
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
@@ -129,7 +130,7 @@ export default async function EstoquePage() {
       tabelaPrecos={(tabelaRaw ?? []) as unknown as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
       fornecedores={(fornecedoresRaw ?? []) as { id: number; nome_fantasia: string }[]}
       empresaId={empresaId!}
-      usaPlaca={!!capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).usaPlaca}
+      usaPlaca={comPlaca}
       filiais={filiais}
       podeTransferir={separacaoAtiva(filiais) && (papel === 'owner' || papel === 'admin')}
     />

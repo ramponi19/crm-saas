@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { LeadsView } from '@/components/modules/leads/leads-view'
 import type { Lead, KanbanColumn, Motivo, Funil } from '@/components/modules/leads/types'
-import { perfilDoLead, vocabulario } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, perfilDoLead, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
 import { devolverLeadsSemResposta } from '@/lib/esteira'
@@ -66,7 +66,7 @@ async function todosOsLeads(
 export default async function LeadsPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [leads, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }, { data: funisRaw }] = await Promise.all([
+  const [leads, { data: usuarios }, { data: msgsNaoLidas }, { data: empresa }, { data: etapasRaw }, { data: motivosRaw }, { data: funisRaw }, cfg] = await Promise.all([
     todosOsLeads(supabase, empresaId),
     supabase
       .from('empresa_usuarios')
@@ -89,6 +89,7 @@ export default async function LeadsPage() {
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, campos_obrigatorios').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
     supabase.from('funis').select('id, nome, padrao').eq('empresa_id', empresaId).order('padrao', { ascending: false }).order('nome'),
+    carregarConfigEmpresa(supabase, empresaId ?? 0),
   ])
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -178,14 +179,14 @@ export default async function LeadsPage() {
       usuarios={usuariosMapped}
       empresaId={empresaId}
       preset={empresa?.preset_onboarding ?? null}
-      perfil={perfilDoLead({ preset: empresa?.preset_onboarding ?? null })}
+      perfil={perfilDoLead(cfg)}
       funilEtapas={funilEtapas}
       motivos={(motivosRaw ?? []) as Motivo[]}
       funis={(funisRaw ?? []) as Funil[]}
       scoreConfig={scoreConfig}
       restringe={restringe}
       meuId={user?.id}
-      equipeLabel={vocabulario({ preset: empresa?.preset_onboarding ?? null }).equipe}
+      equipeLabel={vocabulario(cfg).equipe}
     />
   )
 }

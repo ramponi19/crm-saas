@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (modulo.emPreparacao) return NextResponse.json({ error: `${modulo.nome} está em preparação: só dá para recusar.` }, { status: 409 })
 
   const agora = new Date().toISOString()
-  const cfg = await carregarConfigEmpresa(svc, pedido.empresa_id, null)
+  const cfg = await carregarConfigEmpresa(svc, pedido.empresa_id)
   const atual = cfg.modulos.find((r) => r.modulo === modulo.chave)
   const { error } = atual
     ? await svc.from('empresa_modulos').update({ ativo: true, instalado_em: agora, instalado_por: ctx.userId, updated_at: agora })

@@ -1,30 +1,55 @@
 /**
- * O CARD DO LEAD RECEBE O PERFIL PRONTO (zero-segmento, 23/10/2026).
+ * O CARD DO LEAD RECEBE O PERFIL PRONTO (zero-segmento, 23/10/2026; pela empresa desde 29/10).
  *
  * O modal deixou de perguntar quem a empresa é; `perfilDoLead` responde o que ele
- * mostrava antes, preset a preset. Se um destes mudar, o card de alguém mudou.
+ * mostrava antes, para uma empresa recém-cadastrada com cada preset. Se um destes
+ * mudar, o card de alguém mudou.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { perfilDoLead, vocabulario } from '@/lib/empresa-config'
+import { perfilDoLead, vocabulario, camadasDoMenu } from '@/lib/empresa-config'
+import { PRESETS, empresaNascidaCom } from './presets-da-migracao'
+
+test('a migração traz os 7 presets', () => {
+  assert.deepEqual(Object.keys(PRESETS).sort(), ['assistencia', 'concessionaria', 'food', 'imobiliaria', 'saude', 'servicos', 'varejo'])
+})
 
 test('imobiliária: texto livre, painéis de negócio e match, visitas, corretor', () => {
-  assert.deepEqual(perfilDoLead({ preset: 'imobiliaria' }), {
+  const cfg = empresaNascidaCom('imobiliaria')
+  assert.deepEqual(perfilDoLead(cfg), {
     paineis: ['negocio-imovel', 'match-imoveis'], interesse: 'Imóvel interessado', agendaVisitas: true, textoLivre: true,
   })
-  assert.equal(vocabulario({ preset: 'imobiliaria' }).equipe, 'Corretor')
+  assert.equal(vocabulario(cfg).equipe, 'Corretor')
 })
 
 test('loja de veículos: texto livre, interesse e financiamento, sem visitas', () => {
-  assert.deepEqual(perfilDoLead({ preset: 'concessionaria' }), {
+  assert.deepEqual(perfilDoLead(empresaNascidaCom('concessionaria')), {
     paineis: ['interesse-veiculo', 'financiamento'], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: true,
   })
 })
 
-test('varejo e preset desconhecido: autocomplete do catálogo, nenhum painel, vendedor', () => {
+test('varejo: autocomplete do catálogo, nenhum painel, vendedor', () => {
   const varejo = { paineis: [], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false }
-  assert.deepEqual(perfilDoLead({ preset: 'varejo' }), varejo)
-  assert.deepEqual(perfilDoLead({ preset: null }), varejo)
-  assert.deepEqual(perfilDoLead({ preset: 'nao-existe' }), varejo)
-  assert.equal(vocabulario({ preset: null }).equipe, 'Vendedor')
+  assert.deepEqual(perfilDoLead(empresaNascidaCom('varejo')), varejo)
+  assert.equal(vocabulario(empresaNascidaCom('varejo')).equipe, 'Vendedor')
+})
+
+test('empresa sem base gravada: o texto padrão, nunca um painel de vertical', () => {
+  const cfg = { ...camadasDoMenu({}), modulos: [], forcados: undefined }
+  assert.deepEqual(perfilDoLead(cfg), { paineis: [], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false })
+  assert.equal(vocabulario(cfg).equipe, 'Vendedor')
+})
+
+test('desinstalar Imóveis na Central tira painéis e visitas do card da imobiliária', () => {
+  const cfg = empresaNascidaCom('imobiliaria', [{ modulo: 'imoveis', ativo: false, config: {} }])
+  assert.deepEqual(perfilDoLead(cfg).paineis, [])
+  assert.equal(perfilDoLead(cfg).agendaVisitas, false)
+})
+
+test('clínica: tela inicial na Agenda e a Agenda falando de consulta e paciente', () => {
+  const cfg = empresaNascidaCom('saude')
+  assert.equal(cfg.telaInicial, '/agenda')
+  assert.equal(cfg.vocabulario.contato, 'Paciente')
+  assert.equal(cfg.vocabulario.agenda?.novo, 'Nova consulta')
+  assert.equal(empresaNascidaCom('imobiliaria').telaInicial, null)
 })

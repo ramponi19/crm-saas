@@ -18,7 +18,7 @@ export default async function MeuMenuPage() {
   const [{ data: vinculo }, { data: usuario }, { data: emp }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single(),
-    supabase.from('empresas').select('preset_onboarding, plano').eq('id', empresaId).single(),
+    supabase.from('empresas').select('plano').eq('id', empresaId).single(),
   ])
   const role = vinculo?.role ?? 'owner'
   const isAdmin = usuario?.is_super_admin || role === 'owner' || role === 'admin'
@@ -30,7 +30,7 @@ export default async function MeuMenuPage() {
    * ("Metas e Ranking" da imobiliária sumia daqui). Montadas por
    * lib/empresa-config.ts (`entradaDoMenu`), que é quem lê o preset.
    */
-  const camadas = await carregarConfigEmpresa(supabase, empresaId, emp?.preset_onboarding ?? null)
+  const camadas = await carregarConfigEmpresa(supabase, empresaId)
   const cfg = camadas.dono ?? null
 
   /**

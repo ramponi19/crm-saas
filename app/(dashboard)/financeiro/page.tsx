@@ -46,8 +46,7 @@ export default async function FinanceiroPage() {
    * Aditivo: o livro-caixa acima continua igual para todos. Quem tem o módulo ganha
    * uma aba a mais, e quem não tem não paga por ela (a consulta nem roda).
    */
-  const { data: empresaPreset } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresaPreset?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId)
   let negociosComissao: NegocioComissao[] = []
   let taxasComissao: TaxasComissao | null = null
   let equipeComissao: { id: string; nome: string }[] = []

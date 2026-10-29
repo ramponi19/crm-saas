@@ -94,7 +94,7 @@ const fmt = (v: number) => formatCurrency(v)
 
 export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
   // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
-  // por mesa usam o mesmo campo. Vem pronta da página (capacidadesDoPreset).
+  // por mesa usam o mesmo campo. Vem pronta da página (capacidades dos módulos ligados: Cardápio).
   const isFood = usaComanda
   const [comanda, setComanda] = useState('')
   // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.

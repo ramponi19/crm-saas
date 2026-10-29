@@ -1,9 +1,9 @@
 /**
  * MENU EM GRUPOS (navegação, 21/10/2026).
  *
- * O agrupamento só reparte a lista final do menu: nenhum segmento ou papel pode
+ * O agrupamento só reparte a lista final do menu: nenhum preset ou papel pode
  * ganhar, perder ou reordenar item por causa dele. A foto da cópia (script
- * comparar-menu-agrupado) só tem varejo; aqui passam todos os segmentos do código,
+ * comparar-menu-agrupado) só tem varejo; aqui passam todos os presets da migração,
  * inclusive os extras (o Ranking da imobiliária declara o grupo antigo "Gestão").
  *
  *   npm test
@@ -11,8 +11,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { agruparMenu, resolverMenuAgrupado, resolverMenuPlano, GRUPO_DO_HREF, CATALOGO, type ResolverMenuInput } from '@/lib/menu'
-import { SEGMENTOS, type Segmento } from '@/lib/segmentos'
-import { camadaBase } from '@/lib/empresa-config'
+import { PRESETS, empresaNascidaCom } from './presets-da-migracao'
 
 const PAPEIS: Array<Pick<ResolverMenuInput, 'role' | 'isSuperAdmin'>> = [
   { role: 'owner', isSuperAdmin: false }, { role: 'admin', isSuperAdmin: false },
@@ -20,14 +19,14 @@ const PAPEIS: Array<Pick<ResolverMenuInput, 'role' | 'isSuperAdmin'>> = [
   { role: 'owner', isSuperAdmin: true },
 ]
 
-test('todo segmento e papel: mesmos itens, mesma ordem, no máximo 9 entradas', () => {
-  for (const segmento of Object.keys(SEGMENTOS) as Segmento[]) {
+test('todo preset e papel: mesmos itens, mesma ordem, no máximo 9 entradas', () => {
+  for (const preset of Object.keys(PRESETS)) {
     for (const p of PAPEIS) {
-      const entrada: ResolverMenuInput = { base: camadaBase(undefined, segmento), plano: 'pro', ...p }
+      const entrada: ResolverMenuInput = { base: empresaNascidaCom(preset).base, plano: 'pro', ...p }
       const plano = resolverMenuPlano(entrada).map((i) => i.href)
       const grupos = resolverMenuAgrupado(entrada)
       const agrupado = grupos.flatMap((g) => g.itens.map((i) => i.href))
-      const quem = `${segmento}/${p.isSuperAdmin ? 'superadmin' : p.role}`
+      const quem = `${preset}/${p.isSuperAdmin ? 'superadmin' : p.role}`
       assert.deepEqual([...agrupado].sort(), [...plano].sort(), `${quem}: itens`)
       for (const g of grupos) {
         const pos = g.itens.map((i) => plano.indexOf(i.href))
@@ -40,7 +39,7 @@ test('todo segmento e papel: mesmos itens, mesma ordem, no máximo 9 entradas', 
 })
 
 test('o Ranking da imobiliária (extra, grupo antigo "Gestão") cai em Insights', () => {
-  const grupos = resolverMenuAgrupado({ base: camadaBase(undefined, 'imobiliaria'), role: 'owner', isSuperAdmin: false })
+  const grupos = resolverMenuAgrupado({ base: empresaNascidaCom('imobiliaria').base, role: 'owner', isSuperAdmin: false })
   const insights = grupos.find((g) => g.id === 'insights')
   assert.ok(insights?.itens.some((i) => i.href === '/ranking'))
 })

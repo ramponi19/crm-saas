@@ -1,119 +1,88 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CamadaBase, MenuConfigDono, MenuOverrideRow, MenuOverridesSuperadmin } from '@/lib/menu'
 import type { ModuloPlano } from '@/lib/plano'
-import type { Json } from '@/types/database'
-import { moduloPorChave } from '@/core/modulos'
-import { habilitadosDoMolde, hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
-import { SEGMENTOS, normalizarSegmento, type PainelDoLead } from '@/lib/segmentos'
+import { capacidadesDosModulos, moduloPorChave, paineisDosModulos, type CapacidadesDoModulo, type PainelDoLead } from '@/core/modulos'
+import { hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
+import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
 
 /**
- * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DO CORE, NUM LUGAR SÓ.
+ * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DA EMPRESA, NUM LUGAR SÓ.
  *
  * Até 21/10/2026 o menu e a trava de rota liam `segmentos_config` e três colunas
- * de `empresas` (`menu_override`, `menu_config`, `modulos_override`). O core v1
- * já tinha as tabelas certas desde o corte — `presets_onboarding`,
- * `empresa_menu`, `empresa_modulos` —, mas ninguém lia nem gravava nelas: o
- * que o superadmin e o dono mudavam depois de 20/10 ia só para o legado.
+ * de `empresas`; de 21 a 29/10, a linha de `presets_onboarding` mesclada com um
+ * molde estático por vertical, a cada request. Desde 29/10/2026 o preset é só a
+ * ficha de partida (lib/presets.ts): o cadastro a copia para a empresa, e daqui
+ * em diante só as tabelas DA EMPRESA contam.
  *
- * O menu recebe a camada base PRONTA (`CamadaBase`, montada por `camadaBase`
- * com o banco e o molde estático já resolvidos), mais MenuOverrideRow e
- * MenuConfigDono. Os mapeamentos são puros e exportados para o teste que compara
- * o menu antes e depois (scripts/comparar-menu.mts).
- *
- *   presets_onboarding.rotulos      rótulos do preset + `_menu` com as quatro listas
+ *   empresa_menu.itens.base         a base com que a empresa nasceu: habilitados,
+ *                                   rótulos, extras, ordem, tela inicial, vocabulário
  *   empresa_menu.itens.superadmin   { hidden, labels, habilitados }  (era menu_override)
  *   empresa_menu.itens.dono         { hidden, labels, ordem }        (era menu_config)
- *   empresa_modulos.config.forcado  liga/desliga módulo de plano      (era modulos_override)
- */
-
-export interface PresetRow {
-  chave: string
-  rotulos: Record<string, unknown> | null
-}
-
-interface MenuDoPreset {
-  hidden_hrefs?: string[] | null
-  modulos_habilitados?: string[] | null
-  modulos_extra?: { href: string; label: string; icon: string; grupo?: string }[] | null
-  menu_layout?: Record<string, string[]> | null
-}
-
-/**
- * O que a linha do preset diz, CRU: sem o molde estático por baixo. A trava de
- * rota (proxy.ts), o ranking e o laboratório leem só isto; o menu recebe
- * `camadaBase`, que junta esta leitura ao molde.
- */
-export function menuDoPreset(p: PresetRow | null | undefined): CamadaBase | undefined {
-  if (!p) return undefined
-  const { _menu, _vocabulario: _voc, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset; _vocabulario?: unknown }
-  void _voc
-  const m = _menu ?? {}
-  return {
-    hiddenHrefs: m.hidden_hrefs ?? [],
-    labelOverrides: labels as Record<string, string>,
-    modulosExtra: m.modulos_extra ?? [],
-    habilitados: m.modulos_habilitados ?? undefined,
-    menuLayout: m.menu_layout ?? undefined,
-  }
-}
-
-const MOLDES = SEGMENTOS
-const chaveDoMolde = normalizarSegmento
-
-/** O molde estático de um preset; preset desconhecido ou vazio = varejo. */
-function moldeDoPreset(preset: string | null | undefined) {
-  return MOLDES[chaveDoMolde(preset)]
-}
-
-/** A chave do preset como o código a conhece; desconhecida ou vazia = varejo. */
-export function normalizarPreset(preset: string | null | undefined): string {
-  return chaveDoMolde(preset)
-}
-
-/** O preset existe no código? (troca de preset no superadmin). */
-export function presetConhecido(preset: string | null | undefined): boolean {
-  return !!preset && preset in MOLDES
-}
-
-/** Os presets do código, na ordem do cadastro, com o rótulo do molde. */
-export const PRESETS_DO_CODIGO: { chave: string; nome: string }[] =
-  Object.entries(MOLDES).map(([chave, m]) => ({ chave, nome: m.label }))
-
-/**
- * A CAMADA 1 DO MENU, PRONTA: a linha do preset sobre o molde estático com que
- * a empresa nasceu (o cadastro de presets em lib/segmentos.ts).
+ *   empresa_modulos                 módulos instalados (Central) e forçados (config.forcado)
  *
- * Até 22/10/2026 esta mescla morava dentro de lib/menu.ts, que recebia o nome da
- * vertical e ia buscar o molde sozinho. As regras são as mesmas, cada uma no seu
- * campo:
- *   - módulos ligados: a lista do banco; sem lista, o catálogo comum menos os
- *     ocultos do molde, mais os extras dele;
- *   - rótulos: os do banco quando há linha; sem linha, os do molde;
- *   - extras: LISTA VAZIA DO BANCO NÃO É "NENHUM EXTRA" — É "NÃO CONFIGURADO".
- *     Com `modulos_extra = []` (o estado real da imobiliária em 20/08/2026) o
- *     array vazio vencia o molde e derrubava "Metas e Ranking" do menu — e, junto,
- *     o acesso do corretor à tela. Para TIRAR um extra existe `hidden_hrefs`;
- *   - ordem: rasa, grupo a grupo — o que o superadmin editou vence o molde.
+ * O que um módulo liga nas outras telas (capacidades, painéis do lead) vem do
+ * manifesto (core/modulos.ts) pelos módulos ligados — não de quem a empresa é.
  */
-export function camadaBase(lido: CamadaBase | undefined, preset: string | null): CamadaBase {
-  const molde = moldeDoPreset(preset)
-  return {
-    habilitados: lido?.habilitados ?? habilitadosDoMolde(molde),
-    labelOverrides: lido?.labelOverrides ?? molde.labelOverrides,
-    modulosExtra: lido?.modulosExtra?.length ? lido.modulosExtra : (molde.modulosExtra ?? []),
-    menuLayout: { ...(molde.menuLayout ?? {}), ...(lido?.menuLayout ?? {}) },
-  }
+
+/** Textos da Agenda que mudam com o negócio (clínica: consulta, paciente). */
+export interface RotulosAgenda {
+  evento?: string
+  novo?: string
+  pessoa?: string
+  profissional?: string
+  subtitulo?: string
+  vazio?: string
+  agendado?: string
+  exemplo?: string
+  tipos?: { v: string; l: string }[]
+}
+
+/** Como a empresa chama as coisas. Ausente = o texto padrão de cada tela. */
+export interface Vocabulario {
+  /** Quem atende ("Corretor"). Padrão "Vendedor". */
+  equipe?: string
+  /** O campo "o que o cliente quer", no card do lead. */
+  interesse?: string
+  /** Quem é atendido ("Paciente"). */
+  contato?: string
+  agenda?: RotulosAgenda
+}
+
+/** empresa_menu.itens.base, como o cadastro grava (lib/presets.ts → baseDoPreset). */
+export interface BaseGravada {
+  habilitados?: string[]
+  labels?: Record<string, string>
+  extras?: { href: string; label: string; icon: string; grupo?: string }[]
+  layout?: Record<string, string[]>
+  tela_inicial?: string | null
+  vocabulario?: Vocabulario
 }
 
 export interface ItensMenu {
+  base?: BaseGravada
   superadmin?: MenuOverrideRow
   dono?: MenuConfigDono
 }
 
-/** As camadas da empresa: o que o superadmin define e o que o dono arrasta. */
-export function camadasDoMenu(itens: unknown): { superadmin: MenuOverrideRow | null; dono: MenuConfigDono | undefined } {
+/** As camadas da empresa: a base com que nasceu, o que o superadmin define e o que o dono arrasta. */
+export function camadasDoMenu(itens: unknown): {
+  base: CamadaBase; telaInicial: string | null; vocabulario: Vocabulario
+  superadmin: MenuOverrideRow | null; dono: MenuConfigDono | undefined
+} {
   const i = (itens ?? {}) as ItensMenu
-  return { superadmin: i.superadmin ?? null, dono: i.dono ?? undefined }
+  const b = i.base ?? {}
+  return {
+    base: {
+      habilitados: b.habilitados ?? undefined,
+      labelOverrides: b.labels ?? {},
+      modulosExtra: b.extras ?? [],
+      menuLayout: b.layout ?? {},
+    },
+    telaInicial: b.tela_inicial ?? null,
+    vocabulario: b.vocabulario ?? {},
+    superadmin: i.superadmin ?? null,
+    dono: i.dono ?? undefined,
+  }
 }
 
 export interface ModuloRow {
@@ -156,7 +125,7 @@ export function moduloLigado(rows: ModuloRow[] | null | undefined, modulo: strin
  * das linhas cuja chave está no manifesto (core/modulos.ts). As linhas do corte
  * que não são módulo de menu (`vendas`, `avaliacao`) ficam de fora; as que são
  * (`estoque`, `financeiro`, `assistencia`) vieram ativas, e ativo só confirma o
- * que o preset já ligava — o menu de hoje não muda.
+ * que a base já ligava — o menu de hoje não muda.
  */
 export function instaladosDoManifesto(rows: ModuloRow[] | null | undefined): Record<string, boolean> {
   const out: Record<string, boolean> = {}
@@ -168,9 +137,11 @@ export function instaladosDoManifesto(rows: ModuloRow[] | null | undefined): Rec
 }
 
 export interface ConfigEmpresa {
-  preset: string | null
-  /** A linha do preset, crua (`menuDoPreset`); `camadasParaMenu` junta o molde. */
-  presetLido: CamadaBase | undefined
+  /** Camada 1 do menu: a base com que a empresa nasceu (empresa_menu.itens.base). */
+  base: CamadaBase
+  /** Rota depois do login, quando não é o primeiro item do menu (clínica: /agenda). */
+  telaInicial: string | null
+  vocabulario: Vocabulario
   superadmin: MenuOverrideRow | null
   dono: MenuConfigDono | undefined
   modulos: ModuloRow[]
@@ -182,9 +153,9 @@ export interface ConfigEmpresa {
  * são os itens que o PAPEL não pode ver (financeiro, relatórios), somados aos
  * ocultos do superadmin — exatamente como o layout fazia.
  */
-export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'preset' | 'presetLido' | 'superadmin' | 'dono' | 'forcados'> & Partial<Pick<ConfigEmpresa, 'modulos'>>, permHidden: string[] = []) {
+export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'base' | 'superadmin' | 'dono' | 'forcados'> & Partial<Pick<ConfigEmpresa, 'modulos'>>, permHidden: string[] = []) {
   const mo = cfg.superadmin
-  const base = camadaBase(cfg.presetLido, cfg.preset)
+  const base = cfg.base
   return {
     /** Camada da Central de Módulos (empresa_modulos pelo manifesto). */
     instalados: instaladosDoManifesto(cfg.modulos),
@@ -202,58 +173,12 @@ export function camadasParaMenu(cfg: Pick<ConfigEmpresa, 'preset' | 'presetLido'
 }
 
 /**
- * A linha que a tela de Segmentos do superadmin edita (o formato antigo de
- * segmentos_config), lida de e gravada em presets_onboarding. A tela não muda.
- */
-export interface SegmentoRow {
-  chave: string
-  label: string
-  descricao: string | null
-  hidden_hrefs: string[]
-  label_overrides: Record<string, string>
-  modulos_extra: { href: string; label: string; icon: string; grupo?: string }[]
-  modulos_habilitados: string[] | null
-  menu_layout: Record<string, string[]> | null
-  ordem: number
-  ativo: boolean
-  /** Tela inicial e vocabulário do preset (29/10/2026): a tela não edita, mas salvar conserva. */
-  tela_inicial?: string | null
-  vocabulario?: Record<string, unknown> | null
-}
-
-export function segmentoDoPreset(p: { chave: string; nome: string; descricao: string | null; rotulos: Record<string, unknown> | null; ativo: boolean }): SegmentoRow {
-  const { _menu, _vocabulario, ...labels } = (p.rotulos ?? {}) as Record<string, unknown> & { _menu?: MenuDoPreset & { ordem?: number; tela_inicial?: string }; _vocabulario?: Record<string, unknown> }
-  const m = _menu ?? {}
-  return {
-    chave: p.chave, label: p.nome, descricao: p.descricao,
-    hidden_hrefs: m.hidden_hrefs ?? [], label_overrides: labels as Record<string, string>,
-    modulos_extra: m.modulos_extra ?? [], modulos_habilitados: m.modulos_habilitados ?? null,
-    menu_layout: m.menu_layout ?? null, ordem: m.ordem ?? 0, ativo: p.ativo,
-    tela_inicial: m.tela_inicial ?? null, vocabulario: _vocabulario ?? null,
-  }
-}
-
-export function presetDoSegmento(s: SegmentoRow) {
-  return {
-    chave: s.chave, nome: s.label, descricao: s.descricao, ativo: s.ativo,
-    rotulos: {
-      ...(s.label_overrides ?? {}),
-      _menu: {
-        hidden_hrefs: s.hidden_hrefs ?? [], modulos_habilitados: s.modulos_habilitados,
-        modulos_extra: s.modulos_extra ?? [], menu_layout: s.menu_layout, ordem: s.ordem,
-        ...(s.tela_inicial ? { tela_inicial: s.tela_inicial } : {}),
-      },
-      ...(s.vocabulario ? { _vocabulario: s.vocabulario as Json } : {}),
-    },
-  }
-}
-
-/**
- * Grava UMA camada do menu da empresa sem tocar na outra (o superadmin não
- * apaga a ordem do dono, o dono não apaga a liberação do superadmin).
+ * Grava UMA camada do menu da empresa sem tocar nas outras (o superadmin não
+ * apaga a ordem do dono, o dono não apaga a liberação do superadmin, nenhum dos
+ * dois apaga a base).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function gravarCamadaMenu(db: SupabaseClient<any>, empresaId: number, camada: 'superadmin' | 'dono', valor: unknown) {
+export async function gravarCamadaMenu(db: SupabaseClient<any>, empresaId: number, camada: 'base' | 'superadmin' | 'dono', valor: unknown) {
   const { data } = await db.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
   const itens = { ...(((data as { itens?: Record<string, unknown> } | null)?.itens) ?? {}) }
   if (valor == null) delete itens[camada]
@@ -291,43 +216,31 @@ export async function gravarModulosForcados(db: SupabaseClient<any>, empresaId: 
   return { error: null }
 }
 
-/**
- * Lê as três tabelas de uma vez. `preset` é `empresas.preset_onboarding`, que o
- * chamador já tem na mão (vem junto com a empresa).
- */
+/** Lê as duas tabelas da empresa de uma vez: o menu (base e camadas) e os módulos. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: number, preset: string | null): Promise<ConfigEmpresa> {
-  const [{ data: p }, { data: menu }, { data: modulos }] = await Promise.all([
-    db.from('presets_onboarding').select('chave, rotulos').eq('chave', preset ?? 'varejo').eq('ativo', true).maybeSingle(),
+export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: number): Promise<ConfigEmpresa> {
+  const [{ data: menu }, { data: modulos }] = await Promise.all([
     db.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle(),
     db.from('empresa_modulos').select('modulo, ativo, config').eq('empresa_id', empresaId),
   ])
-  const { superadmin, dono } = camadasDoMenu((menu as { itens?: unknown } | null)?.itens)
+  const camadas = camadasDoMenu((menu as { itens?: unknown } | null)?.itens)
   const rows = (modulos ?? []) as ModuloRow[]
-  return {
-    preset,
-    presetLido: menuDoPreset(p as PresetRow | null),
-    superadmin,
-    dono,
-    modulos: rows,
-    forcados: modulosForcados(rows),
-  }
+  return { ...camadas, modulos: rows, forcados: modulosForcados(rows) }
 }
 
 /**
- * OS MÓDULOS LIGADOS PARA A EMPRESA — a pergunta que o código novo faz no lugar
- * de "qual é o segmento?" (22/10/2026, zero-segmento no código novo).
+ * OS MÓDULOS LIGADOS PARA A EMPRESA — a pergunta que o código faz no lugar de
+ * "qual é o segmento?" (22/10/2026).
  *
- * Endereços ligados pelas camadas de sempre (preset, superadmin, Central de
- * Módulos), a mesma conta do menu e da trava. O preset é lido AQUI, no adaptador
- * de presets_onboarding, e em nenhum outro lugar do código novo.
+ * Endereços ligados pelas camadas de sempre (base, superadmin, Central de
+ * Módulos), a mesma conta do menu e da trava.
  */
 export function ligadosDaEmpresa(cfg: ConfigEmpresa): Set<string> {
   const { overrides, base, instalados } = camadasParaMenu(cfg)
   return hrefsHabilitados({ overrides, base, instalados })
 }
 
-/** A entrada do resolvedor do menu para esta empresa, sem o chamador tocar no preset. */
+/** A entrada do resolvedor do menu para esta empresa. */
 export function entradaDoMenu(
   cfg: ConfigEmpresa,
   quem: { plano?: string; role: string; isSuperAdmin: boolean },
@@ -338,16 +251,31 @@ export function entradaDoMenu(
 }
 
 /**
- * O QUE O CARD DO LEAD MOSTRA ALÉM DO COMUM (23/10/2026).
+ * O QUE OS MÓDULOS LIGADOS FAZEM NAS OUTRAS TELAS (29/10/2026): visitas no lead,
+ * telas próprias, portais, comissão por negócio, captação, cliente com funil,
+ * bloco de veículos, match por veículo, comanda. Vem do manifesto, somado.
+ */
+export function capacidades(cfg: ConfigEmpresa): CapacidadesDoModulo {
+  return capacidadesDosModulos(ligadosDaEmpresa(cfg))
+}
+
+/**
+ * Campo personalizado ativo na empresa (29/10/2026). A placa do veículo é um
+ * campo do item (entidade `item`, módulo dono `estoque`), criado pelo preset de
+ * veículos no cadastro; com ele, o estoque é de veículos.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function campoAtivo(db: SupabaseClient<any>, empresaId: number, entidade: string, chave: string): Promise<boolean> {
+  const { data } = await db.from('campos_personalizados').select('id')
+    .eq('empresa_id', empresaId).eq('entidade', entidade).eq('chave', chave).eq('ativo', true).limit(1)
+  return (data ?? []).length > 0
+}
+
+/**
+ * O QUE O CARD DO LEAD MOSTRA ALÉM DO COMUM (23/10/2026; desde 29/10 pela empresa).
  *
- * O modal perguntava quem a empresa é e ia buscar no cadastro de presets o
- * rótulo do campo de interesse e os painéis. A resposta é a mesma de antes — sai
- * do molde do preset —, só que perguntada aqui: o modal recebe o perfil pronto.
- * Quando o card ganhar campos personalizados (05, item 1), é esta função que
- * passa a ler `campos_personalizados`, e nenhuma tela muda.
- *
- *   paineis        painéis próprios, na ordem declarada (negócio, match...)
- *   interesse      rótulo do campo "produto" do lead
+ *   paineis        painéis dos módulos ligados, na ordem do manifesto
+ *   interesse      rótulo do campo "produto" do lead (vocabulário da empresa)
  *   textoLivre     item vive em tabela própria (imóvel, veículo): campo de texto,
  *                  sem o autocomplete do catálogo
  *   agendaVisitas  bloco de visitas no painel de ações
@@ -361,30 +289,40 @@ export interface PerfilDoLead {
 
 export type { PainelDoLead }
 
-export function perfilDoLead(cfg: Pick<ConfigEmpresa, 'preset'>): PerfilDoLead {
-  const m = moldeDoPreset(cfg.preset)
+export function perfilDoLead(cfg: ConfigEmpresa): PerfilDoLead {
+  const ligados = ligadosDaEmpresa(cfg)
+  const paineis = paineisDosModulos(ligados)
   return {
-    paineis: m.paineisDoLead,
-    interesse: m.interesseLabel,
-    agendaVisitas: !!m.capacidades.agendaVisitas,
-    textoLivre: m.paineisDoLead.length > 0,
+    paineis,
+    interesse: cfg.vocabulario.interesse ?? 'Produto interessado',
+    agendaVisitas: !!capacidadesDosModulos(ligados).agendaVisitas,
+    textoLivre: paineis.length > 0,
   }
 }
 
 /** Como a empresa chama quem atende ("Corretor" na imobiliária). Padrão "Vendedor". */
-export function vocabulario(cfg: Pick<ConfigEmpresa, 'preset'>): { equipe: string } {
-  return { equipe: moldeDoPreset(cfg.preset).equipeLabel ?? 'Vendedor' }
+export function vocabulario(cfg: Pick<ConfigEmpresa, 'vocabulario'>): { equipe: string } {
+  return { equipe: cfg.vocabulario.equipe ?? 'Vendedor' }
 }
 
 /**
- * O QUE O MOLDE DO PRESET DIZ QUE A EMPRESA FAZ — para o que ainda não tem módulo
- * próprio (23/10/2026): placa e chassi no estoque, comanda no PDV, vocabulário de
- * clínica na agenda, bloco de veículos nas automações, tela inicial depois do
- * login. O que já tem módulo (Imóveis, Executivo, Cardápio, Agenda) pergunta
- * `ligadosDaEmpresa(cfg).has(href)`, não isto.
+ * TRANSITÓRIO (29/10/2026): a lista e a validação de presets do cadastro e do
+ * superadmin, ainda pelo código. Saem quando o /register ler presets_onboarding
+ * e a troca de preset sair da ficha da empresa.
  */
-export type Capacidades = ReturnType<typeof moldeDoPreset>['capacidades']
+const MOLDES = SEGMENTOS
+const chaveDoMolde = normalizarSegmento
 
-export function capacidadesDoPreset(cfg: Pick<ConfigEmpresa, 'preset'>): Capacidades {
-  return moldeDoPreset(cfg.preset).capacidades
+/** A chave do preset como o código a conhece; desconhecida ou vazia = varejo. */
+export function normalizarPreset(preset: string | null | undefined): string {
+  return chaveDoMolde(preset)
 }
+
+/** O preset existe no código? (troca de preset no superadmin). */
+export function presetConhecido(preset: string | null | undefined): boolean {
+  return !!preset && preset in MOLDES
+}
+
+/** Os presets do código, na ordem do cadastro, com o rótulo do molde. */
+export const PRESETS_DO_CODIGO: { chave: string; nome: string }[] =
+  Object.entries(MOLDES).map(([chave, m]) => ({ chave, nome: m.label }))

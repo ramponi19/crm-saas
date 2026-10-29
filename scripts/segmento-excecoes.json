@@ -59,7 +59,7 @@
     },
     "app/api/superadmin/segmentos/route.ts": {
       "motivo": "inventario",
-      "teto": 11
+      "teto": 4
     },
     "app/landing/data.ts": {
       "motivo": "inventario",
@@ -123,7 +123,7 @@
     },
     "app/superadmin/segmentos/page.tsx": {
       "motivo": "inventario",
-      "teto": 9
+      "teto": 6
     },
     "app/superadmin/segmentos/segmentos-view.tsx": {
       "motivo": "inventario",
@@ -159,7 +159,7 @@
     },
     "lib/empresa-config.ts": {
       "motivo": "presets_onboarding",
-      "teto": 16
+      "teto": 7
     },
     "lib/estoque-campos.ts": {
       "motivo": "inventario",

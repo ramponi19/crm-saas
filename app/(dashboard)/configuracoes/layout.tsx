@@ -20,11 +20,10 @@ import { ConfiguracoesNav } from '@/components/configuracoes/configuracoes-nav'
 export default async function ConfiguracoesLayout({ children }: { children: React.ReactNode }) {
   const [supabase, empresaId, role] = await Promise.all([createClient(), getEmpresaId(), getEmpresaRole()])
   const isAdmin = role === 'owner' || role === 'admin'
-  const [{ data: empresa }, zapintel] = await Promise.all([
-    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId ?? 0).maybeSingle(),
+  const [zapintel, cfg] = await Promise.all([
     isAdmin && empresaId ? inteligenciaLigada(rastrDb(), empresaId) : Promise.resolve(false),
+    carregarConfigEmpresa(supabase, empresaId ?? 0),
   ])
-  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0, empresa?.preset_onboarding ?? null)
   const secoes = secoesDeConfiguracoes({ isAdmin, abasDosModulos: abasDosModulos(ligadosDaEmpresa(cfg)), zapintel })
 
   return (

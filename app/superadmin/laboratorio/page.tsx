@@ -2,7 +2,7 @@ import { requireSuperAdmin } from '@/lib/superadmin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getImpersonation } from '@/lib/supabase/server'
 import { CATALOGO, statusDo } from '@/lib/menu'
-import { menuDoPreset, type PresetRow } from '@/lib/empresa-config'
+import { baseDoPreset } from '@/lib/presets'
 import { LaboratorioView, type ItemLab } from './laboratorio-view'
 
 export const metadata = { title: 'Laboratório' }
@@ -17,8 +17,8 @@ export default async function LaboratorioPage() {
   // liberado e o que ainda não saiu do catálogo.
   const { data: presets } = await svc.from('presets_onboarding').select('chave, rotulos')
   const contagem = new Map<string, number>()
-  for (const p of (presets ?? []) as PresetRow[]) {
-    for (const href of menuDoPreset(p)?.habilitados ?? []) {
+  for (const p of (presets ?? []) as { chave: string; rotulos: Record<string, unknown> | null }[]) {
+    for (const href of baseDoPreset(p.rotulos).habilitados ?? []) {
       contagem.set(href, (contagem.get(href) ?? 0) + 1)
     }
   }

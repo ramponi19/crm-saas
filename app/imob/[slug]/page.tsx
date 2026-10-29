@@ -1,14 +1,14 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import SiteView from './site-view'
 
 async function getSite(slug: string) {
   const svc = createServiceClient()
   const { data: empresa } = await svc
     .from('empresas')
-    .select('id, nome, preset_onboarding, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_slogan:slogan, wl_whatsapp:whatsapp), telefone')
+    .select('id, nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_slogan:slogan, wl_whatsapp:whatsapp), telefone')
     .eq('slug', slug)
     .maybeSingle()
   if (!empresa) return null
@@ -34,8 +34,8 @@ export default async function SitePublicoPage({ params }: { params: Promise<{ sl
   const { slug } = await params
   const data = await getSite(slug)
   if (!data) notFound()
-  // Site imobiliário: só para o preset que integra portais e site (a imobiliária)
-  if (!capacidadesDoPreset({ preset: data.empresa.preset_onboarding ?? null }).integraPortais) notFound()
+  // Site imobiliário: só para quem tem o módulo que integra portais e site (Imóveis)
+  if (!capacidades(await carregarConfigEmpresa(createServiceClient(), data.empresa.id)).integraPortais) notFound()
 
   return <SiteView empresa={data.empresa} imoveis={data.imoveis} />
 }

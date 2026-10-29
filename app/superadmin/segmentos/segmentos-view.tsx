@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Eye } from 'lucide-react'
 import { Card, Button, IconButton, Input, Modal, Badge, notify } from '@/components/ui'
 import { CATALOGO, resolverMenuPlano } from '@/lib/menu'
-import { camadaBase } from '@/lib/empresa-config'
 import { MenuOrdenavel, type LayoutMenu } from '@/components/layout/menu-ordenavel'
 
 export interface SegmentoRow {
@@ -94,19 +93,19 @@ export function SegmentosView({ initial }: { initial: SegmentoRow[] }) {
    * edição — então a lista que se arrasta é o menu que o segmento vai gerar, e não
    * uma cópia da lista de checkboxes que precisa ser conferida de cabeça.
    *
-   * `modulosExtra` só entra quando existe: lista vazia significa "não configurado"
-   * e deixa o código valer, exatamente como a engine faz.
+   * É a base com que uma empresa nova nasce com este preset (o cadastro copia a
+   * linha para empresa_menu.itens.base): sem molde por baixo desde 29/10/2026.
    */
   const menuDoSegmento = form
     ? resolverMenuPlano({
         role: 'owner',
         isSuperAdmin: false,
-        base: camadaBase({
+        base: {
           habilitados: Array.from(new Set([...TRAVADOS, ...form.habilitados])),
           labelOverrides: form.labels,
-          modulosExtra: form.extras.length ? form.extras : undefined,
+          modulosExtra: form.extras,
           menuLayout: form.menu_layout,
-        }, form.chave),
+        },
       })
     : []
 

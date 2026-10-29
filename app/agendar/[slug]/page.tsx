@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { AgendarView, type Horario } from './agendar-view'
 
 export const metadata = { title: 'Agendar horário' }
@@ -9,12 +9,12 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id, nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor), preset_onboarding').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id, nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor)').eq('slug', slug).maybeSingle()
   if (!empresa) notFound()
   // Mesma regra da rota /api/agendar: quem não tem agenda não tem formulário de
   // agendamento. Sem isto o visitante preenchia o formulário e tomava erro no fim.
-  const cap = capacidadesDoPreset({ preset: empresa.preset_onboarding ?? null })
-  if (!cap.agendaClinica && !cap.agendaVisitas) notFound()
+  // Só recebe agendamento a empresa com a Agenda ligada.
+  if (!ligadosDaEmpresa(await carregarConfigEmpresa(svc, empresa.id)).has('/agenda')) notFound()
 
   const [{ data: horarioRow }, { data: ocupadasRaw }] = await Promise.all([
     svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresa.id).eq('chave', 'horario_comercial').maybeSingle(),

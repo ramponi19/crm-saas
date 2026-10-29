@@ -5,7 +5,7 @@ import { Plus, Trash2, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import type { Json } from '@/types/database'
 
 interface Automacao {
@@ -63,8 +63,8 @@ export function AutomacoesCard() {
       const id = await empresaAtualId(supabase)
       if (!id) return
       setEmpresaId(id)
-      const { data: emp } = await supabase.from('empresas').select('preset_onboarding').eq('id', id).maybeSingle()
-      setComVeiculos(!!capacidadesDoPreset({ preset: emp?.preset_onboarding ?? null }).automacoesVeiculo)
+      // Bloco de veículos: o módulo Avaliação de veículos está ligado.
+      setComVeiculos(!!capacidades(await carregarConfigEmpresa(supabase, id)).automacoesVeiculo)
       const { data: et } = await supabase
         .from('funil_etapas').select('slug, label, tipo').eq('empresa_id', id).eq('ativo', true).order('ordem')
       setEtapas(((et ?? []) as Etapa[]))

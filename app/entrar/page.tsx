@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolverMenu } from '@/lib/menu'
-import { capacidadesDoPreset, carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
 
 // Rota neutra pós-login: decide o destino conforme o papel do usuário.
 // Super admin → painel global; dono/admin da empresa → painel de administração;
@@ -37,15 +37,13 @@ export default async function EntrarPage() {
     redirect('/visao-geral')
   }
 
-  // Saúde: a Agenda é a tela inicial (consultas do dia).
-  const { data: emp } = await supabase
-    .from('empresas')
-    .select('preset_onboarding, plano, permissoes')
-    .eq('id', vinculo.empresa_id).maybeSingle()
-  // Tela inicial do preset (clínica abre a agenda, não o dashboard). Vem do
-  // adaptador: um preset novo declara a sua sem tocar nesta rota.
-  const inicial = capacidadesDoPreset({ preset: emp?.preset_onboarding ?? null }).telaInicial
-  if (inicial) redirect(inicial)
+  const [{ data: emp }, cfg] = await Promise.all([
+    supabase.from('empresas').select('plano, permissoes').eq('id', vinculo.empresa_id).maybeSingle(),
+    carregarConfigEmpresa(supabase, vinculo.empresa_id),
+  ])
+  // Tela inicial da empresa (clínica abre a agenda, não o dashboard): gravada na
+  // base pelo cadastro, a partir do preset escolhido.
+  if (cfg.telaInicial) redirect(cfg.telaInicial)
 
   /**
    * A tela inicial tem de ser uma que o funcionário VÊ.
@@ -58,11 +56,7 @@ export default async function EntrarPage() {
    * sobrou. Sem nenhum item visível (menu todo oculto), cai no /dashboard: é
    * melhor abrir algo do que deixar o login sem destino.
    */
-  const cfg = await carregarConfigEmpresa(supabase, vinculo.empresa_id, emp?.preset_onboarding ?? null)
-  // Sem a ordem do superadmin, como sempre foi aqui: o primeiro item de quem
-  // entra não muda com a troca de fonte (21/10/2026). O molde continua por baixo.
-  const semOrdemDoBanco = { ...cfg, presetLido: cfg.presetLido && { ...cfg.presetLido, menuLayout: undefined } }
-  const { overrides, configDono, base, instalados } = camadasParaMenu(semOrdemDoBanco)
+  const { overrides, configDono, base, instalados } = camadasParaMenu(cfg)
   const grupos = resolverMenu({
     plano: emp?.plano ?? undefined,
     role: vinculo.role ?? 'vendedor',

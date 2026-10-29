@@ -6,7 +6,7 @@ import PDVView from './components/pdv-view'
 import type { EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import type { Tables } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 
 export const metadata = { title: 'PDV' }
 
@@ -31,7 +31,7 @@ export default async function PDVPage() {
     { data: clientes },
     { data: taxas },
     { data: vendasRecentes },
-    { data: empresa },
+    cfgEmpresa,
     { data: tabelaPrecos },
     { data: cfgTroca },
     { data: encomendasRaw },
@@ -58,7 +58,7 @@ export default async function PDVPage() {
       .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
-    supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle(),
+    carregarConfigEmpresa(supabase, empresaId ?? 0),
     // Referência de preço do aparelho recebido em troca + a tolerância da loja.
     supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),
@@ -227,7 +227,7 @@ export default async function PDVPage() {
           clientes={(clientes ?? []).map(comNome)}
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
-          usaComanda={!!capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).usaComanda}
+          usaComanda={!!capacidades(cfgEmpresa).usaComanda}
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
           encomendas={encomendas}

@@ -23,7 +23,7 @@ export default async function IntegracoesPage() {
   const svc = createServiceClient()
 
   const [{ data: empresa }, { data: importCfg }] = await Promise.all([
-    supabase.from('empresas').select('slug, preset_onboarding').eq('id', empresaId).single(),
+    supabase.from('empresas').select('slug').eq('id', empresaId).single(),
     svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'import_imoveis').maybeSingle(),
   ])
 
@@ -43,7 +43,7 @@ export default async function IntegracoesPage() {
   })
 
   // Portais e site do imóvel: quando o módulo Imóveis está ligado para a empresa (22/10/2026).
-  const portais = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)).has('/imoveis')
+  const portais = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId)).has('/imoveis')
 
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 

@@ -25,7 +25,10 @@
 import fs from 'node:fs'
 import { resolverMenuPlano, resolverMenuAgrupado, type ResolverMenuInput } from '../lib/menu'
 import { permsDoPapel, type PermissoesMap } from '../lib/permissoes'
-import { camadasDoMenu, camadasParaMenu, modulosForcados, menuDoPreset, type ModuloRow, type PresetRow } from '../lib/empresa-config'
+import { camadasDoMenu, camadasParaMenu, modulosForcados, type ModuloRow } from '../lib/empresa-config'
+import { baseDoPreset } from '../lib/presets'
+
+type PresetRow = { chave: string; rotulos: Record<string, unknown> | null }
 
 type Core = {
   id: number; preset: string | null; plano: string | null; permissoes: unknown; lojas: number[]
@@ -52,8 +55,8 @@ function permHidden(role: string, permissoes: unknown): string[] {
 
 /** O que app/(dashboard)/layout.tsx monta (mesma conta do comparar-menu). */
 function entrada(e: Core, role: string, superadmin: boolean): ResolverMenuInput {
-  const { superadmin: mo, dono } = camadasDoMenu(e.itens)
-  const cfg = { preset: e.preset, presetLido: menuDoPreset(e.preset_row), superadmin: mo, dono, forcados: modulosForcados(e.modulos) }
+  // A base que o cadastro gravaria a partir da linha do preset (lib/presets.ts).
+  const cfg = { ...camadasDoMenu({ ...((e.itens ?? {}) as object), base: baseDoPreset(e.preset_row?.rotulos) }), forcados: modulosForcados(e.modulos) }
   const { overrides, configDono, base } = camadasParaMenu(cfg, permHidden(role, e.permissoes))
   return { base, plano: e.plano ?? undefined, role, isSuperAdmin: superadmin, overrides, configDono }
 }

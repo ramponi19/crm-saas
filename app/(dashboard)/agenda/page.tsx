@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { capacidadesDoPreset, carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
 import AgendaView from './agenda-view'
 import type { Tables } from '@/types/database'
 
@@ -15,8 +15,7 @@ export default async function AgendaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
-  const cfg = await carregarConfigEmpresa(supabase, empresaId, empresa?.preset_onboarding ?? null)
+  const cfg = await carregarConfigEmpresa(supabase, empresaId)
   /**
    * Gate pelo MÓDULO, não por quem a empresa é (zero-segmento, 23/10/2026).
    *
@@ -25,7 +24,8 @@ export default async function AgendaPage() {
    * a pergunta agora é a da Central: o módulo Agenda está ligado? Desligado, a
    * vitrine (etapa 0) — não o dashboard: quem abriu fica sabendo o que é a Agenda.
    */
-  if (!ligadosDaEmpresa(cfg).has('/agenda')) return <VitrineDoModulo href="/agenda" />
+  const ligados = ligadosDaEmpresa(cfg)
+  if (!ligados.has('/agenda')) return <VitrineDoModulo href="/agenda" />
 
   const { data: vinculo } = await supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).maybeSingle()
   const isGestor = ['owner', 'admin'].includes(vinculo?.role ?? '')
@@ -77,7 +77,9 @@ export default async function AgendaPage() {
       empresaId={empresaId}
       meuId={user.id}
       isGestor={isGestor}
-      clinica={!!capacidadesDoPreset(cfg).agendaClinica}
+      rotulos={cfg.vocabulario.agenda}
+      equipe={vocabulario(cfg).equipe}
+      comImoveis={ligados.has('/imoveis')}
     />
   )
 }

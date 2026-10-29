@@ -6,6 +6,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { Plus, Clock, MapPin, Phone, CalendarDays, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
+import type { RotulosAgenda } from '@/lib/empresa-config'
 
 /**
  * Agenda em CALENDÁRIO DO MÊS + painel do dia (pedido do dono da imobiliária,
@@ -45,7 +46,8 @@ const stInfo = (s: string) => STATUS.find(x => x.v === s) ?? STATUS[0]
  * — é etapa do funil imobiliário, entre contrato e entrega de chaves, e até agora
  * não havia como distingui-la de uma visita comum.
  */
-const TIPOS_IMOB = [
+/** Tipos de compromisso padrão; a empresa pode ter os seus (vocabulário, ex.: clínica). */
+const TIPOS_PADRAO: { v: string; l: string }[] = [
   { v: 'visita', l: 'Visita' },
   { v: 'vistoria', l: 'Vistoria' },
   { v: 'retorno', l: 'Retorno' },
@@ -54,15 +56,7 @@ const TIPOS_IMOB = [
   { v: 'reuniao', l: 'Reunião' },
   { v: 'particular', l: 'Particular' },
   { v: 'outros', l: 'Outros' },
-] as const
-const TIPOS_SAUDE = [
-  { v: 'visita', l: 'Consulta' },
-  { v: 'retorno', l: 'Retorno' },
-  { v: 'apresentacao', l: 'Exame' },
-  { v: 'reuniao', l: 'Reunião' },
-  { v: 'particular', l: 'Particular' },
-  { v: 'outros', l: 'Outros' },
-] as const
+]
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -95,22 +89,25 @@ const faixa = (inicio: string, fim: string | null) => {
 /** Valor para `datetime-local`, que não aceita fuso — tem de ser hora local. */
 const paraCampo = (d: Date) => `${chaveLocal(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
-export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios, empresaId, meuId, isGestor, clinica = false }: {
+export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios, empresaId, meuId, isGestor, rotulos = {}, equipe, comImoveis }: {
   inicial: Visita[]; leads: Opt[]; clientes: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]
   empresaId: number; meuId: string; isGestor: boolean
-  /** Vocabulário de clínica: consulta, paciente, profissional (capacidade do preset). */
-  clinica?: boolean
+  /** Como a empresa chama a Agenda (clínica: consulta, paciente, profissional). Vazio = o padrão. */
+  rotulos?: RotulosAgenda
+  /** Como a empresa chama quem atende, quando a Agenda não tem nome próprio para isso. */
+  equipe: string
+  /** O módulo Imóveis está ligado: o compromisso pode apontar um imóvel. */
+  comImoveis: boolean
 }) {
   const supabase = createClient()
-  const isSaude = clinica
-  const TIPOS = isSaude ? TIPOS_SAUDE : TIPOS_IMOB
+  const TIPOS = rotulos.tipos?.length ? rotulos.tipos : TIPOS_PADRAO
   const rotuloTipo = (v: string | null) => TIPOS.find(t => t.v === v)?.l ?? TIPOS[0].l
   const L = {
-    novo: isSaude ? 'Nova consulta' : 'Novo compromisso',
-    pessoa: isSaude ? 'Paciente (lead)' : 'Lead',
-    prof: isSaude ? 'Profissional' : 'Corretor',
-    subtitulo: isSaude ? 'Gerencie suas consultas e retornos' : 'Gerencie seus compromissos e visitas',
-    nenhum: isSaude ? 'Nenhuma consulta neste dia' : 'Nenhum compromisso neste dia',
+    novo: rotulos.novo ?? 'Novo compromisso',
+    pessoa: rotulos.pessoa ?? 'Lead',
+    prof: rotulos.profissional ?? equipe,
+    subtitulo: rotulos.subtitulo ?? 'Gerencie seus compromissos e visitas',
+    nenhum: rotulos.vazio ?? 'Nenhum compromisso neste dia',
   }
 
   const [lista, setLista] = useState<Visita[]>(inicial)
@@ -264,7 +261,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
     setMes({ ano: dia.getFullYear(), mes: dia.getMonth() })
     setDiaSel(chaveLocal(dia))
     setForm(vazio); setModal(false)
-    notify.ok(isSaude ? 'Consulta agendada' : 'Compromisso agendado')
+    notify.ok(rotulos.agendado ?? 'Compromisso agendado')
   }
 
   async function mudarStatus(v: Visita, status: string) {
@@ -487,7 +484,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
         <div className="space-y-3">
           <Input
             label="Título"
-            placeholder={isSaude ? 'Ex: Consulta de retorno' : 'Ex: Visita ao imóvel'}
+            placeholder={rotulos.exemplo ?? (comImoveis ? 'Ex: Visita ao imóvel' : 'Ex: Reunião com o cliente')}
             hint="Opcional — sem título, aparece o nome de quem vai ser atendido."
             value={form.titulo}
             onChange={e => set('titulo', e.target.value)}
@@ -529,7 +526,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
             </Select>
           </div>
 
-          {!isSaude && (
+          {comImoveis && (
             <Select label="Imóvel" value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
               <option value="">— selecionar —</option>
               {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}

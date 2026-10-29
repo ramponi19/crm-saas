@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { ranquear, type PerfilBusca, type ImovelMatchInput } from '@/lib/match-imoveis'
 import { ranquearVeiculos, type InteresseVeiculo, type VeiculoMatchInput } from '@/lib/match-veiculos'
 
 /**
- * Itens compatíveis com o lead. Ramifica pela capacidade do preset da empresa:
+ * Itens compatíveis com o lead. Ramifica pelo módulo ligado da empresa:
  *  - concessionaria → veículos do estoque × leads.interesse
  *  - demais (imobiliaria) → imóveis × lead_perfil_busca
  * Usa o client com RLS → só enxerga dados da própria empresa (isolado).
@@ -19,11 +19,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { data: empresa } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId!).maybeSingle()
 
   // ── Loja de veículos ──
   // `matchVeiculo`: casa o interesse com unidade de veículo em vez de imóvel.
-  if (capacidadesDoPreset({ preset: empresa?.preset_onboarding ?? null }).matchVeiculo) {
+  if (capacidades(await carregarConfigEmpresa(supabase, empresaId!)).matchVeiculo) {
     const { data: lead } = await supabase.from('leads').select('interesse').eq('id', leadId).maybeSingle()
     const interesse = (lead?.interesse ?? null) as InteresseVeiculo | null
     if (!interesse) return NextResponse.json({ matches: [] })

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { escolherResponsavel } from '@/lib/distribuicao'
-import { capacidadesDoPreset } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
@@ -13,19 +13,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params
   const svc = createServiceClient()
 
-  const { data: empresa } = await svc.from('empresas').select('id, preset_onboarding').eq('slug', slug).maybeSingle()
+  const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
   if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
 
   /**
    * A loja precisa USAR agenda para receber agendamento.
    *
-   * A tela é liberada pela capacidade do preset, a rota não era: um POST no slug de qualquer
+   * A tela é liberada pela Agenda ligada, a rota não era: um POST no slug de qualquer
    * empresa criava lead + consulta numa loja que não tem agenda nenhuma. O lead
    * entrava na roleta, consumia o limite do plano e ninguém ia ver a "consulta",
    * porque a tela não existe ali. Mesmo 404: a rota não conta quem existe.
    */
-  const cap = capacidadesDoPreset({ preset: empresa.preset_onboarding ?? null })
-  if (!cap.agendaClinica && !cap.agendaVisitas) {
+  if (!ligadosDaEmpresa(await carregarConfigEmpresa(svc, empresa.id)).has('/agenda')) {
     return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
   }
 
