@@ -29,10 +29,6 @@
       "motivo": "inventario",
       "teto": 1
     },
-    "app/agendar/[slug]/page.tsx": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/api/agendar/[slug]/route.ts": {
       "motivo": "inventario",
       "teto": 8
