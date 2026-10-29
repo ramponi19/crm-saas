@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolverMenu } from '@/lib/menu'
-import { SEGMENTOS, normalizarSegmento } from '@/lib/segmentos'
-import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
+import { capacidadesDoPreset, carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
 
 // Rota neutra pós-login: decide o destino conforme o papel do usuário.
 // Super admin → painel global; dono/admin da empresa → painel de administração;
@@ -38,14 +37,14 @@ export default async function EntrarPage() {
     redirect('/visao-geral')
   }
 
-  // Saúde: a Agenda é a tela inicial do segmento (consultas do dia).
+  // Saúde: a Agenda é a tela inicial (consultas do dia).
   const { data: emp } = await supabase
     .from('empresas')
-    .select('segmento:preset_onboarding, preset_onboarding, plano, permissoes')
+    .select('preset_onboarding, plano, permissoes')
     .eq('id', vinculo.empresa_id).maybeSingle()
-  // Tela inicial do segmento (clínica abre a agenda, não o dashboard). Vem do
-  // contrato: um segmento novo declara a sua sem tocar nesta rota.
-  const inicial = SEGMENTOS[normalizarSegmento(emp?.segmento)].capacidades.telaInicial
+  // Tela inicial do preset (clínica abre a agenda, não o dashboard). Vem do
+  // adaptador: um preset novo declara a sua sem tocar nesta rota.
+  const inicial = capacidadesDoPreset({ preset: emp?.preset_onboarding ?? null }).telaInicial
   if (inicial) redirect(inicial)
 
   /**

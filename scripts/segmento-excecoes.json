@@ -85,10 +85,6 @@
       "motivo": "inventario",
       "teto": 7
     },
-    "app/entrar/page.tsx": {
-      "motivo": "inventario",
-      "teto": 10
-    },
     "app/imob/[slug]/page.tsx": {
       "motivo": "inventario",
       "teto": 6
