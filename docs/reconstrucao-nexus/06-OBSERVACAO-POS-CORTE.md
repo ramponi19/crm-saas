@@ -674,3 +674,19 @@ Decisão do Lucas: ir de dia, com a migração só de dados (sem DDL), IOwait ab
   - `/api/filial/selecionar` responde 500 com corpo `null` (devia ser 400);
   - o servidor local do ensaio manda erro para o Sentry da produção (DSN no `.env.local`);
   - `ops.volta_filial_20261020` segue lá (apagar a partir de 03/11, com o ok do Lucas).
+
+## 15. 03/11 à noite: card do lead lendo o core (`4eb5098`), deploy só de app
+
+Loja fechada, IOwait 0,2% no push (19:30); `main` = `210eb81` + 5 commits da `feat/card-do-lead`. Gate na `main` local: check, 197 testes, foto 80 (70 + inexistente = varejo), menu 15/15, build, 152/152, verificador 539/5. Push 19:3x, **READY 19:33:46**.
+
+- **O que entrou:** o card busca o próprio lead em `negocios` + `contatos` + `conversas` + `campos_personalizados` (`GET/PATCH /api/leads/[id]/card`, `lib/card-do-lead.ts`), sem a view `leads`; a conversa lê `mensagens` direto, 200 mais recentes e "ver anteriores"; o formulário nasce igual ao banco (nada "alterado" ao abrir) e responsável vazio fica vazio até alguém escolher (responder segue assumindo); campos personalizados de módulo ligado no card, no tipo que o banco valida; "também em <loja>" (link para dono/admin, texto para vendedor); fundir contatos (classe 2) e **desfazer pela fusão registrada** — a fusão guarda a foto em `contato_fusoes.movido._desfazer` e o desfazer recria o contato e as conversas com os mesmos ids (`lib/fusao-contatos.ts`); `/api/leads/mover`, `/atribuir` e `/match/lead/[id]` passaram a `negocios`/`contatos`. Resolve o primeiro item anotado na seção 14 (card sem responsável abrindo como alterado).
+- **Smoke com o Lucas (19:35–19:52):**
+  - histórico longo (lead 3996, 208 mensagens): abriu com 200 e "Ver mensagens anteriores"; o clique trouxe as 8 restantes; ~75 KB por abertura (card 839 B);
+  - card sem responsável (6699): "Sem responsável", sem "alteração não salva";
+  - contatos de teste A/B (criados e apagados depois): campo personalizado gravou e limpou; data `17/05/1990` → 400 sem gravar; mover etapa e voltar; **fundir (registro 273) → desfazer → md5 dos dois contatos, negócios, conversas e identidades idêntico ao antes**; segundo desfazer 409;
+  - "também em Jaguariúna" (4685) é link para o 6000 no dono; o texto para vendedor ficou provado no local (4/4), sem login de vendedor na produção;
+  - tarefa criada e apagada; `/api/saude` 200;
+  - WhatsApp: "test card" do Lucas chegou nas duas lojas (19:49); resposta pelo card em Mogi 19:50:35 e Jaguariúna 19:50:58, Meta aceitou ("enviada") e o Lucas confirmou as duas no celular; a mensagem recebida ficou lida ao abrir o card.
+- **IOwait:** pico 19,7% às 19:35 (deploy), 8,1% às 19:51. **Sentry:** nada na última hora.
+- **Volta (não usada):** Instant Rollback para `210eb81` (só app; nenhuma migração).
+- **Fica anotado:** a página `/leads` ainda carrega a lista inteira do quadro pela view `leads` (é a próxima frente, `feat/quadro-core`); `from('leads')` caiu de 107 leituras em 58 arquivos para 93 em 52; fusões anteriores a 03/11 não têm foto e não se desfazem.
