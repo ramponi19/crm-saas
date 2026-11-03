@@ -1,19 +1,19 @@
 /**
- * data.ts — todo o conteúdo da landing num lugar só (copy, segmentos, planos,
+ * data.ts — todo o conteúdo da landing num lugar só (copy, verticais, planos,
  * módulos, comparativo, FAQ). As seções em `sections/` só renderizam isto.
  *
  * Cores hex aqui são data-driven (dots do funil do mock), como no mock aprovado.
  */
 
 /* ------------------------------------------------------------------ */
-/*  Segmentos — alimentam o mock vivo do hero                          */
+/*  Verticais — alimentam o mock vivo do hero                          */
 /* ------------------------------------------------------------------ */
 
 export type Tone = 'ok' | 'warn' | 'ink3'
 export type FunilCol = { name: string; dot: string; leads: [string, string][] }
 export type Segment = {
   label: string
-  para: string // slug da página SEO /para/[segmento]
+  para: string // slug da página SEO /para/<slug>
   empresa: string
   inicial: string
   nav: [string, string, string]
@@ -121,7 +121,7 @@ export const SEGS: Record<string, Segment> = {
 export const SEG_KEYS = Object.keys(SEGS)
 
 /* ------------------------------------------------------------------ */
-/*  Segmentos — cards da seção clara (linkam as páginas SEO /para/*)   */
+/*  Verticais — cards da seção clara (linkam as páginas SEO /para/*)   */
 /* ------------------------------------------------------------------ */
 
 export const SEG_CARDS: { key: string; title: string; desc: string }[] = [

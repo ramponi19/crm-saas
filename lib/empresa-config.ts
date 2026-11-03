@@ -7,7 +7,7 @@ import { hrefsHabilitados, type ResolverMenuInput } from '@/lib/menu'
 /**
  * A CONFIGURAÇÃO DA EMPRESA SAI DAS TABELAS DA EMPRESA, NUM LUGAR SÓ.
  *
- * Até 21/10/2026 o menu e a trava de rota liam `segmentos_config` e três colunas
+ * Até 21/10/2026 o menu e a trava de rota liam a tabela de configuração por vertical (apagada na Etapa 0) e três colunas
  * de `empresas`; de 21 a 29/10, a linha de `presets_onboarding` mesclada com um
  * molde estático por vertical, a cada request. Desde 29/10/2026 o preset é só a
  * ficha de partida (lib/presets.ts): o cadastro a copia para a empresa, e daqui
@@ -229,7 +229,7 @@ export async function carregarConfigEmpresa(db: SupabaseClient<any>, empresaId: 
 
 /**
  * OS MÓDULOS LIGADOS PARA A EMPRESA — a pergunta que o código faz no lugar de
- * "qual é o segmento?" (22/10/2026).
+ * "qual é a vertical da empresa?" (22/10/2026).
  *
  * Endereços ligados pelas camadas de sempre (base, superadmin, Central de
  * Módulos), a mesma conta do menu e da trava.

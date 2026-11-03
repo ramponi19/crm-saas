@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
 import Sections, { type PlanData } from '@/app/landing/Sections'
 
-/** Conteúdo por segmento (páginas de SEO /para/*). */
+/** Conteúdo por vertical (páginas de SEO /para/*). */
 const PARA: Record<string, { titulo: string; desc: string; eyebrow: string; h1: string; lede: string; bullets: string[] }> = {
   lojas: {
     titulo: 'CRM para lojas e varejo',
@@ -58,12 +58,12 @@ const PARA: Record<string, { titulo: string; desc: string; eyebrow: string; h1: 
 }
 
 export function generateStaticParams() {
-  return Object.keys(PARA).map((segmento) => ({ segmento }))
+  return Object.keys(PARA).map((vertical) => ({ vertical }))
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ segmento: string }> }): Promise<Metadata> {
-  const { segmento } = await params
-  const p = PARA[segmento]
+export async function generateMetadata({ params }: { params: Promise<{ vertical: string }> }): Promise<Metadata> {
+  const { vertical } = await params
+  const p = PARA[vertical]
   if (!p) return { title: 'Nexus' }
   return { title: p.titulo, description: p.desc }
 }
@@ -82,9 +82,9 @@ async function getPlans(): Promise<PlanData[]> {
   } catch { return [] }
 }
 
-export default async function ParaSegmentoPage({ params }: { params: Promise<{ segmento: string }> }) {
-  const { segmento } = await params
-  const p = PARA[segmento]
+export default async function ParaVerticalPage({ params }: { params: Promise<{ vertical: string }> }) {
+  const { vertical } = await params
+  const p = PARA[vertical]
   if (!p) notFound()
   const plans = await getPlans()
 

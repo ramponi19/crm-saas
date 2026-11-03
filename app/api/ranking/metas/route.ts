@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 /**
  * `imoveis_captados` entra aqui porque `valorMetrica` já sabe medir e a tela já
- * oferece a opção onde o segmento capta ativo. Fora da lista, o tipo caía no
+ * oferece a opção onde a empresa capta ativo (módulo Imóveis). Fora da lista, o tipo caía no
  * silêncio pior possível: a rota trocava por "vendas" e a meta passava a medir
  * outra coisa sem avisar ninguém.
  */

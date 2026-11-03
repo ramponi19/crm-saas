@@ -7,7 +7,7 @@ export const metadata = { title: 'Tarefas' }
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
-// Tarefas é módulo de núcleo: disponível em todos os segmentos.
+// Tarefas é módulo de núcleo: disponível em toda empresa.
 export default async function TarefasPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()

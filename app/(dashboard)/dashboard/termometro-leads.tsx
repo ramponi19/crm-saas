@@ -10,7 +10,7 @@ import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig 
  * coluna e somar de cabeça.
  *
  * Vive junto do dashboard da imobiliária, e não em `components/modules/dashboard`,
- * para deixar explícito que é do segmento: nenhum outro dashboard importa daqui.
+ * para deixar explícito que é da imobiliária: nenhum outro dashboard importa daqui.
  */
 
 /**

@@ -107,7 +107,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
     /**
      * Os campos de veículo vão para `veiculo_dados` ALÉM das colunas antigas.
      *
-     * Escrita dupla temporária (Fase 3 do isolamento por segmento): a leitura ainda
+     * Escrita dupla temporária (Fase 3 do isolamento por tipo de negócio): a leitura ainda
      * usa as colunas de `inventario_unidades`, então elas continuam recebendo; a
      * tabela nova recebe em paralelo para o dado de hoje já estar no lugar certo
      * quando a leitura migrar. Sem isso, o dia da troca traria placa vazia em tudo

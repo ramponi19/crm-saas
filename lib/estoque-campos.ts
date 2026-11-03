@@ -2,7 +2,7 @@
  * Quais campos de identificação a entrada de estoque mostra, por tipo de item.
  *
  * Quem decide é a CATEGORIA do produto (`categorias_produtos.tipo_formulario`),
- * não o segmento da empresa. A diferença importa: uma loja de celular vende
+ * não o tipo de negócio da empresa. A diferença importa: uma loja de celular vende
  * capinha, e pedir IMEI e saúde de bateria para uma capinha é o mesmo erro que
  * pedir placa e chassi. Como as categorias são por empresa, cada tenant define as
  * suas e o formulário se adapta sem código novo.

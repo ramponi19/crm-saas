@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 /**
  * Quem captou imóvel no período — a métrica que faltava no ranking.
  *
- * POR QUE UM MÓDULO SEPARADO: `lib/ranking.ts` é núcleo e serve todo segmento; ele
+ * POR QUE UM MÓDULO SEPARADO: `lib/ranking.ts` é núcleo e serve toda empresa; ele
  * não pode consultar `imoveis`, que é tabela de vertical. Este arquivo é a camada da
  * imobiliária: responde a pergunta dela e devolve um número por pessoa, que o
  * ranking recebe pronto.

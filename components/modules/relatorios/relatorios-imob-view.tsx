@@ -27,7 +27,7 @@ function Barra({ label, valor, max, cor }: { label: string; valor: number; max: 
   )
 }
 
-/** Relatório imobiliário (server). Renderizado por /relatorios quando segmento=imobiliaria. */
+/** Relatório imobiliário (server). Renderizado por /relatorios quando o módulo Imóveis está ligado. */
 export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
   de?: string; ate?: string; corretor?: string
 } = {}) {
@@ -83,7 +83,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
     /**
      * Etapas do funil PADRÃO, do banco.
      *
-     * O relatório usava só a constante do segmento: quando o dono renomeou e
+     * O relatório usava só a constante da imobiliária: quando o dono renomeou e
      * reordenou o funil (19/08/2026), o kanban mostrava "Em Análise · Aprovados" e
      * este relatório continuava dizendo "Contato feito · Visita realizada" — dois
      * nomes para a mesma etapa, no mesmo CRM. A constante fica como reserva de

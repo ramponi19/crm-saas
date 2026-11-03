@@ -43,7 +43,7 @@ export async function POST(req: Request) {
    * ORDEM: grupo -> hrefs, mais `__grupos` com a ordem das caixas.
    *
    * Guardada crua, sem conferir se cada href existe: o menu muda com plano,
-   * papel e segmento, e href que hoje não aparece pode voltar amanhã. Quem
+   * papel e base da empresa, e href que hoje não aparece pode voltar amanhã. Quem
    * resolve isso é o `resolverMenu`, que só reordena o que está na tela e ignora
    * o resto — validar aqui apagaria a escolha do dono a cada mudança de plano.
    */

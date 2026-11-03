@@ -1,6 +1,6 @@
 /**
  * Match de veículos — cruza o INTERESSE de compra de um lead com o ESTOQUE
- * de veículos da loja (segmento "concessionaria").
+ * de veículos da loja (módulo Avaliação de veículos).
  * Critérios (filtros eliminatórios + pontuação para ranking):
  *  - categoria (carro, moto, caminhão…) igual à desejada
  *  - marca entre as desejadas

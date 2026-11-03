@@ -33,7 +33,7 @@ const STATUS_IMOVEL: Record<string, string> = {
   disponivel: 'Disponível', reservado: 'Reservado', vendido: 'Vendido', alugado: 'Alugado', inativo: 'Inativo',
 }
 
-/** Dashboard operacional do corretor (segmento imobiliária). Pessoal p/ corretor,
+/** Dashboard operacional do corretor (módulo Imóveis). Pessoal p/ corretor,
  *  visão da equipe p/ dono/admin. Foco: meus leads, visitas, funil. */
 export default async function DashboardImob() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -116,7 +116,7 @@ export default async function DashboardImob() {
     tq,
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle(),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    // Etapas do funil PADRÃO, do banco. A constante do segmento é só o fallback:
+    // Etapas do funil PADRÃO, do banco. A constante da imobiliária é só o fallback:
     // sem isto o dashboard mostraria um funil diferente do que o dono editou.
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, funis!inner(padrao)')
       .eq('empresa_id', empresaId).eq('ativo', true).eq('funis.padrao', true).order('ordem'),

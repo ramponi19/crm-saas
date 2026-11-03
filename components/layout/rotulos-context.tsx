@@ -4,9 +4,9 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 
 /**
- * Os rótulos que o segmento (ou o dono) deu às telas, disponíveis para a barra do topo.
+ * Os rótulos que a base da empresa (ou o dono) deu às telas, disponíveis para a barra do topo.
  *
- * POR QUE ISTO EXISTE: o menu já renomeia telas por segmento — na imobiliária,
+ * POR QUE ISTO EXISTE: o menu já renomeia telas pela base da empresa — na imobiliária,
  * "Leads" é "Pipeline" e "Executivo" é "Dashboard Executivo". A barra do topo, porém,
  * recebia o título escrito à mão dentro de cada tela, então o menu dizia "Pipeline" e
  * o topo da mesma página dizia "Leads". Quem usa não sabe se são dois lugares.
@@ -22,7 +22,7 @@ export function RotulosProvider({ valor, children }: { valor: Record<string, str
 }
 
 /**
- * Rótulo da rota atual, se o segmento tiver renomeado.
+ * Rótulo da rota atual, se a base ou o dono tiver renomeado.
  *
  * Resolve pela PRIMEIRA parte do caminho (`/leads/123` → `/leads`), que é a mesma
  * chave que o menu usa — senão tela com sub-rota perderia o nome.

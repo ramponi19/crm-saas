@@ -1,113 +1,53 @@
 {
-  "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Ao fim da viagem (05, Parte 4, item zero) sobram só presets_onboarding e register.",
+  "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Desde 03/11/2026 sobram só presets_onboarding (tela /superadmin/presets), register (/register) e texto_publico (landing e descrição do site, que o cliente lê; decisão do Lucas).",
   "arquivos": {
-    "app/(dashboard)/agenda/page.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/(dashboard)/dashboard/dashboard-imob.tsx": {
-      "motivo": "inventario",
-      "teto": 2
-    },
-    "app/(dashboard)/dashboard/termometro-leads.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/(dashboard)/estoque/components/unidade-modal.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/(dashboard)/financeiro/components/financeiro-view.tsx": {
-      "motivo": "inventario",
-      "teto": 4
-    },
-    "app/(dashboard)/ranking/ranking-view.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/(dashboard)/tarefas/page.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/api/menu-config/route.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/api/ranking/metas/route.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
     "app/api/register/route.ts": {
       "motivo": "register",
       "teto": 2
     },
-    "app/api/superadmin/empresas/[id]/exportar/route.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "app/api/superadmin/laboratorio/preview/route.ts": {
-      "motivo": "inventario",
+    "app/landing/data.ts": {
+      "motivo": "texto_publico",
       "teto": 3
     },
-    "app/landing/data.ts": {
-      "motivo": "inventario",
-      "teto": 7
-    },
     "app/landing/Landing.tsx": {
-      "motivo": "inventario",
-      "teto": 2
+      "motivo": "texto_publico",
+      "teto": 1
     },
     "app/landing/Sections.tsx": {
-      "motivo": "inventario",
-      "teto": 5
-    },
-    "app/landing/sections/FinalCta.tsx": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 4
     },
+    "app/landing/sections/FinalCta.tsx": {
+      "motivo": "texto_publico",
+      "teto": 3
+    },
     "app/landing/sections/Hero.tsx": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 1
     },
     "app/landing/sections/Modules.tsx": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 1
     },
     "app/landing/sections/ProductStage.tsx": {
-      "motivo": "inventario",
-      "teto": 8
-    },
-    "app/landing/sections/Segments.tsx": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 2
     },
+    "app/landing/sections/Segments.tsx": {
+      "motivo": "texto_publico",
+      "teto": 1
+    },
     "app/layout.tsx": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 1
     },
     "app/manifest.ts": {
-      "motivo": "inventario",
+      "motivo": "texto_publico",
       "teto": 1
-    },
-    "app/para/[segmento]/page.tsx": {
-      "motivo": "inventario",
-      "teto": 10
     },
     "app/register/register-form.tsx": {
       "motivo": "register",
       "teto": 6
-    },
-    "app/superadmin/laboratorio/laboratorio-view.tsx": {
-      "motivo": "inventario",
-      "teto": 12
-    },
-    "app/superadmin/laboratorio/page.tsx": {
-      "motivo": "inventario",
-      "teto": 2
-    },
-    "app/superadmin/metricas/page.tsx": {
-      "motivo": "inventario",
-      "teto": 7
     },
     "app/superadmin/presets/page.tsx": {
       "motivo": "presets_onboarding",
@@ -116,50 +56,6 @@
     "app/superadmin/presets/presets-view.tsx": {
       "motivo": "presets_onboarding",
       "teto": 9
-    },
-    "app/zapintel/api/sugestao/route.ts": {
-      "motivo": "inventario",
-      "teto": 3
-    },
-    "components/layout/rotulos-context.tsx": {
-      "motivo": "inventario",
-      "teto": 3
-    },
-    "components/modules/leads/lead-acoes-panel.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "components/modules/relatorios/relatorios-imob-view.tsx": {
-      "motivo": "inventario",
-      "teto": 2
-    },
-    "components/superadmin/superadmin-shell.tsx": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "lib/captacao-imob.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "lib/empresa-config.ts": {
-      "motivo": "presets_onboarding",
-      "teto": 2
-    },
-    "lib/estoque-campos.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "lib/match-veiculos.ts": {
-      "motivo": "inventario",
-      "teto": 1
-    },
-    "lib/ranking.ts": {
-      "motivo": "inventario",
-      "teto": 2
-    },
-    "lib/zapintel/ponte.ts": {
-      "motivo": "inventario",
-      "teto": 1
     }
   }
 }

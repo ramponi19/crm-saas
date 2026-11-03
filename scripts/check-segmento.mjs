@@ -6,11 +6,11 @@
  * normalizarSegmento...). Arquivo que cita a palavra tem de estar na lista de
  * exceções (scripts/segmento-excecoes.json), com o motivo e um teto de ocorrências:
  *
- *   presets_onboarding  o adaptador do preset de onboarding — o único lugar que
- *                       vai conhecer a palavra quando a viagem terminar;
+ *   presets_onboarding  a tela de presets do superadmin (/superadmin/presets);
  *   register            o cadastro (/register), que escolhe o preset;
- *   inventario          herdado: citado no 03-INVENTARIO-CODIGO.md, sai na viagem
- *                       (Parte 4, item zero do 05).
+ *   texto_publico       o que o cliente lê: landing e descrição do site
+ *                       (decisão do Lucas, 03/11/2026). O inventário herdado
+ *                       zerou em 03/11/2026.
  *
  * O build reprova quando:
  *   - um arquivo FORA da lista passa a citar a palavra (a lista não cresce);

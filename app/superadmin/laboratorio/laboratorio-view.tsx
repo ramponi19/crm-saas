@@ -14,8 +14,8 @@ export interface ItemLab {
   icon: string
   grupo: string
   status: StatusModulo
-  /** Em quantos dos 7 segmentos o módulo está ligado hoje. */
-  segmentos: number
+  /** Em quantos dos 7 presets o módulo está ligado hoje. */
+  presets: number
 }
 
 const SELO: Record<StatusModulo, { rotulo: string; tom: 'warn' | 'acc' | 'ok'; Icon: typeof Hammer }> = {
@@ -28,7 +28,7 @@ const SELO: Record<StatusModulo, { rotulo: string; tom: 'warn' | 'acc' | 'ok'; I
  * Laboratório: abrir qualquer página do CRM para construir, sem depender de
  * liberar o módulo para alguém.
  *
- * Antes, para mexer numa tela nova era preciso ligá-la em `segmentos_config` —
+ * Antes, para mexer numa tela nova era preciso ligá-la na tabela de presets —
  * o que a deixa a um clique de um lojista real. Aqui o superadmin entra na
  * empresa de PREVIEW (demo, fora das métricas) e abre a página com dados de
  * laboratório.
@@ -46,8 +46,8 @@ export function LaboratorioView({ itens, emPreview, empresaPreview }: {
       const r = await fetch('/api/superadmin/laboratorio/preview', { method: 'POST' })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { notify.bad('Não consegui entrar no laboratório', j.error); return }
-      // Preview de outro segmento troca o contexto do tenant — mesma razão do
-      // `segmentos-view`: cache do anterior não pode sobrar.
+      // Preview de outro preset troca o contexto do tenant — mesma razão da
+      // tela de presets: cache do anterior não pode sobrar.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/dashboard'
     } finally { setEntrando(false) }
@@ -65,7 +65,7 @@ export function LaboratorioView({ itens, emPreview, empresaPreview }: {
           </h1>
           <p className="mt-0.5 text-[13px] text-ink-3">
             Abra qualquer tela para construir. Módulo <strong className="text-ink-2">em construção</strong> não
-            aparece para lojista nenhum, mesmo que alguém o ligue num segmento por engano.
+            aparece para lojista nenhum, mesmo que alguém o ligue num preset por engano.
           </p>
         </div>
 
@@ -115,8 +115,8 @@ export function LaboratorioView({ itens, emPreview, empresaPreview }: {
                         <div className="truncate text-[13px] font-medium text-ink">{i.label}</div>
                         <div className="num truncate text-[11px] text-ink-3">{i.href} · {i.grupo}</div>
                       </div>
-                      <Badge tone={i.segmentos > 0 ? 'neutro' : 'warn'}>
-                        {i.segmentos > 0 ? `${i.segmentos}/7 segmentos` : 'nenhum segmento'}
+                      <Badge tone={i.presets > 0 ? 'neutro' : 'warn'}>
+                        {i.presets > 0 ? `${i.presets}/7 presets` : 'nenhum preset'}
                       </Badge>
                       <Badge tone={tom}>{rotulo}</Badge>
                       {/* Abre em outra aba: construir é ir e voltar, e perder
@@ -137,7 +137,7 @@ export function LaboratorioView({ itens, emPreview, empresaPreview }: {
         <p className="text-[11.5px] leading-relaxed text-ink-3">
           O status vive no catálogo do menu (<span className="num">lib/menu.ts</span>), não no banco: é decisão
           de código, versionada junto com a tela. Terminou a construção? Troque para{' '}
-          <strong className="text-ink-2">beta</strong> e ligue no segmento de uma loja cobaia; depois{' '}
+          <strong className="text-ink-2">beta</strong> e ligue o módulo numa loja cobaia; depois{' '}
           <strong className="text-ink-2">produção</strong>.
         </p>
       </div>

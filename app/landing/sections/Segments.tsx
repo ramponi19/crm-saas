@@ -2,7 +2,7 @@
 
 /**
  * Segments — a transição do dark para o claro ("a luz acende": o produto
- * é claro). Seis cards, um por segmento, linkando as páginas SEO /para/*.
+ * é claro). Seis cards, um por vertical, linkando as páginas SEO /para/*.
  */
 
 import Link from 'next/link'

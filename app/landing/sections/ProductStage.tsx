@@ -5,9 +5,9 @@
  *
  * A captura de tela do CRM (mock claro, fiel ao produto) entra inclinada em
  * perspectiva 3D e "endireita" conforme o scroll (scrub). Em ponteiro fino,
- * um tilt sutil segue o mouse. Acima, o seletor de segmento roda em autoplay
- * com barra de progresso — clicar num segmento assume o controle e para o
- * autoplay. A troca de segmento anima os dados internos em stagger.
+ * um tilt sutil segue o mouse. Acima, o seletor de vertical roda em autoplay
+ * com barra de progresso — clicar numa vertical assume o controle e para o
+ * autoplay. A troca de vertical anima os dados internos em stagger.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
@@ -28,7 +28,7 @@ export default function ProductStage() {
   const reduced = usePrefereMenosMovimento()
   const s = SEGS[seg]
 
-  // autoplay do seletor — um timeout por segmento exibido
+  // autoplay do seletor — um timeout por vertical exibida
   useEffect(() => {
     if (locked || reduced) return
     const t = setTimeout(() => {
@@ -85,7 +85,7 @@ export default function ProductStage() {
     return () => { cleanupTilt?.(); ctx.revert() }
   }, [])
 
-  // troca de segmento — dados internos entram em stagger
+  // troca de vertical — dados internos entram em stagger
   const firstRender = useRef(true)
   useLayoutEffect(() => {
     if (firstRender.current) { firstRender.current = false; return }
@@ -114,7 +114,7 @@ export default function ProductStage() {
         style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(0,0,0,.55), transparent 72%)', filter: 'blur(30px)' }}
       />
 
-      {/* seletor de segmento */}
+      {/* seletor de vertical */}
       <div className="mb-5 flex flex-col items-center gap-3">
         <div className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[color:var(--lp-faint)]">
           <span className="lp-live-dot h-[7px] w-[7px] rounded-full bg-ok" />

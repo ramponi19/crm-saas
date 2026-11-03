@@ -97,7 +97,7 @@ export async function POST(req: Request) {
   const papel = papelDoPreset(preset)
 
   /**
-   * ⚠ O RAMO DO SEGMENTO SAIU DAQUI, e a razão está na tela.
+   * ⚠ O RAMO DO NEGÓCIO SAIU DAQUI, e a razão está na tela.
    *
    * O prompt dizia `Sobre o negócio: ${getSegment(segmentId).followupContext}`.
    * Medido em produção em 13/10/2026, foi isto que a IA escreveu para clientes
@@ -106,10 +106,10 @@ export async function POST(req: Request) {
    *     "ainda tenho suas PEÇAS separadinhas aqui"
    *     "garantir aquele ITEM com a gente"
    *
-   * Vocabulário de loja de roupa. A JM tem `segmento = 'varejo'` no CRM, e
+   * Vocabulário de loja de roupa. A JM tem o preset `varejo` no CRM, e
    * `CRM_TO_ZAPINTEL` manda varejo → `ecommerce`, cujo `followupContext` é
    * "Atendente de loja de moda/varejo". O mapa não distingue varejo de celular
-   * de varejo de roupa, e o ZapIntel tem um segmento `celulares` que ninguém
+   * de varejo de roupa, e o ZapIntel tem um ramo `celulares` que ninguém
    * alcança.
    *
    * O conserto não é corrigir o mapa aqui: é parar de deduzir o negócio.

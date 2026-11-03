@@ -83,17 +83,17 @@ export default async function MetricasPage() {
     .sort((a, b) => b.mrr - a.mrr)
   const mrrTotal = mrrPorPlano.reduce((acc, p) => acc + p.mrr, 0)
 
-  // 3) Empresas por segmento
+  // 3) Empresas por preset
   const segAgg = new Map<string, number>()
   lista.forEach(e => {
     // Preset que não existe mais conta como o padrão, como o cadastro faria.
     const seg = e.preset_onboarding && PRESET_LABEL[e.preset_onboarding] ? e.preset_onboarding : PRESET_PADRAO
     segAgg.set(seg, (segAgg.get(seg) ?? 0) + 1)
   })
-  const porSegmento = [...segAgg.entries()]
+  const porPreset = [...segAgg.entries()]
     .map(([seg, qtd]) => ({ seg, label: PRESET_LABEL[seg] ?? seg, qtd }))
     .sort((a, b) => b.qtd - a.qtd)
-  const maxSeg = Math.max(1, ...porSegmento.map(s => s.qtd))
+  const maxSeg = Math.max(1, ...porPreset.map(s => s.qtd))
 
   // 4) Uso vs. limite + última atividade (por empresa ativa)
   const usos = await Promise.all(
@@ -223,20 +223,20 @@ export default async function MetricasPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Empresas por segmento */}
+          {/* Empresas por preset */}
           <Card
             title={
               <span className="flex items-center gap-2">
                 <Layers size={17} strokeWidth={1.7} style={{ color: ROXO }} />
-                Empresas por segmento
+                Empresas por preset
               </span>
             }
           >
-            {porSegmento.length === 0 ? (
+            {porPreset.length === 0 ? (
               <p className="text-[13px] text-ink-3">Nenhuma empresa cadastrada.</p>
             ) : (
               <div className="space-y-3">
-                {porSegmento.map(s => (
+                {porPreset.map(s => (
                   <div key={s.seg}>
                     <div className="mb-1.5 flex justify-between text-[13px]">
                       <span className="font-semibold text-ink-2">{s.label}</span>

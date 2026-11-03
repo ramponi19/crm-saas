@@ -17,7 +17,7 @@ export default async function AgendaPage() {
 
   const cfg = await carregarConfigEmpresa(supabase, empresaId)
   /**
-   * Gate pelo MÓDULO, não por quem a empresa é (zero-segmento, 23/10/2026).
+   * Gate pelo MÓDULO, não por quem a empresa é (23/10/2026).
    *
    * Até 22/10 a página perguntava se o preset declarava agenda de visitas ou de
    * clínica; os presets que declaravam são exatamente os que ligam /agenda, então

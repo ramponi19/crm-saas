@@ -14,7 +14,7 @@ import { buscarTudo } from '@/lib/zapintel/conversas'
  * leads) — que é pergunta de cotação de troca, o oposto de venda fechada.
  *
  * Com a ponte dá para conferir contra o que aconteceu de verdade. É o que as
- * ferramentas do segmento chamam de ligar conversa a resultado, e é de onde
+ * ferramentas do mercado chamam de ligar conversa a resultado, e é de onde
  * elas dizem que vem o retorno.
  *
  * ══ POR QUE TELEFONE, E SÓ TELEFONE ════════════════════════════════════════

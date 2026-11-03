@@ -59,7 +59,7 @@ interface Props {
   faturamentoVendas?: number
   qtdVendas?: number
   /**
-   * Negócios com comissão — só chega preenchido no segmento que declara
+   * Negócios com comissão — só chega preenchido quando o módulo Imóveis, que declara
    * `comissaoPorNegocio`. Null = a aba não existe para esta loja.
    */
   comissoesNegocio?: NegocioComissao[] | null
@@ -70,7 +70,7 @@ interface Props {
 }
 
 /**
- * Abas base, comuns a todo segmento.
+ * Abas base, comuns a toda empresa.
  *
  * A imobiliária ganha "Comissões" — e ganha NA FRENTE, como aba de entrada: no CRM
  * dela o Financeiro É o acompanhamento de comissão e cashback, e o livro-caixa é
@@ -114,7 +114,7 @@ export default function FinanceiroView({
   comissoesNegocio = null, taxasComissao = null, equipeComissao = [], podeQuitarComissao = false,
 }: Props) {
   const supabase = createClient()
-  // A aba só existe quando o segmento a declara; nenhum outro paga por ela.
+  // A aba só existe quando o módulo Imóveis está ligado; ninguém mais paga por ela.
   const temComissoes = !!(comissoesNegocio && taxasComissao)
   const [tab, setTab] = useState(temComissoes ? 'comissoes' : 'fluxo')
   const abas = temComissoes
@@ -408,7 +408,7 @@ export default function FinanceiroView({
             </div>
           )}
 
-          {/* Comissões: existe só quando a página manda os dados (capacidade do segmento). */}
+          {/* Comissões: existe só quando a página manda os dados (capacidade do módulo Imóveis). */}
           {tab === 'comissoes' && comissoesNegocio && taxasComissao && (
             <ComissoesImob
               equipe={equipeComissao}

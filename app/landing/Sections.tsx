@@ -2,7 +2,7 @@
 
 /**
  * Sections — tudo abaixo do hero da landing (sistema "Precisão"):
- * 4· prova social · 5· feature WhatsApp · 6· módulos por segmento ·
+ * 4· prova social · 5· feature WhatsApp · 6· módulos por vertical ·
  * 7· depoimento · 8· comparativo honesto · 9· planos · 10· FAQ · 11· CTA + footer.
  *
  * Movimento sutil: blocos sobem ao entrar na viewport (ScrollTrigger),

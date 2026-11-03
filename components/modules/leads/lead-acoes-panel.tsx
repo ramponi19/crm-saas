@@ -15,7 +15,7 @@ const fmt = (s: string | null) => s
 
 /**
  * Painel de "Próximas ações" dentro do lead: tarefas de follow-up (todos os
- * segmentos) e, para imobiliária, agendamento rápido de visita. Auto-contido —
+ * tipos de negócio) e, para imobiliária, agendamento rápido de visita. Auto-contido —
  * busca e grava direto no Supabase com o usuário logado como responsável.
  */
 export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {

@@ -52,7 +52,7 @@ const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x)
 /**
  * Papel escrito por extenso, ao lado do nome.
  *
- * `vendedor` cai no rótulo do segmento — "Corretor" na imobiliária, "Vendedor" na
+ * `vendedor` cai no rótulo da empresa — "Corretor" na imobiliária, "Vendedor" na
  * loja — porque é a mesma pessoa com dois nomes de mercado.
  */
 const PAPEL_LABEL: Record<string, string> = { owner: 'Proprietário', admin: 'Administrador', tecnico: 'Técnico', member: 'Membro' }

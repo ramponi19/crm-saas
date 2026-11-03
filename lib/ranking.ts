@@ -2,8 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Ranking gamificado (Sprint 3.1) — métricas por vendedor no período + score.
- * Generaliza o ranking que existia só no relatório imob (5.2.b) para todos os
- * segmentos. Score = captações×1 + visitas×2 + propostas×3 + vendas×5.
+ * Generaliza o ranking que existia só no relatório imob (5.2.b) para toda
+ * empresa. Score = captações×1 + visitas×2 + propostas×3 + vendas×5.
  */
 type Db = SupabaseClient
 
@@ -56,8 +56,8 @@ export async function calcularRanking(
   /**
    * Captação de ativo INJETADA por quem conhece a vertical.
    *
-   * Este módulo é núcleo e não consulta `imoveis`: quem sabe onde mora o ativo do
-   * segmento é a camada dele (`lib/captacao-imob.ts`). Sem a injeção, a coluna sai
+   * Este módulo é núcleo e não consulta `imoveis`: quem sabe onde mora o ativo da
+   * imobiliária é a camada dela (`lib/captacao-imob.ts`). Sem a injeção, a coluna sai
    * zerada — não erra, só não mostra.
    */
   opts: { imoveisCaptados?: Map<string, number> } = {},

@@ -7,7 +7,7 @@
  * os efeitos globais (grain, auroras, marquee, spotlight) em `landing.css`.
  *
  * Dramaturgia: abre dark cinematográfico (hero + produto 3D + narrativa do
- * lead + módulos + números), a luz "acende" nos segmentos e seções de
+ * lead + módulos + números), a luz "acende" nas verticais e seções de
  * decisão (planos, FAQ), e fecha dark no CTA final. Rolagem suave via Lenis,
  * animações GSAP com ScrollTrigger — tudo respeitando prefers-reduced-motion.
  *

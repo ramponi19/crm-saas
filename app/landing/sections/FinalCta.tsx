@@ -2,7 +2,7 @@
 
 /**
  * FinalCta — fechamento dark: tipografia gigante, glow cobalto e botão
- * magnético XL. Abaixo, o footer completo (produto, segmentos, conta, legal).
+ * magnético XL. Abaixo, o footer completo (produto, verticais, conta, legal).
  */
 
 import Image from 'next/image'

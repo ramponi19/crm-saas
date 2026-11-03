@@ -13,7 +13,7 @@ export default async function LaboratorioPage() {
   await requireSuperAdmin()
   const svc = createServiceClient()
 
-  // Em quantos segmentos cada href está ligado — mostra de relance o que já foi
+  // Em quantos presets cada href está ligado — mostra de relance o que já foi
   // liberado e o que ainda não saiu do catálogo.
   const { data: presets } = await svc.from('presets_onboarding').select('chave, rotulos')
   const contagem = new Map<string, number>()
@@ -30,7 +30,7 @@ export default async function LaboratorioPage() {
       icon: i.icon,
       grupo: g.label,
       status: statusDo(i),
-      segmentos: contagem.get(i.href) ?? 0,
+      presets: contagem.get(i.href) ?? 0,
     })),
   )
 
