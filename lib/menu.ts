@@ -194,7 +194,6 @@ export const CHAVE_GRUPOS = '__grupos'
  * O menu só pergunta "este módulo está ligado?".
  */
 export interface CamadaBase {
-  hiddenHrefs?: string[]
   labelOverrides?: Record<string, string>
   /** Telas da base que não estão no catálogo comum (ex.: /ranking no menu do time). */
   modulosExtra?: { href: string; label: string; icon: string; grupo?: string }[]

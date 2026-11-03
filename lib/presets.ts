@@ -14,7 +14,8 @@ import type { Json } from '@/types/database'
  * funil, motivos de perda) e, dali em diante, a empresa é dona do que tem.
  *
  *   rotulos              rótulos do menu por href
- *   rotulos._menu        habilitados, extras, ordem, ocultos e a tela inicial
+ *   rotulos._menu        habilitados, extras, ordem e a tela inicial (sem ocultos:
+ *                        ocultar é só de empresa_menu — superadmin e dono; 03/11)
  *   rotulos._vocabulario como a empresa chama as coisas (interesse, equipe, Agenda)
  *   etapas               o funil de partida
  *   campos               campos personalizados de partida (veículos: placa do item)
@@ -22,7 +23,6 @@ import type { Json } from '@/types/database'
  */
 
 interface MenuDoPreset {
-  hidden_hrefs?: string[] | null
   modulos_habilitados?: string[] | null
   modulos_extra?: { href: string; label: string; icon: string; grupo?: string }[] | null
   menu_layout?: Record<string, string[]> | null
@@ -57,7 +57,6 @@ export interface PresetEditavel {
   chave: string
   label: string
   descricao: string | null
-  hidden_hrefs: string[]
   label_overrides: Record<string, string>
   modulos_extra: { href: string; label: string; icon: string; grupo?: string }[]
   modulos_habilitados: string[] | null
@@ -74,7 +73,7 @@ export function editavelDoPreset(p: { chave: string; nome: string; descricao: st
   const m = _menu ?? {}
   return {
     chave: p.chave, label: p.nome, descricao: p.descricao,
-    hidden_hrefs: m.hidden_hrefs ?? [], label_overrides: labels as Record<string, string>,
+    label_overrides: labels as Record<string, string>,
     modulos_extra: m.modulos_extra ?? [], modulos_habilitados: m.modulos_habilitados ?? null,
     menu_layout: m.menu_layout ?? null, ordem: m.ordem ?? 0, ativo: p.ativo,
     tela_inicial: m.tela_inicial ?? null, vocabulario: _vocabulario ?? null,
@@ -87,7 +86,7 @@ export function presetDoEditavel(s: PresetEditavel) {
     rotulos: {
       ...(s.label_overrides ?? {}),
       _menu: {
-        hidden_hrefs: s.hidden_hrefs ?? [], modulos_habilitados: s.modulos_habilitados,
+        modulos_habilitados: s.modulos_habilitados,
         modulos_extra: s.modulos_extra ?? [], menu_layout: s.menu_layout, ordem: s.ordem,
         ...(s.tela_inicial ? { tela_inicial: s.tela_inicial } : {}),
       },
@@ -117,6 +116,16 @@ export async function lerPresets(db: SupabaseClient<any>): Promise<{ chave: stri
     .map((p) => ({ chave: p.chave, nome: p.nome, ordem: p.rotulos?._menu?.ordem ?? 0 }))
     .sort((a, b) => a.ordem - b.ordem || a.chave.localeCompare(b.chave))
     .map(({ chave, nome }) => ({ chave, nome }))
+}
+
+/**
+ * Chave -> nome de TODOS os presets, ativos ou não (as métricas do superadmin
+ * contam empresas pelo preset com que nasceram, mesmo que ele tenha sido desativado).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function lerNomesDosPresets(db: SupabaseClient<any>): Promise<Record<string, string>> {
+  const { data } = await db.from('presets_onboarding').select('chave, nome')
+  return Object.fromEntries(((data ?? []) as { chave: string; nome: string }[]).map((p) => [p.chave, p.nome]))
 }
 
 /** A linha do preset escolhido; escolha desconhecida ou desativada = o padrão. */

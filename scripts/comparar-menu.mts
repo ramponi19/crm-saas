@@ -57,7 +57,7 @@ function entradaLegado(e: Legado, role: string, superadmin: boolean) {
   }
   const s = e.seg
   const lido: CamadaBase | undefined = s ? {
-    hiddenHrefs: s.hidden_hrefs ?? [], labelOverrides: s.label_overrides ?? {}, modulosExtra: s.modulos_extra ?? [],
+    labelOverrides: s.label_overrides ?? {}, modulosExtra: s.modulos_extra ?? [],
     habilitados: s.modulos_habilitados ?? undefined, menuLayout: s.menu_layout ?? undefined,
   } : undefined
   // As fotos só têm varejo, com lista própria: o molde do varejo não somava nada

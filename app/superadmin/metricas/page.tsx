@@ -2,7 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { TrendingUp, AlertTriangle, Layers, Clock } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
-import { lerPresets, PRESET_PADRAO } from '@/lib/presets'
+import { lerNomesDosPresets, PRESET_PADRAO } from '@/lib/presets'
 
 const ROXO = '#6D28D9'
 
@@ -28,16 +28,15 @@ export default async function MetricasPage() {
   // A rota já é trancada em superadmin/layout (requireSuperAdmin).
   const supabase = createServiceClient()
 
-  // Os nomes dos presets são da ferramenta de presets do superadmin (lib/presets.ts).
-  const [{ data: empresas }, { data: planos }, presets] = await Promise.all([
+  // O nome de cada preset é presets_onboarding.nome (decisão do Lucas, 03/11), ativo ou não.
+  const [{ data: empresas }, { data: planos }, PRESET_LABEL] = await Promise.all([
     supabase
       .from('empresas')
       .select('id, nome, plano, status, preset_onboarding, created_at, limite_usuarios, limite_leads')
       .neq('demo', true),
     supabase.from('planos_config').select('id, preco_centavos'),
-    lerPresets(supabase),
+    lerNomesDosPresets(supabase),
   ])
-  const PRESET_LABEL: Record<string, string> = Object.fromEntries(presets.map(({ chave, nome }) => [chave, nome]))
 
   const lista = empresas ?? []
   const hoje = new Date()

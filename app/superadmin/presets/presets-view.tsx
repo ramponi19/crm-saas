@@ -11,7 +11,6 @@ export interface PresetLinha {
   chave: string
   label: string
   descricao: string | null
-  hidden_hrefs: unknown
   label_overrides: unknown
   modulos_extra: unknown
   modulos_habilitados: unknown

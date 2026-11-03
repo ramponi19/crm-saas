@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
   const b = await req.json().catch(() => ({})) as {
     chave?: string; novo?: boolean; label?: string; descricao?: string | null
-    hidden_hrefs?: string[]; label_overrides?: Record<string, string>
+    label_overrides?: Record<string, string>
     modulos_extra?: { href: string; label: string; icon: string }[]
     modulos_habilitados?: string[]
     /** Ordem do menu por grupo: { "Hoje": ["/dashboard", "/leads"], ... }. */
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
    *
    * Antes o `row` trazia `?? []` em todo campo que a tela não manda — e a tela de
    * presets manda apenas label, descrição, ordem, ativo, rótulos e módulos
-   * ligados. Resultado: cada salvamento zerava `hidden_hrefs` e `modulos_extra`
+   * ligados. Resultado: cada salvamento zerava os ocultos e `modulos_extra`
    * em silêncio. Foi exatamente assim que a imobiliária ficou com
    * `modulos_extra = []` e perdeu "Metas e Ranking" do menu (achado em 20/08/2026).
    *
@@ -52,7 +52,6 @@ export async function POST(req: Request) {
     chave,
     label: b.label.trim(),
     descricao: b.descricao !== undefined ? (b.descricao?.trim() || null) : (atual?.descricao ?? null),
-    hidden_hrefs: manter(b.hidden_hrefs, atual?.hidden_hrefs, [] as string[]) as never,
     label_overrides: manter(b.label_overrides, atual?.label_overrides, {} as Record<string, string>) as never,
     modulos_extra: manter(b.modulos_extra, atual?.modulos_extra, [] as { href: string; label: string; icon: string }[]) as never,
     modulos_habilitados: manter(b.modulos_habilitados, atual?.modulos_habilitados, [] as string[]) as never,
