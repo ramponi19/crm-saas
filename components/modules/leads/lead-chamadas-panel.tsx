@@ -43,8 +43,11 @@ export function LeadChamadasPanel({ leadId }: { leadId: number }) {
       direcao, resultado, observacao: obs.trim() || null,
     })
     if (!error) {
-      // A ligação é um contato → atualiza a última tratativa (reflete no timer do card).
-      await supabase.from('leads').update({ ultima_tratativa: new Date().toISOString() }).eq('id', leadId)
+      // A ligação é um contato → atualiza a última tratativa (reflete no timer do card),
+      // direto no negócio pela rota do card (03/11/2026: sem a view `leads`).
+      await fetch(`/api/leads/${leadId}/card`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tratativa: true }),
+      })
     }
     setSalvando(false)
     if (error) { notify.bad('Erro ao registrar', error.message); return }

@@ -4,6 +4,9 @@ import { inscreverPorEtapa } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+/** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
+const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome)'
+
 /**
  * Move um lead de etapa e dispara as automações de "entrou_na_etapa".
  * Substitui o update direto do kanban para que o motor de eventos rode no
@@ -45,25 +48,60 @@ export async function POST(req: Request) {
   }
   const etapa = body.kanban_status as string
 
-  // Lead atual (RLS garante que é da empresa do usuário).
-  const { data: leadAtual } = await supabase
-    .from('leads')
-    .select('id, nome, telefone, responsavel_id, kanban_status')
+  /**
+   * O negócio, direto no core (03/11/2026: a rota deixou a view `leads`). A RLS
+   * garante que é da empresa — e, para o vendedor, da loja dele. A etapa sai como
+   * o gatilho da view a resolvia (`compat_etapa`): pelo slug, no funil do negócio
+   * (ou no padrão, fora o interno); etapa de ganho/perda define o status; slug
+   * que o funil não tem fica guardado em `dados._lead.kanban_status`, como antes.
+   */
+  type NegocioAtual = {
+    id: number; empresa_id: number; funil_id: number | null; responsavel_id: string | null; perdido_em: string | null
+    dados: Record<string, unknown> | null; etapa: { slug: string } | null
+    contato: { id: number; nome: string | null } | null
+  }
+  const { data: negocio } = await supabase
+    .from('negocios')
+    .select(SELECT_NEGOCIO)
     .eq('id', body.leadId)
     .maybeSingle()
-  if (!leadAtual) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
+  const n = negocio as unknown as NegocioAtual | null
+  if (!n) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
+  const dadosLead = ((n.dados ?? {})._lead ?? {}) as Record<string, unknown>
+  const leadAtual = {
+    id: n.id, nome: n.contato?.nome ?? null, responsavel_id: n.responsavel_id,
+    kanban_status: n.etapa?.slug ?? (dadosLead.kanban_status as string | undefined) ?? 'novo',
+  }
+
+  let funilAlvo = funilNovo ?? n.funil_id
+  if (funilAlvo == null) {
+    const { data: padrao } = await supabase.from('funis').select('id')
+      .eq('empresa_id', n.empresa_id).eq('padrao', true).eq('interno', false).order('id').limit(1).maybeSingle()
+    funilAlvo = padrao?.id ?? null
+  }
+  const { data: etapaRow } = funilAlvo == null ? { data: null } : await supabase.from('funil_etapas')
+    .select('id, tipo').eq('funil_id', funilAlvo).eq('slug', etapa).maybeSingle()
+  const status = etapaRow?.tipo === 'ganho' ? 'ganho'
+    : etapaRow?.tipo === 'perdido' ? 'perdido'
+    : !etapaRow && (body.perdido_em ?? n.perdido_em) ? 'perdido' : 'aberto'
 
   const patch: Record<string, unknown> = {
-    kanban_status: etapa,
-    data_transferencia_funil: new Date().toISOString(),
+    funil_id: funilAlvo,
+    etapa_id: etapaRow?.id ?? null,
+    status,
+    entrou_etapa_em: new Date().toISOString(),
   }
-  if (funilNovo != null) patch.funil_id = funilNovo
+  if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
   if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id
   if (body.perdido_em) patch.perdido_em = body.perdido_em
-  if (body.observacoes) patch.observacoes = body.observacoes
 
-  const { error } = await supabase.from('leads').update(patch as never).eq('id', body.leadId)
+  const { error } = await supabase.from('negocios').update(patch as never).eq('id', n.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // A justificativa da perda mora nas observações do contato (onde o vendedor a lê).
+  if (body.observacoes && n.contato) {
+    const { error: errObs } = await supabase.from('contatos').update({ observacoes: body.observacoes }).eq('id', n.contato.id)
+    if (errObs) return NextResponse.json({ error: errObs.message }, { status: 500 })
+  }
 
   // Automações e cadências de entrada — só se a etapa realmente mudou.
   if (leadAtual.kanban_status !== etapa) {

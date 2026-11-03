@@ -75,7 +75,7 @@ const SELECT_NEGOCIO: string = `id, empresa_id, contato_id, filial_id, funil_id,
   etapa:funil_etapas!negocios_etapa_id_fkey(slug),
   contato:contatos!negocios_contato_id_fkey(id, nome, telefone, instagram, origem, observacoes, foto_url, dados)`
 
-const texto = (v: unknown) => (v == null ? '' : String(v))
+const texto = (v: unknown) => (v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v))
 const lead_ = (n: LinhaNegocio) => ((n.dados ?? {})._lead ?? {}) as Json
 
 /** O negócio como o usuário o vê (RLS). Nulo = não existe ou não é da loja dele. */
@@ -176,6 +176,10 @@ export interface AlteracaoDoCard {
   convertido_em?: number
   /** A etapa só registrou a última tratativa (painel de chamadas). */
   tratativa?: boolean
+  /** Excluir o lead = desativar (dados._lead.ativo), como a view fazia. */
+  ativo?: boolean
+  /** Interesse estruturado (painel de veículos) — mora em dados._interesse. */
+  interesse?: Json | null
 }
 
 const limpo = (v: string | null | undefined) => {
@@ -183,14 +187,35 @@ const limpo = (v: string | null | undefined) => {
   return t === '' ? null : t
 }
 
-function mesclar(base: Json | null, valores: Record<string, string | null> | undefined): Json {
+/**
+ * O texto do formulário no tipo que o banco aceita (core_validar_dados):
+ * numero/moeda → número, booleano → true/false, multi → lista; o resto, texto.
+ * Valor que não converte é `undefined` (a rota responde 400 em vez de gravar lixo).
+ */
+export function valorDoCampo(tipo: string, texto: string): unknown {
+  if (tipo === 'numero' || tipo === 'moeda') {
+    const n = Number(texto.replace(/\./g, '').replace(',', '.'))
+    return Number.isFinite(n) ? n : undefined
+  }
+  if (tipo === 'booleano') return texto === 'true' ? true : texto === 'false' ? false : undefined
+  if (tipo === 'multi') return texto.split(',').map((s) => s.trim()).filter(Boolean)
+  return texto
+}
+
+function mesclar(base: Json | null, valores: Record<string, string | null> | undefined, tipos: Map<string, string> = new Map()): Json {
   const out: Json = { ...(base ?? {}) }
   for (const [k, v] of Object.entries(valores ?? {})) {
     const t = limpo(v)
-    if (t == null) delete out[k]
-    else out[k] = t
+    if (t == null) { delete out[k]; continue }
+    const valor = valorDoCampo(tipos.get(k) ?? 'texto', t)
+    if (valor === undefined) throw new ErroDeCampo(k)
+    out[k] = valor
   }
   return out
+}
+
+class ErroDeCampo extends Error {
+  constructor(readonly chave: string) { super(`Valor inválido em "${chave}"`) }
 }
 
 /**
@@ -220,19 +245,38 @@ export async function gravarCardDoLead(
       if (!count) contato.telefone_e164 = e164
     }
   }
-  if (alt.campos?.contato) contato.dados = mesclar(c.dados, alt.campos.contato)
+  // Tipos dos campos personalizados, para gravar no formato que o banco valida.
+  const tipos = { contato: new Map<string, string>(), negocio: new Map<string, string>() }
+  if (alt.campos) {
+    const { data } = await db.from('campos_personalizados').select('entidade, chave, tipo')
+      .eq('empresa_id', n.empresa_id).eq('ativo', true).in('entidade', ['contato', 'negocio'])
+    for (const f of (data ?? []) as { entidade: 'contato' | 'negocio'; chave: string; tipo: string }[]) tipos[f.entidade].set(f.chave, f.tipo)
+  }
+
+  // Tudo convertido ANTES de gravar: valor inválido não deixa metade gravada.
+  let dados: Json = { ...(n.dados ?? {}) }
+  let mudou = false
+  const comLead = (extra: Json) => ({ ...dados, _lead: { ...((dados._lead ?? {}) as Json), ...extra } })
+  try {
+    if (alt.campos?.contato) contato.dados = mesclar(c.dados, alt.campos.contato, tipos.contato)
+    if ('produto_interessado' in alt) { dados = mesclar(dados, { produto_interessado: alt.produto_interessado ?? null }); mudou = true }
+    if (alt.campos?.negocio) { dados = mesclar(dados, alt.campos.negocio, tipos.negocio); mudou = true }
+  } catch (e) {
+    return { error: e instanceof ErroDeCampo ? e.message : 'Valor inválido' }
+  }
+  if (alt.convertido_em != null) { dados = comLead({ convertido_em: alt.convertido_em }); mudou = true }
+  if (alt.tratativa) { dados = comLead({ ultima_tratativa: new Date().toISOString() }); mudou = true }
+  if (typeof alt.ativo === 'boolean') { dados = comLead({ ativo: alt.ativo }); mudou = true }
+  if ('interesse' in alt) {
+    const { _interesse: _, ...resto } = dados
+    dados = alt.interesse == null ? resto : { ...resto, _interesse: alt.interesse }
+    mudou = true
+  }
+
   if (Object.keys(contato).length) {
     const { error } = await db.from('contatos').update(contato).eq('id', c.id)
     if (error) return { error: error.message }
   }
-
-  let dados: Json = { ...(n.dados ?? {}) }
-  let mudou = false
-  const comLead = (extra: Json) => ({ ...dados, _lead: { ...((dados._lead ?? {}) as Json), ...extra } })
-  if ('produto_interessado' in alt) { dados = mesclar(dados, { produto_interessado: alt.produto_interessado ?? null }); mudou = true }
-  if (alt.campos?.negocio) { dados = mesclar(dados, alt.campos.negocio); mudou = true }
-  if (alt.convertido_em != null) { dados = comLead({ convertido_em: alt.convertido_em }); mudou = true }
-  if (alt.tratativa) { dados = comLead({ ultima_tratativa: new Date().toISOString() }); mudou = true }
   if (mudou) {
     const { error } = await db.from('negocios').update({ dados }).eq('id', n.id)
     if (error) return { error: error.message }

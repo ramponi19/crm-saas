@@ -35,9 +35,10 @@ export function LeadInteressePanel({ leadId }: { leadId: number }) {
   }, [leadId])
 
   useEffect(() => {
-    supabase.from('leads').select('interesse').eq('id', leadId).maybeSingle()
+    // O interesse mora em negocios.dados._interesse (03/11/2026: lido direto, sem a view `leads`).
+    supabase.from('negocios').select('dados').eq('id', leadId).maybeSingle()
       .then(({ data }) => {
-        const i = (data?.interesse ?? null) as Record<string, unknown> | null
+        const i = (((data?.dados ?? {}) as Record<string, unknown>)._interesse ?? null) as Record<string, unknown> | null
         if (i) {
           setForm({
             categoria: (i.categoria as string) ?? '',
@@ -66,9 +67,11 @@ export function LeadInteressePanel({ leadId }: { leadId: number }) {
       preco_max: num(form.preco_max),
       km_max: num(form.km_max),
     }
-    const { error } = await supabase.from('leads').update({ interesse }).eq('id', leadId)
+    const r = await fetch(`/api/leads/${leadId}/card`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interesse }),
+    })
     setSalvando(false)
-    if (error) { notify.bad(error.message); return }
+    if (!r.ok) { notify.bad((await r.json().catch(() => ({}))).error ?? 'Erro ao salvar'); return }
     notify.ok('Interesse salvo — buscando veículos compatíveis…')
     buscar()
   }

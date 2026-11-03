@@ -387,7 +387,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
       {/* Modais */}
       {selectedLead && (
         <LeadModal
-          lead={selectedLead}
+          key={selectedLead.id}
+          leadId={selectedLead.id}
           usuarios={usuarios}
           columns={columns}
           perfil={perfil}

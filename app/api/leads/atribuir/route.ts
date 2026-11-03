@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   const role = vinculo?.role ?? ''
   const isAdmin = role === 'owner' || role === 'admin'
 
-  const { data: lead } = await supabase.from('leads').select('responsavel_id').eq('id', body.leadId).maybeSingle()
+  // O negócio pela sessão do usuário (RLS), direto no core — sem a view `leads` (03/11/2026).
+  const { data: lead } = await supabase.from('negocios').select('responsavel_id').eq('id', body.leadId).maybeSingle()
   if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
   const atual = (lead as { responsavel_id: string | null }).responsavel_id
 

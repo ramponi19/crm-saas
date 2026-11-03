@@ -23,8 +23,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // ── Loja de veículos ──
   // `matchVeiculo`: casa o interesse com unidade de veículo em vez de imóvel.
   if (capacidades(await carregarConfigEmpresa(supabase, empresaId!)).matchVeiculo) {
-    const { data: lead } = await supabase.from('leads').select('interesse').eq('id', leadId).maybeSingle()
-    const interesse = (lead?.interesse ?? null) as InteresseVeiculo | null
+    // O interesse mora em negocios.dados._interesse (03/11/2026: direto, sem a view `leads`).
+    const { data: negocio } = await supabase.from('negocios').select('dados').eq('id', leadId).maybeSingle()
+    const interesse = (((negocio?.dados ?? {}) as Record<string, unknown>)._interesse ?? null) as InteresseVeiculo | null
     if (!interesse) return NextResponse.json({ matches: [] })
 
     const { data: unidades } = await supabase

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines, AlertTriangle, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -10,7 +10,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
 import { urlDeMidia } from '@/lib/storage/midia'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { TABELAS, filtroMensagensDoLead, leadsDaLinha } from '@/lib/realtime/tabelas'
+import type { CardDoLead } from '@/lib/card-do-lead'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
 import { PaineisDaVertical } from './paineis-vertical'
@@ -29,7 +29,11 @@ import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Moda
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
 
 interface LeadModalProps {
-  lead: Lead
+  /**
+   * O card busca o próprio lead no core (GET /api/leads/[id]/card, 03/11/2026):
+   * antes ele recebia a linha da view `leads` que a lista do quadro carregava.
+   */
+  leadId: number
   usuarios: Usuario[]
   columns: KanbanColumn[]
   /** O que este card mostra além do comum (lib/empresa-config.ts → perfilDoLead). */
@@ -149,9 +153,9 @@ const ROTULO_ENTREGA: Record<string, string> = {
   falha_envio: 'A Meta não respondeu a tempo — pode ter chegado; confira antes de tentar de novo',
 }
 
-/** Linha de lead_mensagens como ela chega pelo realtime. */
+/** Linha de mensagens como ela chega pelo realtime. */
 type LinhaMsg = {
-  id: number; direcao: string; conteudo: string | null; created_at: string
+  id: number; direcao: string; conteudo: string | null; created_at: string; filial_id?: number | null
   lida: boolean | null; tipo: string | null; midia_url: string | null
   status_entrega?: string | null; erro_envio?: string | null; external_id?: string | null
 }
@@ -403,7 +407,75 @@ function AudioChat({ url }: { url: string }) {
   )
 }
 
-export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClose, onUpdate }: LeadModalProps) {
+async function buscarCard(leadId: number): Promise<{ card: CardDoLead | null; erro: string }> {
+  const r = await fetch(`/api/leads/${leadId}/card`, { cache: 'no-store' })
+  const j = await r.json().catch(() => ({}))
+  return r.ok ? { card: j as CardDoLead, erro: '' } : { card: null, erro: j.error ?? 'Não foi possível abrir o lead' }
+}
+
+/**
+ * O CARD DO LEAD. Busca o que mostra no core, pelo id — e só isso (~1 KB, contra
+ * a lista inteira de leads que o quadro carregava para abrir um). Enquanto chega,
+ * a mesma moldura do modal com "Carregando". O conteúdo só monta com o lead do
+ * banco em mãos, então o formulário nasce igual ao que está gravado e nada
+ * aparece como "alteração não salva" ao abrir.
+ */
+export function LeadModal({ leadId, onUpdate, onClose, ...resto }: LeadModalProps) {
+  const [card, setCard] = useState<CardDoLead | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  useLockScroll(true)
+  useEscape(!card, onClose)
+
+  const recarregar = useCallback(async (): Promise<CardDoLead | null> => {
+    const r = await buscarCard(leadId)
+    if (r.card) setCard(r.card)
+    return r.card
+  }, [leadId])
+  // Outro lead = outro componente (o quadro passa `key`), então o estado já nasce vazio.
+  useEffect(() => {
+    let vivo = true
+    buscarCard(leadId).then((r) => {
+      if (!vivo) return
+      if (r.card) setCard(r.card)
+      else setErro(r.erro)
+    })
+    return () => { vivo = false }
+  }, [leadId])
+
+  const atualizar = useCallback((l: Lead) => {
+    setCard((c) => (c ? { ...c, lead: l } : c))
+    onUpdate(l)
+  }, [onUpdate])
+
+  if (!card) {
+    if (typeof document === 'undefined') return null
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 p-0 sm:p-6"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      >
+        <div className="flex h-[100dvh] w-full flex-col items-center justify-center gap-3 overflow-hidden border border-line bg-card text-[13px] text-ink-3 shadow-[0_30px_70px_-20px_rgba(21,24,28,0.4)] sm:h-[620px] sm:max-h-[92vh] sm:w-[1000px] sm:max-w-[96vw] sm:rounded-modal">
+          {erro ? (
+            <>
+              <span>{erro}</span>
+              <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
+            </>
+          ) : (
+            <><Loader2 size={18} className="animate-spin" /> Carregando o lead…</>
+          )}
+        </div>
+      </div>,
+      document.body,
+    )
+  }
+  return <LeadModalCarregado card={card} recarregar={recarregar} onUpdate={atualizar} onClose={onClose} {...resto} />
+}
+
+function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motivos = [], onClose, onUpdate }: Omit<LeadModalProps, 'leadId'> & {
+  card: CardDoLead
+  recarregar: () => Promise<CardDoLead | null>
+}) {
+  const lead = card.lead
   /*
    * O perfil chega pronto — o modal não pergunta quem a empresa é.
    *
@@ -553,20 +625,11 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
 
   /**
-   * Lead livre abre já com o nome de quem abriu no campo Responsável — mas SÓ
-   * na tela. A posse só é gravada quando a pessoa responde (`assumirSeLivre`).
-   * Assim quem espiou e fechou no X deixa o lead livre para o próximo, e quem
-   * atendeu não precisa lembrar de se atribuir.
+   * Lead livre abre com o Responsável VAZIO e assim fica até alguém escolher
+   * (decisão do Lucas, 03/11/2026). Antes o campo vinha preenchido com quem
+   * abriu — só na tela —, e o card abria marcado "alteração não salva" sem
+   * ninguém ter mexido. Responder continua assumindo o lead (`assumirSeLivre`).
    */
-  useEffect(() => {
-    if (lead.responsavel_id) return
-    let cancel = false
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancel || !data.user) return
-      setForm((f) => (f.responsavel ? f : { ...f, responsavel: data.user!.id }))
-    })
-    return () => { cancel = true }
-  }, [lead.responsavel_id, supabase])
 
   // Valores como estão no banco. Comparar contra eles (e não contra um "sujo"
   // qualquer) é o que faz o botão DESAPARECER quando o funcionário desfaz a
@@ -582,7 +645,18 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
   }
   const mudou = (campo: string) =>
     (form[campo as keyof typeof form] ?? '') !== (original[campo] ?? '')
-  const algoMudou = Object.keys(original).some(mudou)
+
+  /**
+   * Campos personalizados da empresa (Configurações → campos), só os de módulo
+   * ligado — o card os traz prontos (lib/card-do-lead.ts). Chave: "entidade.chave".
+   */
+  const [camposForm, setCamposForm] = useState<Record<string, string>>(
+    () => Object.fromEntries(card.campos.map((c) => [`${c.entidade}.${c.chave}`, c.valor])),
+  )
+  /** Dono e admin trocam de loja; o vendedor vê só a dele. */
+  const gereLojas = ['owner', 'admin'].includes(usuarios.find((u) => u.id === meuId)?.role ?? '')
+  const camposMudados = card.campos.filter((c) => (camposForm[`${c.entidade}.${c.chave}`] ?? '') !== c.valor)
+  const algoMudou = Object.keys(original).some(mudou) || camposMudados.length > 0
 
   /**
    * Botão de salvar logo abaixo do campo alterado. Existe para o vendedor não
@@ -665,40 +739,70 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
     }
   }
 
+  /**
+   * A CONVERSA LÊ `mensagens` DIRETO (03/11/2026): as do contato NA LOJA deste
+   * negócio — a mesma regra da view `lead_mensagens` —, as 200 mais recentes.
+   * A maior conversa da JM tem 4.765 mensagens (1,7 MB) e abrir o card trazia
+   * todas; as anteriores vêm sob pedido, 200 por vez ("ver anteriores").
+   */
+  const POR_PAGINA = 200
+  const COLUNAS_MSG = 'id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em'
+  const [temAnteriores, setTemAnteriores] = useState(false)
+  const [carregandoAnteriores, setCarregandoAnteriores] = useState(false)
+  /** Mensagens antigas entram por cima: a conversa não pode pular para o fim. */
+  const semRolarAteOFim = useRef(false)
+  type MsgRow = {
+    id: number; direcao: string | null; conteudo: string | null; created_at: string
+    tipo: string | null; midia_url: string | null
+    status_entrega: string | null; erro_envio: string | null; external_id: string | null
+    usuario_id: string | null; transcricao: string | null
+    midia_retida_em: string | null
+  }
+  const paraChat = (m: MsgRow): ChatMsg => ({
+    id: m.id,
+    from: m.direcao === 'enviada' ? 'loja' : 'cliente',
+    text: m.conteudo ?? '',
+    time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    tipo: m.tipo ?? 'texto',
+    midiaUrl: m.midia_url,
+    retidaEm: m.midia_retida_em,
+    transcricao: m.transcricao,
+    status: m.status_entrega,
+    erro: m.erro_envio,
+    externalId: m.external_id,
+    iso: m.created_at,
+    // Quem atendeu. Nulo = saiu do celular, fora do CRM.
+    autor: m.usuario_id ? (usuarios.find((u) => u.id === m.usuario_id)?.nome ?? 'Atendente') : null,
+  })
+  /** As mensagens do contato na loja do negócio, das mais novas para as mais antigas. */
+  function mensagensDaConversa(antesDe?: string) {
+    let q = supabase.from('mensagens').select(COLUNAS_MSG).eq('contato_id', card.contatoId)
+    q = card.filialId == null ? q.is('filial_id', null) : q.eq('filial_id', card.filialId)
+    if (antesDe) q = q.lt('created_at', antesDe)
+    return q.order('created_at', { ascending: false }).order('id', { ascending: false }).limit(POR_PAGINA + 1)
+  }
+
+  async function carregarAnteriores() {
+    const maisAntiga = chat.find((m) => m.iso)?.iso
+    if (!maisAntiga) return
+    setCarregandoAnteriores(true)
+    const { data } = await mensagensDaConversa(maisAntiga)
+    const linhas = (data ?? []) as unknown as MsgRow[]
+    setTemAnteriores(linhas.length > POR_PAGINA)
+    semRolarAteOFim.current = true
+    setChat((prev) => [...linhas.slice(0, POR_PAGINA).reverse().map(paraChat), ...prev])
+    setCarregandoAnteriores(false)
+  }
+
   useEffect(() => {
     let cancel = false
     async function load() {
       setLoadingChat(true)
-      const { data } = await supabase
-        .from('lead_mensagens')
-        .select('id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em')
-        .eq('lead_id', lead.id)
-        .order('created_at', { ascending: true })
+      const { data } = await mensagensDaConversa()
       if (cancel) return
-      type MsgRow = {
-        id: number; direcao: string | null; conteudo: string | null; created_at: string
-        tipo: string | null; midia_url: string | null
-        status_entrega: string | null; erro_envio: string | null; external_id: string | null
-        usuario_id: string | null; transcricao: string | null
-        midia_retida_em: string | null
-      }
-      const msgs: ChatMsg[] = ((data ?? []) as MsgRow[]).map((m) => ({
-        id: m.id,
-        from: m.direcao === 'enviada' ? 'loja' : 'cliente',
-        text: m.conteudo ?? '',
-        time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-        tipo: m.tipo ?? 'texto',
-        midiaUrl: m.midia_url,
-        retidaEm: m.midia_retida_em,
-        transcricao: m.transcricao,
-        status: m.status_entrega,
-        erro: m.erro_envio,
-        externalId: m.external_id,
-        iso: m.created_at,
-        // Quem atendeu. Nulo = saiu do celular, fora do CRM.
-        autor: m.usuario_id ? (usuarios.find((u) => u.id === m.usuario_id)?.nome ?? 'Atendente') : null,
-      }))
-      setChat(msgs)
+      const linhas = (data ?? []) as unknown as MsgRow[]
+      setTemAnteriores(linhas.length > POR_PAGINA)
+      setChat(linhas.slice(0, POR_PAGINA).reverse().map(paraChat))
       setLoadingChat(false)
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       /**
@@ -711,104 +815,96 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
        * seguia esperando resposta sem ninguém ver. Medido em 01/09/2026: 15
        * leads presos assim, 17 mensagens invisíveis.
        *
-       * Quem abriu a conversa leu o que estava nela; é a verdade, não uma
-       * dedução a partir de um número que pode estar torto. O contador agora é
-       * espelho: o gatilho `nao_lidas_sincroniza` o recalcula a partir desta
-       * própria escrita, então não é preciso zerá-lo aqui.
+       * Quem abriu a conversa leu o que estava nela — TODA ela, não só as 200
+       * da tela. O contador de `conversas` é espelho: o gatilho o recalcula a
+       * partir desta escrita.
        */
-      const { count } = await supabase
-        .from('lead_mensagens')
-        .update({ lida: true }, { count: 'exact' })
-        .eq('lead_id', lead.id).eq('lida', false).eq('direcao', 'recebida')
+      let marcar = supabase.from('mensagens').update({ lida: true }, { count: 'exact' })
+        .eq('contato_id', card.contatoId).eq('lida', false).eq('direcao', 'recebida')
+      marcar = card.filialId == null ? marcar.is('filial_id', null) : marcar.eq('filial_id', card.filialId)
+      const { count } = await marcar
       if (count || (lead.msgs_nao_lidas ?? 0) > 0) onUpdate({ ...lead, msgs_nao_lidas: 0 })
     }
     load()
 
-    // Tabela e filtro vêm de lib/realtime/tabelas (NEXT_PUBLIC_DB_CORE). No v1
-    // o filtro é pelo contato do negócio, que exige uma consulta antes de assinar.
-    let channel: ReturnType<typeof supabase.channel> | null = null
-    filtroMensagensDoLead(supabase, lead.id).then((filtroMsgs) => {
-      if (cancel) return
-      let ch = supabase.channel(`lead_msgs_${lead.id}`)
-      if (filtroMsgs) ch = ch
-        .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: TABELAS.mensagem, filter: filtroMsgs },
-          (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
-            const m = payload.new as LinhaMsg
-            setChat((prev) => {
-              const novaMsg: ChatMsg = {
-                id: m.id,
-                from: m.direcao === 'enviada' ? 'loja' : 'cliente',
-                text: m.conteudo ?? '',
-                time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-                tipo: m.tipo ?? 'texto',
-                midiaUrl: m.midia_url,
-                status: m.status_entrega ?? null,
-                erro: m.erro_envio ?? null,
-                externalId: m.external_id ?? null,
-                iso: m.created_at,
-              }
-              if (novaMsg.from === 'loja') {
-                // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
-                const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && (x.midiaUrl ? x.midiaUrl === novaMsg.midiaUrl : x.text === novaMsg.text))
-                if (idx >= 0) { const copy = [...prev]; copy[idx] = novaMsg; return copy }
-              }
-              return [...prev, novaMsg]
-            })
-            if (m.direcao === 'recebida' && !m.lida) {
-              supabase.from('lead_mensagens').update({ lida: true }).eq('id', m.id)
+    // Mensagens do contato (o filtro do realtime aceita uma condição só); as de
+    // outra loja do mesmo contato ficam de fora aqui.
+    const daLoja = (m: LinhaMsg) => (m.filial_id ?? null) === (card.filialId ?? null)
+    const channel = supabase.channel(`lead_msgs_${lead.id}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `contato_id=eq.${card.contatoId}` },
+        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+          const m = payload.new as LinhaMsg
+          if (!daLoja(m)) return
+          setChat((prev) => {
+            const novaMsg: ChatMsg = {
+              id: m.id,
+              from: m.direcao === 'enviada' ? 'loja' : 'cliente',
+              text: m.conteudo ?? '',
+              time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+              tipo: m.tipo ?? 'texto',
+              midiaUrl: m.midia_url,
+              status: m.status_entrega ?? null,
+              erro: m.erro_envio ?? null,
+              externalId: m.external_id ?? null,
+              iso: m.created_at,
             }
-          })
-        // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
-        // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
-        .on('postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: TABELAS.mensagem, filter: filtroMsgs },
-          (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
-            const m = payload.new as LinhaMsg
-            if (!m.external_id && !m.status_entrega) return
-            // Pelo id primeiro: a bolha de um envio que estourou o prazo tem a marca
-            // provisória, e o UPDATE já chega com o id da Meta no lugar dela.
-            setChat((prev) => prev.map((x) =>
-              (x.id != null && x.id === m.id) || (x.externalId && x.externalId === m.external_id)
-                ? { ...x, externalId: m.external_id ?? x.externalId, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? null, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
-                : x,
-            ))
-          })
-      ch = ch
-        /**
-         * O PRÓPRIO LEAD TAMBÉM MUDA ENQUANTO A CONVERSA ESTÁ ABERTA: outro
-         * vendedor move de etapa, o admin troca o responsável, a esteira devolve
-         * para o pool. Nada disso aparecia sem F5 — a tela mostrava um estado que
-         * já não existia, e salvar por cima desfazia a mudança do colega.
-         *
-         * Só campos de ESTADO são adotados. Nome, telefone e observações ficam de
-         * fora de propósito: sobrescrever o que a pessoa está digitando seria pior
-         * que ficar desatualizado.
-         */
-        .on('postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: TABELAS.lead, filter: `id=eq.${lead.id}` },
-          async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-            const [linha] = await leadsDaLinha<Record<string, unknown>>(supabase, TABELAS.lead, payload.new)
-            if (!linha || cancel) return
-            const l = linha as {
-              kanban_status?: string | null; responsavel_id?: string | null
-              funil_id?: number | null; valor_estimado?: number | null
+            if (novaMsg.from === 'loja') {
+              // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
+              const idx = prev.findIndex((x) => x.from === 'loja' && x.time === 'agora' && (x.midiaUrl ? x.midiaUrl === novaMsg.midiaUrl : x.text === novaMsg.text))
+              if (idx >= 0) { const copy = [...prev]; copy[idx] = novaMsg; return copy }
             }
-            setForm((f) => ({
-              ...f,
-              status: l.kanban_status ?? f.status,
-              responsavel: l.responsavel_id ?? '',
-            }))
-            onUpdate({ ...lead, ...(linha as object) })
+            return [...prev, novaMsg]
           })
-      channel = ch.subscribe()
-    })
+          if (m.direcao === 'recebida' && !m.lida) {
+            supabase.from('mensagens').update({ lida: true }).eq('id', m.id)
+          }
+        })
+      // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
+      // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mensagens', filter: `contato_id=eq.${card.contatoId}` },
+        (payload: RealtimePostgresChangesPayload<LinhaMsg>) => {
+          const m = payload.new as LinhaMsg
+          if (!daLoja(m) || (!m.external_id && !m.status_entrega)) return
+          // Pelo id primeiro: a bolha de um envio que estourou o prazo tem a marca
+          // provisória, e o UPDATE já chega com o id da Meta no lugar dela.
+          setChat((prev) => prev.map((x) =>
+            (x.id != null && x.id === m.id) || (x.externalId && x.externalId === m.external_id)
+              ? { ...x, externalId: m.external_id ?? x.externalId, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? null, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
+              : x,
+          ))
+        })
+      /**
+       * O PRÓPRIO LEAD TAMBÉM MUDA ENQUANTO A CONVERSA ESTÁ ABERTA: outro
+       * vendedor move de etapa, o admin troca o responsável, a esteira devolve
+       * para o pool. Nada disso aparecia sem F5 — a tela mostrava um estado que
+       * já não existia, e salvar por cima desfazia a mudança do colega.
+       *
+       * O card é relido do core (~1 KB). Só campos de ESTADO vão para o
+       * formulário: nome, telefone e observações ficam como a pessoa os está
+       * digitando — sobrescrever seria pior que ficar desatualizado.
+       */
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'negocios', filter: `id=eq.${lead.id}` },
+        async () => {
+          const novo = await recarregar()
+          if (!novo || cancel) return
+          setForm((f) => ({
+            ...f,
+            status: novo.lead.kanban_status ?? f.status,
+            responsavel: novo.lead.responsavel_id ?? '',
+          }))
+          onUpdate(novo.lead)
+        })
+      .subscribe()
 
-    return () => { cancel = true; if (channel) supabase.removeChannel(channel) }
+    return () => { cancel = true; supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id])
 
   useEffect(() => {
+    if (semRolarAteOFim.current) { semRolarAteOFim.current = false; return }
     if (!loadingChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat.length, loadingChat])
 
@@ -859,7 +955,8 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
         })
         if (error) throw new Error(error.message)
       }
-      await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
+      // (Saiu o `leads.update({ ultima_mensagem_at })` daqui: na view essa coluna
+      // vem de `conversas` e o gatilho a ignorava — a gravação não fazia nada.)
       await assumirSeLivre()
     } catch (e) {
       if (ehTimeoutMeta(e)) {
@@ -885,25 +982,24 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
    */
   async function assumirSeLivre() {
     if (lead.responsavel_id) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('leads')
-      .update({ responsavel_id: user.id, responsavel_desde: new Date().toISOString() })
-      .eq('id', lead.id).is('responsavel_id', null)
-      .select('id')
-    if (data?.length) {
-      setForm((f) => ({ ...f, responsavel: user.id }))
-      onUpdate({ ...lead, responsavel_id: user.id })
+    const r = await fetch(`/api/leads/${lead.id}/card`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assumir: true }),
+    })
+    const j = await r.json().catch(() => ({})) as { assumido?: boolean; responsavelId?: string | null }
+    if (!r.ok) return
+    if (j.assumido && j.responsavelId) {
+      setForm((f) => ({ ...f, responsavel: j.responsavelId! }))
+      onUpdate({ ...lead, responsavel_id: j.responsavelId })
       notify.ok('Lead é seu', 'Você assumiu o atendimento ao responder.')
       return
     }
     // Perdeu a corrida: alguém respondeu primeiro.
-    const { data: atual } = await supabase.from('leads')
-      .select('responsavel_id').eq('id', lead.id).maybeSingle()
-    const dono = usuarios.find((u) => u.id === atual?.responsavel_id)?.nome
-    if (atual?.responsavel_id) {
+    if (j.responsavelId) {
+      const dono = usuarios.find((u) => u.id === j.responsavelId)?.nome
       notify.warn('Este lead já tem dono', dono ? `${dono} assumiu o atendimento primeiro.` : 'Outro vendedor assumiu primeiro.')
-      onUpdate({ ...lead, responsavel_id: atual.responsavel_id as string })
+      setForm((f) => ({ ...f, responsavel: j.responsavelId! }))
+      onUpdate({ ...lead, responsavel_id: j.responsavelId })
     }
   }
 
@@ -942,7 +1038,6 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
         })
         if (error) throw new Error(error.message)
       }
-      await supabase.from('leads').update({ ultima_mensagem_at: new Date().toISOString() }).eq('id', lead.id)
     } catch (e) {
       if (ehTimeoutMeta(e)) {
         // Gravada como falha_envio: a bolha fica, com o aviso (ver sendMsg).
@@ -1162,15 +1257,22 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
      * atendimento.
      */
     setSaving(true)
-    // Campos editáveis (sem a etapa nem o responsável — cada um tem seu caminho).
-    const { error } = await supabase.from('leads').update({
-      nome: form.nome.trim() || null,
-      telefone: form.tel.trim() || null,
-      instagram: form.ig.trim() || null,
-      produto_interessado: form.produto.trim() || null,
-      observacoes: form.obs.trim() || null,
-    }).eq('id', lead.id)
-    if (error) { setSaving(false); notify.bad('Erro ao salvar'); return }
+    // Campos editáveis (sem a etapa nem o responsável — cada um tem seu caminho),
+    // gravados direto no core pela rota do card (contatos + negocios.dados).
+    const campos: { contato: Record<string, string>; negocio: Record<string, string> } = { contato: {}, negocio: {} }
+    for (const c of camposMudados) campos[c.entidade][c.chave] = camposForm[`${c.entidade}.${c.chave}`] ?? ''
+    const rSalvar = await fetch(`/api/leads/${lead.id}/card`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: form.nome, telefone: form.tel, instagram: form.ig,
+        produto_interessado: form.produto, observacoes: form.obs,
+        ...(camposMudados.length ? { campos } : {}),
+      }),
+    })
+    if (!rSalvar.ok) {
+      const j = await rSalvar.json().catch(() => ({}))
+      setSaving(false); notify.bad('Erro ao salvar', j.error); return
+    }
 
     /**
      * TROCA DE DONO vai pela rota, nunca pelo client.
@@ -1197,9 +1299,12 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
       }
     }
 
+    // Relê do banco: o que ficou gravado (telefone normalizado, campos) passa a
+    // ser o "original" — e o aviso de alteração pendente some.
+    const novo = await recarregar()
     setSaving(false)
     notify.ok('Lead atualizado')
-    onUpdate({
+    onUpdate(novo?.lead ?? {
       ...lead, nome: form.nome, telefone: form.tel, instagram: form.ig,
       produto_interessado: form.produto, kanban_status: statusKey, responsavel_id: respId, observacoes: form.obs,
     })
@@ -1226,9 +1331,16 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
 
     if (error || !cliente) { notify.bad('Erro ao converter'); setSaving(false); return }
 
-    await supabase.from('leads')
-      .update({ kanban_status: ganhoColId(columns), convertido_em: cliente.id })
-      .eq('id', lead.id)
+    // Etapa de ganho pela mesma rota do quadro (automações e cadências disparam
+    // igual) e a marca de conversão no negócio, pela rota do card.
+    await fetch('/api/leads/mover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: lead.id, kanban_status: ganhoColId(columns) }),
+    })
+    await fetch(`/api/leads/${lead.id}/card`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ convertido_em: cliente.id }),
+    })
 
     setSaving(false)
     /**
@@ -1260,9 +1372,13 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
 
   async function handleDelete() {
     setSaving(true)
-    const { error } = await supabase.from('leads').update({ ativo: false }).eq('id', lead.id)
+    // Excluir é desativar (dados._lead.ativo = false), como sempre foi pela view.
+    const r = await fetch(`/api/leads/${lead.id}/card`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ativo: false }),
+    })
     setSaving(false)
-    if (error) { notify.bad('Erro ao excluir'); return }
+    if (!r.ok) { notify.bad('Erro ao excluir'); return }
     notify.ok('Lead excluído')
     router.refresh()
     onClose()
@@ -1297,6 +1413,16 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
           )}
           <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">{form.nome || 'Lead'}</h2>
           <Badge tone="acc">{canalNome}</Badge>
+          {/* O mesmo contato tem negócio na outra loja. Quem vê as duas lojas
+              abre por aqui; o vendedor só fica sabendo (a RLS não mostra a outra). */}
+          {card.outrasLojas.map((o) => {
+            const rotulo = `também em ${o.loja.replace(/^.*·\s*/, '')}`
+            const titulo = `Este contato também tem um negócio em ${o.loja}`
+            const estilo = 'rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-ink-2'
+            return gereLojas
+              ? <a key={o.filialId} href={`/leads?lead=${o.leadId}`} title={titulo} className={`${estilo} hover:text-ink`}>{rotulo}</a>
+              : <span key={o.filialId} title={titulo} className={estilo}>{rotulo}</span>
+          })}
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleConvert} disabled={saving} icon={<UserCheck size={15} strokeWidth={1.7} />}>
             Converter em cliente
@@ -1363,6 +1489,45 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
             <Textarea label="Observações" rows={3} value={form.obs} onChange={(e) => set('obs', e.target.value)} placeholder="Contexto, anotações…" />
             {salvarAqui('obs')}
 
+            {/* Campos personalizados da empresa — só os de módulo ligado. */}
+            {card.campos.map((c) => {
+              const k = `${c.entidade}.${c.chave}`
+              const v = camposForm[k] ?? ''
+              const mudar = (valor: string) => setCamposForm((p) => ({ ...p, [k]: valor }))
+              const sujo = v !== c.valor
+              const campo = c.tipo === 'booleano' ? (
+                <Select label={c.rotulo} value={v} onChange={(e) => mudar(e.target.value)}>
+                  <option value="">—</option>
+                  <option value="true">Sim</option>
+                  <option value="false">Não</option>
+                </Select>
+              ) : c.tipo === 'opcao' && c.opcoes.length > 0 ? (
+                <Select label={c.rotulo} value={v} onChange={(e) => mudar(e.target.value)}>
+                  <option value="">—</option>
+                  {c.opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+                </Select>
+              ) : (
+                <Input
+                  label={c.rotulo}
+                  type={c.tipo === 'data' ? 'date' : c.tipo === 'numero' || c.tipo === 'moeda' ? 'number' : 'text'}
+                  value={c.tipo === 'data' ? v.slice(0, 10) : v}
+                  placeholder={c.tipo === 'multi' ? 'Separe por vírgula' : undefined}
+                  onChange={(e) => mudar(e.target.value)}
+                />
+              )
+              return (
+                <div key={k} className="flex flex-col gap-1.5">
+                  {campo}
+                  {sujo && (
+                    <div className="-mt-1 flex items-center gap-2">
+                      <Button size="sm" onClick={handleSave} loading={saving}>Salvar</Button>
+                      <span className="text-[11px] text-warn">alteração não salva</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} agendaVisitas={perfil.agendaVisitas} />}
             <ResponsavelPanel
               leadId={lead.id}
@@ -1399,6 +1564,16 @@ export function LeadModal({ lead, usuarios, columns, perfil, motivos = [], onClo
                 para o texto das bolhas não brigar com ele — e para o tema
                 escuro poder baixar a opacidade sem trocar de imagem. */}
             <div className="chat-fundo flex flex-1 flex-col gap-2.5 overflow-y-auto p-5 scrollbar-thin">
+              {!loadingChat && temAnteriores && (
+                <button
+                  type="button"
+                  onClick={carregarAnteriores}
+                  disabled={carregandoAnteriores}
+                  className="mx-auto rounded-full border border-line bg-card px-3 py-1 text-[11.5px] font-medium text-ink-2 hover:text-ink disabled:opacity-60"
+                >
+                  {carregandoAnteriores ? 'Carregando…' : 'Ver mensagens anteriores'}
+                </button>
+              )}
               {loadingChat ? (
                 <div className="flex h-full items-center justify-center text-[13px] text-ink-3">Carregando mensagens…</div>
               ) : chat.length === 0 ? (
