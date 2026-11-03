@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Filter } from 'lucide-react'
-import { Button, Select } from '@/components/ui'
+import { Button, Select, notify } from '@/components/ui'
 import { Lead, Usuario, getKanbanColumns, ganhoColId, type KanbanColumn, type Motivo, type Funil } from './types'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { TABELAS, leadsDaLinha, mensagemComLead } from '@/lib/realtime/tabelas'
 import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
 import { LeadModal } from './lead-modal'
@@ -16,12 +15,14 @@ import { Topbar } from '@/components/layout/topbar'
 import { ScoreConfigProvider } from './score-config-context'
 import { DEFAULT_SCORE_CONFIG, type ScoreConfig } from '@/lib/lead-score'
 import type { PerfilDoLead } from '@/lib/empresa-config'
+import {
+  aberturaDoQuadro, contagensDoQuadro, leadsPorId, maisDaEtapa, ordenarQuadro,
+  type Contagens, type FiltrosDoQuadro,
+} from '@/lib/quadro'
 
 interface LeadsViewProps {
-  initialLeads: Lead[]
   usuarios: Usuario[]
   empresaId: number
-  /** Preset de onboarding: só escolhe o funil de partida quando o banco não tem etapas. */
   /** O que o card do lead mostra além do comum (lib/empresa-config.ts → perfilDoLead). */
   perfil: PerfilDoLead
   /** Etapas vindas de funil_etapas (banco). Fallback = funil padrão. */
@@ -34,49 +35,42 @@ interface LeadsViewProps {
   scoreConfig?: ScoreConfig
   /** Restringe a ver só os próprios leads (sem permissão verLeadsOutros). */
   restringe?: boolean
-  /** ID do usuário logado (usado com `restringe` no realtime). */
+  /** ID do usuário logado (usado com `restringe`). */
   meuId?: string
   /**
    * Como ESTA empresa chama quem atende. Padrão "Vendedor".
-   *
-   * O filtro do funil dizia "Todos os corretores" em toda empresa — vocabulário de
-   * imobiliária numa tela do núcleo, que a loja de celular lê como texto de outro
-   * sistema. Vem de fora porque a palavra é da empresa, não desta tela: o mesmo
-   * caminho que o Ranking já usa.
+   * Vem de fora porque a palavra é da empresa, não desta tela: o mesmo caminho
+   * que o Ranking já usa.
    */
   equipeLabel?: string
   /** Instante (ms) em que o servidor desenhou: base dos tempos relativos no 1º desenho. */
   agora: number
 }
 
-/**
- * Mais recente no topo — a mesma ordem que o servidor manda na carga inicial
- * (`ultima_mensagem_at desc`).
- *
- * Precisa ser reaplicada a cada mudança em tempo real: o realtime alterava a
- * data do lead NO LUGAR, então quem acabava de escrever continuava no fim da
- * coluna. Lead sem mensagem nenhuma cai para o fim, ordenado pela criação.
- */
-function porMensagemRecente(leads: Lead[]): Lead[] {
-  const quando = (l: Lead) => new Date(l.ultima_mensagem_at ?? l.created_at ?? 0).getTime()
-  return [...leads].sort((a, b) => quando(b) - quando(a))
-}
+/** Lead do quadro: o de sempre, mais o contato (o tempo real acha o lead pela conversa). */
+type LeadDoQuadro = Lead & { contato_id?: number }
 
-export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
-  const [leads,          setLeads]          = useState<Lead[]>(initialLeads)
-  const [selectedLead,   setSelectedLead]   = useState<Lead | null>(null)
+const SEM_CONTAGENS: Contagens = { etapas: {}, esteira: 0 }
+
+/**
+ * O QUADRO DE LEADS (04/11/2026: lê o core, 50 por etapa).
+ *
+ * Os números do topo e de cada coluna vêm de uma consulta agregada sobre a base
+ * inteira (quadro_contagens) — não do que está na tela, que é só o começo de cada
+ * coluna. Cada coluna traz 50 e "carrega mais" de 50 em 50.
+ */
+export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
+  const [leads,          setLeads]          = useState<LeadDoQuadro[]>([])
+  const [contagens,      setContagens]      = useState<Contagens>(SEM_CONTAGENS)
+  const [carregando,     setCarregando]     = useState(true)
+  const [carregandoMais, setCarregandoMais] = useState<Record<string, boolean>>({})
+  const [selectedId,     setSelectedId]     = useState<number | null>(null)
   const [showNewLead,    setShowNewLead]    = useState(false)
   const [sla,            setSla]            = useState({ verde: 15, amarelo: 30, vermelho: 60 })
 
   /**
-   * `/leads?lead=123` abre a conversa daquele lead.
-   *
-   * Existe porque a busca do topo e o toast de notificação mandavam para
-   * `/leads` e pronto: estando já em /leads, `router.push('/leads')` não faz
-   * absolutamente nada — o usuário clica no próprio nome no resultado da busca e
-   * a tela não se mexe. Resultado que não abre é pior que resultado que não
-   * aparece, porque parece defeito do clique.
-   *
+   * `/leads?lead=123` abre a conversa daquele lead — direto pelo id: o card busca
+   * o próprio lead, então ele abre mesmo fora dos 50 que a coluna mostra.
    * O parâmetro é limpo ao fechar o modal, senão a mesma conversa reabriria a
    * cada re-render e o botão Voltar ficaria preso nela.
    */
@@ -91,23 +85,17 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
   const [responsavelId, setResponsavelId] = useState('')
 
   /**
-   * O lead do endereço que esta tela não carregou. Antes a URL era limpa em
-   * silêncio — e o "abrir conversa no CRM" do ZapIntel, que lista a rede
-   * inteira, abria a tela e não abria nada quando o lead era da outra loja
-   * (lead 1710, de Mogi, com o CRM em Jaguariúna; 15/10/2026).
+   * O lead do endereço que o usuário não vê (outra loja, arquivado). A tela diz
+   * por quê e, para dono e admin, oferece abrir na Rede (lead 1710, 15/10/2026).
    */
   const [foraDaLoja, setForaDaLoja] = useState<string | null>(null)
   const [trocandoLoja, setTrocandoLoja] = useState<'' | 'indo' | 'negado'>('')
 
   useEffect(() => {
     if (!leadNaUrl) return
-    const alvo = leads.find(l => String(l.id) === leadNaUrl)
-    // Lead que a RLS não devolve (outra loja, arquivado) não abre — o endereço
-    // é limpo, para não ficar um parâmetro morto pendurado na URL, e a tela diz
-    // por quê.
-    if (alvo) { setSelectedLead(alvo); setForaDaLoja(null) }
-    else { setForaDaLoja(leadNaUrl); router.replace('/leads') }
-  }, [leadNaUrl, leads, router])
+    const id = Number(leadNaUrl)
+    if (Number.isInteger(id) && id > 0) { setSelectedId(id); setForaDaLoja(null) }
+  }, [leadNaUrl])
 
   /** Passa o CRM para "Rede (todas as lojas)" e abre o lead lá. Só dono e admin. */
   async function abrirNaRede() {
@@ -127,21 +115,63 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
     return doFunil.length > 0 ? doFunil : getKanbanColumns()
   }, [funilEtapas, funilId])
 
-  const leadsDoFunilBase = useMemo(
-    () => (funilId == null ? leads : leads.filter(l => (l.funil_id ?? funilPadrao) === funilId)),
-    [leads, funilId, funilPadrao],
-  )
-  const esteiraCount = useMemo(() => leadsDoFunilBase.filter(l => !l.responsavel_id && l.ativo !== false).length, [leadsDoFunilBase])
   /**
    * Esteira e responsável são EXCLUSIVOS: esteira é "sem dono", responsável é "o
    * dono é este". Ligar os dois devolveria quadro vazio sempre, e quadro vazio por
    * combinação de filtro parece sistema sem lead. Os botões também se desligam.
    */
-  const leadsDoFunil = useMemo(() => {
-    if (soEsteira) return leadsDoFunilBase.filter(l => !l.responsavel_id)
-    if (responsavelId) return leadsDoFunilBase.filter(l => l.responsavel_id === responsavelId)
-    return leadsDoFunilBase
-  }, [leadsDoFunilBase, soEsteira, responsavelId])
+  const filtros: FiltrosDoQuadro = useMemo(() => ({
+    funilId: funilId ?? null,
+    responsavelId: soEsteira ? null : responsavelId || null,
+    esteira: soEsteira,
+    soMeus: restringe ? meuId ?? null : null,
+  }), [funilId, soEsteira, responsavelId, restringe, meuId])
+  const filtrosRef = useRef(filtros)
+  useEffect(() => { filtrosRef.current = filtros }, [filtros])
+
+  // ── Carga: contagens (base inteira) + os 50 mais recentes de cada etapa ──
+  useEffect(() => {
+    let vivo = true
+    const db = createClient()
+    Promise.all([contagensDoQuadro(db, filtros), aberturaDoQuadro(db, filtros)])
+      .then(([c, l]) => { if (vivo) { setContagens(c); setLeads(l); setCarregando(false) } })
+      .catch((e) => { if (vivo) { setCarregando(false); notify.bad('Não foi possível carregar o funil', (e as Error).message) } })
+    return () => { vivo = false }
+  }, [filtros])
+
+  /** Contagens de novo, sem pressa (depois de mover, de mensagem nova…). */
+  const recontar = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pedirRecontagem = useCallback(() => {
+    if (recontar.current) clearTimeout(recontar.current)
+    recontar.current = setTimeout(() => {
+      contagensDoQuadro(createClient(), filtrosRef.current).then(setContagens).catch(() => {})
+    }, 600)
+  }, [])
+
+  const carregarMais = useCallback(async (etapa: string) => {
+    const daEtapa = ordenarQuadro(leads.filter(l => (l.kanban_status ?? 'novo') === etapa))
+    const ultimo = daEtapa.at(-1)
+    if (!ultimo) return
+    setCarregandoMais(p => ({ ...p, [etapa]: true }))
+    try {
+      const novos = await maisDaEtapa(createClient(), filtros, etapa, ultimo)
+      setLeads(prev => {
+        const ja = new Set(prev.map(l => l.id))
+        return [...prev, ...novos.filter(l => !ja.has(l.id))]
+      })
+    } catch (e) {
+      notify.bad('Não foi possível carregar mais', (e as Error).message)
+    } finally {
+      setCarregandoMais(p => ({ ...p, [etapa]: false }))
+    }
+  }, [leads, filtros])
+
+  /** Quantos de cada etapa ainda não estão na tela. */
+  const restam = useMemo(() => {
+    const naTela: Record<string, number> = {}
+    for (const l of leads) { const s = l.kanban_status ?? 'novo'; naTela[s] = (naTela[s] ?? 0) + 1 }
+    return Object.fromEntries(columns.map(c => [c.id, Math.max(0, (contagens.etapas[c.id]?.total ?? 0) - (naTela[c.id] ?? 0))]))
+  }, [leads, contagens, columns])
 
   useEffect(() => {
     const supabase = createClient()
@@ -154,124 +184,87 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
       })
   }, [empresaId])
 
+  // Os números do topo, da base inteira (quadro_contagens), não dos cartões na tela.
   const stats = useMemo(() => {
-    const ganhoId   = ganhoColId(columns)
-    const negocIds  = columns.filter(c => c.tipo === 'negociacao').map(c => c.id)
-    const ativos    = leadsDoFunil.filter(l => l.ativo !== false)
-    const conv      = ativos.filter(l => l.kanban_status === ganhoId).length
-    const taxa      = ativos.length > 0 ? Math.round((conv / ativos.length) * 100) : 0
-    const negoc     = ativos
-      .filter(l => negocIds.includes(l.kanban_status ?? ''))
-      .reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
-    const precisam  = ativos.filter(l => (l.msgs_nao_lidas ?? 0) > 0).length
-    return { ativos: ativos.length, taxa, negoc, precisam }
-  }, [leadsDoFunil, columns])
+    const ganhoId  = ganhoColId(columns)
+    const negocIds = columns.filter(c => c.tipo === 'negociacao').map(c => c.id)
+    const e = contagens.etapas
+    const ativos   = Object.values(e).reduce((s, x) => s + x.total, 0)
+    const conv     = e[ganhoId]?.total ?? 0
+    const taxa     = ativos > 0 ? Math.round((conv / ativos) * 100) : 0
+    const negoc    = negocIds.reduce((s, id) => s + (e[id]?.valor ?? 0), 0)
+    const precisam = Object.values(e).reduce((s, x) => s + x.aguardando, 0)
+    return { ativos, taxa, negoc, precisam }
+  }, [contagens, columns])
 
-  // Realtime: novas mensagens recebidas incrementam o badge do card,
-  // e leads novos (conversas que ainda não estão na tela) entram sozinhos.
+  /**
+   * TEMPO REAL. Uma mudança em negócio, conversa (mensagem nova, não lidas) ou
+   * contato (nome) relê só os leads tocados (quadro_pagina por id), já com os
+   * filtros da tela: quem volta entra ou se atualiza no lugar certo; quem não volta
+   * saiu do quadro (arquivado, outro funil, outra loja, outro dono). As contagens
+   * são pedidas de novo logo depois.
+   *
+   * Lead sem dono é da esteira e aparece para todos — inclusive para quem só vê os
+   * próprios: o filtro do banco já sabe disso (`soMeus`).
+   */
+  const leadsRef = useRef(leads)
+  useEffect(() => { leadsRef.current = leads }, [leads])
   useEffect(() => {
     const supabase = createClient()
-    // Tabelas e formato da linha vêm de lib/realtime/tabelas (NEXT_PUBLIC_DB_CORE).
-    function aoAtualizarLead(l: Lead) {
-      // Some só quando foi para OUTRA pessoa. Voltar para a esteira
-      // (responsável nulo) deixa o lead livre — e livre é de todos, então
-      // ele continua na tela para quem quiser pegar.
-      if (restringe && l.responsavel_id != null && l.responsavel_id !== meuId) {
-        setLeads(prev => prev.filter(x => x.id !== l.id))
-        return
-      }
+    async function reler(ids: number[]) {
+      const unicos = [...new Set(ids)].filter(Boolean)
+      if (!unicos.length) return
+      const voltaram = await leadsPorId(supabase, filtrosRef.current, unicos).catch(() => null)
+      if (!voltaram) return
+      const porId = new Map(voltaram.map(l => [l.id, l]))
       setLeads(prev => {
-        if (l.ativo === false) return prev.filter(x => x.id !== l.id)
-        // ENTRA na lista se ainda não estava. O tratador só sabia ALTERAR o
-        // que já estava na tela: um lead que era de outro vendedor — e por
-        // isso nem tinha sido carregado — voltava para a esteira e não
-        // aparecia para ninguém até alguém recarregar a página. Justamente
-        // o caso em que a pressa importa, porque o lead está sem dono.
-        if (!prev.some(x => x.id === l.id)) {
-          return porMensagemRecente([{ ...l, msgs_nao_lidas: l.msgs_nao_lidas ?? 0 }, ...prev])
-        }
-        return porMensagemRecente(prev.map(x => x.id === l.id ? { ...x, ...l } : x))
+        const fora = prev.filter(l => !unicos.includes(l.id))
+        const dentro = unicos.map(id => {
+          const novo = porId.get(id)
+          const antes = prev.find(l => l.id === id)
+          return novo ? { ...antes, ...novo } : null
+        }).filter(Boolean) as LeadDoQuadro[]
+        return [...fora, ...dentro]
       })
-      /**
-       * O MODAL ABERTO TAMBEM E ATUALIZADO.
-       *
-       * O tratador so mexia na lista. Com a conversa aberta, mudanca vinda
-       * de fora — outro vendedor assumindo, ou a propria posse gravada ao
-       * responder — nao chegava na tela, e so aparecia depois do F5.
-       * Relatado em 18/09/2026: o lead mostrava "sem ninguem" enquanto no
-       * banco ja tinha dono.
-       *
-       * Mescla em vez de trocar: o payload do realtime traz a linha do
-       * banco, e o que esta na tela pode ter campo que so existe aqui.
-       */
-      setSelectedLead(prev => (prev && prev.id === l.id ? { ...prev, ...l } : prev))
+      pedirRecontagem()
     }
+    const doContato = (contatoId: unknown) =>
+      leadsRef.current.filter(l => l.contato_id === contatoId).map(l => l.id)
 
-    let channel = supabase
-      .channel('kanban_msgs')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: TABELAS.mensagem },
-        async (payload: RealtimePostgresChangesPayload<{ direcao: string; lead_id: number; created_at: string }>) => {
-          if ((payload.new as { direcao?: string }).direcao !== 'recebida') return
-          const m = await mensagemComLead<{ direcao: string; lead_id: number; created_at: string }>(supabase, payload.new)
-          if (!m || m.direcao !== 'recebida') return
-          // REORDENA. A lista chega do servidor por ultima_mensagem_at desc, mas
-          // atualizar a data no lugar deixava o card parado onde estava: quem
-          // acabou de escrever continuava no fim da coluna, que é justamente
-          // onde ninguém olha. Ordenar aqui devolve o card para o topo na hora.
-          setLeads(prev => porMensagemRecente(prev.map(l =>
-            l.id === m.lead_id
-              ? { ...l, msgs_nao_lidas: (l.msgs_nao_lidas ?? 0) + 1, ultima_mensagem_at: m.created_at }
-              : l
-          )))
+    const channel = supabase
+      .channel('kanban_core')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'negocios' },
+        (p: RealtimePostgresChangesPayload<{ id: number }>) => { reler([(p.new as { id: number }).id]) })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'negocios' },
+        (p: RealtimePostgresChangesPayload<{ id: number }>) => { reler([(p.new as { id: number }).id]) })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'negocios' },
+        (p: RealtimePostgresChangesPayload<{ id: number }>) => {
+          const id = (p.old as { id: number }).id
+          setLeads(prev => prev.filter(x => x.id !== id))
+          pedirRecontagem()
         })
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: TABELAS.lead },
-        async (payload: RealtimePostgresChangesPayload<Lead>) => {
-          for (const novo of await leadsDaLinha<Lead>(supabase, TABELAS.lead, payload.new)) {
-            if (novo.ativo === false) continue
-            // Lead SEM dono é da esteira e aparece para todos. Sem o `!= null` o
-            // vendedor não via chegar lead novo nenhum: todo lead nasce sem
-            // responsável, e ele só apareceria depois de recarregar a página.
-            if (restringe && novo.responsavel_id != null && novo.responsavel_id !== meuId) continue
-            setLeads(prev =>
-              prev.some(l => l.id === novo.id)
-                ? prev
-                : porMensagemRecente([{ ...novo, msgs_nao_lidas: novo.msgs_nao_lidas ?? 0 }, ...prev]))
-          }
+      // Mensagem nova e não lidas mexem em `conversas`; o nome, em `contatos`.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas' },
+        (p: RealtimePostgresChangesPayload<{ contato_id: number }>) => {
+          const ids = doContato((p.new as { contato_id?: number })?.contato_id)
+          if (ids.length) reler(ids); else pedirRecontagem()
         })
-      // Lead atualizado: reflete na hora; se foi desativado (excluído), some da lista
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: TABELAS.lead },
-        async (payload: RealtimePostgresChangesPayload<Lead>) => {
-          for (const l of await leadsDaLinha<Lead>(supabase, TABELAS.lead, payload.new)) aoAtualizarLead(l)
-        })
-      // Lead removido do banco: some da lista na hora (no v1 o id do negócio é o do lead)
-      .on('postgres_changes',
-        { event: 'DELETE', schema: 'public', table: TABELAS.lead },
-        (payload: RealtimePostgresChangesPayload<{ id: number }>) => {
-          const old = payload.old as { id: number }
-          setLeads(prev => prev.filter(x => x.id !== old.id))
-        })
-    // v1: não lidas e última mensagem moram em conversas, e o nome em contatos.
-    for (const tabela of TABELAS.extrasDoLead) {
-      channel = channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: tabela },
-        async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          for (const l of await leadsDaLinha<Lead>(supabase, tabela, payload.new)) aoAtualizarLead(l)
-        })
-    }
-    channel.subscribe()
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contatos' },
+        (p: RealtimePostgresChangesPayload<{ id: number }>) => { reler(doContato((p.new as { id: number }).id)) })
+      .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [pedirRecontagem])
 
+  /** Do card aberto ou do arraste: o lead muda na tela na hora; as contagens, logo depois. */
   function handleLeadUpdate(updated: Lead) {
-    setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
-    if (selectedLead?.id === updated.id) setSelectedLead(updated)
+    setLeads(prev => prev.map(l => l.id === updated.id ? { ...l, ...updated } : l))
+    pedirRecontagem()
   }
 
   function handleLeadCreate(created: Lead) {
     setLeads(prev => [created, ...prev])
     setShowNewLead(false)
+    pedirRecontagem()
   }
 
   const fmtK = (v: number) =>
@@ -295,7 +288,7 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
                 return (
                   <button
                     key={f.id}
-                    onClick={() => setFunilId(f.id)}
+                    onClick={() => { if (f.id !== funilId) { setCarregando(true); setFunilId(f.id) } }}
                     className={`whitespace-nowrap rounded-[6px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${ativo ? 'bg-ink text-white' : 'text-ink-2 hover:bg-ink/[0.04]'}`}
                   >
                     {f.nome}
@@ -306,14 +299,8 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
           )}
           {/*
             Filtro por corretor — só para quem pode ver o lead do colega.
-            Com `restringe`, o servidor já mandou apenas os leads dele: o filtro
-            não teria o que filtrar e sugeriria acesso que ele não tem.
-
-            NÃO condicionar a "ter mais de um corretor": a versão anterior escondia
-            o filtro em empresa de uma pessoa só, e foi assim que ele nasceu
-            invisível para o dono da imobiliária, que ainda não cadastrou a equipe.
-            Recurso que aparece sozinho quando o segundo usuário entra é recurso
-            que ninguém descobre — e, na avaliação do CRM, é recurso que não existe.
+            NÃO condicionar a "ter mais de um corretor": recurso que aparece sozinho
+            quando o segundo usuário entra é recurso que ninguém descobre.
           */}
           {!restringe && (
             <div className="flex items-center gap-1.5">
@@ -321,25 +308,20 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
               <Select
                 aria-label={`Filtrar por ${equipeLabel.toLowerCase()}`}
                 value={responsavelId}
-                onChange={e => { setResponsavelId(e.target.value); if (e.target.value) setSoEsteira(false) }}
+                onChange={e => { setCarregando(true); setResponsavelId(e.target.value); if (e.target.value) setSoEsteira(false) }}
                 className="min-w-[190px]"
               >
-                {/*
-                  "Toda a equipe", e não o plural de `equipeLabel`, porque a lista
-                  abaixo tem o dono e os administradores também — qualquer um pode ser
-                  responsável por um lead. "Todos os vendedores" prometeria uma lista
-                  só de vendedores.
-                */}
+                {/* "Toda a equipe": a lista tem o dono e os admins também. */}
                 <option value="">Toda a equipe</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome || 'Sem nome'}</option>)}
               </Select>
             </div>
           )}
           <button
-            onClick={() => { setSoEsteira(v => !v); setResponsavelId('') }}
+            onClick={() => { setCarregando(true); setSoEsteira(v => !v); setResponsavelId('') }}
             className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${soEsteira ? 'border-warn bg-warn-soft text-warn' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
           >
-            Esteira{esteiraCount > 0 ? ` (${esteiraCount})` : ''}
+            Esteira{contagens.esteira > 0 ? ` (${contagens.esteira})` : ''}
           </button>
           <div className="num text-[13px] text-ink-2">
             {stats.ativos} em aberto
@@ -371,32 +353,39 @@ export function LeadsView({ initialLeads, usuarios, empresaId, perfil, funilEtap
       )}
 
       {/* Kanban */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className={`flex-1 min-h-0 overflow-hidden transition-opacity ${carregando ? 'opacity-50' : ''}`}>
         <KanbanBoard
-          leads={leadsDoFunil}
+          leads={leads}
           usuarios={usuarios}
           columns={columns}
-          onLeadClick={setSelectedLead}
+          onLeadClick={(l) => setSelectedId(l.id)}
           onLeadUpdate={handleLeadUpdate}
           sla={sla}
           motivos={motivos}
           agora={agora}
+          contagens={contagens.etapas}
+          restam={restam}
+          carregandoMais={carregandoMais}
+          onCarregarMais={carregarMais}
         />
       </div>
 
       {/* Modais */}
-      {selectedLead && (
+      {selectedId != null && (
         <LeadModal
-          key={selectedLead.id}
-          leadId={selectedLead.id}
+          key={selectedId}
+          leadId={selectedId}
           usuarios={usuarios}
           columns={columns}
           perfil={perfil}
           // Sem esta lista o modal de perda abriria vazio ("nenhum motivo
-          // cadastrado") justamente onde agora se marca Perdido — e sem erro
-          // algum na tela, que é o pior jeito de faltar dado.
+          // cadastrado") justamente onde agora se marca Perdido.
           motivos={motivos}
-          onClose={() => { setSelectedLead(null); if (leadNaUrl) router.replace('/leads') }}
+          onClose={() => { setSelectedId(null); if (leadNaUrl) router.replace('/leads') }}
+          onNaoEncontrado={() => {
+            if (leadNaUrl) { setForaDaLoja(leadNaUrl); router.replace('/leads') }
+            setSelectedId(null)
+          }}
           onUpdate={handleLeadUpdate}
         />
       )}

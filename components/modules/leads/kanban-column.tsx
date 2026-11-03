@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Lead, Usuario, KanbanColumn as KanbanColumnType } from './types'
 import { LeadCard } from './lead-card'
+import type { ContagemDaEtapa } from '@/lib/quadro'
 
 interface KanbanColumnProps {
   column: KanbanColumnType
@@ -14,12 +15,18 @@ interface KanbanColumnProps {
   onLeadClick: (lead: Lead) => void
   sla?: { verde: number; amarelo: number; vermelho: number }
   agora?: number
+  /** Total e valor da etapa na base inteira; sem ela, conta o que está na tela. */
+  contagem?: ContagemDaEtapa
+  /** Quantos ainda não estão na tela ("carregar mais"). */
+  restam?: number
+  carregandoMais?: boolean
+  onCarregarMais?: () => void
 }
 
 const fmtK = (v: number) =>
   v >= 1000 ? `R$ ${(v / 1000).toFixed(1).replace('.', ',')} mil` : `R$ ${v}`
 
-export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla, agora }: KanbanColumnProps) {
+export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla, agora, contagem, restam = 0, carregandoMais = false, onCarregarMais }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}`, data: { status: column.id } })
 
   /**
@@ -63,9 +70,11 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
     }
   }, [leads])
 
+  // Total e soma da etapa inteira (o quadro mostra só o começo da coluna, 04/11/2026).
   const soma = column.tipo === 'negociacao'
-    ? leads.reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
+    ? contagem?.valor ?? leads.reduce((s, l) => s + (l.valor_estimado ?? 0), 0)
     : 0
+  const total = contagem?.total ?? leads.length
 
   const emptyMsg =
     column.tipo === 'ganho' ? 'Vendas fechadas aparecem aqui.' :
@@ -73,13 +82,13 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
     'Arraste um lead aqui.'
 
   return (
-    <div className="flex h-full w-[84vw] max-w-[300px] flex-none snap-start flex-col sm:w-[228px]">
+    <div data-etapa={column.id} className="flex h-full w-[84vw] max-w-[300px] flex-none snap-start flex-col sm:w-[228px]">
       {/* Header da coluna: dot quadrado 6px · label · soma · contagem */}
       <div className="flex items-center gap-2 px-1 pb-2.5">
         <span className="h-1.5 w-1.5 flex-none rounded-[2px]" style={{ background: column.color }} />
         <span className="truncate text-[12px] font-semibold text-ink-2">{column.label}</span>
         {soma > 0 && <span className="num ml-1 flex-none text-[10.5px] font-medium text-ink-3">{fmtK(soma)}</span>}
-        <span className="num ml-auto flex-none text-[11px] font-semibold text-ink-3">{leads.length}</span>
+        <span data-total className="num ml-auto flex-none text-[11px] font-semibold text-ink-3">{total}</span>
       </div>
 
       {/* Drop zone */}
@@ -95,6 +104,18 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
             <LeadCard key={lead.id} lead={lead} usuarios={usuarios} onClick={() => onLeadClick(lead)} barColor={column.color} sla={sla} agora={agora} />
           ))}
         </SortableContext>
+
+        {/* 50 por vez: a coluna traz o começo e o resto sob pedido (04/11/2026). */}
+        {restam > 0 && onCarregarMais && (
+          <button
+            type="button"
+            onClick={onCarregarMais}
+            disabled={carregandoMais}
+            className="mx-1 my-1 flex-none rounded-control border border-line bg-card px-2 py-1.5 text-[11.5px] font-medium text-ink-2 hover:text-ink disabled:opacity-60"
+          >
+            {carregandoMais ? 'Carregando…' : `Carregar mais (${restam})`}
+          </button>
+        )}
 
         {leads.length === 0 && (
           <div className="flex min-h-[80px] flex-1 items-center justify-center rounded-card border border-dashed border-line px-3 text-center">

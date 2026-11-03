@@ -85,7 +85,8 @@ as $$
     left join nl on nl.contato_id = n.contato_id and nl.f = coalesce(n.filial_id, -1)
    where n.empresa_id = (select id from emp)
      and coalesce((n.dados -> '_lead' ->> 'ativo')::boolean, true)
-     and coalesce(n.funil_id, (select id from padrao)) = p_funil
+     -- Funil nulo = todos (empresa sem funil cadastrado, como a tela antiga mostrava).
+     and (p_funil is null or coalesce(n.funil_id, (select id from padrao)) = p_funil)
      -- Sem "ver leads de outros": os dele e a esteira (sem dono é de todos).
      and (p_so_meus is null or n.responsavel_id is null or n.responsavel_id = p_so_meus)
 $$;

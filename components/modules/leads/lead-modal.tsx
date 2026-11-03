@@ -46,6 +46,8 @@ interface LeadModalProps {
   motivos?: Motivo[]
   onClose: () => void
   onUpdate: (lead: Lead) => void
+  /** O lead não existe ou é de outra loja (404): quem abriu decide o que dizer. */
+  onNaoEncontrado?: () => void
 }
 
 /**
@@ -408,10 +410,10 @@ function AudioChat({ url }: { url: string }) {
   )
 }
 
-async function buscarCard(leadId: number): Promise<{ card: CardDoLead | null; erro: string }> {
+async function buscarCard(leadId: number): Promise<{ card: CardDoLead | null; erro: string; status: number }> {
   const r = await fetch(`/api/leads/${leadId}/card`, { cache: 'no-store' })
   const j = await r.json().catch(() => ({}))
-  return r.ok ? { card: j as CardDoLead, erro: '' } : { card: null, erro: j.error ?? 'Não foi possível abrir o lead' }
+  return r.ok ? { card: j as CardDoLead, erro: '', status: r.status } : { card: null, erro: j.error ?? 'Não foi possível abrir o lead', status: r.status }
 }
 
 /**
@@ -421,7 +423,7 @@ async function buscarCard(leadId: number): Promise<{ card: CardDoLead | null; er
  * banco em mãos, então o formulário nasce igual ao que está gravado e nada
  * aparece como "alteração não salva" ao abrir.
  */
-export function LeadModal({ leadId, onUpdate, onClose, ...resto }: LeadModalProps) {
+export function LeadModal({ leadId, onUpdate, onClose, onNaoEncontrado, ...resto }: LeadModalProps) {
   const [card, setCard] = useState<CardDoLead | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   useLockScroll(true)
@@ -438,9 +440,11 @@ export function LeadModal({ leadId, onUpdate, onClose, ...resto }: LeadModalProp
     buscarCard(leadId).then((r) => {
       if (!vivo) return
       if (r.card) setCard(r.card)
+      else if (r.status === 404 && onNaoEncontrado) onNaoEncontrado()
       else setErro(r.erro)
     })
     return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- o aviso é de quem abriu; o lead é o que importa
   }, [leadId])
 
   const atualizar = useCallback((l: Lead) => {

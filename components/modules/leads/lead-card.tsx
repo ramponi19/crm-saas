@@ -131,7 +131,7 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
   const chip = TIER_CHIP[tier]
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick} className="cursor-grab select-none active:cursor-grabbing">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick} data-lead-id={lead.id} className="cursor-grab select-none active:cursor-grabbing">
       <div
         className="rounded-[10px] border border-line bg-card p-3 transition-all hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]"
         style={{ opacity: isSortableDragging || isDragging ? 0.4 : 1 }}
