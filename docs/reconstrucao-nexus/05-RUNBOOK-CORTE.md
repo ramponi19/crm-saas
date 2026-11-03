@@ -182,7 +182,7 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - **Segmento no código: zero condicionais** (152/152 caíram). A palavra fica em 14 arquivos, 36 ocorrências (`scripts/segmento-excecoes.json`): `register` 2, `presets_onboarding` 2 (tela `/superadmin/presets`), `texto_publico` 10 (landing e descrição do site — decisão do Lucas, 03/11). A lista só encolhe.
 - **Lista de morte — o que fica, e até quando:**
   - **Volta do zero-segmento** (`supabase/scripts/volta/volta-presets-completos.sql`, ida/volta/ida testada no local): guardar até a próxima limpeza; volta junto com o Instant Rollback para `53cc73d` (código novo sem `itens.base` cai para o núcleo; código velho com a volta fica como antes);
-  - `ops.volta_filial_20261020`: volta do principal por loja, apagar a partir de 03/11 (**ainda lá em 03/11**; apagar com o ok do Lucas);
+  - `ops.volta_filial_20261020`: volta do principal por loja. **Entra no DROP da próxima noite com migração** (decisão do Lucas, 03/11): `20261104000100_drop_volta_filial.sql` na branch `db/proxima-noite`, não aplicada; antes de aplicar, copiar as 131 linhas para `dumps/`. O script `volta-principal-por-loja.sql` sai junto;
   - **Chaves `mid:` em `ops.webhook_recebidos`:** cada uma vive 60 s (a própria `webhook_mid_novo` apaga as vencidas); nada a limpar à mão;
   - **Volta da noite de 22/10:** `supabase/scripts/volta/volta-corrida-identidade.sql` e `D:\Nexus-Copia\noite\volta-v-leads-nao-lidas.sql` — guardar até a próxima limpeza; a fusão de dados não volta;
   - pedido de teste nº 1 em `modulo_pedidos` (JM, `/agenda`, smoke (e) de 21/10 19:07): **apagado em 22/10 à noite** pelo recusar do superadmin, com registro em `superadmin_logs` (0 pendentes; ver o 06);

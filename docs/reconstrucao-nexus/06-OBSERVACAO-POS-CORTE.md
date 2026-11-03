@@ -671,9 +671,9 @@ Decisão do Lucas: ir de dia, com a migração só de dados (sem DDL), IOwait ab
 - **Fica anotado:**
   - card de lead sem responsável mostra "alteração não salva" ao abrir (preenche com quem abriu; desde `cb22e59`, 07/08);
   - topo do `/dashboard` diz "Visão geral", e o menu tem outro "Visão geral" (já era assim);
-  - `/api/filial/selecionar` responde 500 com corpo `null` (devia ser 400);
-  - o servidor local do ensaio manda erro para o Sentry da produção (DSN no `.env.local`);
-  - `ops.volta_filial_20261020` segue lá (apagar a partir de 03/11, com o ok do Lucas).
+  - ~~`/api/filial/selecionar` responde 500 com corpo `null`~~ — **400 em produção desde 17:38** (`210eb81`, deploy só de app, IOwait 2,8%): corpo vazio, `null` ou sem `filialId` → 400, troca normal 200;
+  - ~~o servidor local do ensaio manda erro para o Sentry da produção~~ — **resolvido na máquina**: `NEXT_PUBLIC_SENTRY_DSN=` vazio no `.env.local` e no `.env.development.local` (a variável vence o DSN do código; a Vercel não lê esses arquivos);
+  - `ops.volta_filial_20261020` entra no DROP da próxima noite (`20261104000100`, branch `db/proxima-noite`).
 
 ## 15. 03/11 à noite: card do lead lendo o core (`4eb5098`), deploy só de app
 
