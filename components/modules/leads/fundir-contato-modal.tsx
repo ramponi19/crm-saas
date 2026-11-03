@@ -12,6 +12,11 @@ interface Achado {
   negocios: { id: number; status: string; filial: { nome: string } | null }[]
 }
 
+interface Fusao {
+  id: number; em: string; nome: string | null; telefone: string | null; instagram: string | null
+  podeDesfazer: boolean; desfeita: boolean
+}
+
 const CANAL: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', site: 'Site', manual: 'Loja' }
 
 /**
@@ -20,6 +25,10 @@ const CANAL: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instag
  * cliente escolhe o outro; o contato deste card FICA, o escolhido SAI e tudo dele
  * (conversas, negócios, identidades) passa para cá. Registro em contato_fusoes.
  * Só dono e admin (a rota confere).
+ *
+ * Em cima, as fusões em que ESTE contato ficou, com "Desfazer": a fusão guarda
+ * a foto do que mudou e o desfazer recria o contato que saiu com o mesmo id
+ * (lib/fusao-contatos.ts).
  */
 export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }: {
   contatoId: number
@@ -32,6 +41,30 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
   const [buscando, setBuscando] = useState(false)
   const [escolhido, setEscolhido] = useState<Achado | null>(null)
   const [fundindo, setFundindo] = useState(false)
+  const [fusoes, setFusoes] = useState<Fusao[]>([])
+  const [aDesfazer, setADesfazer] = useState<Fusao | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/contatos/fundir?fusoes=${contatoId}`).then((r) => r.json()).then((j) => {
+      if (vivo && Array.isArray(j.fusoes)) setFusoes(j.fusoes)
+    }).catch(() => {})
+    return () => { vivo = false }
+  }, [contatoId])
+
+  async function desfazer() {
+    if (!aDesfazer) return
+    setFundindo(true)
+    const r = await fetch('/api/contatos/fundir/desfazer', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fusaoId: aDesfazer.id }),
+    })
+    const j = await r.json().catch(() => ({}))
+    setFundindo(false)
+    if (!r.ok) { notify.bad('Não foi possível desfazer', j.error); return }
+    notify.ok('Fusão desfeita', `${aDesfazer.nome ?? 'O contato'} voltou a ser um contato separado.`)
+    onFundido()
+  }
 
   useEffect(() => {
     const t = q.trim()
@@ -73,7 +106,12 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
       onClose={onClose}
       size="md"
       title="Fundir com outro contato"
-      footer={escolhido ? (
+      footer={aDesfazer ? (
+        <>
+          <Button variant="ghost" onClick={() => setADesfazer(null)} disabled={fundindo}>Voltar</Button>
+          <Button variant="danger" onClick={desfazer} loading={fundindo}>Desfazer a fusão</Button>
+        </>
+      ) : escolhido ? (
         <>
           <Button variant="ghost" onClick={() => setEscolhido(null)} disabled={fundindo}>Voltar</Button>
           <Button variant="danger" onClick={fundir} loading={fundindo}>Fundir</Button>
@@ -82,7 +120,15 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
         <Button variant="ghost" onClick={onClose}>Cancelar</Button>
       )}
     >
-      {escolhido ? (
+      {aDesfazer ? (
+        <div className="flex flex-col gap-3 text-[13px] text-ink-2">
+          <p>
+            <strong className="text-ink">{aDesfazer.nome ?? 'O contato'}</strong> volta a ser um contato separado, com o mesmo cadastro,
+            e as conversas, negócios e canais que eram dele voltam para ele.
+          </p>
+          <p>O que chegou depois da fusão (mensagem ou negócio novo) continua com {nomeAtual}.</p>
+        </div>
+      ) : escolhido ? (
         <div className="flex flex-col gap-3 text-[13px] text-ink-2">
           <p><strong className="text-ink">Fica:</strong> {nomeAtual} (este card)</p>
           <p><strong className="text-ink">Sai:</strong> {escolhido.nome ?? 'Sem nome'} — {descreve(escolhido) || 'sem telefone nem Instagram'}</p>
@@ -93,6 +139,21 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
         </div>
       ) : (
         <div className="flex flex-col gap-3">
+          {fusoes.length > 0 && (
+            <div className="flex flex-col gap-1.5 rounded-[8px] border border-line-soft p-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Fusões deste contato</span>
+              {fusoes.map((fz) => (
+                <div key={fz.id} className="flex items-center gap-2 text-[12.5px]">
+                  <span className="min-w-0 flex-1 truncate text-ink-2">
+                    {fz.nome ?? 'Contato'}{fz.telefone || fz.instagram ? ` · ${fz.telefone ?? '@' + fz.instagram}` : ''} — {new Date(fz.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {fz.podeDesfazer
+                    ? <Button size="sm" variant="outline" onClick={() => setADesfazer(fz)}>Desfazer</Button>
+                    : <span className="text-[11px] text-ink-3">{fz.desfeita ? 'desfeita' : 'sem foto para desfazer'}</span>}
+                </div>
+              ))}
+            </div>
+          )}
           <p className="text-[12.5px] text-ink-3">
             Para quando a mesma pessoa chegou por canais diferentes (ex.: WhatsApp e Instagram) e virou dois contatos.
           </p>
