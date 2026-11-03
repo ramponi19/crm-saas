@@ -649,3 +649,28 @@ Nenhuma tela com "tente em instantes". O recalcular ficou entre o da cópia (2,7
   - `realtime.authorize`: 0 chamadas no período; `pg_cron`: nenhuma execução desde as 06:00; transcrição de áudio: 21 gravadas à tarde;
   - tráfego da API: 14:00–14:15 tem ~200 requisições, todas 2xx (menos que os 15 rollbacks/min da média).
   O que acompanha a rajada é o volume de requisições da `service_role` sem consulta correspondente nas estatísticas (36,7/min de manhã, 15,7/min na janela calma, 21,8/min à tarde). Sem dano visível: nenhum erro, nenhuma perda de mensagem ou divergência ligada a ela. Próximo passo (só leitura): foto do `xact_rollback` a cada 5 min no expediente de 23/10; no primeiro salto, `pg_stat_activity` e o log de 15 min daquele intervalo.
+
+
+## 14. 03/11: zero-segmento em produção (`1ea2281`, migração `20261029000100`), loja aberta
+
+Decisão do Lucas: ir de dia, com a migração só de dados (sem DDL), IOwait abaixo de 20% antes de cada passo e parada acima de 30%.
+
+- **Antes (só leitura):** `presets_onboarding` (7 linhas) e `empresa_menu` das duas empresas idênticos à cópia de 22/10 (md5); única diferença, `empresa_modulos` 1/`gestao_leads` desligado (sobra do smoke de 22/10). Ensaio no Supabase local (reset do repo até `20261023000200` + dados da cópia + a linha acima + a migração): duas passadas limpas e iguais (dono nas duas lojas, vendedores de Mogi e Jaguariúna). Menu "de antes" registrado na produção, como dono, nas duas lojas: 21 itens, Central com 16 botões, Configurações com 40 seções.
+- **Gate na main local (`1ea2281`, fast-forward sobre `53cc73d`):** check (núcleo, avisos, views, segmento, tsc, edge), 190 testes, foto das 80 combinações (70 iguais + as 10 de preset inexistente iguais ao varejo), comparar-menu 15/15, build, 152/152, verificador 539/5 (as 5 antigas).
+- **Migração** pelo MCP às 14:59 (IOwait 8,3% às 14:58; 21,9% às 14:54 adiou o passo): base gravada nas empresas 1 e 5 (34 habilitados), camadas `dono` e `superadmin` com o mesmo md5 de antes, nenhum preset com `hidden_hrefs`, nomes do cadastro gravados. API: anon segue com `42501`, Auth 200, `/api/saude` 200. Com o código velho ainda no ar, o menu de Jaguariúna saiu idêntico.
+- **Push** 15:00 (IOwait 5,0%), **READY 15:03:45** (Production `1ea2281`).
+- **Smoke com o Lucas (15:05–17:08):**
+  - menu idêntico ao de antes nas duas lojas, item a item; Configurações (40 seções) e Central (16 botões) iguais;
+  - card do lead aberto em Mogi (6703) e Jaguariúna (6987), escolhidos sem mensagem pendente (abrir marca como lida): nenhum painel de imóvel ou veículo;
+  - `/register` numa janela isolada, preset varejo: empresa 6 com a mesma base de menu da JM, módulos de varejo, "Funil principal" com 5 etapas e 6 motivos de perda; depois apagada com `hard_delete_empresa` como o superadmin (log `excluir_empresa_lgpd` 17:02) e o usuário do auth apagado na mesma transação — sem sobra em menu, módulos, funil, motivos, branding, filiais e `usuarios`;
+  - ZapIntel ao vivo (2.823 conversas, última mensagem "agora"); tarefa criada e apagada;
+  - WhatsApp: "teste zs" do Lucas recebido nas duas lojas (17:05); resposta pelo CRM em Mogi 17:06:53 (lida 17:07:02) e Jaguariúna 17:07:42 (entregue 17:07:45); `/api/saude` 200.
+- **IOwait depois:** pico de 25,7% (17:06) e 31,4% (17:08) durante o smoke, de volta a 17,4% (17:09) e 3,1% (17:11) sem nenhuma ação; antes do deploy a tarde já tinha picos isolados (23,9% às 14:04, 21,9% às 14:54).
+- **Sentry:** nada novo desde o deploy. As três ocorrências da tarde vieram do trabalho de antes: `POST /api/filial/selecionar` com corpo `null` (chamada errada minha, ~14:50, 500 sem alterar nada) e duas do servidor local do ensaio, que reporta ao Sentry pelo `.env.local` (`/para/[segmento]` de um build velho e "stream closed early" ao derrubá-lo).
+- **Volta (não usada):** Instant Rollback para `53cc73d` + `supabase/scripts/volta/volta-presets-completos.sql`.
+- **Fica anotado:**
+  - card de lead sem responsável mostra "alteração não salva" ao abrir (preenche com quem abriu; desde `cb22e59`, 07/08);
+  - topo do `/dashboard` diz "Visão geral", e o menu tem outro "Visão geral" (já era assim);
+  - `/api/filial/selecionar` responde 500 com corpo `null` (devia ser 400);
+  - o servidor local do ensaio manda erro para o Sentry da produção (DSN no `.env.local`);
+  - `ops.volta_filial_20261020` segue lá (apagar a partir de 03/11, com o ok do Lucas).
