@@ -215,7 +215,8 @@ function mesclar(base: Json | null, valores: Record<string, string | null> | und
 }
 
 class ErroDeCampo extends Error {
-  constructor(readonly chave: string) { super(`Valor inválido em "${chave}"`) }
+  chave: string
+  constructor(chave: string) { super(`Valor inválido em "${chave}"`); this.chave = chave }
 }
 
 /**
