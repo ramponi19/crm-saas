@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { filialEscolhida } from '@/lib/filial-escolha'
 
 /**
  * Troca a loja em que o dono está trabalhando.
@@ -23,7 +24,11 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error
   const { userId, empresaId } = auth
 
-  const { filialId } = (await req.json().catch(() => ({}))) as { filialId?: number | null }
+  // Corpo mal formado é 400, não 500 (lib/filial-escolha.ts).
+  const filialId = filialEscolhida(await req.json().catch(() => undefined))
+  if (filialId === undefined) {
+    return NextResponse.json({ error: 'Envie { filialId: número da loja ou null }' }, { status: 400 })
+  }
   const svc = createServiceClient()
 
   if (filialId != null) {
