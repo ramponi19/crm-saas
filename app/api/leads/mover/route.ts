@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
-const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome)'
+const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
 
 /**
  * Move um lead de etapa e dispara as automações de "entrou_na_etapa".
@@ -25,6 +25,12 @@ export async function POST(req: Request) {
     motivo_perda_id?: number | null
     perdido_em?: string | null
     observacoes?: string
+    /**
+     * Justificativa da perda arrastada no quadro: emendada AQUI ao fim das
+     * observações do contato, com rótulo e data. O cartão do quadro não traz as
+     * observações (04/11/2026), então montar o texto lá apagaria o que já havia.
+     */
+    justificativa?: string
   }
   if (!body.leadId || (!body.kanban_status && !body.funilId)) {
     return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
@@ -58,7 +64,7 @@ export async function POST(req: Request) {
   type NegocioAtual = {
     id: number; empresa_id: number; funil_id: number | null; responsavel_id: string | null; perdido_em: string | null
     dados: Record<string, unknown> | null; etapa: { slug: string } | null
-    contato: { id: number; nome: string | null } | null
+    contato: { id: number; nome: string | null; observacoes: string | null } | null
   }
   const { data: negocio } = await supabase
     .from('negocios')
@@ -98,8 +104,13 @@ export async function POST(req: Request) {
   const { error } = await supabase.from('negocios').update(patch as never).eq('id', n.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   // A justificativa da perda mora nas observações do contato (onde o vendedor a lê).
-  if (body.observacoes && n.contato) {
-    const { error: errObs } = await supabase.from('contatos').update({ observacoes: body.observacoes }).eq('id', n.contato.id)
+  const justificativa = body.justificativa?.trim()
+  const observacoes = body.observacoes ?? (justificativa
+    ? (n.contato?.observacoes ? n.contato.observacoes + '\n' : '')
+      + `Justificativa da perda (${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}): ${justificativa}`
+    : null)
+  if (observacoes && n.contato) {
+    const { error: errObs } = await supabase.from('contatos').update({ observacoes }).eq('id', n.contato.id)
     if (errObs) return NextResponse.json({ error: errObs.message }, { status: 500 })
   }
 

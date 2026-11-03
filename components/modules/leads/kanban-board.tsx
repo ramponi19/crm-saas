@@ -10,6 +10,7 @@ import { KanbanColumn } from './kanban-column'
 import { LeadCard } from './lead-card'
 import { MotivoPerdaModal } from './motivo-perda-modal'
 import { notify } from '@/components/ui'
+import { ordenarQuadro, type ContagemDaEtapa } from '@/lib/quadro'
 
 interface KanbanBoardProps {
   leads: Lead[]
@@ -21,9 +22,15 @@ interface KanbanBoardProps {
   motivos?: Motivo[]
   /** Instante do 1º desenho, igual no servidor e no navegador (ver leads/page.tsx). */
   agora?: number
+  /** Total, valor e aguardando por etapa, da base inteira (o quadro mostra só o começo de cada coluna). */
+  contagens?: Record<string, ContagemDaEtapa>
+  /** Quantos de cada etapa ainda não estão na tela. */
+  restam?: Record<string, number>
+  carregandoMais?: Record<string, boolean>
+  onCarregarMais?: (etapa: string) => void
 }
 
-export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [], agora }: KanbanBoardProps) {
+export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [], agora, contagens, restam, carregandoMais, onCarregarMais }: KanbanBoardProps) {
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
   const [pendingPerda, setPendingPerda] = useState<Lead | null>(null)
@@ -39,7 +46,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
   )
 
   const getLeadsByStatus = useCallback(
-    (status: string) => localLeads.filter(l => (l.kanban_status ?? 'novo') === status),
+    (status: string) => ordenarQuadro(localLeads.filter(l => (l.kanban_status ?? 'novo') === status)),
     [localLeads]
   )
 
@@ -62,7 +69,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
 
   // Grava a mudança de etapa (+ extras, ex.: motivo de perda) via route server,
   // que também dispara as automações de "entrou_na_etapa". Reverte no erro.
-  async function persistirMove(lead: Lead, extra?: { motivo_perda_id?: number; perdido_em?: string; observacoes?: string }) {
+  async function persistirMove(lead: Lead, extra?: { motivo_perda_id?: number; perdido_em?: string; justificativa?: string }) {
     /**
      * AVISA O PAI ANTES DE GRAVAR. O card pulava de volta para a coluna de
      * origem no instante em que era solto e só ia para o destino quando o
@@ -73,7 +80,8 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
      * servidor rápido resolveria isso; era ida e volta de UI.
      */
     const anterior = leads.find(l => l.id === lead.id)?.kanban_status ?? null
-    const otimista = { ...lead, ...(extra ?? {}) }
+    const { justificativa: _justificativa, ...semJustificativa } = extra ?? {}
+    const otimista = { ...lead, ...semJustificativa }
     onLeadUpdate(otimista)
 
     const destino = columns.find(c => c.id === lead.kanban_status)?.label ?? lead.kanban_status
@@ -128,19 +136,15 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
   async function confirmarPerda(motivoId: number, observacao: string) {
     if (!pendingPerda) return
     setSalvandoPerda(true)
-    const extra: { motivo_perda_id: number; perdido_em: string; observacoes?: string } = {
+    const extra: { motivo_perda_id: number; perdido_em: string; justificativa?: string } = {
       motivo_perda_id: motivoId,
       perdido_em: new Date().toISOString(),
     }
-    if (observacao) {
-      // Rótulo e DATA no texto: a justificativa entra no meio das observações do
-      // lead, e sem carimbo ninguém sabe, meses depois, se aquilo é de agora ou de
-      // uma perda anterior — o mesmo lead pode ser perdido, voltar e ser perdido
-      // de novo.
-      const quando = new Date().toLocaleDateString('pt-BR')
-      extra.observacoes = (pendingPerda.observacoes ? pendingPerda.observacoes + '\n' : '')
-        + `Justificativa da perda (${quando}): ${observacao}`
-    }
+    // A justificativa vai para o fim das observações do contato, com rótulo e DATA
+    // (o mesmo lead pode ser perdido, voltar e ser perdido de novo) — emendada no
+    // SERVIDOR (/api/leads/mover): o cartão do quadro não traz as observações
+    // (04/11/2026), e montar o texto aqui apagaria o que já estava lá.
+    if (observacao) extra.justificativa = observacao
     await persistirMove(pendingPerda, extra)
     setSalvandoPerda(false)
     setPendingPerda(null)
@@ -168,6 +172,10 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
             onLeadClick={onLeadClick}
             sla={sla}
             agora={agora}
+            contagem={contagens?.[col.id]}
+            restam={restam?.[col.id] ?? 0}
+            carregandoMais={!!carregandoMais?.[col.id]}
+            onCarregarMais={onCarregarMais ? () => onCarregarMais(col.id) : undefined}
           />
         ))}
       </div>
