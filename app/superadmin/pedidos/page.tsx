@@ -14,7 +14,7 @@ export default async function PedidosModuloPage() {
   const svc = createServiceClient()
   const { data } = await svc.from('modulo_pedidos')
     .select('id, modulo, pedido_em, empresa:empresas(id, nome), usuario:usuarios!modulo_pedidos_pedido_por_fkey(nome)')
-    .is('atendido_em', null).order('pedido_em')
+    .eq('status', 'pendente').order('pedido_em')
 
   const linhas = (data ?? []) as unknown as Array<{
     id: number; modulo: string; pedido_em: string

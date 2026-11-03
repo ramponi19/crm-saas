@@ -3,6 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { getPortalToken } from '@/lib/portal-token'
 import IntegracoesView from './integracoes-view'
 
 export const metadata = { title: 'Integrações' }
@@ -14,9 +15,9 @@ export const metadata = { title: 'Integrações' }
  * (`portal_leads`) e o token de entrada do Contact2Sale, os dois em texto em
  * `configuracoes_sistema` — a JM e a Preview tinham os dois sem nunca terem usado.
  * O Contact2Sale saiu (desligado em 21/10; a rota de entrada já respondia 404) e
- * as linhas foram apagadas (06, seção 13). O token de portal passa a nascer quando
- * o módulo Imóveis é instalado, cifrado em `empresa_segredos` — primeira migração
- * da viagem. Até lá a tela mostra os endereços sem token.
+ * as linhas foram apagadas (06, seção 13). O token de portal nasce quando o módulo
+ * Imóveis é instalado, cifrado em `empresa_segredos` (primeira migração da viagem);
+ * esta tela só o lê, para o dono configurar o portal e o site.
  */
 export default async function IntegracoesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -44,6 +45,9 @@ export default async function IntegracoesPage() {
 
   // Portais e site do imóvel: quando o módulo Imóveis está ligado para a empresa (22/10/2026).
   const portais = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId)).has('/imoveis')
+  // O token nasce na instalação do Imóveis, cifrado (lib/portal-token.ts); aqui só é LIDO,
+  // e só por quem já passou pela trava de Configurações (dono ou admin).
+  const tokenPortal = portais ? await getPortalToken(svc, empresaId) : null
 
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 
@@ -51,6 +55,7 @@ export default async function IntegracoesPage() {
     <IntegracoesView
       slug={empresa?.slug ?? ''}
       portais={portais}
+      tokenPortal={tokenPortal}
       feedUrlInicial={cfg?.feed_url ?? ''}
       ultimaImportacao={cfg?.ultima_importacao ?? null}
       appId={process.env.NEXT_PUBLIC_META_APP_ID ?? ''}

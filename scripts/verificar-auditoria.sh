@@ -570,6 +570,16 @@ v "instalar so de dono ou admin"        "app/api/modulos/instalar/route.ts" "req
 v "trava de plano no servidor"          "app/api/modulos/instalar/route.ts" "estado.tipo === 'pago'"
 v "atender pedido so do superadmin"     "app/api/superadmin/modulos/pedidos/[id]/route.ts" "requireSuperAdminApi()"
 v "recusar fica no log"                 "app/api/superadmin/modulos/pedidos/[id]/route.ts" "acao: 'recusar_pedido_modulo'"
+# Primeira migracao da viagem (23/10/2026): recusar marca status e nao apaga; o token de
+# portal nasce cifrado (empresa_segredos) na instalacao do Imoveis, pelos dois caminhos.
+n "recusar nao apaga o pedido"          "app/api/superadmin/modulos/pedidos/[id]/route.ts" ".delete()"
+v "recusar marca recusado"              "app/api/superadmin/modulos/pedidos/[id]/route.ts" "status: 'recusado'"
+v "pedido aberto e o pendente"          "app/api/modulos/pedido/route.ts" ".eq('status', 'pendente')"
+v "segredo da empresa vai cifrado"      "lib/empresa-segredos.ts" "valor_cifrado: encryptCredenciais({ valor })"
+v "token de portal nasce no imoveis"    "lib/modulos-instalacao.ts" "if (chave === 'imoveis')"
+v "central prepara o modulo instalado"  "app/api/modulos/instalar/route.ts" "aoInstalarModulo(svc, ctx.empresaId, modulo.chave)"
+v "superadmin prepara o que atende"     "app/api/superadmin/modulos/pedidos/[id]/route.ts" "aoInstalarModulo(svc, pedido.empresa_id, modulo.chave)"
+v "portal le o token do cofre"          "lib/portal-token.ts" "lerSegredo(svc, empresaId, CHAVE_PORTAL)"
 v "trava ve a central de modulos"       "proxy.ts" "instaladosDoManifesto(modulos"
 v "menu ve a central de modulos"        "lib/empresa-config.ts" "instalados: instaladosDoManifesto(cfg.modulos)"
 v "vitrine aponta para o tile"          "components/modulos/vitrine.tsx" "/modulos?m="

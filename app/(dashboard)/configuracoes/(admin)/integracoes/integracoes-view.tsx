@@ -34,10 +34,12 @@ function UrlLinha({ label, url, onCopy }: { label: string; url: string; onCopy: 
   )
 }
 
-export default function IntegracoesView({ slug, portais, feedUrlInicial, ultimaImportacao, appId }: {
+export default function IntegracoesView({ slug, portais, tokenPortal = null, feedUrlInicial, ultimaImportacao, appId }: {
   slug: string; feedUrlInicial: string; ultimaImportacao: string | null
   /** O módulo Imóveis está ligado: mostra portais, site e importação. */
   portais: boolean
+  /** Token de portal e site (nasce na instalação do Imóveis). Null = ainda não gerado. */
+  tokenPortal?: string | null
   /** App ID da Meta — público, roda no navegador dentro do conector oficial. */
   appId: string
 }) {
@@ -138,6 +140,9 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
               <div className="space-y-2">
                 <UrlLinha label="ENVIAR IMÓVEIS →" url={feedUrl} onCopy={() => copiar(feedUrl, 'URL do feed copiada!')} />
                 <UrlLinha label="← RECEBER LEADS" url={leadsUrl} onCopy={() => copiar(leadsUrl, 'URL de leads copiada!')} />
+                {tokenPortal
+                  ? <UrlLinha label="TOKEN (Bearer)" url={`•••••••• ${tokenPortal.slice(-4)}`} onCopy={() => copiar(tokenPortal, 'Token copiado!')} />
+                  : <p className="text-[11.5px] text-bad">O token ainda não foi gerado: reinstale o módulo Imóveis na Central de Módulos.</p>}
               </div>
               <p className="mt-2 text-[11.5px] text-ink-3">No Canal Pro (Grupo OLX): cole a 1ª em “integração de imóveis” e a 2ª em “receber leads no CRM”. Os leads chegam com o token do módulo Imóveis no cabeçalho <code>Authorization: Bearer</code>, nunca na URL.</p>
             </IntegracaoCard>

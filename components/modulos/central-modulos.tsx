@@ -57,7 +57,8 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
         notify.ok('Pedido enviado.')
         return
       }
-      notify.ok(instalar ? `${t.nome} instalado.` : `${t.nome} desinstalado.`)
+      if (j.aviso) notify.warn(j.aviso)
+      else notify.ok(instalar ? `${t.nome} instalado.` : `${t.nome} desinstalado.`)
       setTirar(null)
       router.refresh()
     } finally {

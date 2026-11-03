@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { COOKIE_VERSAO_MODULOS, moduloPorChave } from '@/core/modulos'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { estadoDoModulo } from '@/lib/modulos-central'
+import { aoInstalarModulo } from '@/lib/modulos-instalacao'
 
 /**
  * INSTALAR / DESINSTALAR UM MÓDULO PELA CENTRAL (22/10/2026).
@@ -58,13 +59,17 @@ export async function POST(req: Request) {
       })
   if (error) return NextResponse.json({ error: 'Não foi possível gravar. Tente de novo.' }, { status: 500 })
 
-  // Instalar atende o pedido em aberto do mesmo módulo, se houver.
+  // Instalar atende o pedido pendente do mesmo módulo, se houver, e prepara o que o
+  // módulo precisa (o token de portal do Imóveis — lib/modulos-instalacao.ts).
+  let aviso: string | undefined
   if (instalar) {
-    await svc.from('modulo_pedidos').update({ atendido_em: agora, atendido_por: ctx.userId })
-      .eq('empresa_id', ctx.empresaId).eq('modulo', modulo.href).is('atendido_em', null)
+    await svc.from('modulo_pedidos').update({ status: 'atendido', atendido_em: agora, atendido_por: ctx.userId })
+      .eq('empresa_id', ctx.empresaId).eq('modulo', modulo.href).eq('status', 'pendente')
+    const preparo = await aoInstalarModulo(svc, ctx.empresaId, modulo.chave)
+    if (preparo.error) aviso = `${modulo.nome} foi instalado, mas não terminou de preparar. Tente instalar de novo.`
   }
 
-  const res = NextResponse.json({ ok: true, instalado: instalar })
+  const res = NextResponse.json({ ok: true, instalado: instalar, ...(aviso ? { aviso } : {}) })
   // A trava do proxy guarda os módulos por um minuto; com a versão nova no cookie,
   // quem mudou vê a rota certa já no próximo clique.
   res.cookies.set(COOKIE_VERSAO_MODULOS, String(Date.now()), { path: '/', sameSite: 'lax', httpOnly: true, secure: true, maxAge: 120 })

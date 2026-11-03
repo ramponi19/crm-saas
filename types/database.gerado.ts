@@ -160,6 +160,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "orcamentos_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
       columns: ["troca_cotacao_id"]
 isOneToOne: false
@@ -320,6 +326,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "troca_cotacoes_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "troca_cotacoes_usuario_id_fkey"
       columns: ["usuario_id"]
 isOneToOne: false
@@ -462,6 +474,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "avaliacoes_usados_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "avaliacoes_usados_unidade_id_fkey"
       columns: ["unidade_id"]
 isOneToOne: false
@@ -570,6 +588,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "cadencia_inscricoes_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "cadencia_inscricoes_negocio_id_fkey"
       columns: ["negocio_id"]
 isOneToOne: false
@@ -581,6 +605,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cadencia_inscricoes_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"cadencia_passos": {
@@ -747,6 +777,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "chamadas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"chat_leituras": {
@@ -1142,6 +1178,32 @@ isOneToOne: false
       columns: ["instalado_por"]
 isOneToOne: false
       referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"empresa_segredos": {
+                  Row: {
+                    "atualizado_em": string,"chave": string,"criado_em": string,"empresa_id": number,"valor_cifrado": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string,"chave": string,"criado_em"?: string,"empresa_id": number,"valor_cifrado": string
+                  }
+                  Update: {
+                    "atualizado_em"?: string,"chave"?: string,"criado_em"?: string,"empresa_id"?: number,"valor_cifrado"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "empresa_segredos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "empresa_segredos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "v_empresas_plano"
       referencedColumns: ["id"]
     }
                   ]
@@ -1567,6 +1629,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "inventario_unidades_reservado_lead_id_fkey"
+      columns: ["reservado_lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"estoque_veiculo_dados": {
@@ -2063,6 +2131,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"imoveis_perfis_busca": {
@@ -2119,6 +2193,12 @@ isOneToOne: true
 isOneToOne: true
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "lead_perfil_busca_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: true
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"integracao_eventos": {
@@ -2157,6 +2237,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "integracao_eventos_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"itens": {
@@ -2383,14 +2469,14 @@ isOneToOne: false
                   ]
                 },"modulo_pedidos": {
                   Row: {
-                    "atendido_em": string | null,"atendido_por": string | null,"empresa_id": number,"id": number,"modulo": string,"pedido_em": string,"pedido_por": string | null
+                    "atendido_em": string | null,"atendido_por": string | null,"empresa_id": number,"id": number,"modulo": string,"pedido_em": string,"pedido_por": string | null,"recusado_em": string | null,"recusado_por": string | null,"status": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id": number,"id"?: never,"modulo": string,"pedido_em"?: string,"pedido_por"?: string | null
+                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id": number,"id"?: never,"modulo": string,"pedido_em"?: string,"pedido_por"?: string | null,"recusado_em"?: string | null,"recusado_por"?: string | null,"status"?: string
                   }
                   Update: {
-                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id"?: number,"id"?: never,"modulo"?: string,"pedido_em"?: string,"pedido_por"?: string | null
+                    "atendido_em"?: string | null,"atendido_por"?: string | null,"empresa_id"?: number,"id"?: never,"modulo"?: string,"pedido_em"?: string,"pedido_por"?: string | null,"recusado_em"?: string | null,"recusado_por"?: string | null,"status"?: string
                   }
                   Relationships: [
                     {
@@ -2414,6 +2500,12 @@ isOneToOne: false
     },{
       foreignKeyName: "modulo_pedidos_pedido_por_fkey"
       columns: ["pedido_por"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "modulo_pedidos_recusado_por_fkey"
+      columns: ["recusado_por"]
 isOneToOne: false
       referencedRelation: "usuarios"
       referencedColumns: ["id"]
@@ -2487,6 +2579,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "negocio_historico_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     },{
       foreignKeyName: "negocio_historico_para_etapa_id_fkey"
       columns: ["para_etapa_id"]
@@ -2732,6 +2830,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "rastreamento_eventos_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "rastreamento_eventos_visita_id_fkey"
       columns: ["visita_id"]
 isOneToOne: false
@@ -2801,6 +2905,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rastreamento_visitas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     },{
       foreignKeyName: "rastreamento_visitas_link_id_fkey"
       columns: ["link_id"]
@@ -2936,6 +3046,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "tarefas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "tarefas_negocio_id_fkey"
       columns: ["negocio_id"]
 isOneToOne: false
@@ -2947,6 +3063,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tarefas_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     },{
       foreignKeyName: "tarefas_responsavel_id_fkey"
       columns: ["responsavel_id"]
@@ -3273,6 +3395,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_financiamento_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"vendas_pagamentos": {
@@ -3485,6 +3613,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "propostas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"vendas_termos": {
@@ -3707,6 +3841,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"zapintel_conversa_cache": {
@@ -3747,6 +3887,12 @@ isOneToOne: true
 isOneToOne: true
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "zapintel_lead_perfil_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: true
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"zapintel_midia_retida": {
@@ -3788,6 +3934,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "zapintel_venda_lead_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "zapintel_venda_lead_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: true
@@ -3800,20 +3952,6 @@ isOneToOne: true
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     }
-                  ]
-                },"zz_antes": {
-                  Row: {
-                    "id": number | null,"lead_id": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "id"?: number | null,"lead_id"?: number | null
-                  }
-                  Update: {
-                    "id"?: number | null,"lead_id"?: number | null
-                  }
-                  Relationships: [
-                    
                   ]
                 }
           }
@@ -3860,6 +3998,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "avaliacoes_usados_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     },{
       foreignKeyName: "avaliacoes_usados_unidade_id_fkey"
       columns: ["unidade_id"]
@@ -4326,6 +4470,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_financiamento_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"fipe_consultas": {
@@ -4610,6 +4760,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "inventario_unidades_reservado_lead_id_fkey"
+      columns: ["reservado_lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"lancamentos_financeiros": {
@@ -4712,6 +4868,12 @@ isOneToOne: true
 isOneToOne: true
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "lead_perfil_busca_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: true
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"leads": {
@@ -4918,6 +5080,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"orcamentos": {
@@ -4974,6 +5142,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orcamentos_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     },{
       foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
       columns: ["troca_cotacao_id"]
@@ -5242,6 +5416,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "propostas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
     }
                   ]
                 },"servicos_reparo": {
@@ -5437,6 +5617,12 @@ isOneToOne: false
       referencedRelation: "negocios"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "troca_cotacoes_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    },{
       foreignKeyName: "troca_cotacoes_usuario_id_fkey"
       columns: ["usuario_id"]
 isOneToOne: false
@@ -5528,7 +5714,19 @@ isOneToOne: true
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "mensagens_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mensagens_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "v_empresas_plano"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"veiculo_dados": {
                   Row: {
@@ -5721,7 +5919,7 @@ isOneToOne: false
 { Args: { "p_empresa": number,"p_modulo": string }; Returns: boolean
                            },
 "core_negocio_do_canal":
-{ Args: { "p_contato": number,"p_empresa": number,"p_filial": number,"p_primeira_msg"?: string,"p_so_existente"?: boolean }; Returns: number
+{ Args: { "p_contato": number,"p_empresa": number,"p_filial": number,"p_origem"?: string,"p_origem_id"?: string,"p_primeira_msg"?: string,"p_so_existente"?: boolean }; Returns: number
                            },
 "core_registro_resumo":
 { Args: { "p_empresa"?: number,"p_modulo": string,"p_registro_id": number }; Returns: Json
@@ -5779,6 +5977,9 @@ isOneToOne: false
                            },
 "set_super_admin":
 { Args: { "p_target": string,"p_value": boolean }; Returns: undefined
+                           },
+"webhook_mid_novo":
+{ Args: { "p_conta": string,"p_mid": string }; Returns: boolean
                            },
 "webhook_reenvio":
 { Args: { "p_conta": string,"p_gravar": boolean,"p_hash": string,"p_tamanho": number }; Returns: boolean
@@ -5843,8 +6044,23 @@ isOneToOne: false
 "zapintel_leads_lista":
 { Args: { "p_empresa"?: number,"p_filial"?: number,"p_filtros"?: Json,"p_ordem"?: string,"p_pagina"?: number,"p_por_pagina"?: number,"p_versao"?: string }; Returns: Json
                            },
+"zapintel_mensagens":
+{ Args: { "p_emp": number }; Returns: {
+              "contato_id": number,"conteudo": string,"created_at": string,"direcao": string,"empresa_id": number,"filial_id": number,"id": number,"lead_id": number,"origem": string,"tipo": string,"transcricao": string,"usuario_id": string
+            }[]
+                           },
+"zapintel_negocios":
+{ Args: { "p_emp": number }; Returns: {
+              "ativo": boolean,"contato_id": number,"convertido_em": number,"created_at": string,"empresa_id": number,"filial_id": number,"funil_id": number,"id": number,"kanban_status": string,"nome": string,"origem": string,"origem_id": string,"produto_interessado": string,"responsavel_desde": string,"responsavel_id": string,"telefone": string
+            }[]
+                           },
 "zapintel_posvenda":
 { Args: { "p_empresa"?: number,"p_filial"?: number }; Returns: Json
+                           },
+"zapintel_principal":
+{ Args: { "p_emp": number }; Returns: {
+              "contato_id": number,"filial_id": number,"id": number
+            }[]
                            },
 "zapintel_resumo":
 { Args: { "p_empresa"?: number }; Returns: Json

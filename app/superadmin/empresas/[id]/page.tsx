@@ -85,7 +85,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   // /superadmin/pedidos.
   const { data: pedidosRaw } = await svc.from('modulo_pedidos')
     .select('id, modulo, pedido_em, usuario:usuarios!modulo_pedidos_pedido_por_fkey(nome)')
-    .eq('empresa_id', empresaId).is('atendido_em', null).order('pedido_em')
+    .eq('empresa_id', empresaId).eq('status', 'pendente').order('pedido_em')
   const pedidos = (pedidosRaw ?? []) as unknown as Array<{ id: number; modulo: string; pedido_em: string; usuario: { nome: string | null } | null }>
 
   // Usuários membros
