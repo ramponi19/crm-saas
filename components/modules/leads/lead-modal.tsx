@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, UserCheck, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines, AlertTriangle, RotateCcw } from 'lucide-react'
+import { Send, UserCheck, Merge, Trash2, UserRound, X, Paperclip, Mic, Square, Loader2, Clock, FileText, Megaphone, Instagram, Play, AudioLines, AlertTriangle, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
@@ -24,6 +24,7 @@ import { formatarTextoChat } from '@/lib/texto-whatsapp'
 import { EmojiPicker } from './emoji-picker'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
+import { FundirContatoModal } from './fundir-contato-modal'
 import { useRouter } from 'next/navigation'
 import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
@@ -582,6 +583,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`
   }, [draft])
   const [confirmDel, setConfirmDel] = useState(false)
+  const [fundindo, setFundindo] = useState(false)
   const [movendoEtapa, setMovendoEtapa] = useState(false)
   /** Etapa de perda escolhida, esperando motivo + justificativa. */
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null)
@@ -1424,6 +1426,11 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               : <span key={o.filialId} title={titulo} className={estilo}>{rotulo}</span>
           })}
           <div className="flex-1" />
+          {gereLojas && (
+            <Button variant="ghost" size="sm" onClick={() => setFundindo(true)} disabled={saving} icon={<Merge size={15} strokeWidth={1.7} />}>
+              Fundir contato
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleConvert} disabled={saving} icon={<UserCheck size={15} strokeWidth={1.7} />}>
             Converter em cliente
           </Button>
@@ -1846,6 +1853,18 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
           loading={salvandoPerda}
           onConfirm={confirmarPerda}
           onCancel={() => setPerdaPendente(null)}
+        />
+      )}
+
+      {/* Fundir com outro contato (classe 2 dos duplicados). Depois da fusão a
+          página recarrega no mesmo lead: a conversa e o quadro passam a ter o
+          que veio do contato que saiu. */}
+      {fundindo && (
+        <FundirContatoModal
+          contatoId={card.contatoId}
+          nomeAtual={form.nome || lead.nome || 'este contato'}
+          onClose={() => setFundindo(false)}
+          onFundido={() => { window.location.assign(new URL(`/leads?lead=${lead.id}`, window.location.origin).toString()) }}
         />
       )}
 
