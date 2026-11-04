@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 /**
  * Biblioteca de documentos da loja (contrato de venda, termo de garantia…).
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
 
   const incluirArquivados = new URL(req.url).searchParams.get('arquivados') === '1'
   let q = supabase
-    .from('contrato_documentos')
+    .from('vendas_contrato_documentos')
     .select('id, nome, arquivado, created_at, updated_at')
     .eq('empresa_id', empresaId)
   if (!incluirArquivados) q = q.eq('arquivado', false)
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
   // Versão ativa e nº de páginas de cada documento, numa consulta só.
   const ids = (data ?? []).map((d) => d.id as number)
   const versoes = ids.length
-    ? (await supabase.from('contrato_modelos')
+    ? (await supabase.from('vendas_contrato_modelos')
         .select('documento_id, versao, paginas')
         .in('documento_id', ids).eq('ativo', true)).data ?? []
     : []
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   if (!nome) return NextResponse.json({ error: 'Dê um nome ao documento' }, { status: 400 })
 
   const { data, error } = await supabase
-    .from('contrato_documentos')
+    .from('vendas_contrato_documentos')
     .insert({ empresa_id: empresaId, nome, criado_por: userId } as never)
     .select('id, nome').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -94,7 +95,7 @@ export async function DELETE(req: Request) {
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Documento inválido' }, { status: 400 })
 
   const { count: emitidos } = await supabase
-    .from('contratos_venda').select('*', { count: 'exact', head: true })
+    .from('vendas_contratos').select('*', { count: 'exact', head: true })
     .eq('documento_id', id)
   if ((emitidos ?? 0) > 0 && body.cienteDasEmissoes !== true) {
     return NextResponse.json({
@@ -105,7 +106,7 @@ export async function DELETE(req: Request) {
 
   // Reúne os fundos de TODAS as versões antes de apagar as linhas.
   const { data: versoes } = await supabase
-    .from('contrato_modelos').select('paginas').eq('documento_id', id)
+    .from('vendas_contrato_modelos').select('paginas').eq('documento_id', id)
   const caminhos: string[] = []
   for (const v of (versoes ?? []) as { paginas: unknown }[]) {
     for (const p of (Array.isArray(v.paginas) ? v.paginas : []) as { fundo_url?: string | null }[]) {
@@ -117,9 +118,10 @@ export async function DELETE(req: Request) {
     }
   }
 
-  const { error } = await supabase
-    .from('contrato_documentos').delete().eq('id', id).eq('empresa_id', empresaId)
+  const { data: apagou, error } = await supabase
+    .from('vendas_contrato_documentos').delete().eq('id', id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   // Best-effort: o documento já foi. Falhar aqui só deixa imagem órfã.
   let fundosRemovidos = 0
@@ -153,10 +155,11 @@ export async function PATCH(req: Request) {
 
   // Filtra por empresa junto do id: sem isso, um id de outro tenant passaria
   // pela RLS de UPDATE apenas por sorte da policy.
-  const { error } = await supabase
-    .from('contrato_documentos').update(campos as never)
-    .eq('id', id).eq('empresa_id', empresaId)
+  const { data: gravou, error } = await supabase
+    .from('vendas_contrato_documentos').update(campos as never)
+    .eq('id', id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   return NextResponse.json({ ok: true })
 }

@@ -11,7 +11,7 @@ export default async function ContratosPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const { data: docs } = await supabase
-    .from('contrato_documentos')
+    .from('vendas_contrato_documentos')
     .select('id, nome, arquivado, updated_at')
     .eq('empresa_id', empresaId).eq('arquivado', false)
     .order('nome')
@@ -19,10 +19,10 @@ export default async function ContratosPage() {
   const ids = (docs ?? []).map((d) => d.id as number)
   const [{ data: versoes }, { data: emitidos }] = await Promise.all([
     ids.length
-      ? supabase.from('contrato_modelos').select('documento_id, versao, paginas')
+      ? supabase.from('vendas_contrato_modelos').select('documento_id, versao, paginas')
           .in('documento_id', ids).eq('ativo', true)
       : Promise.resolve({ data: [] }),
-    supabase.from('contratos_venda').select('documento_id').eq('empresa_id', empresaId),
+    supabase.from('vendas_contratos').select('documento_id').eq('empresa_id', empresaId),
   ])
 
   const porDoc = new Map<number, { versao: number; paginas: number }>()

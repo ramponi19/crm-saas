@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { Json } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Item { descricao: string; qtd: number; valor: number }
 
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const body = await req.json().catch(() => ({})) as { cliente_nome?: string; lead_id?: number | null; itens?: unknown; observacoes?: string }
   const { itens, total } = normalizar(body.itens)
-  const { data, error } = await supabase.from('propostas').insert({
+  const { data, error } = await supabase.from('vendas_propostas').insert({
     empresa_id: empresaId,
     cliente_nome: (body.cliente_nome ?? '').trim(),
     lead_id: body.lead_id ?? null,
@@ -43,8 +44,9 @@ export async function PATCH(req: Request) {
   if (body.status && ['rascunho', 'enviada', 'aceita', 'recusada'].includes(body.status)) patch.status = body.status
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nada a atualizar' }, { status: 400 })
 
-  const { error } = await supabase.from('propostas').update(patch as never).eq('id', body.id).eq('empresa_id', empresaId)
+  const { data: gravou, error } = await supabase.from('vendas_propostas').update(patch as never).eq('id', body.id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
 
@@ -52,7 +54,8 @@ export async function DELETE(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const body = await req.json().catch(() => ({})) as { id?: number }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
-  const { error } = await supabase.from('propostas').delete().eq('id', body.id).eq('empresa_id', empresaId)
+  const { data: apagou, error } = await supabase.from('vendas_propostas').delete().eq('id', body.id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

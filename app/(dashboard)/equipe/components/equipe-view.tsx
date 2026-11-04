@@ -9,6 +9,7 @@ import { JANELA_ONLINE_MIN } from '@/lib/presenca'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -263,12 +264,13 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
     const existing = metas[uid] as Meta | undefined
 
     if (existing?.id) {
-      const { error } = await supabase.from('metas_comissoes').update({
+      const { data: gravou, error } = await supabase.from('metas_comissoes').update({
         meta_vendas_valor: meta.meta_vendas_valor ?? null,
         meta_vendas_qtd: meta.meta_vendas_qtd ?? null,
         percentual_comissao_padrao: meta.percentual_comissao_padrao ?? null,
-      }).eq('id', existing.id)
+      }).eq('id', existing.id).select('id')
       if (error) { notify.bad('Erro ao salvar'); setSaving(null); return }
+      if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(null); return }
     } else {
       const { error } = await supabase.from('metas_comissoes').insert({
         usuario_id: uid, mes_ano: mes,
@@ -369,7 +371,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
       supabase.from('vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
-      supabase.from('comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
+      supabase.from('vendas_comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
       // Aparelhos aceitos em troca que ainda não chegaram na loja. Cada um segura
       // a comissão do fechamento inteiro que o trouxe — não só da primeira linha,
       // porque o PDV cria uma venda por item do carrinho.
@@ -395,7 +397,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     if (!empresa_id) { notify.bad('Empresa não encontrada'); setQuitando(null); return }
     // já quitado neste mês de referência? evita dupla quitação
     if (pagas.some(p => p.usuario_id === uid)) { notify.warn('Comissão já quitada neste mês'); setQuitando(null); return }
-    const { error } = await supabase.from('comissoes').insert({
+    const { error } = await supabase.from('vendas_comissoes').insert({
       usuario_id: uid, valor_comissao: valorComissao, percentual, mes_referencia: mes,
       status: 'pago', data_pagamento: new Date().toISOString().split('T')[0], empresa_id,
     })

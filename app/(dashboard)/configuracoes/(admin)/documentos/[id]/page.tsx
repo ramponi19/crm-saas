@@ -18,16 +18,16 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
 
   // Filtra por empresa junto do id: id de outro tenant devolve 404, não erro.
   const { data: doc } = await supabase
-    .from('contrato_documentos')
+    .from('vendas_contrato_documentos')
     .select('id, nome')
     .eq('id', documentoId).eq('empresa_id', empresaId)
     .maybeSingle()
   if (!doc) notFound()
 
   const [{ data: modelo }, { count: emitidos }, garantia] = await Promise.all([
-    supabase.from('contrato_modelos').select('versao, paginas')
+    supabase.from('vendas_contrato_modelos').select('versao, paginas')
       .eq('documento_id', documentoId).eq('ativo', true).maybeSingle(),
-    supabase.from('contratos_venda').select('*', { count: 'exact', head: true })
+    supabase.from('vendas_contratos').select('*', { count: 'exact', head: true })
       .eq('documento_id', documentoId),
     garantiaPadraoLoja(supabase, empresaId!),
   ])

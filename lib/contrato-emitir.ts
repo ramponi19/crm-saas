@@ -40,8 +40,8 @@ export interface DocumentoDisponivel { id: number; nome: string }
 
 export async function documentosDisponiveis(supabase: Client, empresaId: number): Promise<DocumentoDisponivel[]> {
   const { data } = await supabase
-    .from('contrato_documentos')
-    .select('id, nome, contrato_modelos!inner(id)')
+    .from('vendas_contrato_documentos')
+    .select('id, nome, contrato_modelos:vendas_contrato_modelos!inner(id)')
     .eq('empresa_id', empresaId).eq('arquivado', false)
     .eq('contrato_modelos.ativo', true)
     .order('nome')
@@ -51,7 +51,7 @@ export async function documentosDisponiveis(supabase: Client, empresaId: number)
 /** Versao ativa de UM documento. */
 export async function modeloAtivo(supabase: Client, documentoId: number): Promise<ModeloContrato | null> {
   const { data } = await supabase
-    .from('contrato_modelos')
+    .from('vendas_contrato_modelos')
     .select('id, versao, paginas')
     .eq('documento_id', documentoId).eq('ativo', true)
     .maybeSingle()
@@ -271,7 +271,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
 
   const html = renderizarModelo(modelo, dados)
 
-  const { error } = await supabase.from('contratos_venda').insert({
+  const { error } = await supabase.from('vendas_contratos').insert({
     empresa_id: input.empresaId,
     cliente_id: input.clienteId,
     venda_ids: input.vendaIds,
@@ -308,7 +308,7 @@ export interface ContratoArquivado { id: number; nome: string | null; html: stri
 /** Todos os documentos JA emitidos para esta venda — a 2a via de cada um. */
 export async function contratosDaVenda(supabase: Client, vendaId: number): Promise<ContratoArquivado[]> {
   const { data } = await supabase
-    .from('contratos_venda')
+    .from('vendas_contratos')
     .select('id, nome_documento, html, created_at')
     .contains('venda_ids', [vendaId])
     .order('created_at', { ascending: true })

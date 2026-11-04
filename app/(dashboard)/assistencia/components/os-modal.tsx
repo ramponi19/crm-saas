@@ -7,6 +7,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { comNome } from '@/lib/sem-nome'
 
 interface Cobranca {
@@ -211,7 +212,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   async function marcarPronto() {
     if (!os?.id) return
     setMarcandoPronto(true)
-    const { error } = await supabase.from('garantias_assistencias').update({ status: 'pronto' }).eq('id', os.id)
+    const { data: marcou, error } = await supabase.from('assistencia_garantias').update({ status: 'pronto' }).eq('id', os.id).select('id')
+    // 0 linhas: a OS sumiu ou saiu da vista — nem tarefa de aviso, nem "pronta" na tela.
+    if (!error && nadaGravado(marcou)) { setMarcandoPronto(false); notify.bad('Erro ao marcar', NADA_GRAVADO); return }
     if (!error && empresaId) {
       // Aviso "pronto para retirada" = TAREFA interna (Meta-safe: não envia mensagem).
       await supabase.from('tarefas').insert({
@@ -228,7 +231,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
     if (!empresaId) return
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
     supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
-    supabase.from('servicos_reparo').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
+    supabase.from('assistencia_servicos').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
   }, [empresaId])
 
   function set(field: keyof OS, value: string | boolean | number | null) {
@@ -325,12 +328,13 @@ export default function OSModal({ os, isNew, onClose }: Props) {
       observacoes: form.observacoes,
     }
     if (isNew) {
-      const { error } = await supabase.from('garantias_assistencias').insert(campos as TablesInsert<'garantias_assistencias'>)
+      const { error } = await supabase.from('assistencia_garantias').insert(campos as TablesInsert<'assistencia_garantias'>)
       if (error) { notify.bad('Erro ao criar OS'); setSaving(false); return }
       notify.ok('OS criada!')
     } else {
-      const { error } = await supabase.from('garantias_assistencias').update(campos as TablesUpdate<'garantias_assistencias'>).eq('id', os!.id!)
+      const { data: gravou, error } = await supabase.from('assistencia_garantias').update(campos as TablesUpdate<'assistencia_garantias'>).eq('id', os!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       notify.ok('Salvo!')
     }
     router.refresh(); onClose()

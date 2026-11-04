@@ -36,7 +36,7 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
 
   const carregar = useCallback(async () => {
     const { data } = await supabase
-      .from('fichas_financiamento')
+      .from('vendas_fichas_financiamento')
       .select('id, banco, valor, entrada, parcelas, taxa, status')
       .eq('lead_id', leadId).order('created_at', { ascending: false })
     setFichas((data ?? []) as Ficha[])
@@ -50,7 +50,7 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
     if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     if (!form.banco.trim()) { notify.warn('Informe o banco'); return }
     setCriando(true)
-    const { error } = await supabase.from('fichas_financiamento').insert({
+    const { error } = await supabase.from('vendas_fichas_financiamento').insert({
       empresa_id: empresaId, lead_id: leadId, banco: form.banco.trim(),
       valor: num(form.valor), entrada: num(form.entrada), parcelas: num(form.parcelas), taxa: num(form.taxa),
       status: 'enviada',
@@ -63,7 +63,7 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   }
 
   async function mudarStatus(f: Ficha, status: string) {
-    const { data, error } = await supabase.from('fichas_financiamento').update({ status }).eq('id', f.id).select('id')
+    const { data, error } = await supabase.from('vendas_fichas_financiamento').update({ status }).eq('id', f.id).select('id')
     if (error) { notify.bad('Erro ao atualizar'); return }
     if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); carregar(); return }
     if (status === 'negada') notify.warn('Crédito negado', 'Se o lead cair, use o motivo de perda "Crédito negado".')
@@ -72,7 +72,7 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   }
 
   async function excluir(f: Ficha) {
-    const { data, error } = await supabase.from('fichas_financiamento').delete().eq('id', f.id).select('id')
+    const { data, error } = await supabase.from('vendas_fichas_financiamento').delete().eq('id', f.id).select('id')
     if (error) { notify.bad('Erro ao excluir'); return }
     if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); carregar(); return }
     carregar()

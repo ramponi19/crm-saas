@@ -31,7 +31,7 @@ export default async function EquipePage() {
       .gte('data_venda', inicioMes)
       .lt('data_venda', fimMes)
       .eq('status', 'concluida'),
-    supabase.from('comissoes')
+    supabase.from('vendas_comissoes')
       .select('*')
       .eq('empresa_id', empresaId)
       .gte('created_at', inicioMes)

@@ -79,7 +79,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     qLeadsMes,
     qVisitas,
-    supabase.from('propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
+    supabase.from('vendas_propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
     /**
      * Etapas do funil PADRÃO, do banco.
      *

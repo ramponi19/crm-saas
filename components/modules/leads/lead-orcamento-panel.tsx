@@ -76,7 +76,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
      */
     const empresaId = await empresaAtualId(supabase)
     const [{ data }, { data: emp }] = await Promise.all([
-      supabase.from('orcamentos')
+      supabase.from('assistencia_orcamentos')
         // O embed é nomeado pela CONSTRAINT. O hint pela coluna
         // (`!troca_cotacao_id`) também resolve — medido nos dois —, mas o nome da
         // constraint é único por definição, então não passa a ambíguo no dia em

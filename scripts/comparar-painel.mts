@@ -58,7 +58,7 @@ async function antes(db: Db) {
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
     solto.from('inventario_unidades').select('*', head).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
-    solto.from('garantias_assistencias').select('*', head).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
+    solto.from('assistencia_garantias').select('*', head).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
     aplicarEscopo(solto.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
   ])
   type V = { id: number; valor_venda: number; lucro: number | null; data_venda: string | null; canal_venda: string | null; status: string | null; produtos: { nome: string | null } | null }

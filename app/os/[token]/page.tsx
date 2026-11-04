@@ -13,7 +13,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
   const { token } = await params
   const svc = createServiceClient()
   const { data } = await svc
-    .from('garantias_assistencias')
+    .from('assistencia_garantias')
     .select('id, protocolo, defeito_relatado, parecer_tecnico, orcamento_valor, status, aprovado_em, recusado_em, created_at, produtos(nome), clientes(nome), empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
     .eq('token', token).maybeSingle()
 

@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Informe o documento' }, { status: 400 })
   }
   const { data, error } = await supabase
-    .from('contrato_modelos')
+    .from('vendas_contrato_modelos')
     .select('id, versao, paginas, created_at')
     .eq('empresa_id', empresaId).eq('documento_id', documentoId).eq('ativo', true)
     .maybeSingle()
@@ -77,18 +77,18 @@ export async function POST(req: Request) {
   }
 
   const { data: ult } = await supabase
-    .from('contrato_modelos').select('versao')
+    .from('vendas_contrato_modelos').select('versao')
     .eq('documento_id', documentoId).order('versao', { ascending: false }).limit(1).maybeSingle()
   const versao = ((ult?.versao as number | undefined) ?? 0) + 1
 
   // Desativa a anterior ANTES de inserir: o índice único de "um ativo por
   // empresa" recusaria as duas ativas ao mesmo tempo.
   const { error: eOff } = await supabase
-    .from('contrato_modelos').update({ ativo: false }).eq('documento_id', documentoId).eq('ativo', true)
+    .from('vendas_contrato_modelos').update({ ativo: false }).eq('documento_id', documentoId).eq('ativo', true)
   if (eOff) return NextResponse.json({ error: eOff.message }, { status: 500 })
 
   const { data, error } = await supabase
-    .from('contrato_modelos')
+    .from('vendas_contrato_modelos')
     .insert({ empresa_id: empresaId, documento_id: documentoId, versao, paginas, ativo: true, criado_por: userId } as never)
     .select('id, versao').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

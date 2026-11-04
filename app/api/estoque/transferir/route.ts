@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { createServiceClient } from '@/lib/supabase/service'
 import { rotuloDaFilial } from '@/lib/filiais'
 
 /**
@@ -19,6 +20,15 @@ import { rotuloDaFilial } from '@/lib/filiais'
  * O rastro fica em `movimentacao_estoque` com DUAS linhas: a saída pertence à
  * loja de origem e a entrada à de destino. Uma linha só ficaria visível a apenas
  * uma das lojas — a outra veria a peça sumir sem explicação.
+ *
+ * QUEM TRANSFERE (decisão do Lucas, 04/11/2026): dono e admin, de qualquer loja
+ * que enxergam para qualquer outra loja ativa da empresa; vendedor não transfere.
+ * Até 04/11 a gravação ia pelo cliente do usuário, e o WITH CHECK de
+ * `estoque_unidades` (filial dentro de `filiais_visiveis()`) barrava o UPDATE
+ * sempre que havia uma loja escolhida no topo: a peça saía para uma loja fora da
+ * vista. Só funcionava em "Rede". Agora a LEITURA continua pela RLS — só se move o
+ * que a pessoa enxerga — e a GRAVAÇÃO (a unidade e as duas linhas do histórico)
+ * vai pelo cliente de serviço, presa à empresa da sessão e aos ids já lidos.
  */
 
 /** Só o que está na prateleira viaja. Reservado, vendido ou em reparo, não. */
@@ -39,7 +49,9 @@ export async function POST(req: NextRequest) {
   if (ids.length === 0) return NextResponse.json({ error: 'Nenhuma unidade selecionada.' }, { status: 400 })
   if (!Number.isFinite(destinoId) || destinoId <= 0) return NextResponse.json({ error: 'Loja de destino inválida.' }, { status: 400 })
 
-  const { data: destino } = await supabase
+  const svc = createServiceClient()
+  // Destino: qualquer loja ATIVA da empresa da sessão, mesmo fora da vista de quem transfere.
+  const { data: destino } = await svc
     .from('filiais').select('id, nome, cidade')
     .eq('id', destinoId).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle()
   if (!destino) return NextResponse.json({ error: 'Loja de destino não encontrada nesta rede.' }, { status: 404 })
@@ -90,7 +102,7 @@ export async function POST(req: NextRequest) {
    * cliques, ou duas pessoas ao mesmo tempo, não transferem duas vezes nem
    * atropelam uma venda que aconteceu no meio.
    */
-  const { data: movidas, error: erroUpdate } = await supabase
+  const { data: movidas, error: erroUpdate } = await svc
     .from('inventario_unidades')
     .update({
       filial_id: destinoId,
@@ -135,7 +147,7 @@ export async function POST(req: NextRequest) {
    * histórico é ruim; reverter a unidade e deixar o físico e o sistema em
    * desacordo é pior.
    */
-  const { error: erroMov } = await supabase.from('estoque_movimentacoes').insert(linhas)
+  const { error: erroMov } = await svc.from('estoque_movimentacoes').insert(linhas)
 
   return NextResponse.json({
     ok: true,

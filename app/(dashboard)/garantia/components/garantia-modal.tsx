@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import type { TablesInsert } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
 
@@ -99,15 +100,16 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
       tipo: 'garantia',
       empresa_id: empresaId,
       protocolo: payload.protocolo || `GAR-${Date.now().toString().slice(-6)}`,
-    } as TablesInsert<'garantias_assistencias'>
+    } as TablesInsert<'assistencia_garantias'>
 
     if (isNew) {
-      const { error } = await supabase.from('garantias_assistencias').insert(data)
+      const { error } = await supabase.from('assistencia_garantias').insert(data)
       if (error) { notify.bad('Erro ao criar protocolo'); setSaving(false); return }
       notify.ok('Protocolo criado!')
     } else {
-      const { error } = await supabase.from('garantias_assistencias').update(data).eq('id', garantia!.id!)
+      const { data: gravou, error } = await supabase.from('assistencia_garantias').update(data).eq('id', garantia!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar'); setSaving(false); return }
+      if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       notify.ok('Salvo!')
     }
     router.refresh()

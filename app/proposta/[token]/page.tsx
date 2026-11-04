@@ -15,7 +15,7 @@ export default async function PropostaPublicaPage({ params }: { params: Promise<
   // Leitura pública pelo token (segredo do link) via service — sem auth.
   const svc = createServiceClient()
   const { data } = await svc
-    .from('propostas')
+    .from('vendas_propostas')
     .select('cliente_nome, itens, observacoes, total, status, created_at, empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
     .eq('token', token)
     .maybeSingle()

@@ -6,9 +6,9 @@
 # Ordem: fluxo de usuário primeiro (card, quadro, inbox, PDV, tarefa). Lote 2 = PDV/encomenda. A Inbox nova (lib/inbox) já nasceu conferindo; marcar lida usa count.
 
 app/(dashboard)/agenda/agenda-view.tsx:268  update visitas  (supabase)
-app/(dashboard)/assistencia/components/os-modal.tsx:214  update garantias_assistencias  (supabase)
-app/(dashboard)/assistencia/components/os-modal.tsx:332  update garantias_assistencias  (supabase)
-app/(dashboard)/assistencia/components/servicos-catalogo.tsx:52  update servicos_reparo  (supabase)
+app/(dashboard)/assistencia/components/os-modal.tsx:214  update garantias_assistencias  (supabase)  >> FEITO lote views-3: marcar pronto com 0 linhas avisa e não cria a tarefa
+app/(dashboard)/assistencia/components/os-modal.tsx:332  update garantias_assistencias  (supabase)  >> FEITO lote views-3
+app/(dashboard)/assistencia/components/servicos-catalogo.tsx:52  update servicos_reparo  (supabase)  >> FEITO lote views-3 (e o remover da linha 62 também)
 app/(dashboard)/cardapio/cardapio-view.tsx:47  update produtos  (supabase)
 app/(dashboard)/cardapio/cardapio-view.tsx:54  update produtos  (supabase)
 app/(dashboard)/cardapio/cardapio-view.tsx:60  update produtos  (supabase)
@@ -22,7 +22,7 @@ app/(dashboard)/clientes/components/cliente-modal-imob.tsx:308  update clientes 
 app/(dashboard)/clientes/components/cliente-modal-imob.tsx:471  update lead_perfil_busca  (supabase)
 app/(dashboard)/clientes/components/cliente-modal.tsx:176  update clientes  (supabase)
 app/(dashboard)/clientes/components/cliente-modal.tsx:185  update clientes  (supabase)
-app/(dashboard)/equipe/components/equipe-view.tsx:266  update metas_comissoes  (supabase)
+app/(dashboard)/equipe/components/equipe-view.tsx:266  update metas_comissoes  (supabase)  >> FEITO lote views-3
 app/(dashboard)/estoque/components/produto-modal.tsx:119  update produtos  (supabase)
 app/(dashboard)/estoque/components/produto-modal.tsx:130  update produtos  (supabase)
 app/(dashboard)/estoque/components/unidade-modal.tsx:120  upsert veiculo_dados  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3); tabela agora estoque_veiculo_dados
@@ -31,7 +31,7 @@ app/(dashboard)/estoque/components/unidade-modal.tsx:149  update inventario_unid
 app/(dashboard)/financeiro/components/financeiro-view.tsx:216  update lancamentos_financeiros  (supabase)  >> FEITO lote views-2: editar lançamento com 0 linhas avisa
 app/(dashboard)/financeiro/components/financeiro-view.tsx:230  delete lancamentos_financeiros  (supabase)  >> FEITO lote views-2: excluir lançamento com 0 linhas avisa
 app/(dashboard)/financeiro/components/financeiro-view.tsx:239  update cobrancas  (supabase)  >> FEITO lote views-2: marcar pago com 0 linhas avisa e não pinta pago
-app/(dashboard)/garantia/components/garantia-modal.tsx:109  update garantias_assistencias  (supabase)
+app/(dashboard)/garantia/components/garantia-modal.tsx:109  update garantias_assistencias  (supabase)  >> FEITO lote views-3
 app/(dashboard)/imoveis/imoveis-view.tsx:178  delete imoveis  (supabase)
 app/(dashboard)/imoveis/imoveis-view.tsx:231  update chaves_imoveis  (supabase)
 app/(dashboard)/imoveis/imoveis-view.tsx:240  update chaves_imoveis  (supabase)
@@ -62,11 +62,11 @@ app/api/cadencias/route.ts:45  update cadencias  (supabase)
 app/api/cadencias/route.ts:54  delete cadencia_passos  (supabase)
 app/api/cadencias/route.ts:74  update cadencia_inscricoes  (supabase)
 app/api/cadencias/route.ts:90  delete cadencias  (supabase)
-app/api/compras/receber/route.ts:45  update vendas  (supabase)
-app/api/compras/receber/route.ts:49  update pedidos_compra  (supabase)
-app/api/contrato-documentos/route.ts:120  delete contrato_documentos  (supabase)
-app/api/contrato-documentos/route.ts:156  update contrato_documentos  (supabase)
-app/api/contrato-modelo/route.ts:86  update contrato_modelos  (supabase)
+app/api/compras/receber/route.ts:45  update vendas  (supabase)  >> FICA: vínculo da unidade nova na venda da encomenda, complemento; a tela não confirma
+app/api/compras/receber/route.ts:49  update pedidos_compra  (supabase)  >> FEITO lote views-3: 0 linhas = 404
+app/api/contrato-documentos/route.ts:120  delete contrato_documentos  (supabase)  >> FEITO lote views-3: 0 linhas = 404
+app/api/contrato-documentos/route.ts:156  update contrato_documentos  (supabase)  >> FEITO lote views-3: 0 linhas = 404
+app/api/contrato-modelo/route.ts:86  update contrato_modelos  (supabase)  >> FICA: desativa a versão anterior; 0 = não havia ativa
 app/api/distribuicao/route.ts:33  update distribuicao_regras  (supabase)
 app/api/distribuicao/route.ts:52  update distribuicao_regras  (supabase)
 app/api/distribuicao/route.ts:71  delete distribuicao_regras  (supabase)
@@ -79,8 +79,8 @@ app/api/garantia/termo/route.ts:51  update vendas_termos  (supabase)
 app/api/orcamentos/route.ts:164  delete orcamentos  (supabase)  >> FEITO lote views-2: 0 linhas = 404 Nada foi gravado
 app/api/payments/config/route.ts:47  upsert tenant_payment_config  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3)
 app/api/payments/webhook/[provider]/route.ts:89  update cobrancas  (supabase)  >> FICA: o cliente é createServiceClient (sem RLS); entrou pelo nome da variável
-app/api/propostas/route.ts:46  update propostas  (supabase)
-app/api/propostas/route.ts:55  delete propostas  (supabase)
+app/api/propostas/route.ts:46  update propostas  (supabase)  >> FEITO lote views-3: 0 linhas = 404
+app/api/propostas/route.ts:55  delete propostas  (supabase)  >> FEITO lote views-3: 0 linhas = 404
 app/api/push/subscribe/route.ts:17  upsert push_subscriptions  (supabase)
 app/api/push/subscribe/route.ts:40  delete push_subscriptions  (supabase)
 app/api/ranking/metas/route.ts:49  delete metas  (supabase)

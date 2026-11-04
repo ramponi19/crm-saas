@@ -142,14 +142,14 @@ export async function POST(req: Request) {
 
   if (b.id) {
     const patch = statusEnviado ? { ...dados, status: statusEnviado } : dados
-    const { data, error } = await supabase.from('orcamentos').update(patch).eq('id', b.id).select('id, token').single()
+    const { data, error } = await supabase.from('assistencia_orcamentos').update(patch).eq('id', b.id).select('id, token').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, id: b.id, token: data?.token })
   }
   // `usuario_id` só na CRIAÇÃO: é o dono do orçamento, e o escopo por vendedor
   // depende dele. Na edição o dono não muda — senão o admin que corrigisse uma
   // vírgula viraria dono do orçamento do vendedor e sumiria com ele da lista dele.
-  const { data, error } = await supabase.from('orcamentos')
+  const { data, error } = await supabase.from('assistencia_orcamentos')
     .insert({ ...dados, status: statusEnviado ?? 'rascunho', usuario_id: user.id })
     .select('id, token').single()
   if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
@@ -162,7 +162,7 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { data: apagou, error } = await supabase.from('orcamentos').delete().eq('id', id).select('id')
+  const { data: apagou, error } = await supabase.from('assistencia_orcamentos').delete().eq('id', id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })

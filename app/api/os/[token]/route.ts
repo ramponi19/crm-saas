@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const svc = createServiceClient()
   const { data: os } = await svc
-    .from('garantias_assistencias')
+    .from('assistencia_garantias')
     .select('id, empresa_id, protocolo, status, responsavel_tecnico_id, aprovado_em, recusado_em, clientes(nome)')
     .eq('token', token).maybeSingle()
   if (!os) return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
    * duplo POST de um retry) passavam pelos dois e criavam DUAS tarefas de reparo
    * para a mesma OS. A condição vai para dentro do UPDATE — só um vence.
    */
-  const claim = await svc.from('garantias_assistencias')
+  const claim = await svc.from('assistencia_garantias')
     .update({
       status: b.acao === 'aprovar' ? 'aprovado' : 'reprovado',
       ...(b.acao === 'aprovar' ? { aprovado_em: agora } : { recusado_em: agora }),

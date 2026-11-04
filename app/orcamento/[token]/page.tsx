@@ -8,7 +8,7 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
   const { token } = await params
   const svc = createServiceClient()
 
-  const { data: orc } = await svc.from('orcamentos')
+  const { data: orc } = await svc.from('assistencia_orcamentos')
     .select('id, empresa_id, tipo, status, cliente_nome, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, total, valor_devolver, acerto, observacoes, created_at')
     .eq('token', token).maybeSingle()
   if (!orc) notFound()

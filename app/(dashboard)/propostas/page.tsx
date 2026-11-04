@@ -9,7 +9,7 @@ export default async function PropostasPage() {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data } = await supabase
-    .from('propostas')
+    .from('vendas_propostas')
     .select('id, cliente_nome, itens, observacoes, total, status, token, created_at')
     .eq('empresa_id', empresaId)
     .order('created_at', { ascending: false })

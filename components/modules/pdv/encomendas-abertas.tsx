@@ -233,7 +233,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     const { data: { user } } = await supabase.auth.getUser()
     // Todos os itens de uma vez: o dono liga para o fornecedor e pede a
     // encomenda inteira — cobrar um clique por aparelho seria atrito à toa.
-    const { data: marcados, error } = await supabase.from('pedidos_compra')
+    const { data: marcados, error } = await supabase.from('vendas_pedidos_compra')
       .update({ solicitado_em: new Date().toISOString(), solicitado_por: user?.id ?? null } as never)
       .in('id', ids)
       .is('solicitado_em', null)
@@ -294,7 +294,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
       // divergência que ninguém acha depois.
       const pedido = e.itens.find((i) => i.id === l.id)?.pedido_id
       if (pedido && vCusto > 0) {
-        const { data: noPedido } = await supabase.from('pedidos_compra').update({ valor_total: vCusto } as never).eq('id', pedido).select('id')
+        const { data: noPedido } = await supabase.from('vendas_pedidos_compra').update({ valor_total: vCusto } as never).eq('id', pedido).select('id')
         if (nadaGravado(noPedido)) {
           notify.warn('O custo não foi para o pedido de compra', `Pedido #${pedido}: ajuste o valor em Compras.`)
         }

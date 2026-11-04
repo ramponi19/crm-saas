@@ -12,7 +12,7 @@ export default async function GarantiaPage() {
 
   const [{ data: garantias }, { data: termosRaw }] = await Promise.all([
     supabase
-      .from('garantias_assistencias')
+      .from('assistencia_garantias')
       .select(`
         *,
         clientes(nome, telefone),

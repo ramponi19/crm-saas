@@ -69,7 +69,7 @@ export async function calcularRanking(
     db.from('vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
     db.from('visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),
     db.from('leads').select('responsavel_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
-    db.from('propostas').select('lead_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
+    db.from('vendas_propostas').select('lead_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
     // Aparelho aceito em troca que ainda não chegou. Aparelho é dinheiro: se não
     // entrou, a venda não subiu ninguém no ranking nem na meta. Quem cobra o
     // cliente é o vendedor — sem isso o prejuízo da troca que não veio fica todo

@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 /**
  * Marca um pedido de compra como RECEBIDO e dá ENTRADA da unidade no estoque
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
   const { pedidoId } = (await req.json().catch(() => ({}))) as { pedidoId?: number }
   if (!pedidoId) return NextResponse.json({ error: 'Pedido ausente' }, { status: 400 })
 
-  const { data: pedido } = await supabase.from('pedidos_compra')
+  const { data: pedido } = await supabase.from('vendas_pedidos_compra')
     .select('id, status, descricao, valor_total').eq('id', pedidoId).eq('empresa_id', empresaId).maybeSingle()
   if (!pedido) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
   if (pedido.status === 'recebido') return NextResponse.json({ ok: true, jaRecebido: true })
@@ -46,8 +47,9 @@ export async function POST(req: Request) {
     }
   }
 
-  const { error: ePed } = await supabase.from('pedidos_compra').update({ status: 'recebido' } as never).eq('id', pedidoId)
+  const { data: recebido, error: ePed } = await supabase.from('vendas_pedidos_compra').update({ status: 'recebido' } as never).eq('id', pedidoId).select('id')
   if (ePed) return NextResponse.json({ error: ePed.message }, { status: 500 })
+  if (nadaGravado(recebido)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   return NextResponse.json({ ok: true, unidadeId, encomenda: !!venda })
 }

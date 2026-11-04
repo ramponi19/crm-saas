@@ -264,7 +264,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
       const descricao = descreverItem(item)
       const vItem = Number(item.valor) || 0
 
-      const { data: pedido, error: e1 } = await supabase.from('pedidos_compra').insert({
+      const { data: pedido, error: e1 } = await supabase.from('vendas_pedidos_compra').insert({
         empresa_id: empresaId,
         // Fornecedor sai do balcão: quem compra define depois, em Compras. O
         // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.

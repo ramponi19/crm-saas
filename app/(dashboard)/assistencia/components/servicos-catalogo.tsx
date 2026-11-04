@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 import { Card, Table, Badge, Button, EmptyState, Modal, Input, Select, notify, type Column } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 export interface ServicoReparo {
   id: number
@@ -48,20 +49,22 @@ export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo
       tempo_estimado_min: form.tempo ? Number(form.tempo) : null,
     }
     const supabase = createClient()
-    const { error } = edit
-      ? await supabase.from('servicos_reparo').update(payload as never).eq('id', edit.id)
-      : await supabase.from('servicos_reparo').insert(payload as never)
+    const { data: gravou, error } = edit
+      ? await supabase.from('assistencia_servicos').update(payload as never).eq('id', edit.id).select('id')
+      : await supabase.from('assistencia_servicos').insert(payload as never).select('id')
     setSalvando(false)
     if (error) { notify.bad('Erro ao salvar serviço'); return }
+    if (nadaGravado(gravou)) { notify.bad('Erro ao salvar serviço', NADA_GRAVADO); return }
     notify.ok(edit ? 'Serviço atualizado' : 'Serviço cadastrado')
     setNovo(false); router.refresh()
   }
 
   async function remover(s: ServicoReparo) {
     setRemovendo(s.id)
-    const { error } = await createClient().from('servicos_reparo').update({ ativo: false } as never).eq('id', s.id)
+    const { data: removeu, error } = await createClient().from('assistencia_servicos').update({ ativo: false } as never).eq('id', s.id).select('id')
     setRemovendo(null)
     if (error) { notify.bad('Erro ao remover'); return }
+    if (nadaGravado(removeu)) { notify.bad('Erro ao remover', NADA_GRAVADO); return }
     notify.ok('Serviço removido'); router.refresh()
   }
 

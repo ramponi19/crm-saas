@@ -43,7 +43,7 @@ type Arquivado = {
 
 for (const id of ids) {
   const leitor = cliente(jwts[0][1])
-  const { data, error } = await leitor.from('contratos_venda')
+  const { data, error } = await leitor.from('vendas_contratos')
     .select('id, empresa_id, cliente_id, venda_ids, documento_id, nome_documento, dados').eq('id', Number(id)).maybeSingle()
   if (error || !data) { console.error(`contrato ${id}: ${error?.message ?? 'não encontrado'}`); process.exitCode = 1; continue }
   const c = data as Arquivado
