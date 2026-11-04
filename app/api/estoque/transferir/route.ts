@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
    * todas. Não há caminho para mexer no estoque de uma loja que a pessoa não vê.
    */
   const { data: unidades, error: erroLeitura } = await supabase
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .select('id, filial_id, produto_id, quantidade, status')
     .in('id', ids).eq('empresa_id', empresaId).eq('ativo', true)
   if (erroLeitura) return NextResponse.json({ error: erroLeitura.message }, { status: 400 })
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
    * atropelam uma venda que aconteceu no meio.
    */
   const { data: movidas, error: erroUpdate } = await svc
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({
       filial_id: destinoId,
       status: 'pendente',

@@ -9,7 +9,7 @@ const RESERVA_HORAS = 48
 
 async function expirarReservas(svc: ReturnType<typeof createServiceClient>, empresaId: number) {
   await svc
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({ status: 'disponivel', reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null })
     .eq('empresa_id', empresaId)
     .eq('status', 'reservado')
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
   // Claim atômico: só reserva se ainda estiver disponível.
   const { data: unidade } = await svc
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({
       status: 'reservado',
       reservado_lead_id: body.leadId,
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     .eq('empresa_id', auth.empresaId)
     .eq('status', 'disponivel')
     .eq('ativo', true)
-    .select('id, cor, armazenamento, condicao, preco_venda, produtos!produto_id(nome)')
+    .select('id, cor, armazenamento, condicao, preco_venda, produtos:estoque_produtos!produto_id(nome)')
     .maybeSingle()
 
   if (!unidade) return NextResponse.json({ error: 'Esta unidade não está mais disponível.' }, { status: 409 })
@@ -75,7 +75,7 @@ export async function DELETE(req: Request) {
 
   const svc = createServiceClient()
   const { data: unidade } = await svc
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .select('id, status, reservado_por, reservado_lead_id')
     .eq('id', body.unidadeId)
     .eq('empresa_id', auth.empresaId)
@@ -90,7 +90,7 @@ export async function DELETE(req: Request) {
   }
 
   await svc
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({ status: 'disponivel', reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null })
     .eq('id', body.unidadeId)
 

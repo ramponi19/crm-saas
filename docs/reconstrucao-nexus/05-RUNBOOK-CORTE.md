@@ -444,6 +444,25 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
   - banco: `cron.unschedule('automacoes-hora')`, depois `supabase/scripts/volta/volta-automatize.sql`, depois `drop extension pg_net`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8, sem mudança.
 
+## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
+
+**Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
+
+O **core** não se instala nem se tira: Dashboard, Leads/Funil, Clientes, Tarefas, Comunicação (Inbox), Insights, Automações e Configurações. O resto é módulo, e todo módulo novo passa por estes cinco pontos:
+
+1. **Entrada no manifesto** (`core/modulos.ts`, `MODULOS`):
+   - `chave`, que é a linha em `empresa_modulos`;
+   - `href`, `nome`, `frase` (o que faz, numa frase do balcão) e `grupo`;
+   - `requer`: as chaves dos módulos sem os quais este não funciona;
+   - itens de menu, que nascem pelo `href` e pelo catálogo de `lib/menu.ts`, com o grupo em `GRUPO_DO_HREF`;
+   - `abasConfiguracoes`: as seções de Configurações que o módulo traz;
+   - `paineisDoLead`: os painéis no card do lead;
+   - `capacidades`: o que ele liga nas telas dos outros.
+2. **Rotas e telas protegidas por "módulo ligado" no servidor.** A tela e a API conferem `empresa_modulos` (por `lib/empresa-config.ts` ou pela trava de rota do proxy). Esconder o menu não protege nada. Desde o item 5 desta lista, o build reprova a rota que não pertence ao core nem a um módulo, ou a tela de módulo sem a conferência (`scripts/check-modulos.mjs`, com uma lista de exceções que só encolhe).
+3. **Tabelas com o prefixo do módulo** (`estoque_*`, `vendas_*`, `assistencia_*`, `avaliacao_*`, `financeiro_*`, `imoveis_*`). Nunca view de compatibilidade nova; toda view leva `security_invoker = true`.
+4. **Vitrine quando desligado:** a rota mostra `/vitrine/<modulo>`, com o que o módulo faz e o botão de instalar ou pedir, em vez de redirecionar ou dar 404.
+5. **Aparece na Central** (`/modulos`), no grupo do manifesto. Instalar liga junto o que ele `requer`, e desinstalar fica bloqueado enquanto outro módulo ligado depender dele.
+
 ## 04/11/2026 à noite: fase final das views — lotes 1 e 2 (15 views caídas, restam 26)
 
 **Pedido do Lucas:** zerar as 41 views de compatibilidade em lotes: troca das leituras para as tabelas do core, e2e da tela, deploy do app e só então a migração de drop (DDL com IOwait abaixo de 10%), com a API conferida. Detalhe e números no 06, seção 23.

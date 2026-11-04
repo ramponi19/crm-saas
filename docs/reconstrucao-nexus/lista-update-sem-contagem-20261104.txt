@@ -9,12 +9,12 @@ app/(dashboard)/agenda/agenda-view.tsx:268  update visitas  (supabase)
 app/(dashboard)/assistencia/components/os-modal.tsx:214  update garantias_assistencias  (supabase)  >> FEITO lote views-3: marcar pronto com 0 linhas avisa e não cria a tarefa
 app/(dashboard)/assistencia/components/os-modal.tsx:332  update garantias_assistencias  (supabase)  >> FEITO lote views-3
 app/(dashboard)/assistencia/components/servicos-catalogo.tsx:52  update servicos_reparo  (supabase)  >> FEITO lote views-3 (e o remover da linha 62 também)
-app/(dashboard)/cardapio/cardapio-view.tsx:47  update produtos  (supabase)
-app/(dashboard)/cardapio/cardapio-view.tsx:54  update produtos  (supabase)
-app/(dashboard)/cardapio/cardapio-view.tsx:60  update produtos  (supabase)
-app/(dashboard)/catalogo/components/catalogo-view.tsx:181  update tabela_precos  (supabase)
-app/(dashboard)/catalogo/components/catalogo-view.tsx:235  update categorias_produtos  (supabase)
-app/(dashboard)/catalogo/components/catalogo-view.tsx:282  update tabela_precos  (supabase)
+app/(dashboard)/cardapio/cardapio-view.tsx:47  update produtos  (supabase)  >> FEITO lote views-4
+app/(dashboard)/cardapio/cardapio-view.tsx:54  update produtos  (supabase)  >> FEITO lote views-4
+app/(dashboard)/cardapio/cardapio-view.tsx:60  update produtos  (supabase)  >> FEITO lote views-4
+app/(dashboard)/catalogo/components/catalogo-view.tsx:181  update tabela_precos  (supabase)  >> FEITO lote views-4: 0 linhas conta como falha da importação
+app/(dashboard)/catalogo/components/catalogo-view.tsx:235  update categorias_produtos  (supabase)  >> FEITO lote views-4
+app/(dashboard)/catalogo/components/catalogo-view.tsx:282  update tabela_precos  (supabase)  >> FEITO lote views-4
 app/(dashboard)/chat/chat-view.tsx:180  delete mensagens_internas  (supabase)
 app/(dashboard)/clientes/components/cliente-modal-imob.tsx:247  update clientes  (supabase)
 app/(dashboard)/clientes/components/cliente-modal-imob.tsx:264  update leads  (supabase)
@@ -23,8 +23,8 @@ app/(dashboard)/clientes/components/cliente-modal-imob.tsx:471  update lead_perf
 app/(dashboard)/clientes/components/cliente-modal.tsx:176  update clientes  (supabase)
 app/(dashboard)/clientes/components/cliente-modal.tsx:185  update clientes  (supabase)
 app/(dashboard)/equipe/components/equipe-view.tsx:266  update metas_comissoes  (supabase)  >> FEITO lote views-3
-app/(dashboard)/estoque/components/produto-modal.tsx:119  update produtos  (supabase)
-app/(dashboard)/estoque/components/produto-modal.tsx:130  update produtos  (supabase)
+app/(dashboard)/estoque/components/produto-modal.tsx:119  update produtos  (supabase)  >> FEITO lote views-4
+app/(dashboard)/estoque/components/produto-modal.tsx:130  update produtos  (supabase)  >> FEITO lote views-4: remover produto confere erro e linhas
 app/(dashboard)/estoque/components/unidade-modal.tsx:120  upsert veiculo_dados  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3); tabela agora estoque_veiculo_dados
 app/(dashboard)/estoque/components/unidade-modal.tsx:139  update inventario_unidades  (supabase)  >> FEITO lote views-1: salvar unidade com 0 linhas avisa
 app/(dashboard)/estoque/components/unidade-modal.tsx:149  update inventario_unidades  (supabase)  >> FEITO lote views-1: remover unidade com 0 linhas avisa
@@ -51,9 +51,9 @@ app/api/acesso/route.ts:54  update acessos  (supabase)
 app/api/acesso/route.ts:59  update acessos  (supabase)
 app/api/acesso/route.ts:75  update usuarios  (supabase)
 app/api/ausencia/route.ts:32  update empresa_usuarios  (supabase)
-app/api/avaliacoes/route.ts:92  update avaliacoes_usados  (supabase)
-app/api/avaliacoes/route.ts:124  update avaliacoes_usados  (supabase)
-app/api/avaliacoes/route.ts:136  delete avaliacoes_usados  (supabase)
+app/api/avaliacoes/route.ts:92  update avaliacoes_usados  (supabase)  >> FEITO lote views-4: 0 linhas = 404 (e não cria unidade)
+app/api/avaliacoes/route.ts:124  update avaliacoes_usados  (supabase)  >> FICA: vínculo da unidade criada; o UPDATE anterior da mesma avaliação já passou
+app/api/avaliacoes/route.ts:136  delete avaliacoes_usados  (supabase)  >> FEITO lote views-4: 0 linhas = 404
 app/api/cadencias/acao/route.ts:40  update cadencia_inscricoes  (supabase)
 app/api/cadencias/acao/route.ts:47  update cadencia_inscricoes  (supabase)
 app/api/cadencias/acao/route.ts:74  update leads  (supabase)
@@ -128,8 +128,8 @@ components/modules/pdv/encomendas-abertas.tsx:287  update pedidos_compra  (supab
 lib/empresa-config.ts:185  upsert empresa_menu  (db)
 lib/empresa-config.ts:202  update empresa_modulos  (db)
 lib/empresa-config.ts:210  update empresa_modulos  (db)
-lib/encomendas.ts:223  update vendas  (supabase)
-lib/encomendas.ts:241  update inventario_unidades  (supabase)
+lib/encomendas.ts:223  update vendas  (supabase)  >> FEITO lote views-4: concluir encomenda com 0 linhas = erro, sem pagamento
+lib/encomendas.ts:241  update inventario_unidades  (supabase)  >> FEITO lote views-4: baixouEstoque diz a verdade
 lib/presets.ts:175  delete empresa_modulos  (db)
 lib/presets.ts:176  delete campos_personalizados  (db)
 lib/presets.ts:182  upsert empresa_modulos  (db)

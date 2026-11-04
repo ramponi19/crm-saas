@@ -369,7 +369,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
      * balcão e a venda é real. O aviso manda dar entrada pelo Estoque.
      */
     if (formaEntrada === 'aparelho' && aparelhosValidos.length > 0) {
-      const { error: e4 } = await supabase.from('inventario_unidades').insert(
+      const { error: e4 } = await supabase.from('estoque_unidades').insert(
         aparelhosValidos.map((a) => ({
           empresa_id: empresaId,
           grupo_pdv: grupo,

@@ -484,7 +484,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           const saldoAtual = c.item.quantidade ?? 1
           const restante = saldoAtual - c.qtd
           const { data: baixa } = await supabase
-            .from('inventario_unidades')
+            .from('estoque_unidades')
             .update({
               quantidade: restante,
               // Lote zerado sai do estoque; com saldo, continua disponível.
@@ -499,7 +499,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           claimed.push({ id: c.item.id, statusAnterior: statusEsperado, qtdBaixada: c.qtd, saldoAnterior: saldoAtual })
         } else {
           const { data: unidadeClaim } = await supabase
-            .from('inventario_unidades')
+            .from('estoque_unidades')
             .update({ status: unitStatus, cliente_id: clienteSelecionado?.id ?? null })
             .eq('id', c.item.id)
             .eq('status', statusEsperado)
@@ -593,7 +593,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // nome de quem fechou (`usuario_id`) e a comissão do fechamento espera a
       // confirmação de chegada.
       for (const t of trocasValidas) {
-        await supabase.from('inventario_unidades').insert({
+        await supabase.from('estoque_unidades').insert({
           empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'pendente',
           grupo_pdv: grupoPdv, usuario_id: user.id,
           preco_custo: t.num, imei: t.imei.trim() || null,
@@ -724,7 +724,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // Reserva consumida pela venda: limpa o vínculo com o lead.
       const reservaIds = carrinho.filter((c) => c.reserva).map((c) => c.item.id)
       if (reservaIds.length) {
-        await supabase.from('inventario_unidades')
+        await supabase.from('estoque_unidades')
           .update({ reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null } as never)
           .in('id', reservaIds)
       }
@@ -792,7 +792,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           for (const id of vendaIds) if (!foram.has(id)) sobras.push(`venda #${id}`)
         }
         for (const cl of claimed) {
-          const { data: voltou } = await supabase.from('inventario_unidades').update({
+          const { data: voltou } = await supabase.from('estoque_unidades').update({
             status: cl.statusAnterior,
             cliente_id: null,
             // Lote: devolve o saldo que foi baixado nesta tentativa.

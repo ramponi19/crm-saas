@@ -6,8 +6,8 @@ export default async function ComprasPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: pedidos }, { data: fornecedores }, vinculoRes, usuarioRes] = await Promise.all([
-    supabase.from('vendas_pedidos_compra').select('*, fornecedores(nome_fantasia, contato, telefone)').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
-    supabase.from('fornecedores').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
+    supabase.from('vendas_pedidos_compra').select('*, fornecedores:estoque_fornecedores(nome_fantasia, contato, telefone)').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
+    supabase.from('estoque_fornecedores').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
     user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
   ])

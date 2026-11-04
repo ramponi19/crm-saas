@@ -77,7 +77,7 @@ export async function calcularRanking(
     //
     // `ativo` no filtro é a saída: excluir a unidade no estoque encerra a
     // pendência (o caso do cliente que nunca vai trazer).
-    db.from('inventario_unidades').select('grupo_pdv')
+    db.from('estoque_unidades').select('grupo_pdv')
       .eq('empresa_id', empresaId).eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
   ])
 

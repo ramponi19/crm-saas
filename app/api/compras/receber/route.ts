@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   // estoque com os dados reais (IMEI, cor, qtd…) pelo módulo de Estoque.
   let unidadeId: number | null = null
   if (venda) {
-    const { data: unidade, error: eUni } = await supabase.from('inventario_unidades').insert({
+    const { data: unidade, error: eUni } = await supabase.from('estoque_unidades').insert({
       empresa_id: empresaId,
       produto_id: venda.produto_id ?? null,
       condicao: 'novo',

@@ -121,8 +121,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         // O lead também atende por telefone: quem liga para a loja é procurado pelo
         // número, e antes só quem já era cliente aparecia nessa busca.
         supabase.from('leads').select('id, nome, produto_interessado, telefone, ultima_mensagem_at').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(LOTE),
-        supabase.from('inventario_unidades').select('id, imei, numero_serie, produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
-        supabase.from('produtos').select('id').ilike('nome', `%${q}%`).limit(10),
+        supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
+        supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
         numero
           ? supabase.rpc('buscar_lead_por_numero' as never, { p_id: Number(numero) } as never)
           : Promise.resolve({ data: [] }),
@@ -132,8 +132,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       let estoqueNome: EstoqueRow[] = []
       if (produtoIds.length > 0) {
         const { data } = await supabase
-          .from('inventario_unidades')
-          .select('id, imei, numero_serie, produtos!produto_id(nome)')
+          .from('estoque_unidades')
+          .select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)')
           .in('produto_id', produtoIds).eq('ativo', true).limit(LOTE)
         estoqueNome = (data ?? []) as unknown as EstoqueRow[]
       }

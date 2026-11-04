@@ -130,8 +130,8 @@ async function exportClientes() {
 async function exportEstoque() {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('inventario_unidades')
-    .select('imei, numero_serie, estado, status, preco_custo, preco_venda, produtos!produto_id(nome)')
+    .from('estoque_unidades')
+    .select('imei, numero_serie, estado, status, preco_custo, preco_venda, produtos:estoque_produtos!produto_id(nome)')
     .eq('ativo', true)
     .order('id', { ascending: false })
   if (error || !data) { toast.error('Erro ao exportar estoque'); return }

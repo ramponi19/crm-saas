@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, UtensilsCrossed, Copy, ExternalLink } from 'lucide-react'
 import { Card, Button, Input, Textarea, Select, Badge, Modal, EmptyState, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 export interface Item { id: number; nome: string; categoria_id: number | null; preco: number | null; descricao: string | null; foto_url: string | null; disponivel: boolean | null }
 export interface Categoria { id: number; nome: string }
@@ -43,22 +44,25 @@ export function CardapioView({ initial, categorias, empresaId, slug }: { initial
       disponivel: form.disponivel,
     }
     const res = editando === 'novo'
-      ? await supabase.from('produtos').insert({ ...payload, empresa_id: empresaId, ativo: true })
-      : await supabase.from('produtos').update(payload).eq('id', (editando as Item).id)
+      ? await supabase.from('estoque_produtos').insert({ ...payload, empresa_id: empresaId, ativo: true }).select('id')
+      : await supabase.from('estoque_produtos').update(payload).eq('id', (editando as Item).id).select('id')
     setSalvando(false)
     if (res.error) { notify.bad('Erro ao salvar', res.error.message); return }
+    if (nadaGravado(res.data)) { notify.bad('Erro ao salvar', NADA_GRAVADO); return }
     notify.ok('Item salvo'); setEditando(null); router.refresh()
   }
 
   async function toggleDisp(i: Item) {
-    const { error } = await supabase.from('produtos').update({ disponivel: !(i.disponivel ?? true) }).eq('id', i.id)
+    const { data, error } = await supabase.from('estoque_produtos').update({ disponivel: !(i.disponivel ?? true) }).eq('id', i.id).select('id')
     if (error) { notify.bad('Erro'); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); return }
     router.refresh()
   }
   async function remover(i: Item) {
     if (!window.confirm(`Remover "${i.nome}" do cardápio?`)) return
-    const { error } = await supabase.from('produtos').update({ ativo: false }).eq('id', i.id)
+    const { data, error } = await supabase.from('estoque_produtos').update({ ativo: false }).eq('id', i.id).select('id')
     if (error) { notify.bad('Erro ao remover'); return }
+    if (nadaGravado(data)) { notify.bad('Erro ao remover', NADA_GRAVADO); return }
     router.refresh()
   }
 

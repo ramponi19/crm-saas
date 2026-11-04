@@ -19,8 +19,8 @@ export default async function MenuPublicoPage({ params }: { params: Promise<{ sl
   if (!capacidades(await carregarConfigEmpresa(svc, empresa.id)).usaComanda) notFound()
 
   const { data: raw } = await svc
-    .from('produtos')
-    .select('id, nome, preco, descricao, foto_url, categoria_id, disponivel, categorias_produtos!categoria_id(nome)')
+    .from('estoque_produtos')
+    .select('id, nome, preco, descricao, foto_url, categoria_id, disponivel, categorias_produtos:estoque_categorias!categoria_id(nome)')
     .eq('empresa_id', empresa.id).eq('ativo', true).eq('disponivel', true).order('nome')
 
   type Row = { id: number; nome: string; preco: number | null; descricao: string | null; foto_url: string | null; categoria_id: number | null; categorias_produtos: Embed<{ nome: string | null }> }

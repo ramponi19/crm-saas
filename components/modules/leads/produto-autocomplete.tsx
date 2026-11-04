@@ -32,7 +32,7 @@ export function ProdutoAutocomplete({ value, onChange, onSelect, label = 'Produt
     if (term.length < 2) { setRes([]); setOpen(false); return }
     setLoading(true)
     const id = setTimeout(async () => {
-      const { data } = await supabase.from('produtos')
+      const { data } = await supabase.from('estoque_produtos')
         .select('id, nome, preco').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8)
       setRes((data ?? []) as Prod[])
       setOpen((data ?? []).length > 0)

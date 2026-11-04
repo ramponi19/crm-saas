@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { Json } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 const STATUS = ['em_analise', 'ofertado', 'aceito', 'recusado'] as const
 type Status = (typeof STATUS)[number]
@@ -26,7 +27,7 @@ const numOrNull = (v: unknown) => { const n = Number(v); return Number.isFinite(
 type Sb = Awaited<ReturnType<typeof createClient>>
 
 /** Acha (case-insensitive) ou cria uma linha "nome + empresa_id" e devolve o id. */
-async function acharOuCriar(sb: Sb, tabela: 'marcas_produtos' | 'categorias_produtos', empresaId: number, nome: string): Promise<number | null> {
+async function acharOuCriar(sb: Sb, tabela: 'estoque_marcas' | 'estoque_categorias', empresaId: number, nome: string): Promise<number | null> {
   const n = nome.trim()
   if (!n) return null
   const { data: existe } = await sb.from(tabela).select('id').eq('empresa_id', empresaId).ilike('nome', n).limit(1).maybeSingle()
@@ -39,16 +40,16 @@ async function acharOuCriar(sb: Sb, tabela: 'marcas_produtos' | 'categorias_prod
 async function resolverProduto(sb: Sb, empresaId: number, v: Veiculo): Promise<number | null> {
   const nomeModelo = [v.modelo, v.versao].filter(Boolean).join(' ').trim() || (v.marca ?? '').trim()
   if (!nomeModelo) return null
-  const marcaId = v.marca ? await acharOuCriar(sb, 'marcas_produtos', empresaId, v.marca) : null
-  const categoriaId = v.categoria ? await acharOuCriar(sb, 'categorias_produtos', empresaId, v.categoria) : null
+  const marcaId = v.marca ? await acharOuCriar(sb, 'estoque_marcas', empresaId, v.marca) : null
+  const categoriaId = v.categoria ? await acharOuCriar(sb, 'estoque_categorias', empresaId, v.categoria) : null
 
   // modelo já existe? (mesmo nome + mesma marca)
-  let q = sb.from('produtos').select('id').eq('empresa_id', empresaId).ilike('nome', nomeModelo).limit(1)
+  let q = sb.from('estoque_produtos').select('id').eq('empresa_id', empresaId).ilike('nome', nomeModelo).limit(1)
   if (marcaId != null) q = q.eq('marca_id', marcaId)
   const { data: existe } = await q.maybeSingle()
   if (existe?.id) return existe.id
 
-  const { data: novo } = await sb.from('produtos')
+  const { data: novo } = await sb.from('estoque_produtos')
     .insert({ empresa_id: empresaId, nome: nomeModelo, marca_id: marcaId, categoria_id: categoriaId } as never)
     .select('id').single()
   return novo?.id ?? null
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
   const veiculo = limparVeiculo(b.veiculo)
-  const { data, error } = await supabase.from('avaliacoes_usados').insert({
+  const { data, error } = await supabase.from('avaliacao_usados').insert({
     empresa_id: empresaId,
     lead_id: numOrNull(b.lead_id),
     veiculo: veiculo as unknown as Json,
@@ -89,21 +90,22 @@ export async function PATCH(req: Request) {
   if (typeof b.status === 'string' && (STATUS as readonly string[]).includes(b.status)) patch.status = b.status as Status
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nada a atualizar' }, { status: 400 })
 
-  const { error } = await supabase.from('avaliacoes_usados').update(patch as never).eq('id', id).eq('empresa_id', empresaId)
+  const { data: gravou, error } = await supabase.from('avaliacao_usados').update(patch as never).eq('id', id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   // Aceite → o usado entra no estoque (uma vez; só se ainda não houver unidade vinculada).
   let unidadeId: number | null = null
   if (patch.status === 'aceito') {
     const { data: av } = await supabase
-      .from('avaliacoes_usados')
+      .from('avaliacao_usados')
       .select('id, veiculo, km, valor_ofertado, unidade_id')
       .eq('id', id).eq('empresa_id', empresaId).maybeSingle()
     if (av && !av.unidade_id) {
       const v = (av.veiculo ?? {}) as Veiculo
       const desc = [v.marca, v.modelo, v.versao].filter(Boolean).join(' ')
       const produtoId = await resolverProduto(supabase, empresaId!, v)
-      const { data: unidade } = await supabase.from('inventario_unidades').insert({
+      const { data: unidade } = await supabase.from('estoque_unidades').insert({
         empresa_id: empresaId,
         produto_id: produtoId,
         placa: v.placa ?? null,
@@ -121,7 +123,7 @@ export async function PATCH(req: Request) {
       } as never).select('id').single()
       if (unidade?.id) {
         unidadeId = unidade.id
-        await supabase.from('avaliacoes_usados').update({ unidade_id: unidade.id } as never).eq('id', id).eq('empresa_id', empresaId)
+        await supabase.from('avaliacao_usados').update({ unidade_id: unidade.id } as never).eq('id', id).eq('empresa_id', empresaId)
       }
     }
   }
@@ -133,7 +135,8 @@ export async function DELETE(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const b = await req.json().catch(() => ({})) as { id?: number }
   if (!b.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
-  const { error } = await supabase.from('avaliacoes_usados').delete().eq('id', b.id).eq('empresa_id', empresaId)
+  const { data: apagou, error } = await supabase.from('avaliacao_usados').delete().eq('id', b.id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

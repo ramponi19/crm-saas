@@ -16,7 +16,7 @@ export default async function GarantiaPage() {
       .select(`
         *,
         clientes(nome, telefone),
-        produtos(nome)
+        produtos:estoque_produtos(nome)
       `)
       .eq('empresa_id', empresaId)
       .eq('tipo', 'garantia')
@@ -32,7 +32,7 @@ export default async function GarantiaPage() {
           id, data_venda, valor_venda, cliente_id, numero_serie, forma_pagamento,
           parcelas, desconto_valor, quantidade, observacoes, grupo_pdv,
           clientes!cliente_id(nome, telefone),
-          produtos!produto_id(nome),
+          produtos:estoque_produtos!produto_id(nome),
           vendedor:usuarios!vendedor_id(nome)
         )
       `)
@@ -69,7 +69,7 @@ export default async function GarantiaPage() {
   const trocasPorGrupo = new Map<string, { aparelho: string; imei: string | null; valor: number }[]>()
   if (gruposTroca.length) {
     const { data: unidades } = await supabase
-      .from('inventario_unidades')
+      .from('estoque_unidades')
       .select('grupo_pdv, imei, preco_custo, observacoes')
       .eq('empresa_id', empresaId).eq('tipo', 'troca').in('grupo_pdv', gruposTroca)
     for (const u of (unidades ?? []) as { grupo_pdv: string | null; imei: string | null; preco_custo: number | null; observacoes: string | null }[]) {

@@ -84,7 +84,7 @@ export function EncomendaItens({ itens, onChange }: {
       valor: !x.valor && p.preco ? String(p.preco) : x.valor,
     }))
     setBuscando(id)
-    const { data } = await supabase.from('produtos').select('cores, armazenamentos').eq('id', p.id).maybeSingle()
+    const { data } = await supabase.from('estoque_produtos').select('cores, armazenamentos').eq('id', p.id).maybeSingle()
     setBuscando(null)
     // As variantes só entram se a linha ainda for deste produto: entre o clique e
     // a resposta o vendedor pode ter trocado de modelo ou limpado o campo.

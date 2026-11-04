@@ -295,7 +295,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     (async () => {
       const ids = [...new Set(vendas.map((v) => v.produto_id).filter((x): x is number => !!x))]
       if (!ids.length) return new Map<number, string>()
-      const { data } = await c.db.from('produtos').select('id, nome').in('id', ids.slice(0, 300))
+      const { data } = await c.db.from('estoque_produtos').select('id, nome').in('id', ids.slice(0, 300))
       return new Map(((data ?? []) as { id: number; nome: string }[]).map((p) => [p.id, p.nome]))
     })(),
   ])

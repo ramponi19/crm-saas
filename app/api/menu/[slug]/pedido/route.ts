@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (pedidos.length === 0) return NextResponse.json({ error: 'Carrinho vazio' }, { status: 400, headers: CORS })
 
   const ids = [...new Set(pedidos.map((i) => i.produto_id))]
-  const { data: prods } = await svc.from('produtos').select('id, nome, preco, disponivel').eq('empresa_id', empresa.id).in('id', ids)
+  const { data: prods } = await svc.from('estoque_produtos').select('id, nome, preco, disponivel').eq('empresa_id', empresa.id).in('id', ids)
   const prodMap = new Map((prods ?? []).map((p) => [p.id, p]))
 
   const itens: { produto_id: number; nome: string; preco: number; qtd: number }[] = []

@@ -85,7 +85,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   useEffect(() => {
     if (!empresaId) return
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
-    supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
+    supabase.from('estoque_produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
   }, [empresaId])
 
   function set(field: keyof Garantia, value: string | boolean | number | null) {

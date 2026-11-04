@@ -7,7 +7,7 @@ export default async function AssistenciaPage() {
   const [{ data: ordens }, { data: servicos }] = await Promise.all([
     supabase
       .from('assistencia_garantias')
-      .select('*, clientes(nome, telefone), produtos(nome)')
+      .select('*, clientes(nome, telefone), produtos:estoque_produtos(nome)')
       .eq('empresa_id', empresaId)
       .eq('tipo', 'assistencia')
       .order('created_at', { ascending: false }),

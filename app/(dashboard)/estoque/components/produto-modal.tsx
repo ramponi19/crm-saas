@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Modal, Input, Select, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { X, Plus } from 'lucide-react'
 import { APPLE_MODELOS } from '@/lib/apple-modelos'
 
@@ -75,7 +76,7 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   // Ao editar, carrega cores/armazenamentos/garantia salvos.
   useEffect(() => {
     if (!produto?.id) return
-    supabase.from('produtos').select('cores, armazenamentos, garantia_dias, foto_url').eq('id', produto.id).maybeSingle().then(({ data }) => {
+    supabase.from('estoque_produtos').select('cores, armazenamentos, garantia_dias, foto_url').eq('id', produto.id).maybeSingle().then(({ data }) => {
       if (data?.cores) setCores(data.cores)
       if (data?.armazenamentos) setArmazenamentos(data.armazenamentos)
       if (data?.garantia_dias != null) setForm((f) => ({ ...f, garantia_dias: String(data.garantia_dias) }))
@@ -109,15 +110,16 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
       ativo: true,
     }
     if (isNew) {
-      const { data, error } = await supabase.from('produtos').insert({ ...payload, empresa_id: empresa.id }).select().single()
+      const { data, error } = await supabase.from('estoque_produtos').insert({ ...payload, empresa_id: empresa.id }).select().single()
       if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
       const marca = marcas.find(m => m.id === Number(form.marca_id))
       const cat = categorias.find(c => c.id === Number(form.categoria_id))
       notify.ok('Produto cadastrado')
       onSaved({ ...data, ativo: data.ativo ?? true, marca_nome: marca?.nome ?? '', categoria_nome: cat?.nome ?? null })
     } else {
-      const { error } = await supabase.from('produtos').update(payload).eq('id', produto!.id!)
+      const { data: gravou, error } = await supabase.from('estoque_produtos').update(payload).eq('id', produto!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
+      if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       const marca = marcas.find(m => m.id === Number(form.marca_id))
       const cat = categorias.find(c => c.id === Number(form.categoria_id))
       notify.ok('Produto atualizado')
@@ -127,7 +129,9 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   }
 
   async function excluir() {
-    await supabase.from('produtos').update({ ativo: false }).eq('id', produto!.id!)
+    const { data: removeu, error } = await supabase.from('estoque_produtos').update({ ativo: false }).eq('id', produto!.id!).select('id')
+    if (error) { notify.bad('Erro ao remover', error.message); return }
+    if (nadaGravado(removeu)) { notify.bad('Erro ao remover', NADA_GRAVADO); return }
     notify.ok('Produto removido')
     onDeleted?.(produto!.id!)
     onClose()

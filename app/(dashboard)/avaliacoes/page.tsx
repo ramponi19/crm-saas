@@ -9,7 +9,7 @@ export default async function AvaliacoesPage() {
 
   const [{ data: avaliacoes }, { data: leadsRaw }] = await Promise.all([
     supabase
-      .from('avaliacoes_usados')
+      .from('avaliacao_usados')
       .select('id, lead_id, veiculo, km, fotos_urls, valor_mercado, valor_ofertado, status, observacoes, unidade_id, created_at')
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false }),

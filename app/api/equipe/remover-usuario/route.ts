@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   // Solta as reservas de estoque que estavam no nome dele — senão ficariam
   // presas para sempre, com a unidade fora do PDV.
   await service
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({ status: 'disponivel', reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null })
     .eq('empresa_id', empresaId)
     .eq('reservado_por', alvoId)

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 /**
  * A ENCOMENDA — produto que a loja vende antes de ter.
@@ -184,7 +185,7 @@ export async function finalizarEncomenda(
   pagamento?: PagamentoNaEntrega | null,
 ): Promise<ResultadoFinalizar> {
   const { data: v } = await supabase.from('vendas')
-    .select('unidade_id, numero_serie, inventario_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
+    .select('unidade_id, numero_serie, inventario_unidades:estoque_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
     .eq('id', vendaId).maybeSingle()
 
   const uni = Array.isArray(v?.inventario_unidades) ? v?.inventario_unidades[0] : v?.inventario_unidades
@@ -220,8 +221,10 @@ export async function finalizarEncomenda(
     if (pagamento.parcelas && pagamento.parcelas > 1) patch.parcelas = pagamento.parcelas
   }
 
-  const { error } = await supabase.from('vendas').update(patch as never).eq('id', vendaId)
+  const { data: concluiu, error } = await supabase.from('vendas').update(patch as never).eq('id', vendaId).select('id')
   if (error) return { ok: false, erro: error.message, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
+  // 0 linhas: a venda sumiu ou é de outra loja — não diz "entregue" nem registra pagamento.
+  if (nadaGravado(concluiu)) return { ok: false, erro: NADA_GRAVADO, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
 
   let registrouPagamento = false
   if (pagamento && pagamento.valor > 0.005) {
@@ -237,8 +240,10 @@ export async function finalizarEncomenda(
     registrouPagamento = !ePag
   }
 
+  let baixouEstoque = false
   if (v?.unidade_id) {
-    await supabase.from('inventario_unidades').update({ status: 'vendido' } as never).eq('id', v.unidade_id)
+    const { data: baixou } = await supabase.from('estoque_unidades').update({ status: 'vendido' } as never).eq('id', v.unidade_id).select('id')
+    baixouEstoque = !nadaGravado(baixou)
   }
-  return { ok: true, baixouEstoque: !!v?.unidade_id, copiouSerie, registrouPagamento }
+  return { ok: true, baixouEstoque, copiouSerie, registrouPagamento }
 }

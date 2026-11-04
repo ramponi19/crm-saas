@@ -139,7 +139,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
         if (!venda) {
           const { data: unidades } = await supabase
-            .from('inventario_unidades')
+            .from('estoque_unidades')
             .select('id')
             .or(`imei.eq.${serie},imei2.eq.${serie},numero_serie.eq.${serie}`)
             .limit(5)
@@ -230,7 +230,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   useEffect(() => {
     if (!empresaId) return
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
-    supabase.from('produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
+    supabase.from('estoque_produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
     supabase.from('assistencia_servicos').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
   }, [empresaId])
 

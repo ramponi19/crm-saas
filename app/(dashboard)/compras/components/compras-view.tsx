@@ -102,7 +102,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
         observacoes:   formPedido.observacoes.trim() || null,
         status:        formPedido.status,
       })
-      .select('*, fornecedores(nome_fantasia, contato, telefone)')
+      .select('*, fornecedores:estoque_fornecedores(nome_fantasia, contato, telefone)')
       .single()
     if (error) { setErroPedido('Erro ao salvar. Tente novamente.') }
     else { setPedidos(p => [data as Pedido, ...p]); setModalPedido(false); setFormPedido(PEDIDO_VAZIO) }
@@ -127,7 +127,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     setErro(null)
     const supabase = createClient()
     const { data, error } = await supabase
-      .from('fornecedores')
+      .from('estoque_fornecedores')
       .insert({
         empresa_id:    empresaId,
         nome_fantasia: form.nome_fantasia.trim(),

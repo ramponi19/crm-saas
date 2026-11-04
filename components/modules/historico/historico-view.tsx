@@ -116,7 +116,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     const supabase = createClient()
     try {
       const garantiaProduto = v.produto_id
-        ? ((await supabase.from('produtos').select('garantia_dias').eq('id', v.produto_id).maybeSingle())
+        ? ((await supabase.from('estoque_produtos').select('garantia_dias').eq('id', v.produto_id).maybeSingle())
             .data as { garantia_dias?: number | null } | null)?.garantia_dias ?? null
         : null
       const r = await emitirContrato(supabase, {

@@ -78,7 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
       // PENDENTE, não disponível: o cliente aprovou por link, o aparelho dele
       // ainda não passou pelo balcão. Fica no nome do responsável pelo lead.
-      await svc.from('inventario_unidades').insert({
+      await svc.from('estoque_unidades').insert({
         empresa_id: orc.empresa_id,
         produto_id: null,
         condicao: 'usado',
@@ -156,14 +156,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       // e `lucro` (coluna gerada) devolve o preço inteiro como margem — 100% de
       // lucro num aparelho comprado por dinheiro. O relatório mostrava isso como
       // se fosse conta fechada.
-      const { data: uni } = await svc.from('inventario_unidades')
+      const { data: uni } = await svc.from('estoque_unidades')
         .select('id, status, preco_custo, produto_id, imei, numero_serie')
         .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id).maybeSingle()
 
       // Claim atômico: só sai do estoque o que ainda ESTÁ no estoque. Se o balcão
       // vendeu a mesma peça antes do cliente clicar no link, a segunda venda não
       // pode ser registrada — seriam dois faturamentos para um aparelho só.
-      const { data: baixada } = await svc.from('inventario_unidades')
+      const { data: baixada } = await svc.from('estoque_unidades')
         .update({ status: 'vendido' } as never)
         .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id)
         .in('status', ['disponivel', 'reservado'])

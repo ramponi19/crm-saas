@@ -379,7 +379,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
       // `ativo` no filtro é a saída para o caso do cliente nunca entregar: excluir
       // a unidade no estoque (que a desativa) libera a comissão. Sem esse filtro a
       // retenção não teria fim e o vendedor ficaria refém de uma troca que morreu.
-      supabase.from('inventario_unidades').select('grupo_pdv')
+      supabase.from('estoque_unidades').select('grupo_pdv')
         .eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
     ])
     setVendas(v ?? []); setMetas(m ?? []); setPagas(p ?? [])

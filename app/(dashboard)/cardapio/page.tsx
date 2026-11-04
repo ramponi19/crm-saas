@@ -7,8 +7,8 @@ export const metadata = { title: 'Cardápio' }
 export default async function CardapioPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const [{ data: itens }, { data: cats }, { data: empresa }] = await Promise.all([
-    supabase.from('produtos').select('id, nome, categoria_id, preco, descricao, foto_url, disponivel').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    supabase.from('categorias_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('estoque_produtos').select('id, nome, categoria_id, preco, descricao, foto_url, disponivel').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    supabase.from('estoque_categorias').select('id, nome').eq('empresa_id', empresaId).order('nome'),
     supabase.from('empresas').select('slug').eq('id', empresaId).maybeSingle(),
   ])
 

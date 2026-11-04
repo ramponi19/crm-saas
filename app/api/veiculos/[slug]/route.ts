@@ -43,7 +43,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
    */
   if (!(await campoAtivo(svc, empresa.id, 'item', 'placa'))) return vazio
 
-  const { data: unidades } = await svc.from('inventario_unidades')
+  const { data: unidades } = await svc.from('estoque_unidades')
     // `observacoes` NÃO entra: é a nota INTERNA da peça, e é lá que o CRM escreve
     // "entrada por troca no PDV (cliente Maria)" e "downgrade — orçamento #12,
     // cliente João". O feed é público — isso vazava nome de cliente para o portal
@@ -55,7 +55,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   const prodIds = [...new Set((unidades ?? []).map((u) => u.produto_id).filter((x): x is number => x != null))]
   const nomePorProduto = new Map<number, string>()
   if (prodIds.length) {
-    const { data: prods } = await svc.from('produtos').select('id, nome').in('id', prodIds)
+    const { data: prods } = await svc.from('estoque_produtos').select('id, nome').in('id', prodIds)
     for (const p of prods ?? []) nomePorProduto.set(p.id, p.nome)
   }
 

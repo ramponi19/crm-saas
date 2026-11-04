@@ -63,7 +63,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const [fornecedores, setFornecedores] = useState<{ id: number; nome_fantasia: string }[]>([])
 
   useEffect(() => {
-    supabase.from('produtos').select('id, nome, cores, armazenamentos, marcas_produtos!marca_id(nome)').eq('ativo', true).order('nome')
+    supabase.from('estoque_produtos').select('id, nome, cores, armazenamentos, marcas_produtos:estoque_marcas!marca_id(nome)').eq('ativo', true).order('nome')
       .then(({ data }) => {
         type ProdRow = { id: number; nome: string; cores: string[] | null; armazenamentos: string[] | null; marcas_produtos: { nome: string | null } | { nome: string | null }[] | null }
         setProdutos(((data ?? []) as unknown as ProdRow[]).map(p => {
@@ -71,7 +71,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
           return { id: p.id, nome: p.nome, marca_nome: m?.nome ?? '', cores: p.cores ?? [], armazenamentos: p.armazenamentos ?? [] }
         }))
       })
-    supabase.from('fornecedores').select('id, nome_fantasia').eq('ativo', true).order('nome_fantasia')
+    supabase.from('estoque_fornecedores').select('id, nome_fantasia').eq('ativo', true).order('nome_fantasia')
       .then(({ data }) => setFornecedores(data ?? []))
   }, [])
 
@@ -130,14 +130,14 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
 
     if (isNew) {
       const { data, error } = await supabase
-        .from('inventario_unidades')
-        .insert(payload as TablesInsert<'inventario_unidades'>)
+        .from('estoque_unidades')
+        .insert(payload as TablesInsert<'estoque_unidades'>)
         .select('id').single()
       if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
       await gravarVeiculo(data.id)
       notify.ok('Unidade adicionada ao estoque')
     } else {
-      const { data: gravou, error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!).select('id')
+      const { data: gravou, error } = await supabase.from('estoque_unidades').update(payload as TablesUpdate<'estoque_unidades'>).eq('id', unidade!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
       if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       await gravarVeiculo(unidade!.id!)
@@ -148,7 +148,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   }
 
   async function excluir() {
-    const { data: removeu, error } = await supabase.from('inventario_unidades').update({ ativo: false }).eq('id', unidade!.id!).select('id')
+    const { data: removeu, error } = await supabase.from('estoque_unidades').update({ ativo: false }).eq('id', unidade!.id!).select('id')
     if (error) { notify.bad('Erro ao remover', error.message); return }
     if (nadaGravado(removeu)) { notify.bad('Erro ao remover', NADA_GRAVADO); return }
     notify.ok('Removido do estoque')

@@ -18,7 +18,7 @@ export default async function PDVPage() {
 
   // Expiração preguiçosa das reservas de lead (48h): vencida volta a disponível.
   await supabase
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({ status: 'disponivel', reservado_lead_id: null, reservado_por: null, reservado_em: null, reserva_expira_em: null })
     .eq('empresa_id', empresaId)
     .eq('status', 'reservado')
@@ -37,17 +37,17 @@ export default async function PDVPage() {
     { data: encomendasRaw },
   ] = await Promise.all([
     supabase
-      .from('inventario_unidades')
+      .from('estoque_unidades')
       // `quantidade` = saldo do lote (item sem série). `tipo_formulario` da
       // categoria diz se o item é vendido por peça ou por quantidade.
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(tipo_formulario))')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
     // Reservas de lead ativas (aba Reservas do PDV).
     supabase
-      .from('inventario_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos!marca_id(nome)), leads!reservado_lead_id(nome)')
+      .from('estoque_unidades')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), leads!reservado_lead_id(nome)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'reservado')
       .not('reservado_lead_id', 'is', null)
@@ -55,12 +55,12 @@ export default async function PDVPage() {
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('financeiro_taxas').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas')
-      .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
+      .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos:estoque_produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
     carregarConfigEmpresa(supabase, empresaId ?? 0),
     // Referência de preço do aparelho recebido em troca + a tolerância da loja.
-    supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
+    supabase.from('estoque_tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('configuracoes_sistema').select('valor')
       .eq('empresa_id', empresaId).eq('chave', 'troca').maybeSingle(),
@@ -75,7 +75,7 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes!cliente_id(nome, telefone), produtos!produto_id(nome), pedidos_compra:vendas_pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:vendas_pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
@@ -105,13 +105,13 @@ export default async function PDVPage() {
       .map((v) => v.grupo_pdv).filter((g): g is string => !!g),
   )]
   const { data: trocasRaw } = gruposAbertos.length > 0
-    ? await supabase.from('inventario_unidades')
+    ? await supabase.from('estoque_unidades')
         .select('id, grupo_pdv, imei, preco_custo, observacoes, status')
         .eq('empresa_id', empresaId).eq('tipo', 'troca').eq('ativo', true)
         .in('grupo_pdv', gruposAbertos)
     : { data: [] }
 
-  type UnidadeRow = Tables<'inventario_unidades'> & {
+  type UnidadeRow = Tables<'estoque_unidades'> & {
     produtos: Embed<{
       nome: string | null; garantia_dias: number | null; foto_url: string | null
       marcas_produtos: Embed<{ nome: string | null }>

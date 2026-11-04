@@ -59,8 +59,8 @@ export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onRe
 
   const carregarReservas = useCallback(async () => {
     const { data } = await supabase
-      .from('inventario_unidades')
-      .select('id, cor, armazenamento, condicao, preco_venda, reserva_expira_em, produtos!produto_id(nome)')
+      .from('estoque_unidades')
+      .select('id, cor, armazenamento, condicao, preco_venda, reserva_expira_em, produtos:estoque_produtos!produto_id(nome)')
       .eq('reservado_lead_id', leadId)
       .eq('status', 'reservado')
     type Row = Omit<Reservada, 'produto_nome'> & { produtos: Embed<{ nome: string | null }> }
@@ -75,8 +75,8 @@ export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onRe
     setBuscando(true)
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from('inventario_unidades')
-        .select('id, cor, armazenamento, bateria, condicao, estado, imei, numero_serie, preco_venda, produtos!produto_id!inner(nome, marcas_produtos!marca_id(nome))')
+        .from('estoque_unidades')
+        .select('id, cor, armazenamento, bateria, condicao, estado, imei, numero_serie, preco_venda, produtos:estoque_produtos!produto_id!inner(nome, marcas_produtos:estoque_marcas!marca_id(nome))')
         .eq('status', 'disponivel')
         .eq('ativo', true)
         .ilike('produtos.nome', `%${q}%`)

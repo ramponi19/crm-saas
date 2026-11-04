@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   // Dois cliques (ou dois atendentes) não sobrescrevem quem confirmou primeiro,
   // e não reabrem uma unidade que já foi vendida ou reservada depois.
   const { data: confirmada, error } = await supabase
-    .from('inventario_unidades')
+    .from('estoque_unidades')
     .update({
       status: 'disponivel',
       recebido_em: new Date().toISOString(),

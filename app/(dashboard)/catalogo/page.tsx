@@ -40,22 +40,22 @@ export default async function CatalogoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const [{ data: produtosRaw }, { data: unidadesRaw }, { data: categsRaw }, { data: subcatsRaw }, { data: marcasRaw }, { data: tabelaRaw }] = await Promise.all([
-    supabase.from('produtos').select(`
+    supabase.from('estoque_produtos').select(`
       id, nome, marca_id, categoria_id,
-      marcas_produtos!marca_id(nome),
-      categorias_produtos!categoria_id(nome),
+      marcas_produtos:estoque_marcas!marca_id(nome),
+      categorias_produtos:estoque_categorias!categoria_id(nome),
       subcategorias_produtos:estoque_subcategorias!subcategoria_id(nome)
     `).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    supabase.from('inventario_unidades').select(`
+    supabase.from('estoque_unidades').select(`
       id, produto_id, imei, numero_serie, estado, tipo, condicao,
       preco_custo, custo_reparo, preco_venda, status, created_at,
-      produtos!produto_id(nome)
+      produtos:estoque_produtos!produto_id(nome)
     `).eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }),
     // `tipo_formulario` decide os campos da entrada de estoque (lib/estoque-campos).
-    supabase.from('categorias_produtos').select('id, nome, tipo_formulario').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('estoque_categorias').select('id, nome, tipo_formulario').eq('empresa_id', empresaId).order('nome'),
     supabase.from('estoque_subcategorias').select('id, nome, categoria_id').eq('empresa_id', empresaId).order('nome'),
-    supabase.from('marcas_produtos').select('id, nome').eq('empresa_id', empresaId).order('nome'),
-    supabase.from('tabela_precos').select('id, modelo, armazenamento, condicao, preco_sugerido, observacoes').eq('empresa_id', empresaId).eq('ativo', true).order('modelo'),
+    supabase.from('estoque_marcas').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('estoque_tabela_precos').select('id, modelo, armazenamento, condicao, preco_sugerido, observacoes').eq('empresa_id', empresaId).eq('ativo', true).order('modelo'),
   ])
 
   const produtosList = (produtosRaw ?? []) as unknown as ProdutoRow[]

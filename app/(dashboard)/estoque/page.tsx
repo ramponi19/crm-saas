@@ -15,31 +15,31 @@ export default async function EstoquePage() {
 
   const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, comPlaca, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }, { data: filiaisRaw }] = await Promise.all([
     supabase
-      .from('inventario_unidades')
+      .from('estoque_unidades')
       // NÃO dá para embutir o responsável aqui: `inventario_unidades.usuario_id`
       // tem FK para `auth.users`, não para `public.usuarios`. Pedir
       // `usuarios!usuario_id(nome)` derruba a consulta INTEIRA no PostgREST e a
       // página recebe `null` — o estoque aparecia vazio. O nome vem numa consulta
       // separada, logo abaixo.
-      .select(`*, produtos!produto_id(nome, foto_url, marcas_produtos!marca_id(nome)), fornecedores!fornecedor_id(nome_fantasia)`)
+      .select(`*, produtos:estoque_produtos!produto_id(nome, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), fornecedores:estoque_fornecedores!fornecedor_id(nome_fantasia)`)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('created_at', { ascending: false }),
-    supabase.from('marcas_produtos').select('*').eq('empresa_id', empresaId).order('nome'),
-    supabase.from('categorias_produtos').select('*').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('estoque_marcas').select('*').eq('empresa_id', empresaId).order('nome'),
+    supabase.from('estoque_categorias').select('*').eq('empresa_id', empresaId).order('nome'),
     // `tipo_formulario` da categoria decide os campos de identificação da entrada
     // (ver lib/estoque-campos). `cores`/`armazenamentos` são as listas do próprio
     // produto, para não digitar variante à mão.
-    supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    supabase.from('estoque_produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('estoque_movimentacoes').select(`*, produtos:estoque_produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
     // Estoque de veículos: a empresa tem o campo placa no item (criado pelo preset).
     campoAtivo(supabase, empresaId ?? 0, 'item', 'placa'),
     // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
     // ninguem lembra o nome completo, mas tem o telefone na mao.
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    supabase.from('tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('estoque_tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
     // Fornecedor faltava no formulário da aba — só o modal tinha.
-    supabase.from('fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
+    supabase.from('estoque_fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),
     // Lojas da rede: destino possível de uma transferência, e o nome que aparece
     // na coluna quando se está vendo a rede inteira. Empresa de uma loja só
     // devolve uma linha, e a tela esconde tudo que é de rede.
@@ -64,7 +64,7 @@ export default async function EstoquePage() {
     }
   }
 
-  type UnidadeRow = Tables<'inventario_unidades'> & {
+  type UnidadeRow = Tables<'estoque_unidades'> & {
     produtos: Embed<{ nome: string | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
     fornecedores: Embed<{ nome_fantasia: string | null }>
   }

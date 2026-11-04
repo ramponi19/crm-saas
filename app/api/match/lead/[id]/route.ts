@@ -29,8 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!interesse) return NextResponse.json({ matches: [] })
 
     const { data: unidades } = await supabase
-      .from('inventario_unidades')
-      .select('id, ano, km, cor, preco_venda, status, produtos!produto_id(nome, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome))')
+      .from('estoque_unidades')
+      .select('id, ano, km, cor, preco_venda, status, produtos:estoque_produtos!produto_id(nome, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(nome))')
       .eq('ativo', true)
 
     type Embed<T> = T | T[] | null

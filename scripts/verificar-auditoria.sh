@@ -23,7 +23,7 @@ v "venda por link grava o cliente"       "app/api/orcamento/[token]/route.ts" "c
 v "claim atomico da peca"                "app/api/orcamento/[token]/route.ts" "in('status', \['disponivel', 'reservado'\])"
 v "vendedor sem lead vem do orcamento"   "app/api/orcamento/[token]/route.ts" "orc.usuario_id"
 v "garantia calculada pelo IMEI"         "app/(dashboard)/assistencia/components/os-modal.tsx" "garantiaDaVenda"
-v "garantia procura pela unidade"        "app/(dashboard)/assistencia/components/os-modal.tsx" "inventario_unidades"
+v "garantia procura pela unidade"        "app/(dashboard)/assistencia/components/os-modal.tsx" "estoque_unidades"
 v "financeiro avisa das vendas"          "app/(dashboard)/financeiro/components/financeiro-view.tsx" "As vendas não entram"
 v "relatorio avisa custo faltando"       "components/modules/relatorios/relatorios-view.tsx" "sem custo lançado"
 v "encomenda exige produto e preco"    "components/modules/pdv/encomenda-form.tsx" "Informe o produto e o preço"

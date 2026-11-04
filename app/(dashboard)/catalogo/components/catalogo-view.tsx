@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { Search, Plus, Tag, Package, Pencil, Trash2, Download, Upload } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { exportarCSV, lerCSV, type LinhaImportada, type ErroImport } from '@/lib/tabela-precos-csv'
@@ -178,15 +179,16 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
       // Update um a um: o id manda, e um erro numa linha não derruba as outras.
       let falhas = 0
       for (const l of paraAtualizar) {
-        const { error } = await supabase.from('tabela_precos').update({
+        const { data: gravou, error } = await supabase.from('estoque_tabela_precos').update({
           modelo: l.dados.modelo, armazenamento: l.dados.armazenamento,
           condicao: l.dados.condicao, preco_sugerido: l.dados.preco_sugerido,
           observacoes: l.dados.observacoes,
-        }).eq('id', l.dados.id!).eq('empresa_id', empresaId)
-        if (error) falhas++
+        }).eq('id', l.dados.id!).eq('empresa_id', empresaId).select('id')
+        // 0 linhas conta como falha: a linha sumiu entre a prévia e a gravação.
+        if (error || nadaGravado(gravou)) falhas++
       }
       if (paraCriar.length) {
-        const { error } = await supabase.from('tabela_precos').insert(
+        const { error } = await supabase.from('estoque_tabela_precos').insert(
           paraCriar.map((l) => ({
             empresa_id: empresaId, modelo: l.dados.modelo, armazenamento: l.dados.armazenamento,
             condicao: l.dados.condicao, preco_sugerido: l.dados.preco_sugerido,
@@ -228,12 +230,13 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
       if (editCateg === 'new') {
         const empresaId = await empresaAtualId(supabase)
         if (!empresaId) { notify.bad('Empresa não encontrada'); return }
-        const { error } = await supabase.from('categorias_produtos').insert({ ...dados, empresa_id: empresaId, ativo: true })
+        const { error } = await supabase.from('estoque_categorias').insert({ ...dados, empresa_id: empresaId, ativo: true })
         if (error) { notify.bad('Erro ao criar categoria', error.message); return }
         notify.ok('Categoria criada')
       } else if (editCateg) {
-        const { error } = await supabase.from('categorias_produtos').update(dados).eq('id', editCateg.id)
+        const { data: gravou, error } = await supabase.from('estoque_categorias').update(dados).eq('id', editCateg.id).select('id')
         if (error) { notify.bad('Erro ao salvar', error.message); return }
+        if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); return }
         notify.ok('Categoria atualizada')
       }
       setEditCateg(null)
@@ -278,11 +281,12 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
       observacoes: precoForm.observacoes.trim() || null,
     }
     const supabase = createClient()
-    const { error } = editPreco
-      ? await supabase.from('tabela_precos').update(payload as never).eq('id', editPreco.id)
-      : await supabase.from('tabela_precos').insert(payload as never)
+    const { data: gravou, error } = editPreco
+      ? await supabase.from('estoque_tabela_precos').update(payload as never).eq('id', editPreco.id).select('id')
+      : await supabase.from('estoque_tabela_precos').insert(payload as never).select('id')
     setSaving(false)
     if (error) { notify.bad('Erro ao salvar preço'); return }
+    if (nadaGravado(gravou)) { notify.bad('Erro ao salvar preço', NADA_GRAVADO); return }
     setModalPreco(false)
     notify.ok(editPreco ? 'Preço atualizado!' : 'Preço adicionado!')
     router.refresh()
@@ -290,7 +294,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   async function removerPreco(t: TabelaPreco) {
     setRemovendoPreco(t.id)
-    const { error } = await createClient().from('tabela_precos').update({ ativo: false } as never).eq('id', t.id)
+    const { error } = await createClient().from('estoque_tabela_precos').update({ ativo: false } as never).eq('id', t.id)
     setRemovendoPreco(null)
     if (error) { notify.bad('Erro ao remover'); return }
     notify.ok('Preço removido'); router.refresh()

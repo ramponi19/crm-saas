@@ -127,8 +127,8 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
     const [{ data: precos }, { data: regras }, { data: unis }] = await Promise.all([
       supabase.from('avaliacao_precos').select('modelo, armazenamento, na_troca, descontos').eq('ativo', true),
       supabase.from('avaliacao_regras').select('bonus_seminovo, corte_bateria').maybeSingle(),
-      supabase.from('inventario_unidades')
-        .select('id, preco_venda, cor, armazenamento, condicao, produtos!produto_id(nome)')
+      supabase.from('estoque_unidades')
+        .select('id, preco_venda, cor, armazenamento, condicao, produtos:estoque_produtos!produto_id(nome)')
         .eq('status', 'disponivel').eq('ativo', true).limit(400),
     ])
     setAbrindoTroca(false)

@@ -35,10 +35,10 @@ export default async function OrcamentosPage() {
 
   const [{ data }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
     soMeus ? baseOrc.eq('usuario_id', user.id) : baseOrc,
-    supabase.from('inventario_unidades')
-      .select('id, preco_venda, condicao, produtos!produto_id(nome)')
+    supabase.from('estoque_unidades')
+      .select('id, preco_venda, condicao, produtos:estoque_produtos!produto_id(nome)')
       .eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true).limit(300),
-    supabase.from('tabela_precos')
+    supabase.from('estoque_tabela_precos')
       .select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),
   ])

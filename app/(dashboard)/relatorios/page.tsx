@@ -34,7 +34,7 @@ export default async function RelatoriosPage({ searchParams }: {
   const [{ data: vendasRaw }, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }] = await Promise.all([
     supabase
       .from('vendas')
-      .select('id, data_venda, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes!cliente_id(nome), produtos!produto_id(nome), usuarios!vendedor_id(nome)')
+      .select('id, data_venda, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)')
       .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500),
     supabase
       .from('financeiro_lancamentos')
@@ -47,7 +47,7 @@ export default async function RelatoriosPage({ searchParams }: {
     // Aparelhos aceitos em troca que ainda não chegaram. Aqui NÃO tiram a venda da
     // conta — o dono precisa do número real do mês. Servem para separar quanto do
     // faturamento ainda depende de um aparelho entrar na loja.
-    supabase.from('inventario_unidades').select('grupo_pdv')
+    supabase.from('estoque_unidades').select('grupo_pdv')
       .eq('empresa_id', empresaId).eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
   ])
 

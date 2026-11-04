@@ -744,8 +744,8 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     setSerieBuscando(true)
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from('inventario_unidades')
-        .select('id, status, ativo, cor, armazenamento, condicao, bateria, produto_id, created_at, produtos!produto_id(nome)')
+        .from('estoque_unidades')
+        .select('id, status, ativo, cor, armazenamento, condicao, bateria, produto_id, created_at, produtos:estoque_produtos!produto_id(nome)')
         .eq('empresa_id', empresaId)
         .or(`imei.eq.${serie},numero_serie.eq.${serie}`)
         .order('created_at', { ascending: false })
@@ -918,7 +918,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
       observacoes: form.observacoes || null, ativo: true,
     }
-    const { data, error } = await supabase.from('inventario_unidades').insert(payload as TablesInsert<'inventario_unidades'>).select().single()
+    const { data, error } = await supabase.from('estoque_unidades').insert(payload as TablesInsert<'estoque_unidades'>).select().single()
     if (error) { setSaving(false); notify.bad('Erro ao cadastrar', error.message); return }
 
     /**
