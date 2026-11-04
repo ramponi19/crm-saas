@@ -38,12 +38,12 @@ app/(dashboard)/imoveis/imoveis-view.tsx:240  update chaves_imoveis  (supabase)
 app/(dashboard)/imoveis/imoveis-view.tsx:247  delete chaves_imoveis  (supabase)
 app/(dashboard)/kds/kds-view.tsx:68  update pedidos  (supabase)
 app/(dashboard)/kds/kds-view.tsx:74  update pedidos  (supabase)
-app/(dashboard)/pdv/components/pdv-view.tsx:617  update troca_cotacoes  (supabase)
-app/(dashboard)/pdv/components/pdv-view.tsx:713  update inventario_unidades  (supabase)
-app/(dashboard)/pdv/components/pdv-view.tsx:772  delete vendas_pagamentos  (supabase)
-app/(dashboard)/pdv/components/pdv-view.tsx:773  delete vendas  (supabase)
-app/(dashboard)/pdv/components/pdv-view.tsx:776  update inventario_unidades  (supabase)
-app/(dashboard)/pdv/page.tsx:20  update inventario_unidades  (supabase)
+app/(dashboard)/pdv/components/pdv-view.tsx:617  update troca_cotacoes  (supabase)  >> FEITO lote 2: 0 linhas = cotação já usada por outra venda -> avisa o operador
+app/(dashboard)/pdv/components/pdv-view.tsx:713  update inventario_unidades  (supabase)  >> FICA: limpa o vínculo da reserva de peça já vendida; a tela não confirma
+app/(dashboard)/pdv/components/pdv-view.tsx:772  delete vendas_pagamentos  (supabase)  >> FICA: 0 pagamentos é normal (falhou antes de gravar)
+app/(dashboard)/pdv/components/pdv-view.tsx:773  delete vendas  (supabase)  >> FEITO lote 2: volta da venda que falhou diz o que ficou
+app/(dashboard)/pdv/components/pdv-view.tsx:776  update inventario_unidades  (supabase)  >> FEITO lote 2: idem, por peça
+app/(dashboard)/pdv/page.tsx:20  update inventario_unidades  (supabase)  >> FICA: expiração preguiçosa das reservas no servidor; 0 linhas = nada vencido
 app/(dashboard)/tarefas/tarefas-view.tsx:59  update tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
 app/(dashboard)/tarefas/tarefas-view.tsx:66  delete tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
 app/api/acesso/route.ts:43  update acessos  (supabase)
@@ -119,12 +119,12 @@ components/modules/leads/lead-financiamento-panel.tsx:73  delete fichas_financia
 components/modules/leads/lead-match-panel.tsx:71  upsert lead_perfil_busca  (supabase)
 components/modules/leads/lead-modal.tsx:828  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano, a tela não confirma nada; 0 linhas = nada a ler
 components/modules/leads/lead-modal.tsx:866  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano (mesma regra)
-components/modules/pdv/encomenda-form.tsx:187  delete vendas  (supabase)
-components/modules/pdv/encomenda-form.tsx:188  delete pedidos_compra  (supabase)
-components/modules/pdv/encomenda-form.tsx:299  delete pedidos_compra  (supabase)
-components/modules/pdv/encomendas-abertas.tsx:235  update pedidos_compra  (supabase)
-components/modules/pdv/encomendas-abertas.tsx:278  update vendas  (supabase)
-components/modules/pdv/encomendas-abertas.tsx:287  update pedidos_compra  (supabase)
+components/modules/pdv/encomenda-form.tsx:187  delete vendas  (supabase)  >> FEITO lote 2: desfazer diz o que ficou
+components/modules/pdv/encomenda-form.tsx:188  delete pedidos_compra  (supabase)  >> FEITO lote 2: idem
+components/modules/pdv/encomenda-form.tsx:299  delete pedidos_compra  (supabase)  >> FEITO lote 2: entrou no desfazer
+components/modules/pdv/encomendas-abertas.tsx:235  update pedidos_compra  (supabase)  >> FEITO lote 2: 0 linhas = já estava pedida -> avisa, não diz 'registrado'
+components/modules/pdv/encomendas-abertas.tsx:278  update vendas  (supabase)  >> FEITO lote 2: 0 linhas = erro NADA_GRAVADO
+components/modules/pdv/encomendas-abertas.tsx:287  update pedidos_compra  (supabase)  >> FEITO lote 2: custo que não foi para o pedido avisa
 lib/empresa-config.ts:185  upsert empresa_menu  (db)
 lib/empresa-config.ts:202  update empresa_modulos  (db)
 lib/empresa-config.ts:210  update empresa_modulos  (db)

@@ -709,6 +709,12 @@ v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.ts
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"
 v "tarefa do card confere linhas"       "components/modules/leads/lead-acoes-panel.tsx" "eq(.id., t.id).select(.id.)"
 v "remover chamada confere linhas"      "components/modules/leads/lead-chamadas-panel.tsx" "delete().eq(.id., id).select(.id.)"
+# 04/11/2026 lote 2 (PDV e encomenda): marca de cotação, volta da venda que falhou, desfazer da encomenda, pedido e ajuste
+v "cotacao ja usada avisa o operador"   "app/(dashboard)/pdv/components/pdv-view.tsx" "if (nadaGravado(marcada))"
+v "volta da venda diz o que ficou"      "app/(dashboard)/pdv/components/pdv-view.tsx" "A tentativa não foi desfeita por inteiro"
+v "desfazer encomenda diz o que ficou"  "components/modules/pdv/encomenda-form.tsx" "A encomenda não foi desfeita por inteiro"
+v "pedido ja marcado nao diz registrado" "components/modules/pdv/encomendas-abertas.tsx" "if (nadaGravado(marcados))"
+v "ajuste da encomenda confere linhas"  "components/modules/pdv/encomendas-abertas.tsx" "if (nadaGravado(gravou)) { erro = NADA_GRAVADO; break }"
 v "log diz QUAL segredo existe"       "supabase/functions/webhook-leads/index.ts" "segredoInstagram="
 v "perfil do IG pelo host certo"      "supabase/functions/webhook-leads/index.ts" "graph.instagram.com\" : \"https://graph.facebook.com"
 v "lead nasce na loja do canal"       "supabase/functions/webhook-leads/index.ts" "canal.filial_id != null ? { filial_id: canal.filial_id }"

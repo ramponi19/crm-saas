@@ -10,6 +10,7 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Modal, Input, Button, ConfirmDialog, notify } from '@/components/ui'
+import { nadaGravado } from '@/lib/linhas-afetadas'
 import { EncomendaForm } from '@/components/modules/pdv/encomenda-form'
 import { EncomendasAbertas, type EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import { diagnosticar } from '@/lib/encomendas'
@@ -614,10 +615,18 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
        */
       for (const t of trocasValidas) {
         if (!t.cotacaoId) continue
-        await supabase.from('troca_cotacoes')
+        const { data: marcada } = await supabase.from('troca_cotacoes')
           .update({ usada_em: new Date().toISOString(), venda_id: primeiraVendaId } as never)
           .eq('id', t.cotacaoId)
           .is('usada_em', null)
+          .select('id')
+        // 0 linhas = outra venda marcou esta cotação entre a leitura do código e
+        // agora: o abatimento saiu duas vezes. A venda já existe; quem precisa
+        // saber é o operador, agora, e não o fechamento do mês.
+        if (nadaGravado(marcada)) {
+          notify.warn('Esta cotação de troca já tinha sido usada',
+            `Cotação #${t.cotacaoId}: confira o abatimento desta venda antes de entregar o aparelho.`)
+        }
       }
 
       // Pagamentos do fechamento, na primeira venda do grupo: as formas que o
@@ -767,21 +776,31 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       router.refresh()
     } catch (e) {
       // Desfaz a tentativa parcial para o operador poder repetir sem estoque/venda presos.
+      // O que NÃO desfez vai para o operador: venda ou peça presa sem aviso vira
+      // estoque "vendido" que ninguém vendeu.
+      const sobras: string[] = []
       try {
         if (vendaIds.length) {
           await supabase.from('vendas_pagamentos').delete().in('venda_id', vendaIds)
-          await supabase.from('vendas').delete().in('id', vendaIds)
+          const { data: apagadas } = await supabase.from('vendas').delete().in('id', vendaIds).select('id')
+          const foram = new Set(((apagadas ?? []) as { id: number }[]).map((v) => v.id))
+          for (const id of vendaIds) if (!foram.has(id)) sobras.push(`venda #${id}`)
         }
         for (const cl of claimed) {
-          await supabase.from('inventario_unidades').update({
+          const { data: voltou } = await supabase.from('inventario_unidades').update({
             status: cl.statusAnterior,
             cliente_id: null,
             // Lote: devolve o saldo que foi baixado nesta tentativa.
             ...(cl.saldoAnterior != null ? { quantidade: cl.saldoAnterior } : {}),
-          } as never).eq('id', cl.id)
+          } as never).eq('id', cl.id).select('id')
+          if (nadaGravado(voltou)) sobras.push(`peça #${cl.id}`)
         }
-      } catch { /* rollback best-effort */ }
+      } catch { sobras.push('a volta parou no meio') }
       notify.bad('Erro ao finalizar', e instanceof Error ? e.message : String(e))
+      if (sobras.length) {
+        notify.bad('A tentativa não foi desfeita por inteiro',
+          `Ficou: ${sobras.join(', ')}. Confira no Histórico e no Estoque antes de repetir.`)
+      }
     } finally {
       setFinalizando(false)
     }

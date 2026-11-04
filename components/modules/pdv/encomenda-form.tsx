@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { ChevronDown, MapPin, Plus, Smartphone, Trash2, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, notify } from '@/components/ui'
+import { nadaGravado } from '@/lib/linhas-afetadas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
@@ -182,10 +183,22 @@ export function EncomendaForm({ clientes, taxas = [] }: {
    * com os dois primeiros ja no banco. Deixar meia encomenda seria pior que
    * nao lancar — o cliente some da lista pela metade e ninguem entende.
    */
-  async function desfazer(criados: { vendaId: number; pedidoId: number }[]) {
+  async function desfazer(criados: { vendaId: number; pedidoId: number }[], pedidoSolto?: number) {
+    // O que não saiu é dito ao vendedor: meia encomenda calada é o que este
+    // desfazer existe para evitar.
+    const sobras: string[] = []
+    const apagar = async (tabela: 'vendas' | 'pedidos_compra', id: number, rotulo: string) => {
+      const { data } = await supabase.from(tabela).delete().eq('id', id).select('id')
+      if (nadaGravado(data)) sobras.push(`${rotulo} #${id}`)
+    }
+    if (pedidoSolto != null) await apagar('pedidos_compra', pedidoSolto, 'pedido')
     for (const c of criados) {
-      await supabase.from('vendas').delete().eq('id', c.vendaId)
-      await supabase.from('pedidos_compra').delete().eq('id', c.pedidoId)
+      await apagar('vendas', c.vendaId, 'venda')
+      await apagar('pedidos_compra', c.pedidoId, 'pedido')
+    }
+    if (sobras.length) {
+      notify.bad('A encomenda não foi desfeita por inteiro',
+        `Ficou: ${sobras.join(', ')}. Apague em Histórico e em Compras antes de lançar de novo.`)
     }
   }
 
@@ -296,8 +309,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
       } as never).select('id').single()
 
       if (e2 || !venda) {
-        await supabase.from('pedidos_compra').delete().eq('id', pedidoId)
-        await desfazer(criados)
+        await desfazer(criados, pedidoId)
         setSalvando(false); notify.bad(`Erro ao lançar o item ${n + 1}`, e2?.message); return
       }
       criados.push({ vendaId: (venda as { id: number }).id, pedidoId })

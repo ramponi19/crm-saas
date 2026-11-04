@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
 import { type Taxa } from '@/lib/pdv-pagamentos'
@@ -232,12 +233,19 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     const { data: { user } } = await supabase.auth.getUser()
     // Todos os itens de uma vez: o dono liga para o fornecedor e pede a
     // encomenda inteira — cobrar um clique por aparelho seria atrito à toa.
-    const { error } = await supabase.from('pedidos_compra')
+    const { data: marcados, error } = await supabase.from('pedidos_compra')
       .update({ solicitado_em: new Date().toISOString(), solicitado_por: user?.id ?? null } as never)
       .in('id', ids)
       .is('solicitado_em', null)
+      .select('id')
     setOcupado(null)
     if (error) { notify.bad('Não deu para marcar', error.message); return }
+    // 0 linhas = alguém já tinha marcado (o filtro protege a data original).
+    if (nadaGravado(marcados)) {
+      notify.warn('Esta encomenda já estava marcada como pedida', 'A data do primeiro pedido foi mantida.')
+      router.refresh()
+      return
+    }
     notify.ok('Pedido registrado',
       `${e.produto_nome} — a equipe já vê que ${ids.length > 1 ? 'foram encomendados' : 'foi encomendado'}.`)
     router.refresh()
@@ -275,16 +283,21 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     let erro: string | null = null
     for (const l of linhas) {
       const vCusto = Number(l.custo) || 0
-      const { error } = await supabase.from('vendas')
+      const { data: gravou, error } = await supabase.from('vendas')
         .update({ valor_venda: Number(l.venda), valor_custo: vCusto, previsao_entrega: prazo || null } as never)
         .eq('id', l.id)
+        .select('id')
       if (error) { erro = error.message; break }
+      if (nadaGravado(gravou)) { erro = NADA_GRAVADO; break }
       // O custo vai junto para o pedido de compra do MESMO item: são o mesmo
       // número visto de dois lados, e deixar um só atualizado cria a
       // divergência que ninguém acha depois.
       const pedido = e.itens.find((i) => i.id === l.id)?.pedido_id
       if (pedido && vCusto > 0) {
-        await supabase.from('pedidos_compra').update({ valor_total: vCusto } as never).eq('id', pedido)
+        const { data: noPedido } = await supabase.from('pedidos_compra').update({ valor_total: vCusto } as never).eq('id', pedido).select('id')
+        if (nadaGravado(noPedido)) {
+          notify.warn('O custo não foi para o pedido de compra', `Pedido #${pedido}: ajuste o valor em Compras.`)
+        }
       }
     }
     setOcupado(null)
