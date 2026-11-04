@@ -713,6 +713,9 @@ v "gravacao com banco fora vira 500"     "supabase/functions/webhook-leads/index
 v "echo nao engole ErroDeBanco"          "supabase/functions/webhook-leads/index.ts" "if (e instanceof ErroDeBanco) throw e;"
 n "grande nao grava hash antes"          "supabase/functions/webhook-leads/index.ts" "jaRecebido(rpc, hash, tamanho, conta, grande)"
 v "grande em processamento = 503"        "supabase/functions/webhook-leads/index.ts" "\"Retry-After\": \"60\""
+# 04/11/2026: "visto" do Instagram (messaging_seen manda read.mid, não watermark)
+v "visto do Instagram pelo mid"         "supabase/functions/webhook-leads/index.ts" "typeof leitura.mid === \"string\""
+v "conta nova assina messaging_seen"    "lib/canais/instagram-login.ts" "'messages', 'messaging_seen'"
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

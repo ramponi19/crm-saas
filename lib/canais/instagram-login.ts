@@ -191,13 +191,20 @@ export async function perfil(
   }
 }
 
-/** Assina o webhook NA CONTA. Sem isto o CRM não recebe Direct nenhum. */
+/**
+ * Assina o webhook NA CONTA. Sem isto o CRM não recebe Direct nenhum.
+ *
+ * `messaging_seen` desde 04/11/2026: sem ele a resposta do CRM nunca passava de
+ * "enviada" (o Instagram não manda "entregue"; o visto é o único retorno). A conta
+ * também precisa do campo assinado no APP (objeto `instagram`), feito no mesmo dia.
+ */
+export const CAMPOS_CONTA_INSTAGRAM = ['messages', 'messaging_seen'] as const
 export async function assinarWebhook(token: string): Promise<true | Erro> {
   try {
     const r = await fetch(`${GRAPH}/me/subscribed_apps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ subscribed_fields: 'messages', access_token: token }).toString(),
+      body: new URLSearchParams({ subscribed_fields: CAMPOS_CONTA_INSTAGRAM.join(','), access_token: token }).toString(),
       signal: AbortSignal.timeout(15000),
     })
     const j = await json(r)

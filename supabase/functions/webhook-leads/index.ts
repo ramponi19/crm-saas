@@ -2102,8 +2102,22 @@ serve(async (req: Request) => {
           if (leitura) {
             // Só há o "até quando" foi lido: marca como lidas as enviadas ao
             // cliente até esse instante, que é a semântica do evento.
+            //
+            // DOIS FORMATOS (04/11/2026). O Messenger (e o Instagram via Página) manda
+            // `read.watermark` (instante). O Instagram pelo login do Instagram
+            // (`messaging_seen`) manda `read.mid`: o id da última mensagem vista. Sem
+            // tratar o `mid`, o "visto" chegava e era ignorado — as 1.493 respostas de
+            // Instagram de outubro ficaram todas em "enviada". Com o `mid`, vale até a
+            // hora daquela mensagem. O Instagram não manda "entregue": o máximo é
+            // enviada → lida.
             const cliente = (m.sender as Record<string, unknown> | undefined)?.id as string | undefined;
-            const ate = leitura.watermark ? new Date(Number(leitura.watermark)).toISOString() : null;
+            let ate = leitura.watermark ? new Date(Number(leitura.watermark)).toISOString() : null;
+            if (!ate && typeof leitura.mid === "string" && leitura.mid) {
+              const { data: vista } = await db.from("mensagens").select("created_at")
+                .eq("empresa_id", canal.empresa_id).eq("external_id", leitura.mid).maybeSingle();
+              ate = (vista?.created_at as string | undefined) ?? null;
+              if (!ate) console.log(`visto do Instagram sem mensagem correspondente: ${tipo} ${leitura.mid}`);
+            }
             if (cliente && ate) {
               // O cliente é a identidade do canal (contato_identidades), não o lead:
               // pela view `leads` o mesmo cliente nas duas lojas vinha em duas linhas,
