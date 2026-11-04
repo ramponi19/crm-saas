@@ -51,6 +51,45 @@ as $function$
    where status = 'pendente' and data_venc < current_date;
 $function$;
 
+-- fundir_clientes() (fusão de /clientes) faz UPDATE em `cobrancas` e em mais 10 views de
+-- módulo. Todas passam para a tabela agora, de uma vez, para nenhum lote seguinte derrubar
+-- uma view que a fusão ainda usa. Ficam clientes, leads e lead_mensagens (lotes finais).
+-- A troca só casa nome depois de "update " ou "from " (a chave 'vendas' do jsonb de retorno
+-- fica como está) e confere que nada sobrou e que o resto do corpo não mudou de tamanho
+-- além das trocas.
+do $$
+declare
+  v_def text := pg_get_functiondef('public.fundir_clientes(bigint,bigint,bigint)'::regprocedure);
+  v_novo text := v_def;
+  v_par text[];
+  v_trocas int := 0;
+  v_n int;
+begin
+  foreach v_par slice 1 in array array[
+    ['lead_perfil_busca', 'imoveis_perfis_busca'],
+    ['negocios_imobiliarios', 'imoveis_negocios'],
+    ['orcamentos', 'assistencia_orcamentos'],
+    ['propostas', 'vendas_propostas'],
+    ['fichas_financiamento', 'vendas_fichas_financiamento'],
+    ['avaliacoes_usados', 'avaliacao_usados'],
+    ['inventario_unidades', 'estoque_unidades'],
+    ['vendas', 'vendas_vendas'],
+    ['cobrancas', 'financeiro_cobrancas'],
+    ['contratos_venda', 'vendas_contratos'],
+    ['garantias_assistencias', 'assistencia_garantias']]
+  loop
+    v_n := (select count(*) from regexp_matches(v_novo, '(update|from)(\s+)' || v_par[1] || '\M', 'gi'));
+    if v_n = 0 then raise exception 'fundir_clientes: % não encontrado no corpo', v_par[1]; end if;
+    v_trocas := v_trocas + v_n;
+    v_novo := regexp_replace(v_novo, '(update|from)(\s+)' || v_par[1] || '\M', '\1\2' || v_par[2], 'gi');
+  end loop;
+  if v_novo ~* '(update|from)\s+(lead_perfil_busca|negocios_imobiliarios|orcamentos|propostas|fichas_financiamento|avaliacoes_usados|inventario_unidades|vendas|cobrancas|contratos_venda|garantias_assistencias)\M' then
+    raise exception 'fundir_clientes: sobrou view de módulo no corpo';
+  end if;
+  if v_trocas <> 19 then raise exception 'fundir_clientes: % trocas, esperadas 19', v_trocas; end if;
+  execute v_novo;
+end $$;
+
 drop view public.cobrancas;
 drop view public.lancamentos_financeiros;
 drop view public.taxas_pagamento;
