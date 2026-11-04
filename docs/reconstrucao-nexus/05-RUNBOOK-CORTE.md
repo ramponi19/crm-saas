@@ -281,7 +281,12 @@ Migrações pelo `apply_migration` do MCP, uma por vez, com `GET /rest/v1/` (ano
 - Recusar um pedido de módulo grava `recusado` e não apaga mais.
 
 **Pendências que a noite deixou (código, nenhuma migração):**
-- **Pedido recusado some da tela.** Ele fica no banco, mas `/superadmin/pedidos`, a página da empresa no superadmin e a Central do dono só mostram `status = 'pendente'`, e o texto de `/superadmin/pedidos` ainda diz "recusar apaga o pedido". Falta uma seção de recusados, com data e quem recusou, e a correção do texto.
+- ~~**Pedido recusado some da tela.**~~ **Resolvido em 04/11, às 07h18** (`50fd6b4`, só app):
+  - `/superadmin/pedidos` ganhou o cartão "Recusados", com quem pediu e quem recusou;
+  - o texto "apaga" saiu;
+  - a Central mostra a recusa do último pedido ao dono e oferece "Pedir de novo".
+  
+  Smoke na empresa 5, ver o 06, seção 17.
 - **Os 134 UPDATE/DELETE/upsert que não conferem linhas** (cliente do usuário, 70 arquivos): `docs/reconstrucao-nexus/lista-update-sem-contagem-20261104.txt`. Pelo banco, só o `contatos` tinha o SELECT mais largo que o UPDATE. Nos outros, a política de escrita é de papel (admin/dono), e o risco é a tela deixar outro papel tentar. A regra para código novo é pedir `.select('id')` e passar por `nadaGravado()`.
 - **`contatos_delete`** continua só pela loja do próprio contato, mais estreito que o SELECT. Hoje não há DELETE de contato pelo cliente do usuário (fusão e desfazer usam a service_role).
 

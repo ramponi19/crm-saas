@@ -766,3 +766,25 @@ Ordem do prompt da noite (seção "Noite de 03/11/2026" do 05). Loja fechada, IO
   - **a moldura ainda lê a view `leads` 3 vezes por abertura** (sino, notification-provider, limite-banner). Saem com a Inbox única;
   - o MCP da Vercel perde a autorização de escopo de vez em quando. Nesse caso, conferir o deploy pelo GitHub (`gh api …/commits/<sha>/status`);
   - **a primeira abertura do quadro depois de um deploy (~1,5 s)** vale reconferir na próxima abertura da loja.
+
+## 17. 04/11 de manhã: pedido recusado aparece (`50fd6b4`), deploy só de app
+
+Modo construção (prompt do Lucas de 04/11): deploy de app a qualquer hora com IOwait abaixo de 20%, smoke com o Lucas e volta por Instant Rollback. DDL ou migração, só depois das 18h.
+
+- **O que subiu:**
+  - `/superadmin/pedidos` ganhou o cartão "Recusados" (os 50 mais recentes), com módulo, empresa, quem pediu, quem recusou e quando;
+  - o texto da página e do diálogo diz que o pedido fica como recusado e que a loja pode pedir de novo;
+  - a Central decide pelo último pedido de cada módulo (`pedidosERecusas`, em `lib/modulos-central.ts`). Se ele foi recusado, mostra "Seu pedido foi recusado em dd/mm" e o botão vira "Pedir de novo". Um pedido novo esconde a recusa;
+  - teste `tests/pedidos-recusados.test.ts`.
+- **Gate:** check, 204 testes, menu 15/15, verificador 547/5, build. IOwait 1,7% às 07h16. Push às 07h18, **READY 07h18min49s**, conferido pelo status do GitHub (o MCP da Vercel segue sem escopo). API: anon 42501, auth 200, saúde 200.
+- **Smoke às 07h20–07h28:** o Lucas entrou com a conta de superadmin numa aba isolada do chrome-devtools, e eu conduzi.
+  - `/superadmin/pedidos`: "Em aberto (0)" e "Recusados (1)" (Imóveis, Preview · Loja, recusado pelo Lucas às 06h03).
+  - Entrei pelo Laboratório na empresa 5 e abri `/modulos`: Imóveis "Em preparação" e "Seu pedido foi recusado em 04/11.", sem botão.
+  - ZapIntel → **Pedir**: pedido #3 pendente e "Pedido enviado".
+  - Recusar em `/superadmin/pedidos`: o diálogo mostrou o texto novo e o pedido foi para "Recusados (2)".
+  - De volta à Central: "Seu pedido foi recusado em 04/11. Você pode pedir de novo." e **Pedir de novo**. O clique gerou o #4 e "Pedido enviado", e a recusa sumiu.
+  - Limpeza: o #4 foi recusado. No banco ficaram 0 pendentes e #2, #3 e #4 `recusado` com data e autor, com 3 linhas `recusar_pedido_modulo` no log.
+  - A Central da JM (dono) segue igual: sem recusas e as 8 telas "Em preparação".
+- **Grep das views** (critério do 05): `leads` com 92 leituras em 51 arquivos e `lead_mensagens` com 24 em 10 arquivos (8 na Edge `webhook-leads`, 5 em `lib/storage/retencao.ts`, 3 no assistente, 2 no card, e 1 em cada um dos outros 6). Nenhuma zerou, então não há migração de drop.
+- **Para as 18h:** nada deste deploy.
+- **Volta (não usada):** Instant Rollback para `b518f17`.
