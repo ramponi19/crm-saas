@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { nadaGravado } from '@/lib/linhas-afetadas'
 
 /**
  * A INBOX ÚNICA LÊ O CORE DIRETO (04/11/2026): `conversas`, `contatos`,
@@ -233,13 +234,13 @@ export async function marcarConversaLida(db: Db, conversaId: number): Promise<nu
  * Nunca vai para o cliente.
  */
 export const TIPO_NOTA = 'conversa.nota'
-export interface NotaInbox { id: number; texto: string; por_usuario: string | null; em: string }
+export interface NotaInbox { id: number; texto: string; por_usuario: string | null; em: string; editada_em?: string | null }
 
 export async function notasDaConversa(db: Db, conversaId: number): Promise<NotaInbox[]> {
   const { data } = await db.from('eventos').select('id, dados, por_usuario, em')
     .eq('tipo', TIPO_NOTA).eq('entidade', 'conversa').eq('entidade_id', conversaId).order('em')
-  return ((data ?? []) as { id: number; dados: { texto?: string } | null; por_usuario: string | null; em: string }[])
-    .map((n) => ({ id: n.id, texto: n.dados?.texto ?? '', por_usuario: n.por_usuario, em: n.em }))
+  return ((data ?? []) as { id: number; dados: { texto?: string; editada_em?: string } | null; por_usuario: string | null; em: string }[])
+    .map((n) => ({ id: n.id, texto: n.dados?.texto ?? '', por_usuario: n.por_usuario, em: n.em, editada_em: n.dados?.editada_em ?? null }))
 }
 
 export async function gravarNota(
@@ -253,6 +254,27 @@ export async function gravarNota(
   }).select('id, em').single()
   if (error || !data) throw new Error(error?.message ?? 'Não foi possível gravar a nota.')
   return { id: (data as { id: number }).id, texto: t, por_usuario: userId, em: (data as { em: string }).em }
+}
+
+/**
+ * Editar e apagar a nota: só o AUTOR (migração 20261104000400, RLS de `eventos`).
+ * Pede as linhas de volta — com RLS, nota de outra pessoa vira 0 linhas sem erro, e
+ * a tela tem de dizer que não gravou (lib/linhas-afetadas.ts).
+ */
+export async function editarNota(db: Db, id: number, texto: string): Promise<void> {
+  const t = texto.trim()
+  if (!t) throw new Error('A nota não pode ficar vazia.')
+  const { data, error } = await db.from('eventos')
+    .update({ dados: { texto: t, editada_em: new Date().toISOString() } })
+    .eq('id', id).eq('tipo', TIPO_NOTA).select('id')
+  if (error) throw new Error(error.message)
+  if (nadaGravado(data)) throw new Error('Só quem escreveu a nota pode editá-la.')
+}
+
+export async function apagarNota(db: Db, id: number): Promise<void> {
+  const { data, error } = await db.from('eventos').delete().eq('id', id).eq('tipo', TIPO_NOTA).select('id')
+  if (error) throw new Error(error.message)
+  if (nadaGravado(data)) throw new Error('Só quem escreveu a nota pode apagá-la.')
 }
 
 // ── O negócio da conversa (para responder, tarefa e card) ──────────────────

@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CheckCheck, Check, Clock, FileText, History, ListPlus, Loader2, Paperclip, Send, StickyNote, AlertTriangle, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { Button, Input, Modal, Select, notify } from '@/components/ui'
+import { Button, ConfirmDialog, Input, Modal, Select, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { urlDeMidia } from '@/lib/storage/midia'
 import { formatarTextoChat } from '@/lib/texto-whatsapp'
 import { entregarViaEdge, ehTimeoutMeta, TIPO_DB } from '@/lib/envio-edge'
 import { useTempoReal, type EventoTR, type LinhaMensagemTR } from '@/components/layout/tempo-real-empresa'
 import {
-  criarTarefa, gravarNota, lerConversa, marcarConversaLida, mensagensDaConversa, negocioDaConversa, notasDaConversa,
+  apagarNota, criarTarefa, editarNota, gravarNota, lerConversa, marcarConversaLida, mensagensDaConversa, negocioDaConversa, notasDaConversa,
   type ConversaInbox, type MensagemInbox, type NegocioDaConversa, type NotaInbox,
 } from '@/lib/inbox/consultas'
 import { LeadModal } from '@/components/modules/leads/lead-modal'
@@ -390,7 +390,9 @@ export function ConversaPainel({
             )}
             {linhaDoTempo.length === 0 && <p className="py-8 text-center text-[13px] text-ink-3">Nenhuma mensagem nesta conversa.</p>}
             {linhaDoTempo.map((i) => (
-              i.tipo === 'nota' ? <BolhaNota key={`n${i.n.id}`} n={i.n} autor={nomeDe(i.n.por_usuario)} />
+              i.tipo === 'nota' ? <BolhaNota key={`n${i.n.id}`} n={i.n} autor={nomeDe(i.n.por_usuario)} minha={i.n.por_usuario === meuId}
+                  onMudou={(nova) => setNotas((l) => l.map((x) => (x.id === nova.id ? nova : x)))}
+                  onApagou={(id) => setNotas((l) => l.filter((x) => x.id !== id))} />
                 : i.tipo === 'otimista' ? <Bolha key={i.o.chave} lado="loja" conteudo={i.o.conteudo} tipo={i.o.tipo} midia={i.o.midia_url} hora="agora" status={i.o.status} erro={i.o.erro} />
                 : <Bolha key={i.m.id} id={i.m.id} lado={i.m.direcao === 'enviada' ? 'loja' : 'cliente'} conteudo={i.m.conteudo} tipo={i.m.tipo ?? 'texto'}
                     midia={i.m.midia_url} retida={i.m.midia_retida_em} transcricao={i.m.transcricao} hora={horaCurta(i.m.created_at)}
@@ -494,13 +496,69 @@ function AbaEscrita({ ativa, onClick, children }: { ativa: boolean; onClick: () 
   )
 }
 
-function BolhaNota({ n, autor }: { n: NotaInbox; autor: string | null }) {
+/**
+ * Nota interna. Quem escreveu pode editar e apagar (RLS de `eventos`, migração
+ * 20261104000400); os colegas da loja só leem.
+ */
+function BolhaNota({ n, autor, minha, onMudou, onApagou }: {
+  n: NotaInbox; autor: string | null; minha: boolean
+  onMudou: (n: NotaInbox) => void; onApagou: (id: number) => void
+}) {
+  const supabase = useMemo(() => createClient(), [])
+  const [editando, setEditando] = useState(false)
+  const [texto, setTexto] = useState(n.texto)
+  const [ocupado, setOcupado] = useState(false)
+  const [confirmar, setConfirmar] = useState(false)
+
+  async function salvar() {
+    setOcupado(true)
+    try {
+      await editarNota(supabase, n.id, texto)
+      onMudou({ ...n, texto: texto.trim(), editada_em: new Date().toISOString() })
+      setEditando(false)
+    } catch (e) {
+      notify.bad('Não foi possível editar a nota', (e as Error).message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+  async function apagar() {
+    setOcupado(true)
+    try {
+      await apagarNota(supabase, n.id)
+      onApagou(n.id)
+    } catch (e) {
+      notify.bad('Não foi possível apagar a nota', (e as Error).message)
+      setOcupado(false); setConfirmar(false)
+    }
+  }
+
   return (
     <div className="my-1 self-center rounded-control border border-warn/30 bg-warn-soft/60 px-3 py-2 text-[12.5px] text-ink sm:max-w-[80%]" data-nota-id={n.id}>
       <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-warn">
-        <StickyNote size={11} /> Nota interna · {autor ?? 'equipe'} · {horaCurta(n.em)}
+        <StickyNote size={11} /> Nota interna · {autor ?? 'equipe'} · {horaCurta(n.em)}{n.editada_em ? ' · editada' : ''}
+        {minha && !editando && (
+          <span className="ml-auto flex gap-2 normal-case tracking-normal">
+            <button className="font-medium hover:underline" onClick={() => { setTexto(n.texto); setEditando(true) }}>Editar</button>
+            <button className="font-medium hover:underline" onClick={() => setConfirmar(true)}>Apagar</button>
+          </span>
+        )}
       </div>
-      <div className="whitespace-pre-wrap">{n.texto}</div>
+      {editando ? (
+        <div className="flex flex-col gap-1.5">
+          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3}
+            className="w-full resize-y rounded-control border border-line bg-card px-2 py-1.5 text-[12.5px] outline-none focus:border-ink/30" />
+          <div className="flex justify-end gap-1.5">
+            <Button size="sm" variant="ghost" onClick={() => setEditando(false)}>Cancelar</Button>
+            <Button size="sm" loading={ocupado} disabled={!texto.trim()} onClick={salvar}>Salvar</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="whitespace-pre-wrap">{n.texto}</div>
+      )}
+      <ConfirmDialog open={confirmar} onClose={() => setConfirmar(false)} onConfirm={apagar}
+        title="Apagar esta nota?" description="A nota sai da conversa para toda a equipe. Não dá para desfazer."
+        confirmLabel="Apagar" tone="danger" loading={ocupado} />
     </div>
   )
 }
