@@ -377,6 +377,18 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
 - **Lote 2 sem e2e em dois caminhos:** a venda do PDV com cotação de troca e a volta da venda que falha. Ficaram com o gate, o verificador e a revisão. O e2e cobriu encomendas (local 11/11 e smoke na produção).
 - **`usuarios.json` do local está desatualizado:** a Rayssa está inativa na produção. Na foto, a visão de Jaguariúna usou a Vanessa Amorim Volpato.
 
+## 04/11/2026 15h: o "visto" do Instagram (`86cb640`, Edge v69)
+
+- **Causa:** o app (objeto `instagram`) e as duas contas (canais 25 e 26) assinavam só `messages`. Por isso as 1.493 respostas de Instagram dos últimos 30 dias ficaram todas em "enviada".
+- **Feito na Meta, com a autorização do Lucas:**
+  - `POST /{app-id}/subscriptions`: o objeto `instagram` passou a ter `messages`, `messaging_postbacks` e `messaging_seen`;
+  - `POST /me/subscribed_apps` nas duas contas: `messages` e `messaging_seen`.
+- **Edge v69 (15h26min45s):** o visto do login do Instagram chega como `read.mid`, não como `watermark`. Ele vale até a hora daquela mensagem, só no canal do Instagram e pelo contato da identidade. O `watermark` continua valendo.
+- **App:** a conta conectada daqui para frente já assina `messaging_seen` (`CAMPOS_CONTA_INSTAGRAM`). READY às 15h28min41s.
+- **Regra:** o Instagram não manda "entregue". O máximo é enviada → lida.
+- **Volta:** republicar a v68, que é o código de `b189647` (`git show b189647:supabase/functions/webhook-leads/…`). Na Meta, tirar `messaging_seen` das assinaturas é inofensivo.
+- **Grep das views:** `leads` com 85 leituras em 47 arquivos e `lead_mensagens` com 15 em 8, sem mudança.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

@@ -936,3 +936,24 @@ Nenhuma das duas views zerou, então não há migração de drop.
 
 ### Ficaram no banco, de teste
 - As mensagens "teste edge" e as duas "Resposta do teste da Edge v68 (…) — pode ignorar". Elas se somam às "teste inbox" da manhã.
+
+## 20. 04/11 às 15h: o "visto" do Instagram vira "lida" (`86cb640`, Edge v69)
+
+- **Leitura na Meta**, com o token do app e o da conta, sem imprimir nenhum:
+  - **App, objeto `instagram`:** só `messages` e `messaging_postbacks`. O objeto `page` já tinha `message_deliveries` e `message_reads`.
+  - **Contas** @jmstore_importados (canal 26, Mogi) e @jmstore_jaguariuna (canal 25): `["messages"]`.
+- **Assinado** (autorizado): o app ficou com `messages`, `messaging_postbacks` e `messaging_seen` (`success`), e as duas contas com `messages` e `messaging_seen` (`success`), conferido em nova leitura.
+- **Edge:** o `messaging_seen` manda `read.mid`, e o código só entendia `watermark`.
+  - O conserto busca a hora da mensagem do `mid` e marca "lida" nas enviadas até ela, pelo contato da identidade e só neste canal.
+  - **No local** (`visto-mid.mjs`), 6/6: até a vista fica lida; a posterior continua enviada; o WhatsApp do mesmo contato continua enviado; `mid` desconhecido não muda nada; `watermark` funciona. Os 25 cenários da Edge também passaram.
+- **Gate:** 215 testes, verificador 570/5, build. IOwait 14% às 15h20.
+- **Deploy:**
+  - o push às 15h25 foi barrado primeiro pelo modo automático e refeito no modo manual;
+  - Edge **v69 às 15h26min45s**;
+  - app **READY às 15h28min41s**;
+  - API ok.
+- **Smoke com o Lucas:**
+  - mandei "Teste do visto no Instagram (v69)" às 15h27min31s, e ela ficou "enviada";
+  - o Lucas leu no Direct, e às **15h28min40s** ela virou **"lida"**;
+  - as respostas anteriores da conversa 1941, presas em "enviada" desde outubro, também viraram "lida", porque o visto vale até a mensagem vista.
+- **Regra registrada:** o Instagram não manda "entregue". O máximo é enviada → lida.
