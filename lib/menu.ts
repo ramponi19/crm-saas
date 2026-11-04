@@ -234,7 +234,9 @@ export interface ResolverMenuInput {
 const PROTEGIDOS = new Set<string>()
 
 // Núcleo: sempre habilitado, independente do opt-in da base.
-const NUCLEO = new Set(['/dashboard', '/leads', '/clientes'])
+// /comunicacao (Inbox única, 04/11/2026): núcleo porque toda empresa conversa com cliente — sem ela o
+// atendimento ficaria preso ao card do lead.
+const NUCLEO = new Set(['/dashboard', '/leads', '/clientes', '/comunicacao'])
 
 /** Itens marcados `sempreLiberado` / `donoNaoOculta` (preenchidos depois do CATALOGO). */
 let SEMPRE: Set<string> = new Set()
@@ -284,6 +286,8 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
       { href: '/tarefas', label: 'Tarefas', icon: 'CheckSquare' },
       { href: '/agenda', label: 'Agenda', icon: 'Calendar', opcional: true },
+      // Inbox única (04/11/2026): WhatsApp, Instagram e Messenger numa tela só. Núcleo — toda empresa conversa.
+      { href: '/comunicacao', label: 'Comunicação', icon: 'MessageSquareText' },
       { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true, badge: 'chat' },
     ],
   },
@@ -649,7 +653,7 @@ export const GRUPOS_MENU: { id: GrupoMenuId; label: string; icon: string }[] = [
  */
 export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/dashboard': 'inicio', '/tarefas': 'inicio', '/agenda': 'inicio',
-  '/chat': 'comunicacao',
+  '/comunicacao': 'comunicacao', '/chat': 'comunicacao',
   '/leads': 'pipeline', '/clientes': 'pipeline', '/fila': 'pipeline', '/gestao-leads': 'pipeline',
   '/orcamentos': 'vendas', '/propostas': 'vendas', '/pdv': 'vendas', '/historico': 'vendas',
   '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',

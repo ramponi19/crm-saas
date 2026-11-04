@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { MobileTopbar } from '@/components/layout/mobile-topbar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
+import { TempoRealEmpresa } from '@/components/layout/tempo-real-empresa'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
@@ -124,6 +125,8 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
+      {/* Uma assinatura de tempo real por aba (sino, título, avisos, Comunicação). */}
+      <TempoRealEmpresa empresaId={empresaId}>
       {/* Erro que chega sem dono custa uma investigação inteira — ver o
           componente. Fica no layout porque vale para TODAS as telas logadas. */}
       <SentryUsuario
@@ -192,6 +195,7 @@ export default async function DashboardLayout({
       <NotificationProvider empresaNome={empresa?.nome ? `${empresa.nome} — CRM` : undefined} />
       <SessionGuard />
       <AssistenteWidget />
+      </TempoRealEmpresa>
     </EmpresaProvider>
   )
 }

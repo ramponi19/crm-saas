@@ -9,6 +9,7 @@ import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import { useEmpresa } from '@/lib/empresa-context'
 import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
 import { urlDeMidia } from '@/lib/storage/midia'
+import { entregarViaEdge, ehTimeoutMeta, TIPO_DB } from '@/lib/envio-edge'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import type { CardDoLead } from '@/lib/card-do-lead'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
@@ -67,48 +68,7 @@ const CANAL_NOME: Record<string, string> = {
   whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', site: 'Site', manual: 'Loja',
 }
 
-// ⚠️ Zona sensível (Meta). Entrega real acontece na Edge Function, pela Graph API.
-// NÃO alterar a lógica abaixo sem alinhamento — impacta a aprovação de API da Meta.
-const FUNCTIONS_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
-
-// Manda o token da SESSÃO, não a anon key. A anon key é pública (vai no bundle do
-// front), então antes qualquer pessoa que a copiasse conseguia disparar mensagem
-// pela conta do cliente. A Edge agora exige este token e confere se o usuário
-// pertence à empresa dona do lead.
-async function entregarViaEdge(
-  supabase: ReturnType<typeof createClient>,
-  action: 'send' | 'send_meta' | 'send_template',
-  payload: Record<string, unknown>,
-) {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error('Sessão expirada. Entre novamente para enviar.')
-
-  const res = await fetch(`${FUNCTIONS_URL}?action=${action}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  const data = await res.json().catch(() => ({} as Record<string, unknown>))
-  if (!res.ok || (data as { error?: string }).error) {
-    const { error, codigo } = data as { error?: string; codigo?: string }
-    throw new ErroEnvio(error ?? 'Falha ao enviar a mensagem', codigo)
-  }
-}
-
-/**
- * Erro do envio com o código da Edge. `timeout_meta` é diferente dos outros: a
- * mensagem JÁ FOI GRAVADA (como falha_envio) e pode até ter chegado ao cliente —
- * a bolha fica na conversa com "Tentar de novo", em vez de sumir e voltar para o
- * campo de texto, o que levaria a mandar duas vezes sem perceber.
- */
-class ErroEnvio extends Error {
-  constructor(mensagem: string, readonly codigo?: string) { super(mensagem) }
-}
-const ehTimeoutMeta = (e: unknown) => e instanceof ErroEnvio && e.codigo === 'timeout_meta'
+// Envio pela Edge (entregarViaEdge, ErroEnvio, ehTimeoutMeta): lib/envio-edge.ts — o mesmo da Inbox.
 
 interface ChatMsg {
   from: 'cliente' | 'loja'; text: string; time: string; tipo?: string; midiaUrl?: string | null
@@ -165,7 +125,6 @@ type LinhaMsg = {
 
 // Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
 const ehPlaceholderMidia = (t: string) => /^\[(imagem|video|audio|midia|documento)\]$/.test(t)
-const TIPO_DB: Record<'image' | 'video' | 'audio', string> = { image: 'imagem', video: 'video', audio: 'audio' }
 
 /**
  * Áudio da conversa.

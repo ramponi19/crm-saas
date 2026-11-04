@@ -133,11 +133,18 @@ v "tempo esgotado nao vira rajada"  "hooks/zapintel/useRpcAoVivo.ts" "error.code
 v "testes existem"                  "package.json" "\"test\": \"node --import ./tests/alias.mjs"
 # -- estabilizacao (15/10/2026, fase 3) -----------------------------------------
 n "sino nao agrega a view"          "components/layout/topbar.tsx" "from('v_leads_nao_lidas')"
-v "sino le o contador do lead"      "components/layout/topbar.tsx" ".gt('msgs_nao_lidas', 0)"
-v "sino pagina alem de 1000"        "components/layout/topbar.tsx" ".range(de, de + 999)"
-v "sino so escuta recebidas"        "components/layout/topbar.tsx" "filter: 'direcao=eq.recebida'"
+# 04/11/2026 (Inbox única): o sino mora no hub de tempo real da aba e conta CONVERSAS pelo contador
+# conversas.nao_lidas (gatilho core_mensagens_sincroniza) — nunca pela view leads.
+v "sino le o contador da conversa"  "components/layout/tempo-real-empresa.tsx" ".gt('nao_lidas', 0)"
+n "sino nao le a view leads"        "components/layout/topbar.tsx" "from('leads')"
+n "sino nao le a view leads (hub)"  "components/layout/tempo-real-empresa.tsx" "from('leads')"
+v "sino pagina alem de 1000"        "components/layout/tempo-real-empresa.tsx" ".range(de, de + 999)"
+# Não relê nada a cada mensagem: o evento de conversas já traz o contador novo.
+v "sino escuta conversas da empresa" "components/layout/tempo-real-empresa.tsx" "table: 'conversas', filter: filtro"
+n "topo nao abre canal proprio"     "components/layout/topbar.tsx" ".channel("
 n "sino nao escuta tudo"            "components/layout/topbar.tsx" "event: '*', schema: 'public', table: 'lead_mensagens'"
-v "sino recarrega ao reconectar"    "components/layout/topbar.tsx" "if (caiu) { caiu = false; scheduleLoad() }"
+v "sino recarrega ao reconectar"    "components/layout/tempo-real-empresa.tsx" "carregarSino()"
+v "reconexao avisa quem escuta"     "components/layout/tempo-real-empresa.tsx" "for (const fn of reconexao.current)"
 v "migracoes pendentes com volta"   "supabase/pendentes/03_rls_uma_vez_por_consulta.volta.sql" "backup.rls_politicas_20261015"
 v "zapintel so dono/admin (regra)"  "lib/zapintel/quem-usa.ts" "'owner', 'admin'"
 v "zapintel so dono/admin (tela)"   "app/zapintel/layout.tsx" "if (liberado && !papelOk)"
@@ -701,9 +708,12 @@ v "log diz QUAL segredo existe"       "supabase/functions/webhook-leads/index.ts
 v "perfil do IG pelo host certo"      "supabase/functions/webhook-leads/index.ts" "graph.instagram.com\" : \"https://graph.facebook.com"
 v "lead nasce na loja do canal"       "supabase/functions/webhook-leads/index.ts" "canal.filial_id != null ? { filial_id: canal.filial_id }"
 v "assinatura leva o nome da loja"    "supabase/functions/webhook-leads/index.ts" "select(\"nome\").eq(\"id\", filialId)"
-v "notificacao respeita a RLS"        "components/layout/topbar.tsx" "if (!podeVer) return"
-v "toast so com lead visivel"        "components/layout/notification-provider.tsx" "if (!lead) return"
-v "toast abre a conversa"            "components/layout/notification-provider.tsx" "/leads?lead="
+# 04/11/2026: o aviso do navegador saiu do topo e mora com o toast, no hub. Quem filtra é a RLS
+# do Realtime (o canal só entrega a esta sessão o que ela pode ver); nenhum canal próprio.
+v "notificacao respeita a RLS"        "components/layout/notification-provider.tsx" "useTempoReal()"
+n "aviso nao abre canal proprio"      "components/layout/notification-provider.tsx" ".channel("
+v "toast so com mensagem recebida"   "components/layout/notification-provider.tsx" "e.novo.direcao !== 'recebida'"
+v "toast abre a conversa"            "components/layout/notification-provider.tsx" "/comunicacao?c="
 v "busca abre a conversa"            "components/layout/command-palette.tsx" "/leads?lead="
 v "leads le o lead da URL"           "components/modules/leads/leads-view.tsx" "params.get('lead')"
 v "roleta sorteia so na loja"        "lib/roleta.ts" "m.filial_id === alvo"
@@ -717,7 +727,7 @@ v "recebimento zera na transferencia" "app/api/estoque/transferir/route.ts" "rec
 v "movimento nas duas lojas"          "app/api/estoque/transferir/route.ts" "transferencia_entrada"
 # 04/11/2026: as não lidas do quadro são contadas no banco (quadro_base), como v_leads_nao_lidas.
 v "nao lidas contadas no banco"      "supabase/migrations/20261104000200_quadro_core.sql" "join mensagens m on m.conversa_id = x.id and m.direcao = .recebida. and not m.lida"
-v "sino conta no banco tambem"       "components/layout/topbar.tsx" "v_leads_nao_lidas"
+v "sino conta no banco tambem"       "components/layout/tempo-real-empresa.tsx" "from('conversas').select(COLUNAS_SINO)"
 n "borda nao soma nao lidas a mao"   "supabase/functions/webhook-leads/index.ts" "rpc(\"incrementar_msgs_nao_lidas\""
 v "abrir conversa marca sem perguntar" "components/modules/leads/lead-modal.tsx" "count: 'exact'"
 v "contrato descreve pagamento dividido" "lib/contrato-emitir.ts" "vendas_pagamentos"

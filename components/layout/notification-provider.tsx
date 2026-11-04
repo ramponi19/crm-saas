@@ -1,24 +1,35 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { TABELAS, mensagemComLead } from '@/lib/realtime/tabelas'
 import { X, Bell } from 'lucide-react'
+import { useTempoReal } from './tempo-real-empresa'
 
 interface ToastNotif {
   id: string
   titulo: string
   corpo: string
-  leadId?: number
+  conversaId?: number
 }
 
+/**
+ * Título da aba, aviso na tela e aviso do navegador para mensagem recebida.
+ *
+ * Desde 04/11/2026 (Inbox única) tudo sai do hub de tempo real da aba
+ * (tempo-real-empresa.tsx): sem canal próprio e sem reler `lead_mensagens` e
+ * `leads` a cada mensagem só para saber se a pessoa podia ver. O que o hub
+ * entrega já passou pela RLS do Realtime — empresa e loja selecionada —, então
+ * mensagem que chega aqui é mensagem que esta pessoa enxerga.
+ *
+ * Título: (nº de CONVERSAS com mensagem recebida não lida) empresa — CRM. O
+ * mesmo número do sino.
+ */
 export function NotificationProvider({ empresaNome }: { empresaNome?: string }) {
   const router = useRouter()
   const nomeAba = empresaNome?.trim() || 'Nexus CRM'
+  const { assinar, naoLidas, pronto } = useTempoReal()
   const [toasts, setToasts] = useState<ToastNotif[]>([])
-  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
@@ -29,94 +40,45 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
     setTimeout(() => removeToast(t.id), 6000)
   }, [removeToast])
 
+  const n = naoLidas.length
   useEffect(() => {
-    const supabase = createClient()
+    if (!pronto) return
+    document.title = n > 0 ? `(${n}) ${nomeAba}` : nomeAba
+  }, [n, nomeAba, pronto])
 
-    /**
-     * Título da aba: (nº de LEADS ativos aguardando resposta) empresa — CRM.
-     *
-     * Contava varrendo `lead_mensagens` por `lida = false`, SEM olhar se o lead
-     * ainda está ativo. Ao arquivar a base antiga, a aba passou a anunciar 184
-     * conversas pendentes que não existem mais para ninguém — e número que não
-     * corresponde a nada é pior que número nenhum: ensina o vendedor a ignorar o
-     * aviso.
-     *
-     * Agora lê o contador do próprio lead: uma consulta em `leads` em vez de
-     * trazer milhares de mensagens para contar no navegador.
-     */
-    async function updateTitle() {
-      const { count } = await supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('ativo', true)
-        .gt('msgs_nao_lidas', 0)
-      const n = count ?? 0
-      document.title = n > 0 ? `(${n}) ${nomeAba}` : nomeAba
+  useEffect(() => assinar(async (e) => {
+    if (e.tabela !== 'mensagens' || e.tipo !== 'INSERT' || e.novo.direcao !== 'recebida') return
+    const m = e.novo
+    // Quem está com esta conversa aberta na Comunicação, com a aba à vista, já está vendo.
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible'
+      && window.location.pathname === '/comunicacao'
+      && new URLSearchParams(window.location.search).get('c') === String(m.conversa_id)) return
+
+    let nome: string | null = null
+    if (m.contato_id != null) {
+      try {
+        const { data } = await createClient().from('contatos').select('nome').eq('id', m.contato_id).maybeSingle()
+        nome = (data as { nome: string | null } | null)?.nome ?? null
+      } catch { /* sem nome: aviso genérico */ }
     }
-    updateTitle()
+    const titulo = nome ? `Nova mensagem de ${nome}` : 'Nova mensagem'
+    const corpo = m.conteudo?.slice(0, 100) ?? ''
+    addToast({ id: `${m.id}-${Date.now()}`, titulo, corpo, conversaId: m.conversa_id ?? undefined })
 
-    // Realtime: escuta novas mensagens recebidas
-    const channel = supabase
-      .channel(`notif_global_${Date.now()}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: TABELAS.mensagem,
-      }, async (payload: RealtimePostgresChangesPayload<{ id: number; direcao: string; lead_id: number; conteudo: string | null }>) => {
-        if ((payload.new as { direcao?: string }).direcao !== 'recebida') return
-        // No v1 a linha vem de mensagens, sem lead_id: relida pela view (lib/realtime/tabelas).
-        const novo = await mensagemComLead<{ id: number; direcao: string; lead_id: number; conteudo: string | null }>(supabase, payload.new)
-        if (!novo) return
-
-        updateTitle()
-
-        /**
-         * SÓ AVISA SE A PESSOA PODE VER O LEAD — quem decide é a RLS.
-         *
-         * Com a Jaguariúna selecionada no topo, o lead de Mogi some da lista mas
-         * a notificação dele subia na tela, com o texto da mensagem do cliente.
-         * A consulta abaixo já era feita, e o resultado nulo era ignorado: o
-         * toast aparecia mesmo assim, como "Nova mensagem" genérica. Aviso que
-         * vaza é pior que lista que vaza, porque chega sozinho e ninguém pediu.
-         *
-         * Não replicar a regra de loja aqui: pergunta-se ao banco, e o banco
-         * responde com o que aquela sessão enxerga.
-         */
-        let lead: { nome: string | null } | null = null
-        try {
-          const { data } = await supabase
-            .from('leads')
-            .select('nome')
-            .eq('id', novo.lead_id)
-            .maybeSingle()
-          lead = data as { nome: string | null } | null
-        } catch { return }
-        if (!lead) return
-
-        addToast({
-          id: `${novo.id}-${Date.now()}`,
-          titulo: lead.nome ? `Nova mensagem de ${lead.nome}` : 'Nova mensagem',
-          corpo: novo.conteudo?.slice(0, 100) ?? '',
-          leadId: novo.lead_id,
-        })
-      })
-      // Mensagens marcadas como lidas (UPDATE em `lida`) fazem o contador da aba
-      // DESCER em tempo real — sem toast, só recalcula.
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: TABELAS.mensagem,
-      }, () => {
-        updateTitle()
-      })
-      .subscribe()
-
-    channelRef.current = channel
-
-    return () => {
-      supabase.removeChannel(channel)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const notif = new Notification(titulo, {
+          body: m.conteudo?.slice(0, 120) ?? '',
+          tag: `conversa-${m.conversa_id ?? m.id}`,
+          renotify: true,
+        } as NotificationOptions)
+        notif.onclick = () => { window.focus(); router.push(m.conversa_id ? `/comunicacao?c=${m.conversa_id}` : '/comunicacao') }
+        setTimeout(() => { try { notif.close() } catch {} }, 8000)
+      } catch (err) {
+        console.warn('[avisos] falha ao disparar notificação do navegador:', err)
+      }
     }
-  }, [addToast, nomeAba])
+  }), [assinar, addToast, router])
 
   if (toasts.length === 0) return null
 
@@ -136,12 +98,12 @@ export function NotificationProvider({ empresaNome }: { empresaNome?: string }) 
             {t.corpo && (
               <div className="mt-0.5 line-clamp-2 text-[12px] text-ink-2">{t.corpo}</div>
             )}
-            {t.leadId && (
+            {t.conversaId && (
               <button
-                onClick={() => { router.push(`/leads?lead=${t.leadId}`); removeToast(t.id) }}
+                onClick={() => { router.push(`/comunicacao?c=${t.conversaId}`); removeToast(t.id) }}
                 className="mt-1.5 text-[11.5px] font-semibold text-accent transition-colors hover:text-accent/80"
               >
-                Abrir lead →
+                Abrir conversa →
               </button>
             )}
           </div>
