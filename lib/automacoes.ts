@@ -249,6 +249,11 @@ export async function executarEntradaEtapa(db: Db, empresaId: number, lead: Lead
   const neg = await lerNegocio(db, lead.id)
   if (!neg) return
   const agora = new Date()
+  // Entrou de novo na etapa: o que ainda esperava desta mesma automação para este
+  // negócio é substituído pelo agendamento novo (senão "esperar 2 dias" rodaria duas vezes).
+  await db.from('automacao_execucoes')
+    .update({ status: 'pulada', motivo: 'substituída: entrou de novo na etapa' } as never)
+    .eq('negocio_id', neg.id).eq('status', 'agendada').in('automacao_id', lista.map((a) => a.id))
   const { data: criadas, error } = await db.from('automacao_execucoes').insert(lista.map((a) => ({
     empresa_id: empresaId, filial_id: neg.filial_id, automacao_id: a.id, negocio_id: neg.id, contato_id: neg.contato_id,
     acao: a.acao, modelo_id: a.modelo_id ?? null, status: 'agendada',
