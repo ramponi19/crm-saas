@@ -55,13 +55,13 @@ export async function atualizarReferencia(svc: Svc = createServiceClient()): Pro
   const maisRecente = tabela.reduce((a, b) => (b.Codigo > a.Codigo ? b : a), tabela[0])
   const codigo = maisRecente?.Codigo ?? null
   const mes = maisRecente?.Mes?.trim() ?? null
-  await svc.from('fipe_referencia').update({ codigo, mes, atualizado_em: new Date().toISOString() }).eq('id', 1)
+  await svc.from('avaliacao_fipe_referencia').update({ codigo, mes, atualizado_em: new Date().toISOString() }).eq('id', 1)
   return { codigo, mes }
 }
 
 /** Mês de referência atual (revalida se estiver velho; resiliente: mantém o último se a fonte cair). */
 export async function getReferenciaAtual(svc: Svc = createServiceClient()): Promise<{ codigo: number | null; mes: string | null }> {
-  const { data } = await svc.from('fipe_referencia').select('codigo, mes, atualizado_em').eq('id', 1).maybeSingle()
+  const { data } = await svc.from('avaliacao_fipe_referencia').select('codigo, mes, atualizado_em').eq('id', 1).maybeSingle()
   const velho = !data?.atualizado_em || (Date.now() - new Date(data.atualizado_em).getTime()) > REF_TTL_MS
   if (data?.codigo && !velho) return { codigo: data.codigo, mes: data.mes }
   try {
@@ -97,7 +97,7 @@ export async function consultarValor(
   if (!codigo) throw new Error('Referência FIPE indisponível')
 
   const { data: cache } = await svc
-    .from('fipe_consultas')
+    .from('avaliacao_fipe_consultas')
     .select('valor, codigo_fipe, mes_referencia, marca_nome, modelo_nome, ano')
     .eq('tipo', tipo).eq('codigo_marca', marca).eq('codigo_modelo', modelo).eq('ano', ano).eq('referencia_codigo', codigo)
     .maybeSingle()
@@ -123,7 +123,7 @@ export async function consultarValor(
     marca: r.Marca ?? args.marcaNome ?? null, modelo: r.Modelo ?? args.modeloNome ?? null, anoModelo: r.AnoModelo ?? (Number(anoModeloStr) || null),
   }
   // grava no cache (idempotente por unique)
-  await svc.from('fipe_consultas').upsert({
+  await svc.from('avaliacao_fipe_consultas').upsert({
     tipo, codigo_marca: marca, codigo_modelo: modelo, ano, referencia_codigo: codigo,
     marca_nome: out.marca, modelo_nome: out.modelo, ano_label: args.anoLabel ?? null,
     valor: out.valor, codigo_fipe: out.codigoFipe, mes_referencia: out.mesReferencia,

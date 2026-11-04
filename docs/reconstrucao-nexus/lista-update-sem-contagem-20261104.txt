@@ -25,9 +25,9 @@ app/(dashboard)/clientes/components/cliente-modal.tsx:185  update clientes  (sup
 app/(dashboard)/equipe/components/equipe-view.tsx:266  update metas_comissoes  (supabase)
 app/(dashboard)/estoque/components/produto-modal.tsx:119  update produtos  (supabase)
 app/(dashboard)/estoque/components/produto-modal.tsx:130  update produtos  (supabase)
-app/(dashboard)/estoque/components/unidade-modal.tsx:120  upsert veiculo_dados  (supabase)
-app/(dashboard)/estoque/components/unidade-modal.tsx:139  update inventario_unidades  (supabase)
-app/(dashboard)/estoque/components/unidade-modal.tsx:149  update inventario_unidades  (supabase)
+app/(dashboard)/estoque/components/unidade-modal.tsx:120  upsert veiculo_dados  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3); tabela agora estoque_veiculo_dados
+app/(dashboard)/estoque/components/unidade-modal.tsx:139  update inventario_unidades  (supabase)  >> FEITO lote views-1: salvar unidade com 0 linhas avisa
+app/(dashboard)/estoque/components/unidade-modal.tsx:149  update inventario_unidades  (supabase)  >> FEITO lote views-1: remover unidade com 0 linhas avisa
 app/(dashboard)/financeiro/components/financeiro-view.tsx:216  update lancamentos_financeiros  (supabase)
 app/(dashboard)/financeiro/components/financeiro-view.tsx:230  delete lancamentos_financeiros  (supabase)
 app/(dashboard)/financeiro/components/financeiro-view.tsx:239  update cobrancas  (supabase)
@@ -78,7 +78,7 @@ app/api/funis/route.ts:103  delete funis  (supabase)
 app/api/garantia/termo/route.ts:51  update vendas_termos  (supabase)
 app/api/orcamentos/route.ts:164  delete orcamentos  (supabase)
 app/api/payments/config/route.ts:47  upsert tenant_payment_config  (supabase)
-app/api/payments/webhook/[provider]/route.ts:89  update cobrancas  (supabase)
+app/api/payments/webhook/[provider]/route.ts:89  update cobrancas  (supabase)  >> FICA: o cliente é createServiceClient (sem RLS); entrou pelo nome da variável
 app/api/propostas/route.ts:46  update propostas  (supabase)
 app/api/propostas/route.ts:55  delete propostas  (supabase)
 app/api/push/subscribe/route.ts:17  upsert push_subscriptions  (supabase)

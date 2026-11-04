@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Unidade {
   id?: number
@@ -117,7 +118,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
      */
     async function gravarVeiculo(unidadeId: number) {
       if (!isVeiculo) return
-      const { error } = await supabase.from('veiculo_dados').upsert({
+      const { error } = await supabase.from('estoque_veiculo_dados').upsert({
         unidade_id: unidadeId,
         empresa_id: empresaId,
         placa: form.placa, chassi: form.chassi, renavam: form.renavam,
@@ -136,8 +137,9 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
       await gravarVeiculo(data.id)
       notify.ok('Unidade adicionada ao estoque')
     } else {
-      const { error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!)
+      const { data: gravou, error } = await supabase.from('inventario_unidades').update(payload as TablesUpdate<'inventario_unidades'>).eq('id', unidade!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
+      if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       await gravarVeiculo(unidade!.id!)
       notify.ok('Unidade atualizada')
     }
@@ -146,7 +148,9 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   }
 
   async function excluir() {
-    await supabase.from('inventario_unidades').update({ ativo: false }).eq('id', unidade!.id!)
+    const { data: removeu, error } = await supabase.from('inventario_unidades').update({ ativo: false }).eq('id', unidade!.id!).select('id')
+    if (error) { notify.bad('Erro ao remover', error.message); return }
+    if (nadaGravado(removeu)) { notify.bad('Erro ao remover', NADA_GRAVADO); return }
     notify.ok('Removido do estoque')
     router.refresh()
     onClose()

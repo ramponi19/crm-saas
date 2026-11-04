@@ -82,7 +82,7 @@ export function CheckImeiView({ consultas }: { consultas: ConsultaImei[] }) {
       const empresaId = await empresaAtualId(supabase)
       if (!empresaId) { notify.bad('Empresa não encontrada'); return }
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase.from('imei_consultas').insert({
+      const { error } = await supabase.from('estoque_imei_consultas').insert({
         empresa_id: empresaId,
         imei: digitos,
         resultado,

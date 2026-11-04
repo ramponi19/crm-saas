@@ -31,7 +31,7 @@ export default async function EstoquePage() {
     // (ver lib/estoque-campos). `cores`/`armazenamentos` são as listas do próprio
     // produto, para não digitar variante à mão.
     supabase.from('produtos').select(`id, nome, marca_id, categoria_id, ativo, cores, armazenamentos, marcas_produtos!marca_id(nome), categorias_produtos!categoria_id(nome, tipo_formulario)`).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    supabase.from('movimentacao_estoque').select(`*, produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
+    supabase.from('estoque_movimentacoes').select(`*, produtos:estoque_produtos!produto_id(nome), usuarios!usuario_id(nome)`).eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100),
     // Estoque de veículos: a empresa tem o campo placa no item (criado pelo preset).
     campoAtivo(supabase, empresaId ?? 0, 'item', 'placa'),
     // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
@@ -105,7 +105,7 @@ export default async function EstoquePage() {
     }
   })
 
-  type MovRow = Tables<'movimentacao_estoque'> & {
+  type MovRow = Tables<'estoque_movimentacoes'> & {
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
   }

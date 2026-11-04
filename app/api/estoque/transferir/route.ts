@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
    * histórico é ruim; reverter a unidade e deixar o físico e o sistema em
    * desacordo é pior.
    */
-  const { error: erroMov } = await supabase.from('movimentacao_estoque').insert(linhas)
+  const { error: erroMov } = await supabase.from('estoque_movimentacoes').insert(linhas)
 
   return NextResponse.json({
     ok: true,

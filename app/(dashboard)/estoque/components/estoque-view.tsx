@@ -726,7 +726,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     let cancelado = false
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from('imei_consultas')
+        .from('estoque_imei_consultas')
         .select('resultado, motivo, consultado_em')
         .eq('empresa_id', empresaId).eq('imei', d)
         .order('consultado_em', { ascending: false }).limit(1)
@@ -936,7 +936,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
      * perder a entrada do balcão não.
      */
     if (campos.veiculo && (form.placa || form.chassi || form.renavam || form.km || form.ano)) {
-      const { error: erroVeic } = await supabase.from('veiculo_dados').insert({
+      const { error: erroVeic } = await supabase.from('estoque_veiculo_dados').insert({
         unidade_id: data.id,
         empresa_id: empresaId,
         placa: form.placa || null,

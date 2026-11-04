@@ -38,7 +38,7 @@ export async function POST(
 
     // 2) Idempotência: rejeitar duplicatas silenciosamente
     const { data: jaProcessado } = await supabase
-      .from('payment_webhook_eventos')
+      .from('financeiro_webhook_eventos')
       .select('id')
       .eq('provider', provider)
       .eq('provider_ref', refPreliminar)
@@ -81,7 +81,7 @@ export async function POST(
 
     // Registrar idempotência antes de qualquer efeito colateral
     await supabase
-      .from('payment_webhook_eventos')
+      .from('financeiro_webhook_eventos')
       .insert({ provider, provider_ref: refPreliminar })
       .throwOnError()
 
