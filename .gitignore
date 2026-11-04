@@ -57,3 +57,7 @@ deno.lock
 
 # dumps do banco (dado pessoal de cliente): nunca no git
 /dumps/
+
+# Prints de tela (Kommo e Nexus em producao) — tem dado de cliente: nunca no git
+/docs/reconstrucao-nexus/kommo/
+/docs/reconstrucao-nexus/nexus/
