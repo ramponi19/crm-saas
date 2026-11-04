@@ -182,7 +182,13 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
   - **Segmento no código: zero condicionais** (152/152 caíram). A palavra fica em 14 arquivos, 36 ocorrências (`scripts/segmento-excecoes.json`): `register` 2, `presets_onboarding` 2 (tela `/superadmin/presets`), `texto_publico` 10 (landing e descrição do site — decisão do Lucas, 03/11). A lista só encolhe.
 - **Lista de morte — o que fica, e até quando:**
   - **Volta do zero-segmento** (`supabase/scripts/volta/volta-presets-completos.sql`, ida/volta/ida testada no local): guardar até a próxima limpeza; volta junto com o Instant Rollback para `53cc73d` (código novo sem `itens.base` cai para o núcleo; código velho com a volta fica como antes);
-  - `ops.volta_filial_20261020`: volta do principal por loja. **Entra no DROP da próxima noite com migração** (decisão do Lucas, 03/11): `20261104000100_drop_volta_filial.sql` na branch `db/proxima-noite`, não aplicada; antes de aplicar, copiar as 131 linhas para `dumps/`. O script `volta-principal-por-loja.sql` sai junto;
+  - ~~`ops.volta_filial_20261020`~~ — **saiu na noite de 03/11** (`20261104000100`, 20:45). As 131 linhas estão em `dumps/2026-11-03-noite/volta_filial_20261020.json` (md5 `32f27e0c…`), e a volta é `restaurar-volta_filial_20261020.sql` no mesmo lugar. O script `volta-principal-por-loja.sql` sai na próxima limpeza;
+  - **Voltas da noite de 03/11, guardadas até a próxima limpeza:**
+    - `supabase/scripts/volta/volta-quadro-core.sql`, que apaga as 4 funções `quadro_*`;
+    - `supabase/scripts/volta/volta-viagem-1.sql`, em três partes (A e C sozinhas, por causa do CONCURRENTLY);
+    - `dumps/2026-11-04-manha/volta-contatos_update.sql`, com a política antiga lida da produção;
+    - `dumps/2026-11-03-noite/restaurar-mensagens_filial_20261103.sql`, que devolve a loja das 64 mensagens alinhadas;
+  - pedido **#2** em `modulo_pedidos` (empresa 5 Preview · Loja, `/imoveis`, smoke (i) da noite de 03/11): **fica como `recusado`**. É o histórico que a viagem 1 passou a guardar;
   - **Chaves `mid:` em `ops.webhook_recebidos`:** cada uma vive 60 s (a própria `webhook_mid_novo` apaga as vencidas); nada a limpar à mão;
   - **Volta da noite de 22/10:** `supabase/scripts/volta/volta-corrida-identidade.sql` e `D:\Nexus-Copia\noite\volta-v-leads-nao-lidas.sql` — guardar até a próxima limpeza; a fusão de dados não volta;
   - pedido de teste nº 1 em `modulo_pedidos` (JM, `/agenda`, smoke (e) de 21/10 19:07): **apagado em 22/10 à noite** pelo recusar do superadmin, com registro em `superadmin_logs` (0 pendentes; ver o 06);
@@ -199,6 +205,17 @@ Das 2 mensagens simuladas na janela, a do lead antigo voltou. A do contato novo 
 - **Views de compatibilidade:** sair conforme as telas migram para o core.
   - Regra: uma view só cai quando `grep -rn "from('<nome>')" app components lib hooks supabase/functions` volta vazio.
   - Ordem natural: as 37 views simples de módulo (renomear as chamadas para `vendas_vendas`, `estoque_produtos` etc.) → `canais_conectados` → `clientes` → `lead_mensagens` → `leads`.
+  - **View `leads`, com o critério inalterado** (`from('leads')` em `app components lib core hooks supabase/functions`):
+
+    | data | leituras | arquivos | o que saiu |
+    |---|---|---|---|
+    | 03/11, antes do card | 107 | 58 | — |
+    | 03/11, card do lead (`4eb5098`) | 93 | 52 | o card |
+    | **03/11 à noite (`73e2404`)** | **92** | **51** | o quadro de /leads, que agora lê as funções `quadro_*` |
+
+    A abertura de /leads ainda faz 3 leituras da view, todas da moldura e não do quadro: o sino (`topbar.tsx`, até 1.000 leads com não lidas, 53 KB bruto ou 7 KB comprimido), `notification-provider.tsx` e `limite-banner.tsx` (HEAD de contagem). Elas saem com a Inbox única (item 2 da viagem).
+  - `v_leads_nao_lidas`: 0 leituras no app desde a noite de 03/11. A view continua existindo e cai na mesma migração que a `leads`.
+  - Em `scripts/` sobram 7 leituras (ferramentas, fora do critério).
   - **Quando a view `leads` cair, a Edge passa a chamar `mensagem_registrar` por identidade** (`identidade` + canal, sem `lead_id`) e deixa de resolver o lead pela `upsertLead`. Hoje a regra de não duplicar negócio de quem volta pelo canal vive em dois lugares: no gatilho `compat_leads_iud`, que morre com a view, e na `mensagem_registrar` B. As duas chamam `core_negocio_do_canal`. Sem essa troca na Edge, a duplicação volta.
   - Quando `leads` e `lead_mensagens` caírem, saem também:
     - os gatilhos e funções `compat_*` (a `core_negocio_do_canal` fica);
@@ -237,6 +254,37 @@ Migrações pelo `apply_migration` do MCP, uma por vez, com `GET /rest/v1/` (ano
    - commit de docs **por cima da `main`** que já tem os merges dos itens 1 e 2; push da `main` (leva as duas branches e os docs; a Vercel publica — conferir READY e `/api/saude` 200);
    - foto de saúde final (Q1, Q2, IOwait) e Docker fechado.
 
+## Noite de 03/11/2026 (loja fechada, terminou às 06h31 de 04/11)
+
+**Prompt da noite (Lucas):** itens 1 a 6, migração uma por vez pelo MCP, cada uma só depois de estar na `main` local, com a API conferida entre elas. IOwait abaixo de 20% para começar e parada acima de 30%. Falha sem conserto em 5 min = parar, avisar e executar a volta do item 5. A `PAYMENT_ENCRYPTION_KEY` existe em Production na Vercel desde junho.
+
+| item | horário | resultado | commit / migração |
+|---|---|---|---|
+| 1. DROP da `volta_filial` | 20h45 | 131 linhas em `dumps/2026-11-03-noite/`; tabela fora | `452ad74` · `20261104000100` |
+| 2. Quadro no core | 20h49 | 4 funções `quadro_*` INVOKER, executáveis só por authenticated; anon 0 / authenticated 26 | `567fdf3` · `20261104000200` |
+| 3. Viagem 1 | 20h56 | `empresa_segredos` sem leitura por anon nem authenticated; `modulo_pedidos.status`; índice `modulo_pedidos_pendente` válido (CONCURRENTLY, solto) | `73e2404` · `20261024000100` + `000110` |
+| 4. Push | 20h59 | `682444f..73e2404`, **READY 20h59min48s** | — |
+| 4. Smoke (a)–(k) | 21h00 → 06h29 | todos passaram (ver o 06, seção 16). Dois achados consertados durante o smoke, com ok do Lucas | ver abaixo |
+| ↳ dado (b) | 21h05 | 64 mensagens não lidas alinhadas à loja da conversa; quadro e view antiga passaram a bater 100% | dump em `dumps/2026-11-03-noite/` |
+| ↳ defeito (e) | 06h22–06h25 | justificativa da perda descartada em silêncio, defeito nascido em `682444f` | `4cacea6` · `20261104000300`, **READY 06h25min43s** |
+| 5. Volta | — | não usada | — |
+| 6. Fechamento | 06h31 | 05, 06, acompanhamento, foto de saúde final | commit de docs |
+
+**O que a noite mudou:**
+- `/leads` lê `quadro_contagens` + `quadro_pagina`, com 50 cartões por etapa, "carregar mais" por cursor e tempo real relendo por id. Não lê mais a view `leads` nem a `v_leads_nao_lidas`.
+- A abertura ficou bem abaixo de 300 KB, sem contar o JS em cache: o documento tem 11 KB em Jaguariúna e 64 KB em Mogi, e o quadro tem 4 KB comprimido.
+- O banco responde em 58–79 ms (Mogi, dono). Na tela, a primeira abertura depois do deploy levou ~1,5 s e a seguinte ~220 ms.
+- `contatos_update` passou a ter o mesmo USING do `contatos_select`: quem vê o contato pode editá-lo, como era pela view.
+- O mover e o card conferem as linhas gravadas. Um UPDATE de 0 linhas responde 403 com o motivo e nunca "ok" (`lib/linhas-afetadas.ts`).
+- O mover grava a justificativa antes de mover o negócio.
+- `empresa_segredos` existe; o token de portal nasce quando o Imóveis for instalado, e ele continua "em preparação".
+- Recusar um pedido de módulo grava `recusado` e não apaga mais.
+
+**Pendências que a noite deixou (código, nenhuma migração):**
+- **Pedido recusado some da tela.** Ele fica no banco, mas `/superadmin/pedidos`, a página da empresa no superadmin e a Central do dono só mostram `status = 'pendente'`, e o texto de `/superadmin/pedidos` ainda diz "recusar apaga o pedido". Falta uma seção de recusados, com data e quem recusou, e a correção do texto.
+- **Os 134 UPDATE/DELETE/upsert que não conferem linhas** (cliente do usuário, 70 arquivos): `docs/reconstrucao-nexus/lista-update-sem-contagem-20261104.txt`. Pelo banco, só o `contatos` tinha o SELECT mais largo que o UPDATE. Nos outros, a política de escrita é de papel (admin/dono), e o risco é a tela deixar outro papel tentar. A regra para código novo é pedir `.select('id')` e passar por `nadaGravado()`.
+- **`contatos_delete`** continua só pela loja do próprio contato, mais estreito que o SELECT. Hoje não há DELETE de contato pelo cliente do usuário (fusão e desfazer usam a service_role).
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
@@ -263,6 +311,9 @@ Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando
 - **Pronta em 23/10 na branch `feat/viagem-migracao-1`** (migrações `20261024000100_segredos_e_status_pedidos.sql` e `20261024000110_modulo_pedidos_pendente_idx.sql`; `lib/empresa-segredos.ts`, `lib/modulos-instalacao.ts`, `lib/portal-token.ts`; tipos regenerados do local). Testes no Supabase local: `supabase/testes/segredos_e_pedidos.sql` 10/10 (anon e authenticated não leem `empresa_segredos`, service_role lê; pedido nasce pendente; dois pendentes do mesmo módulo barrados; recusar não apaga; pedido novo entra depois de recusado; `atendido` exige `atendido_em`); fluxo do token 9/9 (só o Imóveis gera; no banco só o cifrado; reinstalar não troca; portal e site: 401 sem Bearer, com `?token=` e com Bearer errado, 200 com o certo).
 - **Ordem para aplicar (com o ok do Lucas):** (1) `20261024000100` pelo MCP; (2) `20261024000110` SOZINHA (CONCURRENTLY, fora de transação); (3) deploy da aplicação — o código novo lê `modulo_pedidos.status` e `empresa_segredos`, então NÃO pode subir antes das migrações. Pré-requisito: `PAYMENT_ENCRYPTION_KEY` configurada na Vercel (a mesma das credenciais de pagamento; conferir antes). Volta: deploy anterior + `drop table empresa_segredos` e as colunas novas de `modulo_pedidos` (sem dado a perder enquanto ninguém instalar o Imóveis).
 - Enquanto o Imóveis estiver "em preparação" no manifesto, nenhum caminho de tela o instala: o token só nasce quando ele sair de preparação.
+- **Aplicada na noite de 03/11** (item 3, 20h56; código no ar desde 20h59). A ordem foi a de cima e a chave foi conferida antes. A volta é `supabase/scripts/volta/volta-viagem-1.sql`.
+
+**Nota da etapa Plataforma (Lucas, 03/11):** a `PAYMENT_ENCRYPTION_KEY` cifra hoje as credenciais de pagamento e também o `empresa_segredos`. Quando o Stripe recorrente for retomado, ela deve ser renomeada para uma chave de **cofre geral**, por exemplo `COFRE_ENCRYPTION_KEY`. A troca é recifrar com a chave nova, e o nome atual não deve ser reaproveitado para outro fim.
 
 ## Supabase local (`supabase start`) — desde 21/10/2026
 

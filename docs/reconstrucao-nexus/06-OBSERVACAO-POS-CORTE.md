@@ -690,3 +690,79 @@ Loja fechada, IOwait 0,2% no push (19:30); `main` = `210eb81` + 5 commits da `fe
 - **IOwait:** pico 19,7% às 19:35 (deploy), 8,1% às 19:51. **Sentry:** nada na última hora.
 - **Volta (não usada):** Instant Rollback para `210eb81` (só app; nenhuma migração).
 - **Fica anotado:** a página `/leads` ainda carrega a lista inteira do quadro pela view `leads` (é a próxima frente, `feat/quadro-core`); `from('leads')` caiu de 107 leituras em 58 arquivos para 93 em 52; fusões anteriores a 03/11 não têm foto e não se desfazem.
+
+## 16. 03/11 à noite → 04/11 de manhã: quadro no core, viagem 1, DROP da volta_filial e o defeito do contato de outra loja
+
+Ordem do prompt da noite (seção "Noite de 03/11/2026" do 05). Loja fechada, IOwait entre 0,0% e 12,5% na janela toda (nada acima de 20%), Docker desligado. Gates na `main` local: 197 testes e verificador 539/5 no item 1, 547/5 depois da viagem, menu 15/15, build. No conserto de 04/11: 201 testes, 547/5, build.
+
+- **Item 1, 20h45:** 131 linhas de `ops.volta_filial_20261020` em `dumps/2026-11-03-noite/` (md5 `32f27e0c…`); `20261104000100` aplicada (versão `20261103234508`).
+- **Item 2, 20h49:** `20261104000200_quadro_core`, 4 funções INVOKER. Anon 0 / authenticated 26 (as 22 de antes mais as 4).
+- **Item 3, 20h56:** `20261024000100` por `apply_migration`, mais a `000110` em dois `execute_sql` soltos (drop do índice antigo e create do `modulo_pedidos_pendente`, ambos CONCURRENTLY). `empresa_segredos` não é lida por anon nem por authenticated (API anon 42501).
+- **Item 4, push 20h59:** `682444f..73e2404`, READY 20h59min48s.
+
+### Smoke (dono nas duas lojas; vendedor de Mogi pelo banco e Meta Reviewer pela tela)
+
+| item | Mogi Guaçu | Jaguariúna |
+|---|---|---|
+| (a) /leads abaixo de 300 KB | documento 64 KB + quadro | documento 11 KB, `quadro_pagina` 4 KB comprimido (16 KB bruto) |
+| (b) topo e colunas = banco | 2.027 em aberto / 1.161 aguardando / esteira 1.919 | 809 / 464 / esteira 762 |
+| (c) carregar mais | Novo 150 + 555 = 705, Perdido 150 + 9 = 159, Convertido 79/79; 0 repetidos | Novo 200 + 591 = 791; 0 repetidos |
+| (d) esteira | 1.919 / 1.112 = `quadro_contagens` | 762 / 439 |
+| (e) mover + perda com justificativa | — | **falhou na 1ª vez, passou depois do conserto**: lead 3548 do Lucas, iPhone 18 às 06h28min20s, Perdido às 06h28min32s, motivo Preço, "Justificativa da perda (04/11/2026): Teste" nas observações do contato 2552 às 06h28min33s |
+| (f) WhatsApp aparece sem recarregar | — | mensagem às 06h28min08s; cartão 3548 com "1 · agora" às 06h28min11s; aguardando 465 → 466 às 06h28min12s; página sem reload |
+| (g) card pelo quadro + anteriores | lead 970: as mais antigas vieram por cima, 0 repetidas, o botão some no fim | — |
+| (h) vendedor abre lead da outra loja | RLS: o vendedor de Mogi vê 0 negócios de Jaguariúna | Meta Reviewer (vendedor, só Mogi) em `/leads?lead=6452`: "O lead #6452 não está na loja selecionada no topo — ou foi arquivado." |
+| (i) Central | Imóveis "Em preparação"; pedido #2 da empresa 5 recusado pelo Lucas às 06h03min38s: `status = recusado`, `recusado_por` Lucas, log `recusar_pedido_modulo` | — |
+| (j) ZapIntel, tarefa, saúde | ZapIntel ao vivo (2.828 conversas); tarefa criada e apagada (0 no banco); `/api/saude` 200 | — |
+| (k) funções | anon 0 / authenticated 26 | — |
+
+### Os dois achados do smoke
+
+**(b) Dado: não lidas gravadas na loja errada.**
+- **Sintoma:** em Mogi, o aguardando dava 1.162 na view antiga e 1.161 no quadro.
+- **Causa:** em toda a JM, 4 conversas tinham mensagens não lidas gravadas na outra loja, uma sobra do sync de outubro. Eram 3 conversas de Jaguariúna com 46 mensagens marcadas como Mogi (leads 2468, 970 e 2059) e 1 de Mogi com 18 marcadas como Jaguariúna. O quadro conta pela conversa, e a RLS esconde a conversa da outra loja. A view antiga contava pela mensagem.
+- **Decisão do Lucas:** corrigir o dado.
+- **Correção, 21h05 (IOwait 4,3%):**
+  - dump em `dumps/2026-11-03-noite/mensagens_filial_20261103.json` (md5 do banco `3ecffe37…`), volta em `restaurar-mensagens_filial_20261103.sql`;
+  - UPDATE de `filial_id` igual à loja da conversa, com trava (a mensagem só muda se ainda estiver na loja antiga e se a conversa estiver na loja nova): 64 linhas, 46 para Jaguariúna e 18 para Mogi;
+  - resultado: 0 não lidas fora da loja. Quadro e view antiga batem em todos os funis, com 0 não lidas diferentes nos dois lados: Mogi 2.038 leads e 1.169 aguardando, Jaguariúna 870 leads e 519 aguardando.
+- **Fica para uma noite futura:** **310 mensagens já lidas** nessas mesmas 4 conversas continuam com a loja trocada. Não mudam nenhuma contagem. A correção é a mesma regra (loja da conversa), com dump antes (decisão do Lucas, 04/11).
+
+**(e) Defeito nascido em `682444f` (card do lead, 03/11, 19h33): edição do contato descartada em silêncio quando o contato é de outra loja.**
+- **Sintoma (06h05):** o lead 3548 (Jaguariúna) foi para Perdido com motivo, mas a justificativa não foi gravada, e a tela disse "Lead movido".
+- **Causa:**
+  - O contato 2552 é de Mogi e tem negócio em Jaguariúna.
+  - `contatos_select` deixa ver o contato pelo negócio ou pela conversa numa loja visível, mas `contatos_update` só deixava editar pela loja do próprio contato.
+  - Enquanto as rotas gravavam pela view `leads`, o gatilho SECURITY DEFINER passava por cima da RLS. O card e o `/api/leads/mover` passaram a gravar em `contatos` direto em `682444f`, e o UPDATE barrado virou 0 linhas sem erro.
+  - Afetava a justificativa da perda e a edição de nome, telefone, Instagram, observações e campos do contato no card. Em 04/11 havia 74 negócios abertos em loja diferente da do contato.
+  - O Instant Rollback não resolvia, porque `682444f` já tinha o defeito.
+- **Conserto (decisão do Lucas), commit `4cacea6`:**
+  - migração `20261104000300_contatos_update_como_select`: o USING do UPDATE ficou igual ao do SELECT, e o WITH CHECK continua só na empresa. Aplicada às 06h22, com IOwait de 4,1%;
+  - volta em `dumps/2026-11-04-manha/volta-contatos_update.sql`;
+  - código: `lib/linhas-afetadas.ts`. O mover grava a justificativa antes do negócio e confere as linhas dos dois UPDATE; o card confere contato e negócio. UPDATE de 0 linhas responde 403 com o motivo. O quadro mostra o motivo ao desfazer o card, e a conversão do card confere as duas respostas;
+  - teste `tests/linhas-afetadas.test.ts`.
+- **Conferência no banco, numa transação desfeita:**
+  - o dono em Jaguariúna atualiza o 2552 (1 linha);
+  - o vendedor de Mogi continua com 0 negócios de Jaguariúna;
+  - o vendedor de Mogi edita exatamente os 59 contatos de cadastro em Jaguariúna que já via (os que têm negócio ou conversa em Mogi).
+- **Deploy:** push 06h23, **READY 06h25min43s** (Production `4cacea6`). Conferido pelo status do GitHub, porque o MCP da Vercel tinha perdido a autorização; o Lucas reconectou depois.
+- **Varredura para a lista:** `docs/reconstrucao-nexus/lista-update-sem-contagem-20261104.txt`, com 134 UPDATE/DELETE/upsert pelo cliente do usuário, em 70 arquivos, que não conferem linhas. Pelo catálogo, só o `contatos` tinha o SELECT mais largo que o UPDATE. As outras 33 tabelas com política diferente separam por papel. `contatos_delete` continua estreito, mas nenhuma tela apaga contato pelo cliente do usuário.
+
+### Depois
+
+- **Foto de saúde final, 06h30:**
+  - `D:\Nexus-Copia\saude\pgdb-20261104-0630.json` e `pgss-20261104-0630.json`, com 1.583 entradas;
+  - banco com 212 MB; na última hora, 2 mensagens recebidas, as do teste;
+  - IOwait da última hora: média 1,8%, mediana 0,5%, máximo 12,5% (06h03), nada acima de 20%.
+- **Tempo do quadro:**
+  - no banco (Mogi, dono, 3 rodadas): `quadro_contagens` 79, 58 e 59 ms; `quadro_pagina` 69, 67 e 67 ms;
+  - na tela (Jaguariúna): ~1,5 s na primeira abertura depois do deploy e ~220 ms na seguinte;
+  - as médias de 0,7 a 1,3 s do pgss misturam as minhas conferências (100.000 por etapa, todos os funis).
+- **Sentry:** nenhum issue nas últimas 12 h.
+- **Volta (não usada):** Instant Rollback para `682444f` + `volta-quadro-core.sql` + `volta-viagem-1.sql` + restaurar a `volta_filial` do `dumps/`; do conserto de 04/11, `volta-contatos_update.sql`.
+- **Fica anotado:**
+  - **pedido recusado some da tela** (as três listas filtram `pendente`; o texto de `/superadmin/pedidos` ainda diz "apaga"). Falta a seção de recusados;
+  - **as 310 mensagens lidas com a loja trocada** (noite futura, com dump);
+  - **a moldura ainda lê a view `leads` 3 vezes por abertura** (sino, notification-provider, limite-banner). Saem com a Inbox única;
+  - o MCP da Vercel perde a autorização de escopo de vez em quando. Nesse caso, conferir o deploy pelo GitHub (`gh api …/commits/<sha>/status`);
+  - **a primeira abertura do quadro depois de um deploy (~1,5 s)** vale reconferir na próxima abertura da loja.
