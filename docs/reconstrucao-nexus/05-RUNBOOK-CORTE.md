@@ -404,6 +404,46 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
 - **Volta:** Instant Rollback para `1838510`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8.
 
+## 04/11/2026 17h35: Automatize no funil (`68db6d0` + `40d2164`, Edge v70, 2 migrações, job do pg_cron)
+
+- **Ordem do Lucas: 1 → 2 → 5 → 6, com o gate.**
+  1. Migração `20261105000100_automatize` pelo MCP às 17h35, com IOwait de 2,63% às 17h34. O que ela faz:
+     - `automacoes` ganha as ações `enviar_modelo` e `atribuir_responsavel`, mais `espera_dias` e `modelo_id`;
+     - `contatos` ganha `opt_out_em`;
+     - entra a fila `automacao_execucoes`, com RLS de leitura por empresa e loja;
+     - entra `automacao_reservar(lote)`, que só a service_role executa;
+     - `automacoes`, `cadencias` e `cadencia_passos` passam a ser lidas por todos e gravadas só por dono/admin.
+
+     API ok.
+  2. `20261105000200_pg_net` (pg_net 0.20.3 em `extensions`) às 17h36. API ok.
+  3. Edge `webhook-leads` **v70** às 17h37, pelo worktree em `68db6d0`, com o caminho de serviço `send_template_automacao`:
+     - sem credencial, ou com Bearer falso: 401;
+     - `send`, `send_meta` e `send_template` sem corpo: 400, como antes;
+     - GET de verificação com token errado: 403.
+  4. Push `aa0fd45..68db6d0`: **READY às 17h40min54s**. As rotas novas sem login ou sem segredo dão 401.
+- **Segredo:** `cron_secret` está no Vault desde 17h08, gravado pelo Lucas. Para conferir sem exibir, uma chamada `net.http_get` com o valor do Vault na rota do cron voltou 200, então ele é igual ao CRON_SECRET da Vercel. Não precisou trocar.
+- **Job:** `automacoes-hora`, `17 * * * *` (jobid 4), lê o segredo do Vault na hora. O texto em `cron.job` não tem o segredo. A retenção segue às `0 7 * * *`. Volta: `select cron.unschedule('automacoes-hora');`.
+- **Correção antes do smoke (`40d2164`):** a automação casava com a etapa só pelo `slug`, e o slug só é único **dentro** de um funil (`funil_etapas_funil_slug_key`). Uma automação de "novo" num funil dispararia em quem entra em "novo" de outro funil.
+  - Agora o executor, o "saiu da etapa", o quadro e a criação usam `etapa_id` quando os dois lados têm.
+  - Só o slug repetido, sem o id, é recusado (400).
+  - Testes: e2e local 29/29 de novo, mais o cenário novo `automatize-slug-e2e.mjs`, 6/6.
+  - Gate: 220 testes, verificador 586/5, build. IOwait 11% às 17h54. **READY às 17h56min36s.**
+- **Smoke na produção** (funil 6 "TESTE Automatize (apagar)", só o negócio 7077 do contato 2552 do Lucas, criado pela tela do dono):
+  - **tarefa na hora:** nasceu com `origem = 'automacao'` e o nome do lead;
+  - **troca de responsável:** passou de JM Store para Matheus Rosa;
+  - **esperar 1 dia:** ficou agendada para 05/11 às 17h59. Adiantada e com o cron rodado à mão, executou às 18h00min12s; a tarefa foi para o novo responsável e a rodada ficou em `eventos` (`automacoes.rodada`);
+  - **pausar todas:** a tela mostra "Automações pausadas" e reentrar na etapa não agendou nada. Retomado;
+  - **vendedor** (RLS como a Vanessa): vê as 3 automações; desligar, apagar e mudar cadência afetam 0 linhas; inserir dá erro de RLS.
+- **Limpeza:** apagados o funil 6, as etapas 60/61, o negócio 7077, as 3 automações, as 3 execuções, as 2 tarefas e as 4 linhas de `negocio_historico`. Produção com 0 automações; contato 2552 intacto.
+- **Primeira rodada automática:** às 18h17min00s, `succeeded`, rota 200, fila vazia (578 ms).
+- **Rodada vazia não grava em `eventos`:** é uma linha por empresa que teve trabalho. A resposta de cada chamada fica em `net._http_response` (o pg_net limpa sozinho).
+- **Falta:** o smoke de envio, quando a Meta aprovar o `retorno_atendimento` (Utility) e ele entrar em `modelos_mensagem` como `aprovado`. Só para o número do Lucas.
+- **Voltas:**
+  - app: Instant Rollback para `68db6d0`, ou para `aa0fd45` para tirar o Automatize inteiro;
+  - Edge: republicar a v69, que é o código de `aa0fd45`;
+  - banco: `cron.unschedule('automacoes-hora')`, depois `supabase/scripts/volta/volta-automatize.sql`, depois `drop extension pg_net`.
+- **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8, sem mudança.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

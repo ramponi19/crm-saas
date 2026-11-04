@@ -979,3 +979,50 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - a tela de automações (`/automacoes`) e o PDV abriram;
   - Sentry: nada na última hora.
 - **Volta (não usada):** Instant Rollback para `1838510`.
+
+## 22. 04/11 às 17h35: Automatize no funil (`68db6d0` + `40d2164`, Edge v70, migrações e pg_cron)
+
+- **O que entrou:**
+  - no quadro `/leads`, o botão "Automatize" mostra embaixo de cada etapa as automações de "entrou na etapa" e as cadências que começam nela, com "na fila" e "hoje";
+  - o dono/admin cria pela etapa: esperar 0 a 30 dias e então criar tarefa, avisar o gestor, passar o negócio para alguém da equipe ou enviar modelo aprovado;
+  - o dono/admin liga, desliga e pausa todas;
+  - o vendedor vê e não edita.
+- **Travas do envio** (Edge, caminho de serviço `send_template_automacao`):
+  - só modelo `aprovado` e só com a automação ligada;
+  - 1 envio do mesmo modelo por contato a cada 7 dias;
+  - 50 por hora por empresa, com o excedente na fila;
+  - horário de atendimento (fora dele, agenda para o próximo);
+  - opt-out e bloqueado não recebem;
+  - cada envio fica com `origem = 'automacao'`.
+- **Tempos:**
+
+  | Hora | O quê |
+  |---|---|
+  | 17h34 | IOwait 2,63% |
+  | 17h35 | migração `automatize` |
+  | 17h36 | `pg_net` |
+  | 17h37 | Edge v70 ACTIVE |
+  | 17h40min54s | READY de `68db6d0` |
+  | 17h41 | segredo do Vault conferido: 200 na rota, sem exibir |
+  | 17h42 | job `automacoes-hora` às `17 * * * *` |
+  | 17h54 | IOwait 11% |
+  | 17h56min36s | READY de `40d2164` (correção do slug) |
+  | 17h58–18h05 | smoke |
+
+- **Achado e correção (`40d2164`):** a automação casava com a etapa só pelo slug, e o slug só é único dentro de um funil. Uma etapa de mesmo nome em outro funil dispararia a automação errada e apareceria embaixo das duas.
+  - Agora vale o `etapa_id`, com o slug de reserva para as automações antigas.
+  - O e2e `automatize-slug-e2e.mjs` (6/6) prova os dois lados: a etapa homônima não dispara e a certa dispara.
+- **Smoke** (funil de teste com o negócio 7077 do contato do Lucas):
+  - as 3 automações foram criadas pela tela e gravadas com `etapa_id = 61`;
+  - ao mover, nasceu a tarefa "TESTE AUTO na hora: Lucas Ramponi" (origem automação), o responsável virou Matheus Rosa e a de 1 dia ficou agendada para 05/11 às 17h59;
+  - cron à mão (`net.http_get` com o segredo do Vault): `executadas 1`, `restam 0`, 6,5 s; a segunda tarefa foi para Matheus Rosa e a linha em `eventos` diz `{"executadas":1,"ficaram_para_a_proxima":0}`;
+  - pausar: entrar de novo não criou nada. Retomar: a tela voltou para "Pausar todas";
+  - Vanessa (RLS): vê 3; UPDATE e DELETE afetam 0; INSERT dá `new row violates row-level security policy`.
+- **Limpeza conferida:** 3 funis (como antes), 0 automações, 0 execuções, 5 negócios do contato 2552 (os de antes) e 0 tarefas de teste.
+- **Primeira rodada automática:** às 18h17min00s, `cron.job_run_details` deu runid 41 `succeeded`, e `net._http_response` id 3 deu 200 `{"executadas":0,"rodadas":0,"restam":0,"ms":578}`, com a fila vazia. Sem linha em `eventos`, como previsto.
+- **Pendente:** o smoke de envio, quando a Meta aprovar o `retorno_atendimento`.
+- **Volta (não usada):**
+  - app: Instant Rollback para `68db6d0` ou `aa0fd45`;
+  - Edge: republicar a v69, de `aa0fd45`;
+  - banco: unschedule, depois `volta-automatize.sql`, depois `drop extension pg_net`.
+- **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8.
