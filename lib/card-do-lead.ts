@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Lead } from '@/components/modules/leads/types'
 import { telefoneE164 } from '@/lib/telefone-e164'
+import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
 
 /**
  * O CARD DO LEAD LÊ O CORE (03/11/2026).
@@ -228,7 +229,7 @@ class ErroDeCampo extends Error {
 export async function gravarCardDoLead(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: SupabaseClient<any>, svc: SupabaseClient<any>, leadId: number, userId: string, alt: AlteracaoDoCard,
-): Promise<{ error: string | null; assumido?: boolean; responsavelId?: string | null }> {
+): Promise<{ error: string | null; status?: number; assumido?: boolean; responsavelId?: string | null }> {
   const n = await negocioVisivel(db, leadId)
   if (!n || !n.contato) return { error: 'Lead não encontrado' }
   const c = n.contato
@@ -274,13 +275,16 @@ export async function gravarCardDoLead(
     mudou = true
   }
 
+  // `.select('id')`: com RLS, UPDATE barrado afeta 0 linhas SEM erro (lib/linhas-afetadas.ts).
   if (Object.keys(contato).length) {
-    const { error } = await db.from('contatos').update(contato).eq('id', c.id)
+    const { data, error } = await db.from('contatos').update(contato).eq('id', c.id).select('id')
     if (error) return { error: error.message }
+    if (nadaGravado(data)) return { error: SEM_PERMISSAO_CONTATO, status: 403 }
   }
   if (mudou) {
-    const { error } = await db.from('negocios').update({ dados }).eq('id', n.id)
+    const { data, error } = await db.from('negocios').update({ dados }).eq('id', n.id).select('id')
     if (error) return { error: error.message }
+    if (nadaGravado(data)) return { error: SEM_PERMISSAO_NEGOCIO, status: 403 }
   }
 
   if (alt.assumir) {

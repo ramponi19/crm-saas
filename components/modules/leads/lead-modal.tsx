@@ -1339,16 +1339,23 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
 
     // Etapa de ganho pela mesma rota do quadro (automações e cadências disparam
     // igual) e a marca de conversão no negócio, pela rota do card.
-    await fetch('/api/leads/mover', {
+    // As duas respostas são conferidas (04/11/2026): UPDATE barrado pela RLS volta
+    // 403 e a tela diz o que não foi gravado, em vez de comemorar.
+    const rMover = await fetch('/api/leads/mover', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ leadId: lead.id, kanban_status: ganhoColId(columns) }),
     })
-    await fetch(`/api/leads/${lead.id}/card`, {
+    const rMarca = await fetch(`/api/leads/${lead.id}/card`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ convertido_em: cliente.id }),
     })
 
     setSaving(false)
+    if (!rMover.ok || !rMarca.ok) {
+      const j = await (rMover.ok ? rMarca : rMover).json().catch(() => ({})) as { error?: string }
+      notify.bad('Cliente criado, mas o lead não foi marcado como convertido', j.error)
+      return
+    }
     /**
      * Diz o que FALTOU, em vez de comemorar um cadastro pela metade.
      *

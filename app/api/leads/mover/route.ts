@@ -3,6 +3,7 @@ import { executarEntradaEtapa } from '@/lib/automacoes'
 import { inscreverPorEtapa } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
 const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
@@ -101,18 +102,27 @@ export async function POST(req: Request) {
   if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id
   if (body.perdido_em) patch.perdido_em = body.perdido_em
 
-  const { error } = await supabase.from('negocios').update(patch as never).eq('id', n.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  // A justificativa da perda mora nas observações do contato (onde o vendedor a lê).
+  /**
+   * A justificativa da perda mora nas observações do contato (onde o vendedor a lê).
+   * Grava ANTES do negócio e confere as linhas (04/11/2026): com RLS, UPDATE barrado
+   * afeta 0 linhas sem erro — a rota dizia "ok", o lead ia para Perdido e a
+   * justificativa sumia (contato de uma loja, negócio na outra). Agora, se o
+   * contato não aceita a gravação, nada se move e a tela mostra o motivo.
+   */
   const justificativa = body.justificativa?.trim()
   const observacoes = body.observacoes ?? (justificativa
     ? (n.contato?.observacoes ? n.contato.observacoes + '\n' : '')
       + `Justificativa da perda (${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}): ${justificativa}`
     : null)
   if (observacoes && n.contato) {
-    const { error: errObs } = await supabase.from('contatos').update({ observacoes }).eq('id', n.contato.id)
+    const { data: obsGravada, error: errObs } = await supabase.from('contatos').update({ observacoes }).eq('id', n.contato.id).select('id')
     if (errObs) return NextResponse.json({ error: errObs.message }, { status: 500 })
+    if (nadaGravado(obsGravada)) return NextResponse.json({ error: SEM_PERMISSAO_CONTATO }, { status: 403 })
   }
+
+  const { data: movido, error } = await supabase.from('negocios').update(patch as never).eq('id', n.id).select('id')
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(movido)) return NextResponse.json({ error: SEM_PERMISSAO_NEGOCIO }, { status: 403 })
 
   // Automações e cadências de entrada — só se a etapa realmente mudou.
   if (leadAtual.kanban_status !== etapa) {

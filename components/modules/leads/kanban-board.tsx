@@ -96,7 +96,8 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
       // Desfaz nos dois lugares: no pai (que é a fonte) e na lista local.
       onLeadUpdate({ ...lead, kanban_status: anterior })
       setLocalLeads(prev => prev.map(l => l.id === lead.id ? { ...l, kanban_status: anterior } : l))
-      notify.bad('Erro ao mover o lead', 'O card voltou para a etapa anterior.')
+      const j = await res.json().catch(() => ({})) as { error?: string }
+      notify.bad('Erro ao mover o lead', `${j.error ? j.error + ' ' : ''}O card voltou para a etapa anterior.`)
       return false
     }
     return true

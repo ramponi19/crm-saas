@@ -34,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const svc = createServiceClient()
   const r = await gravarCardDoLead(ctx.db, svc, ctx.leadId, ctx.userId, alt)
-  if (r.error) return NextResponse.json({ error: r.error }, { status: r.error === 'Lead não encontrado' ? 404 : 400 })
+  if (r.error) return NextResponse.json({ error: r.error }, { status: r.status ?? (r.error === 'Lead não encontrado' ? 404 : 400) })
   const card = await carregarCardDoLead(ctx.db, svc, ctx.leadId)
   return NextResponse.json({ ...card, assumido: r.assumido, responsavelId: r.responsavelId })
 }
