@@ -836,3 +836,103 @@ Modo construção: o ok do Lucas veio às 11h20, e o push esperou o IOwait cair 
   - a nota 290.
 - **Para as 18h:** `feat/inbox-notas` (migração `20261104000400`) e as 310 mensagens lidas com loja trocada. Ver o 05, seção "04/11/2026 de dia".
 - **Volta (não usada):** Instant Rollback para `3243508`.
+
+## 19. 04/11 à tarde: lotes 1 e 2, as 1.341 mensagens, Edge v68 e notas (loja aberta, "fazemos tudo agora")
+
+O Lucas pediu cinco itens, um por vez, com a API conferida entre cada um: anon 42501, auth 200 e saúde 200 deram certo nas seis conferências. A migração das notas só entraria com IOwait abaixo de 10%. Os quatro itens de produção entraram, e o quinto é este fechamento.
+
+**Antes de começar:** os lotes 1 e 2 estavam empilhados em cima das notas e da Edge, e o merge levaria as notas antes da migração. Foram reempilhados direto sobre a `main`, o que gerou `7f7cee4` e `525ff57`. O conflito no `verificar-auditoria.sh` foi resolvido à mão. Depois a pilha virou main → lotes → Edge → notas, com o gate completo verde em cada passo.
+
+### Item 1. Lotes 1 e 2 (`525ff57`, só app)
+- **Gate:** check, 211 testes, menu 15/15, verificador 561/5, build. IOwait 6,1% às 13h40. Push às 13h54, **READY às 13h57min29s**.
+- **Smoke às 13h58–14h06:**
+  - **Tarefa:** a 1410 foi criada em `/tarefas`, concluída pela tela (no banco, concluída e com data) e excluída com confirmação (0 no banco, sumiu da tela).
+  - **PDV:** abriu, e a aba Encomenda mostrou as 4 encomendas reais em aberto, que não foram tocadas.
+  - **Encomenda de teste:** venda 140 e pedido 103, de R$ 1,00, com o cliente "Matheus CLIENTE".
+    - **Marcar:** "Pedido feito" mostrou "Pedido registrado", e o pedido 103 ficou marcado com o dono como autor.
+    - **Desmarcar:** pelo banco, já que a tela não tem botão para isso.
+    - **Caso novo do lote 2:** com a tela aberta, marquei por trás e cliquei. Apareceu "Esta encomenda já estava marcada como pedida" e a data do primeiro pedido (14h05) ficou.
+    - **Limpeza:** apaguei a venda 140 e o pedido 103, com a confirmação do Lucas no MCP.
+- **Sentry:** nada na última hora.
+
+### Item 2. Mensagens com loja trocada (só dados)
+- **Levantamento na produção:** **1.341** mensagens com a loja diferente da conversa.
+  - 310 são das 4 conversas de 03/11 e 1.031 vêm de outras 45. São 49 conversas no total.
+  - Todas lidas (0 não lidas), e todas as conversas têm loja.
+  - O número bateu com o esperado (310 + 1.031).
+- **Dump às 14h07:** `dumps/2026-11-04-noite/mensagens_filial_20261104.json`, 1.341 linhas, md5 do banco `21eb30da…`.
+  - A ida (`ida-…sql`) e a volta (`restaurar-…sql`) foram geradas do próprio dump, com trava por id e loja de antes.
+  - São 1.052 mensagens de Mogi para Jaguariúna e 289 de Jaguariúna para Mogi.
+- **IOwait:** 41–42% às 14h06–14h07, durante o dump e as fotos (leituras minhas), e 7,0% às 14h11. O UPDATE esperou passar.
+- **Uma transação só, com leitura repetível, às 14h13min07s.** A loja estava aberta, então duas fotos separadas não seriam comparáveis.
+  - A ordem foi: foto antes nas 4 visões, UPDATE, foto depois e conferência.
+  - A conferência faria a transação abortar se algo não batesse: 1.341 alinhadas, 0 fora da loja e 0 visões diferentes.
+  - A loja ativa do dono voltou ao valor de antes (Mogi).
+
+| visão (pela RLS) | sino | não lidas | quadro + esteira (md5) | mensagens visíveis nas 49 |
+|---|---|---|---|---|
+| dono em Mogi | 1.258 = 1.258 | 15.440 = 15.440 | `50c8dc4a…` = | 3.361 → 2.598 |
+| dono em Jaguariúna | 549 = 549 | 4.238 = 4.238 | `78e14003…` = | 542 → 1.305 |
+| vend-mogi (Luis Felipe) | 1.258 = 1.258 | 15.440 = 15.440 | `50c8dc4a…` = | 3.361 → 2.598 |
+| vend-jag (Vanessa) | 549 = 549 | 4.238 = 4.238 | `78e14003…` = | 542 → 1.305 |
+
+- **Depois do commit:** 0 mensagens fora da loja no banco inteiro. Uma amostra de 6 ids bate com a loja da conversa.
+- **A única mudança, e é a que se queria:** o histórico dessas 49 conversas agora aparece na loja da conversa.
+- **Observação:** a Rayssa, a "vend-jag" do local, está inativa na produção e não vê nada. Usei a Vanessa Amorim Volpato, vendedora ativa de Jaguariúna.
+- **Ressalva da conferência:** usei o `updated_at` desta transação junto com "0 fora da loja" no lugar da lista de ids escrita à mão. Somados, os dois provam o mesmo resultado.
+
+### Item 3. Edge `webhook-leads` v68 (`7d50e56` + `51c50aa`)
+- **O conserto:** `bancoIndisponivel()` em `reenvio.ts`, com teste Deno.
+  - 502/503/504, PGRST000–003, Postgres caindo e falha de rede contam como banco fora.
+  - Violação e valor inválido continuam sendo dado ruim: 200 e log.
+  - Viram `ErroDeBanco` (500): a gravação da mensagem recebida, do anúncio, do eco e do histórico, e a busca ou criação do lead antes dela. O catch do eco repassa o erro.
+  - O envio pela tela não muda.
+- **Pacote grande:** a primeira versão do conserto ainda perdia mensagens no teste (15 de 40).
+  - **Causa:** o hash de 24 h era gravado antes de processar, e o "esquecer" também falha com o banco fora.
+  - **Agora:** antes de processar entra uma trava de 60 s (`webhook_mid_novo`, a mesma tabela, que expira sozinha), e o hash de 24 h só é gravado no fim.
+  - **Reentrega durante o processamento:** recebe **503 com `Retry-After: 60`**, não 200. Um 200 encerraria as tentativas da Meta.
+  - Não precisou de migração.
+- **Teste local** (proxy que derruba o banco depois de K gravações; `D:\Nexus-Copia\inbox\ferramentas\noite-0411\fora-meio.mjs`):
+  - **Grande, 40 mensagens, queda na 15ª:** 500 em 7,5 s; a reentrega imediata recebeu 503; depois da trava, **40 de 40**, 0 duplicadas; o terceiro envio deu 200 em 7 ms.
+  - **Pequeno, 30 mensagens, queda na 10ª:** 500 e depois **30 de 30**.
+  - **5 Directs, queda no 2º:** 500 e depois **5 de 5**. Os mids foram esquecidos.
+  - **Reentrega durante um processamento normal:** 503 e 40 de 40.
+  - **Os 25 cenários de antes:** todos ok. O único "41" era o filtro do próprio teste, que pegava também a mensagem `hist`.
+  - **Antes do conserto:** 200 em ~105 s, com 5 de 5 perdidas.
+- **Gate:** check, 211 testes, menu 15/15, verificador 568/5 (+4 checagens), build.
+- **Deploy:**
+  - **App:** push às 14h28, **READY às 14h31min02s**.
+  - **Edge:** pela CLI a partir do worktree em `51c50aa`. A CLI pediu `--yes`, que entrou com o pedido explícito do Lucas. **v68 ativa às 14h31min43s**, com `verify_jwt` desligado. As sondas sem credencial respondem 403.
+- **Smoke com o Lucas:**
+  - **WhatsApp:** chegou às 14h34min23s (conversa 222). A resposta pela Inbox saiu às 14h35min27s, ficou **entregue** às 14h35min30s e **lida** às 14h36min15s. O status passa pelo caminho novo, direto em `mensagens`.
+  - **Direct:** chegou às 14h34min47s (conversa 1941), marcado como resposta a um anúncio; a Edge gravou o cartão do anúncio junto. A resposta saiu às 14h35min45s. O Lucas confirmou as duas no celular.
+  - **Ecos das vendedoras:** continuaram entrando nas duas lojas.
+  - **Log da Edge (14h31–14h44, filtrado):** 0 erro, 0 falha, 0 órfão, 0 503.
+- **Achado:** a resposta do Direct ficou em "enviada", e a das 11h43, ainda na v67, também. Nos últimos 30 dias, as 1.493 respostas de Instagram ficaram todas em "enviada". Os eventos de entrega e leitura do Instagram não chegam à Edge, provavelmente por assinatura no app da Meta. Não é regressão da v68. A leitura pela identidade ficou provada só no local.
+- **Volta (não usada):** republicar a v67 de `D:\Nexus-Copia\inbox\ferramentas\noite-0411\volta-edge-v67\`, idêntica ao commit `7593932`.
+
+### Item 4. Notas editáveis pelo autor (`b189647` · `20261104000400`)
+- **Gate na pilha nova:** 215 testes, verificador 568/5, build.
+- **Antes de aplicar:**
+  - a `main` local já estava em `b189647`;
+  - a migração era idêntica ao arquivo (só CRLF de diferença);
+  - as políticas da produção eram iguais às da volta.
+- **IOwait 6,1% às 14h41.** A migração foi aplicada pelo MCP às 14h49min49s (versão `20261104174949`), depois de uma confirmação que expirou e foi pedida de novo. A API ficou ok logo em seguida.
+- **RLS na produção, em transação desfeita:** o vendedor de Mogi vê a nota 290, mas editar dá 0 linhas e apagar dá 0 linhas.
+- **Deploy:** push às 14h50min20s, **READY às 14h52min42s**.
+- **Smoke às 14h53:**
+  - a nota 290 mostra "Editar" e "Apagar" para o dono;
+  - editar gravou no banco (texto novo e `editada_em` às 14h53min13s), e a bolha mostra "· editada";
+  - apagar pediu confirmação ("Não dá para desfazer"), a nota sumiu da tela e no banco ficou 0;
+  - uma nota nova (291) foi gravada com o INSERT novo, que exige o autor, e apagada; ficaram 0 notas;
+  - os outros 264 eventos continuam intactos.
+- **Sentry:** nada na última hora.
+
+### Grep das views (critério do 05, sobre a `main` `b189647`)
+- `from('leads')`: 85 leituras em 47 arquivos (eram 86 em 47).
+- `from('lead_mensagens')`: 15 em 8 arquivos (eram 23 em 9). **A Edge zerou.** Ficam 5 em `lib/storage/retencao.ts`, 3 no assistente, 2 no `lead-modal` e 1 em cada um destes: `cliente-modal-imob`, `api/imob/[slug]/lead`, `api/portais/[slug]/leads`, `lib/esteira.ts` e `lib/zapintel/conversas.ts`.
+
+Nenhuma das duas views zerou, então não há migração de drop.
+
+### Ficaram no banco, de teste
+- As mensagens "teste edge" e as duas "Resposta do teste da Edge v68 (…) — pode ignorar". Elas se somam às "teste inbox" da manhã.

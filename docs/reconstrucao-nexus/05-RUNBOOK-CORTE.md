@@ -326,6 +326,57 @@ Nenhuma das duas zerou, então não há migração de drop.
 - Primeiro os que estão em fluxo de usuário: card, quadro, inbox, PDV e tarefa.
 - Saem em lotes junto com as entregas, e a lista marca o que já foi feito.
 
+## 04/11/2026 à tarde: lotes 1 e 2, mensagens, Edge v68 e notas, com a loja aberta e o ok do Lucas
+
+**Pedido do Lucas:** "fazemos tudo agora", um item por vez, com a API conferida entre cada um. A migração das notas só entraria se o IOwait estivesse abaixo de 10% na hora; se não, ficaria para as 18h. Todos os passos de produção passaram. O detalhe e os números estão no 06, seção 19.
+
+| item | horário | resultado | commit / migração / versão |
+|---|---|---|---|
+| 1. Lotes 1 e 2 dos 134 UPDATE (só app) | push 13h54 (IOwait 6,1%), **READY 13h57min29s** | smoke de tarefa, PDV e encomenda ok | `7f7cee4` + `525ff57` |
+| 2. Mensagens com loja trocada | dump 14h07; transação 14h13min07s | **1.341** alinhadas (310 + 1.031, 49 conversas); 4 visões iguais | dados (`dumps/2026-11-04-noite/`) |
+| 3. Edge sem a view + banco fora vira 500 | push 14h28 (READY 14h31min02s); Edge **v68** às 14h31min43s | Direct e WhatsApp do Lucas ok; 0 erro no log | `7d50e56` + `51c50aa` |
+| 4. Notas editáveis pelo autor | migração 14h49min49s (IOwait 6,1%); push 14h50, **READY 14h52min42s** | editar e apagar a nota 290; vendedor 0/0 | `b189647` · `20261104000400` (versão `20261104174949`) |
+
+**O que mudou:**
+- **Tarefa, card e PDV conferem as linhas gravadas.** Em vez de "ok" calado, o 0 linhas agora avisa nestes casos:
+  - concluir ou excluir uma tarefa que sumiu;
+  - remover uma chamada;
+  - cotação de troca já usada por outra venda;
+  - volta de venda que falhou e não desfez tudo;
+  - desfazer de encomenda que deixou sobra;
+  - pedido que já estava marcado (mantém a data);
+  - ajuste de encomenda que não gravou.
+  
+  Na lista dos 134 ficam 13 FEITO e 5 FICA, com o motivo.
+- **Mensagens:** nenhuma mensagem fica mais em loja diferente da conversa (0 no banco).
+- **Edge `webhook-leads` v68:**
+  - não lê mais a view `lead_mensagens`;
+  - a leitura do Direct vai pela identidade do canal e só pelas mensagens daquele canal;
+  - banco fora na gravação (mensagem, anúncio, eco, histórico, lead) responde 500;
+  - o pacote grande grava o hash de 24 h só no fim. Antes de processar, ele pega uma trava de 60 s, e a reentrega que chega durante o processamento recebe 503 com `Retry-After: 60`.
+- **`eventos`:** só a nota (`conversa.nota`) aceita UPDATE e DELETE, e só pelo autor. O INSERT de nota exige `por_usuario` igual ao usuário logado. O resto continua imutável.
+
+**Grep das views** (`git grep` sobre a `main` `b189647`):
+- `from('leads')`: 85 leituras em 47 arquivos (eram 86 em 47). A que saiu é a leitura do Direct na Edge.
+- `from('lead_mensagens')`: 15 em 8 arquivos (eram 23 em 9). A Edge zerou.
+
+Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras que restam na Edge são todas da view `leads`.
+
+**Voltas, guardadas até a próxima limpeza:**
+- **App:** Instant Rollback, um passo por vez: `51c50aa` (antes das notas), `525ff57` (antes da Edge no repositório) e `0e4aa3c` (antes dos lotes).
+- **Notas:** `dumps/2026-11-04-manha/volta-eventos-notas.sql`. Restaura as 3 políticas antigas, conferidas iguais à produção antes de aplicar.
+- **Mensagens:** `dumps/2026-11-04-noite/restaurar-mensagens_filial_20261104.sql`, com trava por id e loja. O dump das 1.341 está em `mensagens_filial_20261104.json`, com md5 do banco `21eb30da…`.
+- **Edge:**
+  - republicar a v67 a partir de `D:\Nexus-Copia\inbox\ferramentas\noite-0411\volta-edge-v67\` (o `index.ts` e o `reenvio.ts`, idênticos ao commit `7593932`);
+  - comando: `npx supabase functions deploy webhook-leads --project-ref guiuzbcqkvelqcuogxtd --use-api --no-verify-jwt --yes`, com os dois arquivos no lugar;
+  - fica fora do repositório porque um `.ts` em `dumps/` entra no eslint e reprova o gate.
+
+**Pendências que a tarde deixou:**
+- **O Instagram não manda entrega nem leitura.** Nos últimos 30 dias, as 1.493 respostas de Instagram ficaram em "enviada", desde antes da v68. Os eventos de entrega e leitura do Direct não estão chegando, e o provável é a assinatura no app da Meta. A leitura do Direct pela identidade ficou provada só no local. Decisão do Lucas, porque é zona da Meta.
+- **A Inbox mostra o cartão de anúncio como JSON cru.** É a mensagem `tipo = 'anuncio'`: o card do lead mostra o cartão, mas a `/comunicacao` não. É código, e vai num próximo lote.
+- **Lote 2 sem e2e em dois caminhos:** a venda do PDV com cotação de troca e a volta da venda que falha. Ficaram com o gate, o verificador e a revisão. O e2e cobriu encomendas (local 11/11 e smoke na produção).
+- **`usuarios.json` do local está desatualizado:** a Rayssa está inativa na produção. Na foto, a visão de Jaguariúna usou a Vanessa Amorim Volpato.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
