@@ -8,7 +8,9 @@ import { Badge, Button, ConfirmDialog, notify } from '@/components/ui'
 /**
  * Lista de pedidos de módulo com Atender / Recusar (22/10/2026). Usada na tela de
  * pedidos do superadmin (todas as empresas) e na tela de cada empresa.
- * Atender instala; recusar apaga e fica no log (/api/superadmin/modulos/pedidos/[id]).
+ * Atender instala; recusar marca o pedido como recusado (com data e quem recusou)
+ * e registra no log (/api/superadmin/modulos/pedidos/[id]). Desde a viagem 1
+ * (03/11/2026) nada é apagado: os recusados aparecem em PedidosRecusados.
  */
 export interface PedidoModulo {
   id: number
@@ -22,6 +24,37 @@ export interface PedidoModulo {
 
 const dia = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+
+/** Pedido recusado, como o superadmin vê no histórico. */
+export interface PedidoRecusado {
+  id: number
+  nome: string
+  pedidoEm: string
+  quem: string | null
+  recusadoEm: string
+  recusadoPor: string | null
+  empresa?: { id: number; nome: string }
+}
+
+/** Histórico dos recusados (04/11/2026): o pedido não some mais ao recusar. */
+export function PedidosRecusados({ pedidos }: { pedidos: PedidoRecusado[] }) {
+  if (pedidos.length === 0) return <p className="text-[13px] text-ink-3">Nenhum pedido recusado.</p>
+  return (
+    <div className="flex flex-col divide-y divide-line-soft">
+      {pedidos.map((p) => (
+        <div key={p.id} className="flex flex-wrap items-center gap-2 py-2.5 text-[13px]">
+          <Badge>{p.nome}</Badge>
+          <Badge tone="bad">Recusado</Badge>
+          {p.empresa && (
+            <Link href={`/superadmin/empresas/${p.empresa.id}`} className="font-medium text-ink hover:underline">{p.empresa.nome}</Link>
+          )}
+          <span className="text-ink-2">pedido por {p.quem ?? 'alguém da loja'} em {dia(p.pedidoEm)}</span>
+          <span className="ml-auto text-ink-2">recusado por {p.recusadoPor ?? '—'} em {dia(p.recusadoEm)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function PedidosModulo({ pedidos }: { pedidos: PedidoModulo[] }) {
   const router = useRouter()
@@ -67,7 +100,7 @@ export function PedidosModulo({ pedidos }: { pedidos: PedidoModulo[] }) {
         onClose={() => setRecusar(null)}
         onConfirm={() => recusar && agir(recusar, 'recusar')}
         title={`Recusar o pedido de ${recusar?.nome ?? ''}?`}
-        description="O pedido é apagado e a recusa fica no log do superadmin. A loja pode pedir de novo."
+        description="O pedido fica como recusado, com a data e quem recusou, e a recusa vai para o log do superadmin. A loja vê a recusa na Central e pode pedir de novo."
         confirmLabel="Recusar"
         tone="danger"
         loading={!!recusar && ocupado === recusar.id}

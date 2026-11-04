@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getEmpresaRole } from '@/lib/owner'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { CATALOGO, donoPodeOcultar } from '@/lib/menu'
-import { tilesDaCentral } from '@/lib/modulos-central'
+import { pedidosERecusas, tilesDaCentral, type PedidoDaEmpresa } from '@/lib/modulos-central'
 import { Topbar } from '@/components/layout/topbar'
 import { CentralModulos } from '@/components/modulos/central-modulos'
 
@@ -29,8 +29,9 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
   const [{ data: empresa }, { data: pedidosRaw }] = await Promise.all([
     supabase.from('empresas').select('plano').eq('id', empresaId).maybeSingle(),
     // Pedidos só pela chave de serviço (RLS fechada), filtrados pela empresa da sessão.
-    createServiceClient().from('modulo_pedidos').select('modulo, pedido_em')
-      .eq('empresa_id', empresaId).eq('status', 'pendente'),
+    // Os recusados também (04/11/2026): o dono vê a recusa e pode pedir de novo.
+    createServiceClient().from('modulo_pedidos').select('modulo, status, pedido_em, recusado_em')
+      .eq('empresa_id', empresaId).in('status', ['pendente', 'recusado']),
   ])
   const cfg = await carregarConfigEmpresa(supabase, empresaId)
 
@@ -39,7 +40,7 @@ export default async function ModulosPage({ searchParams }: { searchParams: Prom
     plano: empresa?.plano ?? undefined,
     forcados: cfg.forcados,
     ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)),
-    pedidos: Object.fromEntries((pedidosRaw ?? []).map((p) => [p.modulo, p.pedido_em])),
+    ...pedidosERecusas((pedidosRaw ?? []) as PedidoDaEmpresa[]),
   })
 
   // O ícone do tile é o do item no menu (o ZapIntel não é item: raio). Instalado

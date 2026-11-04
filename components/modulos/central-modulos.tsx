@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
  *   disponível  → Instalar        (POST /api/modulos/instalar)
  *   instalado   → Desinstalar     (com confirmação)
  *   pago        → Pedir           (POST /api/modulos/pedido; o superadmin atende)
+ *                 recusado → "Pedido recusado em …" + Pedir de novo (04/11/2026)
  *   preparação  → sem botão
  *
  * Depois de instalar ou desinstalar, `router.refresh()` refaz o layout no
@@ -85,6 +86,8 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                 {doGrupo.map((t) => {
                   const Icone = MENU_ICONS[t.icone] ?? MENU_ICONS.Zap
                   const pedidoEm = pedidos[t.chave] ?? t.pedidoEm
+                  // A recusa só aparece enquanto não houver pedido novo em aberto.
+                  const recusadoEm = pedidoEm ? null : t.recusadoEm
                   const e = t.estado
                   return (
                     <div
@@ -110,6 +113,11 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                             {e.tipo === 'preparacao' && <Badge>Em preparação</Badge>}
                           </div>
                           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">{t.frase}</p>
+                          {podeMudar && recusadoEm && (
+                            <p className="mt-1 text-[11.5px] text-ink-3">
+                              Seu pedido foi recusado em {dia(recusadoEm)}.{e.tipo === 'pago' ? ' Você pode pedir de novo.' : ''}
+                            </p>
+                          )}
                           {t.foraDoMenu && (
                             <p className="mt-1 text-[11.5px] text-ink-3">
                               Fora do menu: escondido em{' '}
@@ -136,7 +144,7 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                               <span className="text-[12px] text-ink-3">em {dia(pedidoEm)}</span>
                             </>
                           ) : (
-                            <Button size="sm" variant="outline" loading={ocupado === t.chave} onClick={() => enviar(t, '/api/modulos/pedido')}>Pedir</Button>
+                            <Button size="sm" variant="outline" loading={ocupado === t.chave} onClick={() => enviar(t, '/api/modulos/pedido')}>{recusadoEm ? 'Pedir de novo' : 'Pedir'}</Button>
                           ))}
                         </div>
                       )}

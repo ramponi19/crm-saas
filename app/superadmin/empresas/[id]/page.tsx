@@ -81,8 +81,8 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const zapintelLigado = moduloLigado(camadas.modulos, MODULO_INTELIGENCIA)
 
   // Pedidos de módulo feitos pelo dono na Central de Módulos (22/10/2026; na etapa 0,
-  // pela vitrine). Atender instala; recusar apaga com log — os mesmos botões de
-  // /superadmin/pedidos.
+  // pela vitrine). Atender instala; recusar marca como recusado, com log — os
+  // mesmos botões de /superadmin/pedidos, onde fica o histórico dos recusados.
   const { data: pedidosRaw } = await svc.from('modulo_pedidos')
     .select('id, modulo, pedido_em, usuario:usuarios!modulo_pedidos_pedido_por_fkey(nome)')
     .eq('empresa_id', empresaId).eq('status', 'pendente').order('pedido_em')
