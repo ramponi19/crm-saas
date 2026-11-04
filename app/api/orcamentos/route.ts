@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface ItemOrc { descricao?: string; qtd?: number; valor?: number }
 interface Body {
@@ -41,7 +42,7 @@ async function cotacaoDaEmpresa(
   id: number | null | undefined,
 ): Promise<number | null> {
   if (id == null) return null
-  const { data } = await supabase.from('troca_cotacoes')
+  const { data } = await supabase.from('avaliacao_cotacoes')
     .select('id').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
   return data?.id ?? null
 }
@@ -161,7 +162,8 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { error } = await supabase.from('orcamentos').delete().eq('id', id)
+  const { data: apagou, error } = await supabase.from('orcamentos').delete().eq('id', id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

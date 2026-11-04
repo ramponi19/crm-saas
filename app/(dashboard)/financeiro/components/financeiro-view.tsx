@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { ComissoesImob, type NegocioComissao, type MembroEquipe } from '@/components/modules/financeiro/comissoes-imob'
 import type { TaxasComissao } from '@/lib/comissao-imob'
 import type { TablesInsert } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { Topbar } from '@/components/layout/topbar'
-import { Card, StatCard, Table, Tabs, Badge, Button, IconButton, Input, Select, Textarea, Modal, EmptyState, type Column } from '@/components/ui'
+import { Card, StatCard, Table, Tabs, Badge, Button, IconButton, Input, Select, Textarea, Modal, EmptyState, notify, type Column } from '@/components/ui'
 
 interface Lancamento {
   id: number
@@ -213,11 +214,12 @@ export default function FinanceiroView({
       observacoes: form.observacoes.trim() || null,
     }
     if (editId) {
-      const { error } = await supabase.from('lancamentos_financeiros').update(payload).eq('id', editId)
+      const { data: gravou, error } = await supabase.from('financeiro_lancamentos').update(payload).eq('id', editId).select('id')
       if (error) { setErro('Erro ao atualizar. Tente novamente.'); setSaving(false); return }
+      if (nadaGravado(gravou)) { setErro(NADA_GRAVADO); setSaving(false); return }
       setLancamentos(prev => prev.map(l => l.id === editId ? { ...l, ...payload } : l))
     } else {
-      const { data, error } = await supabase.from('lancamentos_financeiros').insert({ ...payload, empresa_id: empresaId } as TablesInsert<'lancamentos_financeiros'>).select().single()
+      const { data, error } = await supabase.from('financeiro_lancamentos').insert({ ...payload, empresa_id: empresaId } as TablesInsert<'financeiro_lancamentos'>).select().single()
       if (error) { setErro('Erro ao salvar. Tente novamente.'); setSaving(false); return }
       setLancamentos(prev => [data as Lancamento, ...prev])
     }
@@ -227,8 +229,9 @@ export default function FinanceiroView({
 
   async function excluir() {
     if (!editId) return
-    const { error } = await supabase.from('lancamentos_financeiros').delete().eq('id', editId)
+    const { data: apagou, error } = await supabase.from('financeiro_lancamentos').delete().eq('id', editId).select('id')
     if (error) { setErro('Erro ao excluir.'); return }
+    if (nadaGravado(apagou)) { setErro(NADA_GRAVADO); return }
     setLancamentos(prev => prev.filter(l => l.id !== editId))
     setModal(false)
   }
@@ -236,8 +239,10 @@ export default function FinanceiroView({
   const catsFiltradas = categorias.filter(c => c.tipo === form.tipo || c.tipo === 'ambos')
 
   async function marcarPago(id: number) {
-    const { error } = await supabase.from('cobrancas').update({ status: 'pago' }).eq('id', id)
+    const { data: marcou, error } = await supabase.from('financeiro_cobrancas').update({ status: 'pago' }).eq('id', id).select('id')
     if (error) return
+    // 0 linhas: a cobrança sumiu ou é de outra loja — não pinta "pago" na tela.
+    if (nadaGravado(marcou)) { notify.bad(NADA_GRAVADO); return }
     setCobrancas(prev => prev.map(c => c.id === id ? { ...c, status: 'pago' } : c))
   }
 

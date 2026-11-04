@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Código inválido' }, { status: 400 })
   }
 
-  const { data } = await supabase.from('troca_cotacoes')
+  const { data } = await supabase.from('avaliacao_cotacoes')
     .select('id, numero, modelo, armazenamento, imei, valor_final, na_troca, descontos_total, bonus, avarias, cliente_nome, usada_em, venda_id, created_at')
     .eq('empresa_id', empresaId).eq('numero', numero)
     .maybeSingle()

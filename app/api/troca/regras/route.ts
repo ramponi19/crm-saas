@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     patch.corte_bateria = Math.min(100, Math.max(0, n))
   }
 
-  const { error } = await supabase.from('troca_regras')
+  const { error } = await supabase.from('avaliacao_regras')
     .upsert(patch as never, { onConflict: 'empresa_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

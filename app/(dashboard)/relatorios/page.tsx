@@ -37,7 +37,7 @@ export default async function RelatoriosPage({ searchParams }: {
       .select('id, data_venda, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes!cliente_id(nome), produtos!produto_id(nome), usuarios!vendedor_id(nome)')
       .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500),
     supabase
-      .from('lancamentos_financeiros')
+      .from('financeiro_lancamentos')
       .select('id, data_venc, descricao, categoria, tipo, valor, status')
       .eq('empresa_id', empresaId).order('data_venc', { ascending: false }).limit(200),
     supabase

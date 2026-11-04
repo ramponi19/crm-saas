@@ -153,15 +153,15 @@ export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
 
       // Backup p/ rollback: DELETE+INSERT não é transacional no client. Se o insert
       // falhar, restauramos as taxas antigas — o PDV nunca fica sem taxas.
-      const { data: backup } = await supabase.from('taxas_pagamento')
+      const { data: backup } = await supabase.from('financeiro_taxas')
         .select('forma_pagamento, bandeira, parcelas, percentual_taxa, ativo').eq('empresa_id', empresa_id)
 
-      await supabase.from('taxas_pagamento').delete().eq('empresa_id', empresa_id)
+      await supabase.from('financeiro_taxas').delete().eq('empresa_id', empresa_id)
 
       if (rows.length > 0) {
-        const { error } = await supabase.from('taxas_pagamento').insert(rows)
+        const { error } = await supabase.from('financeiro_taxas').insert(rows)
         if (error) {
-          if (backup?.length) await supabase.from('taxas_pagamento').insert(backup.map((b) => ({ ...b, empresa_id })))
+          if (backup?.length) await supabase.from('financeiro_taxas').insert(backup.map((b) => ({ ...b, empresa_id })))
           notify.bad('Erro ao salvar taxas: ' + error.message); return
         }
       }

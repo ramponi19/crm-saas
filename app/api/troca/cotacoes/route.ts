@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { AVARIA_POR_CHAVE, BONUS_LEVA_SEMINOVO, calcularTroca } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { TOTAL_ITENS } from '@/lib/troca-checklist'
@@ -55,11 +56,11 @@ export async function POST(req: Request) {
     .filter((c) => AVARIA_POR_CHAVE[c] || c === BONUS_LEVA_SEMINOVO.chave)
 
   const [{ data: preco }, { data: regras }] = await Promise.all([
-    supabase.from('troca_precos')
+    supabase.from('avaliacao_precos')
       .select('na_troca, descontos')
       .eq('empresa_id', empresaId).eq('modelo', modelo).eq('armazenamento', armazenamento)
       .eq('ativo', true).maybeSingle(),
-    supabase.from('troca_regras').select('bonus_seminovo').eq('empresa_id', empresaId).maybeSingle(),
+    supabase.from('avaliacao_regras').select('bonus_seminovo').eq('empresa_id', empresaId).maybeSingle(),
   ])
 
   /**
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
   }
 
   if (b.id) {
-    const { data, error } = await supabase.from('troca_cotacoes')
+    const { data, error } = await supabase.from('avaliacao_cotacoes')
       .update(dados as never).eq('id', b.id).select('numero').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, id: b.id, numero: data?.numero ?? null, ...conta })
@@ -132,7 +133,7 @@ export async function POST(req: Request) {
 
   // `usuario_id` só na criação, como em orçamentos: é o dono da cotação, e o
   // admin que corrigir uma vírgula não pode virar dono dela.
-  const { data, error } = await supabase.from('troca_cotacoes')
+  const { data, error } = await supabase.from('avaliacao_cotacoes')
     .insert({ ...dados, usuario_id: user.id } as never)
     // `numero` vem do gatilho `numerar_cotacao_troca`, contado por empresa. É o
     // código que o vendedor digita no PDV — quem chama precisa recebê-lo.
@@ -149,7 +150,8 @@ export async function DELETE(req: Request) {
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
   // RLS decide o que este usuário alcança — a cláusula de empresa/loja está na
   // política, não aqui.
-  const { error } = await supabase.from('troca_cotacoes').delete().eq('id', id)
+  const { data: apagou, error } = await supabase.from('avaliacao_cotacoes').delete().eq('id', id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { AVARIA_POR_CHAVE } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
 
   // Lê a linha atual para MESCLAR os descontos: a tela manda só a célula que
   // mudou, e sobrescrever o jsonb inteiro apagaria as outras onze colunas.
-  const { data: atual } = await supabase.from('troca_precos')
+  const { data: atual } = await supabase.from('avaliacao_precos')
     .select('id, na_troca, descontos')
     .eq('empresa_id', empresaId).eq('modelo', modelo).eq('armazenamento', armazenamento)
     .maybeSingle()
@@ -86,10 +87,11 @@ export async function POST(req: Request) {
     atualizado_em: new Date().toISOString(),
   }
 
-  const { error } = atual?.id
-    ? await supabase.from('troca_precos').update(dados as never).eq('id', atual.id)
-    : await supabase.from('troca_precos').insert(dados as never)
+  const { data: gravou, error } = atual?.id
+    ? await supabase.from('avaliacao_precos').update(dados as never).eq('id', atual.id).select('id')
+    : await supabase.from('avaliacao_precos').insert(dados as never).select('id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 409 })
   return NextResponse.json({ ok: true, na_troca: naTroca, descontos })
 }

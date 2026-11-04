@@ -84,7 +84,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
         //
         // Hint que o PostgREST não resolve falha ALTO, com PGRST200 ("no matches
         // were found"), não em silêncio — conferido com um hint inventado.
-        .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
+        .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes:avaliacao_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
         .eq('lead_id', leadId).order('created_at', { ascending: false }),
       empresaId
         ? supabase.from('empresa_menu').select('itens').eq('empresa_id', empresaId).maybeSingle()
@@ -125,8 +125,8 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
   async function abrirTroca() {
     setAbrindoTroca(true)
     const [{ data: precos }, { data: regras }, { data: unis }] = await Promise.all([
-      supabase.from('troca_precos').select('modelo, armazenamento, na_troca, descontos').eq('ativo', true),
-      supabase.from('troca_regras').select('bonus_seminovo, corte_bateria').maybeSingle(),
+      supabase.from('avaliacao_precos').select('modelo, armazenamento, na_troca, descontos').eq('ativo', true),
+      supabase.from('avaliacao_regras').select('bonus_seminovo, corte_bateria').maybeSingle(),
       supabase.from('inventario_unidades')
         .select('id, preco_venda, cor, armazenamento, condicao, produtos!produto_id(nome)')
         .eq('status', 'disponivel').eq('ativo', true).limit(400),

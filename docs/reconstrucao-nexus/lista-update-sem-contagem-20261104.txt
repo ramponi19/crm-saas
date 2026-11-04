@@ -28,9 +28,9 @@ app/(dashboard)/estoque/components/produto-modal.tsx:130  update produtos  (supa
 app/(dashboard)/estoque/components/unidade-modal.tsx:120  upsert veiculo_dados  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3); tabela agora estoque_veiculo_dados
 app/(dashboard)/estoque/components/unidade-modal.tsx:139  update inventario_unidades  (supabase)  >> FEITO lote views-1: salvar unidade com 0 linhas avisa
 app/(dashboard)/estoque/components/unidade-modal.tsx:149  update inventario_unidades  (supabase)  >> FEITO lote views-1: remover unidade com 0 linhas avisa
-app/(dashboard)/financeiro/components/financeiro-view.tsx:216  update lancamentos_financeiros  (supabase)
-app/(dashboard)/financeiro/components/financeiro-view.tsx:230  delete lancamentos_financeiros  (supabase)
-app/(dashboard)/financeiro/components/financeiro-view.tsx:239  update cobrancas  (supabase)
+app/(dashboard)/financeiro/components/financeiro-view.tsx:216  update lancamentos_financeiros  (supabase)  >> FEITO lote views-2: editar lançamento com 0 linhas avisa
+app/(dashboard)/financeiro/components/financeiro-view.tsx:230  delete lancamentos_financeiros  (supabase)  >> FEITO lote views-2: excluir lançamento com 0 linhas avisa
+app/(dashboard)/financeiro/components/financeiro-view.tsx:239  update cobrancas  (supabase)  >> FEITO lote views-2: marcar pago com 0 linhas avisa e não pinta pago
 app/(dashboard)/garantia/components/garantia-modal.tsx:109  update garantias_assistencias  (supabase)
 app/(dashboard)/imoveis/imoveis-view.tsx:178  delete imoveis  (supabase)
 app/(dashboard)/imoveis/imoveis-view.tsx:231  update chaves_imoveis  (supabase)
@@ -76,8 +76,8 @@ app/api/funis/route.ts:78  update funis  (supabase)
 app/api/funis/route.ts:79  update funis  (supabase)
 app/api/funis/route.ts:103  delete funis  (supabase)
 app/api/garantia/termo/route.ts:51  update vendas_termos  (supabase)
-app/api/orcamentos/route.ts:164  delete orcamentos  (supabase)
-app/api/payments/config/route.ts:47  upsert tenant_payment_config  (supabase)
+app/api/orcamentos/route.ts:164  delete orcamentos  (supabase)  >> FEITO lote views-2: 0 linhas = 404 Nada foi gravado
+app/api/payments/config/route.ts:47  upsert tenant_payment_config  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3)
 app/api/payments/webhook/[provider]/route.ts:89  update cobrancas  (supabase)  >> FICA: o cliente é createServiceClient (sem RLS); entrou pelo nome da variável
 app/api/propostas/route.ts:46  update propostas  (supabase)
 app/api/propostas/route.ts:55  delete propostas  (supabase)
@@ -94,10 +94,10 @@ app/api/stripe/webhook/route.ts:46  update empresas  (supabase)
 app/api/stripe/webhook/route.ts:59  update empresas  (supabase)
 app/api/stripe/webhook/route.ts:90  update empresas  (supabase)
 app/api/superadmin/empresas/[id]/route.ts:70  update empresas  (supabase)
-app/api/troca/cotacoes/route.ts:152  delete troca_cotacoes  (supabase)
-app/api/troca/precos/familia/route.ts:75  update troca_precos  (supabase)
-app/api/troca/precos/route.ts:90  update troca_precos  (supabase)
-app/api/troca/regras/route.ts:36  upsert troca_regras  (supabase)
+app/api/troca/cotacoes/route.ts:152  delete troca_cotacoes  (supabase)  >> FEITO lote views-2: 0 linhas = 404 Nada foi gravado
+app/api/troca/precos/familia/route.ts:75  update troca_precos  (supabase)  >> FEITO lote views-2: 0 linhas = 409
+app/api/troca/precos/route.ts:90  update troca_precos  (supabase)  >> FEITO lote views-2: 0 linhas = 409
+app/api/troca/regras/route.ts:36  upsert troca_regras  (supabase)  >> FICA: upsert barrado pela RLS dá erro (lote 3)
 app/i/[codigo]/route.ts:59  update rastreamento_visitas  (db)
 components/modules/configuracoes/assinatura-card.tsx:66  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
 components/modules/configuracoes/automacoes-card.tsx:126  update automacoes  (supabase)  >> FEITO lote 3 (fix/lote-3, 04/11)

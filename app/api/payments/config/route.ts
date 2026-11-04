@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     : encryptCredenciais(credenciais)
 
   const { error } = await supabase
-    .from('tenant_payment_config')
+    .from('financeiro_config_pagamento')
     .upsert({
       empresa_id: empresaId,
       provider,
@@ -66,7 +66,7 @@ export async function GET() {
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
   const { data } = await supabase
-    .from('tenant_payment_config')
+    .from('financeiro_config_pagamento')
     .select('provider, ativo, modo, atualizado_em, credenciais_cipher')
     .eq('empresa_id', empresaId)
     .single()

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     // Persistir a cobrança
     const { data: cobranca, error } = await supabase
-      .from('cobrancas')
+      .from('financeiro_cobrancas')
       .insert({
         empresa_id: empresaId,
         provider: provider.id,

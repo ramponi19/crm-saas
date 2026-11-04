@@ -20,7 +20,7 @@ interface TenantConfig {
 export async function getTenantPaymentConfig(empresaId: number): Promise<TenantConfig> {
   const supabase = await createClient()
   const { data } = await supabase
-    .from('tenant_payment_config')
+    .from('financeiro_config_pagamento')
     .select('provider, ativo, modo, credenciais_cipher')
     .eq('empresa_id', empresaId)
     .single()

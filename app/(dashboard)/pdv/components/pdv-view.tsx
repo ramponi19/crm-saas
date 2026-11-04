@@ -615,7 +615,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
        */
       for (const t of trocasValidas) {
         if (!t.cotacaoId) continue
-        const { data: marcada } = await supabase.from('troca_cotacoes')
+        const { data: marcada } = await supabase.from('avaliacao_cotacoes')
           .update({ usada_em: new Date().toISOString(), venda_id: primeiraVendaId } as never)
           .eq('id', t.cotacaoId)
           .is('usada_em', null)

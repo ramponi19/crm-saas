@@ -53,7 +53,7 @@ export default async function PDVPage() {
       .not('reservado_lead_id', 'is', null)
       .order('reserva_expira_em', { ascending: true }),
     supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    supabase.from('taxas_pagamento').select('*').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('financeiro_taxas').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas')
       .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)

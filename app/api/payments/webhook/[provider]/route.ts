@@ -50,7 +50,7 @@ export async function POST(
 
     // 3) Localizar a cobrança e o tenant
     const { data: cobranca } = await supabase
-      .from('cobrancas')
+      .from('financeiro_cobrancas')
       .select('id, empresa_id, status')
       .eq('provider', provider)
       .eq('provider_ref', refPreliminar)
@@ -62,7 +62,7 @@ export async function POST(
 
     // 4) Carregar credenciais do tenant para validar/consultar
     const { data: config } = await supabase
-      .from('tenant_payment_config')
+      .from('financeiro_config_pagamento')
       .select('credenciais_cipher, modo')
       .eq('empresa_id', cobranca.empresa_id)
       .single()
@@ -87,7 +87,7 @@ export async function POST(
 
     if (result.status && result.status !== cobranca.status) {
       await supabase
-        .from('cobrancas')
+        .from('financeiro_cobrancas')
         .update({
           status: result.status,
           pago_em: result.status === 'confirmado' ? (result.pagoEm ?? new Date().toISOString()) : null,
@@ -129,7 +129,7 @@ async function registrarLancamentoFinanceiro(
   cobrancaId: number
 ) {
   const { data: cobranca } = await supabase
-    .from('cobrancas')
+    .from('financeiro_cobrancas')
     .select('valor, descricao, provider')
     .eq('id', cobrancaId)
     .single()
@@ -139,7 +139,7 @@ async function registrarLancamentoFinanceiro(
   // Evitar duplicidade: checar se já existe lançamento para esta cobrança
   // (vínculo genérico referencia_id + referencia_tp = 'cobranca')
   const { data: existente } = await supabase
-    .from('lancamentos_financeiros')
+    .from('financeiro_lancamentos')
     .select('id')
     .eq('empresa_id', empresaId)
     .eq('referencia_tp', 'cobranca')
@@ -149,7 +149,7 @@ async function registrarLancamentoFinanceiro(
   if (existente) return
 
   const hoje = new Date().toISOString().slice(0, 10)
-  await supabase.from('lancamentos_financeiros').insert({
+  await supabase.from('financeiro_lancamentos').insert({
     empresa_id: empresaId,
     tipo: 'receita',
     valor: cobranca.valor,

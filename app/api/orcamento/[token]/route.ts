@@ -135,7 +135,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       const devolver = Number(orc.valor_devolver) || 0
       if (devolver > 0 && (orc.acerto === 'dinheiro' || orc.acerto === 'credito')) {
         const ehCredito = orc.acerto === 'credito'
-        await svc.from('lancamentos_financeiros').insert({
+        await svc.from('financeiro_lancamentos').insert({
           empresa_id: orc.empresa_id,
           tipo: 'despesa',
           descricao: `${ehCredito ? 'Crédito' : 'Devolução'} — downgrade de ${orc.cliente_nome}`,

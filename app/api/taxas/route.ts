@@ -7,7 +7,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const { data } = await supabase
-    .from('taxas_pagamento')
+    .from('financeiro_taxas')
     .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
     .eq('empresa_id', empresaId)
     .eq('ativo', true)

@@ -29,7 +29,7 @@ async function carregar() {
       .eq('empresa_id', empresaId)
       .in('chave', ['dados_loja', 'preferencias']),
     supabase
-      .from('taxas_pagamento')
+      .from('financeiro_taxas')
       .select('forma_pagamento, bandeira, parcelas, percentual_taxa')
       .eq('empresa_id', empresaId)
       .eq('ativo', true),

@@ -26,8 +26,8 @@ export default async function FinanceiroPage() {
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
   const [{ data: lancamentos }, { data: cobrancas }, { data: vendasMes }] = await Promise.all([
-    supabase.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaId).order('data_venc', { ascending: false }),
-    supabase.from('cobrancas')
+    supabase.from('financeiro_lancamentos').select('*').eq('empresa_id', empresaId).order('data_venc', { ascending: false }),
+    supabase.from('financeiro_cobrancas')
       .select('id, tipo, valor, status, descricao, created_at, link_pagamento, qr_code, linha_digitavel, vencimento, provider, os_id, venda_id, cliente_id, clientes(nome)')
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false })
