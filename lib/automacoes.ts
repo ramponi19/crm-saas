@@ -121,7 +121,9 @@ async function criarTarefa(db: Db, e: Execucao, a: AutomacaoRow, neg: NegocioMin
 /** Envio do modelo pela Edge (caminho de serviço; a Edge confere de novo o aprovado). */
 async function enviarModeloPelaEdge(e: Execucao, a: AutomacaoRow, neg: NegocioMin,
   modelo: { id: number; nome: string; idioma: string; corpo: string | null }, telefone: string): Promise<number | null> {
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads?action=send_template_automacao`
+  // EDGE_WEBHOOK_URL só no teste local (Edge rodando no deno); em produção é a Edge do Supabase.
+  const base = process.env.EDGE_WEBHOOK_URL || `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
+  const url = `${base}?action=send_template_automacao`
   const parametros = ((a.config?.parametros as string[] | undefined) ?? []).map((p) => render(String(p), neg.nome))
   const previa = (modelo.corpo ?? '').replace(/\{\{(\d+)\}\}/g, (_, n) => parametros[Number(n) - 1] ?? '')
   const r = await fetch(url, {

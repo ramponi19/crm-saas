@@ -239,16 +239,90 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
-                },"automacoes": {
+                },"automacao_execucoes": {
                   Row: {
-                    "acao": string,"ativo": boolean,"config": NonNullable<Json>,"created_at": string,"empresa_id": number,"etapa_id": number | null,"etapa_slug": string | null,"gatilho": string,"horas": number | null,"id": number
+                    "acao": string,"agendada_para": string,"automacao_id": number,"contato_id": number | null,"created_at": string,"empresa_id": number,"executada_em": string | null,"filial_id": number | null,"id": number,"mensagem_id": number | null,"modelo_id": number | null,"motivo": string | null,"negocio_id": number,"reservada_em": string | null,"status": string,"tentativas": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "acao": string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id": number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"gatilho": string,"horas"?: number | null,"id"?: never
+                    "acao": string,"agendada_para"?: string,"automacao_id": number,"contato_id"?: number | null,"created_at"?: string,"empresa_id": number,"executada_em"?: string | null,"filial_id"?: number | null,"id"?: never,"mensagem_id"?: number | null,"modelo_id"?: number | null,"motivo"?: string | null,"negocio_id": number,"reservada_em"?: string | null,"status"?: string,"tentativas"?: number
                   }
                   Update: {
-                    "acao"?: string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"gatilho"?: string,"horas"?: number | null,"id"?: never
+                    "acao"?: string,"agendada_para"?: string,"automacao_id"?: number,"contato_id"?: number | null,"created_at"?: string,"empresa_id"?: number,"executada_em"?: string | null,"filial_id"?: number | null,"id"?: never,"mensagem_id"?: number | null,"modelo_id"?: number | null,"motivo"?: string | null,"negocio_id"?: number,"reservada_em"?: string | null,"status"?: string,"tentativas"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "automacao_execucoes_automacao_id_fkey"
+      columns: ["automacao_id"]
+isOneToOne: false
+      referencedRelation: "automacoes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_contato_id_fkey"
+      columns: ["contato_id"]
+isOneToOne: false
+      referencedRelation: "clientes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_contato_id_fkey"
+      columns: ["contato_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "v_empresas_plano"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_modelo_id_fkey"
+      columns: ["modelo_id"]
+isOneToOne: false
+      referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "leads"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacao_execucoes_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "v_leads_nao_lidas"
+      referencedColumns: ["lead_id"]
+    }
+                  ]
+                },"automacoes": {
+                  Row: {
+                    "acao": string,"ativo": boolean,"config": NonNullable<Json>,"created_at": string,"empresa_id": number,"espera_dias": number,"etapa_id": number | null,"etapa_slug": string | null,"gatilho": string,"horas": number | null,"id": number,"modelo_id": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "acao": string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id": number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"gatilho": string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null
+                  }
+                  Update: {
+                    "acao"?: string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id"?: number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"gatilho"?: string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null
                   }
                   Relationships: [
                     {
@@ -268,6 +342,12 @@ isOneToOne: false
       columns: ["etapa_id"]
 isOneToOne: false
       referencedRelation: "funil_etapas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacoes_modelo_id_fkey"
+      columns: ["modelo_id"]
+isOneToOne: false
+      referencedRelation: "modelos_mensagem"
       referencedColumns: ["id"]
     }
                   ]
@@ -933,14 +1013,14 @@ isOneToOne: false
                   ]
                 },"contatos": {
                   Row: {
-                    "ativo": boolean,"cpf_cnpj": string | null,"created_at": string,"dados": NonNullable<Json>,"email": string | null,"empresa_id": number,"endereco": NonNullable<Json>,"filial_id": number | null,"foto_url": string | null,"id": number,"instagram": string | null,"nome": string | null,"observacoes": string | null,"origem": string | null,"origem_id": string | null,"responsavel_desde": string | null,"responsavel_id": string | null,"telefone": string | null,"telefone_e164": string | null,"tipo": string,"updated_at": string
+                    "ativo": boolean,"cpf_cnpj": string | null,"created_at": string,"dados": NonNullable<Json>,"email": string | null,"empresa_id": number,"endereco": NonNullable<Json>,"filial_id": number | null,"foto_url": string | null,"id": number,"instagram": string | null,"nome": string | null,"observacoes": string | null,"opt_out_em": string | null,"origem": string | null,"origem_id": string | null,"responsavel_desde": string | null,"responsavel_id": string | null,"telefone": string | null,"telefone_e164": string | null,"tipo": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean,"cpf_cnpj"?: string | null,"created_at"?: string,"dados"?: NonNullable<Json>,"email"?: string | null,"empresa_id": number,"endereco"?: NonNullable<Json>,"filial_id"?: number | null,"foto_url"?: string | null,"id"?: number,"instagram"?: string | null,"nome"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"origem_id"?: string | null,"responsavel_desde"?: string | null,"responsavel_id"?: string | null,"telefone"?: string | null,"telefone_e164"?: string | null,"tipo"?: string,"updated_at"?: string
+                    "ativo"?: boolean,"cpf_cnpj"?: string | null,"created_at"?: string,"dados"?: NonNullable<Json>,"email"?: string | null,"empresa_id": number,"endereco"?: NonNullable<Json>,"filial_id"?: number | null,"foto_url"?: string | null,"id"?: number,"instagram"?: string | null,"nome"?: string | null,"observacoes"?: string | null,"opt_out_em"?: string | null,"origem"?: string | null,"origem_id"?: string | null,"responsavel_desde"?: string | null,"responsavel_id"?: string | null,"telefone"?: string | null,"telefone_e164"?: string | null,"tipo"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "ativo"?: boolean,"cpf_cnpj"?: string | null,"created_at"?: string,"dados"?: NonNullable<Json>,"email"?: string | null,"empresa_id"?: number,"endereco"?: NonNullable<Json>,"filial_id"?: number | null,"foto_url"?: string | null,"id"?: number,"instagram"?: string | null,"nome"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"origem_id"?: string | null,"responsavel_desde"?: string | null,"responsavel_id"?: string | null,"telefone"?: string | null,"telefone_e164"?: string | null,"tipo"?: string,"updated_at"?: string
+                    "ativo"?: boolean,"cpf_cnpj"?: string | null,"created_at"?: string,"dados"?: NonNullable<Json>,"email"?: string | null,"empresa_id"?: number,"endereco"?: NonNullable<Json>,"filial_id"?: number | null,"foto_url"?: string | null,"id"?: number,"instagram"?: string | null,"nome"?: string | null,"observacoes"?: string | null,"opt_out_em"?: string | null,"origem"?: string | null,"origem_id"?: string | null,"responsavel_desde"?: string | null,"responsavel_id"?: string | null,"telefone"?: string | null,"telefone_e164"?: string | null,"tipo"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -5867,6 +5947,31 @@ isOneToOne: false
                 }
           }
           Functions: {
+"automacao_reservar":
+{ Args: { "p_lote"?: number }; Returns: {
+              "acao": string,
+"agendada_para": string,
+"automacao_id": number,
+"contato_id": number | null,
+"created_at": string,
+"empresa_id": number,
+"executada_em": string | null,
+"filial_id": number | null,
+"id": number,
+"mensagem_id": number | null,
+"modelo_id": number | null,
+"motivo": string | null,
+"negocio_id": number,
+"reservada_em": string | null,
+"status": string,
+"tentativas": number
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "automacao_execucoes"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
             "assistente_status_conversas":
 { Args: { "p_empresa": number }; Returns: {
               "lead_id": number,"mensagens": number,"ultima_enviada": string,"ultima_recebida": string
