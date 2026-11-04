@@ -53,9 +53,9 @@ export interface Cursor { momento: string; id: number }
 
 export const POR_PAGINA = 40
 /** Lote de varredura do filtro "aguardando resposta" (comparação de duas colunas, feita aqui). */
-const LOTE_VARREDURA = 200
+const LOTE_VARREDURA = 500
 /** Teto de lotes por página no "aguardando": acima disso a página volta curta e o "carregar mais" continua. */
-const LOTES_MAX = 6
+const LOTES_MAX = 4
 
 const COLUNAS_CONVERSA = 'id, contato_id, canal_id, filial_id, nao_lidas, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at'
 const COLUNAS_CONTATO = 'id, nome, telefone, instagram, foto_url'
@@ -122,16 +122,12 @@ export async function listarConversas(
     ? `contato:contatos!inner(${COLUNAS_CONTATO}, negocios!negocios_contato_id_fkey!inner(responsavel_id))`
     : `contato:contatos(${COLUNAS_CONTATO})`
 
-  const itens: ConversaInbox[] = []
-  let atual = cursor ?? null
-  const lote = f.aguardando ? LOTE_VARREDURA : POR_PAGINA
   /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
-  const selecao: string = `${COLUNAS_CONVERSA}, ${embedContato}, canal:canais(${COLUNAS_CANAL})`
-  for (let volta = 0; volta < (f.aguardando ? LOTES_MAX : 1); volta++) {
+  const completa: string = `${COLUNAS_CONVERSA}, ${embedContato}, canal:canais(${COLUNAS_CANAL})`
+  const consulta = (selecao: string, desde: Cursor | null, limite: number) => {
     // Tipo solto de propósito: o construtor reatribuído com relação embutida estoura o tsc (TS2589).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let q: any = db.from('conversas').select(selecao)
-      .not('ultima_mensagem_at', 'is', null)
+    let q: any = db.from('conversas').select(selecao).not('ultima_mensagem_at', 'is', null)
     if (idsCanal) q = q.in('canal_id', idsCanal)
     if (f.naoLidas) q = q.gt('nao_lidas', 0)
     if (f.aguardando) q = q.not('ultima_recebida_at', 'is', null)
@@ -139,18 +135,54 @@ export async function listarConversas(
     if (comResp) q = f.responsavel === 'nenhum'
       ? q.is('contato.negocios.responsavel_id', null)
       : q.eq('contato.negocios.responsavel_id', f.responsavel as string)
-    if (atual) q = q.or(filtroDoCursor(atual))
-    const { data, error } = await q.order('ultima_mensagem_at', { ascending: false }).order('id', { ascending: false }).limit(lote)
+    if (desde) q = q.or(filtroDoCursor(desde))
+    return q.order('ultima_mensagem_at', { ascending: false }).order('id', { ascending: false }).limit(limite)
+  }
+  const limpar = (linhas: unknown[]) => (linhas as (ConversaInbox & { contato: (ContatoInbox & { negocios?: unknown }) | null })[])
+    .map(({ contato, ...c }) => ({ ...c, contato: contato ? { id: contato.id, nome: contato.nome, telefone: contato.telefone, instagram: contato.instagram, foto_url: contato.foto_url } : null }))
+
+  if (!f.aguardando) {
+    const { data, error } = await consulta(completa, cursor ?? null, POR_PAGINA)
     if (error) throw new Error(error.message)
-    const linhas = ((data ?? []) as unknown as (ConversaInbox & { contato: (ContatoInbox & { negocios?: unknown }) | null })[])
-      .map(({ contato, ...c }) => ({ ...c, contato: contato ? { id: contato.id, nome: contato.nome, telefone: contato.telefone, instagram: contato.instagram, foto_url: contato.foto_url } : null }))
-    for (const l of linhas) if (!f.aguardando || aguardandoResposta(l)) itens.push(l)
+    const itens = limpar(data ?? [])
+    const ultima = itens[itens.length - 1]
+    return { itens, proximo: itens.length === POR_PAGINA && ultima ? { momento: ultima.ultima_mensagem_at as string, id: ultima.id } : null }
+  }
+
+  /**
+   * "Aguardando resposta": a varredura traz só as datas (≈ 10 KB por lote de 200,
+   * contra ≈ 90 KB com contato e canal) e o detalhe vem depois, só das que entram
+   * na página. Medido no local em 04/11 com a JM inteira: a varredura completa caiu
+   * de 330 ms por página; a página tem no máximo POR_PAGINA conversas.
+   */
+  const leve: string = comResp
+    ? 'id, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at, contato:contatos!inner(id, negocios!negocios_contato_id_fkey!inner(responsavel_id))'
+    : 'id, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at'
+  type Leve = Pick<ConversaInbox, 'id' | 'ultima_mensagem_at' | 'ultima_recebida_at' | 'ultima_enviada_at'>
+  const achadas: Leve[] = []
+  let atual = cursor ?? null
+  let acabou = false
+  for (let volta = 0; volta < LOTES_MAX && achadas.length < POR_PAGINA; volta++) {
+    const { data, error } = await consulta(leve, atual, LOTE_VARREDURA)
+    if (error) throw new Error(error.message)
+    const linhas = (data ?? []) as Leve[]
+    for (const l of linhas) if (aguardandoResposta(l)) achadas.push(l)
     const ultima = linhas[linhas.length - 1]
     atual = ultima ? { momento: ultima.ultima_mensagem_at as string, id: ultima.id } : null
-    if (linhas.length < lote) return { itens, proximo: null }
-    if (itens.length >= POR_PAGINA) break
+    if (linhas.length < LOTE_VARREDURA) { acabou = true; break }
   }
-  return { itens, proximo: atual }
+  // Página com no máximo POR_PAGINA: se sobrou, a próxima recomeça depois da última que entrou.
+  const pagina = achadas.slice(0, POR_PAGINA)
+  const cortou = achadas.length > POR_PAGINA
+  const ultimaDaPagina = pagina[pagina.length - 1]
+  const proximo = cortou && ultimaDaPagina ? { momento: ultimaDaPagina.ultima_mensagem_at as string, id: ultimaDaPagina.id }
+    : acabou ? null : atual
+  if (!pagina.length) return { itens: [], proximo }
+  const { data, error } = await db.from('conversas').select(`${COLUNAS_CONVERSA}, contato:contatos(${COLUNAS_CONTATO}), canal:canais(${COLUNAS_CANAL})` as string)
+    .in('id', pagina.map((c) => c.id))
+  if (error) throw new Error(error.message)
+  const porId = new Map(limpar(data ?? []).map((c) => [c.id, c]))
+  return { itens: pagina.map((c) => porId.get(c.id)).filter((c): c is ConversaInbox => !!c), proximo }
 }
 
 /** Uma conversa pelo id (a RLS devolve nada se for de outra loja). */

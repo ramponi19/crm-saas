@@ -22,8 +22,15 @@ export function LimiteBanner() {
 
     async function fetchUso() {
       const [{ count: leads }, { count: usuarios }] = await Promise.all([
-        supabase.from('leads').select('*', { count: 'exact', head: true })
-          .eq('empresa_id', empresa!.id).eq('ativo', true),
+        /**
+         * Leads ativos contados no core (04/11/2026, Inbox única: a moldura de toda
+         * tela deixou a view `leads`). O `ativo` da view era
+         * coalesce(negocios.dados->_lead->ativo, true) — aqui, "não é false".
+         * Conferido na produção: 2.922 = 2.922 na JM.
+         */
+        supabase.from('negocios').select('id', { count: 'exact', head: true })
+          .eq('empresa_id', empresa!.id)
+          .or('dados->_lead->>ativo.is.null,dados->_lead->>ativo.neq.false'),
         supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true })
           .eq('empresa_id', empresa!.id).eq('ativo', true),
       ])
