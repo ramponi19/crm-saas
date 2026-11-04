@@ -132,7 +132,7 @@ export async function POST(req: Request) {
     try {
       // Automatize (04/11/2026): a fila `automacao_execucoes` só aceita a chave de
       // serviço; quem move já foi autorizado acima (o negócio gravou pela RLS dele).
-      await executarEntradaEtapa(createServiceClient() as unknown as SupabaseClient, empresaId, leadMin, etapa)
+      await executarEntradaEtapa(createServiceClient() as unknown as SupabaseClient, empresaId, leadMin, etapa, etapaRow?.id ?? null)
     } catch (e) {
       // Automação nunca quebra o move.
       console.error('[leads/mover] automações falharam:', e)

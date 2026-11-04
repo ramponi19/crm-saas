@@ -22,7 +22,7 @@ export interface CadDaEtapa { id: number; nome: string; ativo: boolean; inscrito
 export interface DadosAutomatize {
   podeEditar: boolean
   pausado: boolean
-  etapas: { slug: string; label: string; automacoes: AutoDaEtapa[]; cadencias: CadDaEtapa[] }[]
+  etapas: { id: number; slug: string; label: string; automacoes: AutoDaEtapa[]; cadencias: CadDaEtapa[] }[]
   modelos: { id: number; nome: string; idioma: string; corpo: string | null }[]
   equipe: { id: string; nome: string }[]
 }
@@ -156,7 +156,7 @@ function NovaAutomacao({ slug, label, dados, onFechar, onCriou }: {
   async function salvar() {
     setSalvando(true)
     const ok = await postar({
-      op: 'criar', etapa_slug: slug, acao, espera_dias: Number(espera) || 0, titulo, prazo_dias: Number(prazo) || 0,
+      op: 'criar', etapa_id: dados.etapas.find((x) => x.slug === slug)?.id, etapa_slug: slug, acao, espera_dias: Number(espera) || 0, titulo, prazo_dias: Number(prazo) || 0,
       modelo_id: Number(modelo) || null, parametros: parametros ? parametros.split('|').map((p) => p.trim()) : [], responsavel_id: resp,
     })
     setSalvando(false)

@@ -73,9 +73,10 @@ export async function GET(req: Request) {
   const nCadHoje = conta(cadHoje as unknown as { cadencia_inscricoes: { cadencia_id: number } }[], (x) => x.cadencia_inscricoes.cadencia_id)
 
   const porEtapa = (etapas ?? []).map((e) => ({
+    id: e.id as number,
     slug: e.slug as string,
     label: e.label as string,
-    automacoes: (autos ?? []).filter((a) => a.etapa_slug === e.slug || a.etapa_id === e.id).map((a) => ({
+    automacoes: (autos ?? []).filter((a) => (a.etapa_id != null ? a.etapa_id === e.id : a.etapa_slug === e.slug)).map((a) => ({
       id: a.id, acao: a.acao, ativo: a.ativo, espera_dias: a.espera_dias ?? 0, modelo_id: a.modelo_id, config: a.config,
       na_fila: nFila.get(a.id as number) ?? 0, executadas_hoje: nHoje.get(a.id as number) ?? 0,
     })),
@@ -125,8 +126,12 @@ export async function POST(req: Request) {
   if (b.op === 'criar') {
     const acao = String(b.acao) as Acao
     if (!ACOES.includes(acao)) return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
+    // Pelo id da etapa (o slug só é único dentro de um funil); o slug fica de reserva.
+    const etapaId = Number(b.etapa_id) || null
     const etapaSlug = String(b.etapa_slug ?? '')
-    const { data: etapa } = await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('slug', etapaSlug).maybeSingle()
+    const { data: etapa } = etapaId
+      ? await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('id', etapaId).maybeSingle()
+      : await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('slug', etapaSlug).maybeSingle()
     if (!etapa) return NextResponse.json({ error: 'Etapa não encontrada.' }, { status: 400 })
     const espera = Math.max(0, Math.min(90, Math.floor(Number(b.espera_dias) || 0)))
     const config: Record<string, unknown> = {}

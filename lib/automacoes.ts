@@ -73,21 +73,22 @@ async function horarioDaEmpresa(db: Db, empresaId: number): Promise<Horario> {
 
 interface NegocioMin {
   id: number; nome: string | null; responsavel_id: string | null; contato_id: number | null
-  filial_id: number | null; etapa_slug: string | null
+  filial_id: number | null; etapa_slug: string | null; etapa_id: number | null
 }
 
 async function lerNegocio(db: Db, id: number): Promise<NegocioMin | null> {
   const { data } = await db.from('negocios')
-    .select('id, contato_id, filial_id, responsavel_id, dados, contatos(nome), funil_etapas(slug)')
+    .select('id, contato_id, filial_id, responsavel_id, etapa_id, dados, contatos(nome), funil_etapas(slug)')
     .eq('id', id).maybeSingle()
   if (!data) return null
   const d = data as unknown as {
-    id: number; contato_id: number | null; filial_id: number | null; responsavel_id: string | null
+    id: number; contato_id: number | null; filial_id: number | null; responsavel_id: string | null; etapa_id: number | null
     dados: { _lead?: { kanban_status?: string } } | null; contatos: { nome: string | null } | null; funil_etapas: { slug: string } | null
   }
   return {
     id: d.id, nome: d.contatos?.nome ?? null, responsavel_id: d.responsavel_id, contato_id: d.contato_id,
     filial_id: d.filial_id, etapa_slug: d.funil_etapas?.slug ?? d.dados?._lead?.kanban_status ?? null,
+    etapa_id: d.etapa_id ?? null,
   }
 }
 
@@ -152,8 +153,12 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
 
   const neg = await lerNegocio(db, e.negocio_id)
   if (!neg) return { resultado: 'pulada', motivo: 'negócio apagado' }
-  // "Esperar N dias" na etapa: se saiu dela, a ação não vale mais.
-  if (a.etapa_slug && neg.etapa_slug && neg.etapa_slug !== a.etapa_slug) {
+  // "Esperar N dias" na etapa: se saiu dela, a ação não vale mais. Pela etapa (id)
+  // quando a automação tem: o slug só é único dentro de um funil.
+  const saiu = a.etapa_id != null && neg.etapa_id != null
+    ? neg.etapa_id !== a.etapa_id
+    : !!(a.etapa_slug && neg.etapa_slug && neg.etapa_slug !== a.etapa_slug)
+  if (saiu) {
     return { resultado: 'pulada', motivo: `saiu da etapa (${neg.etapa_slug})` }
   }
 
@@ -239,11 +244,15 @@ async function executarReservadas(db: Db, lista: Execucao[]) {
  * Entrada na etapa: agenda uma execução por automação ligada daquela etapa e roda
  * já as de espera 0. `db` precisa ser o cliente de SERVIÇO (a fila só aceita ele).
  */
-export async function executarEntradaEtapa(db: Db, empresaId: number, lead: LeadMin, etapaSlug: string) {
+export async function executarEntradaEtapa(db: Db, empresaId: number, lead: LeadMin, etapaSlug: string, etapaId: number | null = null) {
   const { data } = await db.from('automacoes')
-    .select('id, etapa_slug, acao, espera_dias, modelo_id')
+    .select('id, etapa_slug, etapa_id, acao, espera_dias, modelo_id')
     .eq('empresa_id', empresaId).eq('gatilho', 'entrou_na_etapa').eq('ativo', true)
-  const lista = ((data ?? []) as AutomacaoRow[]).filter((a) => !a.etapa_slug || a.etapa_slug === etapaSlug)
+  // A etapa pelo id quando os dois lados têm: o slug só é único DENTRO de um funil
+  // (funil_etapas_funil_slug_key), e "novo" em dois funis dispararia nos dois.
+  const lista = ((data ?? []) as AutomacaoRow[]).filter((a) => a.etapa_id != null && etapaId != null
+    ? a.etapa_id === etapaId
+    : !a.etapa_slug || a.etapa_slug === etapaSlug)
   if (!lista.length) return
   if (await automacoesPausadas(db, empresaId)) return
   const neg = await lerNegocio(db, lead.id)
