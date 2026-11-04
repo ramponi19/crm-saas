@@ -1850,12 +1850,6 @@ isOneToOne: false
       referencedRelation: "assistencia_garantias"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "cobrancas_os_id_fkey"
-      columns: ["os_id"]
-isOneToOne: false
-      referencedRelation: "garantias_assistencias"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "cobrancas_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
@@ -3337,12 +3331,6 @@ isOneToOne: false
       foreignKeyName: "contrato_modelos_documento_id_fkey"
       columns: ["documento_id"]
 isOneToOne: false
-      referencedRelation: "contrato_documentos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_modelos_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
       referencedRelation: "vendas_contrato_documentos"
       referencedColumns: ["id"]
     },{
@@ -3388,12 +3376,6 @@ isOneToOne: false
       columns: ["criado_por"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
-      referencedRelation: "contrato_documentos"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "contratos_venda_documento_id_fkey"
@@ -3786,12 +3768,6 @@ isOneToOne: false
       columns: ["filial_id"]
 isOneToOne: false
       referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_pedido_compra_id_fkey"
-      columns: ["pedido_compra_id"]
-isOneToOne: false
-      referencedRelation: "pedidos_compra"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "vendas_pedido_compra_id_fkey"
@@ -4220,200 +4196,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"comissoes": {
-                  Row: {
-                    "created_at": string | null,"data_pagamento": string | null,"empresa_id": number | null,"filial_id": number | null,"id": number | null,"mes_referencia": string | null,"percentual": number | null,"status": string | null,"usuario_id": string | null,"valor_comissao": number | null,"venda_id": number | null,"zerado_em": string | null,"zerado_por": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "created_at"?: string | null,"data_pagamento"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"mes_referencia"?: string | null,"percentual"?: number | null,"status"?: string | null,"usuario_id"?: string | null,"valor_comissao"?: number | null,"venda_id"?: number | null,"zerado_em"?: string | null,"zerado_por"?: string | null
-                         }
-                        Update: {
-                           "created_at"?: string | null,"data_pagamento"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"mes_referencia"?: string | null,"percentual"?: number | null,"status"?: string | null,"usuario_id"?: string | null,"valor_comissao"?: number | null,"venda_id"?: number | null,"zerado_em"?: string | null,"zerado_por"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "comissoes_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
-      referencedRelation: "vendas_vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_zerado_por_fkey"
-      columns: ["zerado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"contrato_documentos": {
-                  Row: {
-                    "arquivado": boolean | null,"created_at": string | null,"criado_por": string | null,"empresa_id": number | null,"id": number | null,"nome": string | null,"updated_at": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "arquivado"?: boolean | null,"created_at"?: string | null,"criado_por"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"nome"?: string | null,"updated_at"?: string | null
-                         }
-                        Update: {
-                           "arquivado"?: boolean | null,"created_at"?: string | null,"criado_por"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"nome"?: string | null,"updated_at"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "contrato_documentos_criado_por_fkey"
-      columns: ["criado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_documentos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_documentos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"contrato_modelos": {
-                  Row: {
-                    "ativo": boolean | null,"created_at": string | null,"criado_por": string | null,"documento_id": number | null,"empresa_id": number | null,"id": number | null,"paginas": Json | null,"versao": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "ativo"?: boolean | null,"created_at"?: string | null,"criado_por"?: string | null,"documento_id"?: number | null,"empresa_id"?: number | null,"id"?: number | null,"paginas"?: Json | null,"versao"?: number | null
-                         }
-                        Update: {
-                           "ativo"?: boolean | null,"created_at"?: string | null,"criado_por"?: string | null,"documento_id"?: number | null,"empresa_id"?: number | null,"id"?: number | null,"paginas"?: Json | null,"versao"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "contrato_modelos_criado_por_fkey"
-      columns: ["criado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_modelos_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
-      referencedRelation: "contrato_documentos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_modelos_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
-      referencedRelation: "vendas_contrato_documentos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_modelos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contrato_modelos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"contratos_venda": {
-                  Row: {
-                    "cliente_id": number | null,"created_at": string | null,"criado_por": string | null,"dados": Json | null,"documento_id": number | null,"empresa_id": number | null,"filial_id": number | null,"garantia_dias": number | null,"html": string | null,"id": number | null,"nome_documento": string | null,"venda_ids": (number)[] | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "cliente_id"?: number | null,"created_at"?: string | null,"criado_por"?: string | null,"dados"?: Json | null,"documento_id"?: number | null,"empresa_id"?: number | null,"filial_id"?: number | null,"garantia_dias"?: number | null,"html"?: string | null,"id"?: number | null,"nome_documento"?: string | null,"venda_ids"?: (number)[] | null
-                         }
-                        Update: {
-                           "cliente_id"?: number | null,"created_at"?: string | null,"criado_por"?: string | null,"dados"?: Json | null,"documento_id"?: number | null,"empresa_id"?: number | null,"filial_id"?: number | null,"garantia_dias"?: number | null,"html"?: string | null,"id"?: number | null,"nome_documento"?: string | null,"venda_ids"?: (number)[] | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "contratos_venda_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_criado_por_fkey"
-      columns: ["criado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
-      referencedRelation: "contrato_documentos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_documento_id_fkey"
-      columns: ["documento_id"]
-isOneToOne: false
-      referencedRelation: "vendas_contrato_documentos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contratos_venda_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"core_v_planos": {
                   Row: {
                     "cor": string | null,"descricao": string | null,"destaque": boolean | null,"features": Json | null,"id": string | null,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string | null,"ordem": number | null,"preco_centavos": number | null
@@ -4427,56 +4209,6 @@ isOneToOne: false
                          }
                         Relationships: [
                     
-                  ]
-                },"fichas_financiamento": {
-                  Row: {
-                    "banco": string | null,"created_at": string | null,"empresa_id": number | null,"entrada": number | null,"filial_id": number | null,"id": number | null,"lead_id": number | null,"observacoes": string | null,"parcelas": number | null,"status": string | null,"taxa": number | null,"usuario_id": string | null,"valor": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "banco"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"entrada"?: number | null,"filial_id"?: number | null,"id"?: number | null,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string | null,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
-                         }
-                        Update: {
-                           "banco"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"entrada"?: number | null,"filial_id"?: number | null,"id"?: number | null,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string | null,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "fichas_financiamento_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "v_leads_nao_lidas"
-      referencedColumns: ["lead_id"]
-    }
                   ]
                 },"fornecedores": {
                   Row: {
@@ -4501,74 +4233,6 @@ isOneToOne: false
       columns: ["empresa_id"]
 isOneToOne: false
       referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"garantias_assistencias": {
-                  Row: {
-                    "aprovado_em": string | null,"celular_reserva_fornecido": boolean | null,"cliente_id": number | null,"created_at": string | null,"data_entrada": string | null,"defeito_relatado": string | null,"dentro_garantia": boolean | null,"dias_garantia_restantes": number | null,"empresa_id": number | null,"estado_entrada": string | null,"filial_id": number | null,"id": number | null,"imei_serial": string | null,"modelo_reserva": string | null,"observacoes": string | null,"orcamento_valor": number | null,"parecer_tecnico": string | null,"produto_id": number | null,"protocolo": string | null,"recusado_em": string | null,"responsavel_tecnico_id": string | null,"status": string | null,"tipo": string | null,"token": string | null,"usuario_id": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "aprovado_em"?: string | null,"celular_reserva_fornecido"?: boolean | null,"cliente_id"?: number | null,"created_at"?: string | null,"data_entrada"?: string | null,"defeito_relatado"?: string | null,"dentro_garantia"?: boolean | null,"dias_garantia_restantes"?: number | null,"empresa_id"?: number | null,"estado_entrada"?: string | null,"filial_id"?: number | null,"id"?: number | null,"imei_serial"?: string | null,"modelo_reserva"?: string | null,"observacoes"?: string | null,"orcamento_valor"?: number | null,"parecer_tecnico"?: string | null,"produto_id"?: number | null,"protocolo"?: string | null,"recusado_em"?: string | null,"responsavel_tecnico_id"?: string | null,"status"?: string | null,"tipo"?: string | null,"token"?: string | null,"usuario_id"?: string | null
-                         }
-                        Update: {
-                           "aprovado_em"?: string | null,"celular_reserva_fornecido"?: boolean | null,"cliente_id"?: number | null,"created_at"?: string | null,"data_entrada"?: string | null,"defeito_relatado"?: string | null,"dentro_garantia"?: boolean | null,"dias_garantia_restantes"?: number | null,"empresa_id"?: number | null,"estado_entrada"?: string | null,"filial_id"?: number | null,"id"?: number | null,"imei_serial"?: string | null,"modelo_reserva"?: string | null,"observacoes"?: string | null,"orcamento_valor"?: number | null,"parecer_tecnico"?: string | null,"produto_id"?: number | null,"protocolo"?: string | null,"recusado_em"?: string | null,"responsavel_tecnico_id"?: string | null,"status"?: string | null,"tipo"?: string | null,"token"?: string | null,"usuario_id"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "garantias_assistencias_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_produto_id_fkey"
-      columns: ["produto_id"]
-isOneToOne: false
-      referencedRelation: "estoque_produtos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_produto_id_fkey"
-      columns: ["produto_id"]
-isOneToOne: false
-      referencedRelation: "produtos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_responsavel_tecnico_id_fkey"
-      columns: ["responsavel_tecnico_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
       referencedColumns: ["id"]
     }
                   ]
@@ -4946,142 +4610,6 @@ isOneToOne: false
       referencedColumns: ["lead_id"]
     }
                   ]
-                },"orcamentos": {
-                  Row: {
-                    "acerto": string | null,"aparelho": string | null,"aparelho_novo": string | null,"aparelho_usado": string | null,"aprovado_em": string | null,"cliente_id": number | null,"cliente_nome": string | null,"cliente_telefone": string | null,"created_at": string | null,"defeito": string | null,"empresa_id": number | null,"filial_id": number | null,"garantia_dias": number | null,"id": number | null,"imei": string | null,"itens": Json | null,"lead_id": number | null,"observacoes": string | null,"os_id": number | null,"prazo_dias": number | null,"recusado_em": string | null,"status": string | null,"tipo": string | null,"token": string | null,"total": number | null,"troca_cotacao_id": number | null,"unidade_id": number | null,"usuario_id": string | null,"valor_devolver": number | null,"valor_entrada": number | null,"valor_novo": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string | null,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: number | null,"imei"?: string | null,"itens"?: Json | null,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string | null,"tipo"?: string | null,"token"?: string | null,"total"?: number | null,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number | null,"valor_entrada"?: number | null,"valor_novo"?: number | null
-                         }
-                        Update: {
-                           "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string | null,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: number | null,"imei"?: string | null,"itens"?: Json | null,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string | null,"tipo"?: string | null,"token"?: string | null,"total"?: number | null,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number | null,"valor_entrada"?: number | null,"valor_novo"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "orcamentos_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "v_leads_nao_lidas"
-      referencedColumns: ["lead_id"]
-    },{
-      foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
-      columns: ["troca_cotacao_id"]
-isOneToOne: false
-      referencedRelation: "avaliacao_cotacoes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_unidade_id_fkey"
-      columns: ["unidade_id"]
-isOneToOne: false
-      referencedRelation: "estoque_unidades"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_unidade_id_fkey"
-      columns: ["unidade_id"]
-isOneToOne: false
-      referencedRelation: "inventario_unidades"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"pedidos_compra": {
-                  Row: {
-                    "created_at": string | null,"data_pedido": string | null,"descricao": string | null,"empresa_id": number | null,"filial_id": number | null,"fornecedor_id": number | null,"id": number | null,"observacoes": string | null,"solicitado_em": string | null,"solicitado_por": string | null,"status": string | null,"usuario_id": string | null,"valor_total": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: number | null,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
-                         }
-                        Update: {
-                           "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: number | null,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "pedidos_compra_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_fornecedor_id_fkey"
-      columns: ["fornecedor_id"]
-isOneToOne: false
-      referencedRelation: "estoque_fornecedores"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_fornecedor_id_fkey"
-      columns: ["fornecedor_id"]
-isOneToOne: false
-      referencedRelation: "fornecedores"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_solicitado_por_fkey"
-      columns: ["solicitado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"produtos": {
                   Row: {
                     "armazenamentos": (string)[] | null,"ativo": boolean | null,"categoria_id": number | null,"categoria_tipo": string | null,"codigos": string | null,"cores": (string)[] | null,"created_at": string | null,"descricao": string | null,"disponivel": boolean | null,"empresa_id": number | null,"foto_url": string | null,"garantia_dias": number | null,"id": number | null,"marca_id": number | null,"nome": string | null,"preco": number | null,"subcategoria_id": number | null
@@ -5135,76 +4663,6 @@ isOneToOne: false
       columns: ["subcategoria_id"]
 isOneToOne: false
       referencedRelation: "estoque_subcategorias"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"propostas": {
-                  Row: {
-                    "cliente_nome": string | null,"created_at": string | null,"empresa_id": number | null,"filial_id": number | null,"id": number | null,"itens": Json | null,"lead_id": number | null,"observacoes": string | null,"status": string | null,"token": string | null,"total": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"itens"?: Json | null,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string | null,"token"?: string | null,"total"?: number | null
-                         }
-                        Update: {
-                           "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"itens"?: Json | null,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string | null,"token"?: string | null,"total"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "propostas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "v_leads_nao_lidas"
-      referencedColumns: ["lead_id"]
-    }
-                  ]
-                },"servicos_reparo": {
-                  Row: {
-                    "ativo": boolean | null,"categoria": string | null,"created_at": string | null,"empresa_id": number | null,"filial_id": number | null,"id": number | null,"nome": string | null,"preco": number | null,"tempo_estimado_min": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "ativo"?: boolean | null,"categoria"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"nome"?: string | null,"preco"?: number | null,"tempo_estimado_min"?: number | null
-                         }
-                        Update: {
-                           "ativo"?: boolean | null,"categoria"?: string | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"id"?: number | null,"nome"?: string | null,"preco"?: number | null,"tempo_estimado_min"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "servicos_reparo_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
       referencedColumns: ["id"]
     }
                   ]
@@ -5317,12 +4775,6 @@ isOneToOne: false
       columns: ["filial_id"]
 isOneToOne: false
       referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_pedido_compra_id_fkey"
-      columns: ["pedido_compra_id"]
-isOneToOne: false
-      referencedRelation: "pedidos_compra"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "vendas_pedido_compra_id_fkey"

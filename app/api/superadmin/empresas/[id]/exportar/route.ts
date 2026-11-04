@@ -5,10 +5,15 @@ import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Tabelas com dados pessoais do tenant, exportadas para o ZIP LGPD.
+// Nomes do core (04/11/2026): as views antigas `cobrancas`, `lancamentos_financeiros` e
+// `comissoes` saíram do banco, e o CSV delas vinha VAZIO sem aviso; `vendas`, `produtos` e
+// `imoveis` são views no caminho da mesma saída. `proprietarios` nunca existiu como tabela
+// (sempre exportou vazio) e saiu. `leads`, `lead_mensagens` e `clientes` trocam de fonte
+// nos lotes finais das views.
 const TABELAS = [
-  'empresa_usuarios', 'leads', 'lead_mensagens', 'clientes', 'vendas',
-  'produtos', 'imoveis', 'proprietarios', 'visitas', 'tarefas',
-  'cobrancas', 'lancamentos_financeiros', 'comissoes',
+  'empresa_usuarios', 'leads', 'lead_mensagens', 'clientes', 'vendas_vendas',
+  'estoque_produtos', 'imoveis_imoveis', 'visitas', 'tarefas',
+  'financeiro_cobrancas', 'financeiro_lancamentos', 'vendas_comissoes',
 ]
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +34,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   entries.push({ nome: 'empresa.csv', conteudo: linhasParaCsv([empresa as Record<string, unknown>]) })
 
   for (const tabela of TABELAS) {
-    const { data } = await db.from(tabela).select('*').eq('empresa_id', empresaId)
+    const { data, error } = await db.from(tabela).select('*').eq('empresa_id', empresaId)
+    // Exportação LGPD incompleta não pode sair como se estivesse completa.
+    if (error) return NextResponse.json({ error: `Falha ao exportar ${tabela}: ${error.message}` }, { status: 500 })
     const rows = (data ?? []) as unknown as Record<string, unknown>[]
     entries.push({ nome: `${tabela}.csv`, conteudo: linhasParaCsv(rows) })
   }

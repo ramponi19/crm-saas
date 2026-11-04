@@ -187,14 +187,14 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     // O que não saiu é dito ao vendedor: meia encomenda calada é o que este
     // desfazer existe para evitar.
     const sobras: string[] = []
-    const apagar = async (tabela: 'vendas' | 'pedidos_compra', id: number, rotulo: string) => {
+    const apagar = async (tabela: 'vendas' | 'vendas_pedidos_compra', id: number, rotulo: string) => {
       const { data } = await supabase.from(tabela).delete().eq('id', id).select('id')
       if (nadaGravado(data)) sobras.push(`${rotulo} #${id}`)
     }
-    if (pedidoSolto != null) await apagar('pedidos_compra', pedidoSolto, 'pedido')
+    if (pedidoSolto != null) await apagar('vendas_pedidos_compra', pedidoSolto, 'pedido')
     for (const c of criados) {
       await apagar('vendas', c.vendaId, 'venda')
-      await apagar('pedidos_compra', c.pedidoId, 'pedido')
+      await apagar('vendas_pedidos_compra', c.pedidoId, 'pedido')
     }
     if (sobras.length) {
       notify.bad('A encomenda não foi desfeita por inteiro',
