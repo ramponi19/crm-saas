@@ -1434,7 +1434,7 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
        *
        * Conferir antes custa uma consulta por item e evita o download inteiro.
        */
-      const { data: alvo } = await db.from("lead_mensagens")
+      const { data: alvo } = await db.from("mensagens")
         .select("id").eq("empresa_id", canal.empresa_id).eq("external_id", externalId)
         .limit(1).maybeSingle();
       if (!alvo) { semPlaceholder++; continue; }
@@ -1444,7 +1444,7 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
       if (!url) continue;
 
       const legenda = midia?.caption as string | undefined;
-      const { data } = await db.from("lead_mensagens")
+      const { data } = await db.from("mensagens")
         .update({ tipo: tipoDb, midia_url: url, ...(legenda ? { conteudo: legenda } : {}) })
         .eq("id", alvo.id)
         .select("id");
@@ -1918,7 +1918,7 @@ serve(async (req: Request) => {
                   ?? (m.context as Record<string, unknown> | undefined)?.id;
                 if (!alvo) { console.log(`${t} sem id da mensagem original — payload:`, JSON.stringify(m).slice(0, 300)); continue; }
                 if (t === "revoke") {
-                  await db.from("lead_mensagens")
+                  await db.from("mensagens")
                     .update({ conteudo: "[mensagem apagada]", tipo: "texto", midia_url: null })
                     .eq("empresa_id", canal.empresa_id).eq("external_id", String(alvo));
                 } else {
@@ -1927,7 +1927,7 @@ serve(async (req: Request) => {
                     ?? (bloco?.text as Record<string, unknown> | undefined)?.body
                     ?? (m.text as Record<string, unknown> | undefined)?.body;
                   if (novo) {
-                    await db.from("lead_mensagens").update({ conteudo: String(novo) })
+                    await db.from("mensagens").update({ conteudo: String(novo) })
                       .eq("empresa_id", canal.empresa_id).eq("external_id", String(alvo));
                   }
                 }
@@ -1964,7 +1964,7 @@ serve(async (req: Request) => {
               // troca, limpa o erro, e o status segue o caminho normal abaixo.
               const marca = s.biz_opaque_callback_data as string | undefined;
               if (marca?.startsWith("crm:")) {
-                await db.from("lead_mensagens").update({ external_id: id, erro_envio: null })
+                await db.from("mensagens").update({ external_id: id, erro_envio: null })
                   .eq("empresa_id", canal.empresa_id).eq("external_id", marca);
               }
 
@@ -1987,7 +1987,7 @@ serve(async (req: Request) => {
                 patch.erro_envio = (conhecidos[cod]
                   ?? String(erro.title ?? erro.message ?? "falha no envio")).slice(0, 300);
               }
-              await db.from("lead_mensagens").update(patch)
+              await db.from("mensagens").update(patch)
                 .eq("empresa_id", canal.empresa_id).eq("external_id", id);
             }
           }
@@ -2059,7 +2059,7 @@ serve(async (req: Request) => {
           const entrega = m.delivery as Record<string, unknown> | undefined;
           if (entrega?.mids) {
             for (const mid of (entrega.mids as string[])) {
-              await db.from("lead_mensagens")
+              await db.from("mensagens")
                 .update({ status_entrega: "entregue", status_em: new Date().toISOString() })
                 .eq("empresa_id", canal.empresa_id).eq("external_id", mid);
             }
@@ -2072,12 +2072,18 @@ serve(async (req: Request) => {
             const cliente = (m.sender as Record<string, unknown> | undefined)?.id as string | undefined;
             const ate = leitura.watermark ? new Date(Number(leitura.watermark)).toISOString() : null;
             if (cliente && ate) {
-              const { data: lead } = await db.from("leads").select("id")
-                .eq("empresa_id", canal.empresa_id).eq("origem_id", cliente).eq("ativo", true).maybeSingle();
-              if (lead?.id) {
-                await db.from("lead_mensagens")
+              // O cliente é a identidade do canal (contato_identidades), não o lead:
+              // pela view `leads` o mesmo cliente nas duas lojas vinha em duas linhas,
+              // o maybeSingle() falhava e a leitura não era marcada. E só as mensagens
+              // DESTE canal: a leitura do Direct não diz nada sobre o WhatsApp.
+              const { data: ident } = await db.from("contato_identidades").select("contato_id")
+                .eq("empresa_id", canal.empresa_id).eq("canal_tipo", tipo).eq("external_id", cliente)
+                .maybeSingle();
+              if (ident?.contato_id) {
+                await db.from("mensagens")
                   .update({ status_entrega: "lida", status_em: new Date().toISOString() })
-                  .eq("lead_id", lead.id).eq("direcao", "enviada").lte("created_at", ate)
+                  .eq("empresa_id", canal.empresa_id).eq("contato_id", ident.contato_id).eq("canal_id", canal.id)
+                  .eq("direcao", "enviada").lte("created_at", ate)
                   .in("status_entrega", ["enviada", "entregue"]);
               }
             }

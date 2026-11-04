@@ -704,6 +704,10 @@ v "busca tolerante aos dois ids"      "supabase/functions/webhook-leads/index.ts
 v "envio do IG usa me/messages"       "supabase/functions/webhook-leads/index.ts" "/me/messages?access_token="
 v "assinatura aceita os 2 segredos"   "supabase/functions/webhook-leads/index.ts" "assinaturaConfere(INSTAGRAM_APP_SECRET"
 v "recusa sem nenhum dos 2 segredos"  "supabase/functions/webhook-leads/index.ts" "!APP_SECRET && !INSTAGRAM_APP_SECRET"
+# 04/11/2026 fix/edge-sem-view: a Edge escreve direto em mensagens (a view lead_mensagens perdeu o leitor)
+n "edge nao le a view lead_mensagens"  "supabase/functions/webhook-leads/index.ts" 'from("lead_mensagens")'
+v "leitura do Direct pela identidade" "supabase/functions/webhook-leads/index.ts" 'from("contato_identidades").select("contato_id")'
+v "leitura do Direct so deste canal"  "supabase/functions/webhook-leads/index.ts" '.eq("contato_id", ident.contato_id).eq("canal_id", canal.id)'
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"
