@@ -24,7 +24,7 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
+import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -923,12 +923,14 @@ function extrairAnuncio(m: Record<string, unknown>): AnuncioOrigem | null {
  */
 async function registrarMensagem(
   empresaId: number, canalId: number | null, externalId: string | null, dados: Record<string, unknown>,
-): Promise<{ id: number | null; erro: string | null }> {
-  const { data, error } = await db.rpc("mensagem_registrar", {
+): Promise<{ id: number | null; erro: string | null; fora: boolean }> {
+  const { data, error, status } = await db.rpc("mensagem_registrar", {
     p_empresa: empresaId, p_canal_id: canalId, p_external_id: externalId, p_dados: dados,
   });
-  if (error) return { id: null, erro: error.message };
-  return { id: (data as number | null) ?? null, erro: null };
+  // `fora`: o banco caiu (não é dado ruim). Quem recebe webhook transforma em
+  // ErroDeBanco (500, a Meta reenvia); o envio pela tela segue tratando como antes.
+  if (error) return { id: null, erro: error.message, fora: bancoIndisponivel(error, status) };
+  return { id: (data as number | null) ?? null, erro: null, fora: false };
 }
 
 /**
@@ -1017,7 +1019,9 @@ async function upsertLead(canal: Canal, p: {
     .select("id, nome, instagram, foto_url")
     .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true);
   if (canal.filial_id != null) busca = busca.eq("filial_id", canal.filial_id);
-  const { data: achados } = await busca.order("id", { ascending: true }).limit(1);
+  const { data: achados, error: eBusca, status: sBusca } = await busca.order("id", { ascending: true }).limit(1);
+  // Banco fora na busca: seguir criaria um lead duplicado — ou nenhum, e a mensagem some.
+  if (bancoIndisponivel(eBusca, sBusca)) throw new ErroDeBanco(`buscar lead: ${eBusca?.message}`);
   let existente = (achados?.[0] ?? null) as { id: number; nome: string | null; instagram: string | null; foto_url?: string | null } | null;
 
   // Lead criado à mão tem telefone e origem_id nulo — casa pelos últimos 8 dígitos.
@@ -1055,7 +1059,7 @@ async function upsertLead(canal: Canal, p: {
      * Canal da rede (filial nula) continua caindo no gatilho, que manda para a
      * matriz — o certo para o canal da marca, que atende todas as lojas.
      */
-    const { data: novo, error } = await db.from("leads").insert([{
+    const { data: novo, error, status: sNovo } = await db.from("leads").insert([{
       empresa_id: empresaId, nome: p.nome, telefone: p.telefone, instagram: p.instagramUser,
       origem: p.origem, origem_id: p.origemId, primeira_msg: p.texto,
       kanban_status: "novo", ativo: true, foto_url: p.fotoUrl ?? null,
@@ -1068,6 +1072,7 @@ async function upsertLead(canal: Canal, p: {
       if (canal.filial_id != null) qa = qa.eq("filial_id", canal.filial_id);
       const { data: again } = await qa.order("id", { ascending: true }).limit(1);
       leadId = (again?.[0]?.id as number | undefined) ?? null;
+      if (!leadId && bancoIndisponivel(error, sNovo)) throw new ErroDeBanco(`criar lead: ${error.message}`);
       if (!leadId) { console.error("criar lead:", error.message); return null; }
     } else leadId = novo.id as number;
   } else {
@@ -1089,16 +1094,20 @@ async function upsertLead(canal: Canal, p: {
   // `external_id` derivado do id da mensagem: se a Meta reenviar o webhook, o
   // índice único impede um segundo card.
   if (p.anuncio) {
-    const { erro } = await registrarMensagem(empresaId, canal.id, p.externalId ? `anuncio:${p.externalId}` : null, {
+    const { erro, fora } = await registrarMensagem(empresaId, canal.id, p.externalId ? `anuncio:${p.externalId}` : null, {
       lead_id: leadId, direcao: "recebida", conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
       tipo: "anuncio", midia_url: p.anuncio.midia,
     });
+    if (fora) throw new ErroDeBanco(`anúncio na conversa: ${erro}`);
     if (erro) console.error("anúncio na conversa:", erro);
   }
 
-  const { id: msgId, erro: msgErr } = await registrarMensagem(empresaId, canal.id, p.externalId, {
+  const { id: msgId, erro: msgErr, fora: msgFora } = await registrarMensagem(empresaId, canal.id, p.externalId, {
     lead_id: leadId, direcao: "recebida", conteudo: p.texto, origem: p.origem, lida: false, tipo, midia_url: midiaUrl,
   });
+  // Banco fora: 500 para a Meta reenviar o pacote; o que já gravou não duplica
+  // (external_id repetido não grava de novo).
+  if (msgFora) throw new ErroDeBanco(`gravar mensagem recebida ${p.externalId}: ${msgErr}`);
   if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return leadId; }
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
 
@@ -1142,7 +1151,8 @@ async function registrarEcho(
     let ql = db.from("leads").select("id")
       .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true);
     if (canal.filial_id != null) ql = ql.eq("filial_id", canal.filial_id);
-    const { data: naLoja } = await ql.order("id", { ascending: true }).limit(1);
+    const { data: naLoja, error: eLoja, status: sLoja } = await ql.order("id", { ascending: true }).limit(1);
+    if (bancoIndisponivel(eLoja, sLoja)) throw new ErroDeBanco(`echo buscar lead: ${eLoja?.message}`);
     let lead = (naLoja?.[0] ?? null) as { id: number } | null;
 
     if (!lead && canal.filial_id != null) {
@@ -1160,12 +1170,13 @@ async function registrarEcho(
       }
     }
     if (!lead?.id) return;
-    const { id: msgId, erro } = await registrarMensagem(canal.empresa_id, canal.id, mid, {
+    const { id: msgId, erro, fora } = await registrarMensagem(canal.empresa_id, canal.id, mid, {
       lead_id: lead.id, direcao: "enviada", conteudo: texto, origem, lida: true, tipo, midia_url: midiaUrl,
       // Echo = a mensagem comprovadamente saiu (foi enviada pelo app do celular).
       // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
       status_entrega: "enviada", status_em: new Date().toISOString(),
     });
+    if (fora) throw new ErroDeBanco(`gravar echo ${mid}: ${erro}`);
     if (erro) { console.error("gravar echo:", mid, erro); return; }
     if (msgId == null) { console.log("echo duplicado ignorado:", mid); return; }
 
@@ -1174,7 +1185,11 @@ async function registrarEcho(
     // responder PELO CELULAR não, e ela afundava na lista mesmo tendo acabado
     // de ser atendida. Só depois de gravar: echo repetido não mexe na ordem.
     await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", lead.id);
-  } catch (e) { console.error("registrarEcho:", e); }
+  } catch (e) {
+    // Banco fora sobe até o handler (500 + esquecer hash e mids); o resto é log.
+    if (e instanceof ErroDeBanco) throw e;
+    console.error("registrarEcho:", e);
+  }
 }
 
 // ── Coexistência: contatos do celular ───────────────────────────────────────
@@ -1364,7 +1379,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       if (!leadId && linhas.length < 2) { ignorados++; continue; }
 
       if (!leadId) {
-        const { data: novo, error } = await db.from("leads").insert([{
+        const { data: novo, error, status: sHist } = await db.from("leads").insert([{
           empresa_id: canal.empresa_id, nome: fone, telefone: fone,
           origem: "whatsapp", origem_id: fone,
           ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
@@ -1372,6 +1387,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
           kanban_status: "novo", ativo: true,
           ...(ultimaEm ? { ultima_mensagem_at: ultimaEm } : {}),
         }]).select("id").single();
+        if (error && bancoIndisponivel(error, sHist)) throw new ErroDeBanco(`histórico criar lead: ${error.message}`);
         if (error) { console.error("histórico criar lead:", fone, error.message); falhas++; continue; }
         leadId = novo.id as number;
         criados++;
@@ -1381,8 +1397,9 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       // conversa, medido em 13/10), então o lote nunca foi grande.
       let erroLote: string | null = null;
       for (const { external_id, ...l } of linhas) {
-        const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (external_id as string | null) ?? null,
+        const { erro, fora } = await registrarMensagem(canal.empresa_id, canal.id, (external_id as string | null) ?? null,
           { ...l, lead_id: leadId });
+        if (fora) throw new ErroDeBanco(`histórico gravar: ${erro}`);
         if (erro) { erroLote = erro; break; }
       }
       if (erroLote) { console.error("histórico lote:", erroLote); falhas++; continue; }
@@ -1868,18 +1885,34 @@ serve(async (req: Request) => {
    * REENVIO DA META: o mesmo corpo de novo → 200 na hora, sem processar.
    *
    * Pacote de sincronização leva ~1 min aqui; a Meta não espera tanto e reentrega
-   * (418 vezes o mesmo pacote no canal de Jaguariúna, 13–20/10/2026). Pacote grande
-   * grava o hash JÁ, antes de processar; o pequeno só depois de processado — ver
-   * reenvio.ts e a migração 20261021000200_webhook_recebidos.
+   * (418 vezes o mesmo pacote no canal de Jaguariúna, 13–20/10/2026). O hash só é
+   * gravado (24 h) DEPOIS de processado — ver reenvio.ts e a migração
+   * 20261021000200_webhook_recebidos.
+   *
+   * PACOTE GRANDE: TRAVA CURTA ANTES, HASH SÓ NO FIM (04/11/2026). Até aqui o grande
+   * gravava o hash de 24 h ANTES de processar; se o banco caía no meio, o "esquecer"
+   * também falhava (banco fora) e o reenvio da Meta era descartado como repetição:
+   * 15 de 40 mensagens no teste local. Agora a reentrega que chega DURANTE o
+   * processamento esbarra numa trava de 60 s (webhook_mid_novo, a mesma tabela,
+   * que expira sozinha) e o hash de 24 h só nasce quando o pacote termina. Banco
+   * fora no meio = nada fica preso: a trava expira e o reenvio processa tudo.
    */
   const hash = await hashCorpo(corpoCru);
   const tamanho = tamanhoCorpo(corpoCru);
   const conta = contaDoEvento(body);
   const grande = tamanho > LIMITE_GRANDE;
   const rpc = (fn: string, args: Record<string, unknown>) => db.rpc(fn, args);
-  if (await jaRecebido(rpc, hash, tamanho, conta, grande)) {
+  if (await jaRecebido(rpc, hash, tamanho, conta, false)) {
     console.log(`reenvio da Meta ignorado: ${tamanho} bytes, conta ${conta ?? "?"}`);
     return ok();
+  }
+  const trava = `proc:${hash}`;
+  if (grande && !(await primeiraEntrega(rpc, trava, conta))) {
+    // 503, não 200: um 200 aqui encerraria as tentativas da Meta, e se o processamento
+    // em curso cair (banco fora) o pacote se perde. "Volte depois": quando a Meta voltar,
+    // ou o hash de 24 h já existe (200 sem reprocessar) ou a trava expirou (processa).
+    console.log(`reenvio da Meta durante o processamento: 503, volte depois (${tamanho} bytes, conta ${conta ?? "?"})`);
+    return new Response("pacote em processamento", { status: 503, headers: { ...cors, "Retry-After": "60" } });
   }
 
   /** Directs registrados como "já recebidos" nesta requisição — esquecidos se o banco cair. */
@@ -2137,22 +2170,25 @@ serve(async (req: Request) => {
         }
       }
     }
-    // Pacote pequeno processado: agora sim lembra o hash (o grande gravou antes).
-    if (!grande) await jaRecebido(rpc, hash, tamanho, conta, true);
+    // Pacote processado: agora sim lembra o hash (24 h), grande ou pequeno.
+    await jaRecebido(rpc, hash, tamanho, conta, true);
   } catch (e) {
-    // Banco fora: 500 para a Meta reenviar. O pacote grande já tinha gravado o hash;
-    // sem esquecê-lo, o reenvio seria descartado como repetição. O que já foi gravado
-    // antes do erro não duplica: mensagem_registrar ignora external_id repetido.
+    // Banco fora: 500 para a Meta reenviar. Nenhum hash de 24 h foi gravado; a trava
+    // do grande é esquecida (e, se o banco ainda estiver fora, expira em 60 s). O que
+    // já foi gravado antes do erro não duplica: mensagem_registrar ignora external_id
+    // repetido.
     if (e instanceof ErroDeBanco) {
       console.error("banco indisponível — 500 para a Meta reenviar:", e.message);
-      if (grande) await esquecer(rpc, hash);
+      if (grande) await esquecer(rpc, chaveMid(trava));
       // O reenvio da Meta traz os mesmos mids: sem esquecê-los, seria tomado por segunda entrega.
       for (const m of midsDesta) await esquecer(rpc, chaveMid(m));
       return new Response("banco indisponivel", { status: 500, headers: cors });
     }
     // 200 mesmo em erro: 5xx faz a Meta reenviar em loop, e um evento problemático
-    // não pode travar a fila dos outros.
+    // não pode travar a fila dos outros. O grande grava o hash como antes gravava
+    // (antes de processar): reentrega de um pacote que quebra não é reprocessada.
     console.error("processamento:", e);
+    if (grande) await jaRecebido(rpc, hash, tamanho, conta, true);
   }
 
   return ok();

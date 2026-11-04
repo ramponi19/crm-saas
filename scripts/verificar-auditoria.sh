@@ -708,6 +708,11 @@ v "recusa sem nenhum dos 2 segredos"  "supabase/functions/webhook-leads/index.ts
 n "edge nao le a view lead_mensagens"  "supabase/functions/webhook-leads/index.ts" 'from("lead_mensagens")'
 v "leitura do Direct pela identidade" "supabase/functions/webhook-leads/index.ts" 'from("contato_identidades").select("contato_id")'
 v "leitura do Direct so deste canal"  "supabase/functions/webhook-leads/index.ts" '.eq("contato_id", ident.contato_id).eq("canal_id", canal.id)'
+# 04/11/2026: banco fora no meio do pacote vira 500 (a Meta reenvia) e nada fica preso
+v "gravacao com banco fora vira 500"     "supabase/functions/webhook-leads/index.ts" "if (msgFora) throw new ErroDeBanco"
+v "echo nao engole ErroDeBanco"          "supabase/functions/webhook-leads/index.ts" "if (e instanceof ErroDeBanco) throw e;"
+n "grande nao grava hash antes"          "supabase/functions/webhook-leads/index.ts" "jaRecebido(rpc, hash, tamanho, conta, grande)"
+v "grande em processamento = 503"        "supabase/functions/webhook-leads/index.ts" "\"Retry-After\": \"60\""
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

@@ -1,6 +1,6 @@
 // deno test --no-lock supabase/functions/webhook-leads/reenvio.test.ts
 import { assert, assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
+import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 
 Deno.test("mesmo Direct: só a primeira entrega processa; a chave leva o prefixo mid:", async () => {
   const chamadas: unknown[] = [];
@@ -64,4 +64,17 @@ Deno.test("ErroDeBanco é distinguível de erro de dado", () => {
   assert(e instanceof ErroDeBanco);
   assert(e instanceof Error);
   assert(!(new Error("x") instanceof ErroDeBanco));
+});
+
+Deno.test("banco fora x dado ruim: só o primeiro vira ErroDeBanco (500)", () => {
+  // banco fora: a Meta precisa reenviar
+  assert(bancoIndisponivel({ code: "PGRST002", message: "Could not query the database for the schema cache. Retrying." }, 503));
+  assert(bancoIndisponivel({ code: "", message: "TypeError: fetch failed" }, 0));
+  assert(bancoIndisponivel({ code: "57P01", message: "terminating connection due to administrator command" }, 500));
+  assert(bancoIndisponivel({ message: "upstream" }, 504));
+  // dado ruim: 500 aqui faria a Meta reenviar em loop
+  assertEquals(bancoIndisponivel({ code: "23505", message: "duplicate key value violates unique constraint" }, 409), false);
+  assertEquals(bancoIndisponivel({ code: "22P02", message: "invalid input syntax for type bigint" }, 400), false);
+  assertEquals(bancoIndisponivel({ code: "P0001", message: "lead 1 não encontrado" }, 400), false);
+  assertEquals(bancoIndisponivel(null, 503), false);
 });

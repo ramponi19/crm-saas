@@ -93,3 +93,25 @@ export async function esquecer(rpc: Rpc, hash: string): Promise<void> {
 export class ErroDeBanco extends Error {
   constructor(mensagem: string) { super(mensagem); this.name = "ErroDeBanco"; }
 }
+
+/**
+ * O erro diz que o BANCO está fora — e não que o dado é ruim?
+ *
+ * 04/11/2026: com o canal já em cache, o banco caindo no meio de um pacote fazia a
+ * Edge responder 200 depois de ~105 s e as mensagens se perdiam (5 de 5; 14 de 40
+ * num pacote grande). Só a busca do canal virava 500. Agora a gravação da mensagem
+ * (e o que ela precisa antes: achar ou criar o lead) também vira ErroDeBanco quando
+ * isto devolve true. Dado ruim (violação, valor inválido) continua sendo só log: 500
+ * por evento problemático faria a Meta reenviar em loop.
+ */
+export function bancoIndisponivel(
+  erro: { message?: string; code?: string } | null | undefined, status?: number | null,
+): boolean {
+  if (!erro) return false;
+  if (status === 0 || status === 502 || status === 503 || status === 504) return true;
+  const codigo = String(erro.code ?? "");
+  // PostgREST sem conexão / sem cache de schema; Postgres derrubando ou sem conexões.
+  if (/^PGRST00[0-3]$/.test(codigo)) return true;
+  if (["57P01", "57P02", "57P03", "53300", "08000", "08001", "08003", "08006"].includes(codigo)) return true;
+  return /fetch failed|failed to fetch|network|ECONNREFUSED|ECONNRESET|schema cache|timed? ?out/i.test(String(erro.message ?? ""));
+}
