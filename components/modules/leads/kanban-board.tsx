@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -28,9 +29,11 @@ interface KanbanBoardProps {
   restam?: Record<string, number>
   carregandoMais?: Record<string, boolean>
   onCarregarMais?: (etapa: string) => void
+  /** Automatize: rodapé de cada coluna (modo ligado). */
+  rodapeDaColuna?: (etapa: string, label: string) => ReactNode
 }
 
-export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [], agora, contagens, restam, carregandoMais, onCarregarMais }: KanbanBoardProps) {
+export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdate, sla, motivos = [], agora, contagens, restam, carregandoMais, onCarregarMais, rodapeDaColuna }: KanbanBoardProps) {
   const [activeId,    setActiveId]    = useState<number | null>(null)
   const [localLeads,  setLocalLeads]  = useState<Lead[]>(leads)
   const [pendingPerda, setPendingPerda] = useState<Lead | null>(null)
@@ -177,6 +180,7 @@ export function KanbanBoard({ leads, usuarios, columns, onLeadClick, onLeadUpdat
             restam={restam?.[col.id] ?? 0}
             carregandoMais={!!carregandoMais?.[col.id]}
             onCarregarMais={onCarregarMais ? () => onCarregarMais(col.id) : undefined}
+            rodape={rodapeDaColuna?.(col.id, col.label)}
           />
         ))}
       </div>

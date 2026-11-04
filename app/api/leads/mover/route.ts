@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { executarEntradaEtapa } from '@/lib/automacoes'
+import { createServiceClient } from '@/lib/supabase/service'
 import { inscreverPorEtapa } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -129,7 +130,9 @@ export async function POST(req: Request) {
     const db = supabase as unknown as SupabaseClient
     const leadMin = { id: leadAtual.id, nome: leadAtual.nome, responsavel_id: leadAtual.responsavel_id }
     try {
-      await executarEntradaEtapa(db, empresaId, leadMin, etapa)
+      // Automatize (04/11/2026): a fila `automacao_execucoes` só aceita a chave de
+      // serviço; quem move já foi autorizado acima (o negócio gravou pela RLS dele).
+      await executarEntradaEtapa(createServiceClient() as unknown as SupabaseClient, empresaId, leadMin, etapa)
     } catch (e) {
       // Automação nunca quebra o move.
       console.error('[leads/mover] automações falharam:', e)

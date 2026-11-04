@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -21,12 +22,14 @@ interface KanbanColumnProps {
   restam?: number
   carregandoMais?: boolean
   onCarregarMais?: () => void
+  /** Automatize: o que a etapa faz sozinha, embaixo da coluna (só com o modo ligado). */
+  rodape?: ReactNode
 }
 
 const fmtK = (v: number) =>
   v >= 1000 ? `R$ ${(v / 1000).toFixed(1).replace('.', ',')} mil` : `R$ ${v}`
 
-export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla, agora, contagem, restam = 0, carregandoMais = false, onCarregarMais }: KanbanColumnProps) {
+export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick, sla, agora, contagem, restam = 0, carregandoMais = false, onCarregarMais, rodape }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}`, data: { status: column.id } })
 
   /**
@@ -123,6 +126,7 @@ export function KanbanColumn({ column, leads, usuarios, isDragging, onLeadClick,
           </div>
         )}
       </div>
+      {rodape}
     </div>
   )
 }

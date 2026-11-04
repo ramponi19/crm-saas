@@ -8,6 +8,7 @@ import { montarPonte, gravarPonte } from '@/lib/zapintel/ponte'
 import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MODULO_INTELIGENCIA } from '@/lib/empresa-config'
+import { processarFila } from '@/lib/automacoes'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -145,6 +146,17 @@ export async function GET(
           resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
         }
         return NextResponse.json({ ok: true, job, resultado })
+      }
+
+      /**
+       * AUTOMATIZE (04/11/2026): roda a fila de automacao_execucoes (esperar N dias,
+       * envio de modelo fora do horário, excedente do teto por hora). Chamado de hora
+       * em hora pelo pg_cron do Supabase (o cron da Vercel free só roda 1x/dia), com o
+       * CRON_SECRET lido do Vault. Idempotente: a reserva é FOR UPDATE SKIP LOCKED.
+       */
+      case 'automacoes': {
+        const r = await processarFila(supabase as unknown as SupabaseClient)
+        return NextResponse.json({ ok: true, job, ...r })
       }
 
       default:

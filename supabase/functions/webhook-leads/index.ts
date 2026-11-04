@@ -1571,7 +1571,7 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
 // Envio por MODELO APROVADO. É o único caminho aceito pela Meta quando passaram
 // 24h sem o cliente escrever. O texto que fica gravado na conversa é o corpo do
 // modelo já com as variáveis trocadas — senão o histórico mostraria "{{1}}".
-async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuarioId: string | null = null) {
+async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuarioId: string | null = null, origem = "whatsapp") {
   const number = String(body.number ?? '')
   const leadId = body.leadId as string | undefined
   const nome = String(body.modelo ?? '')
@@ -1621,15 +1621,68 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
     return json({ error: msg }, r.status);
   }
 
+  let mensagemId: number | null = null;
   if (leadId) {
-    const { erro } = await registrarMensagem(canal.empresa_id, canal.id, (data?.messages?.[0]?.id as string) ?? null, {
-      lead_id: leadId, direcao: "enviada", conteudo: previa || `[modelo: ${nome}]`, origem: "whatsapp", lida: true,
+    const { id, erro } = await registrarMensagem(canal.empresa_id, canal.id, (data?.messages?.[0]?.id as string) ?? null, {
+      lead_id: leadId, direcao: "enviada", conteudo: previa || `[modelo: ${nome}]`, origem, lida: true,
       tipo: "texto", usuario_id: usuarioId,
       status_entrega: "enviada", status_em: new Date().toISOString(),
     });
     if (erro) console.error("gravar modelo enviado:", erro);
+    mensagemId = id;
   }
-  return json({ success: true, modelo: nome });
+  return json({ success: true, modelo: nome, mensagemId });
+}
+
+/** Comparação em tempo constante de dois textos (a chave de serviço). */
+async function mesmoSegredo(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false;
+  const enc = new TextEncoder();
+  const [ha, hb] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(a)), crypto.subtle.digest("SHA-256", enc.encode(b))]);
+  const x = new Uint8Array(ha), y = new Uint8Array(hb);
+  let dif = 0;
+  for (let i = 0; i < x.length; i++) dif |= x[i] ^ y[i];
+  return dif === 0;
+}
+
+/**
+ * ENVIO AUTOMÁTICO DE MODELO (Automatize, decisões do Lucas, 04/11/2026).
+ *
+ * O único caminho de envio SEM usuário logado. Quem chama é o servidor do app
+ * (lib/automacoes.ts), com a chave de serviço. As travas de volume, horário e 7 dias
+ * moram lá; aqui a Edge confere de novo o que não pode passar de jeito nenhum:
+ * chave de serviço; automação existente, LIGADA, desta empresa, do tipo
+ * enviar_modelo e com ESTE modelo; modelo desta empresa com status APROVADO; contato
+ * sem opt-out e não bloqueado. A mensagem é gravada com origem 'automacao' (o id da
+ * automação fica em automacao_execucoes.mensagem_id).
+ */
+async function envioAutomatico(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const auth = req.headers.get("authorization") ?? "";
+  const chave = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (!(await mesmoSegredo(chave, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""))) return json({ error: "não autorizado" }, 401);
+
+  const negocioId = Number(body.leadId), modeloId = Number(body.modeloId), automacaoId = Number(body.automacaoId);
+  if (!negocioId || !modeloId || !automacaoId) return json({ error: "leadId, modeloId e automacaoId são obrigatórios" }, 400);
+
+  const { data: neg } = await db.from("negocios").select("id, empresa_id, filial_id, contato_id").eq("id", negocioId).maybeSingle();
+  if (!neg) return json({ error: "negócio não encontrado" }, 404);
+  const empresaId = neg.empresa_id as number;
+
+  const { data: a } = await db.from("automacoes").select("id, ativo, acao, modelo_id")
+    .eq("id", automacaoId).eq("empresa_id", empresaId).maybeSingle();
+  if (!a || !a.ativo || a.acao !== "enviar_modelo" || Number(a.modelo_id) !== modeloId) {
+    return json({ error: "automação desligada, de outra empresa ou de outro modelo" }, 409);
+  }
+  const { data: m } = await db.from("modelos_mensagem").select("id, nome, idioma, status")
+    .eq("id", modeloId).eq("empresa_id", empresaId).maybeSingle();
+  if (!m || m.status !== "aprovado") return json({ error: "modelo não aprovado" }, 409);
+  const { data: c } = await db.from("contatos").select("id, ativo, opt_out_em").eq("id", neg.contato_id ?? 0).maybeSingle();
+  if (!c || c.opt_out_em || c.ativo === false) return json({ error: "contato com opt-out, bloqueado ou inexistente" }, 409);
+
+  const canal = await canalDaLoja(empresaId, "whatsapp", (neg.filial_id as number | null) ?? null);
+  if (!canal) return json({ error: "WhatsApp não conectado nesta loja" }, 502);
+  console.log(`envio automático: automação ${automacaoId}, modelo ${m.nome}, negócio ${negocioId}`);
+  return await enviarModelo(canal, { ...body, leadId: negocioId, modelo: m.nome, idioma: m.idioma }, null, "automacao");
 }
 
 async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>, assinatura = "", usuarioId: string | null = null) {
@@ -1785,6 +1838,12 @@ serve(async (req: Request) => {
   try { body = JSON.parse(corpoCru); } catch { return json({ error: "JSON inválido" }, 400); }
 
   const action = url.searchParams.get("action");
+
+  // ── Envio automático (Automatize): só a chave de serviço ────────────────────
+  if (action === "send_template_automacao") {
+    try { return await envioAutomatico(req, body); }
+    catch (e) { console.error("envio automático:", e); return json({ error: "falha no envio automático" }, 500); }
+  }
 
   // ── Envio pelo CRM ────────────────────────────────────────────────────────
   if (action === "send" || action === "send_meta" || action === "send_template") {

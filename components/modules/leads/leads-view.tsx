@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { formatCurrency } from '@/lib/utils'
 import { KanbanBoard } from './kanban-board'
+import { AutomatizeBarra, AutomatizeEtapa, useAutomatize } from './automatize'
 import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
 import { Topbar } from '@/components/layout/topbar'
@@ -81,6 +82,9 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
   const [soEsteira, setSoEsteira] = useState(false)
+  // Automatize: mostra o que cada etapa faz sozinha (04/11/2026).
+  const [automatize, setAutomatize] = useState(false)
+  const auto = useAutomatize(funilId, automatize)
   /** '' = toda a equipe. Filtro de quem gerencia a equipe. */
   const [responsavelId, setResponsavelId] = useState('')
 
@@ -323,6 +327,13 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
           >
             Esteira{contagens.esteira > 0 ? ` (${contagens.esteira})` : ''}
           </button>
+          <button
+            onClick={() => setAutomatize((v) => !v)}
+            aria-pressed={automatize}
+            className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${automatize ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
+          >
+            Automatize
+          </button>
           <div className="num text-[13px] text-ink-2">
             {stats.ativos} em aberto
             {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação
@@ -352,6 +363,8 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
         </div>
       )}
 
+      {automatize && <AutomatizeBarra dados={auto.dados} recarregar={auto.recarregar} />}
+
       {/* Kanban */}
       <div className={`flex-1 min-h-0 overflow-hidden transition-opacity ${carregando ? 'opacity-50' : ''}`}>
         <KanbanBoard
@@ -367,6 +380,9 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
           restam={restam}
           carregandoMais={carregandoMais}
           onCarregarMais={carregarMais}
+          rodapeDaColuna={automatize && auto.dados
+            ? (etapa, label) => <AutomatizeEtapa slug={etapa} label={label} dados={auto.dados!} recarregar={auto.recarregar} />
+            : undefined}
         />
       </div>
 
