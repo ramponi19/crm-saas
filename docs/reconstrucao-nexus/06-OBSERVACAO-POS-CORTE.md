@@ -957,3 +957,25 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - o Lucas leu no Direct, e às **15h28min40s** ela virou **"lida"**;
   - as respostas anteriores da conversa 1941, presas em "enviada" desde outubro, também viraram "lida", porque o visto vale até a mensagem vista.
 - **Regra registrada:** o Instagram não manda "entregue". O máximo é enviada → lida.
+
+## 21. 04/11 às 15h51: lote 3 (`4e7c0b5`, só app, deploy de dia)
+
+- **O que entrou:**
+  - cartão de anúncio na `/comunicacao`, igual ao do card do lead;
+  - mais 5 UPDATE/DELETE que conferem as linhas: automação ligar/desligar e remover, motivo de perda, e status e exclusão da ficha de F&I;
+  - pagamento do PDV que não grava agora desfaz a venda.
+- **Lista dos 134:** 19 FEITO e 17 FICA. Os 9 upserts de Configurações e do card ficam, porque o upsert barrado pela RLS dá erro: `new row violates row-level security policy`, testado no local como vendedor.
+- **e2e no local** (`D:\Nexus-Copia\inbox\ferramentas\noite-0411\pdv-e2e.mjs` e `lote3-e2e.mjs`):
+  - **PDV 14/14:**
+    - venda da peça 53 (R$ 1.995) com a cotação #982337 (R$ 500): total R$ 1.495; a cotação ficou usada e com `venda_id` igual à venda; pagamentos `dinheiro 1495 + troca 500`; peça vendida;
+    - pagamentos recusados (grant tirado só no local): "Erro ao finalizar · Os pagamentos não foram gravados"; nenhuma venda ficou para a peça 52, a peça voltou a "disponível" e não houve aviso de sobra;
+    - pagamentos e delete da venda recusados: "A tentativa não foi desfeita por inteiro · Ficou: venda #123";
+    - o banco local foi devolvido com a mesma quantidade de vendas.
+  - **Lote 3, 4/4:** o cartão de anúncio aparece sem JSON e sem "Abrir arquivo"; desativar uma automação apagada por trás avisa "Nada foi gravado"; a desativação normal grava.
+- **Gate:** 215 testes, verificador 576/5, build.
+- **Deploy:** IOwait 10% às 15h51; push às 15h51min21s; **READY às 15h53min49s**; API ok.
+- **Smoke:**
+  - o anúncio de 14h34 (AD 040, campanha 120248598866190765) apareceu como cartão com imagem na conversa 1941;
+  - a tela de automações (`/automacoes`) e o PDV abriram;
+  - Sentry: nada na última hora.
+- **Volta (não usada):** Instant Rollback para `1838510`.

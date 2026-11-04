@@ -389,6 +389,21 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
 - **Volta:** republicar a v68, que é o código de `b189647` (`git show b189647:supabase/functions/webhook-leads/…`). Na Meta, tirar `messaging_seen` das assinaturas é inofensivo.
 - **Grep das views:** `leads` com 85 leituras em 47 arquivos e `lead_mensagens` com 15 em 8, sem mudança.
 
+## 04/11/2026 15h51: lote 3 (`1e043c6` + `4e7c0b5`, só app)
+
+- **Inbox:** a mensagem de anúncio (`tipo = 'anuncio'`) aparece com o mesmo cartão do card do lead, porque `AnuncioChat` virou `components/modules/conversa/anuncio-chat.tsx`. Nunca mais aparece JSON cru nem "Abrir arquivo". A prévia da lista diz "Veio de anúncio".
+- **Agora conferem linhas:** automação (ligar, desligar e remover), salvar motivo de perda e ficha de F&I (status e excluir).
+- **Ficam como estão:** os upserts de Configurações e do card, porque o upsert barrado pela RLS dá **erro** (conferido no local), e não 0 linhas calado. Na lista: 19 FEITO e 17 FICA.
+- **PDV:** pagamento que não grava agora desfaz a venda. Antes, o erro do insert de `vendas_pagamentos` era ignorado, a venda fechava e o pagamento sumia.
+- **e2e no local:**
+  - lote 3, 4/4;
+  - PDV, 14/14: venda com cotação de troca, volta completa quando o pagamento é recusado e aviso de volta incompleta;
+  - o recurso para forçar as falhas foi tirar grants **só no local**, devolvidos no fim.
+- **Gate:** 215 testes, verificador 576/5, build. IOwait 10% no push. **READY às 15h53min49s.**
+- **Smoke:** o cartão de anúncio de hoje apareceu na conversa 1941, a tela de automações e o PDV abriram, e o Sentry está limpo.
+- **Volta:** Instant Rollback para `1838510`.
+- **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
