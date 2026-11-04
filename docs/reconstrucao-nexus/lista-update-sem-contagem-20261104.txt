@@ -2,6 +2,8 @@
 # Levantado em 04/11/2026 06h20 (scripts: scratchpad grep-linhas.cjs). 134 chamadas em 70 arquivos; as 80 com service_role ficaram fora (não passam por RLS).
 # Risco real (SELECT mais largo que UPDATE, ver 06 seção 16): só contatos — consertado em 20261104000300 + mover/card.
 # O resto: tabela cujo UPDATE é só de admin/dono; vira 0 linhas silencioso se a tela deixar outro papel tentar.
+# Andamento (dono: Claude, decisão do Lucas 04/11): ">> FEITO lote N" = consertado (.select('id') + nadaGravado); ">> FICA" = não precisa, com o motivo.
+# Ordem: fluxo de usuário primeiro (card, quadro, inbox, PDV, tarefa). Lote 2 = PDV/encomenda. A Inbox nova (lib/inbox) já nasceu conferindo; marcar lida usa count.
 
 app/(dashboard)/agenda/agenda-view.tsx:268  update visitas  (supabase)
 app/(dashboard)/assistencia/components/os-modal.tsx:214  update garantias_assistencias  (supabase)
@@ -42,8 +44,8 @@ app/(dashboard)/pdv/components/pdv-view.tsx:772  delete vendas_pagamentos  (supa
 app/(dashboard)/pdv/components/pdv-view.tsx:773  delete vendas  (supabase)
 app/(dashboard)/pdv/components/pdv-view.tsx:776  update inventario_unidades  (supabase)
 app/(dashboard)/pdv/page.tsx:20  update inventario_unidades  (supabase)
-app/(dashboard)/tarefas/tarefas-view.tsx:59  update tarefas  (supabase)
-app/(dashboard)/tarefas/tarefas-view.tsx:66  delete tarefas  (supabase)
+app/(dashboard)/tarefas/tarefas-view.tsx:59  update tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
+app/(dashboard)/tarefas/tarefas-view.tsx:66  delete tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
 app/api/acesso/route.ts:43  update acessos  (supabase)
 app/api/acesso/route.ts:54  update acessos  (supabase)
 app/api/acesso/route.ts:59  update acessos  (supabase)
@@ -110,13 +112,13 @@ components/modules/configuracoes/motivos-perda-card.tsx:54  update motivos_perda
 components/modules/configuracoes/notificacoes-card.tsx:52  upsert notificacao_prefs  (supabase)
 components/modules/configuracoes/templates-card.tsx:41  upsert configuracoes_sistema  (supabase)
 components/modules/configuracoes/troca-card.tsx:46  upsert configuracoes_sistema  (supabase)
-components/modules/leads/lead-acoes-panel.tsx:79  update tarefas  (supabase)
-components/modules/leads/lead-chamadas-panel.tsx:58  delete chamadas  (supabase)
+components/modules/leads/lead-acoes-panel.tsx:79  update tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
+components/modules/leads/lead-chamadas-panel.tsx:58  delete chamadas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
 components/modules/leads/lead-financiamento-panel.tsx:65  update fichas_financiamento  (supabase)
 components/modules/leads/lead-financiamento-panel.tsx:73  delete fichas_financiamento  (supabase)
 components/modules/leads/lead-match-panel.tsx:71  upsert lead_perfil_busca  (supabase)
-components/modules/leads/lead-modal.tsx:828  update mensagens  (supabase)
-components/modules/leads/lead-modal.tsx:866  update mensagens  (supabase)
+components/modules/leads/lead-modal.tsx:828  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano, a tela não confirma nada; 0 linhas = nada a ler
+components/modules/leads/lead-modal.tsx:866  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano (mesma regra)
 components/modules/pdv/encomenda-form.tsx:187  delete vendas  (supabase)
 components/modules/pdv/encomenda-form.tsx:188  delete pedidos_compra  (supabase)
 components/modules/pdv/encomenda-form.tsx:299  delete pedidos_compra  (supabase)

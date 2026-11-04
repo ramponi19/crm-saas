@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CheckSquare, Square, Plus, CalendarPlus, Loader2, Clock } from 'lucide-react'
 import { Input, Button, IconButton, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 type Tarefa = Tables<'tarefas'>
 type Visita = Tables<'visitas'>
@@ -76,8 +77,9 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
 
   async function toggle(t: Tarefa) {
     const nv = !t.concluida
-    const { error } = await supabase.from('tarefas').update({ concluida: nv, concluida_em: nv ? new Date().toISOString() : null }).eq('id', t.id)
+    const { data, error } = await supabase.from('tarefas').update({ concluida: nv, concluida_em: nv ? new Date().toISOString() : null }).eq('id', t.id).select('id')
     if (error) { notify.bad(error.message); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); return }
     setTarefas(list => list.map(x => x.id === t.id ? { ...x, concluida: nv } : x))
   }
 

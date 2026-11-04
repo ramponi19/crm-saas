@@ -7,6 +7,7 @@ import { Plus, Check, Trash2, Phone, Mail, MessageCircle, MapPin, CircleDot, Lis
 import { cn } from '@/lib/utils'
 import { Button, IconButton, Input, Select, Textarea, Modal, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 type Tarefa = Tables<'tarefas'> & { lead_nome: string | null }
 type LeadMin = { id: number; nome: string | null }
@@ -56,15 +57,17 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
 
   async function toggle(t: Tarefa) {
     const nova = !t.concluida
-    const { error } = await supabase.from('tarefas').update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq('id', t.id)
+    const { data, error } = await supabase.from('tarefas').update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq('id', t.id).select('id')
     if (error) { notify.bad(error.message); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); return }
     setLista(l => l.map(x => x.id === t.id ? { ...x, concluida: nova } : x))
   }
 
   async function excluir(t: Tarefa) {
     if (!confirm('Excluir a tarefa?')) return
-    const { error } = await supabase.from('tarefas').delete().eq('id', t.id)
+    const { data, error } = await supabase.from('tarefas').delete().eq('id', t.id).select('id')
     if (error) { notify.bad(error.message); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); return }
     setLista(l => l.filter(x => x.id !== t.id))
   }
 

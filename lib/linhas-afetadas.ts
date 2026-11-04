@@ -13,5 +13,9 @@ export function nadaGravado(linhas: readonly unknown[] | null | undefined): bool
 
 export const SEM_PERMISSAO_CONTATO =
   'Não foi possível gravar no contato: você não tem permissão para editá-lo nesta loja.'
+/** Para registro que sumiu ou saiu da vista entre abrir a tela e gravar (outra aba, outra loja). */
+export const NADA_GRAVADO =
+  'Nada foi gravado: o registro foi apagado ou não está mais visível para você. Recarregue a página.'
+
 export const SEM_PERMISSAO_NEGOCIO =
   'Não foi possível gravar no lead: você não tem permissão para editá-lo nesta loja.'

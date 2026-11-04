@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Phone, PhoneIncoming, PhoneOutgoing, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Input, Select, Button, Badge, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Chamada { id: number; direcao: string; resultado: string; observacao: string | null; created_at: string | null }
 
@@ -55,8 +56,9 @@ export function LeadChamadasPanel({ leadId }: { leadId: number }) {
   }
 
   async function remover(id: number) {
-    const { error } = await supabase.from('chamadas').delete().eq('id', id)
+    const { data, error } = await supabase.from('chamadas').delete().eq('id', id).select('id')
     if (error) { notify.bad('Erro ao remover'); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); carregar(); return }
     carregar()
   }
 
