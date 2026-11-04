@@ -722,6 +722,7 @@ v "card usa o cartao compartilhado"     "components/modules/leads/lead-modal.tsx
 v "automacao ligar confere linhas"      "components/modules/configuracoes/automacoes-card.tsx" "update({ ativo: !a.ativo }).eq(.id., a.id).select(.id.)"
 v "motivo de perda confere linhas"      "components/modules/configuracoes/motivos-perda-card.tsx" "if (nadaGravado(gravou))"
 v "ficha de F&I confere linhas"         "components/modules/leads/lead-financiamento-panel.tsx" "update({ status }).eq(.id., f.id).select(.id.)"
+v "pagamento que nao grava desfaz venda" "app/(dashboard)/pdv/components/pdv-view.tsx" "if (ePag) throw new Error"
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

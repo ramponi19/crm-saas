@@ -656,7 +656,12 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             bandeira_cartao: null, parcelas: null, valor_com_juros: null,
           }] : []),
         ]
-        if (linhas.length) await supabase.from('vendas_pagamentos').insert(linhas as never)
+        if (linhas.length) {
+          // Pagamento que não gravou desfaz a venda (catch abaixo): venda sem o
+          // dinheiro registrado é o buraco que a encomenda já teve (R$ 84.540 em 09/2026).
+          const { error: ePag } = await supabase.from('vendas_pagamentos').insert(linhas as never)
+          if (ePag) throw new Error(`Os pagamentos não foram gravados: ${ePag.message}`)
+        }
       }
 
       // Termos a assinar, na PRIMEIRA venda do fechamento: são documentos da
