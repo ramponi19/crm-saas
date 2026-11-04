@@ -478,6 +478,36 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
   - **por último:** `canais_conectados`, `clientes`, `lead_mensagens` e `leads`, mais a `storage_orfaos`, que lê as duas últimas e precisa mudar antes delas.
   - Já resolvidos do item 5: o `lib/realtime/tabelas.ts` foi apagado com a Inbox, e a `NEXT_PUBLIC_DB_CORE` tem 0 referências no código. Falta conferir na Vercel.
 
+### Lote 3 (04/11, 20h11): pós-venda, vendas e a transferência — caem 10, restam 16
+
+| código no ar | migração | views que caíram |
+|---|---|---|
+| `74518b8`, READY 20h07min32s; `e73fad5` (exportação e encomenda) | `20261105000500` às 20h11min16s (versão `20261104231116`), IOwait 4,2% | `garantias_assistencias`, `orcamentos`, `servicos_reparo`, `comissoes`, `contrato_documentos`, `contrato_modelos`, `pedidos_compra`, `propostas`, `fichas_financiamento`, `contratos_venda` |
+
+- **Transferência de estoque** (decisão do Lucas, 04/11): dono e admin transferem de qualquer loja que enxergam para qualquer outra loja ativa da empresa; o vendedor não transfere.
+  - A leitura das unidades continua pela RLS, então só se move o que a pessoa enxerga.
+  - A gravação (a unidade e as duas linhas de histórico) vai pelo cliente de serviço, presa à empresa da sessão e aos ids já lidos. A loja de destino é procurada entre as lojas ativas da empresa.
+  - Sem DDL.
+  - Smoke na produção: unidade 53, Mogi → Jaguariúna → Mogi, cada perna com a loja de origem escolhida no topo e com o "Confirmar chegada" de verdade; o histórico de Mogi mostrou as 2 linhas da loja. Depois, o teste foi limpo.
+- **Critério das views ganhou mais uma coluna: nome em texto.** Dois leitores escaparam do from, do embed e do tipo:
+  - `from(tabela)` com o nome numa variável: o desfazer da encomenda no PDV, `'pedidos_compra'`;
+  - a lista de tabelas da **exportação LGPD** do superadmin, com `cobrancas`, `lancamentos_financeiros` e `comissoes`. O CSV dessas três saiu **vazio, sem aviso**, desde 19h41 (as duas primeiras) e 20h11 (a terceira) até `e73fad5`.
+  
+  A exportação agora devolve 500 com o nome da tabela quando uma leitura falha. O `inventario.mjs` passou a listar `literal` (nome entre aspas fora de comentário); o que aparecer ali se revisa à mão, porque chave de aba e de módulo usam os mesmos nomes. O tipo pegou o desfazer da encomenda ao tirar as 10 views de `types/`.
+- **Contrato:** emissão e 2ª via de 3 contratos, como dono e como vendedor, deram 12 HTMLs idênticos byte a byte antes e depois (`scripts/comparar-contrato.mts` no local).
+- **Lista dos 134:**
+  - **conferem linhas:** OS (marcar pronto não cria a tarefa de aviso quando não gravou; salvar), garantia, serviços (salvar e remover), metas da equipe, receber compra, documentos de contrato (renomear e apagar) e propostas;
+  - **ficam como estão:**
+    - o vínculo da unidade no receber compra, que é complemento;
+    - o "desativa a versão anterior" do modelo de contrato, em que 0 linhas é normal.
+- **Volta:** `supabase/scripts/volta/volta-views-lote3.sql`, junto com o Instant Rollback para antes de `74518b8`.
+- **Restam 16 views de compatibilidade, com 419 leituras:**
+  - estoque: `produtos`, `categorias_produtos`, `marcas_produtos`, `fornecedores`, `inventario_unidades`, `tabela_precos`;
+  - `vendas`;
+  - `avaliacoes_usados`;
+  - imob: `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`;
+  - núcleo: `canais_conectados`, `clientes`, `lead_mensagens`, `leads`.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

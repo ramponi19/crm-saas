@@ -1074,3 +1074,40 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - Só funciona em "Rede". A política da produção é a mesma do local.
 - **Anotado para o lote que mexer em `troca/cotacoes`:** salvar uma cotação existente (`b.id`) usa `.maybeSingle()` e responde ok mesmo com 0 linhas.
 - **Grep das views:** caíram 15 e restam 26, com 493 leituras. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
+
+## 24. 04/11 às 20h: lote 3 das views e a transferência com loja escolhida (`74518b8`, `e73fad5`)
+
+- **Tempos:**
+
+  | hora | o quê |
+  |---|---|
+  | 20h05 | IOwait 1,2%; push `74518b8` |
+  | 20h07min32s | READY |
+  | 20h08 | smoke da transferência na produção |
+  | 20h10 | IOwait 4,16% |
+  | 20h11min16s | migração `20261105000500`; API ok duas vezes; 20 views no `public` |
+  | ~20h20 | push `e73fad5`, com IOwait 1,72% medido logo depois |
+
+- **e2e local (40/40):**
+  - transferência Mogi → Jaguariúna com Mogi escolhida e Jaguariúna → Mogi com Jaguariúna escolhida: as duas chegam como `pendente`, com as 2 linhas de histórico certas;
+  - unidade fora da vista dá 404; destino em outra empresa dá 404; vendedor dá 403 e não vê o botão (o dono vê 6);
+  - 9 telas com 200;
+  - propostas: criar, editar, apagar, e editar ou apagar de novo dá 404;
+  - documento de contrato: criar, renomear, listar, apagar, e renomear o apagado dá 404;
+  - compras lista o pedido e o receber grava;
+  - OS: a lista mostra, a página pública abre pelo token, marcar pronto fora da vista avisa e não cria tarefa, e o marcar pronto normal grava e cria a tarefa;
+  - REST com o JWT do dono nas tabelas do painel do card.
+- **Contrato:** `comparar-contrato.mts` reemitiu os contratos 108, 107 e 106 como dono e como vendedor. Rodou uma vez com as views e o código da HEAD e outra sem as views e com o código novo: 12 de 12 HTMLs idênticos. As emissões extras foram apagadas do local.
+- **Smoke na produção:**
+  - as 10 telas deram 200 antes e depois do drop, e `/api/contrato-documentos` trouxe "Compra e Venda";
+  - transferência com a unidade 53 (iPhone 12 Pro). Pela sessão do dono, cada passo deu 200:
+    1. loja Mogi, transferir para Jaguariúna;
+    2. loja Jaguariúna, confirmar chegada;
+    3. transferir de volta para Mogi;
+    4. loja Mogi, confirmar chegada.
+  - o Histórico de Mogi mostrou "Enviado p/ outra loja" e "Veio de outra loja" com o produto;
+  - limpeza: apagadas as 4 linhas de histórico do teste, e o `recebido_em/por` voltou a nulo. A unidade 53 ficou como antes (Mogi, disponível) e o dono, em Mogi.
+- **Dois leitores pelo nome em texto, achados ao tirar as views dos tipos e varrer os nomes entre aspas:**
+  - **exportação LGPD do superadmin** (`app/api/superadmin/empresas/[id]/exportar`): a lista fixa de tabelas tinha `cobrancas`, `lancamentos_financeiros` e `comissoes`, e o erro de cada leitura era ignorado. O ZIP saiu com esses CSVs vazios desde o drop de cada uma. Agora lê as tabelas do core e falha com 500 dizendo qual tabela;
+  - **desfazer da encomenda no PDV** (`encomenda-form.tsx`): `from(tabela)` com `'pedidos_compra'`. Só rodaria quando o lançamento da encomenda falhasse no meio, das 20h11 até `e73fad5`.
+- **Grep das views:** caíram 25 de 41 e restam 16, com 419 leituras. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
