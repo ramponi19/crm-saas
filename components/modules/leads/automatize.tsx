@@ -53,6 +53,9 @@ export function useAutomatize(funilId: number | undefined, ligado: boolean) {
     if (r.ok && j) setDados(j as DadosAutomatize)
     else notify.bad('Não deu para carregar o Automatize', j?.error)
   }, [funilId])
+  // Carregar ao ligar o modo: o setState acontece depois do fetch (assíncrono), não
+  // durante o efeito — é a busca de dados que a regra não distingue.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (ligado) void recarregar() }, [ligado, recarregar])
   return { dados, recarregar }
 }
