@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Row { id?: number; label: string; ativo: boolean }
 
@@ -51,8 +52,9 @@ export function MotivosPerdaCard() {
         const label = row.label.trim()
         if (!label) continue
         if (row.id) {
-          const { error } = await supabase.from('motivos_perda').update({ label, ativo: row.ativo, ordem }).eq('id', row.id)
+          const { data: gravou, error } = await supabase.from('motivos_perda').update({ label, ativo: row.ativo, ordem }).eq('id', row.id).select('id')
           if (error) throw new Error(error.message)
+          if (nadaGravado(gravou)) throw new Error(`“${label}”: ${NADA_GRAVADO}`)
         } else {
           const { error } = await supabase.from('motivos_perda').insert({ empresa_id: empresaId, label, ativo: row.ativo, ordem })
           if (error) throw new Error(error.message)

@@ -716,6 +716,12 @@ v "grande em processamento = 503"        "supabase/functions/webhook-leads/index
 # 04/11/2026: "visto" do Instagram (messaging_seen manda read.mid, não watermark)
 v "visto do Instagram pelo mid"         "supabase/functions/webhook-leads/index.ts" "typeof leitura.mid === \"string\""
 v "conta nova assina messaging_seen"    "lib/canais/instagram-login.ts" "'messages', 'messaging_seen'"
+# 04/11/2026 lote 3: cartão de anúncio na Inbox (mesmo do card) e mais UPDATE que conferem linhas
+v "inbox desenha o cartao de anuncio"   "components/modules/comunicacao/conversa-painel.tsx" "{anuncio && <AnuncioChat"
+v "card usa o cartao compartilhado"     "components/modules/leads/lead-modal.tsx" "from '@/components/modules/conversa/anuncio-chat'"
+v "automacao ligar confere linhas"      "components/modules/configuracoes/automacoes-card.tsx" "update({ ativo: !a.ativo }).eq(.id., a.id).select(.id.)"
+v "motivo de perda confere linhas"      "components/modules/configuracoes/motivos-perda-card.tsx" "if (nadaGravado(gravou))"
+v "ficha de F&I confere linhas"         "components/modules/leads/lead-financiamento-panel.tsx" "update({ status }).eq(.id., f.id).select(.id.)"
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

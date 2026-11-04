@@ -7,6 +7,7 @@ import { Button, ConfirmDialog, Input, Modal, Select, notify } from '@/component
 import { cn } from '@/lib/utils'
 import { urlDeMidia } from '@/lib/storage/midia'
 import { formatarTextoChat } from '@/lib/texto-whatsapp'
+import { AnuncioChat } from '@/components/modules/conversa/anuncio-chat'
 import { entregarViaEdge, ehTimeoutMeta, TIPO_DB } from '@/lib/envio-edge'
 import { useTempoReal, type EventoTR, type LinhaMensagemTR } from '@/components/layout/tempo-real-empresa'
 import {
@@ -568,7 +569,10 @@ function Bolha({ id, lado, conteudo, tipo, midia, retida, transcricao, hora, sta
   retida?: string | null; transcricao?: string | null; hora: string; status?: string | null; erro?: string | null; autor?: string | null
 }) {
   const url = midia ? urlDeMidia(midia) : null
-  const texto = conteudo && !(tipo !== 'texto' && /^\[[a-z]+\]$/.test(conteudo)) ? conteudo : null
+  // Mensagem de anúncio: o conteúdo é o JSON do anúncio e a mídia é a imagem dele.
+  // Mesmo cartão do card do lead — nunca o JSON cru nem "Abrir arquivo".
+  const anuncio = tipo === 'anuncio'
+  const texto = !anuncio && conteudo && !(tipo !== 'texto' && /^\[[a-z]+\]$/.test(conteudo)) ? conteudo : null
   return (
     <div className={cn('flex', lado === 'loja' ? 'justify-end' : 'justify-start')} data-mensagem-id={id}>
       <div className={cn('max-w-[80%] rounded-card px-3 py-2 text-[13px] leading-relaxed shadow-[0_1px_1px_rgba(21,24,28,0.04)]',
@@ -580,7 +584,8 @@ function Bolha({ id, lado, conteudo, tipo, midia, retida, transcricao, hora, sta
         {url && tipo === 'imagem' && <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Imagem" className="mb-1 max-h-[260px] rounded-control" /></a>}
         {url && tipo === 'video' && <video src={url} controls className="mb-1 max-h-[260px] rounded-control" />}
         {url && tipo === 'audio' && <audio src={url} controls className="mb-1 w-[240px]" />}
-        {url && !['imagem', 'video', 'audio'].includes(tipo) && <a href={url} target="_blank" rel="noreferrer" className="mb-1 block text-accent underline">Abrir arquivo</a>}
+        {anuncio && <AnuncioChat conteudo={conteudo ?? ''} midiaUrl={url} />}
+        {url && !anuncio && !['imagem', 'video', 'audio'].includes(tipo) && <a href={url} target="_blank" rel="noreferrer" className="mb-1 block text-accent underline">Abrir arquivo</a>}
         {!url && retida && <div className="mb-1 text-[11.5px] italic text-ink-3">Arquivo retirado pela retenção de mídia.</div>}
         {transcricao && <div className="mb-1 text-[12px] italic text-ink-2">“{transcricao}”</div>}
         {texto && <div className="whitespace-pre-wrap break-words">{formatarTextoChat(texto)}</div>}

@@ -99,24 +99,24 @@ app/api/troca/precos/familia/route.ts:75  update troca_precos  (supabase)
 app/api/troca/precos/route.ts:90  update troca_precos  (supabase)
 app/api/troca/regras/route.ts:36  upsert troca_regras  (supabase)
 app/i/[codigo]/route.ts:59  update rastreamento_visitas  (db)
-components/modules/configuracoes/assinatura-card.tsx:66  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/automacoes-card.tsx:126  update automacoes  (supabase)
-components/modules/configuracoes/automacoes-card.tsx:130  delete automacoes  (supabase)
-components/modules/configuracoes/configuracoes-view.tsx:159  delete taxas_pagamento  (supabase)
-components/modules/configuracoes/configuracoes-view.tsx:178  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/contrato-card.tsx:43  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/devolucao-card.tsx:45  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/horario-card.tsx:57  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/motivos-perda-card.tsx:45  delete motivos_perda  (supabase)
-components/modules/configuracoes/motivos-perda-card.tsx:54  update motivos_perda  (supabase)
-components/modules/configuracoes/notificacoes-card.tsx:52  upsert notificacao_prefs  (supabase)
-components/modules/configuracoes/templates-card.tsx:41  upsert configuracoes_sistema  (supabase)
-components/modules/configuracoes/troca-card.tsx:46  upsert configuracoes_sistema  (supabase)
+components/modules/configuracoes/assinatura-card.tsx:66  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/automacoes-card.tsx:126  update automacoes  (supabase)  >> FEITO lote 3 (fix/lote-3, 04/11)
+components/modules/configuracoes/automacoes-card.tsx:130  delete automacoes  (supabase)  >> FEITO lote 3
+components/modules/configuracoes/configuracoes-view.tsx:159  delete taxas_pagamento  (supabase)  >> FICA: apaga todas antes de regravar; 0 = não havia
+components/modules/configuracoes/configuracoes-view.tsx:178  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/contrato-card.tsx:43  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/devolucao-card.tsx:45  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/horario-card.tsx:57  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/motivos-perda-card.tsx:45  delete motivos_perda  (supabase)  >> FICA: exclusão em lote dos removidos; 0 = já tinha saído
+components/modules/configuracoes/motivos-perda-card.tsx:54  update motivos_perda  (supabase)  >> FEITO lote 3
+components/modules/configuracoes/notificacoes-card.tsx:52  upsert notificacao_prefs  (supabase)  >> FICA: preferência do próprio usuário (RLS usuario_id = auth.uid()); upsert barrado dá erro
+components/modules/configuracoes/templates-card.tsx:41  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
+components/modules/configuracoes/troca-card.tsx:46  upsert configuracoes_sistema  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
 components/modules/leads/lead-acoes-panel.tsx:79  update tarefas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
 components/modules/leads/lead-chamadas-panel.tsx:58  delete chamadas  (supabase)  >> FEITO lote 1 (fix/linhas-lote-1, 04/11)
-components/modules/leads/lead-financiamento-panel.tsx:65  update fichas_financiamento  (supabase)
-components/modules/leads/lead-financiamento-panel.tsx:73  delete fichas_financiamento  (supabase)
-components/modules/leads/lead-match-panel.tsx:71  upsert lead_perfil_busca  (supabase)
+components/modules/leads/lead-financiamento-panel.tsx:65  update fichas_financiamento  (supabase)  >> FEITO lote 3
+components/modules/leads/lead-financiamento-panel.tsx:73  delete fichas_financiamento  (supabase)  >> FEITO lote 3
+components/modules/leads/lead-match-panel.tsx:71  upsert lead_perfil_busca  (supabase)  >> FICA: upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado
 components/modules/leads/lead-modal.tsx:828  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano, a tela não confirma nada; 0 linhas = nada a ler
 components/modules/leads/lead-modal.tsx:866  update mensagens  (supabase)  >> FICA: marcar lida em segundo plano (mesma regra)
 components/modules/pdv/encomenda-form.tsx:187  delete vendas  (supabase)  >> FEITO lote 2: desfazer diz o que ficou

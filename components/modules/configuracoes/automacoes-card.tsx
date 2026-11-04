@@ -7,6 +7,7 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import type { Json } from '@/types/database'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Automacao {
   id: number
@@ -123,11 +124,15 @@ export function AutomacoesCard() {
   }
 
   async function toggle(a: Automacao) {
-    await supabase.from('automacoes').update({ ativo: !a.ativo }).eq('id', a.id)
+    const { data, error } = await supabase.from('automacoes').update({ ativo: !a.ativo }).eq('id', a.id).select('id')
+    if (error) notify.bad('Não foi possível mudar a automação', error.message)
+    else if (nadaGravado(data)) notify.bad(NADA_GRAVADO)
     if (empresaId) await carregar(empresaId)
   }
   async function remover(a: Automacao) {
-    await supabase.from('automacoes').delete().eq('id', a.id)
+    const { data, error } = await supabase.from('automacoes').delete().eq('id', a.id).select('id')
+    if (error) notify.bad('Não foi possível remover a automação', error.message)
+    else if (nadaGravado(data)) notify.bad(NADA_GRAVADO)
     if (empresaId) await carregar(empresaId)
   }
 

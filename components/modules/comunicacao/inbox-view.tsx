@@ -51,7 +51,8 @@ export function horaCurta(iso: string | null): string {
 
 function previaDoTexto(p: Previa | undefined): string {
   if (!p) return ''
-  const t = p.tipo && p.tipo !== 'texto' ? `[${p.tipo}]` : (p.conteudo ?? '')
+  const t = p.tipo === 'anuncio' ? 'Veio de anúncio'
+    : p.tipo && p.tipo !== 'texto' ? `[${p.tipo}]` : (p.conteudo ?? '')
   return (p.direcao === 'enviada' ? 'Você: ' : '') + t.replace(/\s+/g, ' ').slice(0, 90)
 }
 

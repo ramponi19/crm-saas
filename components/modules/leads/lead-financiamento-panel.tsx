@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Landmark, Loader2, Plus, Trash2 } from 'lucide-react'
 import { Input, Button, Badge, notify } from '@/components/ui'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 
 interface Ficha {
   id: number
@@ -62,16 +63,18 @@ export function LeadFinanciamentoPanel({ leadId }: { leadId: number }) {
   }
 
   async function mudarStatus(f: Ficha, status: string) {
-    const { error } = await supabase.from('fichas_financiamento').update({ status }).eq('id', f.id)
+    const { data, error } = await supabase.from('fichas_financiamento').update({ status }).eq('id', f.id).select('id')
     if (error) { notify.bad('Erro ao atualizar'); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); carregar(); return }
     if (status === 'negada') notify.warn('Crédito negado', 'Se o lead cair, use o motivo de perda "Crédito negado".')
     else notify.ok('Status atualizado')
     carregar()
   }
 
   async function excluir(f: Ficha) {
-    const { error } = await supabase.from('fichas_financiamento').delete().eq('id', f.id)
+    const { data, error } = await supabase.from('fichas_financiamento').delete().eq('id', f.id).select('id')
     if (error) { notify.bad('Erro ao excluir'); return }
+    if (nadaGravado(data)) { notify.bad(NADA_GRAVADO); carregar(); return }
     carregar()
   }
 
