@@ -444,6 +444,40 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
   - banco: `cron.unschedule('automacoes-hora')`, depois `supabase/scripts/volta/volta-automatize.sql`, depois `drop extension pg_net`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8, sem mudança.
 
+## 04/11/2026 à noite: fase final das views — lotes 1 e 2 (15 views caídas, restam 26)
+
+**Pedido do Lucas:** zerar as 41 views de compatibilidade em lotes: troca das leituras para as tabelas do core, e2e da tela, deploy do app e só então a migração de drop (DDL com IOwait abaixo de 10%), com a API conferida. Detalhe e números no 06, seção 23.
+
+**O critério de "zerou" ficou mais largo** que o `grep from('<nome>')` da seção "Depois do corte". Uma view só cai com zero em todos estes:
+- `from('<view>')` em app, components, lib, core, hooks, supabase/functions e scripts;
+- **embed do PostgREST dentro do `select`** (`clientes(nome)`, `produtos!produto_id(nome)`). O PDV, o estoque, a garantia e a agenda usam muito. Na troca, o embed ganha alias e a chave do objeto fica igual (`produtos:estoque_produtos!produto_id(nome)`);
+- **tipo** (`Tables<'view'>`), que quebraria na próxima geração dos tipos;
+- **corpo de função SQL/plpgsql que cita a view.** Ele não entra no `pg_depend`: o `drop view` passa e a função quebra só na hora de rodar. Foi assim que apareceu a `fundir_clientes` no lote 2.
+
+Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (contagem por view, `--view=` e `--json`), `renomear.cjs` (troca from, embed com alias e tipo, preservando CRLF), `tirar-tipos.cjs` (tira a view de `types/`) e os e2e.
+
+| lote | código no ar | migração | views que caíram |
+|---|---|---|---|
+| 1 | `43911d1`, READY 18h45min57s | `20261105000300` às 19h38min21s (versão `20261104223821`), IOwait 0,5% | `pre_vendas` (já sem leitor), `movimentacao_estoque`, `veiculo_dados`, `subcategorias_produtos`, `imei_consultas`, `payment_webhook_eventos`, `fipe_consultas`, `fipe_referencia` |
+| 2 | `c9b2372`, READY 19h29min24s; `ebd95b7` (só a migração) | `20261105000400` às 19h41min15s (versão `20261104224115`) | `cobrancas`, `lancamentos_financeiros`, `taxas_pagamento`, `tenant_payment_config`, `troca_cotacoes`, `troca_precos`, `troca_regras` |
+
+- **Funções do banco que passaram a ler a tabela (lote 2):**
+  - `numerar_cotacao_troca`: a chave da trava continua `'troca_cotacoes:'||empresa`;
+  - `refresh_status_atrasados`: sem chamador hoje;
+  - **`fundir_clientes`**: 11 views de módulo, 19 trocas conferidas pelo próprio bloco `DO`. Nela ficam só `clientes`, `leads` e `lead_mensagens`.
+- **Views no `public`:** eram 45, agora são 30. As 26 de compatibilidade que restam somam **493 leituras** (eram 562). O grep do critério antigo segue em `leads` 85/47 e `lead_mensagens` 15/8.
+- **Tipos:** as 15 saíram de `types/database.gerado.ts` e `types/views-espelho.ts`, junto com as 4 relações que apontavam para elas. O `supabase gen types` da CLI atual mudou de formato: gera 11 mil linhas, contra as 6 mil de hoje. Por isso a retirada foi feita no arquivo atual, só com deleções.
+- **Lista dos 134 UPDATE:** consertados a unidade do estoque (salvar e remover), o financeiro (editar, excluir, marcar pago), apagar orçamento, apagar cotação e salvar preço de troca (avulso e por família). Os dois upserts (config de pagamento e regras de troca) e o webhook (service_role) ficam como estão, com o motivo.
+- **Voltas, guardadas até a próxima limpeza:**
+  - `supabase/scripts/volta/volta-views-lote1.sql` e `volta-views-lote2.sql` recriam as views com os grants da produção. A ida/volta/ida foi conferida no local. As funções do lote 2 não voltam ao corpo antigo, porque lendo a tabela funcionam com ou sem as views.
+  - App: Instant Rollback para `c9b2372`, `43911d1` ou `4698b45`. **Só junto com a volta das views**, porque o código antigo lê os nomes velhos.
+- **Defeito achado:** transferir estoque com uma loja escolhida no topo dá erro de RLS. O UPDATE muda `filial_id` para fora de `filiais_visiveis()`, e o WITH CHECK de `estoque_unidades` barra. Só funciona em "Rede". **O Lucas decidiu:** corrigir no lote 3. Dono e admin transferem de qualquer loja que enxergam para qualquer outra da empresa; vendedor não transfere. Com e2e nas duas direções.
+- **Próximos lotes:**
+  - **lote 3:** pós-venda (`garantias_assistencias`, `orcamentos`, `servicos_reparo`), as vendas pequenas (`comissoes`, `contrato_documentos`, `contrato_modelos`, `pedidos_compra`, `propostas`, `fichas_financiamento`, `contratos_venda`) e a transferência;
+  - **depois:** estoque (`produtos`, que é lido por `estoque_item_sync` e `zapintel_posvenda`; `categorias`, `marcas`, `fornecedores`, `tabela_precos`, `inventario_unidades`), `vendas` (4 funções do ZapIntel) e imob;
+  - **por último:** `canais_conectados`, `clientes`, `lead_mensagens` e `leads`, mais a `storage_orfaos`, que lê as duas últimas e precisa mudar antes delas.
+  - Já resolvidos do item 5: o `lib/realtime/tabelas.ts` foi apagado com a Inbox, e a `NEXT_PUBLIC_DB_CORE` tem 0 referências no código. Falta conferir na Vercel.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

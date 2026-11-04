@@ -1026,3 +1026,51 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - Edge: republicar a v69, de `aa0fd45`;
   - banco: unschedule, depois `volta-automatize.sql`, depois `drop extension pg_net`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8.
+
+## 23. 04/11 à noite: fase final das views, lotes 1 e 2 (15 caem; `43911d1`, `c9b2372`, `ebd95b7`)
+
+- **Inventário de partida:** 45 views no `public`. 41 são de compatibilidade: as 37 de módulo, mais `canais_conectados`, `clientes`, `lead_mensagens` e `leads`. As outras 4 não são: `core_v_planos` e `v_empresas_plano`, ambas com 0 leitores; `v_leads_nao_lidas`; e `storage_orfaos`, que lê `leads` e `lead_mensagens`.
+  - Contando `from()` e embed, eram **562 leituras**.
+  - As 37 de módulo são `select *` da tabela: mesmas colunas, sem filtro nem gatilho, e as tabelas têm os grants de escrita do authenticated. Trocar o nome basta.
+- **Tempos:**
+
+  | hora | o quê |
+  |---|---|
+  | 18h43 | IOwait 0,47%; push `43911d1` |
+  | 18h45min57s | READY do lote 1 |
+  | 19h17 | o pedido de aprovação do `apply_migration` expirou: o Lucas não estava na tela |
+  | 19h26 | IOwait 1,68%; push `c9b2372` |
+  | 19h29min24s | READY do lote 2 |
+  | 19h37 | IOwait 0,48% |
+  | 19h38min21s | migração do lote 1; API ok duas vezes |
+  | ~19h39 | push `ebd95b7` (correção da fusão no arquivo da migração) |
+  | 19h41min15s | migração do lote 2; API ok duas vezes; 30 views; funções anon 0 / authenticated 26 |
+  | 19h42–19h45 | smoke com o Lucas |
+
+- **e2e local**, com o app em `:3010` e as views já derrubadas no banco local:
+  - **lote 1, 18/18:**
+    - transferir grava as 2 linhas em `estoque_movimentacoes`, e o Histórico as mostra com o produto pelo embed;
+    - editar e remover unidade; salvar com a unidade fora da vista avisa "Nada foi gravado";
+    - catálogo com subcategoria; registro de IMEI; webhook com referência desconhecida responde `naoEncontrada`.
+  - **lote 2, 27/27:**
+    - preço de troca: criar e atualizar; cotação com o número dado pelo gatilho; apagar a cotação, e apagar de novo dá 404;
+    - 8 telas com 200; `/api/taxas`; o embed `troca_cotacoes:avaliacao_cotacoes` do painel de orçamento, pelo PostgREST com o JWT do dono;
+    - financeiro: editar, editar fora da vista, remover, marcar pago, e marcar pago fora da vista avisando.
+- **Furo pego antes do drop:** a `fundir_clientes` (fusão de `/clientes`, chamada por `fundir-leads-modal`) fazia UPDATE em `cobrancas` e em mais 10 views.
+  - O `pg_depend` não enxerga corpo de função, então o drop do lote 2 passaria e a fusão quebraria na hora de rodar.
+  - A migração ganhou um `DO` que troca as 11 pelas tabelas (19 ocorrências) e aborta se sobrar alguma.
+  - No local, a função era igual à da produção (md5 `77671c6a…`) e a fusão com venda e cobrança passou, numa transação desfeita.
+- **Smoke na produção, com o Lucas:**
+  - `/financeiro`, aba Cobranças: Mogi mostra 2 (Venda #38 e Venda #35, como no banco) e Jaguariúna mostra 0, que é o certo;
+  - `/orcamentos/cotacao` abre nas duas lojas, e `/orcamentos/precos` dá 200;
+  - fusão de teste com 4207 (principal) e 4208 (secundário, com e-mail e uma cobrança de teste):
+    - a rota respondeu 200;
+    - a cobrança passou para o 4207 e o 4208 saiu;
+    - o e-mail foi herdado e a observação registra a fusão;
+  - limpeza: a cobrança 5 e o cliente 4207 foram apagados (0 contatos de teste) e a loja do dono voltou para Mogi.
+  - Antes do drop, as telas de estoque, catálogo e IMEI também deram 200; o catálogo mostrou a subcategoria "Cabo" pelo embed novo. Na produção estão vazias `estoque_movimentacoes`, `estoque_imei_consultas`, `financeiro_webhook_eventos`, as consultas da FIPE, `estoque_veiculo_dados`, os lançamentos e as cotações.
+- **Achado (pré-existente; o Lucas decidiu corrigir no lote 3):** transferir estoque com Mogi ou Jaguariúna escolhida no topo responde 400 com `new row violates row-level security policy for table "estoque_unidades"`.
+  - Causa: o UPDATE leva `filial_id` para uma loja fora de `filiais_visiveis()`.
+  - Só funciona em "Rede". A política da produção é a mesma do local.
+- **Anotado para o lote que mexer em `troca/cotacoes`:** salvar uma cotação existente (`b.id`) usa `.maybeSingle()` e responde ok mesmo com 0 linhas.
+- **Grep das views:** caíram 15 e restam 26, com 493 leituras. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
