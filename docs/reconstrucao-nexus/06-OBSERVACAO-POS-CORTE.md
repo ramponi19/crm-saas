@@ -788,3 +788,51 @@ Modo construção (prompt do Lucas de 04/11): deploy de app a qualquer hora com 
 - **Grep das views** (critério do 05): `leads` com 92 leituras em 51 arquivos e `lead_mensagens` com 24 em 10 arquivos (8 na Edge `webhook-leads`, 5 em `lib/storage/retencao.ts`, 3 no assistente, 2 no card, e 1 em cada um dos outros 6). Nenhuma zerou, então não há migração de drop.
 - **Para as 18h:** nada deste deploy.
 - **Volta (não usada):** Instant Rollback para `b518f17`.
+
+## 18. 04/11 de dia: Inbox única (`3e3b47d`), deploy só de app, loja aberta
+
+Modo construção: o ok do Lucas veio às 11h20, e o push esperou o IOwait cair abaixo de 20%. Ele estava em 29,4% às 11h23 e em 21% às 11h24, e às 11h28 chegou a 6,0%.
+
+- **Gate na `main` local:** check, 211 testes, menu 15/15, verificador 552/5 e build. No local, 4 usuários e 3 abas deram tudo ok.
+- **Deploy:** push `3243508..3e3b47d` às 11h28, **READY às 11h32min10s**, conferido pelo status do GitHub e pelo deployment Production `3e3b47d`. API: anon 42501, auth 200, saúde 200.
+- **Smoke das 11h33 às 11h50.** Conduzi pelo chrome-devtools logado como dono da JM, e o Lucas ficou com o celular.
+  - `/comunicacao` em Mogi: a lista, os filtros (canal, não lidas, aguardando) e a busca funcionaram.
+    - A busca por nome, telefone e @instagram trouxe só as conversas da loja atual: das 7 conversas do Lucas, as 4 de Mogi; as 3 de Jaguariúna ficaram fora.
+  - **Sino = banco** (`select count(*) from conversas where nao_lidas > 0` pela RLS do dono): Mogi 1.247 = 1.247 no começo e 1.251 = 1.251 depois das mensagens; Jaguariúna 542 = 542.
+  - **Mensagens reais do Lucas:**
+    - O WhatsApp (11h41min08s, conversa 222) e o Direct (11h41min22s, conversa 1941) entraram em Mogi e subiram sozinhos para o topo, sem recarregar. O título foi a 1.251.
+    - Abrir cada conversa a deixou lida: `nao_lidas` 0, e o título desceu.
+  - **Respostas pela Inbox:**
+    - WhatsApp às 11h42min24s e Instagram às 11h43min22s, as duas com status da Meta. **O Lucas confirmou as duas no celular.**
+    - A resposta sai com a assinatura da loja ("JM - JM STORE IMPORTADOS:"), como no card.
+  - **Nota interna:** `eventos` 290 (`conversa.nota`, conversa 1941, loja 3, autor = dono). Ela fica para o smoke de editar e apagar das 18h.
+  - **Tarefa:** criada pela conversa (1409, negócio 6410, contato 693, loja 3) e apagada em `/tarefas`; no banco ficaram 0.
+  - **Abrir card** a partir da conversa: o card do lead abriu com a conversa.
+  - **Vendedor (Meta Reviewer, pela RLS):** só a loja 3. Das conversas do Lucas, 0 de Jaguariúna e 2 de Mogi.
+  - **`/leads`:** igual a antes e sem ler a view `leads`.
+  - Troquei a loja para Jaguariúna para conferir e voltei para Mogi; as duas trocas deram 200.
+- **Tempos na produção:**
+  - **Primeiras aberturas, logo depois do deploy e com o IOwait em pico:**
+    - primeira página de conversas: de 0,4 s a 6 s;
+    - "carregar mais": 7,2 s;
+    - "aguardando": 9,7 s;
+    - quadro do `/leads`: ~3 s em `quadro_contagens` + `quadro_pagina`.
+  - **Com o cache quente:**
+    - primeira página: 194–218 ms;
+    - "carregar mais": 174–233 ms;
+    - "não lidas": 72 ms;
+    - "aguardando": 192–304 ms por requisição, em duas requisições seguidas;
+    - busca: 150–610 ms;
+    - quadro: 200/290 ms.
+  - **No banco (`explain analyze` da primeira página pela RLS do dono):** 339 ms de execução e 90 ms de planejamento, tudo em cache (`shared hit`). Quase todo o tempo é a RLS do `contatos`, aplicada nas 2.519 conversas visíveis antes do `limit`.
+  - **Decisão anterior do Lucas:** coluna calculada só acima de 300 ms. Só o "aguardando" encosta nisso, com o cache quente. Fica anotado; nada a fazer hoje.
+- **IOwait:**
+  - 30,2–30,5% às 11h32–11h34, no deploy e nas primeiras aberturas. Ficou um pouco acima do limite de parada de 30%, num ponto só, e o smoke seguiu.
+  - Depois: 17,1% às 11h37, 2,8% às 11h43, 24,6% às 11h46 e 16,0% às 11h48.
+- **Sentry:** nenhum problema na última hora.
+- **Grep das views:** `leads` com 86 leituras em 47 arquivos (eram 92 em 51) e `lead_mensagens` com 23 em 9 (eram 24 em 10; 8 delas na Edge `webhook-leads`). Nenhuma zerou.
+- **Ficaram no banco, de teste:**
+  - as mensagens "teste inbox" e as duas "Resposta do teste da Inbox (…) — pode ignorar";
+  - a nota 290.
+- **Para as 18h:** `feat/inbox-notas` (migração `20261104000400`) e as 310 mensagens lidas com loja trocada. Ver o 05, seção "04/11/2026 de dia".
+- **Volta (não usada):** Instant Rollback para `3243508`.

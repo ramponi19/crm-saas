@@ -290,6 +290,42 @@ Migrações pelo `apply_migration` do MCP, uma por vez, com `GET /rest/v1/` (ano
 - **Os 134 UPDATE/DELETE/upsert que não conferem linhas** (cliente do usuário, 70 arquivos): `docs/reconstrucao-nexus/lista-update-sem-contagem-20261104.txt`. Pelo banco, só o `contatos` tinha o SELECT mais largo que o UPDATE. Nos outros, a política de escrita é de papel (admin/dono), e o risco é a tela deixar outro papel tentar. A regra para código novo é pedir `.select('id')` e passar por `nadaGravado()`.
 - **`contatos_delete`** continua só pela loja do próprio contato, mais estreito que o SELECT. Hoje não há DELETE de contato pelo cliente do usuário (fusão e desfazer usam a service_role).
 
+## 04/11/2026 de dia: Inbox única (`3e3b47d`, só app, loja aberta)
+
+O Lucas deu o ok às 11h20. Ele faz parte do modo construção: deploy de app a qualquer hora, com IOwait abaixo de 20%. O IOwait estava em 29,4% às 11h23 e em 21% às 11h24, e o push esperou até 6,0% às 11h28. O push foi `3243508..3e3b47d` e ficou **READY às 11h32min10s**, conferido pelo status do GitHub e pelo deployment Production `3e3b47d`. Smoke com o Lucas das 11h33 às 11h50, no 06, seção 18. **Volta (não usada):** Instant Rollback para `3243508`.
+
+**O que mudou:**
+- **`/comunicacao` (Inbox única, grupo Comunicação, no núcleo do menu):** WhatsApp, Instagram e Messenger numa coluna só. Tem filtros de canal, não lidas, aguardando e responsável, e busca por nome, telefone ou @instagram. A conversa abre com 200 mensagens e "anteriores". Dá para responder pela Edge, com anexo e modelo de 24 h, e a nota interna vai para `eventos` (`conversa.nota`). Pela conversa também se cria tarefa e se abre o card. A conversa só fica lida com a aba à vista, e "também em <loja>" usa `/api/comunicacao/[id]/lojas`.
+- **Tempo real:** um canal por aba, filtrado pela empresa (`components/layout/tempo-real-empresa.tsx`). Ele alimenta o sino, o título da aba, os avisos e a Inbox. O topbar e o `notification-provider` perderam o canal próprio e a leitura da view `leads`, e o `lib/realtime/tabelas.ts` foi apagado. O chat interno ainda tem canal próprio (`chat_nao_lidas`).
+- **O sino conta conversas** com `nao_lidas > 0`, e não mais mensagens.
+- **`lib/envio-edge.ts`:** o envio saiu do `lead-modal` para ser usado também pela Inbox, sem mudar o comportamento.
+- **`limite-banner` conta negócios:** 2.922, que bate com a view.
+
+**Grep das views** (critério deste runbook, `git grep` sobre `HEAD` em app, components, lib, core, hooks e supabase/functions):
+- `from('leads')`: 86 leituras em 47 arquivos (eram 92 em 51);
+- `from('lead_mensagens')`: 23 em 9 arquivos (eram 24 em 10). São 8 na Edge `webhook-leads`, 5 em `lib/storage/retencao.ts`, 3 no assistente, 2 no `lead-modal` e 1 em cada um destes: `cliente-modal-imob`, `api/imob/[slug]/lead`, `api/portais/[slug]/leads`, `lib/esteira.ts` e `lib/zapintel/conversas.ts`.
+
+Nenhuma das duas zerou, então não há migração de drop.
+
+**Para as 18h (decisão do Lucas, 04/11):**
+1. **`feat/inbox-notas`** (`696d9d1`): nota interna editável e apagável só pelo autor.
+   - Migração `20261104000400_eventos_nota_do_autor.sql`; volta em `dumps/2026-11-04-manha/volta-eventos-notas.sql`.
+   - Antes das 18h: teste no Supabase local e gate completo.
+   - Ordem: migração pelo MCP → conferir a API → merge na `main` → deploy → smoke.
+   - O smoke edita e apaga a nota 290 (conversa 1941), criada no smoke da Inbox.
+2. **As 310 mensagens lidas com loja trocada** (as 4 conversas de 03/11):
+   - antes, o dump delas e um script de volta;
+   - depois, `UPDATE mensagens set filial_id = <loja da conversa>`;
+   - por fim, conferir que sino, não lidas e quadro não mudam. São mensagens lidas, então não devem mudar.
+
+**Próximo trabalho, depois das notas:** a Edge `webhook-leads` deixa de ler `lead_mensagens`.
+- As 8 leituras passam para `conversas`, `mensagens` e `mensagem_registrar`.
+- Teste no local, depois republicar a Edge e fazer smoke de Direct e de WhatsApp.
+
+**Os 134 UPDATE sem conferir linhas** (`lista-update-sem-contagem-20261104.txt`) ficam com o Claude.
+- Primeiro os que estão em fluxo de usuário: card, quadro, inbox, PDV e tarefa.
+- Saem em lotes junto com as entregas, e a lista marca o que já foi feito.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
