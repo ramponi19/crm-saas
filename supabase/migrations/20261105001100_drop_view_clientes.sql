@@ -7,8 +7,9 @@
 --   2. derruba a view e o gatilho INSTEAD OF (compat_clientes / compat_clientes_iud);
 --   3. derruba fundir_clientes: a tela de Clientes funde pela core_fundir_contatos, com foto
 --      para desfazer (lib/fusao-contatos.ts). Ela lia clientes, leads e lead_mensagens;
---   4. marcar_cliente_proprietario (gatilho de imoveis_imoveis) passa a marcar em contatos.dados,
---      e só quando a empresa tem o campo `proprietario` (módulo Imóveis).
+--   4. marcar_cliente_proprietario (gatilho de imoveis_imoveis) vira lógica do módulo Imóveis: grava
+--      só o campo personalizado `proprietario` em contatos.dados (nada em coluna do core), e só em
+--      empresa com o módulo ligado e o campo ativo. Sem o módulo, não grava nada.
 --
 -- As funções do ZapIntel (posvenda, insights) só têm 'clientes' como chave de JSON.
 -- Volta: supabase/scripts/volta/volta-views-lote8.sql, junto com o Instant Rollback do app.
@@ -65,9 +66,12 @@ create or replace function public.marcar_cliente_proprietario()
  set search_path to 'public'
 as $function$
 begin
-  -- O imóvel aponta para o contato; marca o papel no cadastro do cliente (lib/clientes.ts).
-  -- Sem o campo do módulo Imóveis a chave não existe e core_validar_dados a recusaria.
-  if new.proprietario_id is not null then
+  -- Lógica do módulo Imóveis: o imóvel aponta para o contato e o papel vai para o campo
+  -- personalizado `proprietario` do módulo (lib/clientes.ts). Empresa sem o módulo ligado:
+  -- nada é gravado (e, sem o campo, core_validar_dados recusaria a chave).
+  if new.proprietario_id is not null
+     and exists (select 1 from empresa_modulos m
+                  where m.empresa_id = new.empresa_id and m.modulo = 'imoveis' and m.ativo) then
     update contatos
        set dados = dados || '{"proprietario": true}'::jsonb
      where id = new.proprietario_id and empresa_id = new.empresa_id
