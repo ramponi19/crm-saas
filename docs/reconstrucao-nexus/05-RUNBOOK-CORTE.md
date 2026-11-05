@@ -544,6 +544,38 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
 - **Restam 9 views de compatibilidade:** `vendas`, `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`, `canais_conectados`, `clientes`, `lead_mensagens` e `leads`. Ficam também `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos` e `v_empresas_plano`, que não são de compatibilidade.
 - **Dependências entre módulos (item 4):** nenhuma empresa tem módulo ligado sem o requisito. A JM e a Preview têm `pdv`, `estoque` e `assistencia` ligados, e nenhuma tem `avaliacoes`. Leitura adotada: "vendas" = `pdv`.
 
+### 05/11 de manhã: dependências entre módulos e check-modulos (`38e778a`, só app)
+
+- **`requer` no manifesto** (`core/modulos.ts`): PDV e Assistência requerem Estoque; Avaliação requer PDV. Orçamentos não requer nada, e contrato não é módulo à parte (fica no PDV). A conta é transitiva (`lib/modulos-central.ts` → `requisitosDe`, `requisitosFaltando`, `dependentesLigados`).
+- **Central:** instalar com requisito faltando confirma "Vai ligar também: X" e grava os requisitos antes do módulo. Requisito pago ou em preparação bloqueia, com o motivo. Desinstalar o que um módulo ligado usa dá 409 ("Estoque é usado por PDV, Assistência: desinstale PDV, Assistência antes"), e o botão fica desligado.
+- **Pedido de módulo pago:** abre também o pedido de cada requisito que falta. O atender do superadmin instala os requisitos (com o forçado de plano de cada um) e fecha os pedidos deles. Requisito em preparação bloqueia o atendimento.
+- **`scripts/check-modulos.mjs`** (no `npm run build` e no `npm run check`): toda tela e rota de `app/` tem dono (core, plataforma ou módulo do manifesto). Rota de módulo fora da trava do proxy confere "módulo ligado" no servidor (`exigirModuloLigado` de `lib/modulo-ligado.ts`, ou `moduloLigado`, `ligadosDaEmpresa`, `inteligenciaLigada`, `zapintelAcesso`). A lista `scripts/modulos-excecoes.json` só encolhe:
+  - **fora (4):** `/ranking`, `/api/ranking/metas`, `/api/assistente` e `/api/assistente/meu-dia` — viram módulo no manifesto ou ganham dono;
+  - **sem trava (38):** as APIs de módulo e os links públicos (OS, orçamento, proposta, imóvel, cardápio, portais), que funcionam com o módulo desligado. **Defeito antigo**, agora listado.
+- **Testes:** e2e local 20/20 (`D:/Nexus-Copia/inbox/ferramentas/modulos/dependencias-e2e.mjs`); 3 testes unitários novos. O pedido pago com requisito só tem teste unitário: nenhum módulo pago tem requisito hoje.
+- **Smoke na produção** (Central da JM, sem clicar): Estoque "Usado por PDV, Assistência", botão desligado; PDV, Assistência e Orçamentos com Desinstalar normal.
+
+### Lote 5 (05/11, 07h43): vendas — cai 1, restam 8
+
+| código no ar | migração | view que caiu |
+|---|---|---|
+| `22113a9`, READY 07h25min50s | `20261105000700` às 07h43 (versão `20261105104323`), IOwait 2,06%, aprovação do Lucas no chat | `vendas` |
+
+- **29 arquivos** passaram para `vendas_vendas` (from, embed `venda:vendas_vendas!venda_id` da garantia, tipo) e **2 literais** de verdade: o desfazer da encomenda (`apagar('vendas_vendas', ...)`) e a exportação de vendas da empresa (`/api/exportar`). Os outros 39 `'vendas'` são rótulo de tela, grupo do menu, aba ou evento do broadcast.
+- **Funções:** `zapintel_conversa_calc` (1), `zapintel_dashboard` (1), `zapintel_insights` (3) e `zapintel_posvenda` (1) liam a view. O `DO` troca só `from/join vendas`, confere o número na produção e pula a função que já lê a tabela, para ida/volta/ida funcionar no local. As 4 funções do local **não são iguais** às da produção (md5 diferente nas 4, não só na posvenda): o banco local não recria o corpo exato.
+- **Smoke, antes e depois do drop, nas duas lojas** (superadmin do Lucas na aba isolada, como dono da JM):
+
+  | | Mogi | Jaguariúna | banco |
+  |---|---|---|---|
+  | histórico | 55 vendas, R$ 386.017,00, lucro R$ 376.317,00 | 37 vendas, R$ 203.115,00, lucro R$ 200.415,00 | igual (só concluídas no faturamento) |
+  | Visão geral, relatórios, metas, financeiro (mês) | R$ 9.795,00 em 1 venda | R$ 16.383,00 em 4 vendas | igual |
+  | ZapIntel (rede) | painel R$ 26,2 mil em 5 vendas; Insights 42 vendas, R$ 290.520, 33 ligadas; pós-venda 341 clientes, 66 com venda | | iguais antes e depois |
+
+  As 12 telas deram 200 nas duas lojas; `/equipe` leva a `/configuracoes/usuarios`.
+- **Tipos:** `vendas` saiu de `types/database.gerado.ts` (o bloco à mão, por ser o último da seção, e 8 relações pela ferramenta) e de `types/views-espelho.ts`.
+- **Volta:** `supabase/scripts/volta/volta-views-lote5.sql`, junto com o Instant Rollback para antes de `22113a9`.
+- **Restam 8 views de compatibilidade:** `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`, `canais_conectados`, `clientes`, `lead_mensagens` e `leads`. Ficam também `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos` e `v_empresas_plano`.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

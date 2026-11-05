@@ -403,12 +403,6 @@ isOneToOne: false
       foreignKeyName: "troca_cotacoes_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     }
@@ -1793,12 +1787,6 @@ isOneToOne: false
       foreignKeyName: "cobrancas_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "cobrancas_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     }
@@ -3151,12 +3139,6 @@ isOneToOne: false
       foreignKeyName: "vendas_alertas_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_alertas_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     }
@@ -3196,12 +3178,6 @@ isOneToOne: false
       columns: ["usuario_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "comissoes_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
-      referencedRelation: "vendas"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "comissoes_venda_id_fkey"
@@ -3427,12 +3403,6 @@ isOneToOne: false
       foreignKeyName: "vendas_pagamentos_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_pagamentos_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     }
@@ -3533,12 +3503,6 @@ isOneToOne: false
       foreignKeyName: "pre_vendas_venda_id_fkey"
       columns: ["venda_id"]
 isOneToOne: false
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pre_vendas_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
       referencedRelation: "vendas_vendas"
       referencedColumns: ["id"]
     },{
@@ -3634,12 +3598,6 @@ isOneToOne: false
       columns: ["filial_id"]
 isOneToOne: false
       referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_termos_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
-      referencedRelation: "vendas"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "vendas_termos_venda_id_fkey"
@@ -3899,12 +3857,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "v_leads_nao_lidas"
       referencedColumns: ["lead_id"]
-    },{
-      foreignKeyName: "zapintel_venda_lead_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: true
-      referencedRelation: "vendas"
-      referencedColumns: ["id"]
     },{
       foreignKeyName: "zapintel_venda_lead_venda_id_fkey"
       columns: ["venda_id"]
@@ -4333,86 +4285,6 @@ isOneToOne: false
       columns: ["empresa_id"]
 isOneToOne: false
       referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"vendas": {
-                  Row: {
-                    "canal_venda": string | null,"cliente_id": number | null,"comanda": string | null,"comissao": number | null,"created_at": string | null,"data_venda": string | null,"desconto_aprovado_por": string | null,"desconto_motivo": string | null,"desconto_valor": number | null,"empresa_id": number | null,"filial_id": number | null,"forma_pagamento": string | null,"grupo_pdv": string | null,"id": number | null,"lucro": number | null,"numero_serie": string | null,"observacoes": string | null,"parcelas": number | null,"pedido_compra_id": number | null,"previsao_entrega": string | null,"produto_id": number | null,"quantidade": number | null,"status": string | null,"unidade_id": number | null,"usuario_id": string | null,"valor_custo": number | null,"valor_venda": number | null,"vendedor_id": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id"?: number | null,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: number | null,"lucro"?: number | null,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number | null,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda"?: number | null,"vendedor_id"?: string | null
-                         }
-                        Update: {
-                           "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id"?: number | null,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: number | null,"lucro"?: number | null,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number | null,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda"?: number | null,"vendedor_id"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "vendas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_desconto_aprovado_por_fkey"
-      columns: ["desconto_aprovado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_pedido_compra_id_fkey"
-      columns: ["pedido_compra_id"]
-isOneToOne: false
-      referencedRelation: "vendas_pedidos_compra"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_produto_id_fkey"
-      columns: ["produto_id"]
-isOneToOne: false
-      referencedRelation: "estoque_produtos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_unidade_id_fkey"
-      columns: ["unidade_id"]
-isOneToOne: false
-      referencedRelation: "estoque_unidades"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_vendedor_id_fkey"
-      columns: ["vendedor_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
       referencedColumns: ["id"]
     }
                   ]

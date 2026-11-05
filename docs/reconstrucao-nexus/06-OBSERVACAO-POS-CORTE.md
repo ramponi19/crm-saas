@@ -1147,3 +1147,12 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - **Smoke nas duas lojas:** 9 telas com 200 antes e depois do drop. Mogi: estoque 67, PDV 46. Jaguariúna: estoque 89, PDV 30.
 - **Observação:** o `/zapintel/posvenda` levou 500 por timeout na primeira chamada depois do DDL. Passou na segunda e mede 774 ms.
 - **Grep das views:** caíram 32 das 41 e restam 9. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
+
+## 26. 05/11 de manhã: dependências entre módulos, check-modulos e lote 5 das views (`38e778a`, `22113a9`)
+
+- **Deploy:** push às ~07h24 com IOwait de 3,2%; READY às 07h25min50s. API ok.
+- **Central (JM, produção):** Estoque mostra "Usado por PDV, Assistência: desinstale antes", com o botão desligado. Ninguém clicou em Desinstalar.
+- **Lote 5:** migração `20261105000700` às 07h43 (IOwait 2,06%; o IOwait chegou a 14% durante o smoke, e a aplicação esperou baixar). A primeira confirmação do `apply_migration` expirou em 2 minutos; a segunda passou. Views no `public`: 12. Funções que leem `vendas`: 0.
+- **Números iguais antes e depois do drop** nas duas lojas (tabela no 05, "Lote 5").
+- **Check-modulos:** 42 exceções na partida (4 fora, 38 sem trava).
+- **Grep das views:** caíram 33 das 41 e restam 8.

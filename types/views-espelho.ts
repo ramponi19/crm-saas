@@ -5,5 +5,4 @@ export interface ViewsEspelho {
   imoveis: 'imoveis_imoveis'
   lead_perfil_busca: 'imoveis_perfis_busca'
   negocios_imobiliarios: 'imoveis_negocios'
-  vendas: 'vendas_vendas'
 }
