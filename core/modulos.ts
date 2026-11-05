@@ -75,6 +75,13 @@ export interface ModuloManifesto {
   addon?: boolean
   emPreparacao?: boolean
   /**
+   * As chaves dos módulos sem os quais este não funciona (04/11/2026, regra "Como
+   * nasce um módulo", ponto 1). Instalar liga junto o que falta (a conta é
+   * transitiva: Avaliação → PDV → Estoque); desinstalar um requisito fica
+   * bloqueado enquanto um módulo ligado depender dele. Ver lib/modulos-central.ts.
+   */
+  requer?: string[]
+  /**
    * Seções de Configurações que o módulo traz (ids do menu de Configurações):
    * existem quando o módulo está ligado para a empresa. Até 22/10/2026 vinham de
    * uma lista por vertical; agora quem as tem é o módulo.
@@ -111,7 +118,7 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Cotação e orçamento com link de aprovação para o cliente.' },
   { chave: 'propostas', href: '/propostas', nome: 'Propostas', grupo: 'vendas',
     frase: 'Proposta formal com itens, condições e validade, pronta para enviar.' },
-  { chave: 'pdv', href: '/pdv', nome: 'PDV', grupo: 'vendas',
+  { chave: 'pdv', href: '/pdv', nome: 'PDV', grupo: 'vendas', requer: ['estoque'],
     frase: 'Venda no balcão com pagamento, troca, encomenda e contrato.' },
   { chave: 'historico', href: '/historico', nome: 'Histórico de vendas', grupo: 'vendas',
     frase: 'Todas as vendas da loja, com a 2ª via dos documentos emitidos.' },
@@ -119,7 +126,7 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Quanto fica cada parcela com as taxas da sua maquininha e do link de pagamento.' },
   { chave: 'simular_financiamento', href: '/simular-financiamento', nome: 'Financiamento', grupo: 'vendas', emPreparacao: true,
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
-  { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, abasConfiguracoes: ['veiculos-portais'],
+  { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, requer: ['pdv'], abasConfiguracoes: ['veiculos-portais'],
     capacidades: { automacoesVeiculo: true, matchVeiculo: true }, paineisDoLead: ['interesse-veiculo', 'financiamento'],
     frase: 'Vistoria do veículo na troca, com fotos, avarias e o valor oferecido.' },
   { chave: 'consulta_fipe', href: '/consulta-fipe', nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
@@ -145,7 +152,7 @@ export const MODULOS: ModuloManifesto[] = [
 
   { chave: 'garantia', href: '/garantia', nome: 'Garantia', grupo: 'posvenda',
     frase: 'O prazo de garantia de cada venda e o aviso do que está vencendo.' },
-  { chave: 'assistencia', href: '/assistencia', nome: 'Assistência', grupo: 'posvenda',
+  { chave: 'assistencia', href: '/assistencia', nome: 'Assistência', grupo: 'posvenda', requer: ['estoque'],
     frase: 'Ordem de serviço com status, peças e aviso ao cliente.' },
 
   { chave: 'relatorios', href: '/relatorios', nome: 'Relatórios', grupo: 'insights', plano: 'bi',

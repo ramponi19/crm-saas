@@ -3,8 +3,8 @@ import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { COOKIE_VERSAO_MODULOS, moduloPorChave } from '@/core/modulos'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
-import { estadoDoModulo } from '@/lib/modulos-central'
-import { aoInstalarModulo } from '@/lib/modulos-instalacao'
+import { estadoDoModulo, requisitosFaltando, type EntradaCentral } from '@/lib/modulos-central'
+import { aoInstalarModulo, gravarModulo } from '@/lib/modulos-instalacao'
 
 /**
  * INSTALAR / DESINSTALAR UM MÓDULO PELA CENTRAL (22/10/2026).
@@ -17,6 +17,11 @@ import { aoInstalarModulo } from '@/lib/modulos-instalacao'
  * A TRAVA DE PLANO É AQUI, não na tela: módulo fora do plano, contratado à parte
  * ou em preparação não instala por esta rota — o primeiro vira pedido
  * (/api/modulos/pedido), o último não tem botão.
+ *
+ * DEPENDÊNCIAS (04/11/2026, `requer` no manifesto): instalar liga junto os
+ * requisitos que faltam (transitivos, do mais fundo para o mais raso) e devolve os
+ * nomes em `junto`; requisito pago ou em preparação bloqueia (409, com o motivo).
+ * Desinstalar o que um módulo ligado usa dá 409 com o nome de quem usa.
  *
  * Grava pela chave de serviço DEPOIS de conferir o papel: o superadmin
  * impersonando não é membro da empresa, e a RLS de empresa_modulos (só admin da
@@ -33,43 +38,50 @@ export async function POST(req: Request) {
   const svc = createServiceClient()
   const { data: empresa } = await svc.from('empresas').select('plano').eq('id', ctx.empresaId).maybeSingle()
   const cfg = await carregarConfigEmpresa(svc, ctx.empresaId)
-  const estado = estadoDoModulo(modulo, {
+  const entrada: EntradaCentral = {
     ligados: ligadosDaEmpresa(cfg),
     plano: empresa?.plano ?? undefined,
     forcados: cfg.forcados,
     ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)),
-  })
+  }
+  const estado = estadoDoModulo(modulo, entrada)
 
   if (estado.tipo === 'preparacao') return NextResponse.json({ error: `${modulo.nome} ainda está em preparação.` }, { status: 409 })
   if (estado.tipo === 'pago') return NextResponse.json({ error: `${modulo.nome} é ${estado.onde}: peça pela Central.` }, { status: 402 })
   if (!instalar && estado.tipo === 'instalado' && !estado.podeDesinstalar) {
+    if (estado.usadoPor?.length) {
+      const quem = estado.usadoPor.join(', ')
+      return NextResponse.json({ error: `${modulo.nome} é usado por ${quem}: desinstale ${quem} antes.`, usadoPor: estado.usadoPor }, { status: 409 })
+    }
     return NextResponse.json({ error: `${modulo.nome} é contratado à parte: fale com o suporte para tirar.` }, { status: 409 })
   }
-
-  const agora = new Date().toISOString()
-  const atual = cfg.modulos.find((r) => r.modulo === modulo.chave)
-  const { error } = atual
-    ? await svc.from('empresa_modulos').update({
-        ativo: instalar, updated_at: agora,
-        ...(instalar ? { instalado_em: agora, instalado_por: ctx.userId } : {}),
-      }).eq('empresa_id', ctx.empresaId).eq('modulo', modulo.chave)
-    : await svc.from('empresa_modulos').insert({
-        empresa_id: ctx.empresaId, modulo: modulo.chave, origem: 'plano', ativo: instalar,
-        instalado_em: agora, instalado_por: ctx.userId,
-      })
-  if (error) return NextResponse.json({ error: 'Não foi possível gravar. Tente de novo.' }, { status: 500 })
-
-  // Instalar atende o pedido pendente do mesmo módulo, se houver, e prepara o que o
-  // módulo precisa (o token de portal do Imóveis — lib/modulos-instalacao.ts).
-  let aviso: string | undefined
-  if (instalar) {
-    await svc.from('modulo_pedidos').update({ status: 'atendido', atendido_em: agora, atendido_por: ctx.userId })
-      .eq('empresa_id', ctx.empresaId).eq('modulo', modulo.href).eq('status', 'pendente')
-    const preparo = await aoInstalarModulo(svc, ctx.empresaId, modulo.chave)
-    if (preparo.error) aviso = `${modulo.nome} foi instalado, mas não terminou de preparar. Tente instalar de novo.`
+  if (instalar && estado.tipo === 'disponivel' && estado.bloqueio) {
+    return NextResponse.json({ error: estado.bloqueio }, { status: 409 })
   }
 
-  const res = NextResponse.json({ ok: true, instalado: instalar, ...(aviso ? { aviso } : {}) })
+  // Os requisitos antes do módulo: se um falhar no meio, o que ficou ligado é
+  // requisito (funciona sozinho), nunca o módulo sem a base.
+  const junto = instalar ? requisitosFaltando(modulo, entrada) : []
+  const ordem = [...junto, modulo]
+  for (const [i, m] of ordem.entries()) {
+    const { error } = await gravarModulo(svc, { empresaId: ctx.empresaId, modulo: m, ativo: instalar, userId: ctx.userId, linhas: cfg.modulos, origem: 'plano' })
+    if (error) {
+      const ja = ordem.slice(0, i).map((x) => x.nome)
+      return NextResponse.json({ error: `Não foi possível gravar ${m.nome}. Tente de novo.${ja.length ? ` (já ligado: ${ja.join(', ')})` : ''}` }, { status: 500 })
+    }
+  }
+
+  // Prepara o que cada módulo ligado precisa (o token de portal do Imóveis —
+  // lib/modulos-instalacao.ts).
+  let aviso: string | undefined
+  if (instalar) {
+    for (const m of ordem) {
+      const preparo = await aoInstalarModulo(svc, ctx.empresaId, m.chave)
+      if (preparo.error) aviso = `${m.nome} foi instalado, mas não terminou de preparar. Tente instalar de novo.`
+    }
+  }
+
+  const res = NextResponse.json({ ok: true, instalado: instalar, junto: junto.map((m) => m.nome), ...(aviso ? { aviso } : {}) })
   // A trava do proxy guarda os módulos por um minuto; com a versão nova no cookie,
   // quem mudou vê a rota certa já no próximo clique.
   res.cookies.set(COOKIE_VERSAO_MODULOS, String(Date.now()), { path: '/', sameSite: 'lax', httpOnly: true, secure: true, maxAge: 120 })

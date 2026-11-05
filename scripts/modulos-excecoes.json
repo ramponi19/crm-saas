@@ -1,0 +1,169 @@
+{
+  "_leia": "Rotas que já existiam em 05/11/2026 fora da regra \"tudo fora do core é módulo\" (scripts/check-modulos.mjs). SÓ ENCOLHE: \"fora\" = rota sem dono (vira módulo no manifesto ou ganha dono no script); \"sem-trava\" = rota de módulo que não confere se o módulo está ligado (exigirModuloLigado de lib/modulo-ligado.ts). Corrigiu, tire daqui.",
+  "rotas": {
+    "app/(dashboard)/ranking/page.tsx": {
+      "motivo": "fora"
+    },
+    "app/api/admin/importar-imoveis/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/assistente/meu-dia/route.ts": {
+      "motivo": "fora"
+    },
+    "app/api/assistente/route.ts": {
+      "motivo": "fora"
+    },
+    "app/api/avaliacoes/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "avaliacoes"
+    },
+    "app/api/chat/notify/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "chat"
+    },
+    "app/api/chat/upload/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "chat"
+    },
+    "app/api/compras/receber/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "compras"
+    },
+    "app/api/contrato-documentos/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "pdv"
+    },
+    "app/api/contrato-modelo/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "pdv"
+    },
+    "app/api/estoque/confirmar-chegada/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "estoque"
+    },
+    "app/api/estoque/transferir/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "estoque"
+    },
+    "app/api/fipe/opcoes/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "consulta_fipe"
+    },
+    "app/api/fipe/valor/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "consulta_fipe"
+    },
+    "app/api/garantia/termo/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "garantia"
+    },
+    "app/api/imob/[slug]/lead/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/imob/comissao-config/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/imob/negocios/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/match/lead/[id]/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/menu/[slug]/pedido/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "cardapio"
+    },
+    "app/api/orcamento/[token]/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/orcamentos/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/os/[token]/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "assistencia"
+    },
+    "app/api/payments/charge/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "financeiro"
+    },
+    "app/api/payments/config/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "financeiro"
+    },
+    "app/api/portais/[slug]/leads/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/portais/[slug]/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/api/propostas/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "propostas"
+    },
+    "app/api/ranking/metas/route.ts": {
+      "motivo": "fora"
+    },
+    "app/api/reservas/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "estoque"
+    },
+    "app/api/troca/cotacoes/buscar/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/troca/cotacoes/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/troca/precos/familia/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/troca/precos/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/troca/regras/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/api/veiculos/[slug]/route.ts": {
+      "motivo": "sem-trava",
+      "modulo": "avaliacoes"
+    },
+    "app/imob/[slug]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/imovel/[id]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "imoveis"
+    },
+    "app/menu/[slug]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "cardapio"
+    },
+    "app/orcamento/[token]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "orcamentos"
+    },
+    "app/os/[token]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "assistencia"
+    },
+    "app/proposta/[token]/page.tsx": {
+      "motivo": "sem-trava",
+      "modulo": "propostas"
+    }
+  }
+}

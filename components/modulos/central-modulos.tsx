@@ -13,9 +13,13 @@ import { cn } from '@/lib/utils'
  * A grade da Central de Módulos (22/10/2026). O estado de cada tile já vem
  * calculado do servidor (lib/modulos-central.ts); aqui só os botões:
  *
- *   disponível  → Instalar        (POST /api/modulos/instalar)
- *   instalado   → Desinstalar     (com confirmação)
- *   pago        → Pedir           (POST /api/modulos/pedido; o superadmin atende)
+ *   disponível  → Instalar        (POST /api/modulos/instalar); com requisito
+ *                 faltando, confirma antes "vai ligar também: X"; requisito pago
+ *                 ou em preparação = botão desligado com o motivo (04/11/2026)
+ *   instalado   → Desinstalar     (com confirmação); usado por outro módulo
+ *                 ligado = botão desligado com o nome de quem usa
+ *   pago        → Pedir           (POST /api/modulos/pedido; o superadmin atende;
+ *                 o pedido leva junto os requisitos que faltam)
  *                 recusado → "Pedido recusado em …" + Pedir de novo (04/11/2026)
  *   preparação  → sem botão
  *
@@ -38,6 +42,7 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
   const router = useRouter()
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [tirar, setTirar] = useState<TileComIcone | null>(null)
+  const [comJunto, setComJunto] = useState<TileComIcone | null>(null)
   const [pedidos, setPedidos] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -55,12 +60,14 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
       if (!r.ok) { notify.bad(j.error ?? 'Não deu certo. Tente de novo.'); return }
       if (rota === '/api/modulos/pedido') {
         setPedidos((p) => ({ ...p, [t.chave]: j.pedido_em ?? new Date().toISOString() }))
-        notify.ok('Pedido enviado.')
+        notify.ok(j.junto?.length ? `Pedido enviado, com ${j.junto.join(', ')}.` : 'Pedido enviado.')
         return
       }
       if (j.aviso) notify.warn(j.aviso)
+      else if (instalar && j.junto?.length) notify.ok(`${t.nome} instalado, com ${j.junto.join(', ')}.`)
       else notify.ok(instalar ? `${t.nome} instalado.` : `${t.nome} desinstalado.`)
       setTirar(null)
+      setComJunto(null)
       router.refresh()
     } finally {
       setOcupado(null)
@@ -129,22 +136,41 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
 
                       {podeMudar && e.tipo !== 'preparacao' && (
                         <div className="mt-3 flex items-center gap-2 border-t border-line-soft pt-3">
-                          {e.tipo === 'disponivel' && (
-                            <Button size="sm" loading={ocupado === t.chave} onClick={() => enviar(t, '/api/modulos/instalar', true)}>Instalar</Button>
-                          )}
+                          {e.tipo === 'disponivel' && (e.bloqueio ? (
+                            <>
+                              <Button size="sm" disabled>Instalar</Button>
+                              <span className="text-[12px] text-ink-3">{e.bloqueio}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm" loading={ocupado === t.chave}
+                                onClick={() => (e.junto?.length ? setComJunto(t) : enviar(t, '/api/modulos/instalar', true))}
+                              >Instalar</Button>
+                              {e.junto?.length ? <span className="text-[12px] text-ink-3">Liga junto: {e.junto.join(', ')}</span> : null}
+                            </>
+                          ))}
                           {e.tipo === 'instalado' && e.podeDesinstalar && (
                             <Button size="sm" variant="outline" disabled={ocupado === t.chave} onClick={() => setTirar(t)}>Desinstalar</Button>
                           )}
-                          {e.tipo === 'instalado' && !e.podeDesinstalar && (
+                          {e.tipo === 'instalado' && !e.podeDesinstalar && (e.usadoPor?.length ? (
+                            <>
+                              <Button size="sm" variant="outline" disabled>Desinstalar</Button>
+                              <span className="text-[12px] text-ink-3">Usado por {e.usadoPor.join(', ')}: desinstale antes.</span>
+                            </>
+                          ) : (
                             <span className="text-[12px] text-ink-3">Contratado. Para tirar, fale com o suporte.</span>
-                          )}
+                          ))}
                           {e.tipo === 'pago' && (pedidoEm ? (
                             <>
                               <Button size="sm" variant="outline" disabled>Pedido enviado</Button>
                               <span className="text-[12px] text-ink-3">em {dia(pedidoEm)}</span>
                             </>
                           ) : (
-                            <Button size="sm" variant="outline" loading={ocupado === t.chave} onClick={() => enviar(t, '/api/modulos/pedido')}>{recusadoEm ? 'Pedir de novo' : 'Pedir'}</Button>
+                            <>
+                              <Button size="sm" variant="outline" loading={ocupado === t.chave} onClick={() => enviar(t, '/api/modulos/pedido')}>{recusadoEm ? 'Pedir de novo' : 'Pedir'}</Button>
+                              {t.faltam.length > 0 && <span className="text-[12px] text-ink-3">O pedido inclui: {t.faltam.join(', ')}</span>}
+                            </>
                           ))}
                         </div>
                       )}
@@ -156,6 +182,16 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
           )
         })}
       </div>
+
+      <ConfirmDialog
+        open={!!comJunto}
+        onClose={() => setComJunto(null)}
+        onConfirm={() => comJunto && enviar(comJunto, '/api/modulos/instalar', true)}
+        title={`Instalar ${comJunto?.nome ?? ''}?`}
+        description={`${comJunto?.nome ?? ''} precisa de ${comJunto?.faltam.join(', ') ?? ''} para funcionar. Vai ligar também: ${comJunto?.faltam.join(', ') ?? ''}.`}
+        confirmLabel="Instalar tudo"
+        loading={!!comJunto && ocupado === comJunto.chave}
+      />
 
       <ConfirmDialog
         open={!!tirar}

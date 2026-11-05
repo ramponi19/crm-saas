@@ -11,7 +11,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { ABAS_DE_MODULO, MODULOS, abasDosModulos, moduloPorChave, moduloPorHref } from '@/core/modulos'
-import { estadoDoModulo, tilesDaCentral, type EntradaCentral } from '@/lib/modulos-central'
+import { dependentesLigados, estadoDoModulo, requisitosDe, requisitosFaltando, tilesDaCentral, type EntradaCentral } from '@/lib/modulos-central'
 import { CATALOGO, hrefsHabilitados, hrefsLigados, resolverMenuPlano } from '@/lib/menu'
 import { instaladosDoManifesto, ligadosDaEmpresa, type ConfigEmpresa, type ModuloRow } from '@/lib/empresa-config'
 
@@ -87,4 +87,43 @@ test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo
   assert.deepEqual(abasDosModulos(new Set(['/imoveis', '/agenda'])).sort(), ['agendamento', 'portais'])
   assert.deepEqual(abasDosModulos(new Set(VAREJO)), [])
   assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'portais', 'veiculos-portais'])
+})
+
+test('dependências: requisitos transitivos, na ordem de instalar', () => {
+  assert.deepEqual(requisitosDe(m('avaliacoes')).map((x) => x.chave), ['estoque', 'pdv'])
+  assert.deepEqual(requisitosDe(m('pdv')).map((x) => x.chave), ['estoque'])
+  assert.deepEqual(requisitosDe(m('assistencia')).map((x) => x.chave), ['estoque'])
+  // Orçamentos não requer estoque (decisão do Lucas, 05/11/2026).
+  assert.deepEqual(requisitosDe(m('orcamentos')), [])
+  // Todo requisito do manifesto existe e não há ciclo (cada módulo não requer a si mesmo).
+  for (const x of MODULOS) {
+    for (const c of x.requer ?? []) assert.ok(moduloPorChave(c), `${x.chave} requer ${c}, fora do manifesto`)
+    assert.ok(!requisitosDe(x).some((r) => r.chave === x.chave), `ciclo em ${x.chave}`)
+  }
+})
+
+test('dependências: instalar liga junto, desinstalar requisito em uso bloqueia', () => {
+  const semEstoque = entrada({ ligados: new Set(['/dashboard', '/leads']) })
+  assert.deepEqual(estadoDoModulo(m('pdv'), semEstoque), { tipo: 'disponivel', junto: ['Estoque'] })
+  assert.deepEqual(requisitosFaltando(m('pdv'), semEstoque).map((x) => x.chave), ['estoque'])
+  assert.deepEqual(tilesDaCentral(semEstoque).find((x) => x.chave === 'assistencia')!.faltam, ['Estoque'])
+  // Com o estoque ligado, nada vai junto.
+  assert.deepEqual(estadoDoModulo(m('pdv'), entrada({ ligados: new Set(['/estoque']) })), { tipo: 'disponivel' })
+  // Estoque com PDV e Assistência ligados: não sai, e diz quem usa.
+  const usado = entrada({ ligados: new Set(['/estoque', '/pdv', '/assistencia']) })
+  assert.deepEqual(estadoDoModulo(m('estoque'), usado), { tipo: 'instalado', podeDesinstalar: false, usadoPor: ['PDV', 'Assistência'] })
+  assert.deepEqual(dependentesLigados(m('estoque'), usado).map((x) => x.chave), ['pdv', 'assistencia'])
+  // Sem dependente ligado, sai normalmente.
+  assert.deepEqual(estadoDoModulo(m('estoque'), entrada({ ligados: new Set(['/estoque']) })), { tipo: 'instalado', podeDesinstalar: true })
+  // Transitivo: Avaliação ligada (sem PDV, estado legado) ainda segura o Estoque.
+  assert.deepEqual(dependentesLigados(m('estoque'), entrada({ ligados: new Set(['/estoque', '/avaliacoes']) })).map((x) => x.chave), ['avaliacoes'])
+})
+
+test('dependências: requisito pago ou em preparação bloqueia com o motivo', () => {
+  // Manifesto de mentira por cima do real: um módulo que requer Relatórios (bi) e outro que requer a Agenda.
+  const fakeRel = { ...m('fila'), requer: ['relatorios'] }
+  const e = entrada({ plano: 'free', ligados: new Set(['/dashboard']) })
+  assert.deepEqual(estadoDoModulo(fakeRel, e), { tipo: 'disponivel', junto: ['Relatórios'], bloqueio: 'Precisa de Relatórios, que é no plano Starter: peça Relatórios primeiro.' })
+  const fakeAgenda = { ...m('fila'), requer: ['agenda'] }
+  assert.deepEqual(estadoDoModulo(fakeAgenda, e), { tipo: 'disponivel', junto: ['Agenda'], bloqueio: 'Precisa de Agenda, que ainda está em preparação.' })
 })
