@@ -57,7 +57,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!empresa) return naoAchou()
 
   const { data: imoveis } = await svc
-    .from('imoveis')
+    .from('imoveis_imoveis')
     .select('id, codigo, titulo, tipo, finalidade, descricao, valor_venda, valor_locacao, valor_condominio, valor_iptu, area_util, area_total, quartos, suites, banheiros, vagas, cep, logradouro, numero, complemento, bairro, cidade, uf, latitude, longitude, ocultar_numero_publico, fotos')
     .eq('empresa_id', empresa.id)
     .eq('publicar_portais', true)

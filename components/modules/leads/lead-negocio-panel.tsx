@@ -73,8 +73,8 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
   const [form, setForm] = useState({ imovel_id: '', tipo: 'venda', valor: '', assinado_em: '', locacao_inicio: '', locacao_fim: '', cashback: '' })
 
   const carregar = useCallback(async () => {
-    const { data } = await supabase.from('negocios_imobiliarios')
-      .select('id, tipo, valor, status, assinado_em, vistoria_em, chaves_entregues_em, locacao_inicio, locacao_fim, observacoes, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, comissao_status, imoveis!negocios_imobiliarios_imovel_id_fkey(codigo, titulo)')
+    const { data } = await supabase.from('imoveis_negocios')
+      .select('id, tipo, valor, status, assinado_em, vistoria_em, chaves_entregues_em, locacao_inicio, locacao_fim, observacoes, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, comissao_status, imoveis:imoveis_imoveis!negocios_imobiliarios_imovel_id_fkey(codigo, titulo)')
       .eq('lead_id', leadId)
       .not('status', 'eq', 'cancelado')
       .order('created_at', { ascending: false })
@@ -89,7 +89,7 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
   /** Só imóvel que pode ser fechado entra na lista — o resto seria escolha inválida. */
   async function abrirFormulario() {
     setAbrindo(true)
-    const { data } = await supabase.from('imoveis')
+    const { data } = await supabase.from('imoveis_imoveis')
       .select('id, codigo, titulo, finalidade, valor_venda, valor_locacao')
       .in('status', ['disponivel', 'reservado'])
       .order('codigo')

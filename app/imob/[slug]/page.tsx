@@ -14,7 +14,7 @@ async function getSite(slug: string) {
   if (!empresa) return null
 
   const { data: imoveis } = await svc
-    .from('imoveis')
+    .from('imoveis_imoveis')
     .select('id, codigo, titulo, tipo, finalidade, status, bairro, cidade, uf, valor_venda, valor_locacao, quartos, banheiros, vagas, area_util, fotos')
     .eq('empresa_id', empresa.id)
     .eq('status', 'disponivel')

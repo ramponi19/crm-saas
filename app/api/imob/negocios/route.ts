@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   const svc = createServiceClient()
 
   // O imóvel é DESTA empresa? Id vindo do cliente nunca decide sozinho.
-  const { data: imovel } = await svc.from('imoveis')
+  const { data: imovel } = await svc.from('imoveis_imoveis')
     .select('id, status, finalidade, captado_por, codigo, titulo')
     .eq('id', b.imovel_id).eq('empresa_id', empresaId).maybeSingle()
   if (!imovel) return NextResponse.json({ error: 'Imóvel não encontrado' }, { status: 404 })
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
     captador: !!captadorId, vendedor: !!corretorId,
   })
 
-  const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
+  const { data: negocio, error } = await svc.from('imoveis_negocios').insert({
     empresa_id: empresaId,
     imovel_id: imovel.id,
     lead_id: b.lead_id ?? null,
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
    * negócio criado com um aviso, porque perder o registro do que foi combinado é
    * pior que um status de imóvel desatualizado — e o aviso diz o que conferir.
    */
-  const { data: baixado } = await svc.from('imoveis')
+  const { data: baixado } = await svc.from('imoveis_imoveis')
     .update({ status: STATUS_IMOVEL_POR_TIPO[tipo] } as never)
     .eq('id', imovel.id).eq('empresa_id', empresaId)
     .in('status', ['disponivel', 'reservado'])
@@ -220,7 +220,7 @@ async function lancarComissaoManual(
     captador: !!captadorId, vendedor: true,
   })
 
-  const { data: negocio, error } = await svc.from('negocios_imobiliarios').insert({
+  const { data: negocio, error } = await svc.from('imoveis_negocios').insert({
     empresa_id: empresaId,
     origem: 'manual',
     imovel_id: null,
@@ -283,7 +283,7 @@ export async function PATCH(req: Request) {
   if (!b.id) return NextResponse.json({ error: 'Negócio não informado' }, { status: 400 })
 
   const svc = createServiceClient()
-  const { data: atual } = await svc.from('negocios_imobiliarios')
+  const { data: atual } = await svc.from('imoveis_negocios')
     .select('id, status, tipo, imovel_id').eq('id', b.id).eq('empresa_id', empresaId).maybeSingle()
   if (!atual) return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
 
@@ -346,7 +346,7 @@ export async function PATCH(req: Request) {
   }
   patch.updated_at = new Date().toISOString()
 
-  const { error } = await svc.from('negocios_imobiliarios')
+  const { error } = await svc.from('imoveis_negocios')
     .update(patch as never).eq('id', atual.id).eq('empresa_id', empresaId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -363,7 +363,7 @@ export async function PATCH(req: Request) {
    * `id = null` — que não acha nada, mas é consulta escrita por engano.
    */
   if (patch.status === 'cancelado' && atual.imovel_id) {
-    await svc.from('imoveis')
+    await svc.from('imoveis_imoveis')
       .update({ status: 'disponivel' } as never)
       .eq('id', atual.imovel_id).eq('empresa_id', empresaId)
       .in('status', ['vendido', 'alugado'])

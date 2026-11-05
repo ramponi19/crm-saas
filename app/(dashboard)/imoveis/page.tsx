@@ -17,7 +17,7 @@ export default async function ImoveisPage() {
   if (!ligadosDaEmpresa(cfg).has('/imoveis')) redirect('/dashboard')
 
   const [{ data: imoveis }, { data: proprietarios }, { data: equipeRaw }, { data: chavesRaw }] = await Promise.all([
-    supabase.from('imoveis').select('*').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
+    supabase.from('imoveis_imoveis').select('*').eq('empresa_id', empresaId).order('created_at', { ascending: false }),
     /**
      * Proprietário É um cliente (21/08/2026): a lista de escolha são as PESSOAS da
      * carteira, não uma tabela paralela. Quem for escolhido no imóvel ganha o papel
@@ -41,7 +41,7 @@ export default async function ImoveisPage() {
      * empréstimo. Sem embed — o imóvel já está aqui, e embed com nome de FK errado
      * derruba a consulta inteira em silêncio.
      */
-    supabase.from('chaves_imoveis')
+    supabase.from('imoveis_chaves')
       .select('id, imovel_id, codigo, status, com_quem, retirada_em, devolucao_prevista, observacoes')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }),
   ])

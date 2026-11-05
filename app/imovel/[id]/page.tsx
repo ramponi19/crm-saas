@@ -13,7 +13,7 @@ async function getImovel(id: number) {
   // o visitante clicou num anúncio antigo. Com `single()` isso levantava erro e
   // derrubava a renderização, em vez de cair no `return null` da linha seguinte,
   // que é o 404 que o código já queria dar.
-  const { data: imovel } = await svc.from('imoveis').select('*').eq('id', id).maybeSingle()
+  const { data: imovel } = await svc.from('imoveis_imoveis').select('*').eq('id', id).maybeSingle()
   if (!imovel) return null
   const { data: empresa } = await svc
     .from('empresas')

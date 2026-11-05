@@ -153,7 +153,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
       const filtros = leadId != null
         ? `cliente_id.eq.${cliente.id},lead_id.eq.${leadId}`
         : `cliente_id.eq.${cliente.id}`
-      const { data: pf } = await supabase.from('lead_perfil_busca')
+      const { data: pf } = await supabase.from('imoveis_perfis_busca')
         .select('id, preco_min, preco_max, cidades, bairros, tipos, quartos_min, quartos_max, suites_min, vagas_min, area_min, area_max, caracteristicas, observacoes')
         .or(filtros).limit(1).maybeSingle()
       if (vivo) setPrefs((pf ?? null) as Preferencias | null)
@@ -173,7 +173,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
         ? supabase.from('chamadas').select('direcao, resultado, duracao_seg, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(15)
         : Promise.resolve({ data: [] }),
       supabase.from('visitas').select('titulo, tipo, status, data_hora').eq('cliente_id', cliente.id).order('data_hora', { ascending: false }).limit(15),
-      supabase.from('negocios_imobiliarios').select('tipo, valor, status, created_at').eq('cliente_id', cliente.id).order('created_at', { ascending: false }).limit(10),
+      supabase.from('imoveis_negocios').select('tipo, valor, status, created_at').eq('cliente_id', cliente.id).order('created_at', { ascending: false }).limit(10),
     ])
 
     for (const m of ((msgs.data ?? []) as { direcao: string; conteudo: string | null; created_at: string }[])) {
@@ -468,12 +468,12 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
                 const payload = { ...dados, cliente_id: cliente.id, lead_id: leadId, ativo: true }
                 const { data: emp } = await supabase.rpc('get_empresa_id')
                 const { error } = prefs?.id
-                  ? await supabase.from('lead_perfil_busca').update(payload as never).eq('id', prefs.id)
-                  : await supabase.from('lead_perfil_busca').insert({ ...payload, empresa_id: emp } as never)
+                  ? await supabase.from('imoveis_perfis_busca').update(payload as never).eq('id', prefs.id)
+                  : await supabase.from('imoveis_perfis_busca').insert({ ...payload, empresa_id: emp } as never)
                 if (error) { notify.bad('Não foi possível salvar', error.message); return }
                 notify.ok('Preferências salvas')
                 setEditandoPrefs(false)
-                const { data: pf } = await supabase.from('lead_perfil_busca')
+                const { data: pf } = await supabase.from('imoveis_perfis_busca')
                   .select('id, preco_min, preco_max, cidades, bairros, tipos, quartos_min, quartos_max, suites_min, vagas_min, area_min, area_max, caracteristicas, observacoes')
                   .eq('cliente_id', cliente.id).limit(1).maybeSingle()
                 setPrefs((pf ?? null) as Preferencias | null)

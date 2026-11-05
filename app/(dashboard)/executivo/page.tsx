@@ -54,7 +54,7 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1)
   const mesLabel = iniMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
-  let qNeg = supabase.from('negocios_imobiliarios')
+  let qNeg = supabase.from('imoveis_negocios')
     .select('id, tipo, valor, status, comissao_total, comissao_captador, comissao_vendedor, corretor_id, captador_id, imovel_id, lead_id, created_at')
     .eq('empresa_id', empresaId)
     .neq('status', 'cancelado')
@@ -68,7 +68,7 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
    * apenas os negócios deste mês, uma origem que fechou em julho apareceria com
    * 0% de aproveitamento, e o dono cortaria justamente a origem que funciona.
    */
-  let qFechados = supabase.from('negocios_imobiliarios')
+  let qFechados = supabase.from('imoveis_negocios')
     .select('lead_id').eq('empresa_id', empresaId).neq('status', 'cancelado').not('lead_id', 'is', null)
   if (filtro !== 'ambos') qFechados = qFechados.eq('tipo', filtro)
 
@@ -108,7 +108,7 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
     .filter((id): id is number => id != null)
   const [{ data: nomesU }, { data: imoveisN }] = await Promise.all([
     idsUsuarios.length ? supabase.from('usuarios').select('id, nome').in('id', idsUsuarios) : Promise.resolve({ data: [] }),
-    idsImoveis.length ? supabase.from('imoveis').select('id, codigo, titulo, bairro, cidade').in('id', idsImoveis) : Promise.resolve({ data: [] }),
+    idsImoveis.length ? supabase.from('imoveis_imoveis').select('id, codigo, titulo, bairro, cidade').in('id', idsImoveis) : Promise.resolve({ data: [] }),
   ])
   const nomeUsuario = new Map(((nomesU ?? []) as { id: string; nome: string | null }[]).map((u) => [u.id, u.nome ?? '—']))
   const imovelInfo = new Map(((imoveisN ?? []) as { id: number; codigo: string | null; titulo: string | null; bairro: string | null; cidade: string | null }[])

@@ -75,7 +75,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
 
   const [{ data: leads }, { data: imoveis }, { data: membros }, { data: leadsMes }, { data: visitasMes }, { data: propostasMes }, { data: etapasRaw }] = await Promise.all([
     qLeads,
-    supabase.from('imoveis').select('status, tipo, valor_venda').eq('empresa_id', empresaId),
+    supabase.from('imoveis_imoveis').select('status, tipo, valor_venda').eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     qLeadsMes,
     qVisitas,

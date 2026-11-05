@@ -53,7 +53,7 @@ export default async function FinanceiroPage() {
 
   if (ligadosDaEmpresa(cfg).has('/imoveis')) {
     const [{ data: negRaw }, { data: taxaRow }] = await Promise.all([
-      supabase.from('negocios_imobiliarios')
+      supabase.from('imoveis_negocios')
         .select('id, tipo, valor, status, assinado_em, created_at, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, cashback_percentual, comissao_status, comissao_paga_em, comissao_aprovada_em, origem, cliente_nome, imovel_codigo, imovel_id, lead_id, cliente_id, corretor_id, captador_id')
         .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(300),
       supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'comissao_imob').maybeSingle(),
@@ -82,7 +82,7 @@ export default async function FinanceiroPage() {
      */
     const ids = <T,>(arr: (T | null)[]) => [...new Set(arr.filter((x): x is T => x != null))]
     const [{ data: imoveisN }, { data: leadsN }, { data: clientesN }, { data: usuariosN }] = await Promise.all([
-      supabase.from('imoveis').select('id, codigo, titulo').in('id', ids(negocios.map((n) => n.imovel_id))),
+      supabase.from('imoveis_imoveis').select('id, codigo, titulo').in('id', ids(negocios.map((n) => n.imovel_id))),
       supabase.from('leads').select('id, nome').in('id', ids(negocios.map((n) => n.lead_id))),
       supabase.from('clientes').select('id, nome').in('id', ids(negocios.map((n) => n.cliente_id))),
       supabase.from('usuarios').select('id, nome').in('id', ids([...negocios.map((n) => n.corretor_id), ...negocios.map((n) => n.captador_id)])),

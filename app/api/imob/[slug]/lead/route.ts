@@ -77,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   let produto: string | null = null
   if (imovelCodigo) {
-    const { data: im } = await svc.from('imoveis')
+    const { data: im } = await svc.from('imoveis_imoveis')
       .select('titulo, codigo').eq('empresa_id', empresa.id).eq('codigo', imovelCodigo).maybeSingle()
     if (im) produto = im.titulo || im.codigo
   }

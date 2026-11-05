@@ -105,7 +105,7 @@ export default async function GestaoLeadsPage() {
    */
   const idsLista = abertos.map((x) => x.lead.id)
   const { data: perfisRaw } = idsLista.length
-    ? await supabase.from('lead_perfil_busca').select('lead_id, cidades, bairros').eq('empresa_id', empresaId).in('lead_id', idsLista)
+    ? await supabase.from('imoveis_perfis_busca').select('lead_id, cidades, bairros').eq('empresa_id', empresaId).in('lead_id', idsLista)
     : { data: [] }
   const regiaoPorLead = new Map<number, string>()
   for (const p of ((perfisRaw ?? []) as { lead_id: number; cidades: string[] | null; bairros: string[] | null }[])) {

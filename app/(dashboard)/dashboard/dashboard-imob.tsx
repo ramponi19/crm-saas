@@ -81,7 +81,7 @@ export default async function DashboardImob() {
   const iniHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString()
   const fimJanela = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + DIAS_AGENDA).toISOString()
 
-  let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome), imoveis(codigo, titulo)')
+  let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome), imoveis:imoveis_imoveis(codigo, titulo)')
     .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimJanela).order('data_hora').limit(8)
   if (!isGestor) vq = vq.eq('corretor_id', user.id)
 
@@ -109,8 +109,8 @@ export default async function DashboardImob() {
     { count: totalLeadsCarteira },
   ] = await Promise.all([
     q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(TETO_LEADS),
-    supabase.from('imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
-    supabase.from('imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
+    supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     vq,
     tq,
@@ -122,7 +122,7 @@ export default async function DashboardImob() {
       .eq('empresa_id', empresaId).eq('ativo', true).eq('funis.padrao', true).order('ordem'),
     supabase.from('clientes').select('id, nome, tipo_cliente, cidade, created_at')
       .eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }).limit(5),
-    supabase.from('imoveis').select('id, codigo, titulo, tipo, status, valor_venda, valor_locacao, finalidade, bairro')
+    supabase.from('imoveis_imoveis').select('id, codigo, titulo, tipo, status, valor_venda, valor_locacao, finalidade, bairro')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
     cq,
   ])

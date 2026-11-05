@@ -53,11 +53,11 @@ export function UploadFotos({
       setEnviando((n) => n + 1)
       const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
       const caminho = `${empresaId}/${crypto.randomUUID()}.${ext}`
-      const { error } = await supabase.storage.from('estoque_produtos')
+      const { error } = await supabase.storage.from('produtos')
         .upload(caminho, file, { cacheControl: '31536000', upsert: false, contentType: file.type })
       setEnviando((n) => n - 1)
       if (error) { notify.bad(`Falha ao enviar ${file.name}`, error.message); continue }
-      novas.push(supabase.storage.from('estoque_produtos').getPublicUrl(caminho).data.publicUrl)
+      novas.push(supabase.storage.from('produtos').getPublicUrl(caminho).data.publicUrl)
     }
     if (novas.length) onChange(unica ? novas.slice(0, 1) : [...value, ...novas])
   }

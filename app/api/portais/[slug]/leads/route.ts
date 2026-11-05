@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   let produto: string | null = null
   if (clientListingId) {
     const { data: im } = await svc
-      .from('imoveis')
+      .from('imoveis_imoveis')
       .select('titulo, codigo')
       .eq('empresa_id', empresa.id)
       .eq('codigo', String(clientListingId))

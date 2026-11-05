@@ -39,7 +39,7 @@ export function LeadMatchPanel({ leadId }: { leadId: number }) {
   }, [leadId])
 
   useEffect(() => {
-    supabase.from('lead_perfil_busca')
+    supabase.from('imoveis_perfis_busca')
       .select('finalidade, tipos, cidades, bairros, preco_min, preco_max, quartos_min, vagas_min')
       .eq('lead_id', leadId).maybeSingle()
       .then(({ data }) => {
@@ -68,7 +68,7 @@ export function LeadMatchPanel({ leadId }: { leadId: number }) {
     const empresaId = await resolverEmpresaId()
     if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
     setSalvando(true)
-    const { error } = await supabase.from('lead_perfil_busca').upsert({
+    const { error } = await supabase.from('imoveis_perfis_busca').upsert({
       empresa_id: empresaId,
       lead_id: leadId,
       finalidade: form.finalidade,

@@ -36,7 +36,7 @@ export default async function AgendaPage() {
    * mandaria o compromisso do colega para o navegador de quem não pode ver.
    */
   let q = supabase.from('visitas')
-    .select('*, leads(nome, telefone), clientes(nome), imoveis(titulo, codigo, bairro)')
+    .select('*, leads(nome, telefone), clientes(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)')
     .eq('empresa_id', empresaId)
   if (!isGestor) q = q.eq('corretor_id', user.id)
 
@@ -44,7 +44,7 @@ export default async function AgendaPage() {
     q.order('data_hora', { ascending: true }),
     supabase.from('leads').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('ultima_mensagem_at', { ascending: false }).limit(200),
     supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).order('nome').limit(300),
-    supabase.from('imoveis').select('id, titulo, codigo').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(300),
+    supabase.from('imoveis_imoveis').select('id, titulo, codigo').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(300),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 

@@ -30,7 +30,7 @@ export async function imoveisCaptadosPorPessoa(
   const soData = (iso: string) => iso.slice(0, 10)
 
   const { data, error } = await db
-    .from('imoveis')
+    .from('imoveis_imoveis')
     .select('captado_por')
     .eq('empresa_id', empresaId)
     .not('captado_por', 'is', null)

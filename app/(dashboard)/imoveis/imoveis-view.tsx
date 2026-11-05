@@ -9,7 +9,7 @@ import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Glob
 import { Button, IconButton, Input, Select, Textarea, Modal, ConfirmDialog, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables, TablesInsert } from '@/types/database'
 
-type Imovel = Tables<'imoveis'>
+type Imovel = Tables<'imoveis_imoveis'>
 /** Pessoa da carteira que pode ser dona do imóvel — cliente, com o papel marcado. */
 type ProprietarioMin = { id: number; nome: string; proprietario?: boolean | null }
 
@@ -139,7 +139,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
   async function salvar() {
     if (!form.titulo.trim() && !form.codigo.trim()) { notify.bad('Informe ao menos o título ou o código'); return }
     setLoading(true)
-    const payload: TablesInsert<'imoveis'> = {
+    const payload: TablesInsert<'imoveis_imoveis'> = {
       empresa_id: empresaId,
       codigo: form.codigo || null, titulo: form.titulo || null,
       tipo: form.tipo, finalidade: form.finalidade, status: form.status,
@@ -161,12 +161,12 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       aceita_financiamento: form.aceita_financiamento, publicar_portais: form.publicar_portais,
     }
     if (editando) {
-      const { data, error } = await supabase.from('imoveis').update(payload).eq('id', editando.id).select('*').single()
+      const { data, error } = await supabase.from('imoveis_imoveis').update(payload).eq('id', editando.id).select('*').single()
       if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => l.map(x => (x.id === editando.id ? data : x)))
       notify.ok('Imóvel atualizado')
     } else {
-      const { data, error } = await supabase.from('imoveis').insert(payload).select('*').single()
+      const { data, error } = await supabase.from('imoveis_imoveis').insert(payload).select('*').single()
       if (error) { notify.bad(error.message); setLoading(false); return }
       setLista(l => [data, ...l])
       notify.ok('Imóvel cadastrado')
@@ -175,7 +175,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
   }
 
   async function excluir(im: Imovel) {
-    const { error } = await supabase.from('imoveis').delete().eq('id', im.id)
+    const { error } = await supabase.from('imoveis_imoveis').delete().eq('id', im.id)
     if (error) { notify.bad(error.message); return }
     setLista(l => l.filter(x => x.id !== im.id))
     notify.ok('Imóvel excluído')
@@ -213,7 +213,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
 
   // ── Ações de chave (eram a tela /chaves) ──
   async function criarChave(imovelId: number) {
-    const { data, error } = await supabase.from('chaves_imoveis')
+    const { data, error } = await supabase.from('imoveis_chaves')
       .insert({ empresa_id: empresaId, imovel_id: imovelId, codigo: novaChave.trim() || null, status: 'na_imobiliaria' } as never)
       .select('id, imovel_id, codigo, status, com_quem, retirada_em, devolucao_prevista, observacoes').single()
     if (error) { notify.bad('Não foi possível cadastrar', error.message); return }
@@ -228,7 +228,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       status: 'emprestada', com_quem: comQuem.trim(),
       retirada_em: new Date().toISOString(), devolucao_prevista: devolucao || null,
     }
-    const { error } = await supabase.from('chaves_imoveis').update(patch as never).eq('id', c.id)
+    const { error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id)
     if (error) { notify.bad('Não foi possível registrar', error.message); return }
     setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
     setEmprestando(null); setComQuem(''); setDevolucao('')
@@ -237,14 +237,14 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
 
   async function devolverChave(c: ChaveDoImovel) {
     const patch = { status: 'na_imobiliaria', com_quem: null, retirada_em: null, devolucao_prevista: null }
-    const { error } = await supabase.from('chaves_imoveis').update(patch as never).eq('id', c.id)
+    const { error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id)
     if (error) { notify.bad('Não foi possível devolver', error.message); return }
     setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
     notify.ok('Chave devolvida')
   }
 
   async function removerChave(c: ChaveDoImovel) {
-    const { error } = await supabase.from('chaves_imoveis').delete().eq('id', c.id)
+    const { error } = await supabase.from('imoveis_chaves').delete().eq('id', c.id)
     if (error) { notify.bad('Não foi possível remover', error.message); return }
     setListaChaves(l => l.filter(x => x.id !== c.id))
   }

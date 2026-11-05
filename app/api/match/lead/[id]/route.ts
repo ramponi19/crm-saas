@@ -56,7 +56,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // ── Imobiliária (padrão) ──
   const { data: perfil } = await supabase
-    .from('lead_perfil_busca')
+    .from('imoveis_perfis_busca')
     .select('finalidade, tipos, cidades, bairros, preco_min, preco_max, quartos_min, vagas_min')
     .eq('lead_id', leadId)
     .maybeSingle()
@@ -64,7 +64,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!perfil) return NextResponse.json({ matches: [] })
 
   const { data: imoveis } = await supabase
-    .from('imoveis')
+    .from('imoveis_imoveis')
     .select('id, codigo, titulo, tipo, finalidade, status, bairro, cidade, valor_venda, valor_locacao, quartos, vagas')
 
   const matches = ranquear(perfil as PerfilBusca, (imoveis ?? []) as ImovelMatchInput[]).slice(0, 20)

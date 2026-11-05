@@ -72,14 +72,14 @@ export async function POST(req: Request) {
     }
     let existing: { id: number } | null = null
     if (im.codigo) {
-      const { data } = await svc.from('imoveis').select('id').eq('empresa_id', empresaId).eq('codigo', im.codigo).maybeSingle()
+      const { data } = await svc.from('imoveis_imoveis').select('id').eq('empresa_id', empresaId).eq('codigo', im.codigo).maybeSingle()
       existing = data
     }
     if (existing) {
-      await svc.from('imoveis').update(base).eq('id', existing.id) // preserva status atual do CRM
+      await svc.from('imoveis_imoveis').update(base).eq('id', existing.id) // preserva status atual do CRM
       atualizados++
     } else {
-      await svc.from('imoveis').insert({ empresa_id: empresaId, status: 'disponivel', ...base })
+      await svc.from('imoveis_imoveis').insert({ empresa_id: empresaId, status: 'disponivel', ...base })
       criados++
     }
   }
