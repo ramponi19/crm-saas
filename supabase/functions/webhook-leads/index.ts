@@ -1020,24 +1020,121 @@ async function contatoDaIdentidade(empresaId: number, tipo: string, ident: strin
   return contatoId;
 }
 
-type NegocioDaLoja = { id: number; ativo: boolean; dados: Record<string, unknown> };
+type NegocioDaLoja = {
+  id: number; ativo: boolean; status: string; ganhoEm: string | null; criadoEm: string; dados: Record<string, unknown>;
+};
 
 /**
  * Os negócios do contato NA LOJA DO CANAL, do mais antigo para o mais novo.
  * Canal sem loja (o Messenger da marca, que atende a rede) não filtra.
- * `ativo` é o `_lead.ativo` (o "zerar do funil"), não o status: ganho e perdido
- * continuam ativos, e a mensagem nova entra neles sem reabrir — como sempre foi.
+ * `ativo` é o `_lead.ativo` (o "zerar do funil"), não o status.
  */
 async function negociosNaLoja(empresaId: number, contatoId: number, filialId: number | null): Promise<NegocioDaLoja[]> {
-  let q = db.from("negocios").select("id, dados").eq("empresa_id", empresaId).eq("contato_id", contatoId);
+  let q = db.from("negocios").select("id, status, ganho_em, created_at, dados").eq("empresa_id", empresaId).eq("contato_id", contatoId);
   if (filialId != null) q = q.eq("filial_id", filialId);
   const { data, error, status } = await q.order("id", { ascending: true });
   if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`buscar negócio: ${error?.message}`);
   return (data ?? []).map((n) => {
     const dados = (n.dados ?? {}) as Record<string, unknown>;
     const lead = (dados._lead ?? {}) as Record<string, unknown>;
-    return { id: n.id as number, ativo: lead.ativo !== false, dados };
+    return {
+      id: n.id as number, ativo: lead.ativo !== false, status: String(n.status ?? "aberto"),
+      ganhoEm: (n.ganho_em as string | null) ?? null, criadoEm: String(n.created_at ?? ""), dados,
+    };
   });
+}
+
+// ── O cliente que volta (decisão do Lucas, 05/11/2026) ──────────────────────
+const POS_VENDA_PADRAO_DIAS = 30;
+const posVendaCache = new Map<number, { dias: number; ate: number }>();
+
+/**
+ * Dias de pós-venda da empresa: `configuracoes_sistema`, chave `retorno_cliente`
+ * (`{ pos_venda_dias }`, tela Configurações › SLA de atendimento). Sem a linha, 30.
+ * Cache de 5 min por instância: a regra muda raramente e o recebimento é quente.
+ */
+async function posVendaDias(empresaId: number): Promise<number> {
+  const c = posVendaCache.get(empresaId);
+  if (c && c.ate > Date.now()) return c.dias;
+  const { data, error, status } = await db.from("configuracoes_sistema").select("valor")
+    .eq("empresa_id", empresaId).eq("chave", "retorno_cliente").maybeSingle();
+  if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`prazo de pós-venda: ${error?.message}`);
+  const v = Number((data?.valor as { pos_venda_dias?: unknown } | null)?.pos_venda_dias);
+  const dias = Number.isFinite(v) && v >= 0 ? v : POS_VENDA_PADRAO_DIAS;
+  posVendaCache.set(empresaId, { dias, ate: Date.now() + 5 * 60_000 });
+  return dias;
+}
+
+type Destino = { negocioId: number } | { novo: NegocioDaLoja } | { identidade: true };
+
+/**
+ * PARA ONDE VAI A MENSAGEM DE QUEM ESCREVE NA LOJA (regra do Lucas, 05/11/2026):
+ *   1. negócio ABERTO e ativo na loja → entra nele (o mais antigo);
+ *   2. GANHO há até N dias (`posVendaDias`) e ativo → entra nele: é pós-venda;
+ *   3. o negócio mais recente da loja é GANHO há mais de N dias ou PERDIDO → nasce um
+ *      negócio NOVO na primeira etapa do funil, no mesmo contato; o antigo fica como está
+ *      (a `core_negocio_do_canal` o reabriria — e apagaria a data do ganho);
+ *   4. nada disso (contato novo, ou só o negócio "zerado" do funil) → por identidade:
+ *      a `mensagem_registrar` acha ou cria o contato e a `core_negocio_do_canal` cria
+ *      ou reativa, com as travas contra entrega dupla.
+ */
+function destinoDaMensagem(daLoja: NegocioDaLoja[], dias: number, agora = Date.now()): Destino {
+  const aberto = daLoja.find((n) => n.ativo && n.status === "aberto");
+  if (aberto) return { negocioId: aberto.id };
+  const recentes = daLoja
+    .filter((n) => n.ativo && n.status === "ganho" && n.ganhoEm && agora - Date.parse(n.ganhoEm) <= dias * 86_400_000)
+    .sort((a, b) => Date.parse(b.ganhoEm!) - Date.parse(a.ganhoEm!));
+  if (recentes[0]) return { negocioId: recentes[0].id };
+  const maisRecente = [...daLoja].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm) || b.id - a.id)[0];
+  if (maisRecente && (maisRecente.status === "ganho" || maisRecente.status === "perdido")) return { novo: maisRecente };
+  return { identidade: true };
+}
+
+/**
+ * Negócio novo para quem volta depois de ganho antigo ou perdido: primeira etapa do
+ * funil padrão, no mesmo contato e na loja do canal. `_lead.retorno_de` guarda o
+ * negócio anterior.
+ *
+ * DUAS ENTREGAS AO MESMO TEMPO (o cliente manda 3 mensagens seguidas): cada uma grava
+ * o seu e depois confere os negócios abertos que nasceram no último minuto; fica o de
+ * menor id, e quem gravou o outro o apaga (recém-criado, nada pendurado nele).
+ * Limite do plano atingido: a mensagem entra no negócio antigo em vez de se perder.
+ */
+async function negocioDoRetorno(canal: Canal, contatoId: number, anterior: NegocioDaLoja, p: {
+  origem: string; origemId: string; texto: string;
+}): Promise<number> {
+  const empresaId = canal.empresa_id;
+  const { data: funil, error: eF, status: sF } = await db.from("funis").select("id")
+    .eq("empresa_id", empresaId).eq("padrao", true).eq("interno", false).order("id").limit(1);
+  if (bancoIndisponivel(eF, sF)) throw new ErroDeBanco(`funil padrão: ${eF?.message}`);
+  const funilId = (funil?.[0]?.id as number | undefined) ?? null;
+  let etapaId: number | null = null;
+  if (funilId) {
+    const { data: et } = await db.from("funil_etapas").select("id").eq("funil_id", funilId)
+      .order("ordem", { ascending: true }).order("id", { ascending: true }).limit(1);
+    etapaId = (et?.[0]?.id as number | undefined) ?? null;
+  }
+  const { data: novo, error, status } = await db.from("negocios").insert({
+    empresa_id: empresaId, filial_id: canal.filial_id, contato_id: contatoId, funil_id: funilId, etapa_id: etapaId,
+    status: "aberto",
+    dados: { _lead: { ativo: true, primeira_msg: p.texto, origem: p.origem, origem_id: p.origemId, retorno_de: anterior.id } },
+  }).select("id").single();
+  if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`negócio do retorno: ${error?.message}`);
+  if (error || !novo) {
+    console.error("negócio do retorno não criado, mensagem vai para o anterior:", anterior.id, error?.message);
+    return anterior.id;
+  }
+  const meu = novo.id as number;
+  let q = db.from("negocios").select("id").eq("empresa_id", empresaId).eq("contato_id", contatoId)
+    .eq("status", "aberto").gte("created_at", new Date(Date.now() - 60_000).toISOString());
+  if (canal.filial_id != null) q = q.eq("filial_id", canal.filial_id);
+  const { data: irmaos } = await q.order("id", { ascending: true });
+  const primeiro = (irmaos?.[0]?.id as number | undefined) ?? meu;
+  if (primeiro !== meu) {
+    await db.from("negocios").delete().eq("id", meu);
+    console.log("negócio do retorno duplicado por entrega simultânea, fica o", primeiro, "sai o", meu);
+  }
+  return primeiro;
 }
 
 async function registrarRecebida(canal: Canal, p: {
@@ -1059,18 +1156,19 @@ async function registrarRecebida(canal: Canal, p: {
    * de Jaguariúna. A regra do dono: "era para ter meu lead em jaguariuna e mogi e
    * nao transferir os chats". Cada loja tem a sua conversa.
    *
-   * Com negócio ATIVO na loja, a mensagem entra nele (`lead_id`): o ganho e o
-   * perdido não são reabertos por uma mensagem nova. Sem negócio ativo, entra
-   * POR IDENTIDADE: a `mensagem_registrar` acha ou cria o contato, e a
-   * `core_negocio_do_canal` usa o aberto, reabre o mais recente ou cria — com as
-   * travas que impedem duas entregas simultâneas de abrirem dois negócios.
+   * Qual negócio da loja recebe: `destinoDaMensagem` (aberto; ganho recente =
+   * pós-venda; ganho antigo ou perdido = negócio novo; senão, por identidade, com as
+   * travas da `core_negocio_do_canal` contra duas entregas simultâneas).
    */
   const contatoAntes = await contatoDaIdentidade(empresaId, p.origem, p.origemId);
-  const ativo = contatoAntes
-    ? (await negociosNaLoja(empresaId, contatoAntes, canal.filial_id)).find((n) => n.ativo) ?? null
+  const destino: Destino = contatoAntes
+    ? destinoDaMensagem(await negociosNaLoja(empresaId, contatoAntes, canal.filial_id), await posVendaDias(empresaId))
+    : { identidade: true };
+  const negocioId = "negocioId" in destino ? destino.negocioId
+    : "novo" in destino ? await negocioDoRetorno(canal, contatoAntes!, destino.novo, p)
     : null;
-  const quem: Record<string, unknown> = ativo
-    ? { lead_id: ativo.id }
+  const quem: Record<string, unknown> = negocioId != null
+    ? { lead_id: negocioId }
     : {
       identidade: p.origemId, nome: p.nome, instagram: p.instagramUser,
       ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
@@ -1097,7 +1195,7 @@ async function registrarRecebida(canal: Canal, p: {
   // (external_id repetido não grava de novo).
   if (msgFora) throw new ErroDeBanco(`gravar mensagem recebida ${p.externalId}: ${msgErr}`);
 
-  await completarCadastro(canal, p, ativo?.id ?? null);
+  await completarCadastro(canal, p, negocioId);
 
   if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return; }
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
@@ -1171,7 +1269,8 @@ async function registrarEcho(
      */
     const contatoId = await contatoDaIdentidade(canal.empresa_id, origem, destinatario);
     if (!contatoId) return;
-    let negocioId = (await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id)).find((n) => n.ativo)?.id ?? null;
+    const daLojaEcho = await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id);
+    let negocioId = (daLojaEcho.find((n) => n.ativo && n.status === "aberto") ?? daLojaEcho.find((n) => n.ativo))?.id ?? null;
     if (!negocioId && canal.filial_id != null) {
       const conhecido = (await negociosNaLoja(canal.empresa_id, contatoId, null)).some((n) => n.ativo);
       if (conhecido) {
@@ -1326,7 +1425,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       // este filtro ele grudava na conversa que a outra loja já tinha com o cliente.
       const contatoId = await contatoDaIdentidade(canal.empresa_id, "whatsapp", fone);
       const daLoja = contatoId ? await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id) : [];
-      let leadId: number | null = daLoja.find((n) => n.ativo)?.id ?? null;
+      let leadId: number | null = (daLoja.find((n) => n.ativo && n.status === "aberto") ?? daLoja.find((n) => n.ativo))?.id ?? null;
 
       if (!leadId) {
         const inativo = [...daLoja].reverse().find((n) => !n.ativo);

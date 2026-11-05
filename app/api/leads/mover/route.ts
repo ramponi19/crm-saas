@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
-const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
+const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
 
 /**
  * Move um lead de etapa e dispara as automações de "entrou_na_etapa".
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
    */
   type NegocioAtual = {
     id: number; empresa_id: number; funil_id: number | null; responsavel_id: string | null; perdido_em: string | null
+    status: string; ganho_em: string | null
     dados: Record<string, unknown> | null; etapa: { slug: string } | null
     contato: { id: number; nome: string | null; observacoes: string | null } | null
   }
@@ -93,11 +94,20 @@ export async function POST(req: Request) {
     : etapaRow?.tipo === 'perdido' ? 'perdido'
     : !etapaRow && (body.perdido_em ?? n.perdido_em) ? 'perdido' : 'aberto'
 
+  const agora = new Date().toISOString()
   const patch: Record<string, unknown> = {
     funil_id: funilAlvo,
     etapa_id: etapaRow?.id ?? null,
     status,
-    entrou_etapa_em: new Date().toISOString(),
+    entrou_etapa_em: agora,
+    /**
+     * A DATA DO GANHO acompanha o status (05/11/2026). Arrastar para a etapa de ganho
+     * gravava só `status = 'ganho'`: 22 negócios ganhos entre 20/10 e 05/11 ficaram sem
+     * `ganho_em`, e é por ela que a Edge decide se a mensagem de quem volta é pós-venda
+     * (ganho há até N dias) ou abre negócio novo. Ganho → ganho mantém a data; sair do
+     * ganho a limpa, como a reabertura pelo canal (`core_negocio_do_canal`) faz.
+     */
+    ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : agora) : null,
   }
   if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
   if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id

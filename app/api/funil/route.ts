@@ -163,10 +163,18 @@ export async function POST(req: Request) {
       // O que o gatilho da view fazia: etapa nova e o status pelo tipo dela. A
       // data de entrada na etapa é do gatilho `negocios_entrou_etapa`.
       const statusDestino = dest.tipo === 'ganho' ? 'ganho' : dest.tipo === 'perdido' ? 'perdido' : 'aberto'
+      // A data do ganho acompanha o status, como no arrasto (/api/leads/mover): quem
+      // entra no ganho ganha a data de agora; quem já era ganho a mantém; quem sai a perde.
       const { error: erroMove } = await service.from('negocios')
-        .update({ etapa_id: dest.id, status: statusDestino })
+        .update({ etapa_id: dest.id, status: statusDestino, ...(statusDestino === 'ganho' ? {} : { ganho_em: null }) })
         .eq('empresa_id', empresaId).eq('ativo', true).eq('etapa_id', etapa.id)
       if (erroMove) return NextResponse.json({ error: `Falha ao mover os leads: ${erroMove.message}` }, { status: 500 })
+      if (statusDestino === 'ganho') {
+        const { error: erroData } = await service.from('negocios')
+          .update({ ganho_em: new Date().toISOString() })
+          .eq('empresa_id', empresaId).eq('etapa_id', dest.id).eq('status', 'ganho').is('ganho_em', null)
+        if (erroData) return NextResponse.json({ error: `Leads movidos, mas sem a data do ganho: ${erroData.message}` }, { status: 500 })
+      }
 
       // Confere ANTES de apagar. Um lead que tenha entrado na etapa entre a
       // contagem e o update seria perdido de vista.

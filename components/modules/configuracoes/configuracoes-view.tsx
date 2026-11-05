@@ -10,6 +10,7 @@ import { MeiosPagamentoCard } from './meios-pagamento-card'
 import { TemplatesCard } from './templates-card'
 import { AssinaturaCard } from './assinatura-card'
 import { DevolucaoCard } from './devolucao-card'
+import { RetornoClienteCard } from './retorno-cliente-card'
 import { HorarioCard } from './horario-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
@@ -283,6 +284,7 @@ export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
             </div>
           </Card>
           <DevolucaoCard />
+          <RetornoClienteCard />
           </div>
         )}
 
