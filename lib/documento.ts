@@ -46,3 +46,21 @@ export function conferirDocumento(bruto: string | null | undefined): Documento {
   if (d.length === 14) return cnpjValido(d) ? { ok: true, cpf: false, cnpj: true } : { ok: false, erro: 'CNPJ inválido: confira os dígitos' }
   return { ok: false, erro: 'CPF/CNPJ incompleto: o CPF tem 11 dígitos e o CNPJ, 14' }
 }
+
+/**
+ * O documento só é conferido quando MUDA (05/11/2026, pedido do Lucas). Ficha antiga
+ * com CPF incompleto (ex.: 9 dígitos, cadastrado antes da conferência) salva o resto
+ * normalmente; a tela mostra `avisoDocumento` até alguém corrigir o número.
+ */
+export function documentoMudou(antes: string | null | undefined, depois: string | null | undefined): boolean {
+  return soDigitos(antes) !== soDigitos(depois)
+}
+
+/** O aviso da ficha para documento guardado que não passa na conferência; null = nada a avisar. */
+export function avisoDocumento(bruto: string | null | undefined): string | null {
+  const d = soDigitos(bruto)
+  if (!d) return null
+  if (d.length === 11) return cpfValido(d) ? null : 'CPF inválido'
+  if (d.length === 14) return cnpjValido(d) ? null : 'CNPJ inválido'
+  return 'CPF incompleto'
+}

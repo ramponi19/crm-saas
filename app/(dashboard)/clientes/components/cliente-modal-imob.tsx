@@ -9,6 +9,7 @@ import {
 } from '@/components/ui'
 import { formatCurrency } from '@/lib/utils'
 import { formatarData } from '@/lib/datas'
+import { avisoDocumento, documentoMudou } from '@/lib/documento'
 import {
   TIPO_NEGOCIO, STATUS_APROVACAO, ORIGENS_IMOB, TIPOS_IMOVEL, CARACTERISTICAS,
   rotuloTipoNegocio, statusAprovacao,
@@ -252,7 +253,9 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
       onClose()
       return
     }
-    notify.ok('Cliente salvo')
+    const aviso = avisoDocumento(dados.cpf_cnpj)
+    if (aviso) notify.warn('Cliente salvo', `${aviso}: corrija o número quando o cliente informar.`)
+    else notify.ok('Cliente salvo')
     setEditando(false)
   }
 
@@ -340,7 +343,8 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
       {isNew || editando ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Input wrapperClassName="sm:col-span-2" label="Nome completo" required value={form.nome} onChange={(e) => set('nome', e.target.value)} />
-          <Input label="CPF" value={form.cpf_cnpj} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00" />
+          <Input label="CPF" value={form.cpf_cnpj} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00"
+            error={!isNew && !documentoMudou(cliente?.cpf_cnpj, form.cpf_cnpj) ? avisoDocumento(form.cpf_cnpj) ?? undefined : undefined} />
           <Input label="Telefone" value={form.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="(34) 99999-0000" />
           <Input label="E-mail" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
           <Select label="Origem do lead" value={form.origem_cliente} onChange={(e) => set('origem_cliente', e.target.value)}>

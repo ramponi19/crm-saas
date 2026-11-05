@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { telefoneE164 } from '@/lib/telefone-e164'
-import { conferirDocumento, soDigitos } from '@/lib/documento'
+import { conferirDocumento, documentoMudou, soDigitos } from '@/lib/documento'
 
 /**
  * CLIENTES — a camada única sobre `contatos` (lote 8 das views, 05/11/2026).
@@ -298,8 +298,10 @@ export async function atualizarCliente(db: Db, svc: Db, empresaId: number, id: n
   const atual = clienteDoContato(row)
   const novo: EntradaCliente = { ...atual, ...patch }
 
-  // O documento é conferido quando a tela o manda; desativar não depende dele.
-  const doc = 'cpf_cnpj' in patch
+  // O documento só é conferido quando MUDA: a tela manda a ficha inteira, e uma ficha
+  // antiga com CPF incompleto não pode travar a gravação do resto (endereço, telefone...).
+  // Desativar não depende dele.
+  const doc = 'cpf_cnpj' in patch && documentoMudou(atual.cpf_cnpj, patch.cpf_cnpj)
     ? conferirDocumento(novo.cpf_cnpj)
     : { ok: true as const, cpf: atual.cpf_validado, cnpj: atual.cnpj_validado }
   if (!doc.ok) return { error: doc.erro, status: 400 }

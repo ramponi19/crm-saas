@@ -7,7 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, ConfirmDialog, notify } from '@/components/ui'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
-import { conferirDocumento, soDigitos } from '@/lib/documento'
+import { avisoDocumento, conferirDocumento, documentoMudou, soDigitos } from '@/lib/documento'
 import { consultaClientes, contarClientes } from '@/lib/clientes'
 import { iniciais } from '@/lib/sem-nome'
 
@@ -106,8 +106,11 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
       return
     }
     // O servidor confere de novo (lib/clientes.ts); aqui é para avisar antes de enviar.
-    const doc = conferirDocumento(form.cpf_cnpj)
-    if (!doc.ok) { notify.warn(doc.erro); return }
+    // Só quando o documento MUDA: ficha antiga com CPF incompleto salva o resto (aviso no campo).
+    if (isNew || documentoMudou(cliente?.cpf_cnpj, form.cpf_cnpj)) {
+      const doc = conferirDocumento(form.cpf_cnpj)
+      if (!doc.ok) { notify.warn(doc.erro); return }
+    }
     setSaving(true)
     // Os três números de compra são calculados na tela; o id vai na URL, não no corpo.
     const { id: _id, total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
@@ -159,7 +162,9 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { notify.bad('Erro ao salvar', j?.error); setSaving(false); return }
-      notify.ok('Alterações salvas')
+      const aviso = avisoDocumento(form.cpf_cnpj)
+      if (aviso) notify.warn('Alterações salvas', `${aviso}: corrija o número quando o cliente informar.`)
+      else notify.ok('Alterações salvas')
     }
     router.refresh()
     onClose()
@@ -220,7 +225,8 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
           <Input wrapperClassName="col-span-2" label="Nome completo" required value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Nome completo" />
           <Input label="Telefone / WhatsApp" required value={form.telefone ?? ''} onChange={(e) => set('telefone', e.target.value)} placeholder="(11) 99999-9999" />
           <Input label="E-mail" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} placeholder="email@exemplo.com" />
-          <Input label="CPF / CNPJ" required value={form.cpf_cnpj ?? ''} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00" />
+          <Input label="CPF / CNPJ" required value={form.cpf_cnpj ?? ''} onChange={(e) => set('cpf_cnpj', e.target.value)} placeholder="000.000.000-00"
+            error={!isNew && !documentoMudou(cliente?.cpf_cnpj, form.cpf_cnpj) ? avisoDocumento(form.cpf_cnpj) ?? undefined : undefined} />
           <Input label="Data de nascimento" type="date" value={form.data_nascimento ?? ''} onChange={(e) => set('data_nascimento', e.target.value)} />
           <Select label="Tipo de cliente" value={form.tipo_cliente ?? 'Novo'} onChange={(e) => set('tipo_cliente', e.target.value)}>
             {['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'].map((t) => <option key={t}>{t}</option>)}

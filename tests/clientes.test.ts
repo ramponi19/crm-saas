@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { conferirDocumento } from '@/lib/documento'
+import { avisoDocumento, conferirDocumento, documentoMudou } from '@/lib/documento'
 import { iniciais } from '@/lib/sem-nome'
 import { clienteDoContato, entradaDoCorpo } from '@/lib/clientes'
 
@@ -11,6 +11,18 @@ test('documento: vazio passa, CPF e CNPJ pelos dígitos verificadores', () => {
   assert.equal(conferirDocumento('529.982.247-24').ok, false)
   assert.equal(conferirDocumento('111.111.111-11').ok, false)
   assert.equal(conferirDocumento('123.456').ok, false)
+})
+
+test('documento só confere quando muda; ficha antiga incompleta mostra aviso (05/11)', () => {
+  assert.equal(documentoMudou('123.456.789', '123456789'), false)
+  assert.equal(documentoMudou('123.456.789', '123.456.7890'), true)
+  assert.equal(documentoMudou(null, ''), false)
+  assert.equal(avisoDocumento('123.456.789'), 'CPF incompleto')
+  assert.equal(avisoDocumento('1234567890'), 'CPF incompleto')
+  assert.equal(avisoDocumento('529.982.247-24'), 'CPF inválido')
+  assert.equal(avisoDocumento('529.982.247-25'), null)
+  assert.equal(avisoDocumento('11.222.333/0001-81'), null)
+  assert.equal(avisoDocumento(null), null)
 })
 
 test('iniciais: por ponto de código, nunca meio emoji (React #418 de /clientes)', () => {
