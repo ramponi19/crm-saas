@@ -73,7 +73,7 @@ const resumo = { conversas: 0, naJanela: 0, jaGravadas: 0, gravadas: 0, semLead:
 console.log(`janela ${DE.toISOString()} → ${ATE.toISOString()} · ${GRAVAR ? 'GRAVANDO' : 'simulação (use --gravar)'}`)
 
 for (const canalId of CANAIS) {
-  const { data: canal, error } = await db.from('canais_conectados')
+  const { data: canal, error } = await db.from('canais')
     .select('id, empresa_id, filial_id, external_id, ig_user_id, nome_exibicao, access_token_enc').eq('id', canalId).single()
   if (error || !canal?.access_token_enc) { console.error(`canal ${canalId}: sem canal ou sem token`); resumo.erros++; continue }
   const token = decifrarToken(canal.access_token_enc as string)

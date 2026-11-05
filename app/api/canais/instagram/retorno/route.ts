@@ -80,7 +80,7 @@ export async function GET(req: Request) {
    * Sem isto o upsert por (tipo, external_id) roubaria o canal do outro tenant —
    * e o vazamento seria silencioso, do pior tipo.
    */
-  const { data: existente } = await svc.from('canais_conectados')
+  const { data: existente } = await svc.from('canais')
     .select('id, empresa_id, filial_id')
     .eq('tipo', 'instagram').eq('external_id', idDoWebhook).maybeSingle()
 
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
   const assinou = await assinarWebhook(longo.token)
   const agora = new Date().toISOString()
 
-  const { error } = await svc.from('canais_conectados').upsert({
+  const { error } = await svc.from('canais').upsert({
     empresa_id: empresaId,
     tipo: 'instagram',
     // Diz por qual caminho este canal foi conectado: decide o ENVIO (host e token).
@@ -131,7 +131,7 @@ export async function GET(req: Request) {
     const { data: loja } = await sessao.rpc('filial_gravacao', { p_empresa: empresaId })
     const filial = loja as number | null
     if (filial != null) {
-      await svc.from('canais_conectados').update({ filial_id: filial } as never)
+      await svc.from('canais').update({ filial_id: filial } as never)
         .eq('tipo', 'instagram').eq('external_id', idDoWebhook).eq('empresa_id', empresaId)
     }
   }

@@ -32,7 +32,7 @@ async function postar(payload) {
 }
 
 // canal + lead + mensagem enviada de teste
-const canal = (await (await rest('canais_conectados?on_conflict=tipo,external_id', {
+const canal = (await (await rest('canais?on_conflict=tipo,external_id', {
   method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates,return=representation' },
   body: JSON.stringify([{ empresa_id: EMPRESA, tipo: 'whatsapp', external_id: FONE, waba_id: 'waba-teste-st', nome_exibicao: 'TESTE STATUS (apagar)', access_token_enc: cifrar('token-falso'), status: 'ativo' }]),
 })).json())[0]
@@ -78,7 +78,7 @@ checar('falha guarda motivo em português', m?.status_entrega === 'falhou' && /M
 // limpeza
 await rest(`lead_mensagens?lead_id=eq.${lead.id}`, { method: 'DELETE', headers: H })
 await rest(`leads?id=eq.${lead.id}`, { method: 'DELETE', headers: H })
-await rest(`canais_conectados?id=eq.${canal.id}`, { method: 'DELETE', headers: H })
+await rest(`canais?id=eq.${canal.id}`, { method: 'DELETE', headers: H })
 const sobrou = (await (await rest(`leads?select=id&empresa_id=eq.${EMPRESA}`)).json()).length
 console.log(`\nlimpeza: ${sobrou} lead(s) restante(s) na empresa ${EMPRESA} (esperado 0)`)
 console.log(`${ok} passaram · ${falhou} falharam`)

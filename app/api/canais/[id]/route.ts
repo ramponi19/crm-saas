@@ -21,7 +21,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     // Filtro por empresa_id junto do id: impede apagar canal de outra empresa
     // mesmo que alguém invente um id na URL.
     const { data, error } = await svc
-      .from('canais_conectados')
+      .from('canais')
       .delete()
       .eq('id', Number(id))
       .eq('empresa_id', empresaId)
@@ -71,7 +71,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // empresa_id junto do id, como no DELETE: impede mexer em canal de outra
     // empresa mesmo com um id inventado na URL.
     const { data, error } = await svc
-      .from('canais_conectados')
+      .from('canais')
       .update({ filial_id: filialId ?? null, updated_at: new Date().toISOString() })
       .eq('id', Number(id))
       .eq('empresa_id', empresaId)

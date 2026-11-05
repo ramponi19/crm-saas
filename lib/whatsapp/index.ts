@@ -22,7 +22,7 @@ async function canalWhatsApp(empresaId: number): Promise<(CanalEnvio & { canalId
   const svc = createServiceClient()
 
   const buscar = async (filialId: number | null) => {
-    let q = svc.from('canais_conectados')
+    let q = svc.from('canais')
       .select('id, external_id, access_token_enc')
       .eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
     if (filialId != null) q = q.eq('filial_id', filialId)

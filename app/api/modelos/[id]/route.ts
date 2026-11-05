@@ -24,7 +24,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
 
     const { data: canais } = await svc
-      .from('canais_conectados')
+      .from('canais')
       .select('waba_id, access_token_enc')
       .eq('empresa_id', empresaId).eq('tipo', 'whatsapp')
       .order('conectado_em', { ascending: false }).limit(1)

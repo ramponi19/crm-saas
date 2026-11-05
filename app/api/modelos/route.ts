@@ -9,7 +9,7 @@ import { criarModelo, listarModelos, statusDoModelo, metaConfigurada, ehErro } f
 async function canalWhatsApp(empresaId: number) {
   const svc = createServiceClient()
   const { data } = await svc
-    .from('canais_conectados')
+    .from('canais')
     .select('id, waba_id, external_id, access_token_enc, status')
     .eq('empresa_id', empresaId).eq('tipo', 'whatsapp')
     .order('conectado_em', { ascending: false }).limit(1)

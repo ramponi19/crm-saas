@@ -113,11 +113,11 @@ export async function POST(req: Request) {
      */
     const [{ data: lojaSel }, { data: jaExistia }] = await Promise.all([
       supabase.rpc('filial_atual'),
-      svc.from('canais_conectados').select('id')
+      svc.from('canais').select('id')
         .eq('tipo', 'whatsapp').eq('external_id', String(phoneNumberId)).maybeSingle(),
     ])
     const { data: canal, error: erroGravar } = await svc
-      .from('canais_conectados')
+      .from('canais')
       .upsert(
         {
           empresa_id: empresaId,
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
     // Numero NOVO fica com a loja selecionada; reconexao nao mexe na loja.
     const loja = lojaSel as number | null
     if (loja != null && !jaExistia && canal?.id) {
-      await svc.from('canais_conectados').update({ filial_id: loja })
+      await svc.from('canais').update({ filial_id: loja })
         .eq('id', canal.id).eq('empresa_id', empresaId)
     }
 
@@ -163,7 +163,7 @@ export async function POST(req: Request) {
     // 3. assinar o webhook da conta WhatsApp — sem isso nada chega
     const assinou = await assinarWaba(String(wabaId), troca.token)
     if (ehErro(assinou)) {
-      await svc.from('canais_conectados')
+      await svc.from('canais')
         .update({ status: 'erro', ultimo_erro: assinou.erro, ultimo_erro_em: new Date().toISOString() })
         .eq('id', canal.id)
       return NextResponse.json(
@@ -213,7 +213,7 @@ export async function POST(req: Request) {
       )
     }
 
-    await svc.from('canais_conectados').update({
+    await svc.from('canais').update({
       coexistencia,
       nome_exibicao: nome,
       sync_request_ids: requestIds,

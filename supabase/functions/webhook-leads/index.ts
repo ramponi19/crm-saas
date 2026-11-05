@@ -212,7 +212,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
 
   // Erro de banco NÃO é "canal desconhecido": vira ErroDeBanco (500, a Meta reenvia)
   // e não entra no cache. Ver ErroDeBanco em reenvio.ts — 97 eventos perdidos em 20/10.
-  let { data, error } = await db.from("canais_conectados")
+  let { data, error } = await db.from("canais")
     .select(COLUNAS)
     .eq("tipo", tipo).eq("external_id", String(externalId)).maybeSingle();
   if (error) throw new ErroDeBanco(`canal ${chave}: ${error.message}`);
@@ -230,7 +230,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
    * e interpolar isso na sintaxe de filtro do PostgREST seria abrir uma porta.
    */
   if (!data) {
-    const alt = await db.from("canais_conectados")
+    const alt = await db.from("canais")
       .select(COLUNAS)
       .eq("tipo", tipo).eq("ig_user_id", String(externalId)).maybeSingle();
     if (alt.error) throw new ErroDeBanco(`canal ${chave} (ig_user_id): ${alt.error.message}`);
@@ -282,7 +282,7 @@ async function canalPorExternalId(tipo: string, externalId: string | undefined):
  */
 async function canalDaLoja(empresaId: number, tipo: string, filialId: number | null): Promise<Canal | null> {
   if (filialId != null) {
-    const { data } = await db.from("canais_conectados")
+    const { data } = await db.from("canais")
       .select(COLUNAS)
       .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
       .eq("filial_id", filialId)
@@ -290,7 +290,7 @@ async function canalDaLoja(empresaId: number, tipo: string, filialId: number | n
     const daLoja = data?.[0];
     if (daLoja) return montar(daLoja, await decifrarToken(daLoja.access_token_enc as string | null));
   }
-  const { data } = await db.from("canais_conectados")
+  const { data } = await db.from("canais")
     .select(COLUNAS)
     .eq("empresa_id", empresaId).eq("tipo", tipo).eq("status", "ativo")
     .order("conectado_em", { ascending: false }).limit(1);
@@ -300,7 +300,7 @@ async function canalDaLoja(empresaId: number, tipo: string, filialId: number | n
 
 async function marcarErroNoCanal(canalId: number, erro: string, status = "erro") {
   if (!canalId) return;
-  await db.from("canais_conectados")
+  await db.from("canais")
     .update({ status, ultimo_erro: erro.slice(0, 500), ultimo_erro_em: new Date().toISOString() })
     .eq("id", canalId);
 }
@@ -1122,7 +1122,7 @@ async function upsertLead(canal: Canal, p: {
    * atrapalha. Ver a migracao `contador_de_nao_lidas_vira_espelho`.
    */
   await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", leadId);
-  await db.from("canais_conectados").update({ ultima_msg_em: new Date().toISOString() }).eq("id", canal.id);
+  await db.from("canais").update({ ultima_msg_em: new Date().toISOString() }).eq("id", canal.id);
   return leadId;
 }
 
@@ -1244,7 +1244,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
     if (erros && erros.length) {
       const cod = (erros[0] as { code?: number }).code;
       console.log(`histórico não compartilhado pelo cliente (código ${cod})`);
-      await db.from("canais_conectados")
+      await db.from("canais")
         .update({ sync_historico_em: new Date().toISOString(), sync_historico_pct: 100 })
         .eq("id", canal.id);
       continue;
@@ -1415,7 +1415,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
 
   const patch: Record<string, unknown> = { sync_historico_em: new Date().toISOString() };
   if (progresso != null) patch.sync_historico_pct = progresso;
-  await db.from("canais_conectados").update(patch).eq("id", canal.id);
+  await db.from("canais").update(patch).eq("id", canal.id);
   console.log(`histórico: ${importadas} mensagens, ${criados} leads criados, ${reativados} reativados, ${ignorados} conversas de 1 msg ignoradas, ${falhas} falhas, progresso ${progresso ?? "?"}%`);
 }
 
@@ -1736,7 +1736,7 @@ async function enviarMeta(canal: Canal, origemId: string, body: Record<string, u
        * lojas era escolher no escuro. A loja do canal desempata; sem loja, vale a
        * conectada mais recentemente, de forma deterministica.
        */
-      let q = db.from("canais_conectados").select("external_id")
+      let q = db.from("canais").select("external_id")
         .eq("empresa_id", canal.empresa_id).eq("tipo", "messenger").eq("via", "pagina");
       if (canal.filial_id != null) q = q.eq("filial_id", canal.filial_id);
       const { data } = await q.order("conectado_em", { ascending: false }).limit(1);
@@ -2108,7 +2108,7 @@ serve(async (req: Request) => {
           if (campo === "smb_app_state_sync") {
             await guardarBruto(canal, "smb_app_state_sync", value);
             await sincronizarContatos(canal, (value?.state_sync as Record<string, unknown>[]) ?? []);
-            await db.from("canais_conectados")
+            await db.from("canais")
               .update({ sync_contatos_em: new Date().toISOString() }).eq("id", canal.id);
           }
 
@@ -2132,7 +2132,7 @@ serve(async (req: Request) => {
               await marcarErroNoCanal(canal.id, `Meta informou: ${evt}`, "desconectado");
               console.log(`canal ${canal.id} desconectado (${evt})`);
             } else if (/RECONNECT/i.test(evt)) {
-              await db.from("canais_conectados")
+              await db.from("canais")
                 .update({ status: "ativo", ultimo_erro: null }).eq("id", canal.id);
             }
           }

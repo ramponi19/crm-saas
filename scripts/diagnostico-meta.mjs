@@ -55,12 +55,12 @@ const graph = async (path, host = 'graph.facebook.com') => {
 const erro = (b) => `code ${b.error?.code}/${b.error?.error_subcode ?? '-'} · ${b.error?.message}`
 
 const res = await fetch(
-  `${url}/rest/v1/canais_conectados?select=id,empresa_id,filial_id,tipo,via,status,external_id,waba_id,access_token_enc&order=empresa_id,id`,
+  `${url}/rest/v1/canais?select=id,empresa_id,filial_id,tipo,via,status,external_id,waba_id,access_token_enc&order=empresa_id,id`,
   { headers: { apikey: key, Authorization: `Bearer ${key}` } },
 )
 const rows = await res.json()
 if (!Array.isArray(rows)) {
-  console.error('Erro lendo canais_conectados:', JSON.stringify(rows).slice(0, 300))
+  console.error('Erro lendo canais:', JSON.stringify(rows).slice(0, 300))
   process.exit(1)
 }
 if (!rows.length) {

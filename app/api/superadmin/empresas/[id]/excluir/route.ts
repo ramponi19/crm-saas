@@ -25,7 +25,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   // recebimento de mensagens). A fonte é canais_conectados — configuracoes_sistema
   // não guarda mais canal nem token.
   const { count: canaisAtivos } = await svc
-    .from('canais_conectados')
+    .from('canais')
     .select('id', { count: 'exact', head: true })
     .eq('empresa_id', empresaId)
     .eq('status', 'ativo')

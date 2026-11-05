@@ -56,7 +56,7 @@ export async function renovarTokensInstagram(
   const limite = new Date(Date.now() + DIAS_DE_ANTECEDENCIA * 86400_000).toISOString()
 
   let consulta = svc
-    .from('canais_conectados')
+    .from('canais')
     .select('id, empresa_id, nome_exibicao, access_token_enc, token_expira_em')
     .eq('tipo', 'instagram')
     .eq('via', 'instagram')
@@ -101,7 +101,7 @@ export async function renovarTokensInstagram(
        * soluço de rede assustaria o lojista sem motivo — e ele reconectaria
        * uma conexão que estava funcionando.
        */
-      await svc.from('canais_conectados').update({
+      await svc.from('canais').update({
         ...(vencido ? { status: 'expirado' } : {}),
         ultimo_erro: novo.erro.slice(0, 300),
         ultimo_erro_em: agora.toISOString(),
@@ -112,7 +112,7 @@ export async function renovarTokensInstagram(
       continue
     }
 
-    const { error: erroGravar } = await svc.from('canais_conectados').update({
+    const { error: erroGravar } = await svc.from('canais').update({
       access_token_enc: cifrar(novo.token),
       token_expira_em: novo.expiraEm,
       status: 'ativo',

@@ -13,7 +13,7 @@ export async function GET() {
     const { supabase, empresaId } = auth
 
     const { data, error } = await supabase
-      .from('canais_conectados')
+      .from('canais')
       .select(
         'id, tipo, external_id, waba_id, ig_user_id, nome_exibicao, status, coexistencia, ' +
           'token_expira_em, data_access_expira_em, ultimo_erro, ultimo_erro_em, ' +

@@ -154,13 +154,13 @@ export async function POST(req: Request) {
      */
     const [{ data: lojaSel }, { data: jaExistiam }] = await Promise.all([
       supabase.rpc('filial_atual'),
-      svc.from('canais_conectados').select('tipo, external_id')
+      svc.from('canais').select('tipo, external_id')
         .in('external_id', linhas.map((l) => l.external_id)),
     ])
     const existia = new Set(((jaExistiam ?? []) as { tipo: string; external_id: string }[])
       .map((e) => e.tipo + ':' + e.external_id))
 
-    const { error } = await svc.from('canais_conectados')
+    const { error } = await svc.from('canais')
       .upsert(linhas, { onConflict: 'tipo,external_id' })
 
     if (error) {
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
     if (loja != null) {
       for (const l of linhas) {
         if (existia.has(l.tipo + ':' + l.external_id)) continue
-        await svc.from('canais_conectados').update({ filial_id: loja })
+        await svc.from('canais').update({ filial_id: loja })
           .eq('tipo', l.tipo).eq('external_id', l.external_id).eq('empresa_id', empresaId)
       }
     }
