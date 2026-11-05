@@ -527,6 +527,23 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
   - imob: `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`;
   - núcleo: `canais_conectados`, `clientes`, `lead_mensagens`, `leads`.
 
+### Lote 4 (04/11, 20h55): estoque — caem 7, restam 9
+
+| código no ar | migração | views que caíram |
+|---|---|---|
+| `f18ea63`, READY 20h52min36s | `20261105000600` às 20h55min28s (versão `20261104235528`), com IOwait de 8,1% e aprovação do Lucas no chat | `produtos`, `categorias_produtos`, `marcas_produtos`, `fornecedores`, `inventario_unidades`, `tabela_precos`, `avaliacoes_usados` |
+
+- **Funções que liam `produtos`** e passaram para `estoque_produtos`: `estoque_item_sync` (gatilho) e `zapintel_posvenda`. O `DO` conferiu 1 ocorrência em cada no corpo da produção. A `zapintel_posvenda` do Supabase local **não é igual** à da produção (o md5 difere), então o repositório não recria essa função exatamente. Fica para conferir no lote de vendas, que mexe nela de novo.
+- **Leitor por literal:** `app/api/avaliacoes/route.ts`, no `acharOuCriar(tabela: 'marcas_produtos' | 'categorias_produtos')`. **Checagem do verificador presa ao nome:** a linha 26, sobre a garantia, passou a procurar `estoque_unidades`. A linha 635, `from('clientes')` na tela de imóveis, muda no lote de `clientes`.
+- **Varredura retroativa das 25 views anteriores**, com o critério completo (from, embed, tipo, função, literal; app, Edge, scripts, testes; e funções, cron, views, políticas e gatilhos de todos os schemas da produção): **nada sobrando**, além dos dois corrigidos em `e73fad5`. O filtro pelo alias do embed (`.eq('contrato_modelos.ativo', true)`) foi conferido no PostgREST.
+- **Exportação LGPD conferida pelo superadmin:** cobranças 2, lançamentos 0 e comissões 0 batem com o banco. **Defeito antigo:** `leads` e `lead_mensagens` saem cortados em 1.000 linhas, o teto do PostgREST (3.120 e 102.589 no banco). Paginar não basta, porque passa dos 4,5 MB de resposta da Vercel; o caminho seria um ZIP no Storage com link assinado. Decisão do Lucas pendente.
+- **Smoke nas duas lojas:** antes e depois do drop, as 9 telas deram 200, com os mesmos números de produto no estoque e no PDV. O `/zapintel/posvenda` deu **500 por timeout** (`57014`, 8,9 s) na primeira chamada depois do DDL, e o `zapintel_resumo` também, embora não tenha mudado. As duas passaram na segunda tentativa, e a função mede 774 ms. É a recarga de schema do PostgREST somada ao IOwait de 8% (regra 3 do topo deste runbook).
+- **Lista dos 134:**
+  - **conferem linhas:** cardápio, catálogo (importação de preços, categoria, preço), produto, avaliação e concluir encomenda;
+  - **fica como está:** o vínculo da unidade criada pela avaliação.
+- **Restam 9 views de compatibilidade:** `vendas`, `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`, `canais_conectados`, `clientes`, `lead_mensagens` e `leads`. Ficam também `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos` e `v_empresas_plano`, que não são de compatibilidade.
+- **Dependências entre módulos (item 4):** nenhuma empresa tem módulo ligado sem o requisito. A JM e a Preview têm `pdv`, `estoque` e `assistencia` ligados, e nenhuma tem `avaliacoes`. Leitura adotada: "vendas" = `pdv`.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

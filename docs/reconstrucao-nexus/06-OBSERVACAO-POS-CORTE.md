@@ -1111,3 +1111,39 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - **exportação LGPD do superadmin** (`app/api/superadmin/empresas/[id]/exportar`): a lista fixa de tabelas tinha `cobrancas`, `lancamentos_financeiros` e `comissoes`, e o erro de cada leitura era ignorado. O ZIP saiu com esses CSVs vazios desde o drop de cada uma. Agora lê as tabelas do core e falha com 500 dizendo qual tabela;
   - **desfazer da encomenda no PDV** (`encomenda-form.tsx`): `from(tabela)` com `'pedidos_compra'`. Só rodaria quando o lançamento da encomenda falhasse no meio, das 20h11 até `e73fad5`.
 - **Grep das views:** caíram 25 de 41 e restam 16, com 419 leituras. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
+
+## 25. 04/11 às 20h55: lote 4 (estoque), varredura retroativa e exportação LGPD conferida (`f18ea63`)
+
+- **Regra permanente registrada:** "Como nasce um módulo", no 05 e na memória.
+- **Varredura retroativa das 25 views já derrubadas:** nada sobrando em código nem no banco da produção. As únicas ocorrências no banco são texto de propósito: a chave da trava `'troca_cotacoes:'` e os endereços em `migracao.modulo_do_href`.
+- **Exportação LGPD da JM**, pelo superadmin do Lucas na aba isolada (200, 905 KB):
+
+  | CSV | linhas no ZIP | linhas no banco |
+  |---|---:|---:|
+  | usuários | 14 | 14 |
+  | clientes | 102 | 102 |
+  | vendas | 92 | 92 |
+  | produtos | 35 | 35 |
+  | tarefas | 68 | 68 |
+  | cobranças | 2 | 2 |
+  | lançamentos | 0 | 0 |
+  | comissões | 0 | 0 |
+  | **leads** | **1.000** | **3.120** |
+  | **mensagens** | **1.000** | **102.589** |
+
+  Leads e mensagens param no teto de 1.000 linhas do PostgREST; sempre foi assim (defeito antigo). A decisão do Lucas fica pendente.
+- **Lote 4:**
+  - **Tempos:** push às ~20h50 (IOwait 0,56%), READY às 20h52min36s, IOwait de 8,10% às 20h55, migração às 20h55min28s, API ok duas vezes.
+  - **Views:** 13 no `public`; funções anon 0 / authenticated 26.
+  - **e2e local 26/26:**
+    - 10 telas com 200;
+    - o estoque e o PDV mostram o produto pelo embed;
+    - editar produto;
+    - salvar categoria fora da vista avisa;
+    - criar preço sugerido;
+    - avaliação inexistente dá 404 (PATCH e DELETE);
+    - transferir com Mogi escolhida;
+    - 5 selects de embed pelo PostgREST com o JWT do dono.
+- **Smoke nas duas lojas:** 9 telas com 200 antes e depois do drop. Mogi: estoque 67, PDV 46. Jaguariúna: estoque 89, PDV 30.
+- **Observação:** o `/zapintel/posvenda` levou 500 por timeout na primeira chamada depois do DDL. Passou na segunda e mede 774 ms.
+- **Grep das views:** caíram 32 das 41 e restam 9. No critério antigo, `leads` segue com 85/47 e `lead_mensagens` com 15/8.
