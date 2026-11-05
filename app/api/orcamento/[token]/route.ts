@@ -104,7 +104,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       // cliente, acertado por fora (dinheiro/crédito/produto), não pagamento.
       const trocaPaga = Math.min(vale, valorVenda)
 
-      const { data: venda } = await svc.from('vendas').insert({
+      const { data: venda } = await svc.from('vendas_vendas').insert({
         empresa_id: orc.empresa_id,
         grupo_pdv: grupoPdv,
         valor_venda: valorVenda,
@@ -185,7 +185,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         }
         // Ver a nota na ramificação do downgrade: sem lead, quem fez o orçamento leva.
         vendedorId = vendedorId ?? orc.usuario_id ?? null
-        await svc.from('vendas').insert({
+        await svc.from('vendas_vendas').insert({
           empresa_id: orc.empresa_id,
           // Amarra a venda à peça que saiu: sem isto o aparelho ficava 'vendido' no
           // estoque sem nada apontando para qual venda o levou.

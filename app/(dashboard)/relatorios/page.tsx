@@ -33,7 +33,7 @@ export default async function RelatoriosPage({ searchParams }: {
 
   const [{ data: vendasRaw }, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }] = await Promise.all([
     supabase
-      .from('vendas')
+      .from('vendas_vendas')
       .select('id, data_venda, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)')
       .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500),
     supabase
@@ -51,7 +51,7 @@ export default async function RelatoriosPage({ searchParams }: {
       .eq('empresa_id', empresaId).eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
   ])
 
-  type VendaRow = Tables<'vendas'> & {
+  type VendaRow = Tables<'vendas_vendas'> & {
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>

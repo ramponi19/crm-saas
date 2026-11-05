@@ -49,7 +49,7 @@ async function antes(db: Db) {
   const head = { count: 'exact' as const, head: true }
   // Sem esquema tipado: a cópia antiga lê as views, que o tipo do app já não descreve como antes.
   const solto = db as unknown as { from: (t: string) => any } // eslint-disable-line @typescript-eslint/no-explicit-any
-  const qVendas = solto.from('vendas')
+  const qVendas = solto.from('vendas_vendas')
     .select('id, valor_venda, lucro, data_venda, canal_venda, status, vendedor_id, produtos:estoque_produtos!produto_id(nome)')
     .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').gte('data_venda', inicio12m.toISOString())
   const [vendasR, clientes, ativos, novos, estoque, assist, funilR] = await Promise.all([

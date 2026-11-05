@@ -66,7 +66,7 @@ export async function calcularRanking(
 
   const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }, { data: trocasPendentes }] = await Promise.all([
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    db.from('vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
+    db.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
     db.from('visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),
     db.from('leads').select('responsavel_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
     db.from('vendas_propostas').select('lead_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),

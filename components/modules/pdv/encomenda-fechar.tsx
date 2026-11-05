@@ -99,7 +99,7 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
 
     // Acessórios primeiro: se falharem, nada foi concluído ainda.
     for (const a of acessoriosValidos) {
-      const { data: vAc, error } = await supabase.from('vendas').insert({
+      const { data: vAc, error } = await supabase.from('vendas_vendas').insert({
         empresa_id: empresaId,
         grupo_pdv: encomenda.grupo_pdv,
         cliente_id: encomenda.clienteId,

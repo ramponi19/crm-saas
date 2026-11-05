@@ -30,7 +30,7 @@ export default async function HistoricoPage() {
     && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
 
   const baseVendas = supabase
-    .from('vendas')
+    .from('vendas_vendas')
     .select(`
       id, data_venda, valor_venda, lucro, forma_pagamento,
       canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,

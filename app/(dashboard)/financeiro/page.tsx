@@ -32,7 +32,7 @@ export default async function FinanceiroPage() {
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false })
       .limit(200),
-    supabase.from('vendas').select('valor_venda')
+    supabase.from('vendas_vendas').select('valor_venda')
       .eq('empresa_id', empresaId).eq('status', 'concluida').gte('data_venda', inicioMes),
   ])
 

@@ -128,7 +128,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
         let venda: { data_venda: string | null; created_at: string | null } | null = null
 
         const { data: porSerie } = await supabase
-          .from('vendas')
+          .from('vendas_vendas')
           .select('data_venda, created_at')
           .eq('numero_serie', serie)
           .eq('status', 'concluida')
@@ -146,7 +146,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           const ids = (unidades ?? []).map(u => u.id)
           if (ids.length) {
             const { data: porUnidade } = await supabase
-              .from('vendas')
+              .from('vendas_vendas')
               .select('data_venda, created_at')
               .in('unidade_id', ids)
               .eq('status', 'concluida')

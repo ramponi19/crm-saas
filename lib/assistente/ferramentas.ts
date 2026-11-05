@@ -281,7 +281,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     grupo_pdv: string | null; cliente_id: number | null
   }
   const vendas = await buscarTudo<V>((de, ate) => {
-    let q = c.db.from('vendas')
+    let q = c.db.from('vendas_vendas')
       .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id')
       .eq('empresa_id', c.acesso.empresaId)
       .gte('data_venda', inicio(e.de as string)).lt('data_venda', fimInclusivo(e.ate as string))

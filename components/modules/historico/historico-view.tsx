@@ -152,7 +152,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
   async function transferir() {
     if (!transf || !novoVend) return
     setTransfBusy(true)
-    const { error } = await createClient().from('vendas').update({ vendedor_id: novoVend }).eq('id', transf.id)
+    const { error } = await createClient().from('vendas_vendas').update({ vendedor_id: novoVend }).eq('id', transf.id)
     setTransfBusy(false)
     if (error) { notify.bad('Erro ao transferir'); return }
     notify.ok('Venda transferida'); setTransf(null); setNovoVend(''); router.refresh()

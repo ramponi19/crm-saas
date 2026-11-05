@@ -184,7 +184,7 @@ export async function finalizarEncomenda(
   vendaId: number,
   pagamento?: PagamentoNaEntrega | null,
 ): Promise<ResultadoFinalizar> {
-  const { data: v } = await supabase.from('vendas')
+  const { data: v } = await supabase.from('vendas_vendas')
     .select('unidade_id, numero_serie, inventario_unidades:estoque_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
     .eq('id', vendaId).maybeSingle()
 
@@ -221,7 +221,7 @@ export async function finalizarEncomenda(
     if (pagamento.parcelas && pagamento.parcelas > 1) patch.parcelas = pagamento.parcelas
   }
 
-  const { data: concluiu, error } = await supabase.from('vendas').update(patch as never).eq('id', vendaId).select('id')
+  const { data: concluiu, error } = await supabase.from('vendas_vendas').update(patch as never).eq('id', vendaId).select('id')
   if (error) return { ok: false, erro: error.message, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
   // 0 linhas: a venda sumiu ou é de outra loja — não diz "entregue" nem registra pagamento.
   if (nadaGravado(concluiu)) return { ok: false, erro: NADA_GRAVADO, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }

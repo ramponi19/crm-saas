@@ -283,7 +283,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     let erro: string | null = null
     for (const l of linhas) {
       const vCusto = Number(l.custo) || 0
-      const { data: gravou, error } = await supabase.from('vendas')
+      const { data: gravou, error } = await supabase.from('vendas_vendas')
         .update({ valor_venda: Number(l.venda), valor_custo: vCusto, previsao_entrega: prazo || null } as never)
         .eq('id', l.id)
         .select('id')

@@ -31,7 +31,7 @@ export default async function MetasPage() {
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'preferencias').maybeSingle(),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('empresa_id', empresaId).eq('mes_ano', mesAno),
-    supabase.from('vendas').select('vendedor_id, valor_venda, data_venda, status').eq('empresa_id', empresaId).gte('data_venda', inicio).lt('data_venda', fim),
+    supabase.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status').eq('empresa_id', empresaId).gte('data_venda', inicio).lt('data_venda', fim),
     supabase.from('funil_etapas').select('funil_id, slug, tipo, probabilidade').eq('empresa_id', empresaId),
     supabase.from('leads').select('funil_id, kanban_status, valor_estimado').eq('empresa_id', empresaId).eq('ativo', true),
   ])

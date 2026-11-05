@@ -35,7 +35,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       .eq('ativo', true)
       .order('usuario_id'),
     supabase.from('metas_comissoes').select('*').eq('empresa_id', empresaId).eq('mes_ano', mesAtual),
-    supabase.from('vendas')
+    supabase.from('vendas_vendas')
       .select('vendedor_id, valor_venda, status, grupo_pdv')
       .eq('empresa_id', empresaId)
       .gte('data_venda', inicioMes)

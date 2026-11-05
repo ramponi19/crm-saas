@@ -92,7 +92,7 @@ const { data: ponte } = await db
 
 let valorVenda: number | null = null
 if (ponte?.venda_id) {
-  const { data: v } = await db.from('vendas').select('valor_venda').eq('id', ponte.venda_id).maybeSingle()
+  const { data: v } = await db.from('vendas_vendas').select('valor_venda').eq('id', ponte.venda_id).maybeSingle()
   valorVenda = v?.valor_venda != null ? Number(v.valor_venda) : null
 }
 
@@ -202,7 +202,7 @@ async function base(empresaId: number, limite: number | null): Promise<void> {
     .from('zapintel_venda_lead').select('lead_id, venda_id, dias_ate_venda')
     .eq('empresa_id', empresaId).not('lead_id', 'is', null)
   const { data: vendasRaw } = await db
-    .from('vendas').select('id, valor_venda').eq('empresa_id', empresaId)
+    .from('vendas_vendas').select('id, valor_venda').eq('empresa_id', empresaId)
   const valorDa = new Map((vendasRaw ?? []).map((v) => [v.id as number, Number(v.valor_venda ?? 0)]))
   const compra = new Map<number, { valor: number | null; dias: number | null }>()
   for (const p of ponteRaw ?? []) {

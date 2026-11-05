@@ -111,7 +111,7 @@ export async function POST(req: Request) {
   let valorVenda: number | null = null
   if (ponte?.venda_id) {
     const { data: venda, error: erroVenda } = await db
-      .from('vendas').select('valor_venda').eq('id', ponte.venda_id).maybeSingle()
+      .from('vendas_vendas').select('valor_venda').eq('id', ponte.venda_id).maybeSingle()
     if (erroVenda) faltou.push('valor_venda')
     valorVenda = venda?.valor_venda != null ? Number(venda.valor_venda) : null
   }

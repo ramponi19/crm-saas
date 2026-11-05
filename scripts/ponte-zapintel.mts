@@ -46,7 +46,7 @@ const mediana = ciclos.length ? ciclos[Math.floor(ciclos.length / 2)] : null
 
 // ── Os números reais, contra os que a tela mostra hoje ──────────────────────
 const { data: vendas } = await db
-  .from('vendas').select('id, valor_venda, status')
+  .from('vendas_vendas').select('id, valor_venda, status')
   .eq('empresa_id', EMPRESA)
 const concluidas = (vendas ?? []).filter((v) => v.status === 'concluida')
 const total = concluidas.reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)

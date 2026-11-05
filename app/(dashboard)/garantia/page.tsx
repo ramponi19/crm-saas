@@ -28,7 +28,7 @@ export default async function GarantiaPage() {
       .select(`
         id, venda_id, tipo, status, assinado_em,
         anexou:usuarios!assinado_por(nome),
-        venda:vendas!venda_id(
+        venda:vendas_vendas!venda_id(
           id, data_venda, valor_venda, cliente_id, numero_serie, forma_pagamento,
           parcelas, desconto_valor, quantidade, observacoes, grupo_pdv,
           clientes!cliente_id(nome, telefone),

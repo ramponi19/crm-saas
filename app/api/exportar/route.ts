@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const TABELAS: Record<string, { tabela: string; colunas: string; data?: string; corretor?: string }> = {
   leads: { tabela: 'leads', colunas: 'nome, telefone, instagram, origem, kanban_status, produto_interessado, created_at' },
   clientes: { tabela: 'clientes', colunas: 'nome, telefone, email, cpf_cnpj, created_at' },
-  vendas: { tabela: 'vendas', colunas: 'valor_venda, forma_pagamento, parcelas, status, data_venda, created_at' },
+  vendas: { tabela: 'vendas_vendas', colunas: 'valor_venda, forma_pagamento, parcelas, status, data_venda, created_at' },
 
   /**
    * Conjuntos do relatório imobiliário — os mesmos seis que a tela oferece.

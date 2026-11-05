@@ -31,7 +31,7 @@ const { data: ponteRaw } = await db
   .from('zapintel_venda_lead').select('lead_id, dias_ate_venda, venda_id')
   .eq('empresa_id', EMPRESA).not('lead_id', 'is', null)
 const { data: vendasRaw } = await db
-  .from('vendas').select('id, valor_venda').eq('empresa_id', EMPRESA)
+  .from('vendas_vendas').select('id, valor_venda').eq('empresa_id', EMPRESA)
 
 const valorDaVenda = new Map((vendasRaw ?? []).map((v) => [v.id as number, Number(v.valor_venda ?? 0)]))
 const compra = new Map<number, { valor: number | null; dias: number | null }>()

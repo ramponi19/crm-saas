@@ -149,7 +149,7 @@ function escolher(candidatos: LeadComConversa[], dataVenda: number | null): Lead
 /** Monta a ponte da empresa inteira. Não grava — quem grava é `gravarPonte`. */
 export async function montarPonte(db: SupabaseClient, empresaId: number): Promise<LinhaPonte[]> {
   const vendas = await buscarTudo<VendaBanco>((de, ate) =>
-    db.from('vendas')
+    db.from('vendas_vendas')
       .select('id, cliente_id, data_venda, valor_venda, status, canal_venda')
       .eq('empresa_id', empresaId)
       .order('id', { ascending: true }).range(de, ate))

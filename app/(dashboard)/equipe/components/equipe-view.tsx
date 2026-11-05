@@ -369,7 +369,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     // plausível.
     const { ini: inicio, fim } = janelaDoPeriodo(mes)
     const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
-      supabase.from('vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
+      supabase.from('vendas_vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
       supabase.from('vendas_comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
       // Aparelhos aceitos em troca que ainda não chegaram na loja. Cada um segura

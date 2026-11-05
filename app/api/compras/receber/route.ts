@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (pedido.status === 'recebido') return NextResponse.json({ ok: true, jaRecebido: true })
 
   // Encomenda vinculada a este pedido?
-  const { data: venda } = await supabase.from('vendas')
+  const { data: venda } = await supabase.from('vendas_vendas')
     .select('id, unidade_id, produto_id, valor_venda').eq('pedido_compra_id', pedidoId).eq('status', 'encomenda').maybeSingle()
 
   // Só a ENCOMENDA gera unidade automática (reservada p/ a venda). Compra comum
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     if (eUni) return NextResponse.json({ error: eUni.message }, { status: 500 })
     unidadeId = (unidade as { id?: number } | null)?.id ?? null
     if (unidadeId && !venda.unidade_id) {
-      await supabase.from('vendas').update({ unidade_id: unidadeId } as never).eq('id', venda.id)
+      await supabase.from('vendas_vendas').update({ unidade_id: unidadeId } as never).eq('id', venda.id)
     }
   }
 

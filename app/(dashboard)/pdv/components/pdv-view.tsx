@@ -551,7 +551,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         }
         trocaNotaPendente = false
         const { data: venda, error } = await supabase
-          .from('vendas')
+          .from('vendas_vendas')
           .insert(vendaRow as never)
           .select('id').single<{ id: number }>()
         if (error) throw new Error(error.message)
@@ -573,7 +573,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         const fatiaAc = subtotalBruto > 0 ? preco / subtotalBruto : 0
         const descAc = descontoNum * fatiaAc
         const valorAc = preco - descAc
-        const { data: vAc } = await supabase.from('vendas').insert({
+        const { data: vAc } = await supabase.from('vendas_vendas').insert({
           empresa_id: empresaId, grupo_pdv: grupoPdv, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
@@ -787,7 +787,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       try {
         if (vendaIds.length) {
           await supabase.from('vendas_pagamentos').delete().in('venda_id', vendaIds)
-          const { data: apagadas } = await supabase.from('vendas').delete().in('id', vendaIds).select('id')
+          const { data: apagadas } = await supabase.from('vendas_vendas').delete().in('id', vendaIds).select('id')
           const foram = new Set(((apagadas ?? []) as { id: number }[]).map((v) => v.id))
           for (const id of vendaIds) if (!foram.has(id)) sobras.push(`venda #${id}`)
         }

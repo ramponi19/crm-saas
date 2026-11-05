@@ -103,7 +103,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   // Contadores de uso + última atividade (último lead recebido)
   const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }, { data: ultimoLead }] = await Promise.all([
     svc.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    svc.from('vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('vendas_vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('leads').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
