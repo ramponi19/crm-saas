@@ -1179,3 +1179,12 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - **Depois do drop:** API ok; mensagens entrando (9 nos 5 minutos seguintes); Mogi 71 e Jaguariúna 42 clientes; telas 200.
 - **Views no `public`:** 6 (`lead_mensagens`, `leads`, `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
 - **Grep das views:** caíram 39 das 41 e restam 2. Detalhe no 05, "Lote 8".
+
+## 30. 05/11 de 11h10 a 13h30: último lote das views (leads e lead_mensagens), Edge v72, LGPD completa (`7eece14`, `de17682`)
+
+- **Ordem:** Edge v72 às 11h10 → migração A às 12h38min51s (IOwait abaixo de 10% por 12 min seguidos; o Lucas pediu 10 porque a coluna gerada reescreve `negocios`) → push às 12h40, READY 12h43min39s → smoke → teste do Lucas com WhatsApp e Instagram nas duas lojas (13h17–13h20) → migração B às 13h30min35s (IOwait 8,4%, logo depois de um pico). Aprovação do Lucas no chat nas duas migrações.
+- **Depois do drop:** API ok (anon 42501, auth 200, `/api/saude` 200; funções anon 0 / auth 26); mensagens entrando sem negócio duplicado; 20 telas com 200 nas duas lojas; exportação LGPD = banco.
+- **Views no `public`:** 1 (`storage_orfaos`, não é de compatibilidade). No banco inteiro, 4: essa e três do Supabase (`extensions.pg_stat_statements`, `extensions.pg_stat_statements_info`, `vault.decrypted_secrets`).
+- **Grep das views:** caíram as 41 de compatibilidade. Zero leituras de `leads`/`lead_mensagens` no app, na Edge e nos scripts (sobram 13 textos que são chave de menu, rótulo ou rota `/leads`).
+- **IOwait com picos** de 20–33% a cada 8–10 min desde 11h11 (entre eles, 2–7%). Duas fotos canônicas do `pg_stat_statements` (12h46 e 13h21, gravadas em arquivo pela `supabase db query --remote --read-only`): as consultas escreveram 4,9 MB de WAL e leram ~1,6 MB no intervalo — não explicam. O que mais escreveu: apagar arquivo do Storage (2,1 MB, 89 chamadas) e `mensagem_registrar` (1,5 MB, 115). Autovacuum só em tabelas pequenas. Arquivamento do WAL a cada ~2 min (`archive_timeout`), sem casar com os picos. **Causa em aberto**; não é do lote.
+- **Detalhe:** 05, "Último lote".
