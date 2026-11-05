@@ -1,11 +1,17 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { NextResponse } from 'next/server'
+import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const TABELAS: Record<string, { tabela: string; colunas: string; data?: string; corretor?: string }> = {
+/**
+ * `cliente`: o conjunto sai da camada de clientes (lib/clientes.ts) — `contatos` com a
+ * marca `_cliente`, na forma de sempre (cidade, tipo de negócio...). O corretor do
+ * cliente é campo do módulo Imóveis, em `dados`.
+ */
+const TABELAS: Record<string, { tabela: string; colunas: string; data?: string; corretor?: string; cliente?: true }> = {
   leads: { tabela: 'leads', colunas: 'nome, telefone, instagram, origem, kanban_status, produto_interessado, created_at' },
-  clientes: { tabela: 'clientes', colunas: 'nome, telefone, email, cpf_cnpj, created_at' },
+  clientes: { tabela: 'contatos', cliente: true, colunas: 'nome, telefone, email, cpf_cnpj, created_at' },
   vendas: { tabela: 'vendas_vendas', colunas: 'valor_venda, forma_pagamento, parcelas, status, data_venda, created_at' },
 
   /**
@@ -18,7 +24,7 @@ const TABELAS: Record<string, { tabela: string; colunas: string; data?: string; 
    */
   imob_geral:      { tabela: 'leads', data: 'created_at', corretor: 'responsavel_id',
                      colunas: 'nome, telefone, origem, kanban_status, valor_estimado, responsavel_id, created_at' },
-  imob_clientes:   { tabela: 'clientes', data: 'created_at', corretor: 'corretor_id',
+  imob_clientes:   { tabela: 'contatos', cliente: true, data: 'created_at', corretor: 'dados->>corretor_id',
                      colunas: 'nome, cpf_cnpj, telefone, email, tipo_negocio, status_aprovacao, valor_pretendido, regiao_interesse, corretor_id, created_at' },
   imob_imoveis:    { tabela: 'imoveis_imoveis', data: 'created_at',
                      colunas: 'codigo, titulo, tipo, finalidade, status, bairro, cidade, valor_venda, valor_locacao, quartos, vagas, area_util, captado_por, captado_em, created_at' },
@@ -58,7 +64,7 @@ export async function GET(req: Request) {
   // Tabela dinâmica: o client tipado não aceita nome de tabela em string; cast
   // para o client genérico (a permissão e o escopo por empresa já foram validados).
   const db = supabase as unknown as SupabaseClient
-  let q = db.from(cfg.tabela).select(cfg.colunas).eq('empresa_id', empresaId)
+  let q = (cfg.cliente ? consultaClientes(db) : db.from(cfg.tabela).select(cfg.colunas)).eq('empresa_id', empresaId)
 
   /**
    * O recorte vem da MESMA querystring da tela (`de`, `ate`, `corretor`).
@@ -83,7 +89,8 @@ export async function GET(req: Request) {
   const { data: rows, error } = await q.order(cfg.data ?? 'created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const lista = (rows ?? []) as unknown as Record<string, unknown>[]
+  const brutas = (rows ?? []) as unknown as Record<string, unknown>[]
+  const lista: Record<string, unknown>[] = cfg.cliente ? brutas.map((r) => ({ ...clienteDoContato(r) })) : brutas
   const colunas = cfg.colunas.split(',').map(c => c.trim())
   const header = colunas.join(';')
   const linhas = lista.map(r => colunas.map(c => csvEscape(r[c])).join(';'))

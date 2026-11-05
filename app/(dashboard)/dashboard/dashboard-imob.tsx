@@ -9,6 +9,7 @@ import type { ScoreConfig } from '@/lib/lead-score'
 import { TermometroLeads } from './termometro-leads'
 import { LeadsParados, type LeadParado } from './leads-parados'
 import { diasParado, DIAS_PARADO } from '@/lib/lead-parado'
+import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 
 type LeadRow = {
   id: number; nome: string | null; kanban_status: string | null; origem: string | null
@@ -111,7 +112,7 @@ export default async function DashboardImob() {
     q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(TETO_LEADS),
     supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
     supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    consultaClientes(supabase, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     vq,
     tq,
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle(),
@@ -120,7 +121,7 @@ export default async function DashboardImob() {
     // sem isto o dashboard mostraria um funil diferente do que o dono editou.
     supabase.from('funil_etapas').select('slug, label, cor, tipo, ordem, funil_id, funis!inner(padrao)')
       .eq('empresa_id', empresaId).eq('ativo', true).eq('funis.padrao', true).order('ordem'),
-    supabase.from('clientes').select('id, nome, tipo_cliente, cidade, created_at')
+    consultaClientes(supabase)
       .eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }).limit(5),
     supabase.from('imoveis_imoveis').select('id, codigo, titulo, tipo, status, valor_venda, valor_locacao, finalidade, bairro')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(5),
@@ -180,7 +181,8 @@ export default async function DashboardImob() {
 
   type ClienteRow = { id: number; nome: string; tipo_cliente: string | null; cidade: string | null; created_at: string | null }
   type ImovelRow = { id: number; codigo: string | null; titulo: string | null; tipo: string; status: string; valor_venda: number | null; valor_locacao: number | null; finalidade: string; bairro: string | null }
-  const ultimosClientes = (ultimosClientesRaw ?? []) as ClienteRow[]
+  const ultimosClientes: ClienteRow[] = ((ultimosClientesRaw ?? []) as Record<string, unknown>[]).map(clienteDoContato)
+    .map((c) => ({ id: c.id, nome: c.nome ?? '', tipo_cliente: c.tipo_cliente, cidade: c.cidade, created_at: c.created_at }))
   const ultimosImoveis = (ultimosImoveisRaw ?? []) as ImovelRow[]
 
   const recentes = leads.slice(0, 6)

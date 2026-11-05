@@ -1,3 +1,4 @@
+import { cpfValido, cnpjValido } from '@/lib/documento'
 import type { Lead } from '@/types/zapintel'
 
 /**
@@ -30,28 +31,6 @@ import type { Lead } from '@/types/zapintel'
  */
 
 const so = (s: string) => s.replace(/\D/g, '')
-
-function cpfValido(d: string): boolean {
-  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false
-  const dv = (base: string, peso: number) => {
-    let soma = 0
-    for (const c of base) soma += Number(c) * peso--
-    const r = (soma * 10) % 11
-    return r === 10 ? 0 : r
-  }
-  return dv(d.slice(0, 9), 10) === Number(d[9]) && dv(d.slice(0, 10), 11) === Number(d[10])
-}
-
-function cnpjValido(d: string): boolean {
-  if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false
-  const dv = (base: string) => {
-    const pesos = base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    const soma = [...base].reduce((s, c, i) => s + Number(c) * pesos[i], 0)
-    const r = soma % 11
-    return r < 2 ? 0 : 11 - r
-  }
-  return dv(d.slice(0, 12)) === Number(d[12]) && dv(d.slice(0, 13)) === Number(d[13])
-}
 
 function luhn(d: string): boolean {
   if (!/^\d{13,19}$/.test(d)) return false

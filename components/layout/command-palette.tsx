@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText, Calculator, ScanSearch, Car, Wrench, LayoutGrid } from 'lucide-react'
 import { useFerramentas } from './ferramentas-context'
 import { createClient } from '@/lib/supabase/client'
+import { consultaClientes } from '@/lib/clientes'
 
 interface SearchResult {
   tipo: 'cliente' | 'lead' | 'estoque'
@@ -117,7 +118,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
        */
       const numero = /^#?\s*(\d{1,9})$/.exec(q)?.[1]
       const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }, { data: peloNumero }] = await Promise.all([
-        supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
+        consultaClientes(supabase, 'id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
         // O lead também atende por telefone: quem liga para a loja é procurado pelo
         // número, e antes só quem já era cliente aparecia nessa busca.
         supabase.from('leads').select('id, nome, produto_interessado, telefone, ultima_mensagem_at').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(LOTE),

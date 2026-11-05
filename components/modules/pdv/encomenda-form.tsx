@@ -11,6 +11,7 @@ import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 import { EncomendaItens, itemVazio, itensValidos, descreverItem, type ItemEncomenda } from './encomenda-itens'
+import { lerCliente, type Cliente } from '@/lib/clientes'
 
 interface Cli { id: number; nome: string }
 
@@ -56,7 +57,7 @@ function emDias(n: number): string {
 }
 
 /** Endereço em uma linha, pulando o que o cadastro não tem. */
-function umaLinha(c: Record<string, string | null> | null): string {
+function umaLinha(c: Pick<Cliente, 'endereco' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'estado' | 'cep'> | null): string {
   if (!c) return ''
   const rua = [c.endereco, c.numero].filter(Boolean).join(', ')
   const compl = c.complemento ? `(${c.complemento})` : ''
@@ -160,12 +161,10 @@ export function EncomendaForm({ clientes, taxas = [] }: {
     if (!clienteId) return
     let vivo = true
     ;(async () => {
-      const { data } = await supabase.from('clientes')
-        .select('endereco, numero, complemento, bairro, cidade, estado, cep')
-        .eq('id', Number(clienteId)).maybeSingle()
+      const data = await lerCliente(supabase, Number(clienteId))
       // Guardado COM o id de quem é: trocar de cliente não pode deixar na tela
       // o endereço do anterior enquanto a consulta nova não volta.
-      if (vivo) setEnderecoDe({ id: clienteId, texto: umaLinha(data as Record<string, string | null> | null) })
+      if (vivo) setEnderecoDe({ id: clienteId, texto: umaLinha(data) })
     })()
     return () => { vivo = false }
   }, [clienteId, supabase])

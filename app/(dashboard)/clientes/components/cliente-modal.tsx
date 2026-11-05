@@ -7,7 +7,9 @@ import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, ConfirmDialog, notify } from '@/components/ui'
 import { camposFaltantesContrato } from '@/lib/cliente-contrato'
-import type { TablesInsert, TablesUpdate } from '@/types/database'
+import { conferirDocumento, soDigitos } from '@/lib/documento'
+import { consultaClientes, contarClientes } from '@/lib/clientes'
+import { iniciais } from '@/lib/sem-nome'
 
 interface Cliente {
   id?: number
@@ -64,12 +66,6 @@ const EMPTY: Cliente = {
   profissao: null, nacionalidade: 'Brasileiro(a)',
 }
 
-function getInitials(name: string) {
-  const parts = name.trim().split(' ')
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase() || 'CL'
-}
-
 function fmtUltima(d: string | null | undefined) {
   if (!d) return '—'
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
@@ -109,24 +105,12 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
       notify.warn('Faltam dados que o contrato usa', faltando.join(', ') + '.')
       return
     }
+    // O servidor confere de novo (lib/clientes.ts); aqui é para avisar antes de enviar.
+    const doc = conferirDocumento(form.cpf_cnpj)
+    if (!doc.ok) { notify.warn(doc.erro); return }
     setSaving(true)
-    /**
-     * ⚠️ O `id` NÃO PODE IR NO PAYLOAD.
-     *
-     * `form` nasce de `{ ...EMPTY, ...cliente }`, então na edição ele carrega o
-     * `id` junto — e `clientes.id` é `GENERATED ALWAYS AS IDENTITY`. O Postgres
-     * recusa qualquer UPDATE que mencione a coluna, mesmo mandando o MESMO
-     * valor: `column "id" can only be updated to DEFAULT`.
-     *
-     * Reportado da loja em 14/09/2026: o vendedor não conseguia salvar cliente
-     * nenhum. O id continua sendo usado no `.eq('id', ...)` — é só do corpo do
-     * update que ele sai.
-     *
-     * Os três de baixo são colunas CALCULADAS (view/gatilho), não existem para
-     * escrita. Já saíam; o `id` é que faltava.
-     */
+    // Os três números de compra são calculados na tela; o id vai na URL, não no corpo.
     const { id: _id, total_vendas: _tv, valor_total: _vt, ultima_compra: _uc, ...payload } = form
-    const data = { ...payload, ativo: true }
     if (isNew) {
       const empId = await empresaAtualId(supabase)
       if (!empId) { notify.bad('Empresa não encontrada'); setSaving(false); return }
@@ -140,10 +124,9 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
        * vendedor não abriu. Aqui é só aviso, não bloqueio: existe caso legítimo
        * (mesmo CPF, cadastro reativado) e travar o balcão seria pior.
        */
-      const digitos = (form.cpf_cnpj ?? '').replace(/\D/g, '')
+      const digitos = soDigitos(form.cpf_cnpj)
       if (digitos.length >= 11) {
-        const { data: iguais } = await supabase
-          .from('clientes').select('id, nome')
+        const { data: iguais } = await consultaClientes(supabase, 'id, nome')
           .eq('empresa_id', empId).eq('ativo', true)
           .ilike('cpf_cnpj', `%${digitos.slice(-9)}%`).limit(1)
         if (iguais?.length) {
@@ -154,27 +137,28 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
         .from('empresas').select('limite_leads').eq('id', empId).maybeSingle()
       const limite = emp?.limite_leads ?? 0
       if (limite > 0) {
-        const { count } = await supabase.from('clientes')
-          .select('*', { count: 'exact', head: true })
-          .eq('empresa_id', empId).eq('ativo', true)
-        if ((count ?? 0) >= limite) {
+        const count = await contarClientes(supabase, empId, { ativos: true })
+        if (count >= limite) {
           notify.bad('Limite de clientes atingido', `${count}/${limite}. Faça upgrade para continuar.`)
           setSaving(false); return
         }
       }
-      const { data: novo, error } = await supabase
-        .from('clientes')
-        .insert({ ...data, empresa_id: empId } as TablesInsert<'clientes'>)
-        .select('id, nome, telefone, cpf_cnpj')
-        .single()
-      if (error || !novo) { notify.bad('Erro ao cadastrar', error?.message); setSaving(false); return }
+      const r = await fetch('/api/clientes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ativo: true }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j?.cliente) { notify.bad('Erro ao cadastrar', j?.error); setSaving(false); return }
       notify.ok('Cliente cadastrado')
-      onCreated?.(novo as ClienteCriado)
+      const c = j.cliente as ClienteCriado
+      onCreated?.({ id: c.id, nome: c.nome, telefone: c.telefone, cpf_cnpj: c.cpf_cnpj })
     } else {
       // Não reenvia `ativo` na edição — senão reativa silenciosamente um cliente desativado.
-      const { ativo: _ativo, ...semAtivo } = data
-      const { error } = await supabase.from('clientes').update(semAtivo as TablesUpdate<'clientes'>).eq('id', cliente!.id!)
-      if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
+      const { ativo: _ativo, ...semAtivo } = payload
+      const r = await fetch(`/api/clientes/${cliente!.id!}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(semAtivo),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { notify.bad('Erro ao salvar', j?.error); setSaving(false); return }
       notify.ok('Alterações salvas')
     }
     router.refresh()
@@ -182,8 +166,10 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
   }
 
   async function excluir() {
-    const { error } = await supabase.from('clientes').update({ ativo: false }).eq('id', cliente!.id!)
-    if (error) { notify.bad('Erro ao remover', error.message); return }
+    const r = await fetch(`/api/clientes/${cliente!.id!}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ativo: false }),
+    })
+    if (!r.ok) { notify.bad('Erro ao remover', (await r.json().catch(() => ({})))?.error); return }
     notify.ok('Cliente desativado')
     router.refresh()
     onClose()
@@ -204,7 +190,7 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
         title={
           <span className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
-              {getInitials(form.nome || 'CL')}
+              {iniciais(form.nome)}
             </span>
             <span className="truncate">{isNew ? 'Novo cliente' : form.nome || 'Cliente'}</span>
             {isVip ? <Badge tone="warn">VIP</Badge> : !isNew && form.ativo !== false ? <Badge tone="ok" dot>Ativo</Badge> : null}

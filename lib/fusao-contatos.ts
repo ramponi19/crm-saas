@@ -109,6 +109,40 @@ export async function fotoDaFusao(svc: Db, empresaId: number, principalId: numbe
   return { versao: 1, principal, removido, conversasFundidas, identidadesApagadas, identidadesMovidas, linhas }
 }
 
+/**
+ * FUNDE `removido` em `principal` (core_fundir_contatos) com a foto para desfazer —
+ * a mesma operação para o card do lead (/api/contatos/fundir) e para a tela de
+ * Clientes (/api/clientes/fundir, desde 05/11/2026). Devolve o id do registro em
+ * `contato_fusoes`, que é o que o desfazer recebe.
+ */
+export async function fundirContatos(svc: Db, empresaId: number, principalId: number, removidoId: number, userId: string):
+  Promise<{ error: string; status: number } | { error: null; movido: Record<string, number>; fusaoId: number | null; nomeRemovido: string | null }> {
+  // A foto ANTES de fundir: é dela que o desfazer reconstrói tudo.
+  let foto: FotoDaFusao | null
+  try { foto = await fotoDaFusao(svc, empresaId, principalId, removidoId) } catch (e) {
+    return { error: `Não consegui guardar a foto para desfazer: ${(e as Error).message}`, status: 500 }
+  }
+  if (!foto) return { error: 'Contato não encontrado nesta empresa', status: 404 }
+  // A função confere de novo que os dois são desta empresa; aqui só se traduz o erro.
+  const { data: movido, error } = await svc.rpc('core_fundir_contatos', { p_empresa: empresaId, p_principal: principalId, p_removido: removidoId })
+  if (error) return { error: error.message, status: 400 }
+
+  // Quem fundiu (pelo serviço o auth.uid() da função é nulo) e a foto para desfazer.
+  const { data: registro } = await svc.from('contato_fusoes').select('id, movido')
+    .eq('empresa_id', empresaId).eq('contato_principal_id', principalId).eq('contato_removido_id', removidoId)
+    .order('id', { ascending: false }).limit(1).maybeSingle()
+  if (registro) {
+    await svc.from('contato_fusoes').update({
+      por_usuario: userId,
+      movido: { ...((registro.movido ?? {}) as Linha), _desfazer: foto },
+    }).eq('id', registro.id)
+  }
+  await svc.from('eventos').update({ por_usuario: userId })
+    .eq('empresa_id', empresaId).eq('tipo', 'contato.fundido').eq('entidade_id', principalId).is('por_usuario', null)
+
+  return { error: null, movido: (movido ?? {}) as Record<string, number>, fusaoId: (registro?.id as number | undefined) ?? null, nomeRemovido: (foto.removido.nome as string | null) ?? null }
+}
+
 const EM_LOTES = 500
 async function emLotes(lista: number[], f: (lote: number[]) => PromiseLike<{ error: { message: string } | null }>, passo: string) {
   for (let i = 0; i < lista.length; i += EM_LOTES) {

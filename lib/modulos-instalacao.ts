@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { garantirPortalToken } from '@/lib/portal-token'
-import type { ModuloManifesto } from '@/core/modulos'
+import { MODULOS, type ModuloManifesto } from '@/core/modulos'
+import { garantirCampos } from '@/lib/campos-padrao'
 import type { ModuloRow } from '@/lib/empresa-config'
 
 type Svc = ReturnType<typeof createServiceClient>
@@ -10,13 +11,17 @@ type Svc = ReturnType<typeof createServiceClient>
  *
  * Um lugar só, chamado pelos dois caminhos que instalam: a Central de Módulos
  * (`/api/modulos/instalar`) e o superadmin atendendo um pedido
- * (`/api/superadmin/modulos/pedidos/[id]`). Hoje só o Imóveis tem o que preparar: o
- * token de portal e do site, cifrado em `empresa_segredos`.
+ * (`/api/superadmin/modulos/pedidos/[id]`): os campos personalizados do módulo
+ * (manifesto, `campos`) e, no Imóveis, o token de portal e do site, cifrado em
+ * `empresa_segredos`.
  *
  * Falha aqui NÃO desfaz a instalação: o módulo fica instalado e o erro volta para quem
  * chamou mostrar ("instalado, mas o token não foi gerado").
  */
 export async function aoInstalarModulo(svc: Svc, empresaId: number, chave: string): Promise<{ error: string | null }> {
+  const campos = MODULOS.find((m) => m.chave === chave)?.campos ?? []
+  const { error: errCampos } = await garantirCampos(svc, empresaId, campos, chave)
+  if (errCampos) return { error: `campos do módulo: ${errCampos}` }
   if (chave === 'imoveis') {
     const { error } = await garantirPortalToken(svc, empresaId)
     return { error }

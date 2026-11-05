@@ -12,6 +12,7 @@ import { resolverMenu } from '@/lib/menu'
 import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
+import { consultaClientes } from '@/lib/clientes'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -104,7 +105,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }, { data: ultimoLead }] = await Promise.all([
     svc.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('vendas_vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    svc.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    consultaClientes(svc, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('leads').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 

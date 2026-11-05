@@ -44,7 +44,8 @@ export interface CardDoLead {
 }
 
 /** Campos que o card já tem em campo próprio — não aparecem de novo na lista de personalizados. */
-const CAMPOS_COM_LUGAR = new Set(['negocio.produto_interessado'])
+// Os campos do cadastro do cliente que têm lugar na tela de Clientes (lib/clientes.ts).
+const CAMPOS_COM_LUGAR = new Set(['negocio.produto_interessado', 'contato.tipo_cliente', 'contato.origem_cliente', 'contato.corretor_id'])
 
 type Json = Record<string, unknown>
 

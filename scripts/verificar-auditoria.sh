@@ -435,7 +435,7 @@ v "10 tipos de imovel do modelo"       "app/(dashboard)/clientes/components/clie
 v "status de aprovacao existe"         "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "em_analise"
 
 echo "== fusao de clientes (20/08) =="
-v "fusao roda numa funcao do banco"    "app/api/clientes/fundir/route.ts" "rpc('fundir_clientes'"
+v "fusao e a do core, com desfazer"    "app/api/clientes/fundir/route.ts" "fundirContatos(svc"
 v "fundir exige dono ou admin"         "app/api/clientes/fundir/route.ts" "await requireEmpresaRoleApi(.'owner', 'admin'.)"
 n "empresa nao vem do corpo"           "app/api/clientes/fundir/route.ts" "b.empresa"
 v "confirmacao exige digitar o nome"   "app/(dashboard)/clientes/components/fundir-leads-modal.tsx" "disabled={!podeConfirmar}"
@@ -637,7 +637,7 @@ echo "== proprietario e um cliente (21/08) =="
 n "nao existe mais tela paralela"      "lib/menu.ts" "href: '/proprietarios'"
 n "preset nao declara a tela"          "supabase/migrations/20261029000100_presets_completos.sql" '"href":"/proprietarios"'
 v "rota antiga cai em clientes"        "proxy.ts" "'/proprietarios': '/clientes'"
-v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "from('clientes').select('id, nome, proprietario')"
+v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "consultaClientes(supabase).eq('empresa_id', empresaId).eq('ativo', true)"
 v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"
 v "papel se marca na ficha"            "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "proprietario: form.proprietario"
 v "filtro so proprietarios"            "app/(dashboard)/clientes/components/clientes-view.tsx" "soProprietarios"

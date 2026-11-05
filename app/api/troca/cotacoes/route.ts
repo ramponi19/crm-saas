@@ -4,6 +4,7 @@ import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { AVARIA_POR_CHAVE, BONUS_LEVA_SEMINOVO, calcularTroca } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { TOTAL_ITENS } from '@/lib/troca-checklist'
+import { consultaClientes } from '@/lib/clientes'
 
 /**
  * Grava a cotação de troca.
@@ -95,8 +96,8 @@ export async function POST(req: Request) {
   // para quem não foi atendido. Não é da empresa → nulo, o nome digitado vale.
   let clienteId: number | null = null
   if (b.cliente_id != null) {
-    const { data: cli } = await supabase.from('clientes')
-      .select('id').eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
+    const { data: cli } = await consultaClientes(supabase, 'id')
+      .eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
     clienteId = cli?.id ?? null
   }
   let leadId: number | null = null

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
 import { buscarTudo } from '@/lib/zapintel/conversas'
+import { consultaClientes } from '@/lib/clientes'
 
 /**
  * A PONTE: QUAL CONVERSA PRECEDEU CADA VENDA.
@@ -157,7 +158,7 @@ export async function montarPonte(db: SupabaseClient, empresaId: number): Promis
   if (!vendas.length) return []
 
   const clientes = await buscarTudo<ClienteBanco>((de, ate) =>
-    db.from('clientes').select('id, telefone')
+    consultaClientes(db, 'id, telefone')
       .eq('empresa_id', empresaId)
       .order('id', { ascending: true }).range(de, ate))
 

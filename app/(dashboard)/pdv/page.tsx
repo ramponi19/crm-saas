@@ -7,6 +7,7 @@ import type { EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import type { Tables } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { consultaClientes } from '@/lib/clientes'
 
 export const metadata = { title: 'PDV' }
 
@@ -52,10 +53,10 @@ export default async function PDVPage() {
       .eq('ativo', true).eq('status', 'reservado')
       .not('reservado_lead_id', 'is', null)
       .order('reserva_expira_em', { ascending: true }),
-    supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    consultaClientes(supabase, 'id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('financeiro_taxas').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes!cliente_id(nome), produtos:estoque_produtos!produto_id(nome)')
+      .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
     carregarConfigEmpresa(supabase, empresaId ?? 0),
@@ -75,7 +76,7 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:vendas_pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:vendas_pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
@@ -224,7 +225,7 @@ export default async function PDVPage() {
         <PDVView
           itensDisponiveis={itens}
           reservas={reservas}
-          clientes={(clientes ?? []).map(comNome)}
+          clientes={((clientes ?? []) as { id: number; nome: string | null; telefone: string | null; cpf_cnpj: string | null }[]).map(comNome)}
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
           usaComanda={!!capacidades(cfgEmpresa).usaComanda}

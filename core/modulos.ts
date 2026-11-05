@@ -1,4 +1,5 @@
 import type { ModuloPlano } from '@/lib/plano'
+import type { CampoPadrao } from '@/core/campos'
 
 /**
  * O MANIFESTO DOS MÓDULOS (core.modulos_manifesto, interface I22 do
@@ -91,6 +92,12 @@ export interface ModuloManifesto {
   capacidades?: CapacidadesDoModulo
   /** Painéis do card do lead, na ordem. */
   paineisDoLead?: PainelDoLead[]
+  /**
+   * Campos personalizados que o módulo traz (`modulo_dono` = a chave dele), criados ao
+   * instalar (lib/modulos-instalacao.ts) e no cadastro com o módulo no preset. Ficam
+   * ocultos com o módulo desligado (card do lead, ficha do cliente).
+   */
+  campos?: CampoPadrao[]
 }
 
 export const GRUPOS_MODULO: { id: GrupoModulo; label: string }[] = [
@@ -143,6 +150,15 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['portais'],
     capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
+    // O cliente da imobiliária (lib/clientes.ts): sem campo de imóvel no core.
+    campos: [
+      { entidade: 'contato', chave: 'tipo_negocio', rotulo: 'Tipo de negócio', tipo: 'opcao', opcoes: ['compra', 'locacao', 'captacao', 'investidor', 'lancamento'], ordem: 100 },
+      { entidade: 'contato', chave: 'valor_pretendido', rotulo: 'Valor pretendido', tipo: 'moeda', ordem: 110 },
+      { entidade: 'contato', chave: 'regiao_interesse', rotulo: 'Região de interesse', tipo: 'texto', ordem: 120 },
+      { entidade: 'contato', chave: 'status_aprovacao', rotulo: 'Análise cadastral', tipo: 'opcao', opcoes: ['pendente', 'em_analise', 'aprovado', 'reprovado'], ordem: 130 },
+      { entidade: 'contato', chave: 'corretor_id', rotulo: 'Corretor', tipo: 'texto', ordem: 140 },
+      { entidade: 'contato', chave: 'proprietario', rotulo: 'Proprietário', tipo: 'booleano', ordem: 150 },
+    ],
     frase: 'A carteira de imóveis com fotos, chaves e proprietários.' },
   { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
     capacidades: { usaComanda: true },

@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
 import { renderizarModelo, type ModeloContrato, type PaginaModelo, type DadosMescla } from './contrato-modelo'
 import { camposFaltantesContrato } from './cliente-contrato'
+import { lerCliente } from './clientes'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>
@@ -17,8 +18,9 @@ type Client = SupabaseClient<any>
 /** Usado quando a loja não configurou nada em /admin/configuracoes. */
 export const GARANTIA_PADRAO_DIAS = 90
 
-const CAMPOS_COMPRADOR =
-  'nome, cpf_cnpj, nacionalidade, estado_civil, profissao, data_nascimento, telefone, email, endereco, numero, complemento, bairro, cidade, estado, cep'
+/** Os campos do cliente que o contrato usa (o cadastro vem de lib/clientes.ts). */
+const CAMPOS_COMPRADOR = ['nome', 'cpf_cnpj', 'nacionalidade', 'estado_civil', 'profissao', 'data_nascimento', 'telefone',
+  'email', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep'] as const
 
 const COMPRADOR_VAZIO: ContratoComprador = {
   nome: '', cpf_cnpj: null, nacionalidade: null, estado_civil: null, profissao: null,
@@ -185,8 +187,8 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
       .select('nome, cnpj, telefone, ...empresa_branding(wl_logo_url:logo_url), email, cep, endereco, numero, complemento, bairro, cidade, estado, ...empresa_dados_contrato(representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix)')
       .eq('id', input.empresaId).maybeSingle(),
     input.clienteId
-      ? supabase.from('clientes').select(CAMPOS_COMPRADOR).eq('id', input.clienteId).maybeSingle()
-      : Promise.resolve({ data: null }),
+      ? lerCliente(supabase, input.clienteId)
+      : Promise.resolve(null),
     garantiaPadraoLoja(supabase, input.empresaId),
     modeloAtivo(supabase, input.documentoId),
   ])
@@ -233,7 +235,9 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
     banco_nome?: string | null; banco_agencia?: string | null
     banco_conta?: string | null; banco_pix?: string | null
   } | null
-  const c = cliRes.data as Partial<ContratoComprador> | null
+  const c: Partial<ContratoComprador> | null = cliRes
+    ? Object.fromEntries(CAMPOS_COMPRADOR.map((k) => [k, cliRes[k]])) as Partial<ContratoComprador>
+    : null
 
   const dados: DadosMescla = {
     loja: {

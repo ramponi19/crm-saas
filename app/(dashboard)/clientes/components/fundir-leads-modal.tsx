@@ -7,7 +7,7 @@ import { Search, TriangleAlert, ArrowRight } from 'lucide-react'
 /**
  * Fusão de Leads — o assistente de três passos do CRM que o dono usa, com os
  * mesmos dizeres: "Selecione o cliente PRINCIPAL (será mantido)", depois o
- * SECUNDÁRIO (será removido), depois a confirmação com o aviso de irreversível.
+ * SECUNDÁRIO (será removido), depois a confirmação com o aviso.
  *
  * O que acrescentei ao original, porque a fusão é destrutiva:
  *  - busca na lista (a dele mostra todos, e com 300 clientes ninguém acha o par);
@@ -27,7 +27,8 @@ export interface ClienteFusao {
 export default function FundirLeadsModal({ clientes, onClose, onFundido }: {
   clientes: ClienteFusao[]
   onClose: () => void
-  onFundido: (resumo: string) => void
+  /** `fusaoId`: o registro da fusão, para o desfazer. */
+  onFundido: (resumo: string, fusaoId: number | null) => void
 }) {
   const [passo, setPasso] = useState<1 | 2 | 3>(1)
   const [principal, setPrincipal] = useState<ClienteFusao | null>(null)
@@ -60,15 +61,16 @@ export default function FundirLeadsModal({ clientes, onClose, onFundido }: {
     const j = await r.json().catch(() => ({}))
     setFundindo(false)
     if (!r.ok) { notify.bad('Não foi possível fundir', j?.error); return }
-    const m = (j?.movidos ?? {}) as Record<string, number | boolean>
+    // Contagens da fusão de contatos do core: tabela.coluna → linhas que mudaram de dono.
+    const m = (j?.movido ?? {}) as Record<string, number>
     const partes = [
-      m.mensagens ? `${m.mensagens} mensagem(ns)` : null,
-      m.chamadas ? `${m.chamadas} ligação(ões)` : null,
-      m.vendas ? `${m.vendas} venda(s)` : null,
-      m.negocios ? `${m.negocios} negócio(s)` : null,
-      m.compromissos ? `${m.compromissos} compromisso(s)` : null,
+      m['mensagens.contato_id'] ? `${m['mensagens.contato_id']} mensagem(ns)` : null,
+      m['vendas_vendas.cliente_id'] ? `${m['vendas_vendas.cliente_id']} venda(s)` : null,
+      m['negocios.contato_id'] ? `${m['negocios.contato_id']} negócio(s) do funil` : null,
+      m['imoveis_negocios.cliente_id'] ? `${m['imoveis_negocios.cliente_id']} negócio(s) de imóvel` : null,
+      m['visitas.cliente_id'] ? `${m['visitas.cliente_id']} compromisso(s)` : null,
     ].filter(Boolean)
-    onFundido(partes.length ? `Movido: ${partes.join(' · ')}` : 'Cadastros unificados')
+    onFundido(partes.length ? `Movido: ${partes.join(' · ')}` : 'Cadastros unificados', typeof j?.fusaoId === 'number' ? j.fusaoId : null)
   }
 
   const podeConfirmar = confirmacao.trim().toLowerCase() === (secundario?.nome ?? '').trim().toLowerCase()
@@ -168,22 +170,21 @@ export default function FundirLeadsModal({ clientes, onClose, onFundido }: {
 
             <div className="rounded-control border border-bad/30 bg-bad-soft p-3">
               <div className="flex items-center gap-2 text-[13px] font-bold text-bad">
-                <TriangleAlert size={15} strokeWidth={1.9} />Atenção: esta ação é irreversível!
+                <TriangleAlert size={15} strokeWidth={1.9} />Atenção: o cadastro secundário sai da lista
               </div>
               <p className="mt-1.5 text-[12.5px] leading-snug text-ink-2">
                 Tudo que pertence a <strong>{secundario.nome}</strong> passa para{' '}
                 <strong>{principal.nome}</strong>: conversas, ligações, transferências, compromissos,
-                orçamentos, propostas, vendas, contratos, cobranças e negócios — mais a etapa do funil,
-                quando o principal ainda não estiver nele. Campo vazio do principal é completado com o
-                do duplicado; campo preenchido não é sobrescrito. O registro secundário é removido em
-                definitivo.
+                orçamentos, vendas, contratos, cobranças, garantias e negócios do funil. Campo vazio do
+                principal é completado com o do duplicado; campo preenchido não é sobrescrito. O aviso
+                depois da fusão tem o botão Desfazer, que devolve o secundário com tudo que era dele.
               </p>
             </div>
 
             {/*
               Digitar o nome é a trava.
               No original, "Confirmar Fusão" fica a um clique de "Voltar" — e o custo
-              de errar aqui é apagar a pessoa errada, sem desfazer.
+              de errar aqui é juntar a pessoa errada.
             */}
             <Input
               label={`Para confirmar, digite o nome do cliente que será removido`}

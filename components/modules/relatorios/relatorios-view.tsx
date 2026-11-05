@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Card, StatCard, Table, Badge, Tabs, Button, Input, Select, EmptyState, type Column } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
 import { resultadoDasVendas, temCusto } from '@/lib/painel/metricas'
+import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 
 interface Venda {
   id: number
@@ -111,11 +112,9 @@ function exportFinanceiro(rows: Lancamento[]) {
 
 async function exportClientes() {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('nome, telefone, email, cidade, estado, created_at')
-    .order('nome')
-  if (error || !data) { toast.error('Erro ao exportar clientes'); return }
+  const { data: linhas, error } = await consultaClientes(supabase).order('nome')
+  if (error || !linhas) { toast.error('Erro ao exportar clientes'); return }
+  const data = (linhas as Record<string, unknown>[]).map(clienteDoContato)
   if (data.length === 0) { toast.info('Nenhum cliente para exportar'); return }
   downloadCSV(
     'clientes',

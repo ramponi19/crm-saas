@@ -8,6 +8,7 @@ import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/compone
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import type { TablesInsert } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
+import { consultaClientes } from '@/lib/clientes'
 
 interface Garantia {
   id?: number
@@ -84,7 +85,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
   useEffect(() => {
     if (!empresaId) return
-    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
+    consultaClientes(supabase, 'id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(((data ?? []) as { id: number; nome: string | null }[]).map(comNome)))
     supabase.from('estoque_produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
   }, [empresaId])
 

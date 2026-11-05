@@ -15,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const svc = createServiceClient()
   const { data: os } = await svc
     .from('assistencia_garantias')
-    .select('id, empresa_id, protocolo, status, responsavel_tecnico_id, aprovado_em, recusado_em, clientes(nome)')
+    .select('id, empresa_id, protocolo, status, responsavel_tecnico_id, aprovado_em, recusado_em, clientes:contatos!cliente_id(nome)')
     .eq('token', token).maybeSingle()
   if (!os) return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
   if (os.aprovado_em || os.recusado_em) {

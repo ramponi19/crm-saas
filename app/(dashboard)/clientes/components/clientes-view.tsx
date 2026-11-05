@@ -10,39 +10,12 @@ import ClienteModal from './cliente-modal'
 import ClienteModalImob from './cliente-modal-imob'
 import FundirLeadsModal from './fundir-leads-modal'
 import { TIPO_NEGOCIO, STATUS_APROVACAO, rotuloTipoNegocio, statusAprovacao } from './cliente-imob-tipos'
+import { iniciais } from '@/lib/sem-nome'
+import type { Cliente as ClienteDaCamada } from '@/lib/clientes'
 
-interface Cliente {
-  id: number
+/** O cliente da camada (lib/clientes.ts), com o nome já resolvido e os números de compra. */
+type Cliente = Omit<ClienteDaCamada, 'nome'> & {
   nome: string
-  email: string | null
-  telefone: string | null
-  cpf_cnpj: string | null
-  data_nascimento: string | null
-  endereco: string | null
-  numero: string | null
-  complemento: string | null
-  bairro: string | null
-  cidade: string | null
-  estado: string | null
-  cep: string | null
-  tipo_cliente: string | null
-  instagram: string | null
-  origem_cliente: string | null
-  observacoes: string | null
-  estado_civil: string | null
-  profissao: string | null
-  nacionalidade: string | null
-  ativo: boolean | null
-  created_at: string | null
-  /** Campos do cliente imobiliário (migração de 20/08/2026). */
-  lead_id?: number | null
-  tipo_negocio?: string | null
-  status_aprovacao?: string | null
-  /** Papel: é dono de imóvel na carteira. Acumula com o tipo de negócio. */
-  proprietario?: boolean | null
-  corretor_id?: string | null
-  valor_pretendido?: number | null
-  regiao_interesse?: string | null
   total_vendas?: number
   valor_total?: number
   ultima_compra?: string | null
@@ -63,12 +36,6 @@ interface Props {
   etapas?: { id: string; label: string; tipo: string | null }[]
   equipe?: { id: string; nome: string }[]
   jornada?: Record<number, ClienteImob>
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(' ')
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
 }
 
 function fmtUltimaCompra(d: string | null | undefined) {
@@ -145,6 +112,17 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
     })
   }, [filtrados, imob, fCorretor, fTipo, fStatus, soProprietarios, jornada])
 
+  /** Desfaz a fusão que acabou de acontecer: o secundário volta com o que era dele. */
+  async function desfazerFusao(fusaoId: number) {
+    const r = await fetch('/api/contatos/fundir/desfazer', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fusaoId }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) { notify.bad('Não foi possível desfazer', j?.error); return }
+    notify.ok('Fusão desfeita', 'Os dois cadastros voltaram como estavam.')
+    router.refresh()
+  }
+
   function openCliente(c: Cliente) { setClienteSelecionado(c); setIsNew(false); setModalOpen(true) }
   function openNovo() { setClienteSelecionado(null); setIsNew(true); setModalOpen(true) }
 
@@ -154,7 +132,7 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
       render: (c) => (
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
-            {getInitials(c.nome)}
+            {iniciais(c.nome)}
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -211,7 +189,7 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
       render: (c) => (
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
-            {getInitials(c.nome)}
+            {iniciais(c.nome)}
           </span>
           <div className="min-w-0">
             <div className="truncate text-[13px] font-semibold text-ink">{c.nome}</div>
@@ -319,9 +297,14 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
         <FundirLeadsModal
           clientes={clientes.map((c) => ({ id: c.id, nome: c.nome, cpf_cnpj: c.cpf_cnpj, telefone: c.telefone, email: c.email }))}
           onClose={() => setFundir(false)}
-          onFundido={(resumo) => {
+          onFundido={(resumo, fusaoId) => {
             setFundir(false)
-            notify.ok('Cadastros unificados', resumo)
+            notify.ok('Cadastros unificados', fusaoId == null ? resumo : (
+              <span>
+                {resumo}{' · '}
+                <button type="button" className="font-semibold text-acc underline" onClick={() => desfazerFusao(fusaoId)}>Desfazer</button>
+              </span>
+            ))
             // A lista vem do servidor: sem recarregar, o cliente removido continuaria
             // na tela e alguém tentaria abrir um registro que já não existe.
             router.refresh()

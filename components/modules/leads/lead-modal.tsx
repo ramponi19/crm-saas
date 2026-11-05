@@ -1249,18 +1249,15 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     const empresaId = await empresaAtualId(supabase)
     if (!empresaId) { notify.bad('Empresa não encontrada'); setSaving(false); return }
 
-    const { data: cliente, error } = await supabase
-      .from('clientes')
-      .insert({
-        empresa_id: empresaId,
-        nome: form.nome.trim(),
-        telefone: form.tel.trim() || null,
-        instagram: form.ig.trim() || null,
-        ativo: true,
-      })
-      .select('id').single()
-
-    if (error || !cliente) { notify.bad('Erro ao converter'); setSaving(false); return }
+    // Pela camada de clientes (lib/clientes.ts): o contato do lead vira o cliente (pelo telefone ou,
+    // sem telefone, pelo `lead_id`) — o lead que só tem Instagram não ganha um segundo contato.
+    const rCli = await fetch('/api/clientes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: form.nome.trim(), telefone: form.tel.trim() || null, instagram: form.ig.trim() || null, ativo: true, lead_id: lead.id }),
+    })
+    const jCli = await rCli.json().catch(() => ({})) as { cliente?: { id: number }; error?: string }
+    const cliente = jCli.cliente
+    if (!rCli.ok || !cliente) { notify.bad('Erro ao converter', jCli.error); setSaving(false); return }
 
     // Etapa de ganho pela mesma rota do quadro (automações e cadências disparam
     // igual) e a marca de conversão no negócio, pela rota do card.

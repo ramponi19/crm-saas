@@ -4,6 +4,7 @@ import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import type { ChaveDoImovel } from './imoveis-view'
 import ImoveisView from './imoveis-view'
 import { comNome } from '@/lib/sem-nome'
+import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 
 export const metadata = { title: 'Imóveis' }
 
@@ -23,7 +24,7 @@ export default async function ImoveisPage() {
      * carteira, não uma tabela paralela. Quem for escolhido no imóvel ganha o papel
      * de proprietário por trigger no banco — inclusive vindo do import de portais.
      */
-    supabase.from('clientes').select('id, nome, proprietario').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    consultaClientes(supabase).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     /**
      * A equipe, para o campo "Captado por".
      *
@@ -57,7 +58,8 @@ export default async function ImoveisPage() {
   return (
     <ImoveisView
       inicial={imoveis ?? []}
-      proprietarios={(proprietarios ?? []).map(comNome)}
+      proprietarios={((proprietarios ?? []) as Record<string, unknown>[]).map(clienteDoContato)
+        .map((c) => comNome({ id: c.id, nome: c.nome, proprietario: c.proprietario }))}
       equipe={equipe}
       empresaId={empresaId}
       slug={empresa?.slug ?? ''}

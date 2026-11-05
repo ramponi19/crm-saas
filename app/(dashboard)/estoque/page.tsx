@@ -4,6 +4,7 @@ import { campoAtivo } from '@/lib/empresa-config'
 import { getEmpresaRole } from '@/lib/owner'
 import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
+import { consultaClientes } from '@/lib/clientes'
 
 export const metadata = { title: 'Estoque' }
 
@@ -36,7 +37,7 @@ export default async function EstoquePage() {
     campoAtivo(supabase, empresaId ?? 0, 'item', 'placa'),
     // telefone e CPF entram porque a busca do seletor procura por eles: no balcao
     // ninguem lembra o nome completo, mas tem o telefone na mao.
-    supabase.from('clientes').select('id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    consultaClientes(supabase, 'id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('estoque_tabela_precos').select('modelo, armazenamento, condicao, preco_sugerido').eq('empresa_id', empresaId).eq('ativo', true),
     // Fornecedor faltava no formulário da aba — só o modal tinha.
     supabase.from('estoque_fornecedores').select('id, nome_fantasia').eq('empresa_id', empresaId).eq('ativo', true).order('nome_fantasia'),

@@ -10,6 +10,7 @@ import {
   Users, Target, Package, UserCog, Settings, Building2,
   ArrowUpRight, CreditCard, TrendingUp, Store,
 } from 'lucide-react'
+import { consultaClientes } from '@/lib/clientes'
 
 export const metadata = { title: 'Administração' }
 
@@ -26,7 +27,7 @@ export default async function AdminOverviewPage() {
     empresaRes, clientesRes, leadsRes, produtosRes, usuariosRes, vendasRes, planoRes,
   ] = await Promise.all([
     supabase.from('empresas').select('nome, plano, status, trial_ends_at, limite_leads, limite_usuarios').eq('id', empresaId).single(),
-    supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    consultaClientes(supabase, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('estoque_produtos').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),

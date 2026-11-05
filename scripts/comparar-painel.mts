@@ -54,7 +54,7 @@ async function antes(db: Db) {
     .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').gte('data_venda', inicio12m.toISOString())
   const [vendasR, clientes, ativos, novos, estoque, assist, funilR] = await Promise.all([
     aplicarEscopo(qVendas, escopo, 'vendedor_id'),
-    solto.from('clientes').select('*', head).eq('empresa_id', empresaId).eq('ativo', true),
+    solto.from('contatos').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).not('dados->_cliente', 'is', null),
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
     solto.from('estoque_unidades').select('*', head).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),

@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { gravarCamadaMenu, type BaseGravada, type Vocabulario } from '@/lib/empresa-config'
 import { MODULOS } from '@/core/modulos'
 import type { Json } from '@/types/database'
+import { CAMPOS_DO_CORE } from '@/core/campos'
+import { garantirCampos } from '@/lib/campos-padrao'
 
 /**
  * O PRESET DE ONBOARDING — lido só no cadastro (/register) e nas ferramentas de
@@ -181,6 +183,14 @@ export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, 
   if (modulos.length) {
     const { error } = await db.from('empresa_modulos').upsert(modulos, { onConflict: 'empresa_id,modulo', ignoreDuplicates: true })
     avisar('módulos', error)
+  }
+
+  // Os campos do core (o cadastro do cliente) e os dos módulos que o preset liga: sem
+  // eles a empresa nova descartava data de nascimento, tipo e origem do cliente.
+  const comCampos = [{ campos: CAMPOS_DO_CORE, dono: null as string | null }, ...MODULOS.filter((m) => ligados.has(m.href) && m.campos?.length).map((m) => ({ campos: m.campos!, dono: m.chave }))]
+  for (const g of comCampos) {
+    const { error } = await garantirCampos(db, empresaId, g.campos, g.dono)
+    avisar(`campos ${g.dono ?? 'do core'}`, error ? { message: error } : null)
   }
 
   const campos = (preset.campos ?? []).map((c, i) => ({

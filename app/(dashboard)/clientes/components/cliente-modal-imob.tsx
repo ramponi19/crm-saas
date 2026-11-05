@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import {
   Modal, Button, Badge, Input, Select, Textarea, notify,
 } from '@/components/ui'
@@ -103,6 +104,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
   onClose: () => void
 }) {
   const supabase = createClient()
+  const router = useRouter()
   const [aba, setAba] = useState<'dados' | 'imovel' | 'historico'>('dados')
   const [editando, setEditando] = useState(isNew)
   const [salvando, setSalvando] = useState(false)
@@ -235,18 +237,20 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
        */
       proprietario: form.proprietario,
     }
+    // Pela camada de clientes (lib/clientes.ts): os campos de imóvel são do módulo Imóveis.
+    const r = await fetch(isNew ? '/api/clientes' : `/api/clientes/${cliente!.id!}`, {
+      method: isNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados),
+    })
+    const j = await r.json().catch(() => ({}))
+    setSalvando(false)
+    if (!r.ok) { notify.bad('Não foi possível salvar', j?.error); return }
+    // A lista vem do servidor: sem isto o cliente novo (ou o editado) só aparecia ao recarregar.
+    router.refresh()
     if (isNew) {
-      const { data: emp } = await supabase.rpc('get_empresa_id')
-      const { error } = await supabase.from('clientes').insert({ ...dados, empresa_id: emp } as never)
-      setSalvando(false)
-      if (error) { notify.bad('Não foi possível salvar', error.message); return }
       notify.ok('Cliente cadastrado')
       onClose()
       return
     }
-    const { error } = await supabase.from('clientes').update(dados as never).eq('id', cliente!.id!)
-    setSalvando(false)
-    if (error) { notify.bad('Não foi possível salvar', error.message); return }
     notify.ok('Cliente salvo')
     setEditando(false)
   }
@@ -305,9 +309,11 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
        */
     }).select('id').single<{ id: number }>()
     if (error || !novo) { setSalvando(false); notify.bad('Não foi possível criar o lead', error?.message); return }
-    const { error: e2 } = await supabase.from('clientes').update({ lead_id: novo.id } as never).eq('id', cliente.id)
+    const r2 = await fetch(`/api/clientes/${cliente.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: novo.id }),
+    })
     setSalvando(false)
-    if (e2) { notify.bad('Lead criado, mas não vinculou', e2.message); return }
+    if (!r2.ok) { notify.bad('Lead criado, mas não vinculou', (await r2.json().catch(() => ({})))?.error); return }
     setLeadId(novo.id)
     setEtapaAtual(primeira)
     notify.ok('Cliente entrou no funil')

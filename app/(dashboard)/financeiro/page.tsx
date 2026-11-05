@@ -5,6 +5,7 @@ import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 import type { NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
 import FinanceiroView from './components/financeiro-view'
 import { comNomeDoCliente } from '@/lib/sem-nome'
+import { consultaClientes } from '@/lib/clientes'
 
 export default async function FinanceiroPage() {
   const { role } = await requireEmpresaRole(['owner', 'admin'])
@@ -28,7 +29,7 @@ export default async function FinanceiroPage() {
   const [{ data: lancamentos }, { data: cobrancas }, { data: vendasMes }] = await Promise.all([
     supabase.from('financeiro_lancamentos').select('*').eq('empresa_id', empresaId).order('data_venc', { ascending: false }),
     supabase.from('financeiro_cobrancas')
-      .select('id, tipo, valor, status, descricao, created_at, link_pagamento, qr_code, linha_digitavel, vencimento, provider, os_id, venda_id, cliente_id, clientes(nome)')
+      .select('id, tipo, valor, status, descricao, created_at, link_pagamento, qr_code, linha_digitavel, vencimento, provider, os_id, venda_id, cliente_id, clientes:contatos!cliente_id(nome)')
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -84,7 +85,7 @@ export default async function FinanceiroPage() {
     const [{ data: imoveisN }, { data: leadsN }, { data: clientesN }, { data: usuariosN }] = await Promise.all([
       supabase.from('imoveis_imoveis').select('id, codigo, titulo').in('id', ids(negocios.map((n) => n.imovel_id))),
       supabase.from('leads').select('id, nome').in('id', ids(negocios.map((n) => n.lead_id))),
-      supabase.from('clientes').select('id, nome').in('id', ids(negocios.map((n) => n.cliente_id))),
+      consultaClientes(supabase, 'id, nome').in('id', ids(negocios.map((n) => n.cliente_id))),
       supabase.from('usuarios').select('id, nome').in('id', ids([...negocios.map((n) => n.corretor_id), ...negocios.map((n) => n.captador_id)])),
     ])
     const mapaImovel = new Map((imoveisN ?? []).map((i) => [i.id, i.codigo || i.titulo || `#${i.id}`]))

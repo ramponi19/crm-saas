@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { consultaClientes } from '@/lib/clientes'
 
 interface ItemOrc { descricao?: string; qtd?: number; valor?: number }
 interface Body {
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
    */
   let clienteId: number | null = null
   if (b.cliente_id != null) {
-    const { data: cli } = await supabase.from('clientes')
-      .select('id').eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
+    const { data: cli } = await consultaClientes(supabase, 'id')
+      .eq('id', b.cliente_id).eq('empresa_id', empresaId).maybeSingle()
     clienteId = cli?.id ?? null
   }
 

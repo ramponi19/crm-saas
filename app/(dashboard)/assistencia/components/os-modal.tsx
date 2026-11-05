@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { comNome } from '@/lib/sem-nome'
+import { consultaClientes } from '@/lib/clientes'
 
 interface Cobranca {
   id: number
@@ -229,7 +230,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
   useEffect(() => {
     if (!empresaId) return
-    supabase.from('clientes').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes((data ?? []).map(comNome)))
+    consultaClientes(supabase, 'id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setClientes(((data ?? []) as { id: number; nome: string | null }[]).map(comNome)))
     supabase.from('estoque_produtos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setProdutos(data ?? []))
     supabase.from('assistencia_servicos').select('id, nome, preco').eq('empresa_id', empresaId).eq('ativo', true).order('nome').then(({ data }) => setServicos((data ?? []) as never))
   }, [empresaId])

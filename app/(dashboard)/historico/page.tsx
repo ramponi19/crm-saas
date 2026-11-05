@@ -34,7 +34,7 @@ export default async function HistoricoPage() {
     .select(`
       id, data_venda, valor_venda, lucro, forma_pagamento,
       canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
-      clientes!cliente_id(nome),
+      clientes:contatos!cliente_id(nome),
       produtos:estoque_produtos!produto_id(nome),
       usuarios!vendedor_id(nome)
     `)

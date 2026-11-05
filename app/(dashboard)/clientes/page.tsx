@@ -4,6 +4,7 @@ import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig 
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import ClientesView, { type ClienteImob } from './components/clientes-view'
 import { comNome } from '@/lib/sem-nome'
+import { lerTodosOsClientes } from '@/lib/clientes'
 
 /**
  * Clientes.
@@ -13,9 +14,9 @@ import { comNome } from '@/lib/sem-nome'
  * mostrar etapa do funil, score, corretor e status da análise cadastral. São duas
  * telas para a mesma palavra, e a capacidade `clienteComPipeline` escolhe qual.
  *
- * O QUE LIGA AS DUAS METADES: `clientes.lead_id`. A jornada (etapa, score) vive em
- * `leads`; a pessoa para efeito de contrato (CPF validado, estado civil) vive em
- * `clientes`. Sem o vínculo, a mesma pessoa apareceria duas vezes no CRM com
+ * O QUE LIGA AS DUAS METADES: o `lead_id` da marca `_cliente` (lib/clientes.ts). A
+ * jornada (etapa, score) vive em `leads`; a pessoa para efeito de contrato (CPF validado,
+ * estado civil) vive no cadastro do cliente. Sem o vínculo, a mesma pessoa apareceria duas vezes no CRM com
  * históricos separados — foi o que a decisão de 20/08/2026 resolveu.
  */
 export default async function ClientesPage() {
@@ -24,13 +25,7 @@ export default async function ClientesPage() {
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)
   const imob = !!capacidades(cfg).clienteComPipeline
 
-  const { data: clientesRaw } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('empresa_id', empresaId)
-    .order('nome')
-
-  const clientes = (clientesRaw ?? []).map(comNome)
+  const clientes = (await lerTodosOsClientes(supabase, empresaId)).map(comNome)
 
   // Varejo segue exatamente como estava — nenhuma consulta extra, nenhum risco.
   if (!imob) return <ClientesView clientes={clientes} />

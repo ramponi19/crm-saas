@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui'
 import { Loader2, Search } from 'lucide-react'
+import { consultaClientes } from '@/lib/clientes'
 
 interface Sug { id: string; nome: string; telefone: string | null; origem: 'cliente' | 'lead' }
 const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
@@ -38,7 +39,7 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
     setLoading(true)
     const id = setTimeout(async () => {
       const [{ data: cls }, { data: lds }] = await Promise.all([
-        supabase.from('clientes').select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
+        consultaClientes(supabase, 'id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
         supabase.from('leads').select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
       ])
       const merged: Sug[] = []

@@ -15,7 +15,7 @@ export default async function GarantiaPage() {
       .from('assistencia_garantias')
       .select(`
         *,
-        clientes(nome, telefone),
+        clientes:contatos!cliente_id(nome, telefone),
         produtos:estoque_produtos(nome)
       `)
       .eq('empresa_id', empresaId)
@@ -31,7 +31,7 @@ export default async function GarantiaPage() {
         venda:vendas_vendas!venda_id(
           id, data_venda, valor_venda, cliente_id, numero_serie, forma_pagamento,
           parcelas, desconto_valor, quantidade, observacoes, grupo_pdv,
-          clientes!cliente_id(nome, telefone),
+          clientes:contatos!cliente_id(nome, telefone),
           produtos:estoque_produtos!produto_id(nome),
           vendedor:usuarios!vendedor_id(nome)
         )

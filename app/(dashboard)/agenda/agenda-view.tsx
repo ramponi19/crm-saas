@@ -233,7 +233,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
     }
     const { data, error } = await supabase.from('visitas')
       .insert(payload)
-      .select('*, leads(nome, telefone), clientes(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)')
+      .select('*, leads(nome, telefone), clientes:contatos!cliente_id(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)')
       .single()
     setLoading(false)
     if (error) { notify.bad(error.message); return }
