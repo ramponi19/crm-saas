@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { lerFechamentos } from '@/lib/fechamentos'
 
 /**
  * Diagnóstico de conversão (Sprint 3.2).
@@ -34,9 +35,23 @@ export interface Conversao {
 export async function calcularConversao(db: Db, empresaId: number): Promise<Conversao> {
   const janela = new Date(Date.now() - 90 * 86400000).toISOString()
 
+  /**
+   * Todos os negócios, de mil em mil: numa leitura só o PostgREST corta em 1.000 linhas, e
+   * o funil contava um pedaço arbitrário da carteira (achado em 05/11/2026 provando que a
+   * reabertura não muda os números: o mesmo negócio entrava ou não conforme a ordem).
+   */
+  const lerTodosNegocios = async () => {
+    const out: unknown[] = []
+    for (let de = 0; ; de += 1000) {
+      const { data, error } = await db.from('negocios').select(SELECT_ETAPA).eq('empresa_id', empresaId).order('id').range(de, de + 999)
+      if (error) throw new Error(`conversão: ${error.message}`)
+      out.push(...(data ?? []))
+      if ((data ?? []).length < 1000) return { data: out }
+    }
+  }
   const [{ data: etapasRaw }, { data: leadsAll }, { data: cohortRaw }, { data: membrosRaw }] = await Promise.all([
     db.from('funil_etapas').select('slug, label, ordem, tipo').eq('empresa_id', empresaId).eq('ativo', true).order('ordem', { ascending: true }),
-    db.from('negocios').select(SELECT_ETAPA).eq('empresa_id', empresaId),
+    lerTodosNegocios(),
     db.from('negocios').select(SELECT_COHORT).eq('empresa_id', empresaId).gte('created_at', janela),
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
@@ -54,6 +69,16 @@ export async function calcularConversao(db: Db, empresaId: number): Promise<Conv
     if (l.ativo === false) continue // não conta leads excluídos (alinha com o dashboard)
     const s = one(l.etapa)?.slug ?? l.kanban ?? ''
     countPorSlug.set(s, (countPorSlug.get(s) ?? 0) + 1)
+  }
+  /**
+   * Os ganhos que o cliente REABRIU ao voltar a escrever também chegaram ao ganho
+   * (lib/fechamentos.ts): a reabertura leva o negócio de volta à primeira etapa, e só
+   * pela etapa de hoje esse fechamento sumiria do funil. Contam na etapa de ganho.
+   */
+  const slugGanho = etapasUnicas.find((e) => e.tipo === 'ganho')?.slug
+  if (slugGanho) {
+    const reabertos = await lerFechamentos(db, empresaId, { status: 'ganho', soAtivos: true, soReabertos: true })
+    countPorSlug.set(slugGanho, (countPorSlug.get(slugGanho) ?? 0) + reabertos.length)
   }
   const naEtapa = etapasUnicas.map((e) => countPorSlug.get(e.slug) ?? 0)
   // alcançaram etapa i = soma de quem está em i ou além (etapas ordenadas).

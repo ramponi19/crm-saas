@@ -3,15 +3,10 @@
 import { useEffect, useState } from 'react'
 import { TrendingDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { empresaAtualId } from '@/lib/empresa-atual'
+import { lerFechamentos } from '@/lib/fechamentos'
 import { Card } from '@/components/ui'
 
-interface PerdaRow {
-  id: number
-  nome: string | null
-  perdido_em: string | null
-  responsavel_id: string | null
-  motivo: { label: string | null } | { label: string | null }[] | null
-}
 
 interface Barra { label: string; valor: number }
 
@@ -51,16 +46,19 @@ export function RelatorioPerdas() {
 
   useEffect(() => {
     (async () => {
-      // Lead = negócio (a view `leads` caiu); o nome vem do contato, espalhado na linha.
-      const SELECT_PERDA: string = 'id, perdido_em, responsavel_id, ...contatos!contato_id(nome), motivo:motivos_perda!motivo_perda_id(label)'
-      const { data } = await supabase
-        .from('negocios')
-        .select(SELECT_PERDA)
-        .not('perdido_em', 'is', null)
-        .order('perdido_em', { ascending: false })
-        .limit(1000)
-
-      const rows = (data ?? []) as unknown as PerdaRow[]
+      /**
+       * As perdas são os fechamentos 'perdido' (lib/fechamentos.ts): o negócio perdido de
+       * hoje e o perdido que o cliente reabriu ao voltar a escrever (guardado no histórico).
+       * Antes era 'perdido_em' do negócio, que a reabertura limpa — a perda sumia do relatório.
+       */
+      const empresaId = await empresaAtualId(supabase)
+      if (!empresaId) { setCarregando(false); return }
+      const [perdas, { data: motivos }] = await Promise.all([
+        lerFechamentos(supabase, empresaId, { status: 'perdido' }),
+        supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId),
+      ])
+      const motivoPorId = new Map(((motivos ?? []) as { id: number; label: string | null }[]).map((m) => [m.id, m.label]))
+      const rows = perdas.sort((x, y) => (y.em ?? '').localeCompare(x.em ?? ''))
 
       // nomes dos responsáveis
       const { data: membros } = await supabase
@@ -77,13 +75,12 @@ export function RelatorioPerdas() {
       const mResp = new Map<string, number>()
       const mMes = new Map<string, number>()
       for (const r of rows) {
-        const mot = Array.isArray(r.motivo) ? r.motivo[0] : r.motivo
-        const motivoLabel = mot?.label ?? 'Sem motivo'
+        const motivoLabel = (r.motivo_perda_id != null ? motivoPorId.get(r.motivo_perda_id) : null) ?? 'Sem motivo'
         mMotivo.set(motivoLabel, (mMotivo.get(motivoLabel) ?? 0) + 1)
         const resp = r.responsavel_id ? (nomePorId.get(r.responsavel_id) ?? 'Outro') : 'Sem responsável'
         mResp.set(resp, (mResp.get(resp) ?? 0) + 1)
-        if (r.perdido_em) {
-          const d = new Date(r.perdido_em)
+        if (r.em) {
+          const d = new Date(r.em)
           const chave = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
           mMes.set(chave, (mMes.get(chave) ?? 0) + 1)
         }

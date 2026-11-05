@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { aplicarEscopo, type Escopo } from '@/lib/escopo'
 import { SEM_NOME } from '@/lib/sem-nome'
+import { lerFechamentos } from '@/lib/fechamentos'
 
 /**
  * TODO NÚMERO DO PAINEL SAI DAQUI (etapa 0, 21/10/2026).
@@ -213,6 +214,16 @@ export async function contagensDoPainel(db: Db, empresaId: number, escopo: Escop
   ])
 
   const funil = Object.fromEntries(ETAPAS_DO_FUNIL.map((slug, i) => [slug, porEtapa[i].count ?? 0])) as unknown as FunilDoPainel
+  /**
+   * Convertido e perdido somam os ciclos que o cliente REABRIU ao voltar a escrever
+   * (lib/fechamentos.ts, desde 05/11/2026): a reabertura leva o negócio para a primeira
+   * etapa, e só pela etapa de hoje o ganho e a perda sumiriam do painel. O mesmo cliente
+   * aparece em 'novo' (o ciclo de agora) e em 'convertido' (o anterior): são dois ciclos.
+   */
+  const reabertos = (await lerFechamentos(db as never, empresaId, { soAtivos: true, soReabertos: true }))
+    .filter((f) => f.reaberto && (!escopo.soMeu || f.responsavel_id === escopo.userId))
+  funil.convertido += reabertos.filter((f) => f.status === 'ganho').length
+  funil.perdido += reabertos.filter((f) => f.status === 'perdido').length
   return {
     totalClientes: clientes.count ?? 0,
     leadsAtivos: ativos.count ?? 0,

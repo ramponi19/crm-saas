@@ -4,6 +4,7 @@ import { Home, Target, TrendingUp, Wallet, Award } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
 import { RelatoriosFiltros } from './relatorios-filtros'
+import { lerFechamentos } from '@/lib/fechamentos'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -121,7 +122,14 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
   const fechamentoId = ganhoColId(colunas)
 
   const imoveisDisp = I.filter((i) => i.status === 'disponivel')
-  const leadsFechados = L.filter((l) => l.kanban_status === fechamentoId).length
+  /**
+   * Fechados = os que estão no ganho hoje + os ganhos que o cliente reabriu ao voltar a
+   * escrever (lib/fechamentos.ts): a reabertura leva o negócio para a primeira etapa, e
+   * sem o histórico o fechamento sumiria daqui. Só dos negócios ativos, como L.
+   */
+  const ganhosReabertos = (await lerFechamentos(supabase, empresaId ?? 0, { status: 'ganho', soAtivos: true, soReabertos: true }))
+    .filter((f) => f.reaberto && (!corretor || f.responsavel_id === corretor))
+  const leadsFechados = L.filter((l) => l.kanban_status === fechamentoId).length + ganhosReabertos.length
   const taxaConv = L.length > 0 ? Math.round((leadsFechados / L.length) * 100) : 0
   const valorCarteira = imoveisDisp.reduce((s, i) => s + (Number(i.valor_venda) || 0), 0)
 
@@ -151,6 +159,11 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
     corretorMap[key] = corretorMap[key] ?? { total: 0, fechados: 0 }
     corretorMap[key].total++
     if (l.kanban_status === fechamentoId) corretorMap[key].fechados++
+  }
+  for (const f of ganhosReabertos) {
+    const key = f.responsavel_id ?? 'sem'
+    corretorMap[key] = corretorMap[key] ?? { total: 0, fechados: 0 }
+    corretorMap[key].fechados++
   }
   const corretores = Object.entries(corretorMap)
     .map(([id, v]) => ({ nome: id === 'sem' ? 'Sem responsável' : (nomePorId[id] ?? '—'), ...v }))
