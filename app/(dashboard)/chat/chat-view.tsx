@@ -1,5 +1,6 @@
 'use client'
 
+import { nadaGravado } from '@/lib/linhas-afetadas'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useChatNaoLidas, marcarConversaLida } from '@/hooks/use-chat-nao-lidas'
@@ -177,8 +178,10 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
   }
 
   async function apagar(id: number, tipo: 'mural' | 'direto') {
-    const { error } = await supabase.from('mensagens_internas').delete().eq('id', id)
+    const { data: apagadas, error } = await supabase.from('mensagens_internas').delete().eq('id', id).select('id')
     if (error) { notify.bad('Erro ao apagar'); return }
+    // 0 linhas = a mensagem não é sua (a RLS só deixa o autor apagar) ou já tinha saído.
+    if (nadaGravado(apagadas)) { notify.bad('Não foi possível apagar', 'Só quem enviou pode apagar a mensagem, ou ela já foi apagada.'); return }
     if (tipo === 'mural') setMural((p) => p.filter((x) => x.id !== id)); else setDireto((p) => p.filter((x) => x.id !== id))
   }
 

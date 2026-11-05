@@ -1,3 +1,4 @@
+import { nadaGravado } from '@/lib/linhas-afetadas'
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { aguardandoResposta } from '@/lib/esteira'
@@ -38,11 +39,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Informe ausente: true|false' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { data: gravadas, error } = await supabase
     .from('empresa_usuarios')
     .update({ ausente, ausente_em: ausente ? new Date().toISOString() : null })
     .eq('empresa_id', empresaId).eq('usuario_id', user.id)
+    .select('usuario_id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravadas)) return NextResponse.json({ error: 'Você não está na equipe desta empresa: a ausência não foi gravada.' }, { status: 404 })
 
   let liberados = 0
   if (ausente) {

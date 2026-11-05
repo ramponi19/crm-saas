@@ -1,3 +1,4 @@
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 
@@ -57,8 +58,9 @@ export async function PATCH(req: Request) {
   if (typeof body.nome === 'string') {
     const nome = body.nome.trim()
     if (!nome) return NextResponse.json({ error: 'Nome vazio' }, { status: 400 })
-    const { error } = await supabase.from('funis').update({ nome }).eq('id', body.id).eq('empresa_id', empresaId)
+    const { data: gravadas, error } = await supabase.from('funis').update({ nome }).eq('id', body.id).eq('empresa_id', empresaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   }
 
   // Funil interno (equipe): fora das métricas do ZapIntel. O padrão recebe os
@@ -67,8 +69,9 @@ export async function PATCH(req: Request) {
     const { data: f } = await supabase.from('funis').select('padrao').eq('id', body.id).eq('empresa_id', empresaId).maybeSingle()
     if (!f) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
     if (f.padrao && body.interno) return NextResponse.json({ error: 'O funil padrão recebe os leads novos e não pode ser interno.' }, { status: 400 })
-    const { error } = await supabase.from('funis').update({ interno: body.interno }).eq('id', body.id).eq('empresa_id', empresaId)
+    const { data: gravadas, error } = await supabase.from('funis').update({ interno: body.interno }).eq('id', body.id).eq('empresa_id', empresaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   }
 
   if (body.padrao === true) {
@@ -76,8 +79,9 @@ export async function PATCH(req: Request) {
     if (f?.interno) return NextResponse.json({ error: 'Um funil interno não pode ser o padrão.' }, { status: 400 })
     // Só um padrão por empresa.
     await supabase.from('funis').update({ padrao: false }).eq('empresa_id', empresaId)
-    const { error } = await supabase.from('funis').update({ padrao: true }).eq('id', body.id).eq('empresa_id', empresaId)
+    const { data: gravadas, error } = await supabase.from('funis').update({ padrao: true }).eq('id', body.id).eq('empresa_id', empresaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   }
 
   return NextResponse.json({ ok: true })
@@ -101,7 +105,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: `Este funil tem ${count} lead(s). Mova-os antes de excluir.` }, { status: 409 })
   }
 
-  const { error } = await supabase.from('funis').delete().eq('id', body.id).eq('empresa_id', empresaId)
+  const { data: gravadas, error } = await supabase.from('funis').delete().eq('id', body.id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

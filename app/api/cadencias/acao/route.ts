@@ -1,3 +1,4 @@
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { dataDaAcao, proximoPasso, type PassoMin } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
@@ -39,15 +40,17 @@ export async function POST(req: Request) {
   // --- Adiar (snooze para amanhã) ---
   if (body.tipo === 'adiar') {
     const amanha = new Date(); amanha.setDate(amanha.getDate() + 1)
-    const { error } = await supabase.from('cadencia_inscricoes').update({ proxima_acao_em: amanha.toISOString() }).eq('id', insc.id)
+    const { data: gravadas, error } = await supabase.from('cadencia_inscricoes').update({ proxima_acao_em: amanha.toISOString() }).eq('id', insc.id).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
     return NextResponse.json({ ok: true })
   }
 
   // --- Sair da cadência ---
   if (body.tipo === 'sair') {
-    const { error } = await supabase.from('cadencia_inscricoes').update({ status: 'saiu', proxima_acao_em: null }).eq('id', insc.id)
+    const { data: gravadas, error } = await supabase.from('cadencia_inscricoes').update({ status: 'saiu', proxima_acao_em: null }).eq('id', insc.id).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
     return NextResponse.json({ ok: true })
   }
 
@@ -100,8 +103,9 @@ export async function POST(req: Request) {
   const patch = concluir
     ? { status: 'concluida', concluida_em: nowIso, proxima_acao_em: null }
     : { passo_ordem: proxOrdem, proxima_acao_em: proxData }
-  const { error } = await supabase.from('cadencia_inscricoes').update(patch).eq('id', insc.id)
+  const { data: gravadas, error } = await supabase.from('cadencia_inscricoes').update(patch).eq('id', insc.id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   return NextResponse.json({ ok: true, concluida: concluir })
 }

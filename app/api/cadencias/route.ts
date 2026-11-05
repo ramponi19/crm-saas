@@ -1,3 +1,4 @@
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -42,8 +43,10 @@ export async function POST(req: Request) {
 
   let cadenciaId = body.id
   if (cadenciaId) {
-    const { error } = await supabase.from('cadencias').update(dados).eq('id', cadenciaId)
+    const { data: gravadas, error } = await supabase.from('cadencias').update(dados).eq('id', cadenciaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Sem isto os passos seriam apagados e regravados numa cadência que não mudou.
+    if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   } else {
     const { data, error } = await supabase.from('cadencias').insert(dados).select('id').single()
     if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
@@ -87,7 +90,8 @@ export async function DELETE(req: Request) {
 
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { error } = await supabase.from('cadencias').delete().eq('id', id)
+  const { data: gravadas, error } = await supabase.from('cadencias').delete().eq('id', id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

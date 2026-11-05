@@ -1,5 +1,6 @@
 'use client'
 
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
@@ -268,8 +269,9 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
   }
 
   async function mudarStatus(v: Visita, status: string) {
-    const { error } = await supabase.from('visitas').update({ status }).eq('id', v.id)
+    const { data: gravadas, error } = await supabase.from('visitas').update({ status }).eq('id', v.id).select('id')
     if (error) { notify.bad(error.message); return }
+    if (nadaGravado(gravadas)) { notify.bad(NADA_GRAVADO); return }
     setLista(l => l.map(x => x.id === v.id ? { ...x, status } : x))
   }
 
