@@ -1,5 +1,6 @@
 'use client'
 
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Topbar } from '@/components/layout/topbar'
@@ -175,8 +176,9 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
   }
 
   async function excluir(im: Imovel) {
-    const { error } = await supabase.from('imoveis_imoveis').delete().eq('id', im.id)
+    const { data: gravadas, error } = await supabase.from('imoveis_imoveis').delete().eq('id', im.id).select('id')
     if (error) { notify.bad(error.message); return }
+    if (nadaGravado(gravadas)) { notify.bad('Imóvel não excluído', NADA_GRAVADO); return }
     setLista(l => l.filter(x => x.id !== im.id))
     notify.ok('Imóvel excluído')
   }
@@ -228,8 +230,9 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       status: 'emprestada', com_quem: comQuem.trim(),
       retirada_em: new Date().toISOString(), devolucao_prevista: devolucao || null,
     }
-    const { error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id)
+    const { data: gravadas, error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id).select('id')
     if (error) { notify.bad('Não foi possível registrar', error.message); return }
+    if (nadaGravado(gravadas)) { notify.bad('Não foi possível registrar', NADA_GRAVADO); return }
     setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
     setEmprestando(null); setComQuem(''); setDevolucao('')
     notify.ok('Empréstimo registrado')
@@ -237,15 +240,17 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
 
   async function devolverChave(c: ChaveDoImovel) {
     const patch = { status: 'na_imobiliaria', com_quem: null, retirada_em: null, devolucao_prevista: null }
-    const { error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id)
+    const { data: gravadas, error } = await supabase.from('imoveis_chaves').update(patch as never).eq('id', c.id).select('id')
     if (error) { notify.bad('Não foi possível devolver', error.message); return }
+    if (nadaGravado(gravadas)) { notify.bad('Não foi possível devolver', NADA_GRAVADO); return }
     setListaChaves(l => l.map(x => (x.id === c.id ? { ...x, ...patch } : x)))
     notify.ok('Chave devolvida')
   }
 
   async function removerChave(c: ChaveDoImovel) {
-    const { error } = await supabase.from('imoveis_chaves').delete().eq('id', c.id)
+    const { data: gravadas, error } = await supabase.from('imoveis_chaves').delete().eq('id', c.id).select('id')
     if (error) { notify.bad('Não foi possível remover', error.message); return }
+    if (nadaGravado(gravadas)) { notify.bad('Não foi possível remover', NADA_GRAVADO); return }
     setListaChaves(l => l.filter(x => x.id !== c.id))
   }
 

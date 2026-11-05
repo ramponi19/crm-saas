@@ -1,5 +1,6 @@
 'use client'
 
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -471,10 +472,11 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
                 if (!cliente?.id) return
                 const payload = { ...dados, cliente_id: cliente.id, lead_id: leadId, ativo: true }
                 const { data: emp } = await supabase.rpc('get_empresa_id')
-                const { error } = prefs?.id
-                  ? await supabase.from('imoveis_perfis_busca').update(payload as never).eq('id', prefs.id)
-                  : await supabase.from('imoveis_perfis_busca').insert({ ...payload, empresa_id: emp } as never)
+                const { data: gravadas, error } = prefs?.id
+                  ? await supabase.from('imoveis_perfis_busca').update(payload as never).eq('id', prefs.id).select('id')
+                  : await supabase.from('imoveis_perfis_busca').insert({ ...payload, empresa_id: emp } as never).select('id')
                 if (error) { notify.bad('Não foi possível salvar', error.message); return }
+                if (nadaGravado(gravadas)) { notify.bad('Não foi possível salvar', NADA_GRAVADO); return }
                 notify.ok('Preferências salvas')
                 setEditandoPrefs(false)
                 const { data: pf } = await supabase.from('imoveis_perfis_busca')
