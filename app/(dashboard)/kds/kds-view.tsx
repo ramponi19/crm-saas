@@ -1,5 +1,6 @@
 'use client'
 
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -65,13 +66,20 @@ export function KdsView({ empresaId, inicial }: { empresaId: number; inicial: Pe
     const prox = PROX[p.status]
     if (!prox) return
     setPedidos((prev) => prox === 'entregue' ? prev.filter((x) => x.id !== p.id) : prev.map((x) => x.id === p.id ? { ...x, status: prox } : x))
-    const { error } = await supabase.from('pedidos').update({ status: prox }).eq('id', p.id)
-    if (error) notify.bad('Erro ao atualizar pedido')
+    const { data: gravadas, error } = await supabase.from('pedidos').update({ status: prox }).eq('id', p.id).select('id')
+    if (error || nadaGravado(gravadas)) {
+      setPedidos((prev) => [...prev.filter((x) => x.id !== p.id), p].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')))
+      notify.bad('Erro ao atualizar pedido', error ? undefined : NADA_GRAVADO)
+    }
   }
 
   async function cancelar(p: Pedido) {
     setPedidos((prev) => prev.filter((x) => x.id !== p.id))
-    await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', p.id)
+    const { data: gravadas, error } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', p.id).select('id')
+    if (error || nadaGravado(gravadas)) {
+      setPedidos((prev) => [...prev.filter((x) => x.id !== p.id), p].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')))
+      notify.bad('Pedido não cancelado', error?.message ?? NADA_GRAVADO)
+    }
   }
 
   return (

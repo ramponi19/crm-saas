@@ -1,5 +1,6 @@
 'use client'
 
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Receipt, Check, ArrowLeftRight, FileText } from 'lucide-react'
@@ -152,9 +153,10 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
   async function transferir() {
     if (!transf || !novoVend) return
     setTransfBusy(true)
-    const { error } = await createClient().from('vendas_vendas').update({ vendedor_id: novoVend }).eq('id', transf.id)
+    const { data: gravadas, error } = await createClient().from('vendas_vendas').update({ vendedor_id: novoVend }).eq('id', transf.id).select('id')
     setTransfBusy(false)
     if (error) { notify.bad('Erro ao transferir'); return }
+    if (nadaGravado(gravadas)) { notify.bad('Venda não transferida', NADA_GRAVADO); return }
     notify.ok('Venda transferida'); setTransf(null); setNovoVend(''); router.refresh()
   }
 

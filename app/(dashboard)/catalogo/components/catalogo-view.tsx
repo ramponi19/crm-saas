@@ -294,9 +294,10 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   async function removerPreco(t: TabelaPreco) {
     setRemovendoPreco(t.id)
-    const { error } = await createClient().from('estoque_tabela_precos').update({ ativo: false } as never).eq('id', t.id)
+    const { data: gravadas, error } = await createClient().from('estoque_tabela_precos').update({ ativo: false } as never).eq('id', t.id).select('id')
     setRemovendoPreco(null)
     if (error) { notify.bad('Erro ao remover'); return }
+    if (nadaGravado(gravadas)) { notify.bad('Preço não removido', NADA_GRAVADO); return }
     notify.ok('Preço removido'); router.refresh()
   }
 

@@ -1,3 +1,4 @@
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 
@@ -48,17 +49,19 @@ export async function POST(req: NextRequest) {
     .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false })
   if (eUp) return NextResponse.json({ error: `Falha ao enviar: ${eUp.message}` }, { status: 400 })
 
-  const { error: eTermo } = await supabase.from('vendas_termos').update({
+  const { data: marcados, error: eTermo } = await supabase.from('vendas_termos').update({
     status: 'assinado',
     arquivo_url: caminho,
     assinado_em: new Date().toISOString(),
     assinado_por: user.id,
-  } as never).eq('id', termoId).eq('empresa_id', empresaId)
+  } as never).eq('id', termoId).eq('empresa_id', empresaId).select('id')
 
-  if (eTermo) {
+  if (eTermo || nadaGravado(marcados)) {
     // Não deixa arquivo órfão ocupando espaço se o termo não pôde ser marcado.
     await supabase.storage.from('documentos').remove([caminho])
-    return NextResponse.json({ error: eTermo.message }, { status: 400 })
+    return eTermo
+      ? NextResponse.json({ error: eTermo.message }, { status: 400 })
+      : NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   }
 
   // Substituição: remove o anterior só depois de o novo estar gravado.
