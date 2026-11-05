@@ -980,7 +980,67 @@ async function respostaTimeoutMeta(
   return json({ error: MSG_TIMEOUT_META, codigo: "timeout_meta" }, 504);
 }
 
-async function upsertLead(canal: Canal, p: {
+// ── Contato e negócio no core (sem a view `leads`, desde 05/11/2026) ────────
+/**
+ * O CLIENTE É A IDENTIDADE DO CANAL (`contato_identidades`), não o lead.
+ *
+ * Até 05/11/2026 esta Edge procurava e criava o lead pela view `leads`, e a
+ * regra de não duplicar o negócio de quem volta pelo canal vivia no gatilho da
+ * view (`compat_leads_iud`). A view caiu no último lote do corte: a regra vive
+ * só na `mensagem_registrar` (por identidade), que chama `core_negocio_do_canal`
+ * com a trava de identidade e a trava de negócio.
+ *
+ * Contato cadastrado à mão tem telefone e não tem identidade: casa pelo E.164,
+ * a mesma regra da `mensagem_registrar` (o 9º dígito entra na conta). Era o
+ * "últimos 8 dígitos" do código antigo.
+ */
+async function contatoDaIdentidade(empresaId: number, tipo: string, ident: string): Promise<number | null> {
+  const { data, error, status } = await db.from("contato_identidades").select("contato_id")
+    .eq("empresa_id", empresaId).eq("canal_tipo", tipo).eq("external_id", ident).limit(1);
+  if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`buscar identidade: ${error?.message}`);
+  const achado = (data?.[0]?.contato_id as number | undefined) ?? null;
+  if (achado || tipo !== "whatsapp") return achado;
+
+  const { data: e164, error: eFone, status: sFone } = await db.rpc("core_telefone_e164", { p_telefone: ident });
+  if (bancoIndisponivel(eFone, sFone)) throw new ErroDeBanco(`telefone e164: ${eFone?.message}`);
+  if (!e164) return null;
+  const { data: porFone, error: e2, status: s2 } = await db.from("contatos").select("id")
+    .eq("empresa_id", empresaId).eq("telefone_e164", e164 as string).limit(1);
+  if (bancoIndisponivel(e2, s2)) throw new ErroDeBanco(`buscar contato pelo telefone: ${e2?.message}`);
+  const contatoId = (porFone?.[0]?.id as number | undefined) ?? null;
+  if (contatoId) {
+    // O cadastro ganha a identidade do WhatsApp (e o origem_id, se não tinha): a
+    // próxima mensagem casa direto, como na mensagem_registrar. Corrida com outra
+    // entrega = índice único (23505), que não é erro.
+    const { error: eId } = await db.from("contato_identidades")
+      .insert({ empresa_id: empresaId, contato_id: contatoId, canal_tipo: "whatsapp", external_id: ident });
+    if (eId && eId.code !== "23505") console.error("gravar identidade do cadastro:", contatoId, eId.message);
+    await db.from("contatos").update({ origem_id: ident }).eq("id", contatoId).is("origem_id", null);
+  }
+  return contatoId;
+}
+
+type NegocioDaLoja = { id: number; ativo: boolean; dados: Record<string, unknown> };
+
+/**
+ * Os negócios do contato NA LOJA DO CANAL, do mais antigo para o mais novo.
+ * Canal sem loja (o Messenger da marca, que atende a rede) não filtra.
+ * `ativo` é o `_lead.ativo` (o "zerar do funil"), não o status: ganho e perdido
+ * continuam ativos, e a mensagem nova entra neles sem reabrir — como sempre foi.
+ */
+async function negociosNaLoja(empresaId: number, contatoId: number, filialId: number | null): Promise<NegocioDaLoja[]> {
+  let q = db.from("negocios").select("id, dados").eq("empresa_id", empresaId).eq("contato_id", contatoId);
+  if (filialId != null) q = q.eq("filial_id", filialId);
+  const { data, error, status } = await q.order("id", { ascending: true });
+  if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`buscar negócio: ${error?.message}`);
+  return (data ?? []).map((n) => {
+    const dados = (n.dados ?? {}) as Record<string, unknown>;
+    const lead = (dados._lead ?? {}) as Record<string, unknown>;
+    return { id: n.id as number, ativo: lead.ativo !== false, dados };
+  });
+}
+
+async function registrarRecebida(canal: Canal, p: {
   nome: string | null; telefone: string | null; instagramUser: string | null;
   origem: string; origemId: string; texto: string; externalId: string | null;
   tipo?: string; midiaUrl?: string | null; fotoUrl?: string | null;
@@ -990,112 +1050,40 @@ async function upsertLead(canal: Canal, p: {
   const tipo = p.tipo ?? "texto";
   const midiaUrl = p.midiaUrl ?? null;
 
-  // TODA busca de lead filtra empresa_id. Sem isso (v26), dois clientes com o
-  // mesmo consumidor tinham a conversa misturada — vazamento entre empresas.
   /**
-   * O LEAD E PROCURADO NA LOJA DO CANAL, nao so pela empresa.
+   * O NEGÓCIO É O DA LOJA DO CANAL, não só o da empresa.
    *
    * ══ O BUG QUE ISTO CONSERTA (18/09/2026) ═══════════════════════════════════
+   * A busca era empresa + telefone. Com dois números na mesma empresa, o primeiro
+   * contato decidia a loja do lead PARA SEMPRE, e a resposta de Mogi caía no chat
+   * de Jaguariúna. A regra do dono: "era para ter meu lead em jaguariuna e mogi e
+   * nao transferir os chats". Cada loja tem a sua conversa.
    *
-   * A busca era empresa + telefone. Com dois numeros na mesma empresa, o
-   * primeiro contato decidia a loja do lead PARA SEMPRE: o dono mandou um teste
-   * para o numero novo de Jaguariuna as 11:11, o lead nasceu la, e quando Mogi
-   * respondeu pelo numero de Mogi a mensagem caiu no mesmo chat. Do lado da
-   * loja, a conversa de um cliente de Mogi aparecia em Jaguariuna — e a resposta
-   * pelo CRM saia pelo numero da outra loja, porque quem responde e
-   * canalDaLoja(.., lead.filial_id).
-   *
-   * A regra do dono: "era para ter meu lead em jaguariuna e mogi e nao
-   * transferir os chats". Cada loja tem a sua conversa.
-   *
-   * Canal sem loja (o Messenger da marca, que atende a rede) nao filtra: segue
-   * caindo no lead unico da empresa, que e o certo para a marca.
-   *
-   * limit(1) no lugar de maybeSingle: sem o filtro de loja agora podem existir
-   * dois leads do mesmo telefone na empresa, e maybeSingle derrubaria o
-   * recebimento com erro em vez de gravar a mensagem.
+   * Com negócio ATIVO na loja, a mensagem entra nele (`lead_id`): o ganho e o
+   * perdido não são reabertos por uma mensagem nova. Sem negócio ativo, entra
+   * POR IDENTIDADE: a `mensagem_registrar` acha ou cria o contato, e a
+   * `core_negocio_do_canal` usa o aberto, reabre o mais recente ou cria — com as
+   * travas que impedem duas entregas simultâneas de abrirem dois negócios.
    */
-  let busca = db.from("leads")
-    .select("id, nome, instagram, foto_url")
-    .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true);
-  if (canal.filial_id != null) busca = busca.eq("filial_id", canal.filial_id);
-  const { data: achados, error: eBusca, status: sBusca } = await busca.order("id", { ascending: true }).limit(1);
-  // Banco fora na busca: seguir criaria um lead duplicado — ou nenhum, e a mensagem some.
-  if (bancoIndisponivel(eBusca, sBusca)) throw new ErroDeBanco(`buscar lead: ${eBusca?.message}`);
-  let existente = (achados?.[0] ?? null) as { id: number; nome: string | null; instagram: string | null; foto_url?: string | null } | null;
-
-  // Lead criado à mão tem telefone e origem_id nulo — casa pelos últimos 8 dígitos.
-  if (!existente && p.origem === "whatsapp") {
-    const last8 = p.origemId.replace(/\D/g, "").slice(-8);
-    if (last8.length >= 8) {
-      let qc = db.from("leads")
-        .select("id, nome, instagram, telefone")
-        .eq("empresa_id", empresaId).eq("ativo", true)
-        .is("origem_id", null).ilike("telefone", `%${last8}%`);
-      if (canal.filial_id != null) qc = qc.eq("filial_id", canal.filial_id);
-      const { data: cands } = await qc.limit(20);
-      const match = (cands ?? []).find((l) => {
-        const d = (l.telefone || "").replace(/\D/g, "");
-        return d === p.origemId || d.slice(-8) === last8;
-      });
-      if (match) {
-        existente = { id: match.id, nome: match.nome, instagram: match.instagram };
-        await db.from("leads").update({ origem_id: p.origemId }).eq("id", match.id);
-      }
-    }
-  }
-
-  let leadId: number | null = existente?.id ?? null;
-  if (!leadId) {
-    /**
-     * O LEAD NASCE NA LOJA DO CANAL.
-     *
-     * Sem isto o gatilho do banco decide, e ele nao tem sessao para consultar:
-     * cai na matriz. Resultado observado no primeiro Direct real da Jaguariuna —
-     * a mensagem entrou, mas o lead ficou em Mogi, e com a Jaguariuna selecionada
-     * no topo ele era INVISIVEL para o dono. Mensagem que chega e ninguem ve e
-     * pior do que mensagem que nao chega, porque ninguem vai investigar.
-     *
-     * Canal da rede (filial nula) continua caindo no gatilho, que manda para a
-     * matriz — o certo para o canal da marca, que atende todas as lojas.
-     */
-    const { data: novo, error, status: sNovo } = await db.from("leads").insert([{
-      empresa_id: empresaId, nome: p.nome, telefone: p.telefone, instagram: p.instagramUser,
-      origem: p.origem, origem_id: p.origemId, primeira_msg: p.texto,
-      kanban_status: "novo", ativo: true, foto_url: p.fotoUrl ?? null,
-      anuncio: p.anuncio ?? null,
+  const contatoAntes = await contatoDaIdentidade(empresaId, p.origem, p.origemId);
+  const ativo = contatoAntes
+    ? (await negociosNaLoja(empresaId, contatoAntes, canal.filial_id)).find((n) => n.ativo) ?? null
+    : null;
+  const quem: Record<string, unknown> = ativo
+    ? { lead_id: ativo.id }
+    : {
+      identidade: p.origemId, nome: p.nome, instagram: p.instagramUser,
       ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
-    }]).select("id").single();
-    if (error) {
-      let qa = db.from("leads").select("id")
-        .eq("empresa_id", empresaId).eq("origem_id", p.origemId).eq("ativo", true);
-      if (canal.filial_id != null) qa = qa.eq("filial_id", canal.filial_id);
-      const { data: again } = await qa.order("id", { ascending: true }).limit(1);
-      leadId = (again?.[0]?.id as number | undefined) ?? null;
-      if (!leadId && bancoIndisponivel(error, sNovo)) throw new ErroDeBanco(`criar lead: ${error.message}`);
-      if (!leadId) { console.error("criar lead:", error.message); return null; }
-    } else leadId = novo.id as number;
-  } else {
-    const patch: Record<string, unknown> = {};
-    if (p.nome && !existente?.nome) patch.nome = p.nome;
-    if (p.instagramUser && !existente?.instagram) patch.instagram = p.instagramUser;
-    // A foto SEMPRE atualiza quando vem: a pessoa pode ter trocado o avatar, e o
-    // arquivo é sobrescrito no mesmo caminho (não acumula lixo no Storage).
-    if (p.fotoUrl) patch.foto_url = p.fotoUrl;
-    // Cliente que volta por OUTRA campanha: vale o anúncio mais recente, que é o
-    // que explica esta conversa. O histórico de cada entrada fica no chat.
-    if (p.anuncio) patch.anuncio = p.anuncio;
-    if (Object.keys(patch).length) await db.from("leads").update(patch).eq("id", leadId);
-  }
+    };
 
   // O ANÚNCIO ENTRA NA CONVERSA, antes da mensagem — como o cliente vê no
   // aparelho dele. Assim o vendedor lê o que a pessoa acabou de ver, e o
-  // histórico guarda CADA entrada por campanha (o campo no lead só tem a última).
+  // histórico guarda CADA entrada por campanha (o negócio só guarda a última).
   // `external_id` derivado do id da mensagem: se a Meta reenviar o webhook, o
   // índice único impede um segundo card.
   if (p.anuncio) {
     const { erro, fora } = await registrarMensagem(empresaId, canal.id, p.externalId ? `anuncio:${p.externalId}` : null, {
-      lead_id: leadId, direcao: "recebida", conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
+      ...quem, direcao: "recebida", conteudo: JSON.stringify(p.anuncio), origem: p.origem, lida: false,
       tipo: "anuncio", midia_url: p.anuncio.midia,
     });
     if (fora) throw new ErroDeBanco(`anúncio na conversa: ${erro}`);
@@ -1103,30 +1091,68 @@ async function upsertLead(canal: Canal, p: {
   }
 
   const { id: msgId, erro: msgErr, fora: msgFora } = await registrarMensagem(empresaId, canal.id, p.externalId, {
-    lead_id: leadId, direcao: "recebida", conteudo: p.texto, origem: p.origem, lida: false, tipo, midia_url: midiaUrl,
+    ...quem, direcao: "recebida", conteudo: p.texto, origem: p.origem, lida: false, tipo, midia_url: midiaUrl,
   });
   // Banco fora: 500 para a Meta reenviar o pacote; o que já gravou não duplica
   // (external_id repetido não grava de novo).
   if (msgFora) throw new ErroDeBanco(`gravar mensagem recebida ${p.externalId}: ${msgErr}`);
-  if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return leadId; }
-  if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return leadId; }
+
+  await completarCadastro(canal, p, ativo?.id ?? null);
+
+  if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return; }
+  if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
 
   /**
-   * O contador de nao lidas NAO e somado aqui — quem mantem e o gatilho
-   * `nao_lidas_sincroniza`, disparado pelo insert acima.
-   *
-   * Somar aqui era uma das tres maos que mexiam no mesmo numero, e o resultado
-   * era ele derivar sem volta. O RPC `incrementar_msgs_nao_lidas` foi mantido no
-   * banco como no-op justamente para esta chamada poder sair sem pressa: se uma
-   * versao antiga desta funcao ainda estiver no ar, ela nao quebra nem
-   * atrapalha. Ver a migracao `contador_de_nao_lidas_vira_espelho`.
+   * O contador de não lidas e a última mensagem da conversa NÃO são mexidos
+   * aqui — quem mantém é o gatilho em `mensagens`, disparado pelo insert acima.
    */
-  await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", leadId);
   await db.from("canais").update({ ultima_msg_em: new Date().toISOString() }).eq("id", canal.id);
-  return leadId;
 }
 
-// Echo: mensagem enviada FORA do CRM. Nunca cria lead; só anexa a existente.
+/**
+ * Nome, @ e foto no contato; anúncio no negócio. Era o insert/update na view
+ * `leads`: agora vai direto às tabelas.
+ *
+ * - nome: só quando o contato não tem (ou tem o próprio id do canal, que a
+ *   `mensagem_registrar` usa quando o perfil não veio);
+ * - @ do Instagram: só quando não tem;
+ * - foto: SEMPRE que vem — a pessoa pode ter trocado o avatar, e o arquivo é
+ *   sobrescrito no mesmo caminho (não acumula lixo no Storage);
+ * - anúncio: o mais recente, que é o que explica esta conversa.
+ */
+async function completarCadastro(canal: Canal, p: {
+  nome: string | null; instagramUser: string | null; origem: string; origemId: string;
+  texto: string; fotoUrl?: string | null; anuncio?: AnuncioOrigem | null;
+}, negocioId: number | null) {
+  const contatoId = await contatoDaIdentidade(canal.empresa_id, p.origem, p.origemId);
+  if (!contatoId) return;
+
+  if (p.nome || p.instagramUser || p.fotoUrl) {
+    const { data: c } = await db.from("contatos").select("nome, instagram").eq("id", contatoId).maybeSingle();
+    const patch: Record<string, unknown> = {};
+    if (p.nome && (!c?.nome || c.nome === p.origemId) && c?.nome !== p.nome) patch.nome = p.nome;
+    if (p.instagramUser && !c?.instagram) patch.instagram = p.instagramUser;
+    if (p.fotoUrl) patch.foto_url = p.fotoUrl;
+    if (Object.keys(patch).length) {
+      const { error } = await db.from("contatos").update(patch).eq("id", contatoId);
+      if (error) console.error("completar contato:", contatoId, error.message);
+    }
+  }
+
+  if (!p.anuncio) return;
+  const daLoja = await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id);
+  const neg = (negocioId != null ? daLoja.find((n) => n.id === negocioId) : null) ?? daLoja.find((n) => n.ativo);
+  if (!neg) return;
+  const dados: Record<string, unknown> = { ...neg.dados, _anuncio: p.anuncio };
+  // O card do anúncio entra antes da mensagem: o negócio que ele abriu nasceu com
+  // o JSON do anúncio como primeira mensagem. A primeira mensagem é a do cliente.
+  const lead = (neg.dados._lead ?? {}) as Record<string, unknown>;
+  if (lead.primeira_msg === JSON.stringify(p.anuncio)) dados._lead = { ...lead, primeira_msg: p.texto };
+  const { error } = await db.from("negocios").update({ dados }).eq("id", neg.id);
+  if (error) console.error("anúncio no negócio:", neg.id, error.message);
+}
+
+// Echo: mensagem enviada FORA do CRM. Nunca cria contato; só anexa ao que existe.
 async function registrarEcho(
   canal: Canal, destinatario: string | undefined, mid: string | undefined,
   texto: string, origem: string, tipo = "texto", midiaUrl: string | null = null,
@@ -1134,57 +1160,40 @@ async function registrarEcho(
   try {
     if (!destinatario || !mid) return;
     /**
-     * O ECHO TAMBEM E POR LOJA — e este foi o caminho do caso de 18/09/2026.
+     * O ECHO TAMBÉM É POR LOJA — e este foi o caminho do caso de 18/09/2026.
      *
-     * Echo e a mensagem que a loja mandou PELO CELULAR, devolvida pela Meta na
-     * coexistencia. Buscando so por empresa + telefone, a resposta enviada pelo
-     * aparelho de Mogi caiu no chat que estava em Jaguariuna.
-     *
-     * Se o cliente ainda nao tem conversa NESTA loja mas ja tem em outra, o lead
-     * e aberto aqui: a loja falou com ele por este numero, entao a conversa
-     * existe e precisa aparecer na loja certa. Sem isso o echo seria descartado
-     * e a mensagem sumiria do CRM.
-     *
-     * Contato novo de verdade (sem lead em lugar nenhum) continua nao criando
-     * nada por echo — o lead nasce quando o cliente responde, como sempre foi.
+     * Echo é a mensagem que a loja mandou PELO CELULAR, devolvida pela Meta na
+     * coexistência. Se o cliente ainda não tem negócio ativo NESTA loja mas tem em
+     * outra, o negócio é aberto aqui (`core_negocio_do_canal`): a loja falou com
+     * ele por este número, então a conversa existe e precisa aparecer na loja
+     * certa. Contato novo de verdade (sem negócio ativo em lugar nenhum) continua
+     * não criando nada por echo — o negócio nasce quando o cliente responde.
      */
-    let ql = db.from("leads").select("id")
-      .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true);
-    if (canal.filial_id != null) ql = ql.eq("filial_id", canal.filial_id);
-    const { data: naLoja, error: eLoja, status: sLoja } = await ql.order("id", { ascending: true }).limit(1);
-    if (bancoIndisponivel(eLoja, sLoja)) throw new ErroDeBanco(`echo buscar lead: ${eLoja?.message}`);
-    let lead = (naLoja?.[0] ?? null) as { id: number } | null;
-
-    if (!lead && canal.filial_id != null) {
-      const { data: noutraLoja } = await db.from("leads").select("id, nome, telefone")
-        .eq("empresa_id", canal.empresa_id).eq("origem_id", destinatario).eq("ativo", true).limit(1);
-      const conhecido = noutraLoja?.[0];
+    const contatoId = await contatoDaIdentidade(canal.empresa_id, origem, destinatario);
+    if (!contatoId) return;
+    let negocioId = (await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id)).find((n) => n.ativo)?.id ?? null;
+    if (!negocioId && canal.filial_id != null) {
+      const conhecido = (await negociosNaLoja(canal.empresa_id, contatoId, null)).some((n) => n.ativo);
       if (conhecido) {
-        const { data: criado } = await db.from("leads").insert([{
-          empresa_id: canal.empresa_id, nome: (conhecido.nome as string | null) ?? destinatario,
-          telefone: (conhecido.telefone as string | null) ?? destinatario,
-          origem, origem_id: destinatario, kanban_status: "novo", ativo: true,
-          filial_id: canal.filial_id,
-        }]).select("id").single();
-        lead = (criado ?? null) as { id: number } | null;
+        const { data, error, status } = await db.rpc("core_negocio_do_canal", {
+          p_empresa: canal.empresa_id, p_contato: contatoId, p_filial: canal.filial_id,
+          p_primeira_msg: null, p_so_existente: false, p_origem: origem, p_origem_id: destinatario,
+        });
+        if (bancoIndisponivel(error, status)) throw new ErroDeBanco(`echo abrir negócio: ${error?.message}`);
+        if (error) console.error("echo abrir negócio:", error.message);
+        negocioId = (data as number | null) ?? null;
       }
     }
-    if (!lead?.id) return;
+    if (!negocioId) return;
     const { id: msgId, erro, fora } = await registrarMensagem(canal.empresa_id, canal.id, mid, {
-      lead_id: lead.id, direcao: "enviada", conteudo: texto, origem, lida: true, tipo, midia_url: midiaUrl,
+      lead_id: negocioId, direcao: "enviada", conteudo: texto, origem, lida: true, tipo, midia_url: midiaUrl,
       // Echo = a mensagem comprovadamente saiu (foi enviada pelo app do celular).
       // Sem isto ela ficava sem tique nenhum no chat, parecendo não enviada.
       status_entrega: "enviada", status_em: new Date().toISOString(),
     });
     if (fora) throw new ErroDeBanco(`gravar echo ${mid}: ${erro}`);
     if (erro) { console.error("gravar echo:", mid, erro); return; }
-    if (msgId == null) { console.log("echo duplicado ignorado:", mid); return; }
-
-    // A lista de leads é ordenada por `ultima_mensagem_at`. O recebimento já
-    // atualizava; o echo não — então responder pelo CRM subia a conversa e
-    // responder PELO CELULAR não, e ela afundava na lista mesmo tendo acabado
-    // de ser atendida. Só depois de gravar: echo repetido não mexe na ordem.
-    await db.from("leads").update({ ultima_mensagem_at: new Date().toISOString() }).eq("id", lead.id);
+    if (msgId == null) console.log("echo duplicado ignorado:", mid);
   } catch (e) {
     // Banco fora sobe até o handler (500 + esquecer hash e mids); o resto é log.
     if (e instanceof ErroDeBanco) throw e;
@@ -1193,8 +1202,8 @@ async function registrarEcho(
 }
 
 // ── Coexistência: contatos do celular ───────────────────────────────────────
-// Só ATUALIZA nome de lead existente. Não cria lead a partir de contato: a agenda
-// do lojista tem gente que não é lead, e criar todos entupiria o funil.
+// Só ATUALIZA nome de contato existente. Não cria contato a partir da agenda: a
+// agenda do lojista tem gente que não é cliente, e criar todos entupiria o funil.
 async function sincronizarContatos(canal: Canal, lista: Record<string, unknown>[]) {
   for (const item of lista) {
     try {
@@ -1203,11 +1212,11 @@ async function sincronizarContatos(canal: Canal, lista: Record<string, unknown>[
       const nome = c?.full_name || c?.first_name;
       if (!fone || item.action === "remove" || !nome) continue;
       const last8 = fone.slice(-8);
-      const { data: leads } = await db.from("leads").select("id, nome, telefone")
+      const { data: achados } = await db.from("contatos").select("id, nome, telefone")
         .eq("empresa_id", canal.empresa_id).eq("ativo", true)
         .or(`origem_id.eq.${fone},telefone.ilike.%${last8}%`).limit(5);
-      for (const l of leads ?? []) {
-        if (!l.nome || l.nome === l.telefone) await db.from("leads").update({ nome }).eq("id", l.id);
+      for (const l of achados ?? []) {
+        if (!l.nome || l.nome === l.telefone) await db.from("contatos").update({ nome }).eq("id", l.id);
       }
     } catch (e) { console.error("contato:", e); }
   }
@@ -1310,47 +1319,24 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       }
       if (!linhas.length) continue;
 
-      // 1º lead ativo pelo origem_id; 2º lead criado à mão (origem_id nulo, casa
-      // pelos últimos 8 dígitos — mesma regra do recebimento normal); 3º lead
-      // INATIVO pelo origem_id, que é REATIVADO (o zerar do funil não pode
-      // significar perder o histórico de quem volta); 4º cria.
-      let leadId: number | null = null;
-      // Na LOJA DO CANAL: o historico importado e daquele numero, e sem este
-      // filtro ele grudava na conversa que a outra loja ja tinha com o cliente.
-      let qh = db.from("leads").select("id")
-        .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", true);
-      if (canal.filial_id != null) qh = qh.eq("filial_id", canal.filial_id);
-      const { data: ativo } = await qh.order("id", { ascending: true }).limit(1);
-      leadId = (ativo?.[0]?.id as number | undefined) ?? null;
+      // 1º negócio ativo do contato na loja (pela identidade, ou pelo telefone do
+      // contato cadastrado à mão); 2º negócio INATIVO na loja, que é REATIVADO (o
+      // zerar do funil não pode significar perder o histórico de quem volta);
+      // 3º cria. Na LOJA DO CANAL: o histórico importado é daquele número, e sem
+      // este filtro ele grudava na conversa que a outra loja já tinha com o cliente.
+      const contatoId = await contatoDaIdentidade(canal.empresa_id, "whatsapp", fone);
+      const daLoja = contatoId ? await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id) : [];
+      let leadId: number | null = daLoja.find((n) => n.ativo)?.id ?? null;
 
       if (!leadId) {
-        const last8 = fone.slice(-8);
-        if (last8.length >= 8) {
-          let qhc = db.from("leads").select("id, telefone")
-            .eq("empresa_id", canal.empresa_id).eq("ativo", true)
-            .is("origem_id", null).ilike("telefone", `%${last8}%`);
-          if (canal.filial_id != null) qhc = qhc.eq("filial_id", canal.filial_id);
-          const { data: cands } = await qhc.limit(20);
-          const match = (cands ?? []).find((l) => {
-            const d = (l.telefone || "").replace(/\D/g, "");
-            return d === fone || d.slice(-8) === last8;
-          });
-          if (match) {
-            leadId = match.id as number;
-            await db.from("leads").update({ origem_id: fone }).eq("id", leadId);
-          }
-        }
-      }
-
-      if (!leadId) {
-        let qhi = db.from("leads").select("id")
-          .eq("empresa_id", canal.empresa_id).eq("origem_id", fone).eq("ativo", false);
-        if (canal.filial_id != null) qhi = qhi.eq("filial_id", canal.filial_id);
-        const { data: inativos } = await qhi.order("created_at", { ascending: false }).limit(1);
-        const inativo = inativos?.[0] as { id: number } | undefined;
-        if (inativo?.id) {
-          leadId = inativo.id as number;
-          await db.from("leads").update({ ativo: true }).eq("id", leadId);
+        const inativo = [...daLoja].reverse().find((n) => !n.ativo);
+        if (inativo) {
+          const lead = (inativo.dados._lead ?? {}) as Record<string, unknown>;
+          const { error, status: sReat } = await db.from("negocios")
+            .update({ dados: { ...inativo.dados, _lead: { ...lead, ativo: true } } }).eq("id", inativo.id);
+          if (bancoIndisponivel(error, sReat)) throw new ErroDeBanco(`histórico reativar: ${error?.message}`);
+          if (error) console.error("histórico reativar:", inativo.id, error.message);
+          leadId = inativo.id;
           reativados++;
         }
       }
@@ -1378,25 +1364,34 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
        */
       if (!leadId && linhas.length < 2) { ignorados++; continue; }
 
+      // Cria: a 1ª linha entra POR IDENTIDADE (a `mensagem_registrar` acha ou cria o
+      // contato, com o nome = número, como antes) e o negócio da loja sai da
+      // `core_negocio_do_canal` — a mesma do recebimento, com as mesmas travas.
+      let pular = 0;
       if (!leadId) {
-        const { data: novo, error, status: sHist } = await db.from("leads").insert([{
-          empresa_id: canal.empresa_id, nome: fone, telefone: fone,
-          origem: "whatsapp", origem_id: fone,
-          ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
-          primeira_msg: primeiraTexto || null,
-          kanban_status: "novo", ativo: true,
-          ...(ultimaEm ? { ultima_mensagem_at: ultimaEm } : {}),
-        }]).select("id").single();
-        if (error && bancoIndisponivel(error, sHist)) throw new ErroDeBanco(`histórico criar lead: ${error.message}`);
-        if (error) { console.error("histórico criar lead:", fone, error.message); falhas++; continue; }
-        leadId = novo.id as number;
+        const { external_id: ext0, ...l0 } = linhas[0];
+        const r0 = await registrarMensagem(canal.empresa_id, canal.id, (ext0 as string | null) ?? null, {
+          ...l0, identidade: fone, nome: fone, ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
+        });
+        if (r0.fora) throw new ErroDeBanco(`histórico gravar: ${r0.erro}`);
+        if (r0.erro) { console.error("histórico criar contato:", fone, r0.erro); falhas++; continue; }
+        const novoContato = contatoId ?? await contatoDaIdentidade(canal.empresa_id, "whatsapp", fone);
+        if (!novoContato) { console.error("histórico sem contato:", fone); falhas++; continue; }
+        const { data: neg, error, status: sHist } = await db.rpc("core_negocio_do_canal", {
+          p_empresa: canal.empresa_id, p_contato: novoContato, p_filial: canal.filial_id,
+          p_primeira_msg: primeiraTexto || null, p_so_existente: false, p_origem: "whatsapp", p_origem_id: fone,
+        });
+        if (bancoIndisponivel(error, sHist)) throw new ErroDeBanco(`histórico criar negócio: ${error?.message}`);
+        if (error || neg == null) { console.error("histórico criar negócio:", fone, error?.message); falhas++; continue; }
+        leadId = neg as number;
         criados++;
+        pular = 1;
       }
 
       // Uma chamada por mensagem: o histórico vem raso (1,5 mensagem por
       // conversa, medido em 13/10), então o lote nunca foi grande.
       let erroLote: string | null = null;
-      for (const { external_id, ...l } of linhas) {
+      for (const { external_id, ...l } of linhas.slice(pular)) {
         const { erro, fora } = await registrarMensagem(canal.empresa_id, canal.id, (external_id as string | null) ?? null,
           { ...l, lead_id: leadId });
         if (fora) throw new ErroDeBanco(`histórico gravar: ${erro}`);
@@ -1404,12 +1399,8 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
       }
       if (erroLote) { console.error("histórico lote:", erroLote); falhas++; continue; }
       importadas += linhas.length;
-      // ultima_mensagem_at REAL da conversa: histórico velho não pode passar na
-      // frente do atendimento de hoje na ordenação da lista.
-      if (ultimaEm) {
-        await db.from("leads").update({ ultima_mensagem_at: ultimaEm }).eq("id", leadId)
-          .or(`ultima_mensagem_at.is.null,ultima_mensagem_at.lt.${ultimaEm}`);
-      }
+      // A ordem da lista vem da conversa (`conversas.ultima_mensagem_at`), mantida
+      // pelo gatilho em `mensagens` com o created_at REAL de cada linha.
     }
   }
 
@@ -1851,10 +1842,10 @@ serve(async (req: Request) => {
       const leadId = body.leadId as string | undefined;
       if (!leadId) return json({ error: "leadId obrigatório" }, 400);
 
-      // `filial_id` do lead entra no SELECT: é ele que diz por qual conta
+      // `filial_id` do negócio entra no SELECT: é ele que diz por qual conta
       // responder. Sem ele, a escolha do canal caía no "conectado por último".
-      const { data: lead } = await db.from("leads")
-        .select("id, empresa_id, origem_id, filial_id").eq("id", leadId).maybeSingle();
+      const { data: lead } = await db.from("negocios")
+        .select("id, empresa_id, filial_id, contato_id").eq("id", leadId).maybeSingle();
       if (!lead) return json({ error: "lead não encontrado" }, 404);
 
       const usuario = await usuarioDoEnvio(req, lead.empresa_id as number);
@@ -1895,10 +1886,21 @@ serve(async (req: Request) => {
         return json({ error: "canal deve ser instagram ou messenger" }, 400);
       }
       if (!body.texto && !body.midiaUrl) return json({ error: "texto ou midiaUrl" }, 400);
-      if (!lead.origem_id) return json({ error: "lead sem origem_id" }, 400);
       const canal = await canalDaLoja(empresaId, nomeCanal, lojaDoLead);
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
-      return await enviarMeta(canal, String(lead.origem_id), body,
+      /**
+       * O destinatário é a identidade do contato NESTE canal. O id do Instagram e
+       * do Messenger é por conta (a mesma pessoa tem um id em cada página): vale o
+       * da conta que vai enviar; sem ele, o primeiro do tipo. Antes era o
+       * `origem_id` do contato, que é a identidade de ONDE ele chegou primeiro —
+       * para quem chegou pelo WhatsApp, o Direct ia para um número de telefone.
+       */
+      const { data: idents } = await db.from("contato_identidades").select("external_id, canal_id")
+        .eq("empresa_id", empresaId).eq("contato_id", lead.contato_id as number).eq("canal_tipo", nomeCanal)
+        .order("id", { ascending: true });
+      const destino = (idents ?? []).find((i) => i.canal_id === canal.id)?.external_id ?? idents?.[0]?.external_id;
+      if (!destino) return json({ error: `contato sem ${nomeCanal} para responder` }, 400);
+      return await enviarMeta(canal, String(destino), body,
         await assinaturaDe(empresaId, usuario.nome, true, canal.filial_id), usuario.id);
     } catch (e) {
       console.error("envio:", e);
@@ -2026,7 +2028,7 @@ serve(async (req: Request) => {
                 continue;
               }
               const { tipo, conteudo: texto, midiaUrl } = await traduzirWhatsApp(canal, m);
-              await upsertLead(canal, {
+              await registrarRecebida(canal, {
                 nome: ((contatos?.[0]?.profile as Record<string, unknown> | undefined)?.name as string) ?? null,
                 telefone: fone, instagramUser: null, origem: "whatsapp", origemId: fone,
                 texto, externalId: (m.id as string) ?? null, tipo, midiaUrl,
@@ -2232,7 +2234,7 @@ serve(async (req: Request) => {
             username = p?.username || null;
             if (p?.profile_pic) fotoUrl = await salvarFotoPerfil(canal, remetente, p.profile_pic);
           }
-          await upsertLead(canal, {
+          await registrarRecebida(canal, {
             nome, telefone: null, instagramUser: tipo === "instagram" ? username : null,
             origem: tipo, origemId: remetente, texto: midia.texto, externalId: mid ?? null,
             tipo: midia.tipo, midiaUrl: midia.midiaUrl, fotoUrl,

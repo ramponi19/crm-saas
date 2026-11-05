@@ -44,9 +44,10 @@ v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens
 n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
 v "busca global ordena o lead"        "components/layout/command-palette.tsx" "order(.ultima_mensagem_at."
 n "busca global nao volta ao teto de 4" "components/layout/command-palette.tsx" "limit(4)"
-v "lead e procurado na loja do canal"   "supabase/functions/webhook-leads/index.ts" "busca = busca.eq(.filial_id., canal.filial_id)"
-v "echo tambem respeita a loja"         "supabase/functions/webhook-leads/index.ts" "ql = ql.eq(.filial_id., canal.filial_id)"
-v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.ts" "qh = qh.eq(.filial_id., canal.filial_id)"
+v "negocio e procurado na loja"         "supabase/functions/webhook-leads/index.ts" "if (filialId != null) q = q.eq(.filial_id., filialId)"
+v "lead e procurado na loja do canal"   "supabase/functions/webhook-leads/index.ts" "negociosNaLoja(empresaId, contatoAntes, canal.filial_id)"
+v "echo tambem respeita a loja"         "supabase/functions/webhook-leads/index.ts" "negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id)).find((n) => n.ativo)?.id ?? null"
+v "historico importa na loja do canal"  "supabase/functions/webhook-leads/index.ts" "contatoId ? await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id) :"
 v "mensagem guarda o canal de entrada"  "supabase/functions/webhook-leads/index.ts" "canal_id: canal.id"
 # 04/11/2026: o card relê a si mesmo do core quando o negócio muda (lead-modal.tsx).
 v "modal aberto recebe o realtime"      "components/modules/leads/lead-modal.tsx" "table: .negocios., filter: .id=eq"
