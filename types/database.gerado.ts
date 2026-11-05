@@ -950,12 +950,6 @@ isOneToOne: false
       referencedRelation: "canais"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "contato_identidades_canal_id_fkey"
-      columns: ["canal_id"]
-isOneToOne: false
-      referencedRelation: "canais_conectados"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "contato_identidades_contato_id_fkey"
       columns: ["contato_id"]
 isOneToOne: false
@@ -1036,12 +1030,6 @@ isOneToOne: false
       columns: ["canal_id"]
 isOneToOne: false
       referencedRelation: "canais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "conversas_canal_id_fkey"
-      columns: ["canal_id"]
-isOneToOne: false
-      referencedRelation: "canais_conectados"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "conversas_contato_id_fkey"
@@ -2272,12 +2260,6 @@ isOneToOne: false
       columns: ["canal_id"]
 isOneToOne: false
       referencedRelation: "canais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "mensagens_canal_id_fkey"
-      columns: ["canal_id"]
-isOneToOne: false
-      referencedRelation: "canais_conectados"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "mensagens_contato_id_fkey"
@@ -3850,39 +3832,7 @@ isOneToOne: true
                 }
           }
           Views: {
-                "canais_conectados": {
-                  Row: {
-                    "access_token_enc": string | null,"coexistencia": boolean | null,"conectado_em": string | null,"created_at": string | null,"criado_por": string | null,"data_access_expira_em": string | null,"empresa_id": number | null,"external_id": string | null,"filial_id": number | null,"id": number | null,"ig_user_id": string | null,"nome_exibicao": string | null,"status": string | null,"sync_contatos_em": string | null,"sync_historico_em": string | null,"sync_historico_pct": number | null,"sync_request_ids": Json | null,"tipo": string | null,"token_expira_em": string | null,"ultima_msg_em": string | null,"ultimo_erro": string | null,"ultimo_erro_em": string | null,"updated_at": string | null,"via": string | null,"waba_id": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "access_token_enc"?: string | null,"coexistencia"?: boolean | null,"conectado_em"?: string | null,"created_at"?: string | null,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id"?: number | null,"external_id"?: string | null,"filial_id"?: number | null,"id"?: number | null,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string | null,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: Json | null,"tipo"?: string | null,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string | null,"via"?: string | null,"waba_id"?: string | null
-                         }
-                        Update: {
-                           "access_token_enc"?: string | null,"coexistencia"?: boolean | null,"conectado_em"?: string | null,"created_at"?: string | null,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id"?: number | null,"external_id"?: string | null,"filial_id"?: number | null,"id"?: number | null,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string | null,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: Json | null,"tipo"?: string | null,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string | null,"via"?: string | null,"waba_id"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "canais_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "canais_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "canais_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"clientes": {
+                "clientes": {
                   Row: {
                     "ativo": boolean | null,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj_validado": boolean | null,"complemento": string | null,"corretor_id": string | null,"cpf_cnpj": string | null,"cpf_validado": boolean | null,"created_at": string | null,"data_nascimento": string | null,"email": string | null,"empresa_id": number | null,"endereco": string | null,"estado": string | null,"estado_civil": string | null,"filial_id": number | null,"id": number | null,"instagram": string | null,"lead_id": number | null,"nacionalidade": string | null,"nome": string | null,"numero": string | null,"observacoes": string | null,"origem_cliente": string | null,"profissao": string | null,"proprietario": boolean | null,"regiao_interesse": string | null,"status_aprovacao": string | null,"telefone": string | null,"tipo_cliente": string | null,"tipo_negocio": string | null,"usuario_id": string | null,"valor_pretendido": number | null
                   }

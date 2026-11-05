@@ -1164,3 +1164,11 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - **Lotes aplicados até aqui**, pelo `schema_migrations`: `drop_views_lote1` a `drop_views_lote6` (`20261104223821`, `…224115`, `…231116`, `…235528`, `20261105104323`, `…111438`).
 - **Foto de produto:** quebrada pelo lote 4 (bucket com nome de tabela), corrigida e testada com um envio real, depois limpa (detalhe no 05, "Lote 6").
 - **Grep das views:** caíram 37 das 41 e restam 4.
+
+## 28. 05/11 às 09h10: lote 7 das views (canais), Edge v71 e smoke real (`9b0968a`)
+
+- **Ordem:** app às 08h53 (IOwait 0,68%) → Edge v71 às 08h57 (o primeiro deploy foi barrado pelo modo automático; o Lucas trocou para o manual) → smoke com WhatsApp e Instagram reais → migração às 09h10 (IOwait 6,27%).
+- **Smoke:** 4 recebidas e 4 respondidas nas duas lojas, todas no canal certo, com o id da Meta, e as 4 respostas em "lida" (detalhe no 05, "Lote 7").
+- **Depois do drop:** mensagens entrando normalmente; API ok.
+- **Views no `public`:** 7 (`clientes`, `lead_mensagens`, `leads`, `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
+- **Grep das views:** caíram 38 das 41 e restam 3.

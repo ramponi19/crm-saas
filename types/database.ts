@@ -9,7 +9,7 @@
  * anulável; estas têm exatamente as colunas e restrições da tabela, e o app lê e
  * grava nelas como sempre leu e gravou (são auto-atualizáveis).
  *
- * As outras views (`leads`, `lead_mensagens`, `clientes`, `canais_conectados`,
+ * As outras views (`leads`, `lead_mensagens`, `clientes`,
  * ...) juntam mais de uma tabela e seguem como o gerador as entrega.
  */
 import type { Database as Gerado, Json } from './database.gerado'
@@ -30,7 +30,6 @@ interface ColunasObrigatorias {
   leads: 'id' | 'empresa_id' | 'created_at'
   clientes: 'id' | 'empresa_id' | 'created_at'
   lead_mensagens: 'id' | 'empresa_id' | 'direcao' | 'conteudo' | 'tipo' | 'lida' | 'created_at'
-  canais_conectados: 'id' | 'empresa_id' | 'tipo' | 'status'
 }
 type Obrig<R, K extends string> = Omit<R, K & keyof R> & { [P in K & keyof R]-?: NonNullable<R[P]> }
 type Refinadas = {

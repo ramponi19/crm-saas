@@ -593,6 +593,30 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
 - **Volta:** `supabase/scripts/volta/volta-views-lote6.sql`, junto com o Instant Rollback para antes de `17d59ab` (**sem** desfazer a correção do bucket: se voltar, reaplicar só a linha do `upload-fotos.tsx`).
 - **Restam 4 views de compatibilidade** (`canais_conectados`, `clientes`, `lead_mensagens`, `leads`) e 4 que não são (`storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
 
+### Lote 7 (05/11, 09h10): canais — cai 1, restam 3 de compatibilidade
+
+| código no ar | Edge | migração | view que caiu |
+|---|---|---|---|
+| `9b0968a`, READY 08h53min39s | `webhook-leads` **v71** (08h57min57s, do worktree em `9b0968a`) | `20261105000900` às 09h10min21s (versão `20261105121021`), IOwait 6,27%, aprovação do Lucas no chat | `canais_conectados` |
+
+- **12 arquivos, 33 leituras** foram para `canais`: 11 delas na Edge, as rotas de canais e de modelos, a renovação de token, o envio do WhatsApp e a exclusão de empresa. Mais as 2 **URLs REST** dos scripts de diagnóstico (`rest/v1/canais_conectados`), um formato que o critério não pegava. O mesmo formato foi conferido para as 37 views já caídas: nenhuma ocorrência.
+- **Mesmo acesso:** a tabela tem os mesmos grants da view (authenticated nas 25 colunas, sem anon) e a mesma RLS; a view era `security_invoker`.
+- **Edge local:** os 25 cenários passaram com e sem a view (canal fora = 500 e a Meta reenvia, reenvio, mid duplicado, visto do IG, pacote grande). O proxy de teste passou a derrubar `/rest/v1/canais`. O cache de canal da Edge vive no processo: para repetir "canal fora", reiniciar a Edge antes.
+- **Smoke real com o Lucas** (WhatsApp e Instagram, Mogi e Jaguariúna):
+  - **recebidas** pela v71 no canal e na loja certos: WA Mogi (canal 15, loja 3), WA Jaguariúna (28, 6), IG Mogi (26, 3) e IG Jaguariúna (25, 6). Uma mensagem real de cliente também entrou às 08h58;
+  - **respostas** do Lucas pela Comunicação, com o login de dono: as 4 saíram pelo canal da loja, com o id da Meta (`wamid…` e o mid do Direct), e chegaram a **lida** entre 09h07 e 09h08. As 4 chegaram no celular;
+  - o superadmin impersonando **não envia**: a Edge exige vínculo em `empresa_usuarios` (`usuarioDoEnvio`). É regra antiga e fica.
+- **Depois do drop:** as mensagens continuaram entrando (a última às 09h10min21s); `/api/canais` devolve os 5 canais ativos; os modelos e 4 telas deram 200.
+- **Build:** o `types/views-espelho.ts` vazio (do commit de tipos do lote 6, `2773a64`) reprovou o ESLint, e o deploy de `2773a64` falhou. A produção ficou em `17d59ab`, com o mesmo código. Corrigido em `9b0968a` (`Record<never, never>`). Daqui em diante, o gate roda **depois** de tirar os tipos.
+- **Tipos:** `canais_conectados` saiu de `types/database.gerado.ts` (com 3 relações) e de `ColunasObrigatorias` em `types/database.ts`.
+- **Volta:** `supabase/scripts/volta/volta-views-lote7.sql` + Instant Rollback para antes de `9b0968a` + republicar a Edge v70 de `D:/Nexus-Copia/inbox/ferramentas/lote7/volta-edge-v70/` (`index.ts` e `reenvio.ts` de `40d2164`). As três juntas.
+- **As 4 views que não são de compatibilidade** (conferido em 05/11, pedido do Lucas):
+  - `core_v_planos`: nenhum leitor (código, funções, jobs, views; 0 chamadas no `pg_stat_statements`). **Cai no último lote.**
+  - `v_empresas_plano`: nenhum leitor (1 chamada no `pg_stat_statements`, de consulta de inspeção). Tem SELECT para `anon`, mas filtra por `get_empresa_id()`. **Cai no último lote.**
+  - `v_leads_nao_lidas`: lida pela `quadro_base` (o quadro de `/leads`; 145 chamadas). Uso real, mas lê `leads`/`lead_mensagens`: cai com elas, e a `quadro_base` passa a contar no core antes.
+  - `storage_orfaos`: lida só pelo script manual `scripts/limpar-orfaos-chat-midia.mjs` e pela `acharOrfaos()` de `lib/storage/retencao.ts`, que não tem chamador. Lê `leads`/`lead_mensagens`: reescrever sobre `mensagens`/`negocios` antes de elas caírem.
+- **Restam 3 views de compatibilidade:** `clientes`, `lead_mensagens` e `leads`.
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.
