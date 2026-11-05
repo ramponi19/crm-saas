@@ -1,3 +1,4 @@
+import { nadaGravado } from '@/lib/linhas-afetadas'
 import Stripe from 'stripe'
 
 // ─── Lazy client — só instancia quando chamado, não no build ─
@@ -52,10 +53,19 @@ export async function getOrCreateCustomer(empresaId: number, nome: string, email
     metadata: { empresa_id: String(empresaId) },
   })
 
-  await supabase
+  // O pagamento segue com o cliente criado; mas sem gravar o id, o próximo checkout
+  // criaria OUTRO cliente na Stripe para a mesma empresa — tem de aparecer no log.
+  // Pelo cliente de SERVIÇO: authenticated só pode alterar `nome` de empresas, e esta
+  // gravação falhava sempre, calada. Quem chama (checkout) já exigiu dono/admin da empresa.
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  const { data: gravadas, error } = await createServiceClient()
     .from('empresas')
     .update({ stripe_customer_id: customer.id })
     .eq('id', empresaId)
+    .select('id')
+  if (error || nadaGravado(gravadas)) {
+    console.error('[stripe] stripe_customer_id não gravado', { empresaId, erro: error?.message ?? 'nenhuma linha' })
+  }
 
   return customer.id
 }

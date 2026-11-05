@@ -1,3 +1,5 @@
+import { createServiceClient } from '@/lib/supabase/service'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { NextRequest, NextResponse } from 'next/server'
 import { logSuperAdminAction, requireSuperAdminApi } from '@/lib/superadmin'
 import type { Database } from '@/types/database'
@@ -24,7 +26,6 @@ export async function POST(
 
   const ctx = await requireSuperAdminApi()
   if (ctx.error) return ctx.error
-  const { supabase } = ctx
 
   const acao = (await req.json()) as Acao
 
@@ -67,14 +68,20 @@ export async function POST(
       return NextResponse.json({ error: 'Ação desconhecida' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  // Pelo cliente de SERVIÇO: o papel authenticated só pode alterar a coluna `nome` de
+  // empresas (grant de coluna), e plano/status/trial davam "permission denied" (500).
+  // Quem chama já foi conferido como superadmin acima.
+  const { data: gravadas, error } = await createServiceClient()
     .from('empresas')
     .update(update)
     .eq('id', empresaId)
+    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  // Sem isto a ação ia para o log do superadmin como feita mesmo sem mudar a empresa.
+  if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
   await logSuperAdminAction({
     adminUserId: ctx.userId,
