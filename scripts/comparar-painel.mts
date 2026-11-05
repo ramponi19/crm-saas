@@ -50,14 +50,14 @@ async function antes(db: Db) {
   // Sem esquema tipado: a cópia antiga lê as views, que o tipo do app já não descreve como antes.
   const solto = db as unknown as { from: (t: string) => any } // eslint-disable-line @typescript-eslint/no-explicit-any
   const qVendas = solto.from('vendas')
-    .select('id, valor_venda, lucro, data_venda, canal_venda, status, vendedor_id, produtos!produto_id(nome)')
+    .select('id, valor_venda, lucro, data_venda, canal_venda, status, vendedor_id, produtos:estoque_produtos!produto_id(nome)')
     .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').gte('data_venda', inicio12m.toISOString())
   const [vendasR, clientes, ativos, novos, estoque, assist, funilR] = await Promise.all([
     aplicarEscopo(qVendas, escopo, 'vendedor_id'),
     solto.from('clientes').select('*', head).eq('empresa_id', empresaId).eq('ativo', true),
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
     aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
-    solto.from('inventario_unidades').select('*', head).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
+    solto.from('estoque_unidades').select('*', head).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
     solto.from('assistencia_garantias').select('*', head).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
     aplicarEscopo(solto.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
   ])
