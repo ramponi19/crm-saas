@@ -1,0 +1,158 @@
+{
+  "app/(dashboard)/estoque/components/unidade-modal.tsx|estoque_veiculo_dados|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "app/(dashboard)/pdv/components/pdv-view.tsx|estoque_unidades|update": {
+    "n": 1,
+    "motivo": "limpa o vínculo da reserva da peça já vendida; complemento, a tela não confirma"
+  },
+  "app/(dashboard)/pdv/components/pdv-view.tsx|vendas_pagamentos|delete": {
+    "n": 1,
+    "motivo": "volta da venda que falhou: 0 pagamentos é normal (falhou antes de gravar)"
+  },
+  "app/(dashboard)/pdv/page.tsx|estoque_unidades|update": {
+    "n": 1,
+    "motivo": "expiração preguiçosa das reservas no servidor; 0 linhas = nada vencido"
+  },
+  "app/api/acesso/route.ts|acessos|update": {
+    "n": 3,
+    "motivo": "sinal de presença em segundo plano (fechar/renovar sessão); 0 linhas = sessão já fechada; a tela não confirma"
+  },
+  "app/api/acesso/route.ts|usuarios|update": {
+    "n": 1,
+    "motivo": "ultimo_acesso em segundo plano; o erro já vai para o log e a resposta não depende dele"
+  },
+  "app/api/avaliacoes/route.ts|avaliacao_usados|update": {
+    "n": 1,
+    "motivo": "vínculo da unidade criada; o UPDATE anterior da mesma avaliação já foi conferido (404)"
+  },
+  "app/api/cadencias/route.ts|cadencia_passos|delete": {
+    "n": 1,
+    "motivo": "apaga os passos antes de regravar; 0 = cadência sem passos (o UPDATE da cadência já foi conferido)"
+  },
+  "app/api/cadencias/route.ts|cadencia_inscricoes|update": {
+    "n": 1,
+    "motivo": "ajusta inscrições além do novo último passo; 0 = nenhuma passou do fim"
+  },
+  "app/api/compras/receber/route.ts|vendas_vendas|update": {
+    "n": 1,
+    "motivo": "vínculo da unidade nova na venda da encomenda, complemento; o pedido já foi conferido (404)"
+  },
+  "app/api/contrato-modelo/route.ts|vendas_contrato_modelos|update": {
+    "n": 1,
+    "motivo": "desativa a versão anterior; 0 = não havia ativa"
+  },
+  "app/api/funis/route.ts|funis|update": {
+    "n": 1,
+    "motivo": "tira o padrão dos outros funis antes de marcar o novo; 0 = nenhum outro era padrão (o UPDATE do novo é conferido)"
+  },
+  "app/api/payments/config/route.ts|financeiro_config_pagamento|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "app/api/push/subscribe/route.ts|push_subscriptions|upsert": {
+    "n": 1,
+    "motivo": "inscrição do próprio navegador (RLS usuario_id = auth.uid()); upsert barrado dá erro"
+  },
+  "app/api/push/subscribe/route.ts|push_subscriptions|delete": {
+    "n": 1,
+    "motivo": "cancelar a inscrição do próprio navegador; 0 = já não estava inscrito"
+  },
+  "app/api/troca/regras/route.ts|avaliacao_regras|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/assinatura-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/configuracoes-view.tsx|financeiro_taxas|delete": {
+    "n": 1,
+    "motivo": "apaga todas as taxas antes de regravar; 0 = não havia"
+  },
+  "components/modules/configuracoes/configuracoes-view.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/contrato-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/devolucao-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/horario-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/motivos-perda-card.tsx|motivos_perda|delete": {
+    "n": 1,
+    "motivo": "exclusão em lote dos motivos removidos; 0 = já tinham saído"
+  },
+  "components/modules/configuracoes/notificacoes-card.tsx|notificacao_prefs|upsert": {
+    "n": 1,
+    "motivo": "preferência do próprio usuário (RLS usuario_id = auth.uid()); upsert barrado dá erro"
+  },
+  "components/modules/configuracoes/retorno-cliente-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/templates-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/configuracoes/troca-card.tsx|configuracoes_sistema|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/leads/lead-match-panel.tsx|imoveis_perfis_busca|upsert": {
+    "n": 1,
+    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
+  },
+  "components/modules/leads/lead-modal.tsx|mensagens|update": {
+    "n": 1,
+    "motivo": "marcar lida em segundo plano; a tela não confirma nada; 0 linhas = nada a ler"
+  },
+  "lib/automacoes.ts|automacao_execucoes|update": {
+    "n": 2,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (a fila só aceita o de serviço; ver executarEntradaEtapa)"
+  },
+  "lib/empresa-config.ts|empresa_menu|upsert": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (menu-config, superadmin e presets passam svc)"
+  },
+  "lib/empresa-config.ts|empresa_modulos|update": {
+    "n": 2,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu"
+  },
+  "lib/presets.ts|empresa_modulos|delete": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (register e superadmin-preview passam svc)"
+  },
+  "lib/presets.ts|campos_personalizados|delete": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu"
+  },
+  "lib/presets.ts|empresa_modulos|upsert": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu"
+  },
+  "lib/presets.ts|campos_personalizados|upsert": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu"
+  },
+  "lib/stripe.ts|empresas|update": {
+    "n": 1,
+    "motivo": "reconciliarAssinaturas: recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (cron e superadmin/sync-stripe passam createServiceClient)"
+  },
+  "lib/zapintel/perfil.ts|zapintel_lead_perfil|upsert": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (a rota do perfil passa rastrDb)"
+  },
+  "lib/zapintel/ponte.ts|zapintel_venda_lead|upsert": {
+    "n": 1,
+    "motivo": "recebe o cliente de SERVIÇO por parâmetro (sem RLS); 0 linhas = registro que já saiu (cron passa createServiceClient)"
+  }
+}
