@@ -1156,3 +1156,11 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - **Números iguais antes e depois do drop** nas duas lojas (tabela no 05, "Lote 5").
 - **Check-modulos:** 42 exceções na partida (4 fora, 38 sem trava).
 - **Grep das views:** caíram 33 das 41 e restam 8.
+
+## 27. 05/11 às 08h14: lote 6 das views (imob) e a foto de produto (`17d59ab`)
+
+- **Deploy:** push com IOwait de 3,3% (média da hora); READY às 08h10min13s. API ok.
+- **Migração `20261105000800`** às 08h14 (IOwait 1,61%), confirmada pelo Lucas na primeira tentativa. Views no `public`: 8. `propagar_filial_do_lead`: 0.
+- **Lotes aplicados até aqui**, pelo `schema_migrations`: `drop_views_lote1` a `drop_views_lote6` (`20261104223821`, `…224115`, `…231116`, `…235528`, `20261105104323`, `…111438`).
+- **Foto de produto:** quebrada pelo lote 4 (bucket com nome de tabela), corrigida e testada com um envio real, depois limpa (detalhe no 05, "Lote 6").
+- **Grep das views:** caíram 37 das 41 e restam 4.

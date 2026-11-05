@@ -576,6 +576,23 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
 - **Volta:** `supabase/scripts/volta/volta-views-lote5.sql`, junto com o Instant Rollback para antes de `22113a9`.
 - **Restam 8 views de compatibilidade:** `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca`, `canais_conectados`, `clientes`, `lead_mensagens` e `leads`. Ficam também `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos` e `v_empresas_plano`.
 
+### Lote 6 (05/11, 08h14): imob — caem 4, restam 4 de compatibilidade
+
+| código no ar | migração | o que caiu |
+|---|---|---|
+| `17d59ab`, READY 08h10min13s | `20261105000800` às 08h14 (versão `20261105111438`), IOwait 1,61%, aprovação do Lucas no chat | `imoveis`, `chaves_imoveis`, `negocios_imobiliarios`, `lead_perfil_busca` e a função `propagar_filial_do_lead()` |
+
+- **23 arquivos** foram para `imoveis_imoveis`, `imoveis_chaves`, `imoveis_negocios` e `imoveis_perfis_busca` (from, embed `imoveis:imoveis_imoveis(...)` da agenda e do painel, tipo), mais os 2 literais da exportação imob (`imob_imoveis`, `imob_financeiro`).
+- **`propagar_filial_do_lead()`**: era a única função que citava uma delas (update em `lead_perfil_busca`, `lead_mensagens` e `clientes`). Estava morta: função de gatilho sem gatilho, substituída pelos `core_*` no core v1. Caiu junto, e a migração confere antes que nenhum gatilho passou a usá-la. A volta a recria, com os grants.
+- **As políticas `imoveis_*` de `storage.objects`** falam do BUCKET `imoveis`, não da view. Ficam.
+- **Produção sem dado de imob** (0 imóveis, chaves, negócios e perfis; nenhuma empresa com o módulo). O e2e foi no local, com o Imóveis ligado só lá para a empresa 1 e os dados de teste apagados no fim: as 4 escritas pela RLS do dono, os embeds visita→imóvel e chave→imóvel, 7 telas com 200, `/api/match` e as duas exportações imob.
+- **Smoke na produção** (JM, 2 lojas, antes e depois do drop): 11 telas com 200. Com o módulo desligado, `/imoveis` leva a `/dashboard` e a exportação imob dá 403, como esperado.
+- **Defeito do lote 4 achado aqui e corrigido em `17d59ab`:** o `renomear.cjs` trocou `storage.from('produtos')` (bucket) por `estoque_produtos` em `components/ui/upload-fotos.tsx`. O upload de foto de produto e de unidade falhava desde 04/11 20h52; o bucket tinha 0 objetos, então ninguém chegou a tentar. A ferramenta agora pula `storage.from`. **Teste real na produção** (05/11, pedido do Lucas): produto "TESTE FOTO — apagar" (id 179) com foto PNG pela tela do catálogo, gravado com `foto_url` no bucket `produtos/1/`, URL pública 200. Depois, arquivo apagado pela API do Storage e produto apagado: 0 objetos no bucket e 35 produtos na JM, como antes.
+- **Defeito antigo anotado:** `/clientes` dispara o erro de hidratação React #418 (texto diferente entre servidor e navegador) também na produção sem o lote 6, com ou sem o Imóveis. **Decisão do Lucas:** corrigir no lote de `clientes`.
+- **Tipos:** as 4 saíram de `types/database.gerado.ts` (com 3 relações) e de `types/views-espelho.ts`, que ficou vazio.
+- **Volta:** `supabase/scripts/volta/volta-views-lote6.sql`, junto com o Instant Rollback para antes de `17d59ab` (**sem** desfazer a correção do bucket: se voltar, reaplicar só a linha do `upload-fotos.tsx`).
+- **Restam 4 views de compatibilidade** (`canais_conectados`, `clientes`, `lead_mensagens`, `leads`) e 4 que não são (`storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

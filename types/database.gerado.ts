@@ -1989,12 +1989,6 @@ isOneToOne: false
       foreignKeyName: "chaves_imoveis_imovel_id_fkey"
       columns: ["imovel_id"]
 isOneToOne: false
-      referencedRelation: "imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "chaves_imoveis_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
       referencedRelation: "imoveis_imoveis"
       referencedColumns: ["id"]
     }
@@ -2096,12 +2090,6 @@ isOneToOne: false
       columns: ["empresa_id"]
 isOneToOne: false
       referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "negocios_imobiliarios_imovel_id_fkey"
@@ -3739,12 +3727,6 @@ isOneToOne: false
       foreignKeyName: "visitas_imovel_id_fkey"
       columns: ["imovel_id"]
 isOneToOne: false
-      referencedRelation: "imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
       referencedRelation: "imoveis_imoveis"
       referencedColumns: ["id"]
     },{
@@ -3900,44 +3882,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"chaves_imoveis": {
-                  Row: {
-                    "codigo": string | null,"com_quem": string | null,"created_at": string | null,"devolucao_prevista": string | null,"empresa_id": number | null,"id": number | null,"imovel_id": number | null,"observacoes": string | null,"retirada_em": string | null,"status": string | null,"usuario_id": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "codigo"?: string | null,"com_quem"?: string | null,"created_at"?: string | null,"devolucao_prevista"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"imovel_id"?: number | null,"observacoes"?: string | null,"retirada_em"?: string | null,"status"?: string | null,"usuario_id"?: string | null
-                         }
-                        Update: {
-                           "codigo"?: string | null,"com_quem"?: string | null,"created_at"?: string | null,"devolucao_prevista"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"imovel_id"?: number | null,"observacoes"?: string | null,"retirada_em"?: string | null,"status"?: string | null,"usuario_id"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "chaves_imoveis_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "chaves_imoveis_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "chaves_imoveis_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "chaves_imoveis_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis_imoveis"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"clientes": {
                   Row: {
                     "ativo": boolean | null,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj_validado": boolean | null,"complemento": string | null,"corretor_id": string | null,"cpf_cnpj": string | null,"cpf_validado": boolean | null,"created_at": string | null,"data_nascimento": string | null,"email": string | null,"empresa_id": number | null,"endereco": string | null,"estado": string | null,"estado_civil": string | null,"filial_id": number | null,"id": number | null,"instagram": string | null,"lead_id": number | null,"nacionalidade": string | null,"nome": string | null,"numero": string | null,"observacoes": string | null,"origem_cliente": string | null,"profissao": string | null,"proprietario": boolean | null,"regiao_interesse": string | null,"status_aprovacao": string | null,"telefone": string | null,"tipo_cliente": string | null,"tipo_negocio": string | null,"usuario_id": string | null,"valor_pretendido": number | null
@@ -3984,50 +3928,6 @@ isOneToOne: false
                         Relationships: [
                     
                   ]
-                },"imoveis": {
-                  Row: {
-                    "aceita_financiamento": boolean | null,"aceita_permuta": boolean | null,"area_total": number | null,"area_util": number | null,"bairro": string | null,"banheiros": number | null,"captado_em": string | null,"captado_por": string | null,"cep": string | null,"cidade": string | null,"codigo": string | null,"complemento": string | null,"created_at": string | null,"descricao": string | null,"empresa_id": number | null,"finalidade": string | null,"fotos": Json | null,"id": number | null,"iptu_periodicidade": string | null,"latitude": number | null,"logradouro": string | null,"longitude": number | null,"matricula": string | null,"numero": string | null,"ocultar_numero_publico": boolean | null,"proprietario_id": number | null,"publicar_portais": boolean | null,"quartos": number | null,"status": string | null,"suites": number | null,"tipo": string | null,"titulo": string | null,"uf": string | null,"updated_at": string | null,"vagas": number | null,"valor_condominio": number | null,"valor_iptu": number | null,"valor_locacao": number | null,"valor_venda": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "aceita_financiamento"?: boolean | null,"aceita_permuta"?: boolean | null,"area_total"?: number | null,"area_util"?: number | null,"bairro"?: string | null,"banheiros"?: number | null,"captado_em"?: string | null,"captado_por"?: string | null,"cep"?: string | null,"cidade"?: string | null,"codigo"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"descricao"?: string | null,"empresa_id"?: number | null,"finalidade"?: string | null,"fotos"?: Json | null,"id"?: number | null,"iptu_periodicidade"?: string | null,"latitude"?: number | null,"logradouro"?: string | null,"longitude"?: number | null,"matricula"?: string | null,"numero"?: string | null,"ocultar_numero_publico"?: boolean | null,"proprietario_id"?: number | null,"publicar_portais"?: boolean | null,"quartos"?: number | null,"status"?: string | null,"suites"?: number | null,"tipo"?: string | null,"titulo"?: string | null,"uf"?: string | null,"updated_at"?: string | null,"vagas"?: number | null,"valor_condominio"?: number | null,"valor_iptu"?: number | null,"valor_locacao"?: number | null,"valor_venda"?: number | null
-                         }
-                        Update: {
-                           "aceita_financiamento"?: boolean | null,"aceita_permuta"?: boolean | null,"area_total"?: number | null,"area_util"?: number | null,"bairro"?: string | null,"banheiros"?: number | null,"captado_em"?: string | null,"captado_por"?: string | null,"cep"?: string | null,"cidade"?: string | null,"codigo"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"descricao"?: string | null,"empresa_id"?: number | null,"finalidade"?: string | null,"fotos"?: Json | null,"id"?: number | null,"iptu_periodicidade"?: string | null,"latitude"?: number | null,"logradouro"?: string | null,"longitude"?: number | null,"matricula"?: string | null,"numero"?: string | null,"ocultar_numero_publico"?: boolean | null,"proprietario_id"?: number | null,"publicar_portais"?: boolean | null,"quartos"?: number | null,"status"?: string | null,"suites"?: number | null,"tipo"?: string | null,"titulo"?: string | null,"uf"?: string | null,"updated_at"?: string | null,"vagas"?: number | null,"valor_condominio"?: number | null,"valor_iptu"?: number | null,"valor_locacao"?: number | null,"valor_venda"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "imoveis_captado_por_fkey"
-      columns: ["captado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imoveis_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imoveis_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imoveis_proprietario_id_fkey"
-      columns: ["proprietario_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imoveis_proprietario_id_fkey"
-      columns: ["proprietario_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"lead_mensagens": {
                   Row: {
                     "canal_id": number | null,"conteudo": string | null,"created_at": string | null,"direcao": string | null,"empresa_id": number | null,"erro_envio": string | null,"external_id": string | null,"filial_id": number | null,"id": number | null,"lead_id": number | null,"lida": boolean | null,"midia_retida_em": string | null,"midia_url": string | null,"origem": string | null,"status_em": string | null,"status_entrega": string | null,"tipo": string | null,"transcricao": string | null,"usuario_id": string | null
@@ -4041,68 +3941,6 @@ isOneToOne: false
                          }
                         Relationships: [
                     
-                  ]
-                },"lead_perfil_busca": {
-                  Row: {
-                    "area_max": number | null,"area_min": number | null,"ativo": boolean | null,"bairros": (string)[] | null,"caracteristicas": (string)[] | null,"cidades": (string)[] | null,"cliente_id": number | null,"created_at": string | null,"empresa_id": number | null,"filial_id": number | null,"finalidade": string | null,"id": number | null,"lead_id": number | null,"observacoes": string | null,"preco_max": number | null,"preco_min": number | null,"quartos_max": number | null,"quartos_min": number | null,"suites_min": number | null,"tipos": (string)[] | null,"updated_at": string | null,"vagas_min": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "area_max"?: number | null,"area_min"?: number | null,"ativo"?: boolean | null,"bairros"?: (string)[] | null,"caracteristicas"?: (string)[] | null,"cidades"?: (string)[] | null,"cliente_id"?: number | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"finalidade"?: string | null,"id"?: number | null,"lead_id"?: number | null,"observacoes"?: string | null,"preco_max"?: number | null,"preco_min"?: number | null,"quartos_max"?: number | null,"quartos_min"?: number | null,"suites_min"?: number | null,"tipos"?: (string)[] | null,"updated_at"?: string | null,"vagas_min"?: number | null
-                         }
-                        Update: {
-                           "area_max"?: number | null,"area_min"?: number | null,"ativo"?: boolean | null,"bairros"?: (string)[] | null,"caracteristicas"?: (string)[] | null,"cidades"?: (string)[] | null,"cliente_id"?: number | null,"created_at"?: string | null,"empresa_id"?: number | null,"filial_id"?: number | null,"finalidade"?: string | null,"id"?: number | null,"lead_id"?: number | null,"observacoes"?: string | null,"preco_max"?: number | null,"preco_min"?: number | null,"quartos_max"?: number | null,"quartos_min"?: number | null,"suites_min"?: number | null,"tipos"?: (string)[] | null,"updated_at"?: string | null,"vagas_min"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "lead_perfil_busca_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: true
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: true
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "lead_perfil_busca_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: true
-      referencedRelation: "v_leads_nao_lidas"
-      referencedColumns: ["lead_id"]
-    }
                   ]
                 },"leads": {
                   Row: {
@@ -4152,92 +3990,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "usuarios"
       referencedColumns: ["id"]
-    }
-                  ]
-                },"negocios_imobiliarios": {
-                  Row: {
-                    "assinado_em": string | null,"captador_id": string | null,"cashback": number | null,"cashback_percentual": number | null,"chaves_entregues_em": string | null,"cliente_id": number | null,"cliente_nome": string | null,"comissao_aprovada_em": string | null,"comissao_captador": number | null,"comissao_paga_em": string | null,"comissao_status": string | null,"comissao_total": number | null,"comissao_vendedor": number | null,"corretor_id": string | null,"created_at": string | null,"criado_por": string | null,"empresa_id": number | null,"id": number | null,"imovel_codigo": string | null,"imovel_id": number | null,"lead_id": number | null,"locacao_fim": string | null,"locacao_inicio": string | null,"observacoes": string | null,"origem": string | null,"percentual": number | null,"status": string | null,"tipo": string | null,"updated_at": string | null,"valor": number | null,"vistoria_em": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "assinado_em"?: string | null,"captador_id"?: string | null,"cashback"?: number | null,"cashback_percentual"?: number | null,"chaves_entregues_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string | null,"comissao_aprovada_em"?: string | null,"comissao_captador"?: number | null,"comissao_paga_em"?: string | null,"comissao_status"?: string | null,"comissao_total"?: number | null,"comissao_vendedor"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"criado_por"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"imovel_codigo"?: string | null,"imovel_id"?: number | null,"lead_id"?: number | null,"locacao_fim"?: string | null,"locacao_inicio"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"percentual"?: number | null,"status"?: string | null,"tipo"?: string | null,"updated_at"?: string | null,"valor"?: number | null,"vistoria_em"?: string | null
-                         }
-                        Update: {
-                           "assinado_em"?: string | null,"captador_id"?: string | null,"cashback"?: number | null,"cashback_percentual"?: number | null,"chaves_entregues_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string | null,"comissao_aprovada_em"?: string | null,"comissao_captador"?: number | null,"comissao_paga_em"?: string | null,"comissao_status"?: string | null,"comissao_total"?: number | null,"comissao_vendedor"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"criado_por"?: string | null,"empresa_id"?: number | null,"id"?: number | null,"imovel_codigo"?: string | null,"imovel_id"?: number | null,"lead_id"?: number | null,"locacao_fim"?: string | null,"locacao_inicio"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"percentual"?: number | null,"status"?: string | null,"tipo"?: string | null,"updated_at"?: string | null,"valor"?: number | null,"vistoria_em"?: string | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "negocios_imobiliarios_captador_id_fkey"
-      columns: ["captador_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_corretor_id_fkey"
-      columns: ["corretor_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_criado_por_fkey"
-      columns: ["criado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis_imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "leads"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "v_leads_nao_lidas"
-      referencedColumns: ["lead_id"]
     }
                   ]
                 },"storage_orfaos": {
