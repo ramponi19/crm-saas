@@ -42,7 +42,7 @@ export async function verificarLimite(
    */
   const svc = createServiceClient()
   const { count } = recurso === 'leads'
-    ? await svc.from('leads').select('id', { count: 'exact', head: true })
+    ? await svc.from('negocios').select('id', { count: 'exact', head: true })
         .eq('empresa_id', empresaId).eq('ativo', true)
     : await svc.from('empresa_usuarios').select('id', { count: 'exact', head: true })
         .eq('empresa_id', empresaId).eq('ativo', true)

@@ -3,6 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { diasParado, DIAS_ATENCAO } from '@/lib/lead-parado'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
+import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 import { GestaoLeadsView, type LeadAtrasado, type EstadoReativacao } from './gestao-leads-view'
 
 export const metadata = { title: 'Gestão de Leads' }
@@ -41,8 +42,8 @@ export default async function GestaoLeadsPage() {
    */
   const restringe = !!role && !permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
 
-  let qLeads = supabase.from('leads')
-    .select('id, nome, telefone, kanban_status, funil_id, valor_estimado, responsavel_id, ultima_mensagem_at, ultima_tratativa, created_at')
+  // Lead = negócio ativo (a view `leads` caiu); a última mensagem vem da conversa, abaixo.
+  let qLeads = supabase.from('negocios').select(COLUNAS_LEAD)
     .eq('empresa_id', empresaId).eq('ativo', true).limit(1000)
   if (restringe) qLeads = qLeads.eq('responsavel_id', user.id)
 
@@ -89,7 +90,16 @@ export default async function GestaoLeadsPage() {
   // render repetido para divergir — a regra de pureza não se aplica aqui.
   // eslint-disable-next-line react-hooks/purity
   const agora = Date.now()
-  const abertos = ((leadsRaw ?? []) as LeadRow[])
+  // A última mensagem é da conversa do contato na loja — só o negócio principal a leva.
+  const leadsBase = ((leadsRaw ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  const conversas = await conversasDosLeads(supabase, empresaId, leadsBase)
+  const leads: LeadRow[] = leadsBase.map((l) => ({
+    id: l.id, nome: l.nome, telefone: l.telefone, kanban_status: l.kanban_status,
+    valor_estimado: l.valor_estimado, responsavel_id: l.responsavel_id,
+    ultima_mensagem_at: conversas.get(l.id)?.ultima_mensagem_at ?? null,
+    ultima_tratativa: l.ultima_tratativa, created_at: l.created_at,
+  }))
+  const abertos = leads
     // Etapa terminal fora: lead ganho ou perdido não está parado, está resolvido.
     .filter((l) => !terminais.has(l.kanban_status ?? 'novo'))
     .map((l) => ({ lead: l, dias: diasParado(l, agora) }))

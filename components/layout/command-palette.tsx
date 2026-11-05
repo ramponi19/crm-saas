@@ -7,6 +7,7 @@ import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, 
 import { useFerramentas } from './ferramentas-context'
 import { createClient } from '@/lib/supabase/client'
 import { consultaClientes } from '@/lib/clientes'
+import { conversasDosLeads } from '@/lib/leads'
 
 interface SearchResult {
   tipo: 'cliente' | 'lead' | 'estoque'
@@ -57,6 +58,40 @@ const TIPO_LABEL: Record<string, string> = { cliente: 'Cliente', lead: 'Lead', e
  * para uma busca de duas letras nao arrastar a base inteira para o navegador.
  */
 const LOTE = 50
+/** Quantos negócios que batem com a busca entram na ordenação pela última mensagem. */
+const TETO_BUSCA_LEADS = 200
+
+type LeadAchado = { id: number; nome: string | null; produto_interessado: string | null; telefone: string | null; ultima_mensagem_at: string | null }
+
+/**
+ * Leads ativos cujo nome ou telefone bate com `q`, os de conversa mais recente
+ * primeiro, até LOTE — era a view `leads` ordenada por `ultima_mensagem_at`. A
+ * conversa mora em `conversas` (só o negócio principal do contato na loja a leva),
+ * então a ordem é feita aqui sobre os TETO_BUSCA_LEADS mais novos que batem.
+ */
+async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string): Promise<{ data: LeadAchado[] }> {
+  const SELECT_BUSCA: string = 'id, empresa_id, contato_id, filial_id, created_at, produto_interessado:dados->>produto_interessado, contato:contatos!contato_id!inner(nome, telefone)'
+  const { data } = await supabase.from('negocios').select(SELECT_BUSCA)
+    .or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`, { referencedTable: 'contato' })
+    .eq('ativo', true).order('created_at', { ascending: false }).limit(TETO_BUSCA_LEADS)
+  type Linha = { id: number; empresa_id: number; contato_id: number; filial_id: number | null; created_at: string; produto_interessado: string | null; contato: { nome: string | null; telefone: string | null } | null }
+  const linhas = (data ?? []) as unknown as Linha[]
+  // A RLS já deixa só a empresa atual; agrupar por empresa é só para não supor isso.
+  // Falhando a leitura das conversas, a busca segue (mais novos primeiro) em vez de travar.
+  const ultima = new Map<number, string | null>()
+  try {
+    for (const empresa of new Set(linhas.map((l) => l.empresa_id))) {
+      const conv = await conversasDosLeads(supabase, empresa, linhas.filter((l) => l.empresa_id === empresa))
+      for (const [id, c] of conv) ultima.set(id, c.ultima_mensagem_at)
+    }
+  } catch { /* segue sem a ordem da conversa */ }
+  const out: LeadAchado[] = linhas.map((l) => ({
+    id: l.id, nome: l.contato?.nome ?? null, produto_interessado: l.produto_interessado,
+    telefone: l.contato?.telefone ?? null, ultima_mensagem_at: ultima.get(l.id) ?? null,
+  }))
+  out.sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
+  return { data: out.slice(0, LOTE) }
+}
 
 /** Começa com o termo > tem palavra que começa com ele > contém em algum lugar. */
 function relevancia(nome: string | null, termo: string): number {
@@ -121,7 +156,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         consultaClientes(supabase, 'id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
         // O lead também atende por telefone: quem liga para a loja é procurado pelo
         // número, e antes só quem já era cliente aparecia nessa busca.
-        supabase.from('leads').select('id, nome, produto_interessado, telefone, ultima_mensagem_at').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(LOTE),
+        // Lead = negócio ativo; nome/telefone no contato (o !inner faz o filtro valer
+        // para o negócio). A ordem pela última mensagem é feita abaixo, em buscarLeads.
+        buscarLeads(supabase, q),
         supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
         supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
         numero

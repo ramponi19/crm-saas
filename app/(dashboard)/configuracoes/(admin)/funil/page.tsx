@@ -41,11 +41,14 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
    * esses leads apontando para algo que não existe — eles sairiam do kanban sem
    * ninguém perceber, e é justamente o cliente que ainda não comprou.
    */
+  // Lead = negócio ativo; o slug vem da etapa (e, sem etapa, do legado em dados._lead,
+  // como a view fazia).
+  const SELECT_ETAPA: string = 'etapa:funil_etapas!etapa_id(slug), legado:dados->_lead->>kanban_status'
   const { data: leadsPorEtapa } = await supabase
-    .from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true)
+    .from('negocios').select(SELECT_ETAPA).eq('empresa_id', empresaId).eq('ativo', true)
   const contagem: Record<string, number> = {}
-  for (const l of (leadsPorEtapa ?? []) as { kanban_status: string | null }[]) {
-    const k = l.kanban_status ?? ''
+  for (const l of (leadsPorEtapa ?? []) as unknown as { etapa: { slug: string | null } | null; legado: string | null }[]) {
+    const k = l.etapa?.slug ?? l.legado ?? ''
     if (k) contagem[k] = (contagem[k] ?? 0) + 1
   }
 

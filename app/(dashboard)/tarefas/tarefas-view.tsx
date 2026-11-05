@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Button, IconButton, Input, Select, Textarea, Modal, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { embedLead } from '@/lib/leads'
 
 type Tarefa = Tables<'tarefas'> & { lead_nome: string | null }
 type LeadMin = { id: number; nome: string | null }
@@ -45,7 +46,9 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
       responsavel_id: form.responsavel_id || meuId,
       descricao: form.descricao || null,
     }
-    const { data, error } = await supabase.from('tarefas').insert(payload).select('*, leads!tarefas_lead_id_fkey(nome)').single()
+    // O lead da tarefa é o negócio (lead_id); o nome vem do contato.
+    const selectTarefa: string = `*, ${embedLead('tarefas_lead_id_fkey')}`
+    const { data, error } = await supabase.from('tarefas').insert(payload).select(selectTarefa).single()
     setLoading(false)
     if (error) { notify.bad(error.message); return }
     const d = data as unknown as (Tables<'tarefas'> & { leads: { nome: string | null } | null })

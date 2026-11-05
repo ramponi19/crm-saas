@@ -71,7 +71,7 @@ if (!Number.isInteger(LEAD) || LEAD <= 0) {
   process.exit(1)
 }
 
-const { data: dono } = await db.from('leads').select('empresa_id').eq('id', LEAD).maybeSingle()
+const { data: dono } = await db.from('negocios').select('empresa_id').eq('id', LEAD).maybeSingle()
 if (!dono) { console.error(`lead ${LEAD} nao existe`); process.exit(1) }
 const EMPRESA = dono.empresa_id as number
 

@@ -22,6 +22,7 @@ export default async function MetasPage() {
   const isAdmin = usuario?.is_super_admin || vinculo?.role === 'owner' || vinculo?.role === 'admin'
   if (!isAdmin) redirect('/dashboard')
 
+  const SELECT_PIPELINE: string = 'funil_id, valor_estimado, etapa:funil_etapas!etapa_id(slug), legado:dados->_lead->>kanban_status'
   const now = new Date()
   const mesAno = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const inicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
@@ -33,7 +34,8 @@ export default async function MetasPage() {
     supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('empresa_id', empresaId).eq('mes_ano', mesAno),
     supabase.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status').eq('empresa_id', empresaId).gte('data_venda', inicio).lt('data_venda', fim),
     supabase.from('funil_etapas').select('funil_id, slug, tipo, probabilidade').eq('empresa_id', empresaId),
-    supabase.from('leads').select('funil_id, kanban_status, valor_estimado').eq('empresa_id', empresaId).eq('ativo', true),
+    // Lead = negócio ativo; a etapa é o slug (sem etapa, o legado em dados._lead, como a view).
+    supabase.from('negocios').select(SELECT_PIPELINE).eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
   const metaEmpresa = Number((prefRow?.valor as { meta_vendas_mes?: number } | null)?.meta_vendas_mes ?? 0)
@@ -55,8 +57,8 @@ export default async function MetasPage() {
     probPorEtapa.set(`${e.funil_id}:${e.slug}`, { tipo: e.tipo, prob: e.probabilidade })
   }
   let forecast = 0
-  for (const l of (leadsRaw ?? []) as Array<{ funil_id: number | null; kanban_status: string | null; valor_estimado: number | null }>) {
-    const et = probPorEtapa.get(`${l.funil_id}:${l.kanban_status}`)
+  for (const l of (leadsRaw ?? []) as unknown as Array<{ funil_id: number | null; etapa: { slug: string } | null; legado: string | null; valor_estimado: number | null }>) {
+    const et = probPorEtapa.get(`${l.funil_id}:${l.etapa?.slug ?? l.legado}`)
     if (!et || et.tipo === 'ganho' || et.tipo === 'perdido') continue
     forecast += Number(l.valor_estimado ?? 0) * (et.prob / 100)
   }

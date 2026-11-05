@@ -93,11 +93,14 @@ export interface Retirada {
   tipo: TipoRetido
 }
 
-/** O que a consulta de candidatos traz de `lead_mensagens`. */
+/**
+ * O que a consulta de candidatos traz de `mensagens`. Lia a view
+ * `lead_mensagens`, que caiu em 05/11/2026; ela devolvia todas as mensagens
+ * (com ou sem lead), então a tabela traz as mesmas linhas.
+ */
 interface Linha {
   id: number
   midia_url: string
-  lead_id: number
   created_at: string
 }
 
@@ -133,9 +136,9 @@ async function buscarPagina(
   corte: string,
   de: number,
 ): Promise<{ data: Linha[] | null; error: { message: string } | null }> {
-  const colunas = 'id, midia_url, lead_id, created_at'
+  const colunas = 'id, midia_url, created_at'
   if (tipo === 'audio') {
-    return db.from('lead_mensagens').select(colunas)
+    return db.from('mensagens').select(colunas)
       .eq('tipo', 'audio')
       .not('midia_url', 'is', null)
       .not('transcricao', 'is', null)
@@ -143,7 +146,7 @@ async function buscarPagina(
       .order('id', { ascending: true })
       .range(de, de + 999) as unknown as Promise<{ data: Linha[] | null; error: { message: string } | null }>
   }
-  return db.from('lead_mensagens').select(colunas)
+  return db.from('mensagens').select(colunas)
     .eq('tipo', tipo)
     .not('midia_url', 'is', null)
     .lt('created_at', corte)
@@ -208,6 +211,11 @@ export async function aptosParaRetirada(
  * Feito depois da busca, e não como filtro dela, porque é uma pergunta sobre
  * as mensagens VIZINHAS — o PostgREST não faz essa junção, e trazê-la para cá
  * custa uma consulta por lead em vez de uma por imagem.
+ *
+ * "A conversa" é a do contato NA LOJA (contato + loja da mensagem): era o que
+ * o `lead_id` da antiga `lead_mensagens` agrupava (05/11/2026). Mensagem de
+ * contato sem negócio na loja, que lá vinha sem lead, agora também é conferida
+ * contra as vizinhas — na dúvida, guarda.
  */
 /** Exportada para os testes (tests/zapintel.test.ts); o uso real é via `aptosParaRetirada`. */
 export async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): Promise<Retirada[]> {
@@ -222,35 +230,38 @@ export async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): P
    * Agora tudo paginado, erro interrompe a rodada, e as palavras vêm da constante,
    * no texto e na transcrição.
    */
+  type Msg = { id: number; contato_id: number; filial_id: number | null; created_at: string }
+  const conversa = (m: { contato_id: number; filial_id: number | null }) => `${m.contato_id}:${m.filial_id ?? -1}`
   const ids = alvos.map((a) => a.mensagemId)
-  const quando = new Map<number, { id: number; lead_id: number; created_at: string }>()
+  const quando = new Map<number, Msg>()
   for (let i = 0; i < ids.length; i += 500) {
     const { data, error } = await db
-      .from('lead_mensagens')
-      .select('id, lead_id, created_at')
+      .from('mensagens')
+      .select('id, contato_id, filial_id, created_at')
       .in('id', ids.slice(i, i + 500))
     if (error) throw new Error(`retencao: nao consegui conferir as imagens, nada apagado: ${error.message}`)
-    for (const m of (data ?? []) as { id: number; lead_id: number; created_at: string }[]) quando.set(m.id, m)
+    for (const m of (data ?? []) as Msg[]) quando.set(m.id, m)
   }
 
   const filtro = PALAVRAS_DE_PROVA
     .flatMap((p) => [`conteudo.ilike.%${p}%`, `transcricao.ilike.%${p}%`])
     .join(',')
-  const leads = [...new Set([...quando.values()].map((m) => m.lead_id))]
+  const contatos = [...new Set([...quando.values()].map((m) => m.contato_id))]
   const protegidas = new Set<number>()
 
-  for (let i = 0; i < leads.length; i += 50) {
-    const marcos: { lead_id: number; created_at: string }[] = []
+  for (let i = 0; i < contatos.length; i += 50) {
+    // Vêm as do contato em todas as lojas; a loja é conferida abaixo, na chave.
+    const marcos: Omit<Msg, 'id'>[] = []
     for (let de = 0; ; de += 1000) {
       const { data: vizinhas, error } = await db
-        .from('lead_mensagens')
-        .select('lead_id, created_at')
-        .in('lead_id', leads.slice(i, i + 50))
+        .from('mensagens')
+        .select('contato_id, filial_id, created_at')
+        .in('contato_id', contatos.slice(i, i + 50))
         .or(filtro)
         .order('id')
         .range(de, de + 999)
       if (error) throw new Error(`retencao: nao consegui ler as conversas, nada apagado: ${error.message}`)
-      marcos.push(...((vizinhas ?? []) as { lead_id: number; created_at: string }[]))
+      marcos.push(...((vizinhas ?? []) as Omit<Msg, 'id'>[]))
       if (!vizinhas || vizinhas.length < 1000) break
     }
 
@@ -259,7 +270,7 @@ export async function semAsQueSaoProva(db: SupabaseClient, alvos: Retirada[]): P
       if (!m) continue
       const t = Date.parse(m.created_at)
       const perto = marcos.some(
-        (v) => v.lead_id === m.lead_id
+        (v) => conversa(v) === conversa(m)
           && Math.abs(Date.parse(v.created_at) - t) <= JANELA_DE_PROVA_MIN * 60_000,
       )
       if (perto) protegidas.add(a.mensagemId)
@@ -295,11 +306,15 @@ export async function retirarMidia(
   const limpas = new Set<number>()
   for (let i = 0; i < alvos.length; i += 200) {
     const ids = alvos.slice(i, i + 200).map((a) => a.mensagemId)
-    const { error } = await db.from('lead_mensagens')
-      .update({ midia_url: null, midia_retida_em: agora } as never).in('id', ids)
+    // Conta o que GRAVOU (05/11/2026): mensagem que sumiu entre a busca e aqui
+    // não tem URL limpa, e o arquivo dela não pode ser contado nem apagado às cegas.
+    const { data: gravadas, error } = await db.from('mensagens')
+      .update({ midia_url: null, midia_retida_em: agora } as never).in('id', ids).select('id')
     if (error) { r.falhas += ids.length; continue }
-    r.urlsLimpas += ids.length
-    for (const id of ids) limpas.add(id)
+    const ok = ((gravadas ?? []) as { id: number }[]).map((m) => m.id)
+    r.urlsLimpas += ok.length
+    r.falhas += ids.length - ok.length
+    for (const id of ok) limpas.add(id)
   }
 
   // 3. Os arquivos, pela API do Storage — SÓ os de mensagem cuja URL saiu no

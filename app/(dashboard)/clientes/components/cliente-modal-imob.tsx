@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { mensagensDoLead } from '@/lib/leads'
 import {
   Modal, Button, Badge, Input, Select, Textarea, notify,
 } from '@/components/ui'
@@ -169,7 +170,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
 
     const [msgs, chamadas, visitas, negocios] = await Promise.all([
       leadId != null
-        ? supabase.from('lead_mensagens').select('direcao, conteudo, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(15)
+        ? mensagensDoLead(supabase, leadId, 'direcao, conteudo, created_at', 15).then((data) => ({ data }), () => ({ data: [] }))
         : Promise.resolve({ data: [] }),
       leadId != null
         ? supabase.from('chamadas').select('direcao, resultado, duracao_seg, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(15)
@@ -258,15 +259,22 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
   /**
    * Mover de etapa mexe no LEAD, não no cliente.
    *
-   * É o mesmo campo que o kanban arrasta (`leads.kanban_status`), então mover aqui e
-   * mover lá são a mesma ação — não existem duas etapas para a mesma pessoa.
+   * É a mesma rota que o kanban usa ao arrastar (/api/leads/mover), então mover aqui e
+   * mover lá são a mesma ação — não existem duas etapas para a mesma pessoa, e as
+   * automações de "entrou na etapa" rodam igual nos dois lugares.
    */
   async function moverEtapa(id: string) {
     if (leadId == null) return
     const antes = etapaAtual
     setEtapaAtual(id)
-    const { error } = await supabase.from('leads').update({ kanban_status: id } as never).eq('id', leadId)
-    if (error) { setEtapaAtual(antes); notify.bad('Não foi possível mover', error.message); return }
+    const r = await fetch('/api/leads/mover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId, kanban_status: id }),
+    }).catch(() => null)
+    if (!r?.ok) {
+      setEtapaAtual(antes)
+      notify.bad('Não foi possível mover', ((await r?.json().catch(() => null)) as { error?: string } | null)?.error)
+      return
+    }
     notify.ok('Etapa atualizada')
   }
 
@@ -274,41 +282,27 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
   async function vincularAoFunil() {
     if (!cliente?.id) return
     setSalvando(true)
-    const { data: emp } = await supabase.rpc('get_empresa_id')
-    /**
-     * Sem empresa não se cria lead.
-     *
-     * O tipo gerado do banco cobrou isto quando o `as never` saiu: `get_empresa_id()`
-     * devolve `number | null`, e sem a guarda um null viraria insert com empresa nula
-     * — lead órfão que a RLS esconde de todo mundo, inclusive de quem o criou.
-     */
-    if (typeof emp !== 'number') { setSalvando(false); notify.bad('Não foi possível identificar a empresa'); return }
     const primeira = etapas[0]?.id ?? 'novo'
     /**
-     * `leads` NÃO tem coluna de e-mail — só telefone e instagram.
-     *
-     * A primeira versão mandava `email` aqui e o insert falharia em produção com
-     * "column does not exist"; o cliente ficaria sem lead e a tela diria erro cru. O
-     * e-mail continua no cadastro do cliente, que é onde ele já vive.
+     * Pelo servidor (/api/leads → lib/leads.ts), com o contato do cliente: o lead é
+     * um negócio DELE, mesmo sem telefone (antes, sem telefone, o insert na view
+     * criava um segundo contato com o mesmo nome). E-mail não vai: fica no cadastro.
      */
-    const { data: novo, error } = await supabase.from('leads').insert({
-      empresa_id: emp,
-      nome: cliente.nome,
-      telefone: cliente.telefone ?? null,
-      origem: cliente.origem_cliente ?? 'manual',
-      kanban_status: primeira,
-      responsavel_id: cliente.corretor_id ?? null,
-      valor_estimado: cliente.valor_pretendido ?? null,
-      ativo: true,
-      /**
-       * SEM `as never` de propósito.
-       *
-       * A primeira versão mandava `email` aqui e `leads` não tem essa coluna — o
-       * insert falharia só em produção, com erro cru na tela. Sem o cast, o
-       * TypeScript compara o payload com as colunas reais e a build quebra antes.
-       */
-    }).select('id').single<{ id: number }>()
-    if (error || !novo) { setSalvando(false); notify.bad('Não foi possível criar o lead', error?.message); return }
+    const r = await fetch('/api/leads', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contato_id: cliente.id,
+        nome: cliente.nome,
+        telefone: cliente.telefone ?? null,
+        origem: cliente.origem_cliente ?? 'manual',
+        kanban_status: primeira,
+        responsavel_id: cliente.corretor_id ?? null,
+        valor_estimado: cliente.valor_pretendido ?? null,
+      }),
+    }).catch(() => null)
+    const j = (await r?.json().catch(() => null)) as { lead?: { id: number }; error?: string } | null
+    const novo = r?.ok ? j?.lead ?? null : null
+    if (!novo) { setSalvando(false); notify.bad('Não foi possível criar o lead', j?.error); return }
     const r2 = await fetch(`/api/clientes/${cliente.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: novo.id }),
     })

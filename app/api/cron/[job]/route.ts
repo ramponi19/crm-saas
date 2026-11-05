@@ -9,6 +9,7 @@ import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { processarFila } from '@/lib/automacoes'
+import { limparExportacoes } from '@/lib/lgpd/exportacao'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -157,6 +158,16 @@ export async function GET(
       case 'automacoes': {
         const r = await processarFila(supabase as unknown as SupabaseClient)
         return NextResponse.json({ ok: true, job, ...r })
+      }
+
+      /**
+       * Apaga os ZIPs da exportação LGPD com mais de 24 h (bucket privado
+       * `lgpd-exportacoes`). De hora em hora pelo pg_cron (`lgpd-exportacoes-limpar`),
+       * como o `automacoes`: o arquivo vive no máximo 25 h.
+       */
+      case 'lgpd-limpar': {
+        const removidos = await limparExportacoes(supabase as unknown as SupabaseClient)
+        return NextResponse.json({ ok: true, job, removidos })
       }
 
       default:

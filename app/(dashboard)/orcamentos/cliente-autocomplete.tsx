@@ -40,7 +40,9 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
     const id = setTimeout(async () => {
       const [{ data: cls }, { data: lds }] = await Promise.all([
         consultaClientes(supabase, 'id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
-        supabase.from('leads').select('id, nome, telefone').ilike('nome', `%${term}%`).eq('ativo', true).order('nome').limit(8),
+        // Lead = negócio ativo; nome/telefone do contato (o !inner faz o filtro valer para o negócio).
+        supabase.from('negocios').select('id, contato:contatos!contato_id!inner(nome, telefone)')
+          .ilike('contato.nome', `%${term}%`).eq('ativo', true).order('contato(nome)').limit(8),
       ])
       const merged: Sug[] = []
       const seen = new Set<string>()
@@ -49,7 +51,9 @@ export function ClienteAutocomplete({ nome, onNome, onSelect, label = 'Cliente' 
         const k = key(c.nome, c.telefone); if (seen.has(k)) continue
         seen.add(k); merged.push({ id: `c${c.id}`, nome: c.nome, telefone: c.telefone, origem: 'cliente' })
       }
-      for (const l of (lds ?? []) as { id: number; nome: string | null; telefone: string | null }[]) {
+      const leads = ((lds ?? []) as unknown as { id: number; contato: { nome: string | null; telefone: string | null } | null }[])
+        .map((l) => ({ id: l.id, nome: l.contato?.nome ?? null, telefone: l.contato?.telefone ?? null }))
+      for (const l of leads) {
         if (!l.nome) continue
         const k = key(l.nome, l.telefone); if (seen.has(k)) continue
         seen.add(k); merged.push({ id: `l${l.id}`, nome: l.nome, telefone: l.telefone, origem: 'lead' })

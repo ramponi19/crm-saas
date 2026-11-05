@@ -42,7 +42,7 @@ v "pedido feito nao troca a data"       "components/modules/pdv/encomendas-abert
 v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
 v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens.tsx" "onChange((xs) =>"
 n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
-v "busca global ordena o lead"        "components/layout/command-palette.tsx" "order(.ultima_mensagem_at."
+v "busca global ordena o lead"        "components/layout/command-palette.tsx" "out.sort((a, b) => (b.ultima_mensagem_at"
 n "busca global nao volta ao teto de 4" "components/layout/command-palette.tsx" "limit(4)"
 v "negocio e procurado na loja"         "supabase/functions/webhook-leads/index.ts" "if (filialId != null) q = q.eq(.filial_id., filialId)"
 v "lead e procurado na loja do canal"   "supabase/functions/webhook-leads/index.ts" "negociosNaLoja(empresaId, contatoAntes, canal.filial_id)"
@@ -428,8 +428,8 @@ v "varejo mantem a ficha antiga"       "app/(dashboard)/clientes/components/clie
 v "etapa grava no LEAD"                "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "kanban_status: id"
 # Sem 'as never' no insert do lead: quem confere o payload contra as colunas reais
 # e o TypeScript, nao um grep — foi assim que o 'email' inexistente apareceu.
-v "insert do lead sem cast cego"       "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "}).select(.id.).single<{ id: number }>()"
-v "guarda de empresa no insert"        "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "typeof emp !== .number."
+v "lead do cliente pela rota, no contato" "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "contato_id: cliente.id,"
+v "empresa do lead e a da sessao"      "app/api/leads/route.ts" "criarLead(svc, auth.empresaId, {"
 v "cliente sem lead nao inventa score" "app/(dashboard)/clientes/components/clientes-view.tsx" "Sem lead vinculado"
 v "15 caracteristicas do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Ar Condicionado'"
 v "10 tipos de imovel do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Sala Comercial'"

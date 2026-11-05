@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buscarTudo } from '@/lib/zapintel/conversas'
 import { VERSAO_DO_PERFIL } from '@/lib/zapintel/perfil'
+import { conversasDosLeads } from '@/lib/leads'
 import type { Acesso } from './acesso'
 
 /**
@@ -196,20 +197,75 @@ type LeadVisivel = {
   id: number; nome: string | null; kanban_status: string | null; filial_id: number | null
   created_at: string; produto_interessado: string | null; responsavel_id: string | null
   valor_estimado: number | null; origem: string | null; motivo_perda_id: number | null
-  perdido_em: string | null; convertido_em: number | null
+  perdido_em: string | null; convertido_em: number | null; contato_id: number
 }
+
+/**
+ * O lead é o negócio + contato + etapa (a view `leads` caiu, 05/11/2026). A etapa
+ * é a da view: o slug da etapa, senão o guardado em dados._lead.
+ */
+const SELECT_LEAD: string = 'id, contato_id, filial_id, created_at, responsavel_id, valor_estimado, motivo_perda_id, perdido_em, '
+  + 'produto_interessado:dados->>produto_interessado, convertido_em:dados->_lead->>convertido_em, '
+  + 'kanban:dados->_lead->>kanban_status, contato:contatos!contato_id(nome, origem), etapa:funil_etapas!etapa_id(slug)'
+type LinhaLead = Omit<LeadVisivel, 'nome' | 'origem' | 'kanban_status' | 'convertido_em'> & {
+  convertido_em: string | null; kanban: string | null
+  contato: { nome: string | null; origem: string | null } | null; etapa: { slug: string } | null
+}
+const leadDaLinha = (r: LinhaLead): LeadVisivel => ({
+  id: r.id, contato_id: r.contato_id, nome: r.contato?.nome ?? null, kanban_status: r.etapa?.slug ?? r.kanban ?? null,
+  filial_id: r.filial_id, created_at: r.created_at, produto_interessado: r.produto_interessado,
+  responsavel_id: r.responsavel_id, valor_estimado: r.valor_estimado == null ? null : Number(r.valor_estimado),
+  origem: r.contato?.origem ?? null, motivo_perda_id: r.motivo_perda_id, perdido_em: r.perdido_em,
+  convertido_em: r.convertido_em == null ? null : Number(r.convertido_em),
+})
 
 /** Os leads que ESTA pessoa vê — RLS de loja + "só os meus" do papel. */
 async function leadsVisiveis(c: Contexto, filialId?: number): Promise<LeadVisivel[]> {
-  return buscarTudo<LeadVisivel>((de, ate) => {
-    let q = c.db.from('leads')
-      .select('id, nome, kanban_status, filial_id, created_at, produto_interessado, responsavel_id, valor_estimado, origem, motivo_perda_id, perdido_em, convertido_em')
+  const linhas = await buscarTudo<LinhaLead>((de, ate) => {
+    let q = c.db.from('negocios')
+      .select(SELECT_LEAD)
       .eq('empresa_id', c.acesso.empresaId).eq('ativo', true)
     if (filialId) q = q.eq('filial_id', filialId)
     // Lead sem responsável é da esteira, de todos — mesma regra da tela de leads.
     if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
     return q.order('id', { ascending: true }).range(de, ate)
   })
+  return linhas.map(leadDaLinha)
+}
+
+const chaveLoja = (contato: number, filial: number | null) => `${contato}:${filial ?? -1}`
+
+/**
+ * O negócio PRINCIPAL de cada contato em cada loja (ativo primeiro, o mais novo):
+ * era o `lead_id` que a antiga `lead_mensagens` dava à mensagem. Sob a sessão de
+ * quem pergunta — a mensagem visível é da loja dele, e o negócio dela também.
+ */
+async function principaisDosContatos(db: SupabaseClient, empresaId: number, contatos: number[]): Promise<Map<string, number>> {
+  type N = { id: number; contato_id: number; filial_id: number | null; ativo: boolean; created_at: string }
+  const melhor = new Map<string, N>()
+  const unicos = [...new Set(contatos)]
+  for (let i = 0; i < unicos.length; i += 200) {
+    const { data, error } = await db.from('negocios').select('id, contato_id, filial_id, ativo, created_at')
+      .eq('empresa_id', empresaId).in('contato_id', unicos.slice(i, i + 200))
+    if (error) throw new Error(`negócios dos contatos: ${error.message}`)
+    for (const n of (data ?? []) as N[]) {
+      const k = chaveLoja(n.contato_id, n.filial_id)
+      const p = melhor.get(k)
+      if (!p || (n.ativo && !p.ativo)
+        || (n.ativo === p.ativo && (n.created_at > p.created_at || (n.created_at === p.created_at && n.id > p.id)))) melhor.set(k, n)
+    }
+  }
+  return new Map([...melhor].map(([k, n]) => [k, n.id]))
+}
+
+/**
+ * O lead tem a conversa? As mensagens do lead são as do contato na loja do
+ * negócio — e só do negócio principal ali, como a antiga `lead_mensagens` (os
+ * outros negócios do mesmo contato na mesma loja ficavam sem conversa).
+ */
+async function leadTemConversa(c: Contexto, lead: LeadVisivel): Promise<boolean> {
+  const principais = await principaisDosContatos(c.db, c.acesso.empresaId, [lead.contato_id])
+  return principais.get(chaveLoja(lead.contato_id, lead.filial_id)) === lead.id
 }
 
 type Status = { lead_id: number; ultima_recebida: string | null; ultima_enviada: string | null; mensagens: number }
@@ -244,24 +300,43 @@ async function fichasCurtas(c: Contexto): Promise<Map<number, FichaCurta>> {
 async function leadsQueCitam(c: Contexto, texto: string): Promise<Set<number>> {
   const padrao = `%${texto.replace(/[%_,()]/g, ' ').trim().replace(/\s+/g, '%')}%`
   const [{ data: msgs }, { data: diag }, { data: rel }] = await Promise.all([
-    c.db.from('lead_mensagens').select('lead_id')
+    c.db.from('mensagens').select('contato_id, filial_id')
       .eq('empresa_id', c.acesso.empresaId).or(`conteudo.ilike.${padrao},transcricao.ilike.${padrao}`).limit(3000),
     c.svc.from('zapintel_lead_perfil').select('lead_id')
       .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>diagnostico', padrao).limit(1000),
     c.svc.from('zapintel_lead_perfil').select('lead_id')
       .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>relato', padrao).limit(1000),
   ])
-  return new Set([...(msgs ?? []), ...(diag ?? []), ...(rel ?? [])].map((r) => Number((r as { lead_id: number }).lead_id)))
+  // Mensagem → negócio principal do contato na loja (o `lead_id` da antiga view).
+  const achadas = (msgs ?? []) as { contato_id: number; filial_id: number | null }[]
+  // Falha aqui vale o que valia o erro da consulta antiga: nenhuma conversa citando.
+  const principais = await principaisDosContatos(c.db, c.acesso.empresaId, achadas.map((m) => m.contato_id))
+    .catch(() => new Map<string, number>())
+  const daConversa = achadas.map((m) => principais.get(chaveLoja(m.contato_id, m.filial_id)))
+    .filter((id): id is number => id != null)
+  return new Set([...daConversa, ...[...(diag ?? []), ...(rel ?? [])].map((r) => Number((r as { lead_id: number }).lead_id))])
 }
 
 /** O lead está entre os que esta pessoa vê? Toda leitura por id passa aqui. */
 async function leadSeVisivel(c: Contexto, id: number): Promise<LeadVisivel | null> {
-  let q = c.db.from('leads')
-    .select('id, nome, kanban_status, filial_id, created_at, produto_interessado, responsavel_id, valor_estimado, origem, motivo_perda_id, perdido_em, convertido_em')
+  let q = c.db.from('negocios')
+    .select(SELECT_LEAD)
     .eq('empresa_id', c.acesso.empresaId).eq('id', id)
   if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
   const { data } = await q.maybeSingle()
-  return (data as LeadVisivel | null) ?? null
+  return data ? leadDaLinha(data as unknown as LinhaLead) : null
+}
+
+/** Quantas mensagens a conversa do lead tem (0 se ele não é o negócio principal na loja). */
+async function contarMensagensDoLead(c: Contexto, lead: LeadVisivel): Promise<{ count: number | null }> {
+  // Sem saber se é o principal, o número é desconhecido (null), não zero.
+  const tem = await leadTemConversa(c, lead).catch(() => null)
+  if (tem === null) return { count: null }
+  if (!tem) return { count: 0 }
+  const base = c.db.from('mensagens').select('id', { count: 'exact', head: true })
+    .eq('empresa_id', c.acesso.empresaId).eq('contato_id', lead.contato_id)
+  const { count } = await (lead.filial_id == null ? base.is('filial_id', null) : base.eq('filial_id', lead.filial_id))
+  return { count }
 }
 
 // ── as ferramentas ───────────────────────────────────────────────────────────
@@ -508,11 +583,19 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
   if (!Number.isInteger(id) || id <= 0) {
     const nome = typeof e.nome === 'string' ? e.nome.trim() : ''
     if (!nome) return saida({ erro: 'informe lead_id ou nome' })
-    let q = c.db.from('leads').select('id, nome, filial_id, ultima_mensagem_at')
-      .eq('empresa_id', c.acesso.empresaId).eq('ativo', true).ilike('nome', `%${nome.replace(/[%_,()]/g, ' ')}%`)
+    // O nome é do contato; a última mensagem, da conversa dele na loja (só no
+    // negócio principal). A ordem por ela é feita aqui, sobre até 1.000 nomes
+    // que batem — a view ordenava no banco.
+    let q = c.db.from('negocios').select('id, contato_id, filial_id, contato:contatos!contato_id!inner(nome)')
+      .eq('empresa_id', c.acesso.empresaId).eq('ativo', true).ilike('contato.nome', `%${nome.replace(/[%_,()]/g, ' ')}%`)
     if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
-    const { data } = await q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(8)
-    const achados = (data ?? []) as { id: number; nome: string; ultima_mensagem_at: string | null }[]
+    const { data } = await q.limit(1000)
+    const batem = (data ?? []) as unknown as { id: number; contato_id: number; filial_id: number | null; contato: { nome: string } | null }[]
+    const conversas = batem.length ? await conversasDosLeads(c.db, c.acesso.empresaId, batem) : new Map()
+    const achados = batem
+      .map((n) => ({ id: n.id, nome: n.contato?.nome ?? '', ultima_mensagem_at: (conversas.get(n.id)?.ultima_mensagem_at ?? null) as string | null }))
+      .sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
+      .slice(0, 8)
     if (!achados.length) return saida({ erro: `nenhum lead com "${nome}" no nome` })
     if (achados.length > 1) {
       return saida({ varios: achados.map((a) => ({ lead_id: a.id, nome: a.nome, ultima_mensagem: quando(a.ultima_mensagem_at) })) })
@@ -526,7 +609,7 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
     filiais(c), nomesDaEquipe(c),
     c.svc.from('zapintel_lead_perfil').select('perfil, gerado_em, mensagens, versao, modelo')
       .eq('empresa_id', c.acesso.empresaId).eq('lead_id', id).maybeSingle(),
-    c.db.from('lead_mensagens').select('id', { count: 'exact', head: true }).eq('lead_id', id),
+    contarMensagensDoLead(c, lead),
   ])
   const f = ficha as { perfil: Record<string, unknown>; gerado_em: string; mensagens: number; versao: string; modelo: string | null } | null
   return saida({
@@ -554,9 +637,16 @@ async function conversaLer(c: Contexto, e: Entrada): Promise<string> {
   const lead = await leadSeVisivel(c, id)
   if (!lead) return saida({ erro: 'lead não encontrado ou fora do que este usuário pode ver' })
   const n = Math.min(200, Math.max(1, Number(e.ultimas) || 80))
-  const { data } = await c.db.from('lead_mensagens')
-    .select('direcao, conteudo, tipo, transcricao, created_at')
-    .eq('lead_id', id).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(n)
+  // A conversa do contato na loja do negócio — só se ele é o principal ali.
+  let data: unknown[] | null = []
+  if (await leadTemConversa(c, lead)) {
+    const base = c.db.from('mensagens')
+      .select('direcao, conteudo, tipo, transcricao, created_at')
+      .eq('empresa_id', c.acesso.empresaId).eq('contato_id', lead.contato_id)
+    const daLoja = lead.filial_id == null ? base.is('filial_id', null) : base.eq('filial_id', lead.filial_id)
+    const r = await daLoja.order('created_at', { ascending: false }).order('id', { ascending: false }).limit(n)
+    data = r.data
+  }
   const msgs = ((data ?? []) as { direcao: string; conteudo: string | null; tipo: string | null; transcricao: string | null; created_at: string }[]).reverse()
   return saida({
     lead_id: id, nome: lead.nome,

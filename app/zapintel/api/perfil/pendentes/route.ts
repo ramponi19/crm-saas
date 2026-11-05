@@ -108,7 +108,7 @@ export async function GET(req: Request) {
       const ids = data.map((l) => Number(l.lead_id))
       const lojas = new Map<number, number | null>()
       for (let i = 0; i < ids.length; i += 500) {
-        const { data: ls, error } = await db.from('leads').select('id, filial_id')
+        const { data: ls, error } = await db.from('negocios').select('id, filial_id')
           .eq('empresa_id', empresaId).in('id', ids.slice(i, i + 500))
         // Erro aqui NÃO é "nenhum visível": era isso que fazia o robô dizer "em dia".
         if (error) throw new FalhaDePendentes('erro_leads', error.message)

@@ -99,11 +99,12 @@ export default async function DashboardLayout({
     )
     .map(a => ({ id: a.id, titulo: a.titulo, corpo: a.corpo, tom: a.tom }))
 
+  // Leads novos = negócios ativos na etapa de slug 'novo' (a view `leads` caiu).
   const { count: leadsCount } = await supabase
-    .from('leads')
-    .select('*', { count: 'exact', head: true })
+    .from('negocios')
+    .select('id, etapa:funil_etapas!etapa_id!inner(slug)', { count: 'exact', head: true })
     .eq('ativo', true)
-    .eq('kanban_status', 'novo')
+    .eq('etapa.slug', 'novo')
 
   // Enforcement de permissão do papel: esconde itens que o papel não pode ver.
   const perms = permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null)

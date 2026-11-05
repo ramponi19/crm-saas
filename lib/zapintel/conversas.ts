@@ -81,6 +81,23 @@ export type LeadBanco = {
 
 type Consulta = (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>
 
+/**
+ * O lead é o negócio + contato + etapa (a view `leads` caiu, 05/11/2026). Etapa
+ * como a view: o slug da etapa, senão o guardado em dados._lead.
+ */
+const SELECT_LEAD_BANCO: string = 'id, contato_id, filial_id, empresa_id, created_at, motivo_perda_id, perdido_em, responsavel_id, '
+  + 'produto_interessado:dados->>produto_interessado, convertido_em:dados->_lead->>convertido_em, anuncio:dados->_anuncio, '
+  + 'kanban:dados->_lead->>kanban_status, contato:contatos!contato_id(nome, telefone, origem, origem_id), etapa:funil_etapas!etapa_id(slug)'
+type LinhaLeadBanco = {
+  id: number; contato_id: number; filial_id: number | null; empresa_id: number; created_at: string
+  motivo_perda_id: number | null; perdido_em: string | null; responsavel_id: string | null
+  produto_interessado: string | null; convertido_em: string | null; anuncio: unknown; kanban: string | null
+  contato: { nome: string | null; telefone: string | null; origem: string | null; origem_id: string | null } | null
+  etapa: { slug: string } | null
+}
+
+const chaveLoja = (contato: number, filial: number | null) => `${contato}:${filial ?? -1}`
+
 const colher = <T,>({ data, error }: { data: unknown; error: unknown }): T[] => {
   if (error) throw new Error((error as { message?: string }).message ?? 'falha ao ler')
   return (data ?? []) as T[]
@@ -159,15 +176,24 @@ export async function carregarConversas(
   const nomeDaLoja = limpa((empresa?.nome as string) || 'Loja') || 'Loja'
   const preset = (empresa as { preset_onboarding?: string | null } | null)?.preset_onboarding ?? null
 
-  const leadsRaw = await buscarTudo<LeadBanco>((de, ate) => {
-    let q = db.from('leads')
-      .select('id, nome, telefone, origem_id, origem, filial_id, empresa_id, created_at,'
-        + ' ultima_mensagem_at, kanban_status, motivo_perda_id, perdido_em,'
-        + ' produto_interessado, responsavel_id, convertido_em, anuncio')
+  const linhasLead = await buscarTudo<LinhaLeadBanco>((de, ate) => {
+    let q = db.from('negocios')
+      .select(SELECT_LEAD_BANCO)
       .eq('empresa_id', empresaId).eq('ativo', true)
     if (ids.length) q = q.in('id', ids)
     return q.order('id', { ascending: true }).range(de, ate)
   })
+  const contatoDoLead = new Map(linhasLead.map((l) => [l.id, l.contato_id]))
+  const leadsRaw: LeadBanco[] = linhasLead.map((l) => ({
+    id: l.id, nome: l.contato?.nome ?? null, telefone: l.contato?.telefone ?? null,
+    origem_id: l.contato?.origem_id ?? null, origem: l.contato?.origem ?? null,
+    filial_id: l.filial_id, empresa_id: l.empresa_id, created_at: l.created_at,
+    ultima_mensagem_at: null, // da conversa, preenchida abaixo
+    kanban_status: l.etapa?.slug ?? l.kanban ?? null,
+    motivo_perda_id: l.motivo_perda_id, perdido_em: l.perdido_em, produto_interessado: l.produto_interessado,
+    responsavel_id: l.responsavel_id, convertido_em: l.convertido_em == null ? null : Number(l.convertido_em),
+    anuncio: l.anuncio ?? null,
+  }))
 
   // O motivo da perda é escolhido de uma lista por quem perdeu o lead. São
   // poucas linhas por empresa, então vale uma consulta e um mapa — bem mais
@@ -208,17 +234,70 @@ export async function carregarConversas(
     return { analisados: [], porId, nomeDaLoja, preset, indisponivel }
   }
 
-  const alvo = [...porId.keys()]
-  const msgs = await buscarTudo<MsgBanco>((de, ate) => {
-    let q = db.from('lead_mensagens')
-      .select('id, lead_id, direcao, conteudo, tipo, created_at, transcricao')
-      .eq('empresa_id', empresaId)
-    // Filtrar por id só quando o recorte é pequeno: um `in` com milhares de
-    // itens vira uma URL que o servidor recusa. Na empresa inteira o filtro de
-    // empresa já basta, e os poucos leads arquivados são descartados ao montar.
-    if (ids.length) q = q.in('lead_id', alvo)
-    return q.order('id', { ascending: true }).range(de, ate)
-  })
+  /**
+   * A CONVERSA É DO CONTATO NA LOJA, e vale para o negócio PRINCIPAL dele ali
+   * (ativo primeiro, o mais novo) — o `lead_id` que a antiga `lead_mensagens`
+   * dava. Os negócios entram todos (ativos ou não) para escolher o principal,
+   * como a view escolhia.
+   */
+  // Filtrar por contato só quando o recorte é pequeno: um `in` com milhares de
+  // itens vira uma URL que o servidor recusa. Na empresa inteira o filtro de
+  // empresa já basta, e os poucos leads arquivados são descartados ao montar.
+  const contatosAlvo = ids.length ? [...new Set(contatoDoLead.values())] : []
+  type NegocioDoContato = { id: number; contato_id: number; filial_id: number | null; ativo: boolean; created_at: string }
+  type ConversaDoContato = { contato_id: number; filial_id: number | null; ultima_mensagem_at: string | null }
+  type MsgDoContato = Omit<MsgBanco, 'lead_id'> & { contato_id: number; filial_id: number | null }
+  const [negociosDosContatos, conversasDosContatos, msgsDosContatos] = await Promise.all([
+    buscarTudo<NegocioDoContato>((de, ate) => {
+      let q = db.from('negocios').select('id, contato_id, filial_id, ativo, created_at').eq('empresa_id', empresaId)
+      if (contatosAlvo.length) q = q.in('contato_id', contatosAlvo)
+      return q.order('id', { ascending: true }).range(de, ate)
+    }),
+    buscarTudo<ConversaDoContato>((de, ate) => {
+      let q = db.from('conversas').select('contato_id, filial_id, ultima_mensagem_at').eq('empresa_id', empresaId)
+      if (contatosAlvo.length) q = q.in('contato_id', contatosAlvo)
+      return q.order('id', { ascending: true }).range(de, ate)
+    }),
+    buscarTudo<MsgDoContato>((de, ate) => {
+      let q = db.from('mensagens')
+        .select('id, contato_id, filial_id, direcao, conteudo, tipo, created_at, transcricao')
+        .eq('empresa_id', empresaId)
+      if (contatosAlvo.length) q = q.in('contato_id', contatosAlvo)
+      return q.order('id', { ascending: true }).range(de, ate)
+    }),
+  ])
+
+  const principal = new Map<string, NegocioDoContato>()
+  for (const n of negociosDosContatos) {
+    const k = chaveLoja(n.contato_id, n.filial_id)
+    const p = principal.get(k)
+    if (!p || (n.ativo && !p.ativo)
+      || (n.ativo === p.ativo && (n.created_at > p.created_at || (n.created_at === p.created_at && n.id > p.id)))) principal.set(k, n)
+  }
+  // A última mensagem do lead: a mais recente das conversas do contato na loja,
+  // só no negócio principal (como a view calculava).
+  const ultimaDaLoja = new Map<string, string>()
+  for (const c of conversasDosContatos) {
+    if (!c.ultima_mensagem_at) continue
+    const k = chaveLoja(c.contato_id, c.filial_id)
+    const a = ultimaDaLoja.get(k)
+    if (!a || c.ultima_mensagem_at > a) ultimaDaLoja.set(k, c.ultima_mensagem_at)
+  }
+  for (const l of leadsRaw) {
+    const k = chaveLoja(contatoDoLead.get(l.id)!, l.filial_id)
+    l.ultima_mensagem_at = principal.get(k)?.id === l.id ? ultimaDaLoja.get(k) ?? null : null
+  }
+
+  // Mensagem sem negócio na loja não tem lead (a view dava lead_id nulo): fica fora.
+  const msgs: MsgBanco[] = []
+  for (const m of msgsDosContatos) {
+    const lead = principal.get(chaveLoja(m.contato_id, m.filial_id))
+    if (!lead) continue
+    msgs.push({
+      id: m.id, lead_id: lead.id, direcao: m.direcao, conteudo: m.conteudo,
+      transcricao: m.transcricao, tipo: m.tipo, created_at: m.created_at,
+    })
+  }
 
   // ORDEM POR id, NÃO POR created_at — e a razão é correção, não custo.
   //

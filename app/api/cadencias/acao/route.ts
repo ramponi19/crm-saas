@@ -1,6 +1,8 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { dataDaAcao, proximoPasso, type PassoMin } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
+import { marcarNoLead } from '@/lib/leads'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 interface AcaoBody {
   inscricaoId?: number
@@ -71,7 +73,12 @@ export async function POST(req: Request) {
   }
 
   // Foi um contato → atualiza a última tratativa (reflete no timer do card).
-  await supabase.from('leads').update({ ultima_tratativa: nowIso }).eq('id', insc.lead_id)
+  // Mora em negocios.dados._lead (a view `leads` caiu). Como antes, falhar aqui
+  // não desfaz a execução já registrada.
+  if (insc.lead_id) {
+    await marcarNoLead(supabase as unknown as SupabaseClient, insc.lead_id, { ultima_tratativa: nowIso })
+      .catch((e) => console.error('[cadencias/acao] ultima_tratativa:', e))
+  }
 
   // "converteu" encerra a cadência; senão, avança para o próximo passo.
   let concluir = body.resultado === 'converteu'

@@ -153,7 +153,7 @@ async function gravar(caminho: string): Promise<void> {
   const lote = JSON.parse(fs.readFileSync(caminho, 'utf8')) as { leadId: number; perfil: PerfilIA }[]
   const ids = lote.map((x) => x.leadId)
 
-  const { data: dono } = await db.from('leads').select('id, empresa_id').in('id', ids)
+  const { data: dono } = await db.from('negocios').select('id, empresa_id').in('id', ids)
   const empresaDe = new Map((dono ?? []).map((d) => [d.id as number, d.empresa_id as number]))
   const empresaId = empresaDe.get(ids[0])
   if (!empresaId) { console.error('lead nao encontrado'); process.exit(1) }

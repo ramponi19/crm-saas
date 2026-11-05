@@ -28,7 +28,8 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     supabase.from('empresas').select('nome, plano, status, trial_ends_at, limite_leads, limite_usuarios').eq('id', empresaId).single(),
     consultaClientes(supabase, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
+    // Lead = negócio (a view `leads` caiu).
+    supabase.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('estoque_produtos').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas_vendas').select('valor_venda').eq('empresa_id', empresaId).eq('status', 'concluida').gte('data_venda', inicioMes).lt('data_venda', fimMes),

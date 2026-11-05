@@ -28,14 +28,19 @@ export default async function FilaPage() {
   const leadIds = [...new Set(insc.map((i) => i.lead_id))]
   const cadIds = [...new Set(insc.map((i) => i.cadencia_id))]
 
-  const [{ data: leads }, { data: cads }, { data: passos }, { data: tmplRow }] = await Promise.all([
-    supabase.from('leads').select('id, nome, telefone, kanban_status').in('id', leadIds),
+  // Lead = negócio: nome/telefone do contato, etapa pelo slug (sem etapa, o legado em dados._lead).
+  const SELECT_LEAD: string = 'id, contato:contatos!contato_id(nome, telefone), etapa:funil_etapas!etapa_id(slug), legado:dados->_lead->>kanban_status'
+  const [{ data: leadsRaw }, { data: cads }, { data: passos }, { data: tmplRow }] = await Promise.all([
+    supabase.from('negocios').select(SELECT_LEAD).in('id', leadIds),
     supabase.from('cadencias').select('id, nome').in('id', cadIds),
     supabase.from('cadencia_passos').select('cadencia_id, ordem, canal, titulo, template_chave').in('cadencia_id', cadIds),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'mensagens_templates').maybeSingle(),
   ])
 
-  const leadMap = new Map((leads ?? []).map((l) => [l.id, l]))
+  type LeadRow = { id: number; contato: { nome: string | null; telefone: string | null } | null; etapa: { slug: string } | null; legado: string | null }
+  const leadMap = new Map(((leadsRaw ?? []) as unknown as LeadRow[]).map((l) => [l.id, {
+    nome: l.contato?.nome ?? null, telefone: l.contato?.telefone ?? null, kanban_status: l.etapa?.slug ?? l.legado ?? null,
+  }]))
   const cadMap = new Map((cads ?? []).map((c) => [c.id, c.nome]))
   const passoMap = new Map((passos ?? []).map((p) => [`${p.cadencia_id}:${p.ordem}`, p]))
   const templates = (tmplRow?.valor ?? {}) as Record<string, string>

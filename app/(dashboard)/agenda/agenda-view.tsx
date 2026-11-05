@@ -7,6 +7,7 @@ import { Plus, Clock, MapPin, Phone, CalendarDays, ChevronLeft, ChevronRight, Us
 import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
 import type { RotulosAgenda } from '@/lib/empresa-config'
+import { embedLead } from '@/lib/leads'
 
 /**
  * Agenda em CALENDÁRIO DO MÊS + painel do dia (pedido do dono da imobiliária,
@@ -231,9 +232,11 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
       status: 'agendada',
       observacoes: form.observacoes.trim() || null,
     }
+    // O lead da visita é o negócio (visitas.lead_id); nome/telefone vêm do contato.
+    const selectVisita: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)`
     const { data, error } = await supabase.from('visitas')
       .insert(payload)
-      .select('*, leads(nome, telefone), clientes:contatos!cliente_id(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)')
+      .select(selectVisita)
       .single()
     setLoading(false)
     if (error) { notify.bad(error.message); return }

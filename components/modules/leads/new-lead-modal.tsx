@@ -6,7 +6,6 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { Lead, Usuario, type KanbanColumn } from './types'
 import { Modal, Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { ProdutoAutocomplete } from './produto-autocomplete'
-import type { TablesInsert } from '@/types/database'
 
 interface NewLeadModalProps {
   usuarios: Usuario[]
@@ -60,10 +59,12 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
     const empresaId = await empresaAtualId(supabase)
     if (!empresaId) { notify.bad('Empresa não encontrada'); setLoading(false); return }
 
+    // Aviso antes de tentar: o limite de verdade é do banco (gatilho negocios_limite),
+    // que conta os negócios abertos — aqui é a mesma conta, para avisar sem gravar.
     const { data: empresa } = await supabase
       .from('empresas').select('limite_leads').eq('id', empresaId).single()
     const { count: totalLeads } = await supabase
-      .from('leads').select('*', { count: 'exact', head: true })
+      .from('negocios').select('id', { count: 'exact', head: true })
       .eq('empresa_id', empresaId).eq('ativo', true)
     const limiteLeads = empresa?.limite_leads ?? 0
     if (limiteLeads > 0 && (totalLeads ?? 0) >= limiteLeads) {
@@ -71,23 +72,28 @@ export function NewLeadModal({ usuarios, columns, onClose, onCreate, funilId }: 
       setLoading(false); return
     }
 
-    const { data, error } = await supabase.from('leads').insert({
-      empresa_id: empresaId,
-      nome: form.nome.trim(),
-      telefone: form.telefone.trim() || null,
-      instagram: form.instagram.trim() || null,
-      origem: form.origem || null,
-      produto_interessado: form.produto_interessado.trim() || null,
-      valor_estimado: form.valor_estimado ? (Number(form.valor_estimado.replace(/\./g, '').replace(',', '.')) || null) : null,
-      kanban_status: form.kanban_status,
-      responsavel_id: form.responsavel_id || null,
-      observacoes: form.observacoes.trim() || null,
-      funil_id: funilId ?? null,
-      ativo: true, msgs_nao_lidas: 0,
-    } as TablesInsert<'leads'>).select().single()
+    // Pelo servidor (/api/leads → lib/leads.ts): o contato do mesmo telefone em outra
+    // loja não aparece para quem cadastra, e o servidor o reaproveita em vez de duplicar.
+    const r = await fetch('/api/leads', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: form.nome.trim(),
+        telefone: form.telefone.trim() || null,
+        instagram: form.instagram.trim() || null,
+        origem: form.origem || null,
+        produto_interessado: form.produto_interessado.trim() || null,
+        valor_estimado: form.valor_estimado ? (Number(form.valor_estimado.replace(/./g, '').replace(',', '.')) || null) : null,
+        kanban_status: form.kanban_status,
+        responsavel_id: form.responsavel_id || null,
+        observacoes: form.observacoes.trim() || null,
+        funil_id: funilId ?? null,
+      }),
+    }).catch(() => null)
+    const j = (await r?.json().catch(() => null)) as { lead?: Lead; error?: string } | null
+    const data = r?.ok ? j?.lead ?? null : null
 
-    if (error) {
-      const msg = error.message?.includes('LEAD_LIMIT_REACHED')
+    if (!data) {
+      const msg = j?.error === 'LEAD_LIMIT_REACHED'
         ? 'Limite de leads atingido. Faça upgrade para continuar.'
         : 'Tente novamente.'
       notify.bad('Erro ao criar lead', msg)

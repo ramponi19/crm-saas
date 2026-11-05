@@ -66,9 +66,12 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
    * então filtrar o acervo por corretor mostraria carteira vazia e daria a impressão
    * de que a imobiliária não tem imóvel — pior que não filtrar.
    */
-  let qLeads = supabase.from('leads').select('kanban_status, origem, responsavel_id').eq('empresa_id', empresaId).eq('ativo', true)
+  // Lead = negócio (a view `leads` caiu): etapa pelo slug (sem etapa, o legado em
+  // dados._lead, como a view), origem do contato.
+  const SELECT_LEAD: string = 'responsavel_id, etapa:funil_etapas!etapa_id(slug), legado:dados->_lead->>kanban_status, contato:contatos!contato_id(origem)'
+  let qLeads = supabase.from('negocios').select(SELECT_LEAD).eq('empresa_id', empresaId).eq('ativo', true)
   if (corretor) qLeads = qLeads.eq('responsavel_id', corretor)
-  let qLeadsMes = supabase.from('leads').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes)
+  let qLeadsMes = supabase.from('negocios').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes)
   if (corretor) qLeadsMes = qLeadsMes.eq('responsavel_id', corretor)
   let qVisitas = supabase.from('visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes)
   if (corretor) qVisitas = qVisitas.eq('corretor_id', corretor)
@@ -98,11 +101,14 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
   const leadIdsProp = [...new Set(propMes.map((p) => p.lead_id).filter((v): v is number => v != null))]
   const respPorLead: Record<number, string | null> = {}
   if (leadIdsProp.length) {
-    const { data: lr } = await supabase.from('leads').select('id, responsavel_id').in('id', leadIdsProp)
+    const { data: lr } = await supabase.from('negocios').select('id, responsavel_id').in('id', leadIdsProp)
     for (const l of (lr ?? []) as Array<{ id: number; responsavel_id: string | null }>) respPorLead[l.id] = l.responsavel_id
   }
 
-  const L = leads ?? []
+  type LeadRow = { responsavel_id: string | null; etapa: { slug: string } | null; legado: string | null; contato: { origem: string | null } | null }
+  const L = ((leads ?? []) as unknown as LeadRow[]).map((l) => ({
+    kanban_status: l.etapa?.slug ?? l.legado ?? null, origem: l.contato?.origem ?? null, responsavel_id: l.responsavel_id,
+  }))
   const I = imoveis ?? []
   type EtapaRow = { slug: string; label: string; cor: string | null; tipo: string | null }
   const doBanco: KanbanColumn[] = ((etapasRaw ?? []) as unknown as EtapaRow[]).map((e) => ({

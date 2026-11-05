@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import TarefasView from './tarefas-view'
 import type { Tables } from '@/types/database'
+import { embedLead, leadsParaEscolher } from '@/lib/leads'
 
 export const metadata = { title: 'Tarefas' }
 
@@ -17,13 +18,15 @@ export default async function TarefasPage() {
 
   // A chave vai NOMEADA: desde o corte (20/10) tarefas tem lead_id e negocio_id
   // apontando para negocios, e o embed de leads sem a chave ficou ambíguo (PGRST201) —
-  // a lista vinha vazia e criar tarefa falhava, sem erro na tela.
-  let q = supabase.from('tarefas').select('*, leads!tarefas_lead_id_fkey(nome)').eq('empresa_id', empresaId)
+  // a lista vinha vazia e criar tarefa falhava, sem erro na tela. O nome vem do contato.
+  const SELECT_TAREFA: string = `*, ${embedLead('tarefas_lead_id_fkey')}`
+  let q = supabase.from('tarefas').select(SELECT_TAREFA).eq('empresa_id', empresaId)
   if (!isGestor) q = q.eq('responsavel_id', user!.id)
 
-  const [{ data: tarefasRaw }, { data: leads }, { data: membros }] = await Promise.all([
+  const [{ data: tarefasRaw }, leads, { data: membros }] = await Promise.all([
     q.order('concluida').order('vencimento', { nullsFirst: false }),
-    supabase.from('leads').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('ultima_mensagem_at', { ascending: false }).limit(200),
+    // Os de conversa mais recente primeiro (era `leads` por ultima_mensagem_at).
+    leadsParaEscolher(supabase, empresaId, 200),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
@@ -36,7 +39,7 @@ export default async function TarefasPage() {
   return (
     <TarefasView
       inicial={tarefas}
-      leads={leads ?? []}
+      leads={leads}
       usuarios={usuarios}
       empresaId={empresaId}
       meuId={user!.id}

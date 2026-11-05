@@ -26,7 +26,8 @@ export async function contarLeadsPorFilial(
   opcoes: { soAtivos?: boolean } = {},
 ): Promise<{ porFilial: Map<number, number>; semFilial: number; total: number }> {
   const base = () => {
-    const q = svc.from('leads').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId)
+    // O lead é o negócio (a view `leads` caiu); `ativo` é a coluna gerada.
+    const q = svc.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId)
     return opcoes.soAtivos ? q.eq('ativo', true) : q
   }
 

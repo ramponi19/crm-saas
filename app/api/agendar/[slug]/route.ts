@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
+import { criarLead } from '@/lib/leads'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -47,11 +48,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   const responsavel = await escolherResponsavel(svc, empresa.id, { origem: 'agendamento', valor_estimado: null })
 
-  const { data: lead } = await svc.from('leads').insert({
-    empresa_id: empresa.id, nome, telefone: (b.telefone || '').trim() || null,
-    origem: 'agendamento', kanban_status: 'novo', ativo: true, responsavel_id: responsavel,
+  // Contato + negócio pela camada (a view `leads` caiu). Como antes, falha ao
+  // criar o lead não impede a consulta: ela fica sem lead.
+  const lead = await criarLead(svc, empresa.id, {
+    nome, telefone: (b.telefone || '').trim() || null,
+    origem: 'agendamento', kanban_status: 'novo', responsavel_id: responsavel,
     observacoes: 'Agendamento online',
-  }).select('id').single()
+  })
 
   const { error } = await svc.from('visitas').insert({
     empresa_id: empresa.id, lead_id: lead?.id ?? null, corretor_id: responsavel,

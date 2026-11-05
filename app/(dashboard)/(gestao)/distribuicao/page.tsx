@@ -24,7 +24,8 @@ export default async function DistribuicaoPage() {
   const [{ data: regrasRaw }, { data: membrosRaw }, { count: semDono }] = await Promise.all([
     supabase.from('distribuicao_regras').select('id, ordem, nome, ativo, criterio, config, destinatarios').eq('empresa_id', empresaId).order('ordem', { ascending: true }),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).is('responsavel_id', null),
+    // Lead = negócio (a view `leads` caiu); `ativo` é a coluna gerada do "zerar do funil".
+    supabase.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true).is('responsavel_id', null),
   ])
 
   const regras: Regra[] = (regrasRaw ?? []).map((r) => ({

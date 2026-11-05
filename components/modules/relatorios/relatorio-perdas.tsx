@@ -51,9 +51,11 @@ export function RelatorioPerdas() {
 
   useEffect(() => {
     (async () => {
+      // Lead = negócio (a view `leads` caiu); o nome vem do contato, espalhado na linha.
+      const SELECT_PERDA: string = 'id, perdido_em, responsavel_id, ...contatos!contato_id(nome), motivo:motivos_perda!motivo_perda_id(label)'
       const { data } = await supabase
-        .from('leads')
-        .select('id, nome, perdido_em, responsavel_id, motivo:motivos_perda(label)')
+        .from('negocios')
+        .select(SELECT_PERDA)
         .not('perdido_em', 'is', null)
         .order('perdido_em', { ascending: false })
         .limit(1000)

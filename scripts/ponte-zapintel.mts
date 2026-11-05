@@ -53,7 +53,7 @@ const total = concluidas.reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)
 const ticket = concluidas.length ? total / concluidas.length : 0
 
 const { count: leadsAtivos } = await db
-  .from('leads').select('id', { count: 'exact', head: true })
+  .from('negocios').select('id', { count: 'exact', head: true })
   .eq('empresa_id', EMPRESA).eq('ativo', true)
 
 const leadsQueCompraram = new Set(ligadas.map((l) => l.lead_id)).size

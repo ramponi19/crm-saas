@@ -876,15 +876,9 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
         await entregarViaEdge(supabase, 'send', { number: lead.telefone, text: t, leadId: lead.id })
       } else {
-        if (!empresa?.id) throw new Error('Empresa não encontrada')
-        // Canal sem integração (anotação de atendimento presencial): grava
-        // direto, e com o autor, igual aos canais que passam pela Edge.
-        const { data: { user: autor } } = await supabase.auth.getUser()
-        const { error } = await supabase.from('lead_mensagens').insert({
-          empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
-          conteudo: t, origem: canal, lida: true, usuario_id: autor?.id ?? null,
-        })
-        if (error) throw new Error(error.message)
+        // Canal sem integração (anotação de atendimento presencial): grava pelo
+        // servidor, com o autor, igual aos canais que passam pela Edge.
+        await registrarSemCanal({ conteudo: t, origem: canal })
       }
       // (Saiu o `leads.update({ ultima_mensagem_at })` daqui: na view essa coluna
       // vem de `conversas` e o gatilho a ignorava — a gravação não fazia nada.)
@@ -898,6 +892,17 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
       rollback()
       notify.bad('Erro ao enviar', e instanceof Error ? e.message : 'Tente novamente.')
     }
+  }
+
+  /**
+   * Mensagem de canal sem integração (manual, site, indicação): /api/leads/[id]/mensagem,
+   * que grava pela mensagem_registrar com o autor. Era o insert na view lead_mensagens.
+   */
+  async function registrarSemCanal(m: { conteudo: string; origem: string; tipo?: string; midia_url?: string }) {
+    const r = await fetch(`/api/leads/${lead.id}/mensagem`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m),
+    })
+    if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? 'Falha ao gravar a mensagem')
   }
 
   /**
@@ -962,12 +967,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
         await entregarViaEdge(supabase, 'send', { number: lead.telefone, leadId: lead.id, midiaUrl: url, tipoMidia })
       } else {
-        if (!empresa?.id) throw new Error('Empresa não encontrada')
-        const { error } = await supabase.from('lead_mensagens').insert({
-          empresa_id: empresa.id, lead_id: lead.id, direcao: 'enviada',
-          conteudo: `[${tipoDb}]`, origem: canal, lida: true, tipo: tipoDb, midia_url: url,
-        })
-        if (error) throw new Error(error.message)
+        await registrarSemCanal({ conteudo: `[${tipoDb}]`, origem: canal, tipo: tipoDb, midia_url: url })
       }
     } catch (e) {
       if (ehTimeoutMeta(e)) {

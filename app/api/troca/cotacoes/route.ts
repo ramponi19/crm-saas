@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   }
   let leadId: number | null = null
   if (b.lead_id != null) {
-    const { data: ld } = await supabase.from('leads')
+    const { data: ld } = await supabase.from('negocios')
       .select('id').eq('id', b.lead_id).eq('empresa_id', empresaId).maybeSingle()
     leadId = ld?.id ?? null
   }

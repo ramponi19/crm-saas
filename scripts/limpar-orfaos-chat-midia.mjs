@@ -18,7 +18,7 @@
  *    `storage.objects` deixa o binário no S3 e o espaço continua contando.
  *
  * 3. **Duas colunas apontam para o bucket**, e as duas são conferidas aqui:
- *    `lead_mensagens.midia_url` e `leads.foto_url`. Em setembro os avatares
+ *    `mensagens.midia_url` e `contatos.foto_url` (até 05/11/2026, pelas views `lead_mensagens` e `leads`). Em setembro os avatares
  *    quase entraram na lista por engano porque só a primeira foi olhada.
  *
  * 4. **Avatares ficam de fora** (`<empresa>/avatares/`). São 13 arquivos de
@@ -52,7 +52,7 @@ const mb = (b) => `${(b / 1024 / 1024).toFixed(1)} MB`
 /** Dos nomes dados, quais AINDA são órfãos agora? */
 async function aindaOrfaos(nomes) {
   const vivos = new Set()
-  for (const col of [['lead_mensagens', 'midia_url'], ['leads', 'foto_url']]) {
+  for (const col of [['mensagens', 'midia_url'], ['contatos', 'foto_url']]) {
     const [tabela, coluna] = col
     for (const nome of nomes) {
       const { data, error } = await db.from(tabela).select('id')

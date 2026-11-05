@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
+import { nadaGravado } from '@/lib/linhas-afetadas'
 
 // Reserva de unidade do estoque para um lead (48h). Feita no modal do lead;
 // a venda é finalizada no PDV (aba Reservas). Cancelamento: só quem reservou
@@ -30,7 +31,8 @@ export async function POST(req: Request) {
   await expirarReservas(svc, auth.empresaId)
 
   // Lead precisa ser da mesma empresa (evita reservar estoque para lead alheio).
-  const { data: lead } = await svc.from('leads').select('id').eq('id', body.leadId).eq('empresa_id', auth.empresaId).eq('ativo', true).maybeSingle()
+  // O lead é o negócio (a view `leads` caiu); `dados` para gravar o interesse abaixo.
+  const { data: lead } = await svc.from('negocios').select('id, dados').eq('id', body.leadId).eq('empresa_id', auth.empresaId).eq('ativo', true).maybeSingle()
   if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
 
   const agora = new Date()
@@ -58,10 +60,16 @@ export async function POST(req: Request) {
   // Preenche o interesse do lead com o produto real reservado.
   const prod = Array.isArray(unidade.produtos) ? unidade.produtos[0] : unidade.produtos
   const descricao = [prod?.nome, unidade.armazenamento, unidade.cor, unidade.condicao ? `(${unidade.condicao})` : null].filter(Boolean).join(' ')
-  await svc.from('leads').update({
-    produto_interessado: descricao || null,
+  // `produto_interessado` mora em negocios.dados; vazio tira a chave, como a view fazia.
+  const dados = { ...((lead.dados ?? {}) as Record<string, unknown>) }
+  if (descricao) dados.produto_interessado = descricao
+  else delete dados.produto_interessado
+  const { data: gravado, error: erroLead } = await svc.from('negocios').update({
+    dados,
     valor_estimado: unidade.preco_venda ?? null,
-  }).eq('id', body.leadId)
+  } as never).eq('id', body.leadId).select('id')
+  // A reserva já valeu; o interesse no lead é complemento — registra e segue.
+  if (erroLead || nadaGravado(gravado)) console.error('[reservas] interesse do lead não gravado:', body.leadId, erroLead?.message)
 
   return NextResponse.json({ ok: true, descricao, expiraEm: expira.toISOString() })
 }

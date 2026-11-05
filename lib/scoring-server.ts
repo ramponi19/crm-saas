@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calcularScore, mergeScoreConfig, type ScoreConfig } from '@/lib/lead-score'
 import { dataDaAcao } from '@/lib/cadencia'
+import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 
 /**
  * Reavaliação de scores no servidor (Sprint 2.3). Recalcula o score dos leads
@@ -19,10 +20,15 @@ async function carregarConfig(svc: Db, empresaId: number): Promise<ScoreConfig> 
 export async function reavaliarScores(svc: Db, empresaId: number): Promise<{ avaliados: number; enfileirados: number }> {
   const cfg = await carregarConfig(svc, empresaId)
 
-  const { data: leads } = await svc.from('leads')
-    .select('id, origem, valor_estimado, telefone, instagram, ultima_mensagem_at, ultima_tratativa, created_at, msgs_nao_lidas, primeira_msg, responsavel_id, kanban_status')
+  // O lead é o negócio + contato + etapa (a view `leads` caiu); última mensagem e
+  // não lidas vêm da conversa do contato na loja, só no negócio principal.
+  const { data: linhas } = await svc.from('negocios')
+    .select(COLUNAS_LEAD)
     .eq('empresa_id', empresaId).eq('ativo', true).limit(1000)
-  if (!leads?.length) return { avaliados: 0, enfileirados: 0 }
+  if (!linhas?.length) return { avaliados: 0, enfileirados: 0 }
+  const base = (linhas as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  const conversas = await conversasDosLeads(svc, empresaId, base)
+  const leads = base.map((l) => ({ ...l, ...conversas.get(l.id) }))
 
   const ids = leads.map((l) => l.id)
 

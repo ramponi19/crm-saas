@@ -2477,14 +2477,14 @@ isOneToOne: false
                   ]
                 },"negocios": {
                   Row: {
-                    "contato_id": number,"created_at": string,"dados": NonNullable<Json>,"devolucoes": number,"devolvido_em": string | null,"empresa_id": number,"entrou_etapa_em": string | null,"etapa_id": number | null,"filial_id": number | null,"funil_id": number | null,"ganho_em": string | null,"id": number,"motivo_perda_id": number | null,"ordem": number,"perdido_em": string | null,"responsavel_id": string | null,"status": string,"titulo": string | null,"updated_at": string,"valor_estimado": number | null
+                    "ativo": boolean,"contato_id": number,"created_at": string,"dados": NonNullable<Json>,"devolucoes": number,"devolvido_em": string | null,"empresa_id": number,"entrou_etapa_em": string | null,"etapa_id": number | null,"filial_id": number | null,"funil_id": number | null,"ganho_em": string | null,"id": number,"motivo_perda_id": number | null,"ordem": number,"perdido_em": string | null,"responsavel_id": string | null,"status": string,"titulo": string | null,"updated_at": string,"valor_estimado": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "contato_id": number,"created_at"?: string,"dados"?: NonNullable<Json>,"devolucoes"?: number,"devolvido_em"?: string | null,"empresa_id": number,"entrou_etapa_em"?: string | null,"etapa_id"?: number | null,"filial_id"?: number | null,"funil_id"?: number | null,"ganho_em"?: string | null,"id"?: number,"motivo_perda_id"?: number | null,"ordem"?: number,"perdido_em"?: string | null,"responsavel_id"?: string | null,"status"?: string,"titulo"?: string | null,"updated_at"?: string,"valor_estimado"?: number | null
+                    "ativo"?: never,"contato_id": number,"created_at"?: string,"dados"?: NonNullable<Json>,"devolucoes"?: number,"devolvido_em"?: string | null,"empresa_id": number,"entrou_etapa_em"?: string | null,"etapa_id"?: number | null,"filial_id"?: number | null,"funil_id"?: number | null,"ganho_em"?: string | null,"id"?: number,"motivo_perda_id"?: number | null,"ordem"?: number,"perdido_em"?: string | null,"responsavel_id"?: string | null,"status"?: string,"titulo"?: string | null,"updated_at"?: string,"valor_estimado"?: number | null
                   }
                   Update: {
-                    "contato_id"?: number,"created_at"?: string,"dados"?: NonNullable<Json>,"devolucoes"?: number,"devolvido_em"?: string | null,"empresa_id"?: number,"entrou_etapa_em"?: string | null,"etapa_id"?: number | null,"filial_id"?: number | null,"funil_id"?: number | null,"ganho_em"?: string | null,"id"?: number,"motivo_perda_id"?: number | null,"ordem"?: number,"perdido_em"?: string | null,"responsavel_id"?: string | null,"status"?: string,"titulo"?: string | null,"updated_at"?: string,"valor_estimado"?: number | null
+                    "ativo"?: never,"contato_id"?: number,"created_at"?: string,"dados"?: NonNullable<Json>,"devolucoes"?: number,"devolvido_em"?: string | null,"empresa_id"?: number,"entrou_etapa_em"?: string | null,"etapa_id"?: number | null,"filial_id"?: number | null,"funil_id"?: number | null,"ganho_em"?: string | null,"id"?: number,"motivo_perda_id"?: number | null,"ordem"?: number,"perdido_em"?: string | null,"responsavel_id"?: string | null,"status"?: string,"titulo"?: string | null,"updated_at"?: string,"valor_estimado"?: number | null
                   }
                   Relationships: [
                     {

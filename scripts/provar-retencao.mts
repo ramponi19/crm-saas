@@ -66,7 +66,7 @@ console.log(`\n${total + orfaos.length} alvos no total`)
 if (achados.length) {
   console.error(`\nFALHOU — ${achados.length} arquivos intocaveis entraram na retencao:`)
   for (const a of achados.slice(0, 10)) console.error(`  ${a}`)
-  console.error('\nConfira `leads.foto_url` na view `storage_orfaos` e os tipos em `lead_mensagens`.\n')
+  console.error('\nConfira `contatos.foto_url` na view `storage_orfaos` e os tipos em `mensagens`.\n')
   process.exit(1)
 }
 

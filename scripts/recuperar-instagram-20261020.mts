@@ -116,8 +116,13 @@ for (const canalId of CANAIS) {
       }
       let lead: { id: number } | null = null
       if (clienteId) {
-        const { data: leads } = await db.from('leads').select('id, filial_id')
-          .eq('empresa_id', canal.empresa_id).eq('origem_id', clienteId).eq('ativo', true).order('id', { ascending: false })
+        // Pela identidade do canal (a view leads caiu em 05/11/2026): os negócios ativos do contato.
+        const { data: ident } = await db.from('contato_identidades').select('contato_id')
+          .eq('empresa_id', canal.empresa_id).eq('external_id', clienteId).limit(1)
+        const { data: leads } = ident?.[0]
+          ? await db.from('negocios').select('id, filial_id').eq('empresa_id', canal.empresa_id)
+              .eq('contato_id', ident[0].contato_id).eq('ativo', true).order('id', { ascending: false })
+          : { data: [] }
         const lista = (leads ?? []) as { id: number; filial_id: number | null }[]
         lead = lista.find((l) => l.filial_id === canal.filial_id) ?? lista[0] ?? null
       }

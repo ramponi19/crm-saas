@@ -5,6 +5,19 @@ import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/
 import ClientesView, { type ClienteImob } from './components/clientes-view'
 import { comNome } from '@/lib/sem-nome'
 import { lerTodosOsClientes } from '@/lib/clientes'
+import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
+
+/**
+ * O lead de cada cliente (o negócio do `lead_id`), com a conversa do contato na
+ * loja — a view `leads` caiu; etapa vem de funil_etapas, nome/telefone do contato.
+ */
+async function lerJornadaDosLeads(db: Awaited<ReturnType<typeof createClient>>, empresaId: number, ids: number[]) {
+  const { data } = await db.from('negocios').select(COLUNAS_LEAD).in('id', ids)
+  const leads = ((data ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  const conversas = await conversasDosLeads(db, empresaId, leads)
+  const semConversa = { ultima_mensagem_at: null, ultima_recebida_at: null, ultima_enviada_at: null, msgs_nao_lidas: 0 }
+  return leads.map((l) => ({ ...l, ...(conversas.get(l.id) ?? semConversa) }))
+}
 
 /**
  * Clientes.
@@ -15,7 +28,7 @@ import { lerTodosOsClientes } from '@/lib/clientes'
  * telas para a mesma palavra, e a capacidade `clienteComPipeline` escolhe qual.
  *
  * O QUE LIGA AS DUAS METADES: o `lead_id` da marca `_cliente` (lib/clientes.ts). A
- * jornada (etapa, score) vive em `leads`; a pessoa para efeito de contrato (CPF validado,
+ * jornada (etapa, score) vive no negócio (`lib/leads`); a pessoa para efeito de contrato (CPF validado,
  * estado civil) vive no cadastro do cliente. Sem o vínculo, a mesma pessoa apareceria duas vezes no CRM com
  * históricos separados — foi o que a decisão de 20/08/2026 resolveu.
  */
@@ -33,12 +46,8 @@ export default async function ClientesPage() {
   type ClienteRow = { id: number; lead_id: number | null; corretor_id: string | null }
   const idsLead = [...new Set((clientes as ClienteRow[]).map((c) => c.lead_id).filter((x): x is number => x != null))]
 
-  const [{ data: leadsRaw }, { data: etapasRaw }, { data: membrosRaw }, { data: scoreRow }] = await Promise.all([
-    idsLead.length
-      ? supabase.from('leads')
-          .select('id, kanban_status, origem, valor_estimado, telefone, instagram, msgs_nao_lidas, ultima_mensagem_at, ultima_tratativa, created_at, responsavel_id')
-          .in('id', idsLead)
-      : Promise.resolve({ data: [] }),
+  const [leadsRaw, { data: etapasRaw }, { data: membrosRaw }, { data: scoreRow }] = await Promise.all([
+    idsLead.length ? lerJornadaDosLeads(supabase, empresaId, idsLead) : Promise.resolve([]),
     // Etapas do funil PADRÃO: os rótulos que o dono editou, não os do código.
     supabase.from('funil_etapas').select('slug, label, tipo, ordem, funis!inner(padrao)')
       .eq('empresa_id', empresaId).eq('ativo', true).eq('funis.padrao', true).order('ordem'),
@@ -71,7 +80,7 @@ export default async function ClientesPage() {
     ultima_mensagem_at: string | null; ultima_tratativa: string | null; created_at: string | null
     responsavel_id: string | null
   }
-  const leadPorId = new Map(((leadsRaw ?? []) as LeadRow[]).map((l) => [l.id, l]))
+  const leadPorId = new Map((leadsRaw as LeadRow[]).map((l) => [l.id, l]))
 
   /**
    * A jornada de cada cliente, resolvida no servidor.

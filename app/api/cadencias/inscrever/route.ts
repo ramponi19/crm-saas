@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   if (!body.leadId || !body.cadenciaId) return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
 
   // Lead (RLS garante a empresa) — usa o responsável atual como dono da inscrição.
-  const { data: lead } = await supabase.from('leads').select('id, responsavel_id').eq('id', body.leadId).maybeSingle()
+  const { data: lead } = await supabase.from('negocios').select('id, responsavel_id').eq('id', body.leadId).maybeSingle()
   if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
 
   // Já inscrito e ativo nessa cadência?

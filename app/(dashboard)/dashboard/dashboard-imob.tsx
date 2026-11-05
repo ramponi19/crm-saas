@@ -10,6 +10,7 @@ import { TermometroLeads } from './termometro-leads'
 import { LeadsParados, type LeadParado } from './leads-parados'
 import { diasParado, DIAS_PARADO } from '@/lib/lead-parado'
 import { consultaClientes, clienteDoContato } from '@/lib/clientes'
+import { COLUNAS_LEAD, conversasDosLeads, embedLead, leadDoNegocio, type Lead } from '@/lib/leads'
 
 type LeadRow = {
   id: number; nome: string | null; kanban_status: string | null; origem: string | null
@@ -17,6 +18,101 @@ type LeadRow = {
   created_at: string | null; telefone: string | null; instagram: string | null
   valor_estimado: number | null; msgs_nao_lidas: number | null
 }
+type Db = Awaited<ReturnType<typeof createClient>>
+const chaveLoja = (contato: number, filial: number | null) => `${contato}:${filial ?? -1}`
+
+/**
+ * Os `limite` leads ativos de conversa mais recente — era a view `leads` ordenada
+ * por `ultima_mensagem_at` (nulos por último). A conversa mora em `conversas` e só
+ * o negócio PRINCIPAL do contato na loja a leva (lib/leads), então não dá para
+ * ordenar no banco:
+ *   - carteira que cabe no teto: lê toda e ordena aqui (exato e barato);
+ *   - carteira maior: percorre as conversas da mais recente para trás e fica com o
+ *     principal de cada contato/loja que for da carteira (havendo negócio ativo, o
+ *     principal é o ativo mais novo); faltando, completa com os sem conversa, os
+ *     mais novos primeiro (na view a ordem entre os nulos era indefinida).
+ */
+async function leadsPorUltimaMensagem(db: Db, empresaId: number, limite: number, responsavel: string | null): Promise<LeadRow[]> {
+  const ativos = (colunas: string) => {
+    let b = db.from('negocios').select(colunas).eq('empresa_id', empresaId).eq('ativo', true)
+    if (responsavel) b = b.eq('responsavel_id', responsavel)
+    return b
+  }
+  const lerPorIds = async (ids: number[]) => {
+    const out: Lead[] = []
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data } = await db.from('negocios').select(COLUNAS_LEAD).in('id', ids.slice(i, i + 200))
+      out.push(...((data ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio))
+    }
+    return out
+  }
+
+  let leads: Lead[]
+  let ordemFixa: Map<number, number> | null = null
+  const { data: primeiros } = await ativos(COLUNAS_LEAD).order('created_at', { ascending: false }).limit(limite + 1)
+  if ((primeiros ?? []).length <= limite) {
+    leads = ((primeiros ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  } else {
+    const escolhidos: number[] = []
+    const vistas = new Set<string>()
+    for (let de = 0; escolhidos.length < limite; de += 1000) {
+      const { data: convs } = await db.from('conversas').select('contato_id, filial_id')
+        .eq('empresa_id', empresaId).not('ultima_mensagem_at', 'is', null)
+        .order('ultima_mensagem_at', { ascending: false }).order('id', { ascending: false }).range(de, de + 999)
+      const pagina = (convs ?? []) as { contato_id: number; filial_id: number | null }[]
+      if (!pagina.length) break
+      const novas: string[] = []
+      for (const c of pagina) {
+        const k = chaveLoja(c.contato_id, c.filial_id)
+        if (!vistas.has(k)) { vistas.add(k); novas.push(k) }
+      }
+      const contatos = [...new Set(novas.map((k) => Number(k.split(':')[0])))]
+      type Neg = { id: number; contato_id: number; filial_id: number | null; responsavel_id: string | null; created_at: string }
+      const principal = new Map<string, Neg>()
+      for (let i = 0; i < contatos.length; i += 200) {
+        const { data } = await db.from('negocios').select('id, contato_id, filial_id, responsavel_id, created_at')
+          .eq('empresa_id', empresaId).eq('ativo', true).in('contato_id', contatos.slice(i, i + 200))
+        for (const n of (data ?? []) as Neg[]) {
+          const k = chaveLoja(n.contato_id, n.filial_id)
+          const p = principal.get(k)
+          if (!p || n.created_at > p.created_at || (n.created_at === p.created_at && n.id > p.id)) principal.set(k, n)
+        }
+      }
+      for (const k of novas) {
+        if (escolhidos.length >= limite) break
+        const p = principal.get(k)
+        if (p && (!responsavel || p.responsavel_id === responsavel)) escolhidos.push(p.id)
+      }
+    }
+    if (escolhidos.length < limite) {
+      const ja = new Set(escolhidos)
+      const { data: semConversa } = await ativos('id').order('created_at', { ascending: false }).limit(limite)
+      for (const n of (semConversa ?? []) as unknown as { id: number }[]) {
+        if (escolhidos.length >= limite) break
+        if (!ja.has(n.id)) escolhidos.push(n.id)
+      }
+    }
+    ordemFixa = new Map(escolhidos.map((id, i) => [id, i]))
+    leads = await lerPorIds(escolhidos)
+  }
+
+  const conversas = await conversasDosLeads(db, empresaId, leads)
+  const linhas: LeadRow[] = leads.map((l) => {
+    const c = conversas.get(l.id)
+    return {
+      id: l.id, nome: l.nome, kanban_status: l.kanban_status, origem: l.origem, responsavel_id: l.responsavel_id,
+      ultima_mensagem_at: c?.ultima_mensagem_at ?? null, ultima_tratativa: l.ultima_tratativa, created_at: l.created_at,
+      telefone: l.telefone, instagram: l.instagram, valor_estimado: l.valor_estimado, msgs_nao_lidas: c?.msgs_nao_lidas ?? 0,
+    }
+  })
+  const fim = Number.MAX_SAFE_INTEGER
+  const ordem = ordemFixa
+  return ordem
+    ? linhas.sort((a, b) => (ordem.get(a.id) ?? fim) - (ordem.get(b.id) ?? fim))
+    : linhas.sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? '')
+      || (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+}
+
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -72,17 +168,15 @@ export default async function DashboardImob() {
    * deixaria de refletir a carteira inteira.
    */
   const TETO_LEADS = 400
-  let q = supabase.from('leads')
-    .select('id, nome, kanban_status, origem, responsavel_id, ultima_mensagem_at, ultima_tratativa, created_at, telefone, instagram, valor_estimado, msgs_nao_lidas')
-    .eq('empresa_id', empresaId).eq('ativo', true)
-  if (!isGestor) q = q.eq('responsavel_id', user.id)
+  const q = leadsPorUltimaMensagem(supabase, empresaId, TETO_LEADS, isGestor ? null : user.id)
 
   // janela de "hoje" (local) e a dos próximos dias, para a agenda do cockpit
   const agora = new Date()
   const iniHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString()
   const fimJanela = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + DIAS_AGENDA).toISOString()
 
-  let vq = supabase.from('visitas').select('id, data_hora, status, leads(nome), imoveis:imoveis_imoveis(codigo, titulo)')
+  const SELECT_VISITA: string = `id, data_hora, status, ${embedLead('visitas_lead_id_fkey')}, imoveis:imoveis_imoveis(codigo, titulo)`
+  let vq = supabase.from('visitas').select(SELECT_VISITA)
     .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimJanela).order('data_hora').limit(8)
   if (!isGestor) vq = vq.eq('corretor_id', user.id)
 
@@ -95,21 +189,22 @@ export default async function DashboardImob() {
    * calculado é pior que número ausente, porque ninguém desconfia dele. Um
    * `count` é barato (o banco nem devolve linha) e paga a honestidade.
    */
-  let cq = supabase.from('leads').select('*', { count: 'exact', head: true })
+  let cq = supabase.from('negocios').select('id', { count: 'exact', head: true })
     .eq('empresa_id', empresaId).eq('ativo', true)
   if (!isGestor) cq = cq.eq('responsavel_id', user.id)
 
-  let tq = supabase.from('tarefas').select('id, titulo, vencimento, leads!tarefas_lead_id_fkey(nome)')
+  const SELECT_TAREFA: string = `id, titulo, vencimento, ${embedLead('tarefas_lead_id_fkey')}`
+  let tq = supabase.from('tarefas').select(SELECT_TAREFA)
     .eq('empresa_id', empresaId).eq('concluida', false).order('vencimento', { nullsFirst: false }).limit(8)
   if (!isGestor) tq = tq.eq('responsavel_id', user.id)
 
   const [
-    { data: leadsRaw }, { count: imoveisDisp }, { count: imoveisTotal }, { count: totalClientes },
+    leads, { count: imoveisDisp }, { count: imoveisTotal }, { count: totalClientes },
     { data: visitasRaw }, { data: tarefasRaw }, { data: scoreCfgRow }, { data: membrosRaw },
     { data: etapasRaw }, { data: ultimosClientesRaw }, { data: ultimosImoveisRaw },
     { count: totalLeadsCarteira },
   ] = await Promise.all([
-    q.order('ultima_mensagem_at', { ascending: false, nullsFirst: false }).limit(TETO_LEADS),
+    q,
     supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('status', 'disponivel'),
     supabase.from('imoveis_imoveis').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     consultaClientes(supabase, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
@@ -128,7 +223,6 @@ export default async function DashboardImob() {
     cq,
   ])
 
-  const leads = (leadsRaw ?? []) as LeadRow[]
   const scoreCfg = (scoreCfgRow?.valor ?? null) as Partial<ScoreConfig> | null
 
   type EtapaRow = { slug: string; label: string; cor: string; tipo: string; ordem: number }

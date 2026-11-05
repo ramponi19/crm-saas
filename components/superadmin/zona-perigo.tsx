@@ -15,18 +15,19 @@ export function ZonaPerigo({ empresaId, empresaNome }: { empresaId: number; empr
   async function exportar() {
     setBaixando(true)
     try {
+      // O servidor grava o ZIP no Storage (bucket privado, apagado em 24 h) e devolve
+      // um link assinado de 10 minutos: a exportação completa passa do teto de resposta.
       const res = await fetch(`/api/superadmin/empresas/${empresaId}/exportar`)
-      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha') }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const j = await res.json().catch(() => ({})) as { url?: string; error?: string; contagens?: Record<string, number> }
+      if (!res.ok || !j.url) throw new Error(j.error ?? 'Falha')
       const a = document.createElement('a')
-      a.href = url
-      a.download = `lgpd-${empresaId}-${new Date().toISOString().slice(0, 10)}.zip`
+      a.href = j.url
+      a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()
       a.remove()
-      URL.revokeObjectURL(url)
-      notify.ok('Exportação concluída', 'ZIP com os CSVs baixado.')
+      const c = j.contagens ?? {}
+      notify.ok('Exportação concluída', `ZIP baixado (link válido por 10 min): ${c.leads ?? 0} leads, ${c.mensagens ?? 0} mensagens, ${c.clientes ?? 0} clientes.`)
     } catch (e) {
       notify.bad('Não foi possível exportar', e instanceof Error ? e.message : undefined)
     } finally {

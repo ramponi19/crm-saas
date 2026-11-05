@@ -95,7 +95,8 @@ export async function DELETE(req: Request) {
   if (!funil) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
   if (funil.padrao) return NextResponse.json({ error: 'Não é possível excluir o funil padrão.' }, { status: 400 })
 
-  const { count } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('funil_id', body.id)
+  // Negócios do funil, ativos ou não (como a view `leads`, que caiu, contava).
+  const { count } = await supabase.from('negocios').select('*', { count: 'exact', head: true }).eq('funil_id', body.id)
   if ((count ?? 0) > 0) {
     return NextResponse.json({ error: `Este funil tem ${count} lead(s). Mova-os antes de excluir.` }, { status: 409 })
   }

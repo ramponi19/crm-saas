@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { dataDaAcao } from '@/lib/cadencia'
+import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 
 /**
  * Re-aquecimento / win-back (Sprint 3.3). Recicla leads FRIOS (parados há N
@@ -32,17 +33,24 @@ export async function reativarFrios(svc: Db, empresaId: number): Promise<{ reati
   const perdidoSlugs = new Set((etapasEsp ?? []).filter((e) => e.tipo === 'perdido').map((e) => e.slug))
   const ganhoSlugs = new Set((etapasEsp ?? []).filter((e) => e.tipo === 'ganho').map((e) => e.slug))
 
-  const { data: leads } = await svc.from('leads')
-    .select('id, responsavel_id, kanban_status, ultima_tratativa, ultima_mensagem_at, created_at, perdido_em, ativo')
+  // O lead é o negócio + contato + etapa (a view `leads` caiu).
+  const { data: linhas } = await svc.from('negocios')
+    .select(COLUNAS_LEAD)
     .eq('empresa_id', empresaId).limit(3000)
+  const leads = ((linhas ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  // A última mensagem é da conversa do contato na loja (só no negócio principal);
+  // só falta para quem chega à conta de "frio" sem tratativa registrada.
+  const semTratativa = leads.filter((l) => l.ativo !== false && !l.ultima_tratativa && l.perdido_em == null
+    && !ganhoSlugs.has(l.kanban_status) && !perdidoSlugs.has(l.kanban_status))
+  const conversas = semTratativa.length ? await conversasDosLeads(svc, empresaId, semTratativa) : new Map()
 
   const candidatos = new Map<number, string | null>()
-  for (const l of (leads ?? []) as Array<{ id: number; responsavel_id: string | null; kanban_status: string | null; ultima_tratativa: string | null; ultima_mensagem_at: string | null; created_at: string | null; perdido_em: string | null; ativo: boolean | null }>) {
+  for (const l of leads) {
     if (l.ativo === false) continue // lead excluído nunca reativa
     if (ganhoSlugs.has(l.kanban_status ?? '')) continue // já ganho/convertido — não reprospecção
     const perdido = l.perdido_em != null || perdidoSlugs.has(l.kanban_status ?? '')
     if (perdido) { if (cfg.incluir_perdidos) candidatos.set(l.id, l.responsavel_id); continue }
-    const ultAtiv = l.ultima_tratativa ?? l.ultima_mensagem_at ?? l.created_at
+    const ultAtiv = l.ultima_tratativa ?? conversas.get(l.id)?.ultima_mensagem_at ?? l.created_at
     if (!ultAtiv || ultAtiv < corte) candidatos.set(l.id, l.responsavel_id) // frio (ou sem atividade)
   }
   if (candidatos.size === 0) return { reativados: 0 }

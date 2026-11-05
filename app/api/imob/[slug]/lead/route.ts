@@ -4,6 +4,7 @@ import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
+import { criarLead, registrarMensagemDoLead } from '@/lib/leads'
 
 /**
  * Captura de leads do SITE PRÓPRIO da imobiliária.
@@ -85,25 +86,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const responsavel = await escolherResponsavel(svc, empresa.id, { origem: 'site', valor_estimado: null })
   const detalhes = [email ? `E-mail: ${email}` : null, imovelCodigo ? `Imóvel: ${imovelCodigo}` : null, mensagem ? `Mensagem: ${mensagem}` : null].filter(Boolean).join(' · ')
 
-  const { data: lead, error } = await svc.from('leads').insert({
-    empresa_id: empresa.id,
+  // Contato + negócio pela camada (a view `leads` caiu). Não lidas e última
+  // mensagem são da conversa: nascem da mensagem registrada abaixo.
+  const lead = await criarLead(svc, empresa.id, {
     nome, telefone,
     origem: 'site',
     kanban_status: 'novo',
-    ativo: true,
     responsavel_id: responsavel,
     produto_interessado: produto,
     observacoes: `Lead do site${detalhes ? ' · ' + detalhes : ''}`,
-    msgs_nao_lidas: mensagem ? 1 : 0,
     primeira_msg: mensagem,
-    ultima_mensagem_at: new Date().toISOString(),
-  }).select('id').single()
+  })
 
-  if (error || !lead) return NextResponse.json({ error: 'Falha ao registrar lead' }, { status: 500, headers: CORS })
+  if (lead.error || !lead.id) return NextResponse.json({ error: 'Falha ao registrar lead' }, { status: 500, headers: CORS })
 
   if (mensagem) {
-    await svc.from('lead_mensagens').insert({
-      empresa_id: empresa.id, lead_id: lead.id, conteudo: mensagem, direcao: 'recebida', origem: 'site', lida: false,
+    await registrarMensagemDoLead(svc, empresa.id, lead.id, {
+      conteudo: mensagem, direcao: 'recebida', origem: 'site', lida: false,
     })
   }
 

@@ -11,6 +11,13 @@ type Db = SupabaseClient
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
+/**
+ * O lead é o negócio (a view `leads` caiu). Etapa como a view: o slug da etapa,
+ * senão o slug guardado em dados._lead; a origem é a do contato.
+ */
+const SELECT_ETAPA: string = 'ativo, etapa:funil_etapas!etapa_id(slug), kanban:dados->_lead->>kanban_status'
+const SELECT_COHORT: string = 'id, responsavel_id, created_at, contato:contatos!contato_id(origem)'
+
 export interface EtapaFunil { slug: string; label: string; naEtapa: number; alcancaram: number; taxa: number | null }
 export interface RespVendedor { usuario_id: string; nome: string; leads: number; comContato: number; semContato: number; tempoMedioH: number | null }
 export interface RespCanal { canal: string; leads: number; tempoMedioH: number | null }
@@ -29,8 +36,8 @@ export async function calcularConversao(db: Db, empresaId: number): Promise<Conv
 
   const [{ data: etapasRaw }, { data: leadsAll }, { data: cohortRaw }, { data: membrosRaw }] = await Promise.all([
     db.from('funil_etapas').select('slug, label, ordem, tipo').eq('empresa_id', empresaId).eq('ativo', true).order('ordem', { ascending: true }),
-    db.from('leads').select('kanban_status, ativo').eq('empresa_id', empresaId),
-    db.from('leads').select('id, responsavel_id, origem, created_at').eq('empresa_id', empresaId).gte('created_at', janela),
+    db.from('negocios').select(SELECT_ETAPA).eq('empresa_id', empresaId),
+    db.from('negocios').select(SELECT_COHORT).eq('empresa_id', empresaId).gte('created_at', janela),
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
@@ -42,9 +49,10 @@ export async function calcularConversao(db: Db, empresaId: number): Promise<Conv
   const etapasUnicas = etapas.filter((e) => (vistos.has(e.slug) ? false : (vistos.add(e.slug), true)))
 
   const countPorSlug = new Map<string, number>()
-  for (const l of (leadsAll ?? []) as { kanban_status: string | null; ativo: boolean | null }[]) {
+  type LinhaEtapa = { ativo: boolean | null; etapa: Embed<{ slug: string }>; kanban: string | null }
+  for (const l of (leadsAll ?? []) as unknown as LinhaEtapa[]) {
     if (l.ativo === false) continue // não conta leads excluídos (alinha com o dashboard)
-    const s = l.kanban_status ?? ''
+    const s = one(l.etapa)?.slug ?? l.kanban ?? ''
     countPorSlug.set(s, (countPorSlug.get(s) ?? 0) + 1)
   }
   const naEtapa = etapasUnicas.map((e) => countPorSlug.get(e.slug) ?? 0)
@@ -63,7 +71,10 @@ export async function calcularConversao(db: Db, empresaId: number): Promise<Conv
   }
 
   // --- Tempo de 1º contato (cohort 90d). Primeira chamada por lead. ---
-  const cohort = (cohortRaw ?? []) as { id: number; responsavel_id: string | null; origem: string | null; created_at: string | null }[]
+  type LinhaCohort = { id: number; responsavel_id: string | null; created_at: string | null; contato: Embed<{ origem: string | null }> }
+  const cohort = ((cohortRaw ?? []) as unknown as LinhaCohort[]).map((l) => ({
+    id: l.id, responsavel_id: l.responsavel_id, created_at: l.created_at, origem: one(l.contato)?.origem ?? null,
+  }))
   const cohortIds = cohort.map((l) => l.id)
   const primeiraChamada = new Map<number, string>()
   if (cohortIds.length) {

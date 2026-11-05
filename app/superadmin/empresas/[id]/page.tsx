@@ -103,10 +103,11 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
   // Contadores de uso + última atividade (último lead recebido)
   const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }, { data: ultimoLead }] = await Promise.all([
-    svc.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    // Lead = negócio (a view `leads` caiu); todos, ativos ou não, como antes.
+    svc.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('vendas_vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     consultaClientes(svc, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    svc.from('leads').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    svc.from('negocios').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   // Saúde da assinatura (derivada do stripe_status) e atividade.

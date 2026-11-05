@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { aguardandoResposta } from '@/lib/esteira'
+import { conversasDosLeads } from '@/lib/leads'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/** `string`: com relação embutida o parser de tipos do supabase-js estoura. */
+const SELECT_MEUS: string = 'id, contato_id, filial_id, dados, etapa:funil_etapas!etapa_id(slug)'
+type NegocioMeu = {
+  id: number; contato_id: number; filial_id: number | null
+  dados: { _lead?: { kanban_status?: string | null } } | null; etapa: { slug: string } | null
+}
 
 /**
  * Almoço / ausência do atendente.
@@ -46,19 +55,30 @@ export async function POST(req: Request) {
     // Dois passos porque a comparação é ENTRE COLUNAS (recebida > enviada), que o
     // PostgREST não expressa num filtro. Lê os candidatos, decide com a mesma
     // função da esteira e solta só esses.
-    const consulta = supabase.from('leads')
-      .select('id, ultima_recebida_at, ultima_enviada_at')
+    // Direto no negócio (a view `leads` caiu). A etapa vem embutida e o filtro das
+    // finais é feito aqui, com a mesma regra da view (slug da etapa, senão o slug
+    // guardado em dados._lead); as marcas de recebida/enviada vêm da conversa.
+    const { data: linhas } = await supabase.from('negocios')
+      .select(SELECT_MEUS)
       .eq('empresa_id', empresaId).eq('responsavel_id', user.id).eq('ativo', true)
-    const { data: meus } = slugs.length
-      ? await consulta.not('kanban_status', 'in', `(${slugs.join(',')})`)
-      : await consulta
+    const meus = ((linhas ?? []) as unknown as NegocioMeu[]).filter((n) => {
+      if (!slugs.length) return true
+      // `not in` do SQL: sem slug nenhum a linha também ficava de fora.
+      const slug = n.etapa?.slug ?? n.dados?._lead?.kanban_status ?? null
+      return slug != null && !slugs.includes(slug)
+    })
+    // Falha ao ler as conversas = ninguém aguardando: não solta nada às cegas.
+    const conversas = meus.length
+      ? await conversasDosLeads(supabase as unknown as SupabaseClient, empresaId, meus).catch(() => new Map())
+      : new Map()
 
-    const pendentes = (meus ?? []).filter(aguardandoResposta).map((l) => l.id)
+    const pendentes = meus.filter((n) => aguardandoResposta(conversas.get(n.id) ?? {})).map((l) => l.id)
     if (pendentes.length) {
       // Condicional no responsável: se alguém já assumiu nesse meio-tempo, a
-      // linha não é tocada.
-      const { data } = await supabase.from('leads')
-        .update({ responsavel_id: null, responsavel_desde: null })
+      // linha não é tocada. `responsavel_desde` fica no JSON, como a view fazia
+      // (o null passava por jsonb_strip_nulls e não apagava a chave).
+      const { data } = await supabase.from('negocios')
+        .update({ responsavel_id: null })
         .in('id', pendentes).eq('responsavel_id', user.id).select('id')
       liberados = data?.length ?? 0
     }

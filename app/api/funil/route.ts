@@ -140,9 +140,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'O funil não pode ficar sem etapas' }, { status: 400 })
     }
 
-    const { count: comLeads } = await service.from('leads')
+    // Pela etapa, no negócio (a view `leads` caiu). A view comparava o SLUG na
+    // empresa inteira: a mesma etapa de outro funil entrava na conta e no move.
+    const { count: comLeads } = await service.from('negocios')
       .select('*', { count: 'exact', head: true })
-      .eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', etapa.slug)
+      .eq('empresa_id', empresaId).eq('ativo', true).eq('etapa_id', etapa.id)
 
     if ((comLeads ?? 0) > 0) {
       const destino = (alvo.moverPara ?? '').trim()
@@ -155,19 +157,22 @@ export async function POST(req: Request) {
       // O destino tem de existir NESTE funil — senão trocaríamos um status órfão
       // por outro.
       const { data: dest } = await service.from('funil_etapas')
-        .select('slug').eq('funil_id', funilId).eq('slug', destino).maybeSingle()
+        .select('id, slug, tipo').eq('funil_id', funilId).eq('slug', destino).maybeSingle()
       if (!dest) return NextResponse.json({ error: 'Etapa de destino não existe neste funil' }, { status: 400 })
 
-      const { error: erroMove } = await service.from('leads')
-        .update({ kanban_status: destino })
-        .eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', etapa.slug)
+      // O que o gatilho da view fazia: etapa nova e o status pelo tipo dela. A
+      // data de entrada na etapa é do gatilho `negocios_entrou_etapa`.
+      const statusDestino = dest.tipo === 'ganho' ? 'ganho' : dest.tipo === 'perdido' ? 'perdido' : 'aberto'
+      const { error: erroMove } = await service.from('negocios')
+        .update({ etapa_id: dest.id, status: statusDestino })
+        .eq('empresa_id', empresaId).eq('ativo', true).eq('etapa_id', etapa.id)
       if (erroMove) return NextResponse.json({ error: `Falha ao mover os leads: ${erroMove.message}` }, { status: 500 })
 
       // Confere ANTES de apagar. Um lead que tenha entrado na etapa entre a
       // contagem e o update seria perdido de vista.
-      const { count: sobrou } = await service.from('leads')
+      const { count: sobrou } = await service.from('negocios')
         .select('*', { count: 'exact', head: true })
-        .eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', etapa.slug)
+        .eq('empresa_id', empresaId).eq('ativo', true).eq('etapa_id', etapa.id)
       if ((sobrou ?? 0) > 0) {
         return NextResponse.json(
           { error: `Ainda há ${sobrou} lead(s) em "${etapa.label}" — etapa não foi excluída.` },

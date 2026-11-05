@@ -8,11 +8,15 @@ import type { Tables } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { consultaClientes } from '@/lib/clientes'
+import { embedLead } from '@/lib/leads'
 
 export const metadata = { title: 'PDV' }
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
+
+const SELECT_RESERVA: string = 'id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), '
+  + embedLead('inventario_unidades_reservado_lead_id_fkey')
 
 export default async function PDVPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
@@ -45,10 +49,10 @@ export default async function PDVPage() {
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
-    // Reservas de lead ativas (aba Reservas do PDV).
+    // Reservas de lead ativas (aba Reservas do PDV). O lead é o negócio; o nome, do contato.
     supabase
       .from('estoque_unidades')
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), leads!reservado_lead_id(nome)')
+      .select(SELECT_RESERVA)
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'reservado')
       .not('reservado_lead_id', 'is', null)

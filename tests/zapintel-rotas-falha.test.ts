@@ -126,20 +126,20 @@ describe('Checagem de funil interno que falha: bloqueia', () => {
 })
 
 describe('leadDeFunilInterno (real): erro do banco lança, não devolve "não é interno"', () => {
-  test('erro ao ler `leads` → FalhaFunilInterno', async () => {
+  test('erro ao ler `negocios` → FalhaFunilInterno', async () => {
     const real = await import('@/lib/zapintel/funil-interno')
     const db = bancoFalso(() => ({ data: null, error: { message: 'boom' } }))
     await assert.rejects(() => real.leadDeFunilInterno(db as never, 1, 7), real.FalhaFunilInterno)
   })
   test('erro ao ler `funis` → FalhaFunilInterno', async () => {
     const real = await import('@/lib/zapintel/funil-interno')
-    const db = bancoFalso((c) => c.tabela === 'leads' ? { data: { funil_id: 3 }, error: null } : { data: null, error: { message: 'boom' } })
+    const db = bancoFalso((c) => c.tabela === 'negocios' ? { data: { funil_id: 3 }, error: null } : { data: null, error: { message: 'boom' } })
     await assert.rejects(() => real.leadDeFunilInterno(db as never, 1, 7), real.FalhaFunilInterno)
   })
   test('lead sem funil → false; funil interno → true', async () => {
     const real = await import('@/lib/zapintel/funil-interno')
     assert.equal(await real.leadDeFunilInterno(bancoFalso(() => ({ data: { funil_id: null }, error: null })) as never, 1, 7), false)
-    const db = bancoFalso((c) => c.tabela === 'leads' ? { data: { funil_id: 3 }, error: null } : { data: { interno: true }, error: null })
+    const db = bancoFalso((c) => c.tabela === 'negocios' ? { data: { funil_id: 3 }, error: null } : { data: { interno: true }, error: null })
     assert.equal(await real.leadDeFunilInterno(db as never, 1, 7), true)
   })
 })

@@ -84,12 +84,14 @@ export default async function FinanceiroPage() {
     const ids = <T,>(arr: (T | null)[]) => [...new Set(arr.filter((x): x is T => x != null))]
     const [{ data: imoveisN }, { data: leadsN }, { data: clientesN }, { data: usuariosN }] = await Promise.all([
       supabase.from('imoveis_imoveis').select('id, codigo, titulo').in('id', ids(negocios.map((n) => n.imovel_id))),
-      supabase.from('leads').select('id, nome').in('id', ids(negocios.map((n) => n.lead_id))),
+      // Lead = negócio do core; o nome é do contato.
+      supabase.from('negocios').select('id, contato:contatos!contato_id(nome)').in('id', ids(negocios.map((n) => n.lead_id))),
       consultaClientes(supabase, 'id, nome').in('id', ids(negocios.map((n) => n.cliente_id))),
       supabase.from('usuarios').select('id, nome').in('id', ids([...negocios.map((n) => n.corretor_id), ...negocios.map((n) => n.captador_id)])),
     ])
     const mapaImovel = new Map((imoveisN ?? []).map((i) => [i.id, i.codigo || i.titulo || `#${i.id}`]))
-    const mapaLead = new Map((leadsN ?? []).map((l) => [l.id, l.nome]))
+    const mapaLead = new Map(((leadsN ?? []) as unknown as { id: number; contato: { nome: string | null } | null }[])
+      .map((l) => [l.id, l.contato?.nome ?? null]))
     const mapaCliente = new Map((clientesN ?? []).map((c) => [c.id, c.nome]))
     const mapaUsuario = new Map((usuariosN ?? []).map((u) => [u.id, u.nome]))
 

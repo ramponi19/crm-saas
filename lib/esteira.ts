@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { minutosUteis, HORARIO_PADRAO, type HorarioLoja } from './horario-util'
+import { conversasDosLeads } from './leads'
 
 /**
  * Devolução de lead à esteira por falta de resposta.
@@ -19,6 +20,13 @@ export const DEVOLUCAO_PADRAO: ConfigDevolucao = { ativo: true, minutos: 30 }
 interface LeadDono {
   id: number; responsavel_id: string; responsavel_desde: string | null
   created_at: string | null; devolucoes: number | null
+}
+
+/** `string`: com relação embutida o parser de tipos do supabase-js estoura. */
+const SELECT_DONO: string = 'id, contato_id, filial_id, responsavel_id, created_at, devolucoes, dados, etapa:funil_etapas!etapa_id!inner(slug)'
+type NegocioDono = {
+  id: number; contato_id: number; filial_id: number | null; responsavel_id: string
+  created_at: string | null; devolucoes: number | null; dados: { _lead?: { responsavel_desde?: string | null } } | null
 }
 
 /** Evita varrer a cada render do servidor quando várias abas abrem juntas. */
@@ -54,32 +62,40 @@ export async function devolverLeadsSemResposta(
 
   // Sem reatribuir o builder (`q = q.not(...)`): o TypeScript recursa no tipo
   // encadeado do PostgREST e estoura com "type instantiation excessively deep".
-  const base = db.from('leads')
-    .select('id, responsavel_id, responsavel_desde, created_at, devolucoes')
+  // Direto no negócio (a view `leads` caiu): a etapa entra pelo slug, com !inner.
+  const base = db.from('negocios')
+    .select(SELECT_DONO)
     .eq('empresa_id', empresaId).eq('ativo', true).not('responsavel_id', 'is', null)
     .limit(500)
-  const { data: leads } = finais.length
-    ? await base.not('kanban_status', 'in', `(${finais.join(',')})`)
+  const { data: linhas } = finais.length
+    ? await base.not('etapa.slug', 'in', `(${finais.join(',')})`)
     : await base
-  if (!leads?.length) return { devolvidos: 0, avaliados: 0 }
+  const negocios = (linhas ?? []) as unknown as NegocioDono[]
+  if (!negocios.length) return { devolvidos: 0, avaliados: 0 }
+  const leads: (LeadDono & { contato_id: number; filial_id: number | null })[] = negocios.map((n) => ({
+    id: n.id, contato_id: n.contato_id, filial_id: n.filial_id, responsavel_id: n.responsavel_id,
+    responsavel_desde: n.dados?._lead?.responsavel_desde ?? null, created_at: n.created_at, devolucoes: n.devolucoes,
+  }))
 
-  const ids = (leads as LeadDono[]).map((l) => l.id)
-  const { data: msgs } = await db.from('lead_mensagens')
-    .select('lead_id, direcao, created_at')
-    .eq('empresa_id', empresaId).in('lead_id', ids)
-    .order('created_at', { ascending: false }).limit(4000)
-
-  // Última mensagem de cada lado, por lead.
+  // Última mensagem de cada lado, por lead: a conversa do contato na loja, só no
+  // negócio principal (a mesma regra da antiga `lead_mensagens`). Antes vinha das
+  // 4000 mensagens mais novas da empresa; a conversa já guarda as duas marcas.
+  // Sem as conversas não dá para saber quem respondeu: a varredura para aqui (sem
+  // elas, todo lead pareceria "pegou e sumiu" e seria devolvido).
+  let conversas: Awaited<ReturnType<typeof conversasDosLeads>>
+  try {
+    conversas = await conversasDosLeads(db, empresaId, leads)
+  } catch (e) {
+    console.error('[esteira] conversas dos leads:', e)
+    return { devolvidos: 0, avaliados: 0 }
+  }
   const ultima = new Map<number, { recebida?: string; enviada?: string }>()
-  for (const m of (msgs ?? []) as { lead_id: number; direcao: string; created_at: string }[]) {
-    const reg = ultima.get(m.lead_id) ?? {}
-    if (m.direcao === 'recebida') { if (!reg.recebida) reg.recebida = m.created_at }
-    else if (!reg.enviada) reg.enviada = m.created_at
-    ultima.set(m.lead_id, reg)
+  for (const [id, c] of conversas) {
+    ultima.set(id, { recebida: c.ultima_recebida_at ?? undefined, enviada: c.ultima_enviada_at ?? undefined })
   }
 
   const vencidos: number[] = []
-  for (const l of leads as LeadDono[]) {
+  for (const l of leads) {
     const marco = marcoDeCobranca(l, ultima.get(l.id))
     if (!marco) continue
     if (minutosUteis(new Date(marco), new Date(agora), horario) >= cfg.minutos) vencidos.push(l.id)
@@ -90,10 +106,12 @@ export async function devolverLeadsSemResposta(
   // a linha não é tocada — o dono novo não perde o lead por corrida.
   let devolvidos = 0
   for (const id of vencidos) {
-    const lead = (leads as LeadDono[]).find((l) => l.id === id)!
-    const { data } = await db.from('leads')
+    const lead = leads.find((l) => l.id === id)!
+    // Colunas do negócio. `responsavel_desde` fica no JSON: a view gravava o null
+    // com jsonb_strip_nulls, que não apagava a chave; o próximo dono a reescreve.
+    const { data } = await db.from('negocios')
       .update({
-        responsavel_id: null, responsavel_desde: null,
+        responsavel_id: null,
         devolvido_em: new Date(agora).toISOString(),
         devolucoes: (lead.devolucoes ?? 0) + 1,
       })

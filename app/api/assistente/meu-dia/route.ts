@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
+import { conversasDosLeads } from '@/lib/leads'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // "Iniciar o dia": roteiro priorizado a partir das demandas do usuário logado.
 // Free-safe: envia ao Gemini só CONTAGENS (sem nomes/dados de cliente).
@@ -25,7 +27,7 @@ export async function POST() {
   const [atrasadas, hoje, leadsResp, fila, visitas] = await Promise.all([
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).lt('vencimento', inicioHoje),
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).gte('vencimento', inicioHoje).lt('vencimento', fimHoje),
-    supabase.from('leads').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('ativo', true).gt('msgs_nao_lidas', 0),
+    leadsComNaoLidas(supabase as unknown as SupabaseClient, empresaId, uid),
     supabase.from('cadencia_inscricoes').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('status', 'ativa').lte('proxima_acao_em', fimHoje),
     supabase.from('visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje),
   ])
@@ -77,4 +79,25 @@ Regras: comece pelo mais urgente (leads aguardando e fila do dia costumam vir pr
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Erro no assistente' }, { status: 500 })
   }
+}
+
+/**
+ * Leads ativos do usuário com mensagem não lida (era `leads.msgs_nao_lidas > 0`).
+ * Parte das conversas com não lida — o conjunto pequeno —, acha os negócios do
+ * usuário desses contatos e aplica a regra da view: a conversa conta só no
+ * negócio principal do contato na loja (`conversasDosLeads`).
+ */
+async function leadsComNaoLidas(db: SupabaseClient, empresaId: number, uid: string): Promise<{ count: number }> {
+  const { data: convs } = await db.from('conversas').select('contato_id').eq('empresa_id', empresaId).gt('nao_lidas', 0)
+  const contatos = [...new Set(((convs ?? []) as { contato_id: number }[]).map((c) => c.contato_id))]
+  const negocios: { id: number; contato_id: number; filial_id: number | null }[] = []
+  for (let i = 0; i < contatos.length; i += 200) {
+    const { data } = await db.from('negocios').select('id, contato_id, filial_id')
+      .eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('ativo', true).in('contato_id', contatos.slice(i, i + 200))
+    negocios.push(...((data ?? []) as typeof negocios))
+  }
+  if (!negocios.length) return { count: 0 }
+  // Erro de leitura vira zero, como a contagem da view fazia (count null → 0).
+  const conv = await conversasDosLeads(db, empresaId, negocios).catch(() => new Map())
+  return { count: negocios.filter((n) => (conv.get(n.id)?.msgs_nao_lidas ?? 0) > 0).length }
 }

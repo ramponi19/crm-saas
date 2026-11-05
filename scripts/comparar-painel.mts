@@ -55,11 +55,11 @@ async function antes(db: Db) {
   const [vendasR, clientes, ativos, novos, estoque, assist, funilR] = await Promise.all([
     aplicarEscopo(qVendas, escopo, 'vendedor_id'),
     solto.from('contatos').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).not('dados->_cliente', 'is', null),
-    aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
-    aplicarEscopo(solto.from('leads').select('*', head).eq('empresa_id', empresaId).eq('ativo', true).eq('kanban_status', 'novo'), escopo, 'responsavel_id'),
+    aplicarEscopo(solto.from('negocios').select('*', head).eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
+    aplicarEscopo(solto.from('negocios').select('id, etapa:funil_etapas!etapa_id!inner(slug)', head).eq('empresa_id', empresaId).eq('ativo', true).eq('etapa.slug', 'novo'), escopo, 'responsavel_id'),
     solto.from('estoque_unidades').select('*', head).eq('empresa_id', empresaId).eq('status', 'disponivel').eq('ativo', true),
     solto.from('assistencia_garantias').select('*', head).eq('empresa_id', empresaId).not('status', 'in', '(concluido,entregue,cancelada,recusado,reprovado)'),
-    aplicarEscopo(solto.from('leads').select('kanban_status').eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
+    aplicarEscopo(solto.from('negocios').select('...funil_etapas!etapa_id(kanban_status:slug)').eq('empresa_id', empresaId).eq('ativo', true), escopo, 'responsavel_id'),
   ])
   type V = { id: number; valor_venda: number; lucro: number | null; data_venda: string | null; canal_venda: string | null; status: string | null; produtos: { nome: string | null } | null }
   const vendas = (vendasR.data ?? []) as unknown as V[]

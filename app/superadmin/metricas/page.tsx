@@ -99,9 +99,10 @@ export default async function MetricasPage() {
   const usos = await Promise.all(
     ativas.map(async e => {
       const [{ count: leads }, { count: usuarios }, { data: ultimoLead }] = await Promise.all([
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', e.id),
+        // Lead = negócio (a view `leads` caiu); todos, ativos ou não, como antes.
+        supabase.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', e.id),
         supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', e.id).eq('ativo', true),
-        supabase.from('leads').select('created_at').eq('empresa_id', e.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('negocios').select('created_at').eq('empresa_id', e.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       const limLeads = e.limite_leads ?? 0
       const limUsuarios = e.limite_usuarios ?? 0

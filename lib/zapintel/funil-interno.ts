@@ -19,7 +19,7 @@ export const MENSAGEM_FALHA_FUNIL = 'Não foi possível confirmar se esta conver
 export async function leadDeFunilInterno(
   db: import('@supabase/supabase-js').SupabaseClient, empresaId: number, leadId: number,
 ): Promise<boolean> {
-  const { data: lead, error } = await db.from('leads').select('funil_id').eq('empresa_id', empresaId).eq('id', leadId).maybeSingle()
+  const { data: lead, error } = await db.from('negocios').select('funil_id').eq('empresa_id', empresaId).eq('id', leadId).maybeSingle()
   if (error) throw new FalhaFunilInterno(error.message)
   const funil = (lead as { funil_id: number | null } | null)?.funil_id
   if (funil == null) return false

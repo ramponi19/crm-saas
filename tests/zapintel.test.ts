@@ -20,11 +20,11 @@ const mais = (min: number) => new Date(Date.parse(T0) + min * 60_000).toISOStrin
 describe('retenção de mídia: na dúvida, nada sai', () => {
   test('imagem perto de "paguei" num ÁUDIO TRANSCRITO fica (antes só o texto contava)', async () => {
     const db = bancoFalso((c) => {
-      if (c.tabela === 'lead_mensagens' && filtro(c, 'or')) {
-        // O banco devolveria a vizinha do lead 1 porque a TRANSCRIÇÃO tem "paguei".
-        return { data: [{ lead_id: 1, created_at: mais(5) }], error: null }
+      if (c.tabela === 'mensagens' && filtro(c, 'or')) {
+        // O banco devolveria a vizinha do contato 1 porque a TRANSCRIÇÃO tem "paguei".
+        return { data: [{ contato_id: 1, filial_id: null, created_at: mais(5) }], error: null }
       }
-      return { data: [{ id: 10, lead_id: 1, created_at: T0 }, { id: 20, lead_id: 2, created_at: T0 }], error: null }
+      return { data: [{ id: 10, contato_id: 1, filial_id: null, created_at: T0 }, { id: 20, contato_id: 2, filial_id: null, created_at: T0 }], error: null }
     })
     const fora = await semAsQueSaoProva(como(db), [img(10), img(20)])
     assert.deepEqual(fora.map((a) => a.mensagemId), [20])
@@ -44,7 +44,7 @@ describe('retenção de mídia: na dúvida, nada sai', () => {
   test('erro ao ler as conversas vizinhas também interrompe', async () => {
     const db = bancoFalso((c) => filtro(c, 'or')
       ? { data: null, error: { message: 'timeout' } }
-      : { data: [{ id: 1, lead_id: 1, created_at: T0 }], error: null })
+      : { data: [{ id: 1, contato_id: 1, filial_id: null, created_at: T0 }], error: null })
     await assert.rejects(semAsQueSaoProva(como(db), [img(1)]), /nada apagado/)
   })
 
@@ -55,7 +55,7 @@ describe('retenção de mídia: na dúvida, nada sai', () => {
       if (!filtro(c, 'or') && inn?.[0] === 'id') {
         const ids = inn[1] as number[]
         pedidos.push(ids)
-        return { data: ids.map((id) => ({ id, lead_id: id, created_at: T0 })), error: null }
+        return { data: ids.map((id) => ({ id, contato_id: id, filial_id: null, created_at: T0 })), error: null }
       }
       return { data: [], error: null }
     })
@@ -73,10 +73,10 @@ describe('retenção de mídia: na dúvida, nada sai', () => {
         const r = filtro(c, 'range')!
         paginas.push(r[0])
         // 1ª página cheia (sem marco perto); a 2ª traz o marco que protege.
-        if (r[0] === 0) return { data: Array.from({ length: 1000 }, () => ({ lead_id: 1, created_at: mais(-500) })), error: null }
-        return { data: [{ lead_id: 1, created_at: mais(3) }], error: null }
+        if (r[0] === 0) return { data: Array.from({ length: 1000 }, () => ({ contato_id: 1, filial_id: null, created_at: mais(-500) })), error: null }
+        return { data: [{ contato_id: 1, filial_id: null, created_at: mais(3) }], error: null }
       }
-      return { data: [{ id: 1, lead_id: 1, created_at: T0 }], error: null }
+      return { data: [{ id: 1, contato_id: 1, filial_id: null, created_at: T0 }], error: null }
     })
     const fora = await semAsQueSaoProva(como(db), [img(1)])
     assert.deepEqual(paginas, [0, 1000])
@@ -84,7 +84,7 @@ describe('retenção de mídia: na dúvida, nada sai', () => {
   })
 
   test('imagem que não foi encontrada para conferir não sai', async () => {
-    const db = bancoFalso((c) => filtro(c, 'or') ? { data: [], error: null } : { data: [{ id: 1, lead_id: 1, created_at: T0 }], error: null })
+    const db = bancoFalso((c) => filtro(c, 'or') ? { data: [], error: null } : { data: [{ id: 1, contato_id: 1, filial_id: null, created_at: T0 }], error: null })
     const fora = await semAsQueSaoProva(como(db), [img(1), img(2)])
     assert.deepEqual(fora.map((a) => a.mensagemId), [1])
   })
@@ -93,7 +93,8 @@ describe('retenção de mídia: na dúvida, nada sai', () => {
     const alvos = Array.from({ length: 250 }, (_, i) => img(i + 1)) // 2 lotes de update: 200 + 50
     let updates = 0
     const db = bancoFalso((c) => {
-      if (c.op === 'update') { updates++; return updates === 1 ? { data: null, error: { message: 'falhou' } } : { data: null, error: null } }
+      // O update confere as linhas (.select('id')): o lote que gravou devolve os ids.
+      if (c.op === 'update') { updates++; return updates === 1 ? { data: null, error: { message: 'falhou' } } : { data: (filtro(c, 'in')![1] as number[]).map((id) => ({ id })), error: null } }
       if (c.op === 'remove') return { data: (c.dados as string[]).map((n) => ({ name: n })), error: null }
       return { data: null, error: null }
     })

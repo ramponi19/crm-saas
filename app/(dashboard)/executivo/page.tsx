@@ -6,6 +6,7 @@ import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Badge } from '@/components/ui'
+import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 import { TrendingUp, Home, Users, Flame, Target, MapPin } from 'lucide-react'
 
 export const metadata = { title: 'Executivo' }
@@ -78,9 +79,8 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   ] = await Promise.all([
     qNeg,
     // Pipeline aberto: só o que ainda pode fechar.
-    supabase.from('leads')
-      .select('id, nome, origem, kanban_status, funil_id, valor_estimado, responsavel_id, ultima_mensagem_at, ultima_tratativa, created_at, msgs_nao_lidas')
-      .eq('empresa_id', empresaId).eq('ativo', true).limit(500),
+    // Lead = negócio ativo (a view `leads` caiu); a conversa vem logo abaixo.
+    supabase.from('negocios').select(COLUNAS_LEAD).eq('empresa_id', empresaId).eq('ativo', true).limit(500),
     supabase.from('funil_etapas').select('funil_id, slug, tipo, probabilidade').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle(),
     supabase.from('visitas').select('imovel_id').eq('empresa_id', empresaId).not('imovel_id', 'is', null).limit(1000),
@@ -135,7 +135,17 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
     ultima_mensagem_at: string | null; ultima_tratativa: string | null; created_at: string | null
     msgs_nao_lidas: number | null
   }
-  const leads = (leadsRaw ?? []) as LeadRow[]
+  // Última mensagem e não lidas são da conversa do contato na loja (só o negócio principal).
+  const leadsBase = ((leadsRaw ?? []) as unknown as Record<string, unknown>[]).map(leadDoNegocio)
+  const conversas = await conversasDosLeads(supabase, empresaId, leadsBase)
+  const leads: LeadRow[] = leadsBase.map((l) => {
+    const c = conversas.get(l.id)
+    return {
+      id: l.id, nome: l.nome, origem: l.origem, kanban_status: l.kanban_status, funil_id: l.funil_id,
+      valor_estimado: l.valor_estimado, responsavel_id: l.responsavel_id, ultima_mensagem_at: c?.ultima_mensagem_at ?? null,
+      ultima_tratativa: l.ultima_tratativa, created_at: l.created_at, msgs_nao_lidas: c?.msgs_nao_lidas ?? 0,
+    }
+  })
   const abertos = leads.filter((l) => !terminais.has(l.kanban_status ?? 'novo'))
 
   /**

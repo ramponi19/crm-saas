@@ -1,7 +1,13 @@
+import { deflateRawSync } from 'node:zlib'
+
 /**
- * Gerador de ZIP mínimo (método STORE, sem compressão) — sem dependências.
+ * Gerador de ZIP mínimo (método DEFLATE, do zlib do Node) — sem dependências.
  * Suficiente para empacotar CSVs de exportação LGPD. Constrói local headers +
  * central directory + EOCD conforme APPNOTE do formato ZIP.
+ *
+ * Comprime desde 05/11/2026: a exportação passou a sair completa (sem o teto de mil
+ * linhas) e vai para o Storage, que no plano free aceita até 50 MB por arquivo. CSV
+ * comprime bem; sem compressão as mensagens de uma loja já passavam disso.
  */
 
 const CRC_TABLE = (() => {
@@ -25,7 +31,7 @@ export interface ZipEntry {
   conteudo: string
 }
 
-/** Monta um Buffer ZIP (STORE) a partir de arquivos texto. */
+/** Monta um Buffer ZIP (DEFLATE) a partir de arquivos texto. */
 export function criarZip(entries: ZipEntry[]): Buffer {
   const locais: Buffer[] = []
   const centrais: Buffer[] = []
@@ -33,8 +39,10 @@ export function criarZip(entries: ZipEntry[]): Buffer {
 
   for (const e of entries) {
     const nomeBuf = Buffer.from(e.nome, 'utf8')
-    const dados = Buffer.from(e.conteudo, 'utf8')
-    const crc = crc32(dados)
+    const original = Buffer.from(e.conteudo, 'utf8')
+    const crc = crc32(original)
+    const tamOriginal = original.length
+    const dados = deflateRawSync(original, { level: 6 })
     const tam = dados.length
 
     // Local file header (30 bytes + nome)
@@ -42,12 +50,12 @@ export function criarZip(entries: ZipEntry[]): Buffer {
     lh.writeUInt32LE(0x04034b50, 0) // assinatura
     lh.writeUInt16LE(20, 4)         // versão necessária
     lh.writeUInt16LE(0, 6)          // flags
-    lh.writeUInt16LE(0, 8)          // método = STORE
+    lh.writeUInt16LE(8, 8)          // método = DEFLATE
     lh.writeUInt16LE(0, 10)         // hora
     lh.writeUInt16LE(0, 12)         // data
     lh.writeUInt32LE(crc, 14)
     lh.writeUInt32LE(tam, 18)       // tamanho comprimido
-    lh.writeUInt32LE(tam, 22)       // tamanho original
+    lh.writeUInt32LE(tamOriginal, 22) // tamanho original
     lh.writeUInt16LE(nomeBuf.length, 26)
     lh.writeUInt16LE(0, 28)         // extra len
     locais.push(lh, nomeBuf, dados)
@@ -58,12 +66,12 @@ export function criarZip(entries: ZipEntry[]): Buffer {
     ch.writeUInt16LE(20, 4)         // versão de criação
     ch.writeUInt16LE(20, 6)         // versão necessária
     ch.writeUInt16LE(0, 8)          // flags
-    ch.writeUInt16LE(0, 10)         // método
+    ch.writeUInt16LE(8, 10)         // método = DEFLATE
     ch.writeUInt16LE(0, 12)         // hora
     ch.writeUInt16LE(0, 14)         // data
     ch.writeUInt32LE(crc, 16)
     ch.writeUInt32LE(tam, 20)
-    ch.writeUInt32LE(tam, 24)
+    ch.writeUInt32LE(tamOriginal, 24)
     ch.writeUInt16LE(nomeBuf.length, 28)
     ch.writeUInt16LE(0, 30)         // extra len
     ch.writeUInt16LE(0, 32)         // comment len

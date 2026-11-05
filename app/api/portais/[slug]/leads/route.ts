@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
+import { criarLead, registrarMensagemDoLead } from '@/lib/leads'
 
 /**
  * Webhook INBOUND de leads dos portais (Grupo OLX: ZAP, VivaReal, Imovelweb).
@@ -75,35 +76,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     mensagem ? `Mensagem: ${mensagem}` : null,
   ].filter(Boolean).join(' · ')
 
-  const { data: lead, error } = await svc
-    .from('leads')
-    .insert({
-      empresa_id: empresa.id,
-      nome: String(nome),
-      telefone: telefone ? String(telefone) : null,
-      origem: 'grupo-olx',
-      origem_id: leadId ? String(leadId) : null,
-      kanban_status: 'novo',
-      ativo: true,
-      responsavel_id: responsavel,
-      produto_interessado: produto,
-      observacoes: `Lead ${origem}${detalhes ? ' · ' + detalhes : ''}`,
-      msgs_nao_lidas: mensagem ? 1 : 0,
-      primeira_msg: mensagem ? String(mensagem) : null,
-      ultima_mensagem_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single()
+  // Contato + negócio pela camada (a view `leads` caiu). Não lidas e última
+  // mensagem são da conversa: nascem da mensagem registrada abaixo.
+  const lead = await criarLead(svc, empresa.id, {
+    nome: String(nome),
+    telefone: telefone ? String(telefone) : null,
+    origem: 'grupo-olx',
+    origem_id: leadId ? String(leadId) : null,
+    kanban_status: 'novo',
+    responsavel_id: responsavel,
+    produto_interessado: produto,
+    observacoes: `Lead ${origem}${detalhes ? ' · ' + detalhes : ''}`,
+    primeira_msg: mensagem ? String(mensagem) : null,
+  })
 
-  if (error || !lead) {
+  if (lead.error || !lead.id) {
     return NextResponse.json({ error: 'Falha ao registrar lead' }, { status: 500 })
   }
 
   // registra a mensagem do lead (aparece no chat)
   if (mensagem) {
-    await svc.from('lead_mensagens').insert({
-      empresa_id: empresa.id,
-      lead_id: lead.id,
+    await registrarMensagemDoLead(svc, empresa.id, lead.id, {
       conteudo: String(mensagem),
       direcao: 'recebida',
       origem: 'grupo-olx',
