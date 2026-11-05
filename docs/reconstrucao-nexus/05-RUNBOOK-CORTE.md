@@ -617,6 +617,34 @@ Ferramentas em `D:/Nexus-Copia/inbox/ferramentas/views/`: `inventario.mjs` (cont
   - `storage_orfaos`: lida só pelo script manual `scripts/limpar-orfaos-chat-midia.mjs` e pela `acharOrfaos()` de `lib/storage/retencao.ts`, que não tem chamador. Lê `leads`/`lead_mensagens`: reescrever sobre `mensagens`/`negocios` antes de elas caírem.
 - **Restam 3 views de compatibilidade:** `clientes`, `lead_mensagens` e `leads`.
 
+### Lote 8 (05/11, 10h20): clientes — cai 1, restam 2 de compatibilidade
+
+| código no ar | migrações | o que caiu |
+|---|---|---|
+| `2f7faa9`, READY 10h16min46s; `05cb255` (só a migração B) | `20261105001000` (só dados, ANTES do deploy) às 10h12 (versão `20261105131202`), IOwait 2,85%; `20261105001100` às 10h20min50s (versão `20261105132050`), IOwait 3,98%; as duas com aprovação do Lucas no chat | a view `clientes`, o gatilho `compat_clientes_iud` e a função `fundir_clientes` |
+
+- **A view não era 1:1.** Cliente é o contato com a marca `dados._cliente`; a view tirava ~30 colunas do JSON e o gatilho INSTEAD OF (SECURITY DEFINER) montava o JSON de volta. Virou a camada **`lib/clientes.ts`** (sem RPC nova):
+  - **ler:** `consultaClientes(db, colunas)` (o builder já filtrado por `dados->_cliente`), `clienteDoContato` (a forma de sempre: endereco, cidade, tipo_cliente…), `lerCliente`, `lerTodosOsClientes` (de mil em mil);
+  - **gravar:** `criarCliente` e `atualizarCliente`, só pelo servidor (`POST /api/clientes`, `PATCH /api/clientes/[id]`). A busca pelo telefone usa o serviço, como o gatilho: o vendedor de Mogi que cadastra um telefone de Jaguariúna marca o contato que já existe em vez de bater no índice único. A edição confere a RLS da sessão (era o `security_invoker` da view) e grava pelo serviço;
+  - **CPF/CNPJ conferido no app** (`lib/documento.ts`, o validador que já existia na máscara do ZapIntel): 11 dígitos têm de ser CPF válido, 14 CNPJ válido, o resto é recusado; vazio passa. `cpf_validado`/`cnpj_validado` passaram a ser verdadeiros (o gatilho gravava sempre `false`).
+- **Campos por dono** (regra do Lucas): colunas de `contatos` (nome, telefone, e-mail, CPF, Instagram, observações, ativo), `contatos.endereco` (logradouro… cep), campos do **core** em `dados` (`core/campos.ts`: nascimento, estado civil, profissão, nacionalidade, **tipo e origem do cliente**) e campos do **módulo Imóveis** (`campos` no manifesto, `modulo_dono = 'imoveis'`: tipo de negócio, valor pretendido, região de interesse, análise cadastral, corretor, proprietário). `contatos.tipo` (pessoa/empresa) e `contatos.origem` (canal de entrada) dizem outra coisa, por isso tipo e origem do cliente são campos. Nenhum campo de imobiliária no core; a marca `_cliente` ficou só com `cpf_validado`, `cnpj_validado`, `lead_id`, `usuario_id` (e `ids`, do corte).
+- **Campos de partida:** o cadastro (`aplicarPreset`) garante os do core e os dos módulos ligados; instalar um módulo (`aoInstalarModulo`) garante os dele (`lib/campos-padrao.ts`). Até aqui empresa nova nascia sem os do core e o nascimento digitado sumia.
+- **Fusão de clientes:** pela `core_fundir_contatos` com foto (`fundirContatos` em `lib/fusao-contatos.ts`, a mesma do card do lead) e botão **Desfazer** no aviso. A `fundir_clientes` caiu (lia `clientes`, `leads` e `lead_mensagens`; não tinha volta).
+- **`marcar_cliente_proprietario`** (gatilho de `imoveis_imoveis`) é lógica do módulo Imóveis: grava só o campo `proprietario` em `dados`, só com o módulo ligado e o campo ativo. Sem o módulo, não grava nada.
+- **ZapIntel:** `zapintel_posvenda` e `zapintel_insights` só têm `'clientes'` como chave de JSON; `zapintel_dashboard` não cita. Ficam.
+- **35 arquivos** pela camada; os 12 embeds viraram `clientes:contatos!cliente_id(...)` (a FK já aponta para `contatos`; só colunas). A exportação de clientes (`/api/exportar`, inclusive `imob_clientes`, com o corretor em `dados->>corretor_id`) e o `clientes.csv` da exportação LGPD saem da camada (este sem o teto de mil).
+- **Defeitos achados e corrigidos:**
+  - **React #418 de /clientes:** um cliente com nome começando por emoji ("✨ Agueda"). As iniciais pegavam `nome[0]`, meio par UTF-16, que o servidor manda como "�". `iniciais()` em `lib/sem-nome.ts`, por ponto de código. Na produção: 0 erros no console nas duas lojas;
+  - **a edição levava as outras lojas junto:** o gatilho regravava `contatos.filial_id` em toda edição, e `contatos_propagar_filial` (AFTER UPDATE OF filial_id) movia negócios, conversas e mensagens das outras lojas para a loja do contato. A camada não regrava a loja;
+  - a ficha da imobiliária não recarregava a lista depois de salvar.
+- **Converter lead** manda o `lead_id`: o lead que só tem Instagram não ganha um segundo contato.
+- **Testes (local):** `scripts/comparar-clientes.mts` (camada × view, 77 clientes, 0 divergência); `comparar-contrato.mts` 12/12 HTMLs idênticos byte a byte (3 contratos, dono e vendedor, emissão e 2ª via); e2e `views-lote8-e2e.mjs` 47/47 e `views-lote8-imob-e2e.mjs` 15/15 no build de produção local (lista, busca, criar, editar, CPF inválido, fundir e desfazer, PDV, histórico, exportar, dono e vendedores nas duas lojas, Imóveis ligado e desligado); `tests/clientes.test.ts`. Ida/volta/ida das migrações no local.
+- **Smoke na produção** (superadmin na aba isolada, saiu no fim): Mogi 71 e Jaguariúna 42 clientes na tela = view = RLS, antes e depois do drop; 12 telas 200; criar, CPF inválido 400, editar, fundir, desfazer e desativar com 2 clientes de teste, apagados depois. A exportação dá 403 ao superadmin impersonando (exige `empresa_usuarios`, regra antiga).
+- **Dois clientes com documento incompleto** (recusados ao salvar até alguém corrigir): Alexandre Fernandes 17pm (Jaguariúna, 9 dígitos, id 47) e Luana (Mogi, 10 dígitos, id 16). O número não foi alterado; a equipe corrige.
+- **Tipos:** `clientes` saiu de `types/database.gerado.ts` (com 18 relações), `fundir_clientes` das funções, `clientes` de `ColunasObrigatorias`.
+- **Volta:** `supabase/scripts/volta/volta-views-lote8.sql` (recria view com defaults e grants, gatilho, `fundir_clientes`, a `marcar` antiga, e devolve os cinco campos à marca) + Instant Rollback para antes de `2f7faa9`. A `20261105001000` não precisa voltar.
+- **Restam 2 views de compatibilidade** (`lead_mensagens`, `leads`) e 4 que não são (`storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
+
 ## Para a viagem (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
 
 Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando a sua view de compatibilidade. Tudo testado no Supabase local (`supabase start`, IDE fechado); **nenhum deploy e nenhuma migração em produção sem o ok do Lucas pelo chat**.

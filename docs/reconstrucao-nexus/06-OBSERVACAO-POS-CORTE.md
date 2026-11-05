@@ -1172,3 +1172,10 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - **Depois do drop:** mensagens entrando normalmente; API ok.
 - **Views no `public`:** 7 (`clientes`, `lead_mensagens`, `leads`, `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
 - **Grep das views:** caíram 38 das 41 e restam 3.
+
+## 29. 05/11 às 10h20: lote 8 das views (clientes) e o #418 (`2f7faa9`, `05cb255`)
+
+- **Ordem:** migração A (só dados: campos do cliente e cópia da marca para `dados`) às 10h12, IOwait 2,85% → push às 10h12min23s, READY 10h16min46s → smoke nas duas lojas → migração B (drop) às 10h20min50s, IOwait 3,98%. Aprovação do Lucas no chat nas duas.
+- **Depois do drop:** API ok; mensagens entrando (9 nos 5 minutos seguintes); Mogi 71 e Jaguariúna 42 clientes; telas 200.
+- **Views no `public`:** 6 (`lead_mensagens`, `leads`, `storage_orfaos`, `v_leads_nao_lidas`, `core_v_planos`, `v_empresas_plano`).
+- **Grep das views:** caíram 39 das 41 e restam 2. Detalhe no 05, "Lote 8".

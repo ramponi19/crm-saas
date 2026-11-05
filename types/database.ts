@@ -9,7 +9,7 @@
  * anulável; estas têm exatamente as colunas e restrições da tabela, e o app lê e
  * grava nelas como sempre leu e gravou (são auto-atualizáveis).
  *
- * As outras views (`leads`, `lead_mensagens`, `clientes`,
+ * As outras views (`leads`, `lead_mensagens`,
  * ...) juntam mais de uma tabela e seguem como o gerador as entrega.
  */
 import type { Database as Gerado, Json } from './database.gerado'
@@ -22,13 +22,12 @@ type OutrasViews = Omit<PG['Views'], keyof ViewsEspelho>
 /**
  * Nas views de compatibilidade (as que juntam tabelas e gravam por gatilho), as
  * colunas abaixo saem direto de uma coluna NOT NULL da tabela de origem
- * (`leads.id` = `negocios.id`, `clientes.id` = `contatos.id`, ...). O gerador
+ * (`leads.id` = `negocios.id`, ...). O gerador
  * não sabe disso e as declara anuláveis. `nome` NÃO está aqui de propósito:
  * `contatos.nome` aceita nulo, e o código tem de tratar.
  */
 interface ColunasObrigatorias {
   leads: 'id' | 'empresa_id' | 'created_at'
-  clientes: 'id' | 'empresa_id' | 'created_at'
   lead_mensagens: 'id' | 'empresa_id' | 'direcao' | 'conteudo' | 'tipo' | 'lida' | 'created_at'
 }
 type Obrig<R, K extends string> = Omit<R, K & keyof R> & { [P in K & keyof R]-?: NonNullable<R[P]> }

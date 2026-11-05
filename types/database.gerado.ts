@@ -53,12 +53,6 @@ isOneToOne: false
       foreignKeyName: "garantias_assistencias_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "garantias_assistencias_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -112,12 +106,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "orcamentos_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "orcamentos_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -243,12 +231,6 @@ isOneToOne: false
       foreignKeyName: "automacao_execucoes_contato_id_fkey"
       columns: ["contato_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "automacao_execucoes_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -346,12 +328,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "troca_cotacoes_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "troca_cotacoes_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -909,12 +885,6 @@ isOneToOne: false
       foreignKeyName: "contato_fusoes_contato_principal_id_fkey"
       columns: ["contato_principal_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contato_fusoes_contato_principal_id_fkey"
-      columns: ["contato_principal_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -948,12 +918,6 @@ isOneToOne: false
       columns: ["canal_id"]
 isOneToOne: false
       referencedRelation: "canais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contato_identidades_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "contato_identidades_contato_id_fkey"
@@ -1030,12 +994,6 @@ isOneToOne: false
       columns: ["canal_id"]
 isOneToOne: false
       referencedRelation: "canais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "conversas_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "conversas_contato_id_fkey"
@@ -1569,12 +1527,6 @@ isOneToOne: false
       foreignKeyName: "inventario_unidades_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "inventario_unidades_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -1736,12 +1688,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "cobrancas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "cobrancas_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -2015,12 +1961,6 @@ isOneToOne: false
       foreignKeyName: "imoveis_proprietario_id_fkey"
       columns: ["proprietario_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imoveis_proprietario_id_fkey"
-      columns: ["proprietario_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     }
@@ -2042,12 +1982,6 @@ isOneToOne: false
       columns: ["captador_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "negocios_imobiliarios_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "negocios_imobiliarios_cliente_id_fkey"
@@ -2118,12 +2052,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "lead_perfil_busca_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "lead_perfil_busca_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -2260,12 +2188,6 @@ isOneToOne: false
       columns: ["canal_id"]
 isOneToOne: false
       referencedRelation: "canais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "mensagens_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "mensagens_contato_id_fkey"
@@ -2566,12 +2488,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "negocios_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "negocios_contato_id_fkey"
       columns: ["contato_id"]
 isOneToOne: false
@@ -2967,12 +2883,6 @@ isOneToOne: false
       foreignKeyName: "tarefas_contato_id_fkey"
       columns: ["contato_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "tarefas_contato_id_fkey"
-      columns: ["contato_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -3246,12 +3156,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "contratos_venda_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "contratos_venda_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -3593,12 +3497,6 @@ isOneToOne: false
       foreignKeyName: "vendas_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "vendas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
       referencedRelation: "contatos"
       referencedColumns: ["id"]
     },{
@@ -3670,12 +3568,6 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "visitas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "clientes"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "visitas_cliente_id_fkey"
       columns: ["cliente_id"]
 isOneToOne: false
@@ -3832,39 +3724,7 @@ isOneToOne: true
                 }
           }
           Views: {
-                "clientes": {
-                  Row: {
-                    "ativo": boolean | null,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj_validado": boolean | null,"complemento": string | null,"corretor_id": string | null,"cpf_cnpj": string | null,"cpf_validado": boolean | null,"created_at": string | null,"data_nascimento": string | null,"email": string | null,"empresa_id": number | null,"endereco": string | null,"estado": string | null,"estado_civil": string | null,"filial_id": number | null,"id": number | null,"instagram": string | null,"lead_id": number | null,"nacionalidade": string | null,"nome": string | null,"numero": string | null,"observacoes": string | null,"origem_cliente": string | null,"profissao": string | null,"proprietario": boolean | null,"regiao_interesse": string | null,"status_aprovacao": string | null,"telefone": string | null,"tipo_cliente": string | null,"tipo_negocio": string | null,"usuario_id": string | null,"valor_pretendido": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                           "ativo"?: boolean | null,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj_validado"?: boolean | null,"complemento"?: string | null,"corretor_id"?: string | null,"cpf_cnpj"?: string | null,"cpf_validado"?: boolean | null,"created_at"?: string | null,"data_nascimento"?: string | null,"email"?: string | null,"empresa_id"?: number | null,"endereco"?: string | null,"estado"?: string | null,"estado_civil"?: string | null,"filial_id"?: number | null,"id"?: number | null,"instagram"?: string | null,"lead_id"?: number | null,"nacionalidade"?: string | null,"nome"?: string | null,"numero"?: string | null,"observacoes"?: string | null,"origem_cliente"?: string | null,"profissao"?: string | null,"proprietario"?: boolean | null,"regiao_interesse"?: string | null,"status_aprovacao"?: string | null,"telefone"?: string | null,"tipo_cliente"?: string | null,"tipo_negocio"?: string | null,"usuario_id"?: string | null,"valor_pretendido"?: number | null
-                         }
-                        Update: {
-                           "ativo"?: boolean | null,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj_validado"?: boolean | null,"complemento"?: string | null,"corretor_id"?: string | null,"cpf_cnpj"?: string | null,"cpf_validado"?: boolean | null,"created_at"?: string | null,"data_nascimento"?: string | null,"email"?: string | null,"empresa_id"?: number | null,"endereco"?: string | null,"estado"?: string | null,"estado_civil"?: string | null,"filial_id"?: number | null,"id"?: number | null,"instagram"?: string | null,"lead_id"?: number | null,"nacionalidade"?: string | null,"nome"?: string | null,"numero"?: string | null,"observacoes"?: string | null,"origem_cliente"?: string | null,"profissao"?: string | null,"proprietario"?: boolean | null,"regiao_interesse"?: string | null,"status_aprovacao"?: string | null,"telefone"?: string | null,"tipo_cliente"?: string | null,"tipo_negocio"?: string | null,"usuario_id"?: string | null,"valor_pretendido"?: number | null
-                         }
-                        Relationships: [
-                    {
-      foreignKeyName: "contatos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contatos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "v_empresas_plano"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "contatos_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"core_v_planos": {
+                "core_v_planos": {
                   Row: {
                     "cor": string | null,"descricao": string | null,"destaque": boolean | null,"features": Json | null,"id": string | null,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string | null,"ordem": number | null,"preco_centavos": number | null
                   }
@@ -4092,9 +3952,6 @@ isOneToOne: false
                            },
 "filial_gravacao":
 { Args: { "p_empresa": number }; Returns: number
-                           },
-"fundir_clientes":
-{ Args: { "p_empresa": number,"p_principal": number,"p_secundario": number }; Returns: Json
                            },
 "get_empresa_id":
 { Args: Record<PropertyKey, never>; Returns: number
