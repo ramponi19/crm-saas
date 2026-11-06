@@ -69,7 +69,9 @@ export default function FundirLeadsModal({ clientes, onClose, onFundido }: {
       m['negocios.contato_id'] ? `${m['negocios.contato_id']} negócio(s) do funil` : null,
       m['imoveis_negocios.cliente_id'] ? `${m['imoveis_negocios.cliente_id']} negócio(s) de imóvel` : null,
       m['visitas.cliente_id'] ? `${m['visitas.cliente_id']} compromisso(s)` : null,
+      j?.negociosJuntados ? `${j.negociosJuntados} negócio(s) repetido(s) juntado(s)` : null,
     ].filter(Boolean)
+    if (j?.avisoJuncao) notify.warn('Atenção', j.avisoJuncao)
     onFundido(partes.length ? `Movido: ${partes.join(' · ')}` : 'Cadastros unificados', typeof j?.fusaoId === 'number' ? j.fusaoId : null)
   }
 

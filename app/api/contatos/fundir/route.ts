@@ -71,5 +71,5 @@ export async function POST(req: Request) {
 
   const r = await fundirContatos(createServiceClient(), auth.empresaId, principal, removido, auth.userId)
   if (r.error !== null) return NextResponse.json({ error: r.error }, { status: r.status })
-  return NextResponse.json({ ok: true, movido: r.movido, fusaoId: r.fusaoId })
+  return NextResponse.json({ ok: true, movido: r.movido, fusaoId: r.fusaoId, negociosJuntados: r.negociosJuntados, avisoJuncao: r.avisoJuncao })
 }

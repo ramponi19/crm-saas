@@ -91,7 +91,10 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
     const j = await r.json().catch(() => ({}))
     setFundindo(false)
     if (!r.ok) { notify.bad('Não foi possível fundir', j.error); return }
-    notify.ok('Contatos fundidos', `${escolhido.nome ?? 'O contato escolhido'} agora faz parte de ${nomeAtual}.`)
+    const juntados = Number(j.negociosJuntados ?? 0)
+    notify.ok('Contatos fundidos', `${escolhido.nome ?? 'O contato escolhido'} agora faz parte de ${nomeAtual}.`
+      + (juntados ? ` ${juntados === 1 ? 'Um negócio repetido foi juntado' : `${juntados} negócios repetidos foram juntados`} ao que ficou no funil.` : ''))
+    if (j.avisoJuncao) notify.warn('Atenção', j.avisoJuncao)
     onFundido()
   }
 

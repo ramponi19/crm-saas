@@ -1,3 +1,4 @@
+import { desfazerJuncao, juntarNegociosDoContato } from '@/lib/juntar-negocios'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -61,6 +62,8 @@ export interface FotoDaFusao {
   identidadesApagadas: Linha[]
   identidadesMovidas: number[]
   linhas: Record<string, number[]>
+  /** Eventos `negocio.juntado` das junções feitas depois da fusão (06/11/2026); o desfazer volta por eles. */
+  juncoes?: number[]
 }
 
 /** ids de uma tabela onde `coluna = valor`, de mil em mil (o PostgREST corta em mil). */
@@ -116,7 +119,7 @@ export async function fotoDaFusao(svc: Db, empresaId: number, principalId: numbe
  * `contato_fusoes`, que é o que o desfazer recebe.
  */
 export async function fundirContatos(svc: Db, empresaId: number, principalId: number, removidoId: number, userId: string):
-  Promise<{ error: string; status: number } | { error: null; movido: Record<string, number>; fusaoId: number | null; nomeRemovido: string | null }> {
+  Promise<{ error: string; status: number } | { error: null; movido: Record<string, number>; fusaoId: number | null; nomeRemovido: string | null; negociosJuntados: number; avisoJuncao: string | null }> {
   // A foto ANTES de fundir: é dela que o desfazer reconstrói tudo.
   let foto: FotoDaFusao | null
   try { foto = await fotoDaFusao(svc, empresaId, principalId, removidoId) } catch (e) {
@@ -131,16 +134,24 @@ export async function fundirContatos(svc: Db, empresaId: number, principalId: nu
   const { data: registro } = await svc.from('contato_fusoes').select('id, movido')
     .eq('empresa_id', empresaId).eq('contato_principal_id', principalId).eq('contato_removido_id', removidoId)
     .order('id', { ascending: false }).limit(1).maybeSingle()
+  // Os negócios ativos do contato que ficou, repetidos na mesma loja e funil, viram um
+  // só (06/11/2026): o mais avançado fica, o outro sai do funil com tudo movido.
+  const junta = await juntarNegociosDoContato(svc, empresaId, principalId, { userId, origem: 'fusao', fusao: (registro?.id as number | undefined) ?? null })
   if (registro) {
     await svc.from('contato_fusoes').update({
       por_usuario: userId,
-      movido: { ...((registro.movido ?? {}) as Linha), _desfazer: foto },
+      movido: { ...((registro.movido ?? {}) as Linha), _desfazer: { ...foto, juncoes: junta.juncoes.map((j) => j.evento) }, ...(junta.juncoes.length ? { negocios_juntados: junta.juncoes.length } : {}) },
     }).eq('id', registro.id)
   }
   await svc.from('eventos').update({ por_usuario: userId })
     .eq('empresa_id', empresaId).eq('tipo', 'contato.fundido').eq('entidade_id', principalId).is('por_usuario', null)
 
-  return { error: null, movido: (movido ?? {}) as Record<string, number>, fusaoId: (registro?.id as number | undefined) ?? null, nomeRemovido: (foto.removido.nome as string | null) ?? null }
+  return {
+    error: null, movido: (movido ?? {}) as Record<string, number>, fusaoId: (registro?.id as number | undefined) ?? null,
+    nomeRemovido: (foto.removido.nome as string | null) ?? null,
+    negociosJuntados: junta.juncoes.length,
+    avisoJuncao: junta.error ? `Contatos fundidos, mas os negócios repetidos não foram todos juntados: ${junta.error}` : null,
+  }
 }
 
 const EM_LOTES = 500
@@ -174,6 +185,12 @@ export async function desfazerFusao(svc: Db, empresaId: number, fusaoId: number,
   if (!principalAgora) return { error: 'O contato que ficou não existe mais', status: 409 }
 
   const voltou: Record<string, number> = {}
+  // 0. Antes de tudo, as junções de negócio que a fusão fez voltam (da última para a primeira).
+  for (const ev of [...(foto.juncoes ?? [])].reverse()) {
+    const r = await desfazerJuncao(svc, empresaId, ev, userId)
+    if (r.error && r.error !== 'Esta junção já foi desfeita') return { error: r.error, status: 500, voltou }
+    voltou['negócios separados'] = (voltou['negócios separados'] ?? 0) + 1
+  }
   try {
     // 1. O principal devolve o que a fusão preencheu (só onde estava vazio e segue igual ao do removido).
     const antes = foto.principal, rem = foto.removido
