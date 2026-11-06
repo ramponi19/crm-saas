@@ -62,7 +62,8 @@ function aguardandoDesde(lead: { ultima_recebida_at?: string | null; ultima_envi
   return aguardandoResposta(lead) ? lead.ultima_recebida_at ?? null : null
 }
 
-function humanElapsed(date: string | null, agora: number): string {
+/** "agora", "há 5 min", "há 3h", "há 2 dias" — para "cliente há X" e "você respondeu há Y". */
+function haQuanto(date: string | null | undefined, agora: number): string {
   if (!date) return ''
   const min = Math.floor((agora - new Date(date).getTime()) / 60_000)
   if (min < 1) return 'agora'
@@ -70,7 +71,7 @@ function humanElapsed(date: string | null, agora: number): string {
   const h = Math.floor(min / 60)
   if (h < 24) return `há ${h}h`
   const d = Math.floor(h / 24)
-  return `parado há ${d} ${d > 1 ? 'dias' : 'dia'}`
+  return `há ${d} ${d > 1 ? 'dias' : 'dia'}`
 }
 
 export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, agora: agoraInicial }: LeadCardProps) {
@@ -94,9 +95,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
    */
   const doTempo = (agora: number) => {
     const { score, tier } = calcularScore(lead, scoreCfg, agora)
-    return `${humanElapsed(esperandoDesde, agora)}|${getSlaTone(esperandoDesde, agora, sla)}|${score}|${tier}`
+    return `${getSlaTone(esperandoDesde, agora, sla)}|${score}|${tier}|${haQuanto(lead.ultima_recebida_at, agora)}|${haQuanto(lead.ultima_enviada_at, agora)}`
   }
-  const [espera, tom, scoreTxt, tier] = useSyncExternalStore(
+  const [tom, scoreTxt, tier, cliente, voce] = useSyncExternalStore(
     assinarRelogio,
     () => doTempo(instanteDoRelogio(agoraInicial)),
     () => doTempo(agoraInicial ?? instanteDoRelogio()),
@@ -145,16 +146,25 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
                 {(lead.msgs_nao_lidas ?? 0) > 99 ? '99+' : lead.msgs_nao_lidas}
               </span>
             )}
-            {esperandoDesde && (
-              <span
-                title="Cliente esperando resposta"
-                className={`whitespace-nowrap text-[10px] font-semibold ${SLA_CLASS[slaTone]}`}
-              >
-                {espera}
-              </span>
-            )}
           </div>
         </div>
+
+        {/*
+          * O QUE ORDENA O CARTÃO, À VISTA (06/11/2026): o quadro sobe pela última mensagem
+          * do cliente; "você respondeu" não mexe na posição. Esperando resposta, o
+          * "cliente há X" ganha a cor do SLA (como o relógio de antes).
+          */}
+        {(cliente || voce) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[10px] leading-tight">
+            {cliente && (
+              <span data-tempo="cliente" title={esperandoDesde ? 'Cliente esperando resposta' : 'Última mensagem do cliente'}
+                className={esperandoDesde ? `whitespace-nowrap font-semibold ${SLA_CLASS[slaTone]}` : 'whitespace-nowrap text-ink-3'}>
+                cliente {cliente}
+              </span>
+            )}
+            {voce && <span data-tempo="voce" className="whitespace-nowrap text-ink-3">{cliente ? '· ' : ''}você respondeu {voce}</span>}
+          </div>
+        )}
       </div>
     </div>
   )

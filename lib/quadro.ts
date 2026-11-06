@@ -41,9 +41,13 @@ export interface Contagens { etapas: Record<string, ContagemDaEtapa>; esteira: n
 
 interface Pagina { colunas: string[]; linhas: unknown[][] }
 
-/** O instante que ordena o quadro e serve de cursor: última mensagem, ou a criação. */
-export function momentoDe(l: Pick<Lead, 'ultima_mensagem_at' | 'created_at'>): string {
-  return l.ultima_mensagem_at ?? l.created_at ?? new Date(0).toISOString()
+/**
+ * O instante que ordena o quadro e serve de cursor: a última mensagem DO CLIENTE, ou a
+ * criação (06/11/2026). Resposta da equipe não mexe na posição — a mesma regra de
+ * quadro_base.momento (migração 20261106000100_quadro_ordem_cliente).
+ */
+export function momentoDe(l: Pick<Lead, 'ultima_recebida_at' | 'created_at'>): string {
+  return l.ultima_recebida_at ?? l.created_at ?? new Date(0).toISOString()
 }
 
 /** Mais recente primeiro, id como desempate — a mesma ordem do banco. */
