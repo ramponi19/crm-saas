@@ -153,6 +153,31 @@ async function emLotes<T>(ids: number[], f: (lote: number[]) => Promise<T[]>): P
   return out
 }
 
+/** O negócio principal do contato na loja: ativo primeiro, depois o mais novo (id desempata). */
+function melhorQue(n: { id: number; created_at: string; ativo?: boolean | null }, p: { id: number; created_at: string; ativo?: boolean | null }): boolean {
+  const na = n.ativo !== false, pa = p.ativo !== false
+  if (na !== pa) return na
+  return n.created_at > p.created_at || (n.created_at === p.created_at && n.id > p.id)
+}
+
+/**
+ * UM POR CONTATO E LOJA (06/11/2026). Um contato fundido (Instagram + WhatsApp) pode
+ * ficar com dois negócios abertos na mesma loja, e as listas que buscam NEGÓCIO
+ * (busca do topo/⌘K, escolher lead na tarefa e na agenda) mostravam a pessoa duas
+ * vezes. Fica o principal — a mesma regra de `quadro_base` e de `conversasDosLeads` —,
+ * na posição em que o contato apareceu primeiro.
+ */
+export function umPorContatoELoja<T extends { id: number; contato_id: number; filial_id: number | null; created_at: string; ativo?: boolean | null }>(lista: T[]): T[] {
+  const ordem: string[] = []
+  const melhor = new Map<string, T>()
+  for (const n of lista) {
+    const k = chave(n.contato_id, n.filial_id)
+    const p = melhor.get(k)
+    if (!p) { ordem.push(k); melhor.set(k, n) } else if (melhorQue(n, p)) melhor.set(k, n)
+  }
+  return ordem.map((k) => melhor.get(k)!)
+}
+
 /**
  * A conversa de cada negócio, como a view `leads` calculava: soma das conversas do
  * contato NA LOJA do negócio, só para o negócio principal (ativo primeiro, o mais
@@ -234,20 +259,22 @@ export async function leadsParaEscolher(db: Db, empresaId: number, limite = 200)
   doContato.sort((a, b) => (ordem.get(chave(a.contato_id, a.filial_id)) ?? fim) - (ordem.get(chave(b.contato_id, b.filial_id)) ?? fim)
     || b.created_at.localeCompare(a.created_at))
 
-  const vistos = new Set<number>()
+  // Uma linha por contato e loja (o negócio principal): o contato fundido com dois
+  // negócios abertos na mesma loja aparecia duas vezes na lista.
+  const vistos = new Set<string>()
   const out: { id: number; nome: string | null }[] = []
-  for (const n of doContato) {
+  for (const n of umPorContatoELoja(doContato)) {
     if (out.length >= limite) break
-    if (vistos.has(n.id)) continue
-    vistos.add(n.id); out.push({ id: n.id, nome: um(n.contato)?.nome ?? null })
+    vistos.add(chave(n.contato_id, n.filial_id)); out.push({ id: n.id, nome: um(n.contato)?.nome ?? null })
   }
   if (out.length < limite) {
-    const { data: novos } = await db.from('negocios').select('id, contato:contatos!contato_id(nome)')
+    const { data: novos } = await db.from('negocios').select('id, contato_id, filial_id, created_at, contato:contatos!contato_id(nome)')
       .eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }).limit(limite)
-    for (const n of (novos ?? []) as unknown as { id: number; contato: { nome: string | null } | null }[]) {
+    for (const n of umPorContatoELoja((novos ?? []) as unknown as Linha[])) {
       if (out.length >= limite) break
-      if (vistos.has(n.id)) continue
-      vistos.add(n.id); out.push({ id: n.id, nome: um(n.contato)?.nome ?? null })
+      const k = chave(n.contato_id, n.filial_id)
+      if (vistos.has(k)) continue
+      vistos.add(k); out.push({ id: n.id, nome: um(n.contato)?.nome ?? null })
     }
   }
   return out

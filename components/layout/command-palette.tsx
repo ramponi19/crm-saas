@@ -7,7 +7,8 @@ import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, 
 import { useFerramentas } from './ferramentas-context'
 import { createClient } from '@/lib/supabase/client'
 import { consultaClientes } from '@/lib/clientes'
-import { conversasDosLeads } from '@/lib/leads'
+import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
+import { OrigemIcon } from '@/components/modules/conversa/canal-icone'
 
 interface SearchResult {
   tipo: 'cliente' | 'lead' | 'estoque'
@@ -15,6 +16,8 @@ interface SearchResult {
   titulo: string
   sub: string
   href: string
+  /** Canais do contato (whatsapp, instagram, messenger) — um resultado por pessoa e loja. */
+  canais?: string[]
 }
 
 interface Acao {
@@ -61,7 +64,15 @@ const LOTE = 50
 /** Quantos negócios que batem com a busca entram na ordenação pela última mensagem. */
 const TETO_BUSCA_LEADS = 200
 
-type LeadAchado = { id: number; nome: string | null; produto_interessado: string | null; telefone: string | null; ultima_mensagem_at: string | null }
+type LeadAchado = { id: number; nome: string | null; produto_interessado: string | null; telefone: string | null; ultima_mensagem_at: string | null; loja: string | null; canais: string[] }
+
+const ORDEM_CANAIS = ['whatsapp', 'instagram', 'messenger']
+/** Os canais pelas identidades do contato; sem identidade, pelo que a ficha tem (telefone, @). */
+function canaisDoContato(c: { telefone: string | null; instagram: string | null; identidades?: { canal_tipo: string | null }[] | null } | null): string[] {
+  const tem = new Set((c?.identidades ?? []).map((i) => (i.canal_tipo ?? '').toLowerCase()).filter(Boolean))
+  if (!tem.size) { if (c?.telefone) tem.add('whatsapp'); if (c?.instagram) tem.add('instagram') }
+  return ORDEM_CANAIS.filter((k) => tem.has(k))
+}
 
 /**
  * Leads ativos cujo nome ou telefone bate com `q`, os de conversa mais recente
@@ -70,12 +81,15 @@ type LeadAchado = { id: number; nome: string | null; produto_interessado: string
  * então a ordem é feita aqui sobre os TETO_BUSCA_LEADS mais novos que batem.
  */
 async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string): Promise<{ data: LeadAchado[] }> {
-  const SELECT_BUSCA: string = 'id, empresa_id, contato_id, filial_id, created_at, produto_interessado:dados->>produto_interessado, contato:contatos!contato_id!inner(nome, telefone)'
+  const SELECT_BUSCA: string = 'id, empresa_id, contato_id, filial_id, created_at, produto_interessado:dados->>produto_interessado, filial:filiais!negocios_filial_id_fkey(nome), contato:contatos!contato_id!inner(nome, telefone, instagram, identidades:contato_identidades(canal_tipo))'
   const { data } = await supabase.from('negocios').select(SELECT_BUSCA)
     .or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`, { referencedTable: 'contato' })
     .eq('ativo', true).order('created_at', { ascending: false }).limit(TETO_BUSCA_LEADS)
-  type Linha = { id: number; empresa_id: number; contato_id: number; filial_id: number | null; created_at: string; produto_interessado: string | null; contato: { nome: string | null; telefone: string | null } | null }
-  const linhas = (data ?? []) as unknown as Linha[]
+  type Linha = { id: number; empresa_id: number; contato_id: number; filial_id: number | null; created_at: string; produto_interessado: string | null; filial: { nome: string | null } | null; contato: { nome: string | null; telefone: string | null; instagram: string | null; identidades: { canal_tipo: string | null }[] | null } | null }
+  // UM RESULTADO POR PESSOA E LOJA (06/11/2026): o contato fundido (Instagram + WhatsApp)
+  // ficou com dois negócios abertos na mesma loja e aparecia duas vezes, os dois abrindo
+  // o mesmo cartão. Fica o negócio principal (a mesma regra do quadro).
+  const linhas = umPorContatoELoja((data ?? []) as unknown as Linha[])
   // A RLS já deixa só a empresa atual; agrupar por empresa é só para não supor isso.
   // Falhando a leitura das conversas, a busca segue (mais novos primeiro) em vez de travar.
   const ultima = new Map<number, string | null>()
@@ -88,6 +102,7 @@ async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string)
   const out: LeadAchado[] = linhas.map((l) => ({
     id: l.id, nome: l.contato?.nome ?? null, produto_interessado: l.produto_interessado,
     telefone: l.contato?.telefone ?? null, ultima_mensagem_at: ultima.get(l.id) ?? null,
+    loja: l.filial?.nome ?? null, canais: canaisDoContato(l.contato),
   }))
   out.sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
   return { data: out.slice(0, LOTE) }
@@ -184,7 +199,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         [...xs].sort((a, b) => relevancia(a.nome, q) - relevancia(b.nome, q))
 
       const cli = porRelevancia((clientes ?? []) as Array<{ id: number; nome: string | null; telefone: string | null }>)
-      const lds = porRelevancia((leads ?? []) as Array<{ id: number; nome: string | null; produto_interessado: string | null; telefone: string | null }>)
+      const lds = porRelevancia((leads ?? []) as LeadAchado[])
+      // Com o mesmo contato em mais de uma loja (visão "Rede"), a loja diz qual é qual.
+      const variasLojas = new Set(lds.map((l) => l.loja)).size > 1
       // Lote cheio: pode haver mais la fora do que coube nesta consulta.
       setTemMais(cli.length >= LOTE || lds.length >= LOTE)
 
@@ -201,7 +218,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
-        ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: l.produto_interessado ?? l.telefone ?? 'sem produto', href: `/leads?lead=${l.id}` })),
+        ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: [variasLojas ? l.loja : null, l.produto_interessado ?? l.telefone ?? 'sem produto'].filter(Boolean).join(' · '), href: `/leads?lead=${l.id}`, canais: l.canais })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
@@ -301,7 +318,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               >
                 <span className="rounded-[6px] bg-ink/[0.05] px-2 py-0.5 text-[10px] font-semibold text-ink-2">{TIPO_LABEL[r.tipo]}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">{r.titulo}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium text-ink">{r.titulo}</span>
+                    {r.canais?.map((c) => <span key={c} data-canal={c} title={c}><OrigemIcon origem={c} size={13} /></span>)}
+                  </span>
                   <span className="block truncate text-[11px] text-ink-3">{r.sub}</span>
                 </span>
               </button>

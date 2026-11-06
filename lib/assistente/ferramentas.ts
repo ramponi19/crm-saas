@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buscarTudo } from '@/lib/zapintel/conversas'
 import { VERSAO_DO_PERFIL } from '@/lib/zapintel/perfil'
-import { conversasDosLeads } from '@/lib/leads'
+import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import type { Acesso } from './acesso'
 
 /**
@@ -586,11 +586,12 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
     // O nome é do contato; a última mensagem, da conversa dele na loja (só no
     // negócio principal). A ordem por ela é feita aqui, sobre até 1.000 nomes
     // que batem — a view ordenava no banco.
-    let q = c.db.from('negocios').select('id, contato_id, filial_id, contato:contatos!contato_id!inner(nome)')
+    let q = c.db.from('negocios').select('id, contato_id, filial_id, created_at, contato:contatos!contato_id!inner(nome)')
       .eq('empresa_id', c.acesso.empresaId).eq('ativo', true).ilike('contato.nome', `%${nome.replace(/[%_,()]/g, ' ')}%`)
     if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
     const { data } = await q.limit(1000)
-    const batem = (data ?? []) as unknown as { id: number; contato_id: number; filial_id: number | null; contato: { nome: string } | null }[]
+    // Um por contato e loja: o contato fundido com dois negócios abertos não vira "vários".
+    const batem = umPorContatoELoja((data ?? []) as unknown as { id: number; contato_id: number; filial_id: number | null; created_at: string; contato: { nome: string } | null }[])
     const conversas = batem.length ? await conversasDosLeads(c.db, c.acesso.empresaId, batem) : new Map()
     const achados = batem
       .map((n) => ({ id: n.id, nome: n.contato?.nome ?? '', ultima_mensagem_at: (conversas.get(n.id)?.ultima_mensagem_at ?? null) as string | null }))
