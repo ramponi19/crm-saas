@@ -625,8 +625,10 @@ v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx
 v "secao de modulo pelo modulo ligado"  "components/modules/configuracoes/secao-configuracoes.tsx" "ABAS_DE_MODULO.includes(abaReal) && !abas.includes(abaReal)"
 v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "ligadosDaEmpresa("
 # 22/10/2026: "segmento" nao entra em codigo novo; a lista de excecoes so encolhe.
-v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:modulos && next build"
-v "build reprova rota fora de modulo"  "package.json" "npm run check:modulos && next build"
+v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:modulos && npm run check:gravacao && next build"
+v "build reprova rota fora de modulo"  "package.json" "npm run check:modulos && npm run check:gravacao && next build"
+# 05/11/2026: gravação do app sem conferir as linhas reprova o build; a lista de exceções só encolhe.
+v "build reprova gravacao sem conferencia" "package.json" "npm run check:gravacao && next build"
 v "configuracoes so dono ou admin"     "app/(dashboard)/configuracoes/(admin)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 v "insights e automacoes so dono/admin" "app/(dashboard)/(gestao)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 n "abas do /admin sem redirecionamento" "next.config.ts" "DESTINO_DA_ABA"
