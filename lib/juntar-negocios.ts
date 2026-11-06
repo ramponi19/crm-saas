@@ -8,10 +8,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * com dois negócios abertos em Mogi, dois cartões no quadro e dois resultados na busca.
  * A regra do produto é UM card por contato por loja (05/11).
  *
- * Por contato, loja e funil, entre os negócios ATIVOS:
- *   fica   o mais avançado no funil (maior `ordem` da etapa); empate: o mais recente
- *   sai    vira ativo = false (`dados._lead.ativo`, de onde a coluna `ativo` é gerada),
- *          com `dados._juntado` dizendo para qual foi
+ * Por contato, loja e funil, entre os negócios ATIVOS, fica (regra do Lucas, 06/11/2026):
+ *   aberto x fechado   o aberto (ganho e perdido são "fechados")
+ *   dois abertos       o mais avançado no funil (maior `ordem` da etapa); empate, o mais recente
+ *   dois fechados      o fechado mais recentemente (ganho_em/perdido_em; sem data, a criação)
+ * O que sai vira ativo = false (`dados._lead.ativo`, de onde a coluna `ativo` é gerada),
+ * com `dados._juntado` dizendo para qual foi. Se ele estava FECHADO, o fechamento vai
+ * para `negocio_historico` do que fica (acao 'fechamento_juntado', com status, datas,
+ * motivo e valor — como a reabertura do cliente que volta) e o status dele é limpo:
+ * o ganho/perda continua nos relatórios por lib/fechamentos.ts, uma vez só.
  * e tudo que apontava para o que sai passa para o que fica (TABELAS_DO_NEGOCIO), menos:
  *   cadência     inscrição ATIVA numa cadência em que o que fica já está ativo sai dela
  *                (status 'saiu'); as outras mudam de negócio
@@ -71,11 +76,17 @@ export interface FotoDaJuncao {
   automacaoPulada: { id: number; motivo: string | null }[]
   /** ids em negocio_historico gravados pela junção. */
   historico: number[]
+  /** O fechamento do que saiu (ganho/perdido), guardado no histórico do que fica; o desfazer o devolve. */
+  fechamento?: { historico: number | null; status: string; ganho_em: string | null; perdido_em: string | null; motivo_perda_id: number | null }
 }
 
 export interface Juncao { evento: number; fica: number; sai: number; filial: number | null; funil: number | null }
 
-type Negocio = { id: number; filial_id: number | null; funil_id: number | null; etapa_id: number | null; created_at: string; dados: Linha | null }
+type Negocio = { id: number; filial_id: number | null; funil_id: number | null; etapa_id: number | null; created_at: string; dados: Linha | null
+  status: string | null; ganho_em: string | null; perdido_em: string | null; motivo_perda_id: number | null; valor_estimado: number | null }
+
+const FECHADOS = ['ganho', 'perdido']
+export const estaFechado = (status: string | null | undefined) => FECHADOS.includes(status ?? '')
 
 const chave = (n: { filial_id: number | null; funil_id: number | null }) => `${n.filial_id ?? -1}:${n.funil_id ?? -1}`
 /** A chave de cada tabela (quase todas `id`; zapintel_venda_lead é por venda). */
@@ -119,15 +130,25 @@ async function voltar(svc: Db, f: FotoDaJuncao) {
     const { error } = await svc.from('automacao_execucoes').update({ status: 'agendada', motivo: a.motivo }).eq('id', a.id).eq('status', 'pulada')
     if (error) throw new Error(`automação ${a.id}: ${error.message}`)
   }
-  const { data: volta, error: eV } = await svc.from('negocios').update({ dados: f.dadosAntes }).eq('id', f.sai).select('id')
+  const fech = f.fechamento
+  const patch = fech
+    ? { dados: f.dadosAntes, status: fech.status, ganho_em: fech.ganho_em, perdido_em: fech.perdido_em, motivo_perda_id: fech.motivo_perda_id }
+    : { dados: f.dadosAntes }
+  const { data: volta, error: eV } = await svc.from('negocios').update(patch).eq('id', f.sai).select('id')
   if (eV || !volta?.length) throw new Error(`negócio #${f.sai}: ${eV?.message ?? 'não existe mais'}`)
+  // O fechamento volta a ser do negócio: o registro no histórico do outro sai (senão contaria duas vezes).
+  if (fech?.historico) {
+    const { error } = await svc.from('negocio_historico').delete().eq('id', fech.historico)
+    if (error) throw new Error(`fechamento no histórico: ${error.message}`)
+  }
 }
 
 /**
  * Quais negócios do contato se juntam: por loja e funil, o que fica primeiro.
  * Puro (sem banco) — a mesma escolha da fusão, da correção e da lista de conferência.
  */
-export function planoDeJuncao<T extends { id: number; filial_id: number | null; funil_id: number | null; created_at: string; ordem: number | null }>(
+export function planoDeJuncao<T extends { id: number; filial_id: number | null; funil_id: number | null; created_at: string; ordem: number | null
+  status?: string | null; ganho_em?: string | null; perdido_em?: string | null }>(
   negocios: T[],
 ): { fica: T; saem: T[] }[] {
   const grupos = new Map<string, T[]>()
@@ -135,8 +156,14 @@ export function planoDeJuncao<T extends { id: number; filial_id: number | null; 
   const out: { fica: T; saem: T[] }[] = []
   for (const lista of grupos.values()) {
     if (lista.length < 2) continue
-    const ord = [...lista].sort((a, b) => (b.ordem ?? -1) - (a.ordem ?? -1)
-      || b.created_at.localeCompare(a.created_at) || b.id - a.id)
+    const fechadoEm = (n: T) => n.ganho_em ?? n.perdido_em ?? n.created_at
+    const ord = [...lista].sort((a, b) => {
+      const fa = estaFechado(a.status), fb = estaFechado(b.status)
+      if (fa !== fb) return fa ? 1 : -1                                  // aberto antes de fechado
+      if (!fa) return (b.ordem ?? -1) - (a.ordem ?? -1)                  // abertos: o mais avançado,
+        || b.created_at.localeCompare(a.created_at) || b.id - a.id      //   empate: o mais recente
+      return fechadoEm(b).localeCompare(fechadoEm(a)) || b.id - a.id    // fechados: o mais recente
+    })
     out.push({ fica: ord[0], saem: ord.slice(1) })
   }
   return out
@@ -147,7 +174,7 @@ export async function juntarNegociosDoContato(svc: Db, empresaId: number, contat
   quem: { userId: string | null; origem: 'fusao' | 'correcao'; fusao?: number | null }): Promise<{ error: string | null; juncoes: Juncao[] }> {
   const juncoes: Juncao[] = []
   try {
-    const { data, error } = await svc.from('negocios').select('id, filial_id, funil_id, etapa_id, created_at, dados')
+    const { data, error } = await svc.from('negocios').select('id, filial_id, funil_id, etapa_id, created_at, dados, status, ganho_em, perdido_em, motivo_perda_id, valor_estimado')
       .eq('empresa_id', empresaId).eq('contato_id', contatoId).eq('ativo', true)
     if (error) throw new Error(`negócios do contato: ${error.message}`)
     const negocios = (data ?? []) as Negocio[]
@@ -232,10 +259,25 @@ async function juntarUm(svc: Db, empresaId: number, contatoId: number, fica: Neg
       foto.linhas['imoveis_perfis_busca.lead_id'] = perfilSai
       await mover(svc, 'imoveis_perfis_busca', 'lead_id', perfilSai, sai.id, fica.id)
     }
-    // 5. O que sai deixa o funil.
+    // 5. Fechado que sai: o fechamento vai para o histórico do que fica (os relatórios o contam lá).
+    if (estaFechado(sai.status)) {
+      foto.fechamento = { historico: null, status: sai.status!, ganho_em: sai.ganho_em, perdido_em: sai.perdido_em, motivo_perda_id: sai.motivo_perda_id }
+      const detalhe = Object.fromEntries(Object.entries({
+        status: sai.status, ganho_em: sai.ganho_em, perdido_em: sai.perdido_em, motivo_perda_id: sai.motivo_perda_id,
+        valor_estimado: sai.valor_estimado, de_negocio: sai.id, origem: quem.origem, fusao: quem.fusao ?? null,
+      }).filter(([, v]) => v != null))
+      const { data: hf, error } = await svc.from('negocio_historico').insert({
+        empresa_id: empresaId, negocio_id: fica.id, de_etapa_id: sai.etapa_id, para_etapa_id: fica.etapa_id,
+        acao: 'fechamento_juntado', por_usuario: quem.userId, detalhe,
+      }).select('id').single()
+      if (error || !hf) throw new Error(`fechamento no histórico: ${error?.message ?? 'não gravou'}`)
+      foto.fechamento.historico = hf.id as number
+    }
+    // 6. O que sai deixa o funil (e, se estava fechado, perde o status — que agora mora no histórico).
     const lead = ((sai.dados ?? {}) as Linha)._lead as Linha | undefined
     const dados = { ...(sai.dados ?? {}), _lead: { ...(lead ?? {}), ativo: false }, _juntado: { em, para: fica.id, origem: quem.origem, fusao: quem.fusao ?? null } }
-    const { data: saiu, error: eS } = await svc.from('negocios').update({ dados }).eq('id', sai.id).select('id, ativo')
+    const patch = foto.fechamento ? { dados, status: 'aberto', ganho_em: null, perdido_em: null, motivo_perda_id: null } : { dados }
+    const { data: saiu, error: eS } = await svc.from('negocios').update(patch).eq('id', sai.id).select('id, ativo')
     if (eS || !saiu?.length || (saiu[0] as { ativo: boolean }).ativo !== false) throw new Error(`negócio #${sai.id} não saiu do funil: ${eS?.message ?? 'nenhuma linha'}`)
   } catch (e) {
     let volta = 'voltou ao que era'
@@ -246,7 +288,7 @@ async function juntarUm(svc: Db, empresaId: number, contatoId: number, fica: Neg
     throw new Error(`#${sai.id} → #${fica.id}: ${(e as Error).message}; ${volta}`)
   }
 
-  // 6. Histórico dos dois e o evento com a foto.
+  // 7. Histórico dos dois e o evento com a foto.
   const { data: hist, error: eH } = await svc.from('negocio_historico').insert([
     { empresa_id: empresaId, negocio_id: fica.id, acao: 'juntado', por_usuario: quem.userId, detalhe: { recebeu: sai.id, origem: quem.origem, fusao: quem.fusao ?? null } },
     { empresa_id: empresaId, negocio_id: sai.id, acao: 'juntado_em', por_usuario: quem.userId, detalhe: { para: fica.id, origem: quem.origem, fusao: quem.fusao ?? null } },

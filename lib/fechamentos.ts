@@ -11,6 +11,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *   - o estado ATUAL do negócio (status ganho/perdido, com a data e o motivo);
  *   - um 'reaberto_por_mensagem' com `detalhe.status` ganho/perdido (o ciclo anterior).
  * Um negócio que fechou, reabriu e fechou de novo conta duas vezes: são dois ciclos.
+ * Desde 06/11/2026, também um 'fechamento_juntado': o negócio fechado que saiu do funil
+ * na junção de negócios repetidos (lib/juntar-negocios.ts) deixa o fechamento no
+ * histórico do negócio que ficou, e o status dele é limpo — conta uma vez, lá.
  * Venda e faturamento continuam contando por `vendas_vendas`.
  *
  * A RLS de quem chama vale: o histórico é lido junto com o negócio (`!inner`), então a
@@ -46,6 +49,9 @@ export interface FiltroFechamentos {
   soReabertos?: boolean
 }
 
+/** Ações de `negocio_historico` que guardam um fechamento (status ganho/perdido no `detalhe`). */
+export const ACOES_DE_FECHAMENTO = ['reaberto_por_mensagem', 'fechamento_juntado']
+
 const um = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null))
 
 async function paginar<T>(f: (de: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
@@ -72,7 +78,7 @@ export async function lerFechamentos(db: Db, empresaId: number, filtro: FiltroFe
   const SELECT_REAB: string = 'id, negocio_id, detalhe, em, negocio:negocios!negocio_id!inner(responsavel_id, filial_id, contato_id, ativo)'
   const reabertos = await paginar<Json>((de) => {
     let q = db.from('negocio_historico').select(SELECT_REAB).eq('empresa_id', empresaId)
-      .eq('acao', 'reaberto_por_mensagem').in('detalhe->>status', status)
+      .in('acao', ACOES_DE_FECHAMENTO).in('detalhe->>status', status)
     if (filtro.soAtivos) q = q.eq('negocio.ativo', true)
     return q.order('id').range(de, de + 999)
   })
