@@ -58,6 +58,7 @@ mock.module('@/lib/owner', {
     requireOwnerOrAdminApi: async () => ({ userId: estado.user, empresaId: estado.empresa, role: 'owner', supabase: novo() }),
     requireEmpresaRoleApi: async () => ({ userId: estado.user, empresaId: estado.empresa, role: estado.papel, supabase: novo() }),
     getEmpresaRole: async () => estado.papel,
+    requireEmpresaRole: async () => ({ userId: estado.user, empresaId: estado.empresa, role: estado.papel }),
   },
 })
 mock.module('@/lib/superadmin', {
@@ -75,7 +76,23 @@ mock.module('@/lib/roleta', {
     proximoResponsavel: async () => 'u-9',
   },
 })
-mock.module('@/lib/canais/crypto', { namedExports: { cifrarToken: (t: string) => `enc:${t}` } })
+mock.module('@/lib/canais/crypto', { namedExports: { cifrarToken: (t: string) => `enc:${t}`, cofreConfigurado: () => true } })
+mock.module('next/headers', {
+  namedExports: { cookies: async () => ({ get: () => ({ value: 'st-1' }), delete: () => {}, set: () => {} }) },
+})
+/** Conta do Instagram que volta do login: `id` (escopo do app) e `user_id` (conta profissional). */
+const igConta = { id: 'ig-app-1', contaProfissionalId: null as string | null, username: 'loja' }
+mock.module('@/lib/canais/instagram-login', {
+  namedExports: {
+    ehErro: (x: unknown) => !!x && typeof x === 'object' && 'erro' in (x as object),
+    trocarCodigo: async () => ({ token: 'curto' }),
+    tokenLongo: async () => ({ token: 'longo', expiraEm: null }),
+    perfil: async () => ({ ...igConta }),
+    assinarWebhook: async () => true,
+    cifrar: (t: string) => `enc:${t}`,
+    configurado: () => true, urlAutorizacao: () => 'x', urlRetorno: () => 'x',
+  },
+})
 mock.module('@/lib/canais/meta', {
   namedExports: {
     metaConfigurada: () => true,
@@ -95,6 +112,7 @@ mock.module('@/lib/canais/meta', {
 
 const { POST: conectarWhatsApp } = await import('@/app/api/canais/whatsapp/route')
 const { POST: conectarMeta } = await import('@/app/api/canais/meta/route')
+const { GET: voltaInstagram } = await import('@/app/api/canais/instagram/retorno/route')
 const { POST: criarUsuario } = await import('@/app/api/equipe/criar-usuario/route')
 const { PATCH: atualizarUsuario } = await import('@/app/api/equipe/atualizar-usuario/route')
 const { POST: moverLead } = await import('@/app/api/leads/mover/route')
@@ -170,6 +188,42 @@ describe('canais: número ou Página já conectados em OUTRA empresa', () => {
     const r = await conectarMeta(json('http://x/api/canais/meta', { token: 'tok' }))
     assert.equal(r.status, 200)
     assert.equal(todas().filter((c) => c.op === 'upsert').length, 1)
+  })
+
+  const retornoIg = () => voltaInstagram(new Request('http://x/api/canais/instagram/retorno?code=c&state=st-1'))
+  const erroIg = (r: Response) => new URL(r.headers.get('location') ?? 'http://x').searchParams.get('ig_erro')
+  /**
+   * `canais` com as linhas dadas, respondendo como o PostgREST: `.in(col, ids)` devolve
+   * lista; `.eq(...).maybeSingle()` devolve a linha ou nulo (a busca do código antigo).
+   */
+  const canaisIg = (linhas: { id: number; empresa_id: number; external_id: string; ig_user_id: string }[]) =>
+    (c: Consulta) => {
+      if (c.tabela !== 'canais' || c.op !== 'select') return ok()
+      const casa = (l: Record<string, unknown>) => c.filtros.every(([m, col, v]) =>
+        m === 'in' ? (v as unknown[]).includes(l[col as string])
+          : m === 'eq' ? (col === 'tipo' ? true : l[col as string] === v) : true)
+      const achou = linhas.filter(casa)
+      return c.filtros.some(([m]) => m === 'in') ? ok(achou) : ok(achou[0] ?? null)
+    }
+
+  test('Instagram: conta gravada por OUTRA empresa pelo outro id (ig_user_id) é recusada', async () => {
+    // A outra empresa conectou com o user_id; aqui ele não veio e o id do webhook cai no `id`.
+    igConta.contaProfissionalId = null
+    estado.responder = canaisIg([{ id: 25, empresa_id: 2, external_id: 'ig-prof-1', ig_user_id: 'ig-app-1' }])
+    const r = await retornoIg()
+    assert.match(erroIg(r) ?? '', /outra conta do sistema/)
+    assert.equal(escritas().length, 0)
+  })
+
+  test('Instagram: reconexão da própria conta continua passando', async () => {
+    igConta.contaProfissionalId = 'ig-prof-1'
+    estado.responder = canaisIg([{ id: 25, empresa_id: 1, external_id: 'ig-prof-1', ig_user_id: 'ig-app-1' }])
+    const r = await retornoIg()
+    assert.equal(erroIg(r), null)
+    const up = todas().find((c) => c.op === 'upsert')!
+    assert.equal((up.dados as { external_id: string }).external_id, 'ig-prof-1')
+    // Reconexão não mexe na loja do canal.
+    assert.equal(todas().filter((c) => c.op === 'update').length, 0)
   })
 
   test('a migração trava empresa_id de canais no banco', () => {

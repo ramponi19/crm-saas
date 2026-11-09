@@ -79,14 +79,26 @@ export async function GET(req: Request) {
    *
    * Sem isto o upsert por (tipo, external_id) roubaria o canal do outro tenant —
    * e o vazamento seria silencioso, do pior tipo.
+   *
+   * Confere os DOIS ids da conta (09/11/2026). Se a outra empresa gravou a conta
+   * pelo `user_id` e aqui ele não veio (cai no `id`), o `external_id` difere e a
+   * conferência só pelo `external_id` deixava passar: nasciam duas linhas com o
+   * mesmo `ig_user_id`, e a busca do webhook por esse campo (`maybeSingle`) passa
+   * a dar erro, derrubando o recebimento da empresa que conectou primeiro. Duas
+   * consultas em vez de `.or()`: os ids vêm da Meta, não entram em filtro montado.
    */
-  const { data: existente } = await svc.from('canais')
-    .select('id, empresa_id, filial_id')
-    .eq('tipo', 'instagram').eq('external_id', idDoWebhook).maybeSingle()
-
-  if (existente && existente.empresa_id !== empresaId) {
+  const ids = [...new Set([idDoWebhook, quem.id, quem.contaProfissionalId].filter((x): x is string => !!x))]
+  type Achado = { id: number; empresa_id: number; external_id: string }
+  const [{ data: porExterno }, { data: porIgUser }] = await Promise.all([
+    svc.from('canais').select('id, empresa_id, external_id').eq('tipo', 'instagram').in('external_id', ids),
+    svc.from('canais').select('id, empresa_id, external_id').eq('tipo', 'instagram').in('ig_user_id', ids),
+  ])
+  const achados = [...(porExterno ?? []), ...(porIgUser ?? [])] as Achado[]
+  if (achados.some((c) => c.empresa_id !== empresaId)) {
     return voltar(base, { ig_erro: 'Esta conta do Instagram já está conectada em outra conta do sistema.' })
   }
+  // A linha que o upsert vai atualizar (mesmo tipo + external_id), se já existe: decide a loja lá embaixo.
+  const existente = achados.find((c) => c.external_id === idDoWebhook) ?? null
 
   const assinou = await assinarWebhook(longo.token)
   const agora = new Date().toISOString()
@@ -114,7 +126,11 @@ export async function GET(req: Request) {
     criado_por: userId,
   } as never, { onConflict: 'tipo,external_id' })
 
-  if (error) return voltar(base, { ig_erro: error.message })
+  if (error) {
+    // 23505 = chave única; 'outra empresa' vem do gatilho canais_empresa_fixa (a segunda trava).
+    const conflito = error.code === '23505' || /duplicate|unique|outra empresa/i.test(error.message)
+    return voltar(base, { ig_erro: conflito ? 'Esta conta do Instagram já está conectada em outra conta do sistema.' : error.message })
+  }
 
   /**
    * Canal NOVO nasce na loja selecionada no topo; reconexão não mexe na loja.
