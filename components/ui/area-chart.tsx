@@ -1,6 +1,8 @@
 'use client'
 
 import { formatCurrency } from '@/lib/utils'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, primeiroDoMes, rotuloDoMes } from '@/lib/datas'
 
 interface MonthData {
   mes: string  // 'YYYY-MM'
@@ -11,14 +13,14 @@ interface AreaChartProps {
   data: MonthData[]
 }
 
-// Gera os últimos 12 meses com labels PT-BR
-function buildMonths(): { key: string; label: string }[] {
+// Gera os últimos 12 meses com labels PT-BR, no calendário da loja (no servidor, em
+// UTC, o mês virava às 21h do último dia e o gráfico saía deslocado um mês).
+function buildMonths(fuso: string): { key: string; label: string }[] {
   const months = []
-  const now = new Date()
+  const hoje = diaNoFuso(agora(), fuso)
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const label = d.toLocaleDateString('pt-BR', { month: 'short' })
+    const key = primeiroDoMes(hoje, -i).slice(0, 7)
+    const label = rotuloDoMes(key, { month: 'short' })
       .toUpperCase().replace('.', '')
     months.push({ key, label })
   }
@@ -26,7 +28,8 @@ function buildMonths(): { key: string; label: string }[] {
 }
 
 export function AreaChart({ data }: AreaChartProps) {
-  const months = buildMonths()
+  const fuso = useFuso()
+  const months = buildMonths(fuso)
 
   // Mapeia dados reais nos 12 meses (zero onde não há venda)
   const dataMap = Object.fromEntries(data.map(d => [d.mes, d.total]))

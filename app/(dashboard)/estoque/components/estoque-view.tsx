@@ -15,6 +15,8 @@ import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   Modal, type Column, BuscaSelect } from '@/components/ui'
 import type { TablesInsert } from '@/types/database'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDiaMes, formatarHora } from '@/lib/datas'
 
 export interface Unidade {
   id: number
@@ -143,10 +145,7 @@ const STATUS_FILTER = [
 ]
 
 const fmt = (v: number) => formatCurrency(v)
-const fmtDate = (s: string) => {
-  const d = new Date(s)
-  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-}
+const fmtDate = (s: string, fuso: string) => `${formatarDiaMes(s, '', fuso)} · ${formatarHora(s, '', fuso)}`
 
 type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
 
@@ -161,6 +160,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
   const isVeiculo = usaPlaca
+  const fuso = useFuso()
   const [tab, setTab] = useState<Tab>('lista')
   const router = useRouter()
   const imei = useFerramenta('/check-imei')
@@ -423,7 +423,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   ]
 
   const histCols: Column<Movimentacao>[] = [
-    { key: 'data', header: 'Data', className: 'num w-[130px]', render: (m) => <span className="text-ink-2">{fmtDate(m.created_at)}</span> },
+    { key: 'data', header: 'Data', className: 'num w-[130px]', render: (m) => <span className="text-ink-2">{fmtDate(m.created_at, fuso)}</span> },
     {
       key: 'movimento', header: 'Movimento',
       render: (m) => { const t = TIPO_BADGE[m.tipo_movimento] ?? { label: m.tipo_movimento, tone: 'neutro' as Tone }; return <Badge tone={t.tone}>{t.label}</Badge> },
@@ -680,6 +680,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [form, setForm] = useState({
     produto_id: '', tipo: preset?.tipo ?? 'compra', condicao: preset?.condicao ?? (isVeiculo ? 'usado' : 'novo'), estado: isVeiculo ? 'bom' : (preset?.seminovo ? 'bom' : 'lacrado'),
     status: 'disponivel', cor: '', armazenamento: '', imei: '', imei2: '', numero_serie: '',
@@ -1095,7 +1096,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
                   )}
                   {!serieBuscando && serieAchado?.tipo === 'conhecido' && (
                     <span className="text-[11.5px] text-ok">
-                      Já passou pela loja{serieAchado.quando ? ` em ${fmtDate(serieAchado.quando)}` : ''} — dados preenchidos; confira os preços.
+                      Já passou pela loja{serieAchado.quando ? ` em ${fmtDate(serieAchado.quando, fuso)}` : ''} — dados preenchidos; confira os preços.
                     </span>
                   )}
 
@@ -1111,7 +1112,8 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
                         </span>
                       )
                     }
-                    const quando = fmtDate(consultaImei.quando)
+                    const quando = fmtDate(consultaImei.quando, fuso)
+
                     if (consultaImei.resultado === 'reprovado') {
                       return (
                         <span className="text-[11.5px] font-semibold text-bad">

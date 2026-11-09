@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Handshake, Loader2, Key, ClipboardCheck, FileSignature, X } from 'lucide-react'
 import { Input, Select, Button, Badge, notify } from '@/components/ui'
-import { formatarData } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData } from '@/lib/datas'
 
 /**
  * O negócio deste lead: venda ou locação de um imóvel.
@@ -65,6 +66,7 @@ const TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro' | 'acc'> = {
 
 export function LeadNegocioPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [negocio, setNegocio] = useState<Negocio | null>(null)
   const [imoveis, setImoveis] = useState<ImovelOpcao[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -135,8 +137,8 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
 
   async function avancar(status: string, campo?: string) {
     setSalvando(true)
-    const hoje = new Date()
-    const iso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+    // O dia de hoje na loja (não no computador de quem clicou).
+    const iso = diaNoFuso(agora(), fuso)
     const res = await fetch('/api/imob/negocios', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: negocio!.id, status, ...(campo ? { [campo]: iso } : {}) }),
@@ -185,7 +187,7 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
               <div key={p.status} className="flex items-center gap-2 text-[12px]">
                 <Icon size={13} strokeWidth={1.8} className={data ? 'text-ok' : 'text-ink-3'} />
                 <span className={data ? 'text-ink-2' : 'text-ink-3'}>{p.label}</span>
-                <span className="num ml-auto text-ink-3">{formatarData(data, undefined, '—')}</span>
+                <span className="num ml-auto text-ink-3">{formatarData(data, undefined, '—', fuso)}</span>
               </div>
             )
           })}
@@ -193,9 +195,10 @@ export function LeadNegocioPanel({ leadId }: { leadId: number }) {
             <div className="flex items-center gap-2 border-t border-line-soft pt-1.5 text-[12px] text-ink-3">
               <span>Vigência</span>
               <span className="num ml-auto">
-                {formatarData(negocio.locacao_inicio, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—')}
+                {formatarData(negocio.locacao_inicio, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—', fuso)}
                 {' a '}
-                {formatarData(negocio.locacao_fim, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—')}
+                {formatarData(negocio.locacao_fim, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—', fuso)}
+
               </span>
             </div>
           )}

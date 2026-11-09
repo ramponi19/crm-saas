@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { lerFechamentos } from '@/lib/fechamentos'
 import { Card } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarNoFuso } from '@/lib/datas'
 
 
 interface Barra { label: string; valor: number }
@@ -38,6 +40,7 @@ function Breakdown({ titulo, dados }: { titulo: string; dados: Barra[] }) {
 
 export function RelatorioPerdas() {
   const supabase = createClient()
+  const fuso = useFuso()
   const [carregando, setCarregando] = useState(true)
   const [porMotivo, setPorMotivo] = useState<Barra[]>([])
   const [porResp, setPorResp] = useState<Barra[]>([])
@@ -79,11 +82,9 @@ export function RelatorioPerdas() {
         mMotivo.set(motivoLabel, (mMotivo.get(motivoLabel) ?? 0) + 1)
         const resp = r.responsavel_id ? (nomePorId.get(r.responsavel_id) ?? 'Outro') : 'Sem responsável'
         mResp.set(resp, (mResp.get(resp) ?? 0) + 1)
-        if (r.em) {
-          const d = new Date(r.em)
-          const chave = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
-          mMes.set(chave, (mMes.get(chave) ?? 0) + 1)
-        }
+        // O mês da perda no fuso da loja: a das 22h do dia 31 é do mês 31, não do seguinte.
+        const chave = formatarNoFuso(r.em, { month: 'short', year: '2-digit' }, '', fuso)
+        if (chave) mMes.set(chave, (mMes.get(chave) ?? 0) + 1)
       }
 
       const ord = (m: Map<string, number>) => [...m.entries()].map(([label, valor]) => ({ label, valor })).sort((a, b) => b.valor - a.valor)
@@ -93,7 +94,7 @@ export function RelatorioPerdas() {
       setTotal(rows.length)
       setCarregando(false)
     })()
-  }, [supabase])
+  }, [supabase, fuso])
 
   if (carregando) return null
 

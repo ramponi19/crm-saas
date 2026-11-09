@@ -1,6 +1,7 @@
 import { LoginForm } from '@/components/modules/auth/login-form'
 import Image from 'next/image'
 import type { Metadata } from 'next'
+import { agora, FUSO_PADRAO, partesNoFuso } from '@/lib/datas'
 
 export const metadata: Metadata = { title: 'Entrar' }
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-[12px] text-ink-3">
-          Acesso seguro · Nexus © {new Date().getFullYear()}
+          Acesso seguro · Nexus © {partesNoFuso(agora(), FUSO_PADRAO).ano}
         </p>
       </div>
     </div>

@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { agora as agoraDe, formatarDiaMes, formatarHora, inicioDoDia, instanteLocal, diaNoFuso, somarDias } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { Topbar } from '@/components/layout/topbar'
 import { Home, CircleAlert, ArrowUpRight, Users, CalendarDays } from 'lucide-react'
@@ -115,8 +117,9 @@ async function leadsPorUltimaMensagem(db: Db, empresaId: number, limite: number,
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+// Componente de SERVIDOR (UTC): sem o fuso da loja a visita das 14h saía como 17h.
+const hora = (iso: string, fuso: string) => formatarHora(iso, '', fuso)
+const diaMes = (iso: string, fuso: string) => formatarDiaMes(iso, '', fuso)
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 /** Janela dos "próximos compromissos" — hoje mais os dias seguintes. */
@@ -171,9 +174,11 @@ export default async function DashboardImob() {
   const q = leadsPorUltimaMensagem(supabase, empresaId, TETO_LEADS, isGestor ? null : user.id)
 
   // janela de "hoje" (local) e a dos próximos dias, para a agenda do cockpit
-  const agora = new Date()
-  const iniHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString()
-  const fimJanela = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + DIAS_AGENDA).toISOString()
+  const agora = agoraDe()
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  // A janela da agenda começa à meia-noite DA LOJA (antes: 21h de ontem, no UTC do servidor).
+  const iniHoje = inicioDoDia(agora, fuso).toISOString()
+  const fimJanela = instanteLocal(somarDias(diaNoFuso(agora, fuso), DIAS_AGENDA), '00:00', fuso).toISOString()
 
   const SELECT_VISITA: string = `id, data_hora, status, ${embedLead('visitas_lead_id_fkey')}, imoveis:imoveis_imoveis(codigo, titulo)`
   let vq = supabase.from('visitas').select(SELECT_VISITA)
@@ -343,8 +348,8 @@ export default async function DashboardImob() {
                   {proximos.map(v => (
                     <div key={v.id} className="flex items-center gap-3 border-b border-line-soft py-2.5 last:border-0">
                       <span className="w-[58px] flex-none">
-                        <span className="num block text-[13px] font-semibold leading-tight text-ink">{hora(v.data_hora)}</span>
-                        <span className="num block text-[10.5px] leading-tight text-ink-3">{diaMes(v.data_hora)}</span>
+                        <span className="num block text-[13px] font-semibold leading-tight text-ink">{hora(v.data_hora, fuso)}</span>
+                        <span className="num block text-[10.5px] leading-tight text-ink-3">{diaMes(v.data_hora, fuso)}</span>
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] text-ink">{v.lead_nome || 'Visita'}</span>
@@ -368,7 +373,7 @@ export default async function DashboardImob() {
                       <div key={t.id} className="flex items-center gap-2 border-b border-line-soft py-2.5 last:border-0">
                         {atrasada ? <CircleAlert size={15} strokeWidth={1.7} className="shrink-0 text-bad" /> : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
                         <span className="flex-1 truncate text-[13px] text-ink">{t.titulo}{t.lead_nome ? <span className="text-ink-3"> · {t.lead_nome}</span> : ''}</span>
-                        {t.vencimento && <span className={`num text-[11px] shrink-0 ${atrasada ? 'font-semibold text-bad' : 'text-ink-3'}`}>{diaMes(t.vencimento)}</span>}
+                        {t.vencimento && <span className={`num text-[11px] shrink-0 ${atrasada ? 'font-semibold text-bad' : 'text-ink-3'}`}>{diaMes(t.vencimento, fuso)}</span>}
                       </div>
                     )
                   })}
@@ -464,7 +469,7 @@ export default async function DashboardImob() {
                     {c.tipo_cliente && <Badge tone="neutro">{c.tipo_cliente}</Badge>}
                     {c.created_at && (
                       <span className="num inline-flex shrink-0 items-center gap-1 text-[11px] text-ink-3">
-                        <CalendarDays size={11} strokeWidth={1.7} />{diaMes(c.created_at)}
+                        <CalendarDays size={11} strokeWidth={1.7} />{diaMes(c.created_at, fuso)}
                       </span>
                     )}
                   </Link>

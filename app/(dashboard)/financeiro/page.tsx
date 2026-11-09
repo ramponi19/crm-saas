@@ -6,6 +6,8 @@ import type { NegocioComissao } from '@/components/modules/financeiro/comissoes-
 import FinanceiroView from './components/financeiro-view'
 import { comNomeDoCliente } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
+import { inicioDoMes } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export default async function FinanceiroPage() {
   const { role } = await requireEmpresaRole(['owner', 'admin'])
@@ -24,7 +26,8 @@ export default async function FinanceiroPage() {
    * o lançamento manual), e está com o dono. Até lá a tela DIZ o que ela não conta,
    * em vez de deixar o número mentir sozinho.
    */
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+  // 1º do mês à meia-noite no fuso da loja (no servidor UTC, era 21h do último dia).
+  const inicioMes = inicioDoMes(undefined, await fusoDaEmpresa(supabase, empresaId)).toISOString()
 
   const [{ data: lancamentos }, { data: cobrancas }, { data: vendasMes }] = await Promise.all([
     supabase.from('financeiro_lancamentos').select('*').eq('empresa_id', empresaId).order('data_venc', { ascending: false }),

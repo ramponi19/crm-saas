@@ -10,6 +10,8 @@ import { camposFaltantesContrato } from '@/lib/cliente-contrato'
 import { avisoDocumento, conferirDocumento, documentoMudou, soDigitos } from '@/lib/documento'
 import { consultaClientes, contarClientes } from '@/lib/clientes'
 import { iniciais } from '@/lib/sem-nome'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 interface Cliente {
   id?: number
@@ -66,13 +68,13 @@ const EMPTY: Cliente = {
   profissao: null, nacionalidade: 'Brasileiro(a)',
 }
 
-function fmtUltima(d: string | null | undefined) {
+function fmtUltima(d: string | null | undefined, fuso: string) {
   if (!d) return '—'
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
   if (diff === 0) return 'Hoje'
   if (diff === 1) return 'Ontem'
   if (diff < 7) return `${diff} dias`
-  return new Date(d).toLocaleDateString('pt-BR')
+  return formatarData(d, undefined, '—', fuso)
 }
 
 function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'ink' | 'ok' }) {
@@ -86,6 +88,7 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
 
 export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeInicial }: Props) {
   const supabase = createClient()
+  const fuso = useFuso()
   const router = useRouter()
   const [form, setForm] = useState<Cliente>(
     isNew ? { ...EMPTY, nome: nomeInicial ?? '' } : { ...EMPTY, ...cliente },
@@ -217,7 +220,8 @@ export default function ClienteModal({ cliente, isNew, onClose, onCreated, nomeI
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Stat label="Compras" value={tv} />
             <Stat label="Total gasto" value={vt > 0 ? formatCurrency(vt) : '—'} tone="ok" />
-            <Stat label="Última compra" value={fmtUltima(uc)} />
+            <Stat label="Última compra" value={fmtUltima(uc, fuso)}
+ />
           </div>
         )}
 

@@ -9,6 +9,8 @@ import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import type { TablesInsert } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData } from '@/lib/datas'
 
 interface Garantia {
   id?: number
@@ -39,14 +41,15 @@ interface Props {
   onClose: () => void
 }
 
-const EMPTY: Garantia = {
+/** Garantia em branco; `hoje` é o dia da loja (o padrão da data de entrada). */
+const vazia = (hoje: string): Garantia => ({
   protocolo: null, tipo: 'garantia', status: 'em_analise',
   defeito_relatado: null, parecer_tecnico: null, orcamento_valor: null,
   imei_serial: null, dentro_garantia: true, dias_garantia_restantes: null,
-  data_entrada: new Date().toISOString().split('T')[0], observacoes: null,
+  data_entrada: hoje, observacoes: null,
   estado_entrada: null, celular_reserva_fornecido: false, modelo_reserva: null,
   cliente_id: null, produto_id: null,
-}
+})
 
 const STATUS_OPTIONS = [
   { value: 'em_analise', label: 'Em análise' },
@@ -78,7 +81,11 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const router = useRouter()
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
-  const [form, setForm] = useState<Garantia>(isNew ? EMPTY : { ...EMPTY, ...garantia })
+  const fuso = useFuso()
+  const [form, setForm] = useState<Garantia>(() => {
+    const base = vazia(diaNoFuso(agora(), fuso))
+    return isNew ? base : { ...base, ...garantia }
+  })
   const [saving, setSaving] = useState(false)
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
@@ -145,7 +152,8 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
 
       {!isNew && (
         <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <Stat label="Entrada" value={new Date(garantia?.data_entrada ?? garantia?.created_at ?? '').toLocaleDateString('pt-BR')} />
+          <Stat label="Entrada" value={formatarData(garantia?.data_entrada ?? garantia?.created_at, undefined, '—', fuso)}
+ />
           <Stat label="Prazo" value={garantia?.dias_garantia_restantes != null ? `${garantia.dias_garantia_restantes}d` : '—'} />
           <Stat label="Orçamento" value={garantia?.orcamento_valor ? `R$ ${Number(garantia.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
         </div>

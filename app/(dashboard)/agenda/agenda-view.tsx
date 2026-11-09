@@ -9,6 +9,8 @@ import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify
 import type { Tables } from '@/types/database'
 import type { RotulosAgenda } from '@/lib/empresa-config'
 import { embedLead } from '@/lib/leads'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaDaSemana, diaNoFuso, diasEntre, formatarData, formatarHora, instanteLocal, paraData, partesNoFuso, primeiroDoMes, rotuloDoMes } from '@/lib/datas'
 
 /**
  * Agenda em CALENDÁRIO DO MÊS + painel do dia (pedido do dono da imobiliária,
@@ -63,16 +65,18 @@ const TIPOS_PADRAO: { v: string; l: string }[] = [
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 /**
- * Chave do dia em horário LOCAL.
+ * Chave do dia (`YYYY-MM-DD`) no FUSO DA LOJA.
  *
- * `toISOString().slice(0,10)` — que a versão anterior usava para dizer "Hoje" — é
- * data em UTC: das 21h à meia-noite em Brasília ela já devolve o dia seguinte, e o
- * compromisso das 22h caía no dia errado. O calendário todo depende desta função.
+ * `toISOString().slice(0,10)` é data em UTC: das 21h à meia-noite em Brasília já
+ * devolve o dia seguinte. E o relógio "local" (getDate) também não serve: no servidor
+ * (UTC) ele dá outro dia que no navegador — o compromisso das 22h caía na célula de
+ * amanhã no primeiro desenho. O calendário todo depende desta função.
  */
-const chaveLocal = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const chaveDoInstante = (iso: string, fuso: string) => diaNoFuso(paraData(iso) ?? agora(), fuso)
 
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+const hora = (iso: string, fuso: string) => formatarHora(iso, '', fuso)
+
+const dois = (n: number) => String(n).padStart(2, '0')
 
 /**
  * Faixa de horário — com a data do fim quando ele cai em OUTRO dia.
@@ -80,16 +84,23 @@ const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: 
  * "09:00–11:30" num compromisso que termina depois de amanhã é mentira curta: quem
  * lê acha que acaba de manhã e marca outra coisa às 14h. Dia diferente, mostra a data.
  */
-const faixa = (inicio: string, fim: string | null) => {
-  if (!fim) return hora(inicio)
-  const a = new Date(inicio), b = new Date(fim)
-  const mesmoDia = chaveLocal(a) === chaveLocal(b)
+const faixa = (inicio: string, fim: string | null, fuso: string) => {
+  if (!fim) return hora(inicio, fuso)
+  const mesmoDia = chaveDoInstante(inicio, fuso) === chaveDoInstante(fim, fuso)
   return mesmoDia
-    ? `${hora(inicio)}–${hora(fim)}`
-    : `${hora(inicio)} → ${b.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hora(fim)}`
+    ? `${hora(inicio, fuso)}–${hora(fim, fuso)}`
+    : `${hora(inicio, fuso)} → ${formatarData(fim, { day: '2-digit', month: '2-digit' }, '', fuso)} ${hora(fim, fuso)}`
 }
-/** Valor para `datetime-local`, que não aceita fuso — tem de ser hora local. */
-const paraCampo = (d: Date) => `${chaveLocal(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+/**
+ * Valor para `datetime-local`, que não aceita fuso: é o relógio de parede DA LOJA
+ * (não o do computador de quem abriu), e volta a instante por `doCampo`.
+ */
+const paraCampo = (d: Date, fuso: string) => {
+  const p = partesNoFuso(d, fuso)
+  return `${diaNoFuso(d, fuso)}T${dois(p.hora)}:${dois(p.minuto)}`
+}
+/** `YYYY-MM-DDTHH:MM` do campo, lido no fuso da loja. */
+const doCampo = (v: string, fuso: string) => instanteLocal(v.slice(0, 10), v.slice(11, 16), fuso)
 
 export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios, empresaId, meuId, isGestor, rotulos = {}, equipe, comImoveis }: {
   inicial: Visita[]; leads: Opt[]; clientes: Opt[]; imoveis: Opt[]; usuarios: UsuarioMin[]
@@ -102,6 +113,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
   comImoveis: boolean
 }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const TIPOS = rotulos.tipos?.length ? rotulos.tipos : TIPOS_PADRAO
   const rotuloTipo = (v: string | null) => TIPOS.find(t => t.v === v)?.l ?? TIPOS[0].l
   const L = {
@@ -116,9 +128,11 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
   const [modal, setModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const hoje = new Date()
-  const [mes, setMes] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() })
-  const [diaSel, setDiaSel] = useState<string>(chaveLocal(hoje))
+  /** "Hoje" é o dia da loja — o mesmo no servidor (UTC) e no navegador. */
+  const hoje = diaNoFuso(agora(), fuso)
+  /** Mês exibido, `YYYY-MM`. */
+  const [mes, setMes] = useState(hoje.slice(0, 7))
+  const [diaSel, setDiaSel] = useState<string>(hoje)
   /** 'minha' = só os meus; 'supervisao' = da equipe (só gestor tem a aba). */
   const [aba, setAba] = useState<'minha' | 'supervisao'>('minha')
   const [deQuem, setDeQuem] = useState<string>('')
@@ -147,19 +161,19 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
   const porDia = useMemo(() => {
     const m = new Map<string, Visita[]>()
     for (const v of visiveis) {
-      const k = chaveLocal(new Date(v.data_hora))
+      const k = chaveDoInstante(v.data_hora, fuso)
       const arr = m.get(k)
       if (arr) arr.push(v); else m.set(k, [v])
     }
     for (const arr of m.values()) arr.sort((a, b) => a.data_hora.localeCompare(b.data_hora))
     return m
-  }, [visiveis])
+  }, [visiveis, fuso])
 
   /** Semanas do mês: só os dias deste mês, com os vazios do começo. */
   const semanas = useMemo(() => {
-    const primeiro = new Date(mes.ano, mes.mes, 1)
-    const total = new Date(mes.ano, mes.mes + 1, 0).getDate()
-    const celulas: (number | null)[] = Array(primeiro.getDay()).fill(null)
+    const primeiro = `${mes}-01`
+    const total = diasEntre(primeiro, primeiroDoMes(primeiro, 1))
+    const celulas: (number | null)[] = Array(diaDaSemana(primeiro)).fill(null)
     for (let d = 1; d <= total; d++) celulas.push(d)
     while (celulas.length % 7 !== 0) celulas.push(null)
     const out: (number | null)[][] = []
@@ -167,25 +181,19 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
     return out
   }, [mes])
 
-  const chaveDoDia = (dia: number) => chaveLocal(new Date(mes.ano, mes.mes, dia))
-  const nomeDoMes = new Date(mes.ano, mes.mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-  const mover = (delta: number) => setMes(m => {
-    const d = new Date(m.ano, m.mes + delta, 1)
-    return { ano: d.getFullYear(), mes: d.getMonth() }
-  })
+  const chaveDoDia = (dia: number) => `${mes}-${dois(dia)}`
+  const nomeDoMes = rotuloDoMes(mes)
+  const mover = (delta: number) => setMes(m => primeiroDoMes(`${m}-01`, delta).slice(0, 7))
 
   const doDia = porDia.get(diaSel) ?? []
-  const rotuloDoDia = (() => {
-    const [a, m, d] = diaSel.split('-').map(Number)
-    return new Date(a, m - 1, d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-  })()
+  // Data pura: sai no dia dela, sem fuso.
+  const rotuloDoDia = formatarData(diaSel, { day: '2-digit', month: 'long' })
 
   /** Abrir o modal já no dia escolhido: 9h do dia clicado é o padrão útil. */
   function abrirNovo() {
-    const [a, m, d] = diaSel.split('-').map(Number)
     setForm({
       ...vazio,
-      data_hora: paraCampo(new Date(a, m - 1, d, 9, 0)),
+      data_hora: `${diaSel}T09:00`,
       corretor_id: aba === 'supervisao' && deQuem ? deQuem : meuId,
     })
     setModal(true)
@@ -193,15 +201,15 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
 
   // Agendar retorno: reabre o modal com a pessoa e uma data sugerida (+30 dias).
   function agendarRetorno(v: Visita) {
-    const dt = new Date(Date.now() + 30 * 864e5)
-    dt.setHours(9, 0, 0, 0)
+    // Às 9h (da loja) do dia daqui a 30 dias.
+    const dt = instanteLocal(diaNoFuso(new Date(Date.now() + 30 * 864e5), fuso), '09:00', fuso)
     setForm({
       ...vazio,
       tipo: 'retorno',
       titulo: v.titulo ? `Retorno — ${v.titulo}` : '',
       lead_id: v.lead_id ? String(v.lead_id) : '',
       cliente_id: v.cliente_id ? String(v.cliente_id) : '',
-      data_hora: paraCampo(dt),
+      data_hora: paraCampo(dt, fuso),
     })
     setModal(true)
   }
@@ -214,7 +222,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
      * Aqui para dizer o que está errado; lá para que nenhum outro caminho grave um
      * compromisso que termina antes de começar.
      */
-    if (form.fim && new Date(form.fim) < new Date(form.data_hora)) {
+    if (form.fim && doCampo(form.fim, fuso) < doCampo(form.data_hora, fuso)) {
       notify.warn('O horário de término é antes do início'); return
     }
     setLoading(true)
@@ -226,8 +234,9 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
       cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
       imovel_id: form.imovel_id ? Number(form.imovel_id) : null,
       corretor_id: form.corretor_id || meuId,
-      data_hora: new Date(form.data_hora).toISOString(),
-      fim: form.fim ? new Date(form.fim).toISOString() : null,
+      // O que se digitou é o relógio da loja, não o do computador de quem agenda.
+      data_hora: doCampo(form.data_hora, fuso).toISOString(),
+      fim: form.fim ? doCampo(form.fim, fuso).toISOString() : null,
       local: form.local.trim() || null,
       participantes: form.participantes.trim() || null,
       status: 'agendada',
@@ -261,9 +270,9 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
      * Quem marca para quinta quer ver a quinta — é ali que ele confere se não pôs
      * dois clientes no mesmo horário.
      */
-    const dia = new Date(nova.data_hora)
-    setMes({ ano: dia.getFullYear(), mes: dia.getMonth() })
-    setDiaSel(chaveLocal(dia))
+    const dia = chaveDoInstante(nova.data_hora, fuso)
+    setMes(dia.slice(0, 7))
+    setDiaSel(dia)
     setForm(vazio); setModal(false)
     notify.ok(rotulos.agendado ?? 'Compromisso agendado')
   }
@@ -351,7 +360,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
                   const k = chaveDoDia(dia)
                   const itens = porDia.get(k) ?? []
                   const selecionado = k === diaSel
-                  const eHoje = k === chaveLocal(hoje)
+                  const eHoje = k === hoje
                   return (
                     <button
                       key={k}
@@ -407,7 +416,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
                           <span className="inline-flex shrink-0 items-center gap-1 text-ink">
                             <Clock size={13} strokeWidth={1.7} className="text-ink-3" />
                             <span className="num text-[14px] font-semibold leading-none">
-                              {faixa(v.data_hora, v.fim)}
+                              {faixa(v.data_hora, v.fim, fuso)}
                             </span>
                           </span>
                           <span className="min-w-0 flex-1">

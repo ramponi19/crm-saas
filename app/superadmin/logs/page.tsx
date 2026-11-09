@@ -1,13 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { ScrollText } from 'lucide-react'
 import { Card, Table, EmptyState, type Column } from '@/components/ui'
+import { formatarDataHora, FUSO_PADRAO } from '@/lib/datas'
 
 
+// Superadmin não é de uma empresa: hora de Brasília (o servidor roda em UTC).
 function fmtDataHora(d: string) {
-  return new Date(d).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+  return formatarDataHora(d, undefined, '', FUSO_PADRAO)
 }
 
 const ACAO_LABEL: Record<string, string> = {

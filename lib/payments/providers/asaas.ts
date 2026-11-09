@@ -8,6 +8,7 @@ import type {
   WebhookResult,
   Credenciais,
 } from '../types'
+import { diaNoFuso, FUSO_PADRAO, somarDias } from '@/lib/datas'
 
 function safeEqual(a: string, b: string): boolean {
   try {
@@ -78,7 +79,9 @@ export class AsaasProvider implements PaymentProvider {
 
   async criarCobranca(input: CriarCobrancaInput): Promise<CobrancaResult> {
     const customer = await this.getCustomer(input)
-    const vencimento = input.vencimento ?? new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)
+    // Padrão: hoje + 3 dias no calendário de Brasília — o do Asaas, que lê `dueDate`
+    // como dia brasileiro (em UTC, depois das 21h o "hoje" já era amanhã).
+    const vencimento = input.vencimento ?? somarDias(diaNoFuso(undefined, FUSO_PADRAO), 3)
 
     const res = await fetch(`${this.base}/payments`, {
       method: 'POST',

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Select, Input, Badge, EmptyState, notify } from '@/components/ui'
 import { Phone, MessageCircle, Mail, CheckSquare, PhoneCall, ExternalLink, Clock, LogOut, CheckCircle2 } from 'lucide-react'
+import { inicioDoDia, paraData } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
 
 export interface ItemFila {
   inscricaoId: number
@@ -32,10 +34,10 @@ function waLink(tel: string | null, msg: string) {
   if (d && d.length <= 11 && !d.startsWith('55')) d = '55' + d
   return `https://wa.me/${d}${msg ? `?text=${encodeURIComponent(msg)}` : ''}`
 }
-const atrasada = (iso: string | null) => {
-  if (!iso) return false
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
-  return new Date(iso) < hoje
+/** Venceu antes de hoje (meia-noite no fuso da loja)? */
+const atrasada = (iso: string | null, fuso: string) => {
+  const d = paraData(iso)
+  return !!d && d < inicioDoDia(undefined, fuso)
 }
 
 export function FilaView({ itens: iniciais, templates }: { itens: ItemFila[]; templates: Record<string, string> }) {
@@ -118,8 +120,9 @@ function FilaCard({ item, templates, resultado, setResultado, obs, setObs, busy,
   obs: string; setObs: (v: string) => void
   busy: boolean; agir: (tipo: 'executar' | 'adiar' | 'sair', res?: string) => void
 }) {
+  const fuso = useFuso()
   const c = CANAL[item.canal] ?? CANAL.ligacao
-  const late = atrasada(item.venceEm)
+  const late = atrasada(item.venceEm, fuso)
   const msg = item.templateChave ? (templates[item.templateChave] ?? '').replace(/\{\{nome\}\}/g, item.leadNome) : ''
 
   return (

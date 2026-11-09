@@ -6,6 +6,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { Button, Select, Input, Modal, Badge, EmptyState, notify } from '@/components/ui'
 import { formatCurrency } from '@/lib/utils'
 import type { LinhaRanking } from '@/lib/ranking'
+import { agora, partesNoFuso, primeiroDoMes } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
 import { Trophy, Medal, ChevronLeft, ChevronRight, RefreshCw, Plus, Trash2, Target, Crown } from 'lucide-react'
 
 export interface MetaUi { id: number; escopo: string; tipo: string; alvo: number; usuario_nome: string; realizado: number }
@@ -40,10 +42,9 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 /** "2026-08" → "Agosto 2026" (cabeçalho da seção e rodapé do modal). */
 const mesAno = (p: string) => { const [a, m] = p.split('-').map(Number); return `${MESES[m - 1] ?? ''} ${a}` }
 
+/** "2026-08" + 1 → "2026-09" (calendário puro). */
 function shiftMes(p: string, d: number) {
-  const [a, m] = p.split('-').map(Number)
-  const nd = new Date(a, m - 1 + d, 1)
-  return `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}`
+  return primeiroDoMes(`${p}-01`, d).slice(0, 7)
 }
 /** "1 visitas" no pódio era o tipo de detalhe que faz a tela parecer rascunho. */
 const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`
@@ -69,6 +70,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
   equipeLabel?: string
 }) {
   const router = useRouter()
+  const fuso = useFuso()
   const [aba, setAba] = useState<'ranking' | 'metas'>('ranking')
   const [recalc, setRecalc] = useState(false)
   const [novaMeta, setNovaMeta] = useState(false)
@@ -82,7 +84,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
    * no endereço, se alguém chegar por link antigo. Lista fixa em código envelhece:
    * um seletor que para em 2027 vira tela sem saída em 2028.
    */
-  const anoAtual = new Date().getFullYear()
+  const anoAtual = partesNoFuso(agora(), fuso).ano
   const anos = [...new Set([anoAtual - 2, anoAtual - 1, anoAtual, anoAtual + 1, anoSel])].sort((a, b) => a - b)
 
   async function recalcular() {

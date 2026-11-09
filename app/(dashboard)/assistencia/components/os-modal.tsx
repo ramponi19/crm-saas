@@ -10,6 +10,8 @@ import { Modal, Input, Select, Textarea, Button, Badge, notify } from '@/compone
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData, paraData } from '@/lib/datas'
 
 interface Cobranca {
   id: number
@@ -47,14 +49,15 @@ interface OS {
 }
 interface Props { os: OS | null; isNew: boolean; onClose: () => void }
 
-const EMPTY: OS = {
+/** OS em branco; `hoje` é o dia da loja (o padrão da data de entrada). */
+const vazia = (hoje: string): OS => ({
   protocolo: null, tipo: 'assistencia', status: 'em_analise',
   defeito_relatado: null, parecer_tecnico: null, orcamento_valor: null,
   imei_serial: null, dentro_garantia: false, dias_garantia_restantes: null,
-  data_entrada: new Date().toISOString().split('T')[0], observacoes: null,
+  data_entrada: hoje, observacoes: null,
   estado_entrada: null, celular_reserva_fornecido: false, modelo_reserva: null,
   cliente_id: null, produto_id: null,
-}
+})
 
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
@@ -85,7 +88,11 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const router = useRouter()
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
-  const [form, setForm] = useState<OS>(isNew ? EMPTY : { ...EMPTY, ...os })
+  const fuso = useFuso()
+  const [form, setForm] = useState<OS>(() => {
+    const base = vazia(diaNoFuso(agora(), fuso))
+    return isNew ? base : { ...base, ...os }
+  })
   const [saving, setSaving] = useState(false)
   /** O que a venda daquele IMEI diz sobre a garantia — null = não procurado ainda. */
   const [garantiaDaVenda, setGarantiaDaVenda] = useState<
@@ -167,12 +174,12 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           .select('valor').eq('chave', 'contrato').maybeSingle()
         const diasTotal = Number((cfg?.valor as { garantia_dias?: unknown } | null)?.garantia_dias) || 90
 
-        const base = new Date(venda.data_venda ?? venda.created_at ?? Date.now())
+        const base = paraData(venda.data_venda ?? venda.created_at) ?? agora()
         const passados = Math.floor((Date.now() - base.getTime()) / 86_400_000)
         const restantes = diasTotal - passados
 
         if (!cancelado) {
-          setGarantiaDaVenda({ vendaEm: base.toLocaleDateString('pt-BR'), diasTotal, restantes })
+          setGarantiaDaVenda({ vendaEm: formatarData(base, undefined, '', fuso), diasTotal, restantes })
           // Só preenche o que o atendente ainda não tocou: sobrescrever um número
           // que ele acabou de digitar seria pior que não sugerir nada.
           setForm((f) => f.dias_garantia_restantes == null
@@ -185,7 +192,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
     }, 500)
 
     return () => { cancelado = true; clearTimeout(timer) }
-  }, [form.imei_serial])
+  }, [form.imei_serial, fuso])
   const [clientes, setClientes] = useState<{ id: number; nome: string }[]>([])
   const [produtos, setProdutos] = useState<{ id: number; nome: string }[]>([])
   const [servicos, setServicos] = useState<{ id: number; nome: string; preco: number }[]>([])
@@ -368,7 +375,8 @@ export default function OSModal({ os, isNew, onClose }: Props) {
 
       {!isNew && (
         <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <Stat label="Entrada" value={new Date(os?.data_entrada ?? os?.created_at ?? '').toLocaleDateString('pt-BR')} />
+          <Stat label="Entrada" value={formatarData(os?.data_entrada ?? os?.created_at, undefined, '—', fuso)} />
+
           <Stat label="Orçamento" value={os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
           <Stat label="Aparelho" value={os?.produtos?.nome ?? '—'} />
         </div>

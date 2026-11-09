@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { UserPlus, UserMinus, ArrowLeftRight, History } from 'lucide-react'
 import { Button, Select, Badge, notify } from '@/components/ui'
 import type { Usuario } from './types'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora } from '@/lib/datas'
 
 interface HistItem { acao: string; de_responsavel: string | null; para_responsavel: string | null; em: string }
 
@@ -39,6 +41,7 @@ export function ResponsavelPanel({ leadId, usuarios, responsavel, onChange }: {
   onChange: (id: string | null) => void
 }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [meuId, setMeuId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [hist, setHist] = useState<HistItem[]>([])
@@ -132,7 +135,8 @@ export function ResponsavelPanel({ leadId, usuarios, responsavel, onChange }: {
               <div key={i} className="text-[11.5px] text-ink-3">
                 <span className="text-ink-2">{ACAO_LABEL[h.acao] ?? h.acao}</span>
                 {['transferir', 'atribuir', 'distribuir', 'atribuicao'].includes(h.acao) ? ` → ${nome(h.para_responsavel)}` : ''}
-                {' · '}{new Date(h.em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {' · '}{formatarDataHora(h.em, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso)}
+
               </div>
             ))}
           </div>

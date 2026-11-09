@@ -3,6 +3,8 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 import { conversasDosLeads } from '@/lib/leads'
+import { periodo } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // "Iniciar o dia": roteiro priorizado a partir das demandas do usuário logado.
@@ -18,9 +20,11 @@ export async function POST() {
   if (cfg && cfg.ativo === false) return NextResponse.json({ error: 'O assistente está temporariamente desativado.' }, { status: 503 })
   const modelo = cfg?.modelo || process.env.GEMINI_MODEL || MODELO_PADRAO
 
-  const now = new Date()
-  const inicioHoje = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString()
-  const fimHoje = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
+  // O "hoje" da loja: meia-noite a meia-noite no fuso da empresa (fim exclusivo).
+  // Em UTC ele ia das 21h de ontem às 21h de hoje em Brasília.
+  const hojeLoja = periodo('hoje', undefined, await fusoDaEmpresa(supabase, empresaId))
+  const inicioHoje = hojeLoja.de.toISOString()
+  const fimHoje = hojeLoja.ate.toISOString()
 
   const uid = user.id
   const head = { count: 'exact' as const, head: true }
@@ -28,7 +32,7 @@ export async function POST() {
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).lt('vencimento', inicioHoje),
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).gte('vencimento', inicioHoje).lt('vencimento', fimHoje),
     leadsComNaoLidas(supabase as unknown as SupabaseClient, empresaId, uid),
-    supabase.from('cadencia_inscricoes').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('status', 'ativa').lte('proxima_acao_em', fimHoje),
+    supabase.from('cadencia_inscricoes').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('status', 'ativa').lt('proxima_acao_em', fimHoje),
     supabase.from('visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje),
   ])
 

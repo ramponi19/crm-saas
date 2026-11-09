@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { Clock, LogIn } from 'lucide-react'
 import { Card, Table, Badge, Select, EmptyState, type Column } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDiaMes, formatarHora } from '@/lib/datas'
 
 export interface SessaoAcesso {
   id: number
@@ -22,8 +24,9 @@ export interface ResumoUsuario {
   minutos: number
 }
 
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-const dia = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+// No fuso da empresa: sem ele o servidor (UTC) escrevia a hora +3h e o React acusava o #418.
+const hora = (iso: string, fuso: string) => formatarHora(iso, '', fuso)
+const dia = (iso: string, fuso: string) => formatarDiaMes(iso, '', fuso)
 
 /** 95 min → "1h35". Minuto cru fica ilegível a partir de duas horas. */
 function duracao(min: number): string {
@@ -55,18 +58,19 @@ export function UsoEquipe({ sessoes, resumo, dias }: {
   sessoes: SessaoAcesso[]; resumo: ResumoUsuario[]; dias: number
 }) {
   const router = useRouter()
+  const fuso = useFuso()
 
   const cols: Column<SessaoAcesso>[] = [
     { key: 'usuario', header: 'Usuário', render: (s) => <span className="font-medium text-ink">{s.usuario}</span> },
     {
       key: 'entrada', header: 'Entrada', className: 'num',
-      render: (s) => <span className="text-ink-2">{dia(s.entrada)} · {hora(s.entrada)}</span>,
+      render: (s) => <span className="text-ink-2">{dia(s.entrada, fuso)} · {hora(s.entrada, fuso)}</span>,
     },
     {
       key: 'saida', header: 'Saída', className: 'num',
       render: (s) => s.aberta
         ? <Badge tone="ok" dot>agora</Badge>
-        : <span className="text-ink-2">{dia(s.fim)} · {hora(s.fim)}</span>,
+        : <span className="text-ink-2">{dia(s.fim, fuso)} · {hora(s.fim, fuso)}</span>,
     },
     {
       key: 'tempo', header: 'Tempo', align: 'right', className: 'num',

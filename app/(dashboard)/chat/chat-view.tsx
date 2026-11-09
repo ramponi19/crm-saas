@@ -9,12 +9,15 @@ import { Send, Megaphone, MessageSquare, Trash2, Bell, BellRing } from 'lucide-r
 import { Topbar } from '@/components/layout/topbar'
 import { Select, notify } from '@/components/ui'
 import { VAPID_PUBLIC_KEY } from '@/lib/vapid'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora } from '@/lib/datas'
 
 export interface Membro { id: string; nome: string; role: string }
 export interface MsgInicial { id: number; autor_id: string; conteudo: string; created_at: string | null }
 interface Msg { id: number; autor_id: string; destinatario_id?: string | null; conteudo: string; created_at: string | null }
 
-const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'agora')
+const hora = (iso: string | null, fuso: string) =>
+  formatarDataHora(iso, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, 'agora', fuso)
 
 // Converte a chave pública VAPID (base64url) no formato que o pushManager espera.
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -28,6 +31,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 
 export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaId: number; meuId: string; membros: Membro[]; muralInicial: MsgInicial[] }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [aba, setAba] = useState<'mural' | 'direto'>('mural')
   const [mural, setMural] = useState<Msg[]>(muralInicial as Msg[])
   const [peer, setPeer] = useState('')
@@ -256,7 +260,8 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
                   <div className={`rounded-[12px] px-3.5 py-2.5 text-[13.5px] ${meu ? 'rounded-br-[3px] bg-ink text-white' : 'rounded-bl-[3px] border border-line bg-card text-ink'}`}>
                     {m.conteudo}
                     <div className={`mt-1 flex items-center gap-2 text-[9.5px] ${meu ? 'text-white/55' : 'text-ink-3'}`}>
-                      <span className="num">{hora(m.created_at)}</span>
+                      <span className="num">{hora(m.created_at, fuso)}
+</span>
                       {meu && <button onClick={() => apagar(m.id, aba)} className="-m-1 p-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100" aria-label="Apagar"><Trash2 size={13} strokeWidth={1.8} /></button>}
                     </div>
                   </div>

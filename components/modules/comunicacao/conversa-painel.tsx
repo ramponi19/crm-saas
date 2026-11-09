@@ -16,6 +16,7 @@ import {
 } from '@/lib/inbox/consultas'
 import { LeadModal } from '@/components/modules/leads/lead-modal'
 import { ICONE_CANAL, horaCurta, nomeDoContato, type InboxProps } from './inbox-view'
+import { useFuso } from '@/components/fuso-provider'
 
 const NOME_CANAL = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger' } as const
 const JANELA_WHATSAPP_MS = 24 * 60 * 60 * 1000
@@ -33,6 +34,7 @@ type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string 
 export function ConversaPainel({
   conversaId, inicial, empresaId, meuId, usuarios, etapas, funilPadrao, motivos, perfil, onVoltar, onAbrirConversa,
 }: InboxProps & { conversaId: number; inicial: ConversaInbox | null; onVoltar: () => void; onAbrirConversa: (id: number) => void }) {
+  const fuso = useFuso()
   const supabase = useMemo(() => createClient(), [])
   const { assinar, aoReconectar } = useTempoReal()
   const [conversa, setConversa] = useState<ConversaInbox | null>(inicial)
@@ -396,7 +398,7 @@ export function ConversaPainel({
                   onApagou={(id) => setNotas((l) => l.filter((x) => x.id !== id))} />
                 : i.tipo === 'otimista' ? <Bolha key={i.o.chave} lado="loja" conteudo={i.o.conteudo} tipo={i.o.tipo} midia={i.o.midia_url} hora="agora" status={i.o.status} erro={i.o.erro} />
                 : <Bolha key={i.m.id} id={i.m.id} lado={i.m.direcao === 'enviada' ? 'loja' : 'cliente'} conteudo={i.m.conteudo} tipo={i.m.tipo ?? 'texto'}
-                    midia={i.m.midia_url} retida={i.m.midia_retida_em} transcricao={i.m.transcricao} hora={horaCurta(i.m.created_at)}
+                    midia={i.m.midia_url} retida={i.m.midia_retida_em} transcricao={i.m.transcricao} hora={horaCurta(i.m.created_at, fuso)}
                     status={i.m.status_entrega} erro={i.m.erro_envio} autor={i.m.direcao === 'enviada' ? nomeDe(i.m.usuario_id) : null} />
             ))}
             <div ref={fimRef} />
@@ -505,6 +507,7 @@ function BolhaNota({ n, autor, minha, onMudou, onApagou }: {
   n: NotaInbox; autor: string | null; minha: boolean
   onMudou: (n: NotaInbox) => void; onApagou: (id: number) => void
 }) {
+  const fuso = useFuso()
   const supabase = useMemo(() => createClient(), [])
   const [editando, setEditando] = useState(false)
   const [texto, setTexto] = useState(n.texto)
@@ -537,7 +540,7 @@ function BolhaNota({ n, autor, minha, onMudou, onApagou }: {
   return (
     <div className="my-1 self-center rounded-control border border-warn/30 bg-warn-soft/60 px-3 py-2 text-[12.5px] text-ink sm:max-w-[80%]" data-nota-id={n.id}>
       <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-warn">
-        <StickyNote size={11} /> Nota interna · {autor ?? 'equipe'} · {horaCurta(n.em)}{n.editada_em ? ' · editada' : ''}
+        <StickyNote size={11} /> Nota interna · {autor ?? 'equipe'} · {horaCurta(n.em, fuso)}{n.editada_em ? ' · editada' : ''}
         {minha && !editando && (
           <span className="ml-auto flex gap-2 normal-case tracking-normal">
             <button className="font-medium hover:underline" onClick={() => { setTexto(n.texto); setEditando(true) }}>Editar</button>

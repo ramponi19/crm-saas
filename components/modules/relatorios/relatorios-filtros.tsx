@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button, Input, Select } from '@/components/ui'
 import { FileSpreadsheet, Printer, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, primeiroDoMes, somarDias } from '@/lib/datas'
 
 /**
  * Filtros e exportação do relatório imobiliário.
@@ -18,22 +20,20 @@ import { FileSpreadsheet, Printer, SlidersHorizontal, RotateCcw } from 'lucide-r
  * da tela e ninguém descobre por quê.
  */
 
-const HOJE = () => new Date()
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-/** Atalhos: o dono pensa em "este mês", não em duas datas. */
-function atalhos() {
-  const h = HOJE()
-  const inicioMes = new Date(h.getFullYear(), h.getMonth(), 1)
-  const inicioMesPassado = new Date(h.getFullYear(), h.getMonth() - 1, 1)
-  const fimMesPassado = new Date(h.getFullYear(), h.getMonth(), 0)
-  const noventa = new Date(h.getTime() - 89 * 86400000)
-  const inicioAno = new Date(h.getFullYear(), 0, 1)
+/**
+ * Atalhos: o dono pensa em "este mês", não em duas datas.
+ *
+ * Datas puras do calendário DA LOJA: com o relógio de quem roda, o servidor (UTC)
+ * já estava "amanhã" depois das 21h e o atalho não batia com o do navegador.
+ */
+function atalhos(fuso: string) {
+  const h = diaNoFuso(agora(), fuso)
+  const inicioMes = primeiroDoMes(h)
   return [
-    { id: 'mes', label: 'Este mês', de: iso(inicioMes), ate: iso(h) },
-    { id: 'passado', label: 'Mês passado', de: iso(inicioMesPassado), ate: iso(fimMesPassado) },
-    { id: '90d', label: '90 dias', de: iso(noventa), ate: iso(h) },
-    { id: 'ano', label: 'Este ano', de: iso(inicioAno), ate: iso(h) },
+    { id: 'mes', label: 'Este mês', de: inicioMes, ate: h },
+    { id: 'passado', label: 'Mês passado', de: primeiroDoMes(h, -1), ate: somarDias(inicioMes, -1) },
+    { id: '90d', label: '90 dias', de: somarDias(h, -89), ate: h },
+    { id: 'ano', label: 'Este ano', de: `${h.slice(0, 4)}-01-01`, ate: h },
   ]
 }
 
@@ -54,6 +54,7 @@ export function RelatoriosFiltros({ equipe, de, ate, corretor }: {
 }) {
   const router = useRouter()
   const params = useSearchParams()
+  const fuso = useFuso()
   const [abrir, setAbrir] = useState(!!(params.get('de') || params.get('corretor')))
   const [tipo, setTipo] = useState(TIPOS_EXPORT[0].v)
 
@@ -90,7 +91,7 @@ export function RelatoriosFiltros({ equipe, de, ate, corretor }: {
           Filtros
         </Button>
 
-        {atalhos().map((a) => (
+        {atalhos(fuso).map((a) => (
           <button
             key={a.id}
             onClick={() => aplicar({ de: a.de, ate: a.ate })}

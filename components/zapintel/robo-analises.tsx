@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { mensagemPorStatus } from "@/lib/zapintel/mensagem-erro";
 import { RefreshCw, Sparkles, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { formatarDiaMes } from "@/lib/datas";
+import { useFuso } from "@/components/fuso-provider";
 
 /**
  * QUANTAS FICHAS FICARAM PARA TRÁS — O BLOCO NO TOPO DO CHAT DO ZAPINTEL.
@@ -98,8 +100,7 @@ export function ResumoPendentes({ indisponivel, nNovas, nAndou, onTentar }: {
   );
 }
 
-const dataCurta = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }) : "";
+const dataCurta = (iso: string | null, fuso: string) => formatarDiaMes(iso, "", fuso);
 
 export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
   /** O número que o robô mostra no selo. */
@@ -109,6 +110,7 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
   /** Muda quando o chat abre: reconta. */
   recontar?: number;
 }) {
+  const fuso = useFuso();
   const [desatualizadas, setDesatualizadas] = useState<Pendente[] | null>(null);
   const [semAnalise, setSemAnalise] = useState<Pendente[]>([]);
   const [iaDisponivel, setIaDisponivel] = useState(false);
@@ -288,7 +290,7 @@ export function AnalisesPendentes({ onTotal, onAbrirLead, recontar }: {
                 </div>
                 <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 1 }}>
                   {nova ? "nova · ainda sem análise"
-                    : <>{p.novas > 0 ? `+${p.novas} ${p.novas === 1 ? "mensagem" : "mensagens"}` : "conversa mudou"}{p.geradoEm && ` desde ${dataCurta(p.geradoEm)}`}</>}
+                    : <>{p.novas > 0 ? `+${p.novas} ${p.novas === 1 ? "mensagem" : "mensagens"}` : "conversa mudou"}{p.geradoEm && ` desde ${dataCurta(p.geradoEm, fuso)}`}</>}
                   {p.filial && ` · ${p.filial}`}
                 </div>
               </div>

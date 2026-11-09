@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { criarZip, linhasParaCsv, type ZipEntry } from '@/lib/zip'
 import { lerTodosOsClientes } from '@/lib/clientes'
 import { leadDoNegocio } from '@/lib/leads'
+import { diaNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 /**
  * EXPORTAÇÃO LGPD DA EMPRESA (superadmin) — completa, no Storage, com link de 10 min.
@@ -89,7 +91,8 @@ export async function gerarExportacao(svc: Db, empresaId: number, empresa: Linha
   entries.push({ nome: 'leads.csv', conteudo: linhasParaCsv(leads) })
 
   const zip = criarZip(entries)
-  const hoje = new Date().toISOString().slice(0, 10)
+  // O dia do nome do arquivo é o da empresa (em UTC, depois das 21h já era amanhã).
+  const hoje = diaNoFuso(undefined, await fusoDaEmpresa(svc, empresaId))
   const caminho = `lgpd-${empresaId}-${slug}-${hoje}-${Date.now()}.zip`
   const { error: eUp } = await svc.storage.from(BUCKET_LGPD).upload(caminho, zip, { contentType: 'application/zip', upsert: false })
   if (eUp) throw new Error(`gravar o ZIP no Storage: ${eUp.message}`)

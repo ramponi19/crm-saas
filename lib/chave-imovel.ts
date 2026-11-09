@@ -1,4 +1,4 @@
-import { paraData } from '@/lib/datas'
+import { agora, diaNoFuso, FUSO_PADRAO, paraData } from '@/lib/datas'
 
 /**
  * Onde está a chave de um imóvel — derivado das chaves cadastradas dele.
@@ -37,14 +37,14 @@ export const rotuloEstado = (e: EstadoChave) => ESTADOS.find((x) => x.id === e) 
  * A conta ingênua compara `new Date('2026-08-18')` (meia-noite UTC, que em Brasília
  * é 17/08 às 21h) com a meia-noite LOCAL: a chave aparecia atrasada no próprio dia
  * em que devia voltar, um dia antes da hora — e quem empresta chave cobra o corretor
- * por isso. Com as duas pontas no fuso local, o dia do vencimento ainda está em tempo.
+ * por isso. Compara DIAS no fuso da empresa (`devolucao_prevista` é data pura): o dia
+ * do vencimento ainda está em tempo.
  */
-export function chaveAtrasada(c: ChaveMin): boolean {
+export function chaveAtrasada(c: ChaveMin, fuso: string = FUSO_PADRAO): boolean {
   if (c.status !== 'emprestada') return false
   const prevista = paraData(c.devolucao_prevista ?? null)
   if (!prevista) return false
-  const agora = new Date()
-  return prevista < new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+  return diaNoFuso(prevista, fuso) < diaNoFuso(agora(), fuso)
 }
 
 /**
@@ -53,9 +53,9 @@ export function chaveAtrasada(c: ChaveMin): boolean {
  * A pior notícia ganha: um imóvel com duas chaves, uma na loja e uma atrasada, está
  * com chave atrasada — é isso que alguém precisa resolver hoje.
  */
-export function estadoDaChave(chaves: ChaveMin[]): EstadoChave {
+export function estadoDaChave(chaves: ChaveMin[], fuso: string = FUSO_PADRAO): EstadoChave {
   if (!chaves.length) return 'sem'
-  if (chaves.some(chaveAtrasada)) return 'atrasada'
+  if (chaves.some((c) => chaveAtrasada(c, fuso))) return 'atrasada'
   if (chaves.some((c) => c.status === 'emprestada')) return 'emprestada'
   return 'na_imobiliaria'
 }

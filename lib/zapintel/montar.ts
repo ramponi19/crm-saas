@@ -1,5 +1,6 @@
 import type { Lead, RawMessage } from '@/types/zapintel'
 import type { LeadBanco, MsgBanco } from '@/lib/zapintel/conversas'
+import { FUSO_PADRAO, agora, diaNoFuso, diasEntre, partesNoFuso } from '@/lib/datas'
 
 /**
  * O LEAD, MONTADO DIRETO DAS TABELAS DO CRM.
@@ -73,31 +74,18 @@ const DIA_MS = 86_400_000
  * número certo. É o mesmo formato das duas falhas mudas que este módulo já
  * teve (análise truncada, canal de tempo real sem linha).
  *
- * ══ POR QUE UM FUSO FIXO, E NÃO UM POR EMPRESA ═════════════════════════════
+ * ══ O FUSO É O DA EMPRESA ═════════════════════════════════════════════════
  *
- * Porque não existe campo de fuso em `empresas`, e inventar um agora seria
- * coluna sem quem a preencha. Os três tenants são do Brasil e o país não tem
- * horário de verão desde 2019, então Brasília está certo para todos hoje. No
- * dia em que entrar tenant de outro fuso, o lugar de consertar é aqui — uma
- * linha — e não espalhado por quem formata data.
+ * Desde 10/11/2026 o fuso mora em `configuracoes_sistema` (chave `fuso`, padrão
+ * Brasília) e chega aqui por parâmetro (`fusoDaEmpresa` em quem carrega as
+ * conversas). Antes era Brasília fixo nesta linha.
  */
-const FUSO_DA_LOJA = 'America/Sao_Paulo'
 
-/**
- * `sv-SE` porque é o locale que formata como `YYYY-MM-DD HH:MM` — o mesmo
- * formato que as telas e a ficha já esperam. `h23` para meia-noite sair como
- * `00` e não `24`.
- */
-const RELOGIO = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: FUSO_DA_LOJA,
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-})
-
-/** `YYYY-MM-DD` e `HH:MM` no fuso da loja, numa formatação só. */
-const dataEHora = (iso: string): [string, string] => {
-  const s = RELOGIO.format(new Date(iso))
-  return [s.slice(0, 10), s.slice(11, 16)]
+/** `YYYY-MM-DD` e `HH:MM` (h23: meia-noite é `00`) no fuso da loja. */
+const dataEHora = (iso: string, fuso: string): [string, string] => {
+  const d = new Date(iso)
+  const p = partesNoFuso(d, fuso)
+  return [diaNoFuso(d, fuso), `${String(p.hora).padStart(2, '0')}:${String(p.minuto).padStart(2, '0')}`]
 }
 
 /**
@@ -105,10 +93,9 @@ const dataEHora = (iso: string): [string, string] => {
  * de 24 h, e a ficha dizia "última mensagem: hoje" para quem falou às 18h34
  * de ontem (lead 5784, 15/10).
  */
-const diasAte = (iso: string | null): number => {
+const diasAte = (iso: string | null, fuso: string): number => {
   if (!iso || Number.isNaN(Date.parse(iso))) return 999
-  const dia = (d: Date) => Date.parse(`${RELOGIO.format(d).slice(0, 10)}T12:00:00Z`)
-  return Math.max(0, Math.round((dia(new Date()) - dia(new Date(iso))) / DIA_MS))
+  return Math.max(0, diasEntre(diaNoFuso(new Date(iso), fuso), diaNoFuso(agora(), fuso)))
 }
 
 /**
@@ -118,14 +105,14 @@ const diasAte = (iso: string | null): number => {
  * ordenando em memória depois de ler por `id` (a paginação paralela exige
  * ordem total, e `created_at` empata porque o webhook grava em lote).
  */
-export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Lead[] {
+export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[], fuso: string = FUSO_PADRAO): Lead[] {
   const porLead = new Map<number, RawMessage[]>()
 
   for (const m of msgs) {
     const banco = porId.get(m.lead_id)
     if (!banco) continue
     const lista = porLead.get(m.lead_id) ?? []
-    const [dataMsg, horaMsg] = dataEHora(m.created_at)
+    const [dataMsg, horaMsg] = dataEHora(m.created_at, fuso)
     lista.push({
       date: dataMsg,
       time: horaMsg,
@@ -175,7 +162,7 @@ export function montarLeads(porId: Map<number, LeadBanco>, msgs: MsgBanco[]): Le
     const firstDate = primeira?.date ?? ''
     const lastDate = ultima?.date ?? ''
 
-    const daysInactive = diasAte(banco.ultima_mensagem_at ?? null)
+    const daysInactive = diasAte(banco.ultima_mensagem_at ?? null, fuso)
     const conversationDays = firstDate && lastDate
       ? Math.max(0, Math.round((Date.parse(`${lastDate}T12:00:00`) - Date.parse(`${firstDate}T12:00:00`)) / DIA_MS))
       : 0

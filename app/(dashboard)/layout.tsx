@@ -20,6 +20,8 @@ import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
+import { FusoProvider } from '@/components/fuso-provider'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export default async function DashboardLayout({
   children,
@@ -118,6 +120,9 @@ export default async function DashboardLayout({
   const { overrides: menuOverrides, configDono: menuConfig, base, instalados, rotulos } = camadasParaMenu(cfg, permHidden)
   // Ferramentas fora do menu (Simular parcela, Check IMEI, FIPE): mesmas camadas do
   // menu, entregues às telas-casa e ao ⌘K.
+  // O fuso da empresa: toda tela abaixo mostra e corta datas nele (lib/datas, useFuso).
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+
   const ferramentas = resolverFerramentas({
     plano, role,
     isSuperAdmin: usuario?.is_super_admin ?? false,
@@ -126,6 +131,7 @@ export default async function DashboardLayout({
 
   return (
     <EmpresaProvider>
+      <FusoProvider fuso={fuso}>
       {/* Uma assinatura de tempo real por aba (sino, título, avisos, Comunicação). */}
       <TempoRealEmpresa empresaId={empresaId}>
       {/* Erro que chega sem dono custa uma investigação inteira — ver o
@@ -197,6 +203,7 @@ export default async function DashboardLayout({
       <SessionGuard />
       <AssistenteWidget />
       </TempoRealEmpresa>
+      </FusoProvider>
     </EmpresaProvider>
   )
 }

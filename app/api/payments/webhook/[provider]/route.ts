@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { buildProvider } from '@/lib/payments'
 import { decryptCredenciais } from '@/lib/payments/crypto'
 import type { ProviderId } from '@/lib/payments/types'
+import { agora, diaNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 const PROVIDERS_VALIDOS: ProviderId[] = ['mercadopago', 'asaas', 'efibank', 'pagseguro']
 
@@ -148,7 +150,9 @@ async function registrarLancamentoFinanceiro(
 
   if (existente) return
 
-  const hoje = new Date().toISOString().slice(0, 10)
+  // O dia DA LOJA: pagamento confirmado das 21h às 24h gravava "amanhã" (dia UTC), e
+  // no último dia do mês ia para o caixa do mês seguinte.
+  const hoje = diaNoFuso(agora(), await fusoDaEmpresa(supabase, empresaId))
   await supabase.from('financeiro_lancamentos').insert({
     empresa_id: empresaId,
     tipo: 'receita',

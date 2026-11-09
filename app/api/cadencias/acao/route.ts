@@ -39,7 +39,8 @@ export async function POST(req: Request) {
 
   // --- Adiar (snooze para amanhã) ---
   if (body.tipo === 'adiar') {
-    const amanha = new Date(); amanha.setDate(amanha.getDate() + 1)
+    // Amanhã no mesmo horário: +24h (janela móvel, não depende de fuso).
+    const amanha = new Date(Date.now() + 86_400_000)
     const { data: gravadas, error } = await supabase.from('cadencia_inscricoes').update({ proxima_acao_em: amanha.toISOString() }).eq('id', insc.id).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })

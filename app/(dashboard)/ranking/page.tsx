@@ -5,6 +5,8 @@ import { imoveisCaptadosPorPessoa } from '@/lib/captacao-imob'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import { RankingView, type MetaUi, type MembroOpt } from './ranking-view'
 import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
+import { mesNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export const metadata = { title: 'Ranking & Metas' }
 
@@ -18,9 +20,9 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const empresaId = await getEmpresaId()
   if (!empresaId) redirect('/dashboard')
 
-  const now = new Date()
   const sp = await searchParams
-  const periodo = /^\d{4}-\d{2}$/.test(sp.periodo ?? '') ? sp.periodo! : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  // O mês padrão é o da loja (no servidor UTC, o dia 1º começava às 21h do último dia).
+  const periodo = /^\d{4}-\d{2}$/.test(sp.periodo ?? '') ? sp.periodo! : mesNoFuso(undefined, await fusoDaEmpresa(supabase, empresaId))
 
   /**
    * A trava lê a MESMA base que monta o menu (empresa_menu.itens.base): os extras

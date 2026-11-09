@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
+import { agora, diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 /**
  * `cliente`: o conjunto sai da camada de clientes (lib/clientes.ts) — `contatos` com a
@@ -104,12 +106,12 @@ export async function GET(req: Request) {
   const corretor = url.searchParams.get('corretor') ?? ''
   const soData = /^\d{4}-\d{2}-\d{2}$/
 
-  if (cfg.data && soData.test(de)) q = q.gte(cfg.data, de)
-  if (cfg.data && soData.test(ate)) {
-    const [a, m, d] = ate.split('-').map(Number)
-    const seguinte = new Date(a, m - 1, d + 1)
-    q = q.lt(cfg.data, `${seguinte.getFullYear()}-${String(seguinte.getMonth() + 1).padStart(2, '0')}-${String(seguinte.getDate()).padStart(2, '0')}`)
-  }
+  // As colunas de período são timestamptz: o dia vira o INSTANTE da meia-noite da loja.
+  // Com 'YYYY-MM-DD' puro o Postgres usava meia-noite UTC = 21h de Brasília, e a
+  // planilha cortava 3 horas de cada ponta.
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  if (cfg.data && soData.test(de)) q = q.gte(cfg.data, instanteLocal(de, '00:00', fuso).toISOString())
+  if (cfg.data && soData.test(ate)) q = q.lt(cfg.data, instanteLocal(somarDias(ate, 1), '00:00', fuso).toISOString())
   if (cfg.corretor && corretor) q = q.eq(cfg.corretor, corretor)
 
   const { data: rows, error } = await q.order(cfg.data ?? 'created_at', { ascending: false })
@@ -128,7 +130,7 @@ export async function GET(req: Request) {
   // BOM p/ Excel reconhecer UTF-8 (acentos).
   const csv = '﻿' + [header, ...linhas].join('\n')
 
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = diaNoFuso(agora(), fuso)
   return new NextResponse(csv, {
     status: 200,
     headers: {

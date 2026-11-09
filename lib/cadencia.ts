@@ -15,11 +15,13 @@ type Db = SupabaseClient
 export interface PassoMin { ordem: number; dia_offset: number }
 export interface LeadMinC { id: number; responsavel_id: string | null }
 
-/** Data da ação de um passo = data da inscrição + dia_offset dias. */
+/**
+ * Data da ação de um passo = data da inscrição + dia_offset dias, no mesmo horário.
+ * Soma em blocos de 24h: não depende de fuso (o Brasil não tem horário de verão
+ * desde 2019) e é o mesmo resultado que o `setDate` dava no servidor UTC.
+ */
 export function dataDaAcao(inscricaoIso: string, diaOffset: number): string {
-  const base = new Date(inscricaoIso)
-  base.setDate(base.getDate() + (diaOffset || 0))
-  return base.toISOString()
+  return new Date(new Date(inscricaoIso).getTime() + (diaOffset || 0) * 86_400_000).toISOString()
 }
 
 /** Próximo passo após `ordemAtual` (menor ordem estritamente maior). */

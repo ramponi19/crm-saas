@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { TrendingUp, AlertTriangle, Layers, Clock } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
 import { lerNomesDosPresets, PRESET_PADRAO } from '@/lib/presets'
+import { agora, diaNoFuso, FUSO_PADRAO, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes } from '@/lib/datas'
 
 const ROXO = '#6D28D9'
 
@@ -13,8 +14,9 @@ function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-function mesLabel(d: Date) {
-  return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+/** "nov. de 26" de um mês `YYYY-MM`. */
+function mesLabel(mes: string) {
+  return rotuloDoMes(mes, { month: 'short', year: '2-digit' })
 }
 
 function diasDesde(d: Date, ref: Date) {
@@ -39,7 +41,7 @@ export default async function MetricasPage() {
   ])
 
   const lista = empresas ?? []
-  const hoje = new Date()
+  const hoje = agora()
 
   // Preço mensal por plano (planos_config em centavos → reais; fallback no hardcode).
   const precoPlano: Record<string, number> = { ...PRECO_FALLBACK }
@@ -54,20 +56,18 @@ export default async function MetricasPage() {
   const baseChurn = ativas.length + cancelados.length
   const churnPct = baseChurn > 0 ? (cancelados.length / baseChurn) * 100 : 0
 
-  // 1) Novos tenants por mês (últimos 6 meses)
+  // 1) Novos tenants por mês (últimos 6 meses). Superadmin não é de uma empresa:
+  // o mês é o do fuso padrão (Brasília), não o do UTC do servidor.
   const meses: { label: string; chave: string; total: number }[] = []
+  const hojeDia = diaNoFuso(hoje, FUSO_PADRAO)
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
-    meses.push({
-      label: mesLabel(d),
-      chave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      total: 0,
-    })
+    const chave = primeiroDoMes(hojeDia, -i).slice(0, 7)
+    meses.push({ label: mesLabel(chave), chave, total: 0 })
   }
   lista.forEach(e => {
-    if (!e.created_at) return
-    const d = new Date(e.created_at)
-    const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const d = paraData(e.created_at)
+    if (!d) return
+    const chave = mesNoFuso(d, FUSO_PADRAO)
     const m = meses.find(x => x.chave === chave)
     if (m) m.total++
   })

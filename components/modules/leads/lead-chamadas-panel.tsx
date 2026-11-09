@@ -6,6 +6,8 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { Phone, PhoneIncoming, PhoneOutgoing, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Input, Select, Button, Badge, notify } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora } from '@/lib/datas'
 
 interface Chamada { id: number; direcao: string; resultado: string; observacao: string | null; created_at: string | null }
 
@@ -16,11 +18,13 @@ const RESULTADO: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | '
   ocupado: { label: 'Ocupado', tone: 'warn' },
   retornar: { label: 'Retornar', tone: 'neutro' },
 }
-const quando = (iso: string | null) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '')
+const quando = (iso: string | null, fuso: string) =>
+  formatarDataHora(iso, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso)
 
 export function LeadChamadasPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
   const { resolverEmpresaId } = useEmpresa()
+  const fuso = useFuso()
   const [itens, setItens] = useState<Chamada[]>([])
   const [carregou, setCarregou] = useState(false)
   const [direcao, setDirecao] = useState('saida')
@@ -80,7 +84,8 @@ export function LeadChamadasPanel({ leadId }: { leadId: number }) {
               <div key={c.id} className="flex items-center gap-2 rounded-control border border-line p-2">
                 <Icon size={14} strokeWidth={1.7} className="flex-none text-ink-3" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12px] text-ink-2">{c.direcao === 'entrada' ? 'Recebida' : 'Feita'} · <span className="num">{quando(c.created_at)}</span></div>
+                  <div className="text-[12px] text-ink-2">{c.direcao === 'entrada' ? 'Recebida' : 'Feita'} · <span className="num">{quando(c.created_at, fuso)}
+</span></div>
                   {c.observacao && <div className="truncate text-[11px] text-ink-3">{c.observacao}</div>}
                 </div>
                 <Badge tone={r.tone} className="shrink-0">{r.label}</Badge>

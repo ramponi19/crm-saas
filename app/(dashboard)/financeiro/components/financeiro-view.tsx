@@ -9,6 +9,8 @@ import type { TablesInsert } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Table, Tabs, Badge, Button, IconButton, Input, Select, Textarea, Modal, EmptyState, notify, type Column } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData } from '@/lib/datas'
 
 interface Lancamento {
   id: number
@@ -96,7 +98,8 @@ const EMPTY_FORM = {
   tipo: 'despesa' as string,
   descricao: '',
   valor: '' as string | number,
-  data_venc: new Date().toISOString().split('T')[0],
+  // O padrão "hoje" entra em abrirNovo, no dia da loja (aqui seria o dia do servidor, em UTC).
+  data_venc: '',
   data_pgto: '',
   status: 'pendente',
   categoria: '',
@@ -107,6 +110,11 @@ const EMPTY_FORM = {
 const fmtBRL = (v: number | null) => v != null ? formatCurrency(v) : '—'
 // "A pagar/receber" = ainda em aberto (pendente ou atrasado); nunca conta cancelado.
 const emAberto = (s: string | null) => s === 'pendente' || s === 'atrasado'
+
+/** Dia/mês do lançamento: o vencimento (data pura) ou, sem ele, a criação no fuso da loja. */
+const formatarDiaMesLancamento = (l: { data_venc: string | null; created_at?: string | null }, fuso: string) =>
+  formatarData(l.data_venc || l.created_at, { day: '2-digit', month: '2-digit' }, '', fuso)
+
 const naoCancelado = (s: string | null) => s !== 'cancelado'
 
 export default function FinanceiroView({
@@ -115,6 +123,7 @@ export default function FinanceiroView({
   comissoesNegocio = null, taxasComissao = null, equipeComissao = [], podeQuitarComissao = false,
 }: Props) {
   const supabase = createClient()
+  const fuso = useFuso()
   // A aba só existe quando o módulo Imóveis está ligado; ninguém mais paga por ela.
   const temComissoes = !!(comissoesNegocio && taxasComissao)
   const [tab, setTab] = useState(temComissoes ? 'comissoes' : 'fluxo')
@@ -169,7 +178,7 @@ export default function FinanceiroView({
   }, [lancamentos])
 
   function abrirNovo(tipoInicial: string) {
-    setForm({ ...EMPTY_FORM, tipo: tipoInicial })
+    setForm({ ...EMPTY_FORM, tipo: tipoInicial, data_venc: diaNoFuso(agora(), fuso) })
     setEditId(null)
     setErro(null)
     setModal(true)
@@ -271,7 +280,7 @@ export default function FinanceiroView({
   const cobCols: Column<Cobranca>[] = [
     {
       key: 'data', header: 'Data', className: 'num w-[96px]',
-      render: (c) => <span className="text-ink-2">{new Date(c.created_at ?? '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>,
+      render: (c) => <span className="text-ink-2">{formatarData(c.created_at, { day: '2-digit', month: '2-digit', year: '2-digit' }, '', fuso)}</span>,
     },
     {
       key: 'descricao', header: 'Descrição',
@@ -542,10 +551,11 @@ export default function FinanceiroView({
 }
 
 function LancamentosTable({ lancamentos, onEditar }: { lancamentos: Lancamento[]; onEditar: (l: Lancamento) => void }) {
+  const fuso = useFuso()
   const cols: Column<Lancamento>[] = [
     {
       key: 'data', header: 'Data', className: 'num w-[88px]',
-      render: (l) => <span className="text-ink-2">{new Date(l.data_venc ? l.data_venc + 'T00:00:00' : l.created_at ?? '').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>,
+      render: (l) => <span className="text-ink-2">{formatarDiaMesLancamento(l, fuso)}</span>,
     },
     { key: 'descricao', header: 'Descrição', render: (l) => <span className="font-medium text-ink">{l.descricao ?? '—'}</span> },
     { key: 'categoria', header: 'Categoria', hideOnMobile: true, render: (l) => <span className="text-ink-2">{l.categoria ?? '—'}</span> },

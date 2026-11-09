@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { consultaClientes } from '@/lib/clientes'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { calcularComissao, calcularComissaoPorPercentual, cashbackCabe, mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
+import { agora, diaNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 /**
  * Negócio fechado da imobiliária — venda ou locação de um imóvel.
@@ -360,9 +362,10 @@ export async function PATCH(req: Request) {
    * As datas são do SERVIDOR: data de pagamento vinda do navegador é o relógio de
    * quem clicou, e comissão paga é dinheiro que saiu, não palpite de fuso.
    */
-  // Dia de Brasilia, nao do servidor (UTC na Vercel): comissao paga depois das
-  // 21h saia com a data do dia seguinte.
-  const hojeIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  // Dia DA LOJA, nao do servidor (UTC na Vercel): comissao paga depois das 21h saia
+  // com a data do dia seguinte.
+  const fuso = await fusoDaEmpresa(svc, empresaId)
+  const hojeIso = () => diaNoFuso(agora(), fuso)
   if (b.comissao_status === 'paga') {
     patch.comissao_status = 'paga'
     patch.comissao_paga_em = hojeIso()

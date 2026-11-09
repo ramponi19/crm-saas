@@ -12,6 +12,8 @@ import { formatCurrency } from '@/lib/utils'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 import { EncomendaItens, itemVazio, itensValidos, descreverItem, type ItemEncomenda } from './encomenda-itens'
 import { lerCliente, type Cliente } from '@/lib/clientes'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, somarDias } from '@/lib/datas'
 
 interface Cli { id: number; nome: string }
 
@@ -49,11 +51,9 @@ const FORMAS = [
   { key: 'aparelho', label: 'Aparelho semi-novo' },
 ]
 
-/** `YYYY-MM-DD` de hoje + n dias, no fuso local (nada de toISOString aqui). */
-function emDias(n: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + n)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** `YYYY-MM-DD` de hoje + n dias, no dia da loja (nada de toISOString aqui). */
+function emDias(n: number, fuso: string): string {
+  return somarDias(diaNoFuso(agora(), fuso), n)
 }
 
 /** Endereço em uma linha, pulando o que o cadastro não tem. */
@@ -71,6 +71,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
   const supabase = createClient()
   const router = useRouter()
   const { resolverEmpresaId } = useEmpresa()
+  const fuso = useFuso()
 
   const [aberto, setAberto] = useState(false)
   const [clienteId, setClienteId] = useState('')
@@ -583,7 +584,8 @@ export function EncomendaForm({ clientes, taxas = [] }: {
             onChange={(e) => setPrazo(e.target.value)} hint="Em branco, a encomenda aparece como “sem prazo combinado”." />
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {[3, 7, 15, 30].map((n) => (
-              <button key={n} type="button" onClick={() => setPrazo(emDias(n))}
+              <button key={n} type="button" onClick={() => setPrazo(emDias(n, fuso))
+}
                 className="h-7 rounded-control border border-line bg-card px-2.5 text-[11.5px] font-medium text-ink-2 transition-colors hover:bg-line-soft">
                 {n} dias
               </button>

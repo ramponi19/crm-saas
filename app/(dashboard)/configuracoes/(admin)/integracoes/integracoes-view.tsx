@@ -8,6 +8,8 @@ import { Globe, Rss, Code2, DownloadCloud, Copy, ExternalLink, MessageCircle } f
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Button, IconButton, Input, notify } from '@/components/ui'
 import { CanaisView } from '@/components/modules/canais/canais-view'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora } from '@/lib/datas'
 
 function IntegracaoCard({ icon: Icon, titulo, desc, children }: { icon: typeof Globe; titulo: string; desc: string; children: React.ReactNode }) {
   return (
@@ -44,6 +46,8 @@ export default function IntegracoesView({ slug, portais, tokenPortal = null, fee
   appId: string
 }) {
   const origin = useOrigem()
+  const fuso = useFuso()
+
   const base = origin
 
   /**
@@ -131,7 +135,8 @@ document.getElementById('apice-lead').addEventListener('submit', async function 
                   {importando ? 'Importando…' : 'Importar agora'}
                 </Button>
               </div>
-              {ultima && <p className="mt-2 text-[11.5px] text-ink-3">Última importação: {new Date(ultima).toLocaleString('pt-BR')}</p>}
+              {ultima && <p className="mt-2 text-[11.5px] text-ink-3">Última importação: {formatarDataHora(ultima, undefined, '', fuso)}
+</p>}
               <p className="mt-1 text-[11.5px] text-ink-3">Dica: no painel do seu site/Kenlo, a URL do feed fica em Integrações → Portais.</p>
             </IntegracaoCard>
 

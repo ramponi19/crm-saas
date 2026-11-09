@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import {
   agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
 } from '@/lib/automatize/travas'
@@ -191,7 +192,9 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
       return { resultado: 'pulada', motivo: 'este contato já recebeu este modelo nos últimos 7 dias' }
     }
 
-    const quando = proximoHorario(agora, await horarioDaEmpresa(db, e.empresa_id))
+    // O horário de atendimento no relógio DA LOJA (fuso da empresa).
+    const [horario, fuso] = await Promise.all([horarioDaEmpresa(db, e.empresa_id), fusoDaEmpresa(db, e.empresa_id)])
+    const quando = proximoHorario(agora, horario, fuso)
     if (quando.getTime() > agora.getTime()) return { resultado: 'adiada', motivo: 'fora do horário de atendimento', quando }
 
     const { count } = await db.from('automacao_execucoes').select('id', { count: 'exact', head: true })

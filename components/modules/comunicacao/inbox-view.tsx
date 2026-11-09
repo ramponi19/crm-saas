@@ -13,6 +13,8 @@ import {
 } from '@/lib/inbox/consultas'
 import type { KanbanColumn, Motivo, Usuario } from '@/components/modules/leads/types'
 import type { PerfilDoLead } from '@/lib/empresa-config'
+import { useFuso } from '@/components/fuso-provider'
+import { FUSO_PADRAO, agora, formatarDiaMes, formatarHora, mesmoDia, paraData } from '@/lib/datas'
 import { ConversaPainel } from './conversa-painel'
 
 export type EtapaDoCard = KanbanColumn
@@ -39,14 +41,14 @@ export function nomeDoContato(c: ConversaInbox['contato']): string {
   return c.nome?.trim() || c.telefone || (c.instagram ? `@${c.instagram}` : 'Contato sem nome')
 }
 
-export function horaCurta(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const hoje = new Date()
-  const mesmoDia = d.toDateString() === hoje.toDateString()
-  return mesmoDia
-    ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+/**
+ * Hora (se foi hoje) ou dia/mês, no fuso da loja — o mesmo texto no servidor (UTC)
+ * e no navegador, sem o erro de hidratação #418 nem a hora +3h no primeiro desenho.
+ */
+export function horaCurta(iso: string | null, fuso: string = FUSO_PADRAO): string {
+  const d = paraData(iso)
+  if (!d) return ''
+  return mesmoDia(d, agora(), fuso) ? formatarHora(d, '', fuso) : formatarDiaMes(d, '', fuso)
 }
 
 function previaDoTexto(p: Previa | undefined): string {
@@ -83,6 +85,7 @@ function lerFiltrosDaUrl(p: URLSearchParams): FiltrosInbox {
  * aba (uma assinatura só, tempo-real-empresa.tsx).
  */
 export function InboxView(props: InboxProps) {
+  const fuso = useFuso()
   const { usuarios, meuId } = props
   const params = useSearchParams()
   const [filtros, setFiltros] = useState<FiltrosInbox>(() => lerFiltrosDaUrl(new URLSearchParams(params.toString())))
@@ -313,7 +316,7 @@ export function InboxView(props: InboxProps) {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className={cn('truncate text-[13.5px]', naoLidas ? 'font-semibold text-ink' : 'font-medium text-ink')}>{nomeDoContato(c.contato)}</span>
-                        <span className="ml-auto flex-none text-[11px] text-ink-3">{horaCurta(c.ultima_mensagem_at)}</span>
+                        <span className="ml-auto flex-none text-[11px] text-ink-3">{horaCurta(c.ultima_mensagem_at, fuso)}</span>
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5">
                         <Icone size={12} strokeWidth={1.8} className="flex-none text-ink-3" aria-label={c.canal ? c.canal.tipo : 'anterior aos canais'} />

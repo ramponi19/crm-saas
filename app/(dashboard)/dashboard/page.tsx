@@ -3,6 +3,7 @@ import { DashboardView } from '@/components/modules/dashboard/dashboard-view'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { escopoDoUsuario } from '@/lib/escopo'
 import { painelCompleto } from '@/lib/painel/metricas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import DashboardImob from './dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
@@ -18,8 +19,8 @@ async function getDashboardData() {
    * Uma conta só, aqui no servidor (lib/painel/metricas.ts → painelCompleto). Até
    * 21/10/2026 o navegador ainda chamava /api/dashboard e refazia tudo.
    */
-  const escopo = await escopoDoUsuario(supabase, empresaId)
-  return painelCompleto(supabase, empresaId, escopo)
+  const [escopo, fuso] = await Promise.all([escopoDoUsuario(supabase, empresaId), fusoDaEmpresa(supabase, empresaId)])
+  return painelCompleto(supabase, empresaId, escopo, fuso)
 }
 
 export default async function DashboardPage() {

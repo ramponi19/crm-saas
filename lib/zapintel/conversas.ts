@@ -1,4 +1,5 @@
 import { montarLeads } from '@/lib/zapintel/montar'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import type { Lead } from '@/types/zapintel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -309,5 +310,5 @@ export async function carregarConversas(
   // memória, sobre dado já carregado: milissegundos.
   msgs.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
 
-  return { analisados: montarLeads(porId, msgs), porId, nomeDaLoja, preset, indisponivel }
+  return { analisados: montarLeads(porId, msgs, await fusoDaEmpresa(db, empresaId)), porId, nomeDaLoja, preset, indisponivel }
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Modal, Input, Button, notify } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora } from '@/lib/datas'
 
 interface Achado {
   id: number
@@ -36,6 +38,7 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
   onClose: () => void
   onFundido: () => void
 }) {
+  const fuso = useFuso()
   const [q, setQ] = useState('')
   const [achados, setAchados] = useState<Achado[]>([])
   const [buscando, setBuscando] = useState(false)
@@ -148,7 +151,8 @@ export function FundirContatoModal({ contatoId, nomeAtual, onClose, onFundido }:
               {fusoes.map((fz) => (
                 <div key={fz.id} className="flex items-center gap-2 text-[12.5px]">
                   <span className="min-w-0 flex-1 truncate text-ink-2">
-                    {fz.nome ?? 'Contato'}{fz.telefone || fz.instagram ? ` · ${fz.telefone ?? '@' + fz.instagram}` : ''} — {new Date(fz.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {fz.nome ?? 'Contato'}{fz.telefone || fz.instagram ? ` · ${fz.telefone ?? '@' + fz.instagram}` : ''} — {formatarDataHora(fz.em, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso)}
+
                   </span>
                   {fz.podeDesfazer
                     ? <Button size="sm" variant="outline" onClick={() => setADesfazer(fz)}>Desfazer</Button>

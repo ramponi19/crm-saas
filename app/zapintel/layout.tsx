@@ -8,6 +8,8 @@ import { ZapSidebar } from '@/components/zapintel/zap-sidebar'
 import { PreviewBanner } from '@/components/zapintel/preview-banner'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { inteligenciaLigada } from '@/lib/empresa-config'
+import { FusoProvider } from '@/components/fuso-provider'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export const metadata = { title: 'ZapIntel' }
 
@@ -23,11 +25,12 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
   const { userId, empresaId } = await zapintelEmpresa()
   // O complemento é o módulo 'inteligencia' de empresa_modulos (era a tabela à parte
   // complementos_empresa até 21/10/2026) — lib/empresa-config.ts.
-  const [{ data: usuario }, { data: empresa }, addon, papelOk] = await Promise.all([
+  const [{ data: usuario }, { data: empresa }, addon, papelOk, fuso] = await Promise.all([
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     rastrDb().from('empresas').select('nome').eq('id', empresaId).single(),
     inteligenciaLigada(rastrDb(), empresaId),
     zapintelPapelPermitido(userId, empresaId),
+    fusoDaEmpresa(rastrDb(), empresaId),
   ])
 
   const liberado = !!usuario?.is_super_admin || addon
@@ -62,6 +65,7 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
   return (
     <div className="zi-root" style={{ display: 'flex', minHeight: '100dvh' }}>
       <Providers empresaId={empresaId}>
+      <FusoProvider fuso={fuso}>
         <ZapSidebar empresaNome={empresa?.nome ?? 'Minha empresa'} />
         <main className="zi-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100dvh', padding: '28px 24px' }}>
           {previewAtivo && <PreviewBanner empresaNome={empresa?.nome ?? 'empresa'} />}
@@ -69,6 +73,7 @@ export default async function ZapIntelLayout({ children }: { children: React.Rea
         </main>
         {/* O mesmo assistente do CRM, com as análises pendentes no topo. */}
         <AssistenteWidget variante="zapintel" />
+      </FusoProvider>
       </Providers>
     </div>
   )

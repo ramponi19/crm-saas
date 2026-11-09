@@ -6,6 +6,8 @@ import { Plus, Trash2, ClipboardCheck, Car } from 'lucide-react'
 import { Card, Button, Input, Textarea, Select, Badge, Modal, EmptyState, notify } from '@/components/ui'
 import { FipePicker } from '@/components/modules/veiculos/fipe-picker'
 import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 export interface Veiculo {
   categoria?: string; marca?: string; modelo?: string; versao?: string
@@ -36,6 +38,7 @@ const STATUS: Record<string, { label: string; tone: 'neutro' | 'acc' | 'ok' | 'w
 const vazioVeiculo: Veiculo = { categoria: '', marca: '', modelo: '', versao: '', ano: null, placa: '', cor: '', chassi: '' }
 
 export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads: { id: number; nome: string | null }[] }) {
+  const fuso = useFuso()
   const router = useRouter()
   const fipe = useFerramenta('/consulta-fipe')
   const [editando, setEditando] = useState<Avaliacao | 'nova' | null>(null)
@@ -132,7 +135,8 @@ export function AvaliacoesView({ initial, leads }: { initial: Avaliacao[]; leads
                       <button onClick={() => abrir(a)} className="text-[14px] font-semibold text-ink hover:text-accent">{tituloVeiculo(v)}</button>
                       <div className="text-[12px] text-ink-3">
                         {[v?.ano ? String(v.ano) : null, a.km != null ? `${a.km.toLocaleString('pt-BR')} km` : null, v?.placa].filter(Boolean).join(' · ') || 'sem detalhes'}
-                        {' · '}<span className="num">{new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
+                        {' · '}<span className="num">{formatarData(a.created_at, undefined, '', fuso)}
+</span>
                       </div>
                     </div>
                     <div className="text-right">

@@ -9,6 +9,7 @@ import { formatarData } from '@/lib/datas'
 import { Plus, Pencil, Trash2, X, Loader2, Home, Search, ImagePlus, Share2, Globe, KeyRound, ArrowRightLeft, Undo2 } from 'lucide-react'
 import { Button, IconButton, Input, Select, Textarea, Modal, ConfirmDialog, Card, Badge, EmptyState, notify } from '@/components/ui'
 import type { Tables, TablesInsert } from '@/types/database'
+import { useFuso } from '@/components/fuso-provider'
 
 type Imovel = Tables<'imoveis_imoveis'>
 /** Pessoa da carteira que pode ser dona do imóvel — cliente, com o papel marcado. */
@@ -66,6 +67,7 @@ const vazio = {
 type FormT = typeof vazio
 
 export default function ImoveisView({ inicial, proprietarios, equipe, empresaId, slug, chaves = [] }: { inicial: Imovel[]; proprietarios: ProprietarioMin[]; equipe: { id: string; nome: string }[]; empresaId: number; slug: string; chaves?: ChaveDoImovel[] }) {
+  const fuso = useFuso()
   const supabase = createClient()
   const [lista, setLista] = useState<Imovel[]>(inicial)
   const [busca, setBusca] = useState('')
@@ -203,15 +205,15 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
       (im.cidade ?? '').toLowerCase().includes(termo)
     if (!casaBusca) return false
     if (fChave === 'todas') return true
-    return estadoDaChave(chavesPorImovel.get(im.id) ?? []) === fChave
+    return estadoDaChave(chavesPorImovel.get(im.id) ?? [], fuso) === fChave
   })
 
   /** Quantos imóveis em cada estado — o chip mostra o número, como o placar antigo. */
   const contagemChave = useMemo(() => {
     const c: Record<EstadoChave, number> = { sem: 0, na_imobiliaria: 0, emprestada: 0, atrasada: 0 }
-    for (const im of lista) c[estadoDaChave(chavesPorImovel.get(im.id) ?? [])] += 1
+    for (const im of lista) c[estadoDaChave(chavesPorImovel.get(im.id) ?? [], fuso)] += 1
     return c
-  }, [lista, chavesPorImovel])
+  }, [lista, chavesPorImovel, fuso])
 
   // ── Ações de chave (eram a tela /chaves) ──
   async function criarChave(imovelId: number) {
@@ -346,7 +348,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
                           se a chave do imóvel está na loja, na rua ou atrasada. */}
                       {(() => {
                         const dele = chavesPorImovel.get(im.id) ?? []
-                        const est = estadoDaChave(dele)
+                        const est = estadoDaChave(dele, fuso)
                         if (est === 'sem') return null
                         const r = rotuloEstado(est)
                         const quem = comQuemEsta(dele)
@@ -490,7 +492,7 @@ export default function ImoveisView({ inicial, proprietarios, equipe, empresaId,
                 ) : (
                   <div className="mb-2 divide-y divide-line-soft">
                     {(chavesPorImovel.get(editando.id) ?? []).map(c => {
-                      const atrasou = chaveAtrasada(c)
+                      const atrasou = chaveAtrasada(c, fuso)
                       return (
                         <div key={c.id} className="py-2">
                           <div className="flex flex-wrap items-center gap-2">

@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import { Car, RefreshCw, Info } from 'lucide-react'
 import { Card, Button, Badge, notify } from '@/components/ui'
+import { formatarDataHora, FUSO_PADRAO } from '@/lib/datas'
 
 export function FipeView({ mes, atualizadoEm, totalCache }: { mes: string | null; atualizadoEm: string | null; totalCache: number }) {
   const [ref, setRef] = useState({ mes, atualizadoEm })
   const [total] = useState(totalCache)
   const [sincronizando, setSincronizando] = useState(false)
 
-  const fmt = (s: string | null) => (s ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'nunca sincronizado')
+  // Superadmin: hora de Brasília, igual no servidor e no navegador.
+  const fmt = (s: string | null) => formatarDataHora(s, undefined, 'nunca sincronizado', FUSO_PADRAO)
 
   async function atualizar() {
     setSincronizando(true)

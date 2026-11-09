@@ -4,6 +4,7 @@ import { mensagemDoProvedor } from '@/lib/assistente-erros'
 import type { Acesso } from './acesso'
 import { negocioDoPreset } from './negocio'
 import { executar, FERRAMENTAS, ROTULO } from './ferramentas'
+import { formatarNoFuso } from '@/lib/datas'
 
 /**
  * O ASSISTENTE QUE LÊ O SISTEMA.
@@ -48,12 +49,12 @@ export const MODELO_CHAT_PADRAO = 'claude-sonnet-5-5'
 export interface Turno { role: 'user' | 'model'; text: string }
 
 function instrucoes(o: {
-  empresa: string; preset: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null
+  empresa: string; preset: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null; fuso: string
 }): string {
-  const agora = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  }).format(new Date())
+  // "Agora" no relógio DA LOJA: é o que o assistente usa para "hoje", "ontem" e "este mês".
+  const agora = formatarNoFuso(new Date(), {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }, '', o.fuso)
   const limites = [
     o.acesso.soMinhasVendas && 'só vê as próprias vendas',
     o.acesso.soMeusLeads && 'só vê os próprios leads e os sem responsável',
@@ -95,6 +96,8 @@ export function respostaDoChat(o: {
   lojas: string[]
   tela: string | null
   extra: string | null
+  /** Fuso da empresa (lib/fuso-empresa). */
+  fuso: string
   /** Registro de uso (tokens) para o painel do superadmin. */
   registrar: (tokensIn: number, tokensOut: number) => Promise<void>
 }): Response {
@@ -105,7 +108,7 @@ export function respostaDoChat(o: {
   // e entre perguntas da mesma pessoa. Cache neles.
   const system: Anthropic.TextBlockParam[] = [{
     type: 'text',
-    text: instrucoes({ empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra }),
+    text: instrucoes({ empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra, fuso: o.fuso }),
     cache_control: { type: 'ephemeral' },
   }]
   const tools: Anthropic.Tool[] = FERRAMENTAS.map((t, i) =>

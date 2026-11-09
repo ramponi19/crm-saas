@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { TrendingUp, Target, Save } from 'lucide-react'
 import { Card, StatCard, Button, Input, notify } from '@/components/ui'
+import { rotuloDoMes } from '@/lib/datas'
 
 export interface MetaVendedor {
   usuarioId: string
@@ -39,7 +40,7 @@ export function MetasView({ mesAno, metaEmpresa, realizadoTotal, forecast, vende
   )
   const [salvando, setSalvando] = useState<string | null>(null)
 
-  const mesLabel = new Date(`${mesAno}-01T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  const mesLabel = rotuloDoMes(mesAno)
 
   async function salvar(usuarioId: string) {
     setSalvando(usuarioId)

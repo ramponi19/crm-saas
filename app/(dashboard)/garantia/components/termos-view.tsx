@@ -8,6 +8,8 @@ import { formatCurrency } from '@/lib/utils'
 import { Card, Table, Button, Badge, EmptyState, Modal, notify, type Column } from '@/components/ui'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type DocumentoDisponivel } from '@/lib/contrato-emitir'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 export interface TrocaDoTermo { aparelho: string; imei: string | null; valor: number }
 
@@ -56,6 +58,7 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
  * lista faria a fila de "falta assinatura" se perder no meio de reparos.
  */
 export function TermosView({ vendas, documentos, empresaId }: Props) {
+  const fuso = useFuso()
   const router = useRouter()
   const [emitindo, setEmitindo] = useState<number | null>(null)
   const [escolhendoDoc, setEscolhendoDoc] = useState<VendaTermo | null>(null)
@@ -139,7 +142,7 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
   const colunas = (assinado: boolean): Column<VendaTermo>[] => [
     {
       key: 'data', header: 'Data', className: 'num w-[110px]',
-      render: (v) => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span>,
+      render: (v) => <span className="text-ink-2">{formatarData(v.data_venda, undefined, '—', fuso)}</span>,
     },
     {
       // O tipo precisa estar visível: a mesma venda pode ter dois termos, e sem
@@ -168,7 +171,8 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
             <Badge tone="ok">Assinado</Badge>
             {v.assinado_em && (
               <span className="text-[10.5px] text-ink-3">
-                {new Date(v.assinado_em).toLocaleDateString('pt-BR')}{v.anexado_por ? ` · ${v.anexado_por}` : ''}
+                {formatarData(v.assinado_em, undefined, '', fuso)}
+{v.anexado_por ? ` · ${v.anexado_por}` : ''}
               </span>
             )}
           </div>

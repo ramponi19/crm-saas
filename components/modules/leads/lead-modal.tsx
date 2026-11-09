@@ -30,6 +30,8 @@ import { FundirContatoModal } from './fundir-contato-modal'
 import { useRouter } from 'next/navigation'
 import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
+import { useFuso } from '@/components/fuso-provider'
+import { agora as agoraNoRelogio, formatarData, formatarDataHora, formatarDiaMes } from '@/lib/datas'
 
 interface LeadModalProps {
   /**
@@ -246,6 +248,7 @@ const NOME_MIDIA: Record<string, string> = {
  * guardar o arquivo. Ali sabemos o que era e optamos por não ter.
  */
 function MidiaAusente({ placeholder, retidaEm }: { placeholder: string; retidaEm?: string | null }) {
+  const fuso = useFuso()
   /**
    * DUAS AUSENCIAS QUE PARECEM A MESMA, E NAO SAO.
    *
@@ -259,7 +262,7 @@ function MidiaAusente({ placeholder, retidaEm }: { placeholder: string; retidaEm
    * novo; "guardamos 7 dias" explica o que houve.
    */
   if (retidaEm) {
-    const dia = new Date(retidaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const dia = formatarDiaMes(retidaEm, '', fuso)
     return (
       <span className="text-[13px] italic text-[#667781]">
         {NOME_MIDIA[placeholder] ?? 'Anexo'} — não guardado (retirado em {dia})
@@ -415,6 +418,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
    */
   const supabase = createClient()
   const { empresa } = useEmpresa()
+  const fuso = useFuso()
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   /**
@@ -693,7 +697,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     id: m.id,
     from: m.direcao === 'enviada' ? 'loja' : 'cliente',
     text: m.conteudo ?? '',
-    time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    time: formatarDataHora(m.created_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso),
     tipo: m.tipo ?? 'texto',
     midiaUrl: m.midia_url,
     retidaEm: m.midia_retida_em,
@@ -772,7 +776,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               id: m.id,
               from: m.direcao === 'enviada' ? 'loja' : 'cliente',
               text: m.conteudo ?? '',
-              time: new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+              time: formatarDataHora(m.created_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso),
               tipo: m.tipo ?? 'texto',
               midiaUrl: m.midia_url,
               status: m.status_entrega ?? null,
@@ -1147,7 +1151,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     if (!perdaPendente) return
     setSalvandoPerda(true)
     try {
-      const quando = new Date().toLocaleDateString('pt-BR')
+      const quando = formatarData(agoraNoRelogio(), undefined, '', fuso)
+
       const obsNova = justificativa
         ? (form.obs ? form.obs + '\n' : '') + `Justificativa da perda (${quando}): ${justificativa}`
         : form.obs

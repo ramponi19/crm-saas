@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { acessoDoUsuario } from '@/lib/assistente/acesso'
 import { respostaDoChat, MODELO_CHAT_PADRAO, type Turno } from '@/lib/assistente/chat-dados'
 import { negocioDoPreset } from '@/lib/assistente/negocio'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
@@ -109,6 +110,7 @@ export async function POST(req: Request) {
       lojas,
       tela: body.contexto ? String(body.contexto).slice(0, 60) : null,
       extra: cfg?.system_extra ?? null,
+      fuso: await fusoDaEmpresa(supabase, empresaId),
       registrar: async (tokIn, tokOut) => {
         if (usoId && (tokIn || tokOut)) {
           await svc.from('assistente_uso').update({ tokens_in: tokIn, tokens_out: tokOut } as never).eq('id', usoId)

@@ -12,6 +12,8 @@ import { TIPOS_FORMULARIO } from '@/lib/estoque-campos'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Topbar } from '@/components/layout/topbar'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarDiaMes } from '@/lib/datas'
 import {
   Button,
   Input,
@@ -117,6 +119,7 @@ function getInitials(name: string) {
 }
 
 export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit }: Props) {
+  const fuso = useFuso()
   const [tab, setTab] = useState<Tab>('produtos')
   const produtos = produtosInit
   const tabela = tabelaInit
@@ -145,7 +148,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `tabela-precos_${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `tabela-precos_${diaNoFuso(agora(), fuso)}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }
@@ -326,7 +329,8 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
   const colsEstoque: Column<Unidade>[] = [
     {
       key: 'data', header: 'Data', className: 'num w-[80px]',
-      render: (u) => { const d = new Date(u.created_at); return <span className="text-ink-2">{`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`}</span> },
+      render: (u) => <span className="text-ink-2">{formatarDiaMes(u.created_at, '', fuso)}</span>,
+
     },
     { key: 'produto', header: 'Produto', render: (u) => <span className="truncate font-semibold text-ink">{u.produto_nome}</span> },
     {

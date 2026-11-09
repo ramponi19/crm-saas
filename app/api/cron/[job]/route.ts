@@ -61,8 +61,8 @@ export async function GET(
         // Filtrava por `created_at`, coluna que `stripe_eventos` não tem — a
         // data dela é `processado_em`. O job falhava todo dia desde setembro
         // com "Erro no cron" no log, sem apagar nada (achado em 14/10/2026).
-        const corte = new Date()
-        corte.setDate(corte.getDate() - 90)
+        // 90 dias de 24h para trás (janela móvel, não depende de fuso).
+        const corte = new Date(Date.now() - 90 * 86_400_000)
         const { data, error } = await supabase
           .from('stripe_eventos')
           .delete()

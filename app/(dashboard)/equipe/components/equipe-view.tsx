@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { UserPlus, UserMinus, Pencil, Save, ChevronLeft, ChevronRight, Check, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
-import { janelaDoPeriodo } from '@/lib/ranking'
+import { diaNoFuso, formatarData, limitesDoMes, mesNoFuso } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
 import { JANELA_ONLINE_MIN } from '@/lib/presenca'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
@@ -73,12 +74,12 @@ const ROLES: { value: string; label: string; tone: Tone }[] = [
 function initials(nome: string) {
   return nome.trim().split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
-function fmtAcesso(d: string | null) {
+function fmtAcesso(d: string | null, fuso: string) {
   if (!d) return '—'
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
   if (diff < 2) return 'Agora'; if (diff < 60) return `${diff} min`
   if (diff < 1440) return `${Math.floor(diff/60)}h`; if (diff < 2880) return 'Ontem'
-  return new Date(d).toLocaleDateString('pt-BR')
+  return formatarData(d, undefined, '—', fuso)
 }
 function prevMonth(m: string) {
   const [y, mo] = m.split('-').map(Number)
@@ -231,7 +232,9 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
 const supabase = createClient()
 
 function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
-  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
+  const fuso = useFuso()
+  // O mês da loja, não o do UTC (que vira às 21h do último dia em Brasília).
+  const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [metas, setMetas] = useState<Record<string, Meta & { _dirty?: boolean }>>({})
   const [saving, setSaving] = useState<string | null>(null)
 
@@ -352,7 +355,8 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
 // ─── Aba Comissões ────────────────────────────────────────────────────────────
 
 function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
-  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
+  const fuso = useFuso()
+  const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [vendas, setVendas] = useState<VendaResumo[]>([])
   const [metas, setMetas] = useState<Array<Meta & { empresa_id: number }>>([])
   const [pagas, setPagas] = useState<ComissaoPaga[]>([])
@@ -364,10 +368,12 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
   const load = useCallback(async () => {
     // Janela pela função única. O cálculo que estava aqui produzia 3 HORAS em vez
-    // de um mês (ver janelaDoPeriodo), então a aba Comissões mostrava faturamento
-    // zero para todo mundo — e ninguém desconfiava, porque zero é um número
-    // plausível.
-    const { ini: inicio, fim } = janelaDoPeriodo(mes)
+    // de um mês, então a aba Comissões mostrava faturamento zero para todo mundo —
+    // e ninguém desconfiava, porque zero é um número plausível. Desde 10/11/2026 o
+    // mês é o do fuso da empresa (lib/datas), não o do computador de quem abriu.
+    const janela = limitesDoMes(mes, fuso)
+    const inicio = janela.de.toISOString()
+    const fim = janela.ate.toISOString()
     const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
       supabase.from('vendas_vendas').select('vendedor_id, valor_venda, status, grupo_pdv').gte('data_venda', inicio).lt('data_venda', fim).eq('status', 'concluida'),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
@@ -384,7 +390,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     ])
     setVendas(v ?? []); setMetas(m ?? []); setPagas(p ?? [])
     setGruposRetidos(new Set(((pend ?? []) as { grupo_pdv: string | null }[]).map((u) => u.grupo_pdv).filter((g): g is string => !!g)))
-  }, [mes])
+  }, [mes, fuso])
 
   useEffect(() => { load() }, [load])
 
@@ -399,7 +405,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
     if (pagas.some(p => p.usuario_id === uid)) { notify.warn('Comissão já quitada neste mês'); setQuitando(null); return }
     const { error } = await supabase.from('vendas_comissoes').insert({
       usuario_id: uid, valor_comissao: valorComissao, percentual, mes_referencia: mes,
-      status: 'pago', data_pagamento: new Date().toISOString().split('T')[0], empresa_id,
+      status: 'pago', data_pagamento: diaNoFuso(undefined, fuso), empresa_id,
     })
     if (error) { notify.bad('Erro ao quitar', error.message); setQuitando(null); return }
     notify.ok('Comissão quitada!'); await load(); setQuitando(null)
@@ -570,6 +576,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {} }: Props) {
   const router = useRouter()
+  const fuso = useFuso()
 
   /**
    * Bolinha verde de quem está no CRM agora — por REALTIME, não por consulta
@@ -722,7 +729,7 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
           Online
         </span>
       ) : (
-        <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso)}</span>
+        <span className="text-ink-2">{fmtAcesso(u.ultimo_acesso, fuso)}</span>
       ),
     },
     {

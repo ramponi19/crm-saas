@@ -11,6 +11,8 @@ import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
 import type { Classe } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, num, ha } from "@/components/zapintel/rotulos";
+import { formatarDiaMes, formatarNoFuso } from "@/lib/datas";
+import { useFuso } from "@/components/fuso-provider";
 
 /**
  * ATENDIMENTO — COMO A LOJA ATENDE. Substitui Performance I e II (15/10/2026).
@@ -331,13 +333,12 @@ function Semanas({ d }: { d: Atendimento }) {
         <div className="at-semanas">
           {d.semanas.map((s, i) => {
             const atual = i === d.semanas.length - 1;
-            const dt = new Date(`${s.inicio}T12:00:00`);
             return (
               <div key={s.inicio} className={`at-sem ${atual ? "atual" : ""}`} title={`${num(s.turnos)} vezes que clientes falaram`}>
                 <b>{s.mais4h}%</b>
                 <div className="at-sem-trilho"><span style={{ height: `${(s.mais4h / max) * 100}%`, background: s.mais4h >= 12 ? "var(--red)" : s.mais4h >= 9 ? "var(--orange)" : "var(--green)" }} /></div>
                 <small>{minutos(s.mediana)}</small>
-                <em>{dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}{atual ? " · atual" : ""}</em>
+                <em>{formatarDiaMes(s.inicio)}{atual ? " · atual" : ""}</em>
               </div>
             );
           })}
@@ -379,6 +380,7 @@ function ForaDoHorario({ d }: { d: Atendimento }) {
  * lê pronto (10 ms). "Recalcular" faz a conta na hora. Mede no máximo 30 dias.
  */
 function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: number | null; empresa: number | null }) {
+  const fuso = useFuso();
   const diasConta = dias == null || dias > 30 ? 30 : dias;
   const [d, setD] = useState<Conversa | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -426,7 +428,7 @@ function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: numb
         </div>
         <div className="at-recalc-caixa">
           {d?.geradoEm && !carregando && (
-            <span>calculado {new Date(d.geradoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}</span>
+            <span>calculado {formatarNoFuso(d.geradoEm, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, "", fuso)}</span>
           )}
           <button className="at-link at-recalc" onClick={() => { forcar.current = true; setRodada((r) => r + 1); }} disabled={carregando}>
             <RefreshCw size={12} className={carregando ? "gira" : ""} /> {carregando ? "calculando…" : "recalcular"}

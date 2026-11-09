@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { TrendingUp, ArrowUpRight } from 'lucide-react'
 import { SyncStripeButton } from '@/components/superadmin/sync-stripe-button'
 import { StatCard } from '@/components/ui'
+import { agora } from '@/lib/datas'
 
 const ROXO = '#6D28D9'
 
@@ -41,9 +42,8 @@ export default async function SuperAdminDashboard() {
     .filter(e => e.status === 'ativo' && e.plano !== 'free')
     .reduce((acc, e) => acc + (PRECO_PLANO[e.plano] ?? 0), 0)
 
-  // Novos cadastros nos últimos 30 dias
-  const trintaDiasAtras = new Date()
-  trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30)
+  // Novos cadastros nos últimos 30 dias (janela móvel: não depende de fuso)
+  const trintaDiasAtras = new Date(agora().getTime() - 30 * 86_400_000)
   const novos30d = lista.filter(
     e => e.created_at && new Date(e.created_at) >= trintaDiasAtras
   ).length

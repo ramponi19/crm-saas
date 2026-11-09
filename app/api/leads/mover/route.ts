@@ -5,6 +5,8 @@ import { inscreverPorEtapa } from '@/lib/cadencia'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
+import { formatarData } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
 const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
@@ -156,7 +158,7 @@ export async function POST(req: Request) {
   const justificativa = body.justificativa?.trim()
   const observacoes = body.observacoes ?? (justificativa
     ? (n.contato?.observacoes ? n.contato.observacoes + '\n' : '')
-      + `Justificativa da perda (${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}): ${justificativa}`
+      + `Justificativa da perda (${formatarData(agora, undefined, '', await fusoDaEmpresa(supabase, empresaId))}): ${justificativa}`
     : null)
   if (observacoes && n.contato) {
     const { data: obsGravada, error: errObs } = await supabase.from('contatos').update({ observacoes }).eq('id', n.contato.id).select('id')

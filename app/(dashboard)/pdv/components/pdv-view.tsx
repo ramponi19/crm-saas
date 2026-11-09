@@ -26,6 +26,7 @@ import {
   resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
   FORMAS_PARCELAVEIS, type LinhaPagamento,
 } from '@/lib/pdv-pagamentos'
+import { useFuso } from '@/components/fuso-provider'
 
 interface ItemEstoque {
   id: number; produto_id: number | null; produto_nome: string; marca_nome: string
@@ -94,6 +95,7 @@ const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0
 const fmt = (v: number) => formatCurrency(v)
 
 export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
+  const fuso = useFuso()
   // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
   // por mesa usam o mesmo campo. Vem pronta da página (capacidades dos módulos ligados: Cardápio).
   const isFood = usaComanda
@@ -112,8 +114,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [aba, setAba] = useState<'pronta' | 'encomenda'>('pronta')
   /** Só para pintar o contador da aba de vermelho quando há algo estourado. */
   const encomendasAtrasadas = useMemo(
-    () => encomendas.filter((e) => diagnosticar(e).situacao === 'atrasada').length,
-    [encomendas],
+    () => encomendas.filter((e) => diagnosticar(e, undefined, fuso).situacao === 'atrasada').length,
+    [encomendas, fuso],
   )
   const supabase = createClient()
   const router = useRouter()

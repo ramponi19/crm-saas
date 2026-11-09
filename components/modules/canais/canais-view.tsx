@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loader2, Info } from 'lucide-react'
 import { Button, Badge, ConfirmDialog, Modal, Textarea, notify } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData, formatarDataHora } from '@/lib/datas'
 
 // ⚠️ Zona sensível (Meta). Esta tela dispara o fluxo oficial de conexão.
 // O token do cliente nunca passa por aqui: o navegador recebe só um código de
@@ -56,8 +58,8 @@ const ROTULO_STATUS: Record<Canal['status'], { texto: string; tom: 'ok' | 'warn'
 }
 
 
-const dataBr = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null
+/** Data no fuso da loja (o mesmo texto no servidor e no navegador); nula sem data. */
+const dataBr = (iso: string | null, fuso: string) => formatarData(iso, undefined, '', fuso) || null
 
 /** Limite a partir do qual o vencimento do token vira assunto do lojista. */
 const DIAS_PARA_ALARMAR = 7
@@ -70,6 +72,7 @@ const diasParaVencer = (iso: string | null): number | null => {
 }
 
 export function CanaisView({ appId }: { appId: string }) {
+  const fuso = useFuso()
   const [canais, setCanais] = useState<Canal[]>([])
   const [lojas, setLojas] = useState<Loja[]>([])
   const [mudandoLoja, setMudandoLoja] = useState<number | null>(null)
@@ -565,7 +568,7 @@ export function CanaisView({ appId }: { appId: string }) {
         const c = por(tipo)
         const { nome, icone: Icone, cor } = META[tipo]
         const st = c ? ROTULO_STATUS[c.status] : null
-        const acessoExpira = dataBr(c?.data_access_expira_em ?? null)
+        const acessoExpira = dataBr(c?.data_access_expira_em ?? null, fuso)
         /**
          * Dias até o token vencer, e SÓ quando já está em zona de risco.
          *
@@ -592,7 +595,7 @@ export function CanaisView({ appId }: { appId: string }) {
                   {c ? (
                     <div className="mt-1 space-y-0.5 text-sm text-ink-2">
                       <p>{c.nome_exibicao ?? c.external_id}</p>
-                      {c.ultima_msg_em && <p className="text-xs text-ink-3">Última mensagem: {new Date(c.ultima_msg_em).toLocaleString('pt-BR')}</p>}
+                      {c.ultima_msg_em && <p className="text-xs text-ink-3">Última mensagem: {formatarDataHora(c.ultima_msg_em, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }, '', fuso)}</p>}
                       {c.sync_historico_pct != null && c.sync_historico_pct < 100 && (
                         <p className="text-xs text-ink-3">Copiando conversas anteriores: {c.sync_historico_pct}%</p>
                       )}

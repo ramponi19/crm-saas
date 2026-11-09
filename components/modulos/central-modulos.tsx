@@ -8,6 +8,8 @@ import { MENU_ICONS } from '@/components/layout/menu-icons'
 import { GRUPOS_MODULO } from '@/core/modulos'
 import type { TileModulo } from '@/lib/modulos-central'
 import { cn } from '@/lib/utils'
+import { formatarDiaMes } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
 
 /**
  * A grade da Central de Módulos (22/10/2026). O estado de cada tile já vem
@@ -35,10 +37,10 @@ export interface TileComIcone extends TileModulo {
   foraDoMenu: boolean
 }
 
-const dia = (iso: string) =>
-  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
+const dia = (iso: string, fuso: string) => formatarDiaMes(iso, '', fuso)
 
 export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComIcone[]; podeMudar: boolean; destaque: string | null }) {
+  const fuso = useFuso()
   const router = useRouter()
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [tirar, setTirar] = useState<TileComIcone | null>(null)
@@ -122,7 +124,7 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">{t.frase}</p>
                           {podeMudar && recusadoEm && (
                             <p className="mt-1 text-[11.5px] text-ink-3">
-                              Seu pedido foi recusado em {dia(recusadoEm)}.{e.tipo === 'pago' ? ' Você pode pedir de novo.' : ''}
+                              Seu pedido foi recusado em {dia(recusadoEm, fuso)}.{e.tipo === 'pago' ? ' Você pode pedir de novo.' : ''}
                             </p>
                           )}
                           {t.foraDoMenu && (
@@ -164,7 +166,7 @@ export function CentralModulos({ tiles, podeMudar, destaque }: { tiles: TileComI
                           {e.tipo === 'pago' && (pedidoEm ? (
                             <>
                               <Button size="sm" variant="outline" disabled>Pedido enviado</Button>
-                              <span className="text-[12px] text-ink-3">em {dia(pedidoEm)}</span>
+                              <span className="text-[12px] text-ink-3">em {dia(pedidoEm, fuso)}</span>
                             </>
                           ) : (
                             <>

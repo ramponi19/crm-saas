@@ -3,6 +3,7 @@ import type { Database } from '@/types/database'
 import { aplicarEscopo, type Escopo } from '@/lib/escopo'
 import { SEM_NOME } from '@/lib/sem-nome'
 import { lerFechamentos } from '@/lib/fechamentos'
+import { FUSO_PADRAO, agora, inicioDoAno, inicioDoDia, inicioDoDiaHaDias, inicioDoMes, mesNoFuso, paraData } from '@/lib/datas'
 
 /**
  * TODO NÚMERO DO PAINEL SAI DAQUI (etapa 0, 21/10/2026).
@@ -85,14 +86,23 @@ export function resultadoDasVendas(vendas: Array<{ valor_venda: number | null; v
 
 // ── Períodos ──────────────────────────────────────────────────────────────
 
-export function inicioDosPeriodos(): Record<string, Date> {
-  const now = new Date()
-  const hoje = new Date(now); hoje.setHours(0, 0, 0, 0)
-  const d7 = new Date(now); d7.setDate(d7.getDate() - 7); d7.setHours(0, 0, 0, 0)
-  const d30 = new Date(now); d30.setDate(d30.getDate() - 30); d30.setHours(0, 0, 0, 0)
-  const mes = new Date(now.getFullYear(), now.getMonth(), 1)
-  const ano = new Date(now.getFullYear(), 0, 1)
-  return { hoje, '7d': d7, '30d': d30, mes, ano }
+/**
+ * Início de cada período do painel, à MEIA-NOITE DA LOJA (fuso da empresa).
+ *
+ * Até 10/11/2026 era `setHours(0,0,0,0)` e `new Date(ano, mes, 1)` no servidor, que
+ * roda em UTC: o "Hoje" começava às 21h de ontem (passava o dia somando as vendas de
+ * ontem das 21h às 24h e zerava às 21h), e "Mês"/"Ano" começavam às 21h do último
+ * dia do período anterior. Os períodos mantêm o mesmo sentido (7d = desde 00h de 7
+ * dias atrás); muda só onde o dia começa.
+ */
+export function inicioDosPeriodos(agoraRef: Date = agora(), fuso: string = FUSO_PADRAO): Record<string, Date> {
+  return {
+    hoje: inicioDoDia(agoraRef, fuso),
+    '7d': inicioDoDiaHaDias(7, agoraRef, fuso),
+    '30d': inicioDoDiaHaDias(30, agoraRef, fuso),
+    mes: inicioDoMes(agoraRef, fuso),
+    ano: inicioDoAno(agoraRef, fuso),
+  }
 }
 
 // ── Vendas ────────────────────────────────────────────────────────────────
@@ -302,12 +312,11 @@ export interface DadosPainel {
  * saiu; a página chama esta função e entrega pronto, inclusive os outros períodos
  * (a troca Hoje/7 dias/Mês/Ano é só escolher qual mostrar).
  */
-export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo): Promise<DadosPainel> {
-  const starts = inicioDosPeriodos()
-  const inicio12m = new Date()
-  inicio12m.setMonth(inicio12m.getMonth() - 12)
-  inicio12m.setDate(1); inicio12m.setHours(0, 0, 0, 0)
-  const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
+export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo, fuso: string = FUSO_PADRAO, agoraRef: Date = agora()): Promise<DadosPainel> {
+  const starts = inicioDosPeriodos(agoraRef, fuso)
+  const inicio12m = inicioDoMes(agoraRef, fuso, -12)
+  // A meta do mês é a do mês DA LOJA: no dia 30 às 21h o UTC já está no mês seguinte.
+  const mesAtual = mesNoFuso(agoraRef, fuso) // YYYY-MM
 
   const [vendas, recentes, contagens, { vendedores, metaPorUsuario }] = await Promise.all([
     vendasDesde(db, empresaId, escopo, inicio12m),
@@ -324,12 +333,12 @@ export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo):
     periods[key] = resultadoDasVendas(fechadas.filter((v) => v.data_venda && new Date(v.data_venda).getTime() >= startMs))
   }
 
-  // Faturamento mensal, 12 meses.
+  // Faturamento mensal, 12 meses — a venda das 21h do dia 30 é do mês dela, no fuso da loja.
   const porMes: Record<string, number> = {}
   for (const v of fechadas) {
-    if (!v.data_venda) continue
-    const d = new Date(v.data_venda)
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const d = paraData(v.data_venda)
+    if (!d) continue
+    const k = mesNoFuso(d, fuso)
     porMes[k] = (porMes[k] ?? 0) + v.valor_venda
   }
   const faturamentoMensal = Object.entries(porMes).map(([mes, total]) => ({ mes, total })).sort((a, b) => a.mes.localeCompare(b.mes))

@@ -13,6 +13,7 @@ import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 import { consultaClientes } from '@/lib/clientes'
+import { formatarData, FUSO_PADRAO } from '@/lib/datas'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -45,9 +46,9 @@ function getInitials(nome: string) {
   return nome.slice(0, 2).toUpperCase()
 }
 
+// Superadmin não é de uma empresa: o dia de Brasília (o servidor roda em UTC).
 function fmtData(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+  return formatarData(d, { day: '2-digit', month: 'long', year: 'numeric' }, '—', FUSO_PADRAO)
 }
 
 interface PageProps {

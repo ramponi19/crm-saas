@@ -6,6 +6,7 @@
 
 import { valorPorExtenso } from './contrato-extenso'
 import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
+import { agora, FUSO_PADRAO, paraData, partesNoFuso } from './datas'
 
 /**
  * Um bloco de texto posicionado na página, em PORCENTAGEM (escala com o papel).
@@ -114,11 +115,12 @@ function descreverPagamentos(partes: NonNullable<DadosMescla['pagamentos']>): st
   return `${txt.slice(0, -1).join(', ')} e ${txt[txt.length - 1]}`
 }
 
-function dataExtenso(iso?: string): string {
-  const d = iso ? new Date(iso) : new Date()
+/** "10 de novembro de 2026" — o dia no fuso da empresa (no servidor UTC, depois das 21h saía amanhã). */
+function dataExtenso(iso: string | undefined, fuso: string): string {
+  const p = partesNoFuso(paraData(iso) ?? agora(), fuso)
   const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho',
     'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
-  return `${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`
+  return `${p.dia} de ${meses[p.mes - 1]} de ${p.ano}`
 }
 
 function enderecoLinha(c: ContratoComprador): string {
@@ -154,7 +156,7 @@ function tabelaItens(itens: ContratoItem[], garantiaPadrao: number): string {
  * A ordem importa na substituicao: chaves mais longas primeiro, senao
  * {{total}} comeria o inicio de {{total_extenso}}.
  */
-export function marcadores(d: DadosMescla): Record<string, string> {
+export function marcadores(d: DadosMescla, fuso: string = FUSO_PADRAO): Record<string, string> {
   const c = d.comprador
   const itensDesc = d.itens.filter((i) => i.descricao?.trim()).map((i) => i.descricao)
   // A divisão detalhada manda quando existe; a forma única é o caminho comum.
@@ -207,7 +209,7 @@ export function marcadores(d: DadosMescla): Record<string, string> {
     'parcelas': String(d.parcelas ?? 1),
     'garantia_dias': String(d.garantia_dias),
     'vendedor': esc(d.vendedor ?? ''),
-    'data_extenso': dataExtenso(d.data),
+    'data_extenso': dataExtenso(d.data, fuso),
     // Aparelhos entregues pelo cliente na troca — base do termo de entrega do
     // usado. Sem troca, todos saem vazios (ou zerados), e o modelo que os usa
     // simplesmente não mostra nada.
@@ -349,9 +351,9 @@ const CSS_PAGINA = `
 export function renderizarModelo(
   modelo: ModeloContrato,
   dados: DadosMescla,
-  opts: { reconstituido?: boolean } = {},
+  opts: { reconstituido?: boolean; fuso?: string } = {},
 ): string {
-  const valores = marcadores(dados)
+  const valores = marcadores(dados, opts.fuso ?? FUSO_PADRAO)
   const paginas = [...modelo.paginas].sort((a, b) => a.ordem - b.ordem)
 
   const corpo = paginas.map((p, i) => {

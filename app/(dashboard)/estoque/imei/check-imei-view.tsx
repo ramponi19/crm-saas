@@ -13,6 +13,8 @@ import {
   validarImei, formatarImei, URL_CONSULTA_OFICIAL,
   MOTIVOS_IMPEDIMENTO, RESULTADO_ROTULO, type ResultadoImei,
 } from '@/lib/imei'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 export interface ConsultaImei {
   id: number
@@ -42,6 +44,7 @@ const TOM: Record<string, 'ok' | 'bad' | 'warn'> = {
  * resultado não morrer na memória de quem consultou.
  */
 export function CheckImeiView({ consultas }: { consultas: ConsultaImei[] }) {
+  const fuso = useFuso()
   const router = useRouter()
   const [imei, setImei] = useState('')
   const [resultado, setResultado] = useState<ResultadoImei>('aprovado')
@@ -119,7 +122,7 @@ export function CheckImeiView({ consultas }: { consultas: ConsultaImei[] }) {
       key: 'quando', header: 'Consultado', align: 'right', className: 'num',
       render: (c) => (
         <div className="flex flex-col items-end">
-          <span className="text-ink-2">{new Date(c.consultado_em).toLocaleDateString('pt-BR')}</span>
+          <span className="text-ink-2">{formatarData(c.consultado_em, undefined, '', fuso)}</span>
           {c.consultado_por_nome && <span className="text-[10.5px] text-ink-3">{c.consultado_por_nome}</span>}
         </div>
       ),
@@ -164,7 +167,8 @@ export function CheckImeiView({ consultas }: { consultas: ConsultaImei[] }) {
                   <div className="mb-1 text-[12px] font-semibold text-ink">Este IMEI já foi consultado</div>
                   {anteriores.slice(0, 3).map((c) => (
                     <div key={c.id} className="text-[11.5px] text-ink-2">
-                      {new Date(c.consultado_em).toLocaleDateString('pt-BR')} ·{' '}
+                      {formatarData(c.consultado_em, undefined, '', fuso)} ·{' '}
+
                       <span className={c.resultado === 'reprovado' ? 'font-semibold text-bad' : 'text-ink-2'}>
                         {RESULTADO_ROTULO[c.resultado as ResultadoImei] ?? c.resultado}
                       </span>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Megaphone } from 'lucide-react'
 import { Card, Button, Input, Textarea, Select, Badge, ConfirmDialog, EmptyState, notify } from '@/components/ui'
+import { FUSO_PADRAO, formatarData, instanteLocal } from '@/lib/datas'
 
 const PLATFORM = '#6D28D9'
 
@@ -22,9 +23,12 @@ export type Aviso = {
 const TOM_LABEL: Record<string, string> = { info: 'Informativo', alerta: 'Alerta', sucesso: 'Novidade' }
 const TOM_TONE: Record<string, 'neutro' | 'warn' | 'ok'> = { info: 'neutro', alerta: 'warn', sucesso: 'ok' }
 
+/**
+ * Superadmin cuida de todas as empresas: não há "a" empresa da tela, então vale o
+ * fuso padrão (Brasília) — fixo, para o servidor e o navegador escreverem igual.
+ */
 function fmtData(d: string | null) {
-  if (!d) return null
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatarData(d, { day: '2-digit', month: 'short', year: 'numeric' }, '', FUSO_PADRAO) || null
 }
 
 export function AvisosManager({ avisosInit, empresas, planos }: {
@@ -61,7 +65,9 @@ export function AvisosManager({ avisosInit, empresas, planos }: {
         body: JSON.stringify({
           titulo, corpo, tom, alvo,
           alvo_valor: alvo === 'todos' ? null : alvoValor,
-          expira_em: expira ? new Date(expira).toISOString() : null,
+          // O campo é um DIA: expira à 00h dele em Brasília. `new Date('2026-11-20')` era
+          // meia-noite UTC = 19/11 21h, e a lista mostrava "expira 19/11".
+          expira_em: expira ? instanteLocal(expira, '00:00', FUSO_PADRAO).toISOString() : null,
         }),
       })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Falha ao criar') }

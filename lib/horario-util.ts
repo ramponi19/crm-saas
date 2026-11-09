@@ -1,3 +1,5 @@
+import { FUSO_PADRAO, diaNoFuso, instanteLocal, partesNoFuso, somarDias } from '@/lib/datas'
+
 /**
  * Minutos ÚTEIS entre dois instantes, segundo o horário de funcionamento da loja.
  *
@@ -27,24 +29,13 @@ export function minutosDoDia(hhmm: string): number | null {
 }
 
 /**
- * Fuso: o horário da loja é local (America/Sao_Paulo), e o servidor roda em UTC.
- * Comparar a hora UTC com "09:00" abriria a loja às 6 da manhã. Converte-se o
- * instante para a hora local antes de decidir se está aberto.
+ * Fuso: o horário da loja é local (o fuso da empresa, padrão Brasília), e o servidor
+ * roda em UTC. Comparar a hora UTC com "09:00" abriria a loja às 6 da manhã.
+ * Converte-se o instante para a hora local antes de decidir se está aberto.
  */
-const FUSO = 'America/Sao_Paulo'
-
-function partesLocais(d: Date): { diaSemana: number; minutos: number; dia: string } {
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: FUSO, weekday: 'short', hour: '2-digit', minute: '2-digit',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour12: false,
-  })
-  const p = Object.fromEntries(fmt.formatToParts(d).map((x) => [x.type, x.value]))
-  const semana: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-  return {
-    diaSemana: semana[p.weekday as string] ?? 0,
-    minutos: Number(p.hour) * 60 + Number(p.minute),
-    dia: `${p.year}-${p.month}-${p.day}`,
-  }
+function partesLocais(d: Date, fuso: string): { diaSemana: number; minutos: number; dia: string } {
+  const p = partesNoFuso(d, fuso)
+  return { diaSemana: p.diaSemana, minutos: p.hora * 60 + p.minuto, dia: diaNoFuso(d, fuso) }
 }
 
 /**
@@ -54,7 +45,7 @@ function partesLocais(d: Date): { diaSemana: number; minutos: number; dia: strin
  * interseção do expediente com o intervalo. Limite de 400 dias para um `de`
  * corrompido não virar laço infinito.
  */
-export function minutosUteis(de: Date, ate: Date, horario: HorarioLoja): number {
+export function minutosUteis(de: Date, ate: Date, horario: HorarioLoja, fuso: string = FUSO_PADRAO): number {
   if (!(de instanceof Date) || !(ate instanceof Date)) return 0
   if (ate <= de) return 0
 
@@ -70,7 +61,7 @@ export function minutosUteis(de: Date, ate: Date, horario: HorarioLoja): number 
   let total = 0
   const cursor = new Date(de.getTime())
   for (let i = 0; i < 400; i++) {
-    const { diaSemana, minutos: minAtual, dia } = partesLocais(cursor)
+    const { diaSemana, minutos: minAtual, dia } = partesLocais(cursor, fuso)
 
     if (dias.includes(diaSemana)) {
       // Fim do expediente DESTE dia, em instante absoluto.
@@ -81,9 +72,8 @@ export function minutosUteis(de: Date, ate: Date, horario: HorarioLoja): number 
       if (ate <= fimExpediente) break
     }
 
-    // Pula para 00:00 local do dia seguinte.
-    const proximo = new Date(`${dia}T00:00:00-03:00`)
-    proximo.setDate(proximo.getDate() + 1)
+    // Pula para 00:00 do dia seguinte, no fuso da loja.
+    const proximo = instanteLocal(somarDias(dia, 1), '00:00', fuso)
     if (proximo <= cursor) break
     if (proximo >= ate) break
     cursor.setTime(proximo.getTime())

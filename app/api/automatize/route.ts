@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { agora, inicioDoDia } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import { CHAVE_PAUSA } from '@/lib/automacoes'
 
@@ -21,10 +23,6 @@ import { CHAVE_PAUSA } from '@/lib/automacoes'
 const ACOES = ['criar_tarefa', 'notificar_gestor', 'enviar_modelo', 'atribuir_responsavel'] as const
 type Acao = typeof ACOES[number]
 
-function inicioDoDiaSp(): string {
-  const agora = new Date(Date.now() - 3 * 3_600_000)
-  return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()) + 3 * 3_600_000).toISOString()
-}
 
 async function papel(supabase: Awaited<ReturnType<typeof createClient>>, empresaId: number, userId: string) {
   const { data } = await supabase.from('empresa_usuarios').select('role')
@@ -39,7 +37,8 @@ export async function GET(req: Request) {
   const funilId = Number(new URL(req.url).searchParams.get('funil')) || null
 
   const role = await papel(supabase, empresaId, user.id)
-  const hoje = inicioDoDiaSp()
+  // 00:00 de hoje no fuso DA LOJA (antes: deslocamento fixo de −3h).
+  const hoje = inicioDoDia(agora(), await fusoDaEmpresa(supabase, empresaId)).toISOString()
 
   let qEtapas = supabase.from('funil_etapas').select('id, slug, label, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem')
   if (funilId) qEtapas = qEtapas.eq('funil_id', funilId)

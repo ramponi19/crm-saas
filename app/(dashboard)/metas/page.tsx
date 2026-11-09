@@ -2,6 +2,8 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { MetasView, type MetaVendedor } from './metas-view'
+import { limitesDoMes, mesNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export const metadata = { title: 'Metas' }
 
@@ -23,10 +25,12 @@ export default async function MetasPage() {
   if (!isAdmin) redirect('/dashboard')
 
   const SELECT_PIPELINE: string = 'funil_id, valor_estimado, etapa:funil_etapas!etapa_id(slug), legado:dados->_lead->>kanban_status'
-  const now = new Date()
-  const mesAno = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const inicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const fim = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+  // Mês da meta no fuso da loja: vira à meia-noite do dia 1º, não às 21h do último dia.
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const mesAno = mesNoFuso(undefined, fuso)
+  const limites = limitesDoMes(mesAno, fuso)
+  const inicio = limites.de.toISOString()
+  const fim = limites.ate.toISOString()
 
   const [{ data: prefRow }, { data: membrosRaw }, { data: metasRaw }, { data: vendasRaw }, { data: etapasRaw }, { data: leadsRaw }] = await Promise.all([
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'preferencias').maybeSingle(),

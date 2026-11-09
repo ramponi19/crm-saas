@@ -7,6 +7,8 @@ import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
 import { num, ha } from "@/components/zapintel/rotulos";
 import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
+import { formatarData } from "@/lib/datas";
+import { useFuso } from "@/components/fuso-provider";
 
 /**
  * PÓS-VENDA — QUEM JÁ COMPROU E PRECISA DA LOJA. Reconstruída em 15/10/2026.
@@ -127,6 +129,7 @@ export default function PosVendaPage() {
 }
 
 function Cartao({ c, agora }: { c: Cliente; agora: number }) {
+  const fuso = useFuso();
   const [copiado, setCopiado] = useState(false);
   const crm = `/leads?lead=${c.leadId}`;
   async function copiar() {
@@ -148,7 +151,7 @@ function Cartao({ c, agora }: { c: Cliente; agora: number }) {
       <div className="pv2-compra">
         <ShoppingBag size={12} />
         {c.vendaEm
-          ? <>{c.produto || "Produto não informado"}{c.valor ? ` · ${reais(c.valor)}` : ""} · {new Date(c.vendaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}</>
+          ? <>{c.produto || "Produto não informado"}{c.valor ? ` · ${reais(c.valor)}` : ""} · {formatarData(c.vendaEm, undefined, "", fuso)}</>
           : <span className="pv2-sem">venda não registrada no CRM — a conversa diz que comprou</span>}
       </div>
       {!!c.pendencias?.length && (

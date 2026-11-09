@@ -14,6 +14,7 @@ import type { Lead } from "@/types/zapintel";
 import type { Ficha } from "@/lib/zapintel/ficha";
 import type { Travou } from "@/lib/zapintel/travou";
 import type { PerfilIA } from "@/lib/zapintel/perfil";
+import { formatarDiaMes } from "@/lib/datas";
 
 /**
  * A FICHA DO LEAD — REESCRITA DO ZERO EM 15/10/2026.
@@ -296,7 +297,7 @@ export default function FichaDoLead() {
         <section className="card fc-relato">
           <div className="fc-cab">
             <h2>O que aconteceu</h2>
-            <span className="fc-mudo">{ia?.relato ? "escrito pela análise" : "fatos da conversa"} · conversa até {new Date(`${ficha.ultimaEm}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
+            <span className="fc-mudo">{ia?.relato ? "escrito pela análise" : "fatos da conversa"} · conversa até {formatarDiaMes(ficha.ultimaEm)}</span>
           </div>
           {(ia?.relato || ficha.relato) && (
             <div className="fc-texto">{(ia?.relato || ficha.relato).split(/\n{2,}/).map((p, i) => <p key={i}>{p.trim()}</p>)}</div>

@@ -4,19 +4,23 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Repeat, Plus, LogOut, Loader2, Clock } from 'lucide-react'
 import { Select, Button, Badge, notify } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarDiaMes, paraData } from '@/lib/datas'
 
 interface Insc { id: number; cadencia_id: number; passo_ordem: number; proxima_acao_em: string | null }
 interface Cad { id: number; nome: string }
 
-const dia = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—')
-const venceu = (iso: string | null) => {
-  if (!iso) return false
-  const h = new Date(); h.setHours(23, 59, 59, 999)
-  return new Date(iso) <= h
+const dia = (iso: string | null, fuso: string) => formatarDiaMes(iso, '—', fuso)
+/** A próxima ação cai hoje ou antes, no dia da loja. */
+const venceu = (iso: string | null, fuso: string) => {
+  const d = paraData(iso)
+  if (!d) return false
+  return diaNoFuso(d, fuso) <= diaNoFuso(agora(), fuso)
 }
 
 export function LeadCadenciaPanel({ leadId }: { leadId: number }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [cadencias, setCadencias] = useState<Cad[]>([])
   const [inscricoes, setInscricoes] = useState<Insc[]>([])
   const [carregou, setCarregou] = useState(false)
@@ -69,10 +73,11 @@ export function LeadCadenciaPanel({ leadId }: { leadId: number }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12.5px] font-medium text-ink">{nomePorId[i.cadencia_id] ?? 'Cadência'}</div>
                 <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
-                  <Clock size={11} strokeWidth={1.8} /> Passo {i.passo_ordem} · próxima ação <span className="num">{dia(i.proxima_acao_em)}</span>
+                  <Clock size={11} strokeWidth={1.8} /> Passo {i.passo_ordem} · próxima ação <span className="num">{dia(i.proxima_acao_em, fuso)}</span>
                 </div>
               </div>
-              {venceu(i.proxima_acao_em) && <Badge tone="warn" className="shrink-0">Na fila</Badge>}
+              {venceu(i.proxima_acao_em, fuso) &&
+ <Badge tone="warn" className="shrink-0">Na fila</Badge>}
               <button type="button" onClick={() => sair(i.id)} className="shrink-0 text-ink-3 hover:text-bad" aria-label="Sair da cadência"><LogOut size={13} strokeWidth={1.7} /></button>
             </div>
           ))}

@@ -9,6 +9,8 @@ import { Card, StatCard, Table, Badge, Tabs, Button, Input, Select, EmptyState, 
 import { RelatorioPerdas } from './relatorio-perdas'
 import { resultadoDasVendas, temCusto } from '@/lib/painel/metricas'
 import { consultaClientes, clienteDoContato } from '@/lib/clientes'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData, formatarDiaMes, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
 
 interface Venda {
   id: number
@@ -69,18 +71,22 @@ function csvCell(v: string | number | null | undefined): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-function downloadCSV(filename: string, header: string[], rows: (string | number | null)[][]) {
+/** O dia da loja (`YYYY-MM-DD`) de um instante do banco; vazio quando não há data. */
+const diaDaLoja = (v: string | null, fuso: string) => { const d = paraData(v); return d ? diaNoFuso(d, fuso) : '' }
+
+function downloadCSV(filename: string, header: string[], rows: (string | number | null)[][], fuso: string) {
   const content = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\n')
   // BOM para o Excel reconhecer UTF-8 (acentos)
   const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`
+  // O dia do nome do arquivo é o da loja: às 22h ainda é hoje, não amanhã (UTC).
+  a.download = `${filename}_${diaNoFuso(agora(), fuso)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
 }
 
-function exportCSV(rows: Venda[]) {
+function exportCSV(rows: Venda[], fuso: string) {
   if (rows.length === 0) { toast.info('Nenhuma venda para exportar'); return }
   downloadCSV(
     'vendas',
@@ -88,29 +94,34 @@ function exportCSV(rows: Venda[]) {
     // separar lá o que a tela separa aqui.
     ['Data', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro', 'Troca pendente'],
     rows.map(v => [
-      v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
+      formatarData(v.data_venda, undefined, '', fuso),
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
       // Sem custo lançado o lucro fica em branco: a coluna gerada daria o preço cheio.
       v.valor_venda, v.desconto_valor ?? 0, temCusto({ valor_custo: v.valor_custo ?? null }) ? (v.lucro ?? 0) : '',
       v.troca_pendente ? 'sim' : 'nao',
-    ])
+    ]),
+    fuso,
   )
 }
 
-function exportFinanceiro(rows: Lancamento[]) {
+function exportFinanceiro(rows: Lancamento[], fuso: string) {
   if (rows.length === 0) { toast.info('Nenhum lançamento para exportar'); return }
   downloadCSV(
     'financeiro',
     ['Vencimento', 'Descrição', 'Categoria', 'Tipo', 'Valor', 'Status'],
     rows.map(l => [
-      l.data_venc ? new Date(l.data_venc).toLocaleDateString('pt-BR') : '',
+      // data_venc é coluna `date` (dia puro). `new Date('2026-11-10')` é meia-noite
+      // UTC = 09/11 21h em Brasília: o CSV saía SEMPRE um dia antes. formatarData
+      // mostra o dia dele, sem fuso.
+      formatarData(l.data_venc),
       l.descricao ?? '', l.categoria ?? '', l.tipo, l.valor, l.status,
-    ])
+    ]),
+    fuso,
   )
 }
 
-async function exportClientes() {
+async function exportClientes(fuso: string) {
   const supabase = createClient()
   const { data: linhas, error } = await consultaClientes(supabase).order('nome')
   if (error || !linhas) { toast.error('Erro ao exportar clientes'); return }
@@ -121,12 +132,13 @@ async function exportClientes() {
     ['Nome', 'Telefone', 'E-mail', 'Cidade', 'Estado', 'Cadastro'],
     (data as Array<{ nome: string | null; telefone: string | null; email: string | null; cidade: string | null; estado: string | null; created_at: string | null }>).map(c => [
       c.nome ?? '', c.telefone ?? '', c.email ?? '', c.cidade ?? '', c.estado ?? '',
-      c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '',
-    ])
+      formatarData(c.created_at, undefined, '', fuso),
+    ]),
+    fuso,
   )
 }
 
-async function exportEstoque() {
+async function exportEstoque(fuso: string) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('estoque_unidades')
@@ -144,18 +156,21 @@ async function exportEstoque() {
         prod?.nome ?? '', u.imei ?? '', u.numero_serie ?? '', u.estado ?? '',
         u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
       ]
-    })
+    }),
+    fuso,
   )
 }
 
 function BarChart({ vendas }: { vendas: Venda[] }) {
-  const today = new Date()
+  const fuso = useFuso()
+  // Os 7 dias da loja (hoje e os 6 anteriores); a venda conta no dia dela no fuso
+  // da loja — antes agrupava pelo dia UTC e a venda das 21h caía no dia seguinte.
+  const hoje = diaNoFuso(agora(), fuso)
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today); d.setDate(d.getDate() - (6 - i))
-    const key = d.toISOString().slice(0, 10)
-    const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const key = somarDias(hoje, i - 6)
+    const label = formatarDiaMes(key)
     const total = vendas
-      .filter(v => v.data_venda?.startsWith(key) && v.status === 'concluida')
+      .filter(v => v.status === 'concluida' && diaDaLoja(v.data_venda, fuso) === key)
       .reduce((s, v) => s + v.valor_venda, 0)
     return { label, total }
   })
@@ -178,20 +193,22 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
 }
 
 export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
+  const fuso = useFuso()
   const [aba, setAba]           = useState('vendas')
-  const [dataIni, setDataIni]   = useState(() => {
-    const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10)
-  })
-  const [dataFim, setDataFim]   = useState(() => new Date().toISOString().slice(0, 10))
+  // Período padrão: do dia 1 até hoje, no calendário da loja. O `setDate(1)` antigo
+  // mantinha a hora e cortava em UTC: depois das 21h o "início do mês" virava dia 2.
+  const [dataIni, setDataIni]   = useState(() => primeiroDoMes(diaNoFuso(agora(), fuso)))
+  const [dataFim, setDataFim]   = useState(() => diaNoFuso(agora(), fuso))
   const [vendedor, setVendedor] = useState('Todos')
 
   const vendasFiltradas = useMemo(() => vendas.filter(v => {
-    if (!v.data_venda) return false
-    const d = v.data_venda.slice(0, 10)
+    // data_venda é instante: o dia que conta é o da loja, não o do UTC.
+    const d = diaDaLoja(v.data_venda, fuso)
+    if (!d) return false
     if (d < dataIni || d > dataFim) return false
     if (vendedor !== 'Todos' && v.vendedor_nome !== vendedor) return false
     return true
-  }), [vendas, dataIni, dataFim, vendedor])
+  }), [vendas, dataIni, dataFim, vendedor, fuso])
 
   const kpis = useMemo(() => {
     const conc     = vendasFiltradas.filter(v => v.status === 'concluida')
@@ -236,14 +253,15 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
     return { qtd: pendentes.length, valorPendente, firme: total - valorPendente }
   }, [vendasFiltradas])
 
-  const mesAtual  = new Date().toISOString().slice(0, 7)
+  // O mês da loja: no último dia, depois das 21h, o UTC já mostrava o mês seguinte.
+  const mesAtual  = mesNoFuso(agora(), fuso)
   const lancMes   = lancamentos.filter(l => l.data_venc.startsWith(mesAtual))
   const entradas  = lancMes.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
   const saidas    = lancMes.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0)
   const saldo     = entradas - saidas
 
   const vendaCols: Column<Venda>[] = [
-    { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{formatarData(v.data_venda, undefined, '—', fuso)}</span> },
     { key: 'cliente', header: 'Cliente', render: v => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
     {
       // Venda sem cadastro de produto (acessório, aparelho de troca) guarda a
@@ -271,7 +289,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   ]
 
   const lancCols: Column<Lancamento>[] = [
-    { key: 'data', header: 'Data', className: 'num w-[100px]', render: l => <span className="text-ink-2">{new Date(l.data_venc + 'T00:00:00').toLocaleDateString('pt-BR')}</span> },
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: l => <span className="text-ink-2">{formatarData(l.data_venc, undefined, '—')}</span> },
     { key: 'desc', header: 'Descrição', render: l => <span className="font-medium text-ink">{l.descricao ?? '—'}</span> },
     { key: 'cat', header: 'Categoria', hideOnMobile: true, render: l => <span className="text-ink-2">{l.categoria ?? '—'}</span> },
     { key: 'tipo', header: 'Tipo', render: l => { const r = l.tipo === 'receita'; return <Badge tone={r ? 'ok' : 'bad'}>{r ? 'Entrada' : 'Saída'}</Badge> } },
@@ -310,7 +328,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               >
                 Gerar
               </Button>
-              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => exportCSV(vendasFiltradas)}>CSV</Button>
+              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => exportCSV(vendasFiltradas, fuso)}>CSV</Button>
             </div>
           </Card>
 
@@ -368,7 +386,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
         {aba === 'caixa' && (
           <Card
             flush
-            title={<>Livro-caixa · {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</>}
+            title={<>Livro-caixa · {rotuloDoMes(mesAtual)}</>}
             actions={
               <span className="text-[12px] text-ink-2">
                 Entradas <span className="num font-semibold text-ok">{formatCurrency(entradas)}</span>
@@ -401,10 +419,10 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
           <Card title="Exportar dados">
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas) },
-                { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: exportClientes },
-                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: exportEstoque },
-                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos) },
+                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas, fuso) },
+                { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => exportClientes(fuso) },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso) },
+                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos, fuso) },
               ].map(e => (
                 <button key={e.label} onClick={e.action}
                   className="flex items-start gap-3 rounded-card border border-line bg-card p-4 text-left transition-colors hover:bg-raised">

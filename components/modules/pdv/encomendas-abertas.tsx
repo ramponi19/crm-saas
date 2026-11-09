@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils'
 import { type Taxa } from '@/lib/pdv-pagamentos'
 import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
 import { EncomendaFechar } from './encomenda-fechar'
+import { useFuso } from '@/components/fuso-provider'
 
 /**
  * AS ENCOMENDAS EM ABERTO, no lugar onde o vendedor já está.
@@ -135,6 +136,7 @@ const dataBR = (iso: string | null) =>
 export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, documentos = [] }: {
   encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]
 }) {
+  const fuso = useFuso()
   const router = useRouter()
   const supabase = createClient()
   const [ocupado, setOcupado] = useState<number | null>(null)
@@ -169,12 +171,12 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
   const [hoje] = useState(() => new Date())
   // Agrupa ANTES de ordenar: a urgencia e da encomenda, nao do item solto.
   const ordenadas = useMemo(
-    () => ordenarPorUrgencia(agruparPorEncomenda(encomendas).map((g) => juntar(g.itens)), hoje),
-    [encomendas, hoje],
+    () => ordenarPorUrgencia(agruparPorEncomenda(encomendas).map((g) => juntar(g.itens)), hoje, fuso),
+    [encomendas, hoje, fuso],
   )
 
-  const atrasadas = ordenadas.filter((e) => diagnosticar(e, hoje).situacao === 'atrasada').length
-  const chegaram = ordenadas.filter((e) => diagnosticar(e, hoje).situacao === 'chegou').length
+  const atrasadas = ordenadas.filter((e) => diagnosticar(e, hoje, fuso).situacao === 'atrasada').length
+  const chegaram = ordenadas.filter((e) => diagnosticar(e, hoje, fuso).situacao === 'chegou').length
 
   /**
    * A peça chegou: dá entrada no estoque, já reservada para este cliente.
@@ -337,7 +339,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
       </div>
 
       {ordenadas.map((e) => {
-        const d = diagnosticar(e, hoje)
+        const d = diagnosticar(e, hoje, fuso)
         const falta = Math.max(0, e.valor_venda - e.sinal_pago)
         const chegou = d.situacao === 'chegou'
         return (

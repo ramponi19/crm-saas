@@ -11,6 +11,8 @@ import {
   ArrowUpRight, CreditCard, TrendingUp, Store,
 } from 'lucide-react'
 import { consultaClientes } from '@/lib/clientes'
+import { periodo } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export const metadata = { title: 'Administração' }
 
@@ -19,9 +21,11 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 export default async function AdminOverviewPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const mes = new Date().toISOString().slice(0, 7)
-  const inicioMes = `${mes}-01`
-  const fimMes = new Date(new Date(inicioMes).getFullYear(), new Date(inicioMes).getMonth() + 1, 1).toISOString()
+  // O mês da loja (vira à meia-noite do fuso dela, não às 21h do último dia).
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const mesAtual = periodo('mes', undefined, fuso)
+  const inicioMes = mesAtual.de.toISOString()
+  const fimMes = mesAtual.ate.toISOString()
 
   const [
     empresaRes, clientesRes, leadsRes, produtosRes, usuariosRes, vendasRes, planoRes,

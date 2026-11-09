@@ -8,6 +8,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, Badge } from '@/components/ui'
 import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 import { TrendingUp, Home, Users, Flame, Target, MapPin } from 'lucide-react'
+import { mesNoFuso, periodo, rotuloDoMes } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 export const metadata = { title: 'Executivo' }
 
@@ -49,11 +51,10 @@ export default async function ExecutivoPage({ searchParams }: { searchParams: Pr
   const { tipo } = await searchParams
   const filtro: Filtro = tipo === 'venda' || tipo === 'locacao' ? tipo : 'ambos'
 
-  // Mês corrente no fuso LOCAL — mês que vira no dia 1º às 21h de Brasília não é mês.
-  const agora = new Date()
-  const iniMes = new Date(agora.getFullYear(), agora.getMonth(), 1)
-  const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1)
-  const mesLabel = iniMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  // Mês corrente no fuso da EMPRESA — mês que vira no último dia às 21h de Brasília não é mês.
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const { de: iniMes, ate: fimMes } = periodo('mes', undefined, fuso)
+  const mesLabel = rotuloDoMes(mesNoFuso(undefined, fuso))
 
   let qNeg = supabase.from('imoveis_negocios')
     .select('id, tipo, valor, status, comissao_total, comissao_captador, comissao_vendedor, corretor_id, captador_id, imovel_id, lead_id, created_at')

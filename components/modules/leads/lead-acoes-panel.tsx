@@ -6,13 +6,19 @@ import { CheckSquare, Square, Plus, CalendarPlus, Loader2, Clock } from 'lucide-
 import { Input, Button, IconButton, notify } from '@/components/ui'
 import type { Tables } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora, instanteLocal } from '@/lib/datas'
 
 type Tarefa = Tables<'tarefas'>
 type Visita = Tables<'visitas'>
 
-const fmt = (s: string | null) => s
-  ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const fmt = (s: string | null, fuso: string) => s
+  ? formatarDataHora(s, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso)
   : null
+
+/** `2026-11-10T09:00` digitado no campo datetime-local = 09:00 no relógio da loja. */
+const instanteDoCampo = (valor: string, fuso: string) =>
+  instanteLocal(valor.slice(0, 10), valor.slice(11, 16), fuso).toISOString()
 
 /**
  * Painel de "Próximas ações" dentro do lead: tarefas de follow-up (todos os
@@ -25,6 +31,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
   agendaVisitas?: boolean
 }) {
   const supabase = createClient()
+  const fuso = useFuso()
 
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [visitas, setVisitas] = useState<Visita[]>([])
@@ -64,7 +71,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       empresa_id: empresaId, lead_id: leadId, titulo: nova.trim(), tipo: 'outro',
-      vencimento: prazo ? new Date(prazo).toISOString() : null,
+      vencimento: prazo ? instanteDoCampo(prazo, fuso) : null,
       responsavel_id: user?.id ?? null,
     }
     const { data, error } = await supabase.from('tarefas').insert(payload).select('*').single()
@@ -89,7 +96,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       empresa_id: empresaId, lead_id: leadId, corretor_id: user?.id ?? null,
-      data_hora: new Date(visData).toISOString(), status: 'agendada',
+      data_hora: instanteDoCampo(visData, fuso), status: 'agendada',
       observacoes: visObs || null,
     }
     const { data, error } = await supabase.from('visitas').insert(payload).select('*').single()
@@ -125,7 +132,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
                 <span className="flex-1 min-w-0">
                   <span className={`text-[12.5px] ${t.concluida ? 'text-ink-3 line-through' : 'text-ink'}`}>{t.titulo}</span>
                   {t.vencimento && (
-                    <span className={`block num text-[10.5px] ${atrasada ? 'text-bad font-semibold' : 'text-ink-3'}`}>{fmt(t.vencimento)}</span>
+                    <span className={`block num text-[10.5px] ${atrasada ? 'text-bad font-semibold' : 'text-ink-3'}`}>{fmt(t.vencimento, fuso)}</span>
                   )}
                 </span>
               </button>
@@ -136,7 +143,8 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
               <Clock size={16} strokeWidth={1.7} className="text-accent shrink-0 mt-[1px]" />
               <span className="flex-1 min-w-0">
                 <span className="text-[12.5px] text-ink">Visita {v.status !== 'agendada' ? `· ${v.status}` : ''}</span>
-                <span className="block num text-[10.5px] text-ink-3">{fmt(v.data_hora)}</span>
+                <span className="block num text-[10.5px] text-ink-3">{fmt(v.data_hora, fuso)}
+</span>
               </span>
             </div>
           ))}

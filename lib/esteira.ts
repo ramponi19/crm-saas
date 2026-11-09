@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { minutosUteis, HORARIO_PADRAO, type HorarioLoja } from './horario-util'
 import { conversasDosLeads } from './leads'
+import { fusoDaEmpresa } from './fuso-empresa'
 
 /**
  * Devolução de lead à esteira por falta de resposta.
@@ -47,9 +48,11 @@ export async function devolverLeadsSemResposta(
   }
   ultimaVarredura.set(empresaId, agora)
 
-  const [{ data: cfgRow }, { data: horarioRow }] = await Promise.all([
+  const [{ data: cfgRow }, { data: horarioRow }, fuso] = await Promise.all([
     db.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'devolucao_esteira').maybeSingle(),
     db.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'horario').maybeSingle(),
+    // O expediente é contado no relógio DA LOJA.
+    fusoDaEmpresa(db, empresaId),
   ])
   const cfg: ConfigDevolucao = { ...DEVOLUCAO_PADRAO, ...((cfgRow?.valor ?? {}) as Partial<ConfigDevolucao>) }
   if (!cfg.ativo || !(cfg.minutos > 0)) return { devolvidos: 0, avaliados: 0 }
@@ -98,7 +101,7 @@ export async function devolverLeadsSemResposta(
   for (const l of leads) {
     const marco = marcoDeCobranca(l, ultima.get(l.id))
     if (!marco) continue
-    if (minutosUteis(new Date(marco), new Date(agora), horario) >= cfg.minutos) vencidos.push(l.id)
+    if (minutosUteis(new Date(marco), new Date(agora), horario, fuso) >= cfg.minutos) vencidos.push(l.id)
   }
   if (!vencidos.length) return { devolvidos: 0, avaliados: leads.length }
 

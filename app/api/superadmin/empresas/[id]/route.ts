@@ -57,8 +57,8 @@ export async function POST(
       if (!Number.isFinite(dias) || dias <= 0 || dias > 365) {
         return NextResponse.json({ error: 'Quantidade de dias inválida' }, { status: 400 })
       }
-      const novoFim = new Date()
-      novoFim.setDate(novoFim.getDate() + dias)
+      // Agora + N dias de 24h (janela móvel, não depende de fuso).
+      const novoFim = new Date(Date.now() + dias * 86_400_000)
       update = { trial_ends_at: novoFim.toISOString() }
       logAcao = 'estender_trial'
       logDetalhes = { dias, trial_ends_at: novoFim.toISOString() }

@@ -5,6 +5,7 @@ import type { Travou } from '@/lib/zapintel/travou'
 import { perguntarIA } from '@/lib/zapintel/ia'
 import { leadParaIA } from '@/lib/zapintel/mascara'
 import type { DadoIndisponivel } from '@/lib/zapintel/conversas'
+import { agora, formatarData, formatarNoFuso, FUSO_PADRAO, instanteLocal } from '@/lib/datas'
 
 /**
  * A FICHA DO LEAD ESCRITA POR IA — tudo que a tela do lead afirma, acima do
@@ -130,7 +131,7 @@ export interface MarcaDaConversa {
 }
 
 /**
- * ⚠ O `-03:00` NÃO É ENFEITE — SEM ELE A MARCA DEPENDE DE ONDE O CÓDIGO RODA.
+ * ⚠ O FUSO NÃO É ENFEITE — SEM ELE A MARCA DEPENDE DE ONDE O CÓDIGO RODA.
  *
  * `date`/`time` são o relógio da LOJA (`montar.ts`). Sem fuso explícito,
  * `Date.parse` lê esse texto no fuso da MÁQUINA: no computador do Lucas
@@ -139,11 +140,12 @@ export interface MarcaDaConversa {
  * a marca certa, e a produção calcularia outra para a mesma conversa —
  * todas pareceriam desatualizadas e cada lead aberto pediria IA de novo.
  *
- * O Brasil não tem horário de verão desde 2019, então o fuso da loja é fixo.
- * E é a mesma conta que `zapintel_analises_pendentes` faz no banco.
+ * Desde 10/11/2026 o relógio é lido no fuso da empresa (`instanteLocal`), que
+ * tem de ser o MESMO com que `montar.ts` escreveu `date`/`time` — só assim o
+ * instante volta ao `created_at` que `zapintel_analises_pendentes` usa no banco.
  */
-const instante = (m: RawMessage): number => {
-  const t = Date.parse(`${m.date}T${(m.time || '00:00')}:00-03:00`)
+const instante = (m: RawMessage, fuso: string): number => {
+  const t = instanteLocal(m.date, m.time || '00:00', fuso).getTime()
   return Number.isNaN(t) ? 0 : t
 }
 
@@ -156,12 +158,12 @@ const instante = (m: RawMessage): number => {
  * a ficha escrita quando a IA só via "[audio]" — que é o caso de quase toda a
  * base em 13/10/2026.
  */
-export function marcaDaConversa(lead: Lead): MarcaDaConversa {
+export function marcaDaConversa(lead: Lead, fuso: string = FUSO_PADRAO): MarcaDaConversa {
   const msgs = lead.messages || []
   let marca = 0
   let transcritos = 0
   for (const m of msgs) {
-    const t = instante(m)
+    const t = instante(m, fuso)
     if (t > marca) marca = t
     if (m.transcrito) transcritos++
   }
@@ -169,7 +171,7 @@ export function marcaDaConversa(lead: Lead): MarcaDaConversa {
 }
 
 /**
- * ⚠ O `T12:00:00` NÃO É ENFEITE — SEM ELE A DATA ANDA UM DIA PARA TRÁS.
+ * ⚠ DATA PURA NÃO PASSA POR FUSO — SEM ISSO A DATA ANDA UM DIA PARA TRÁS.
  *
  * `new Date('2026-07-31')` é interpretado como meia-noite UTC. Em São Paulo
  * (UTC-3) isso é 21h de 30/07, e `toLocaleDateString` imprime **30/07**.
@@ -179,13 +181,10 @@ export function marcaDaConversa(lead: Lead): MarcaDaConversa {
  * fato e teria de escolher uma.
  *
  * É o mesmo erro de fuso que em 12/10/2026 fez o painel anunciar pico de
- * movimento às 14h quando o real é 11h. Meio-dia é a hora que sobrevive a
- * qualquer fuso do Brasil.
+ * movimento às 14h quando o real é 11h. `formatarData` mostra a data pura como
+ * ela é e o instante no fuso da loja.
  */
-const data = (iso: string): string => {
-  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00` : iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('pt-BR')
-}
+const data = (iso: string, fuso: string): string => formatarData(iso, undefined, iso, fuso)
 
 /**
  * A conversa como texto, marcando o que é transcrição.
@@ -254,8 +253,11 @@ export function contextoDoPerfil(opts: {
    * ligada", "Loja: Loja").
    */
   indisponivel?: readonly DadoIndisponivel[]
+  /** Fuso da empresa (padrão Brasília): o "Hoje" e as datas do prompt. */
+  fuso?: string
 }): string {
   const { ficha, travou, kanban, temVendaRegistrada } = opts
+  const fuso = opts.fuso ?? FUSO_PADRAO
   const falta = (d: DadoIndisponivel) => !!opts.indisponivel?.includes(d)
   const nomeDaLoja = falta('empresa') ? INDISPONIVEL : opts.nomeDaLoja
   // O que vai à IA é a CÓPIA mascarada: primeiro nome e sem CPF, telefone,
@@ -266,7 +268,7 @@ export function contextoDoPerfil(opts: {
   const fatos = [
     // A próxima ação leva prazo ("até 23/10"), e o modelo não sabe que dia é
     // hoje: sem esta linha ele conta a partir da última mensagem ou inventa.
-    `Hoje: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}`,
+    `Hoje: ${formatarNoFuso(agora(), { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }, '', fuso)}`,
     `Loja: ${nomeDaLoja}`,
     `Cliente: ${lead.contact}`,
     `Canal: ${f.canal}`,
@@ -280,7 +282,7 @@ export function contextoDoPerfil(opts: {
     falta('responsaveis') ? `Quem atendeu: ${INDISPONIVEL}`
       : f.vendedor && f.vendedor !== 'Loja' ? `Quem atendeu: ${f.vendedor}` : '',
     kanban ? `Etapa no funil do CRM (movida por uma pessoa): ${kanban}` : '',
-    `Primeira mensagem: ${data(f.primeiraEm)} · Última: ${data(f.ultimaEm)}`,
+    `Primeira mensagem: ${data(f.primeiraEm, fuso)} · Última: ${data(f.ultimaEm, fuso)}`,
     `${f.mensagensLead + f.mensagensLoja} mensagens — ${f.mensagensLead} do cliente, ${f.mensagensLoja} da loja`,
     `Sem falar há ${f.diasInativo} dia(s)`,
     falta('venda')
@@ -660,6 +662,8 @@ export async function gerarPerfil(opts: {
   modelo?: string
   /** O que do CRM não deu para ler — ver `contextoDoPerfil`. */
   indisponivel?: readonly DadoIndisponivel[]
+  /** Fuso da empresa — ver `contextoDoPerfil`. */
+  fuso?: string
 }): Promise<ResultadoPerfil> {
   const t0 = Date.now()
   const r = await perguntarIA({

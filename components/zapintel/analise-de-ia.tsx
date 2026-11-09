@@ -1,5 +1,7 @@
 import { RefreshCw, Sparkles, AlertTriangle, Bot } from "lucide-react";
 import type { PerfilIA } from "@/lib/zapintel/perfil";
+import { formatarDataHora } from "@/lib/datas";
+import { useFuso } from "@/components/fuso-provider";
 
 /**
  * O BLOCO "ANÁLISE DE IA" DA FICHA DO LEAD — e quando ele NÃO oferece gerar.
@@ -36,6 +38,7 @@ export function AnaliseDeIA({ guardado, analisando, novas, leadMessages, storeMe
   erroIA: string;
   onAnalisar: (forcar: boolean) => void;
 }) {
+  const fuso = useFuso();
   const ia = guardado?.perfil ?? null;
   const podeGerar = iaLigada && !funilInterno;
 
@@ -55,7 +58,7 @@ export function AnaliseDeIA({ guardado, analisando, novas, leadMessages, storeMe
             </div>
           )}
           <div className="fc-rodape">
-            <span>Análise de {new Date(guardado!.geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })}</span>
+            <span>Análise de {formatarDataHora(guardado!.geradoEm, { dateStyle: "short", timeStyle: "short" }, "", fuso)}</span>
             {podeGerar && guardado?.atual && (
               <button className="fc-link" onClick={() => onAnalisar(true)} disabled={analisando}><RefreshCw size={11} /> Refazer análise</button>
             )}

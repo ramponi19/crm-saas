@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Badge, Button, ConfirmDialog, notify } from '@/components/ui'
+import { formatarDataHora } from '@/lib/datas'
 
 /**
  * Lista de pedidos de módulo com Atender / Recusar (22/10/2026). Usada na tela de
@@ -22,8 +23,8 @@ export interface PedidoModulo {
   empresa?: { id: number; nome: string }
 }
 
-const dia = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+// Tela do superadmin (várias empresas): o fuso padrão da lib.
+const dia = (iso: string) => formatarDataHora(iso, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 /** Pedido recusado, como o superadmin vê no histórico. */
 export interface PedidoRecusado {

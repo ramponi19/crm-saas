@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { janelaDoPeriodo } from '@/lib/ranking'
+import { limitesDoMes, mesNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import EquipeView from '@/app/(dashboard)/equipe/components/equipe-view'
 import { UsoEquipe } from '@/components/admin/uso-equipe'
 import { carregarUsoDaEquipe } from '@/lib/uso-equipe'
@@ -23,9 +24,13 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
   const dias = Math.min(90, Math.max(1, Number(sp.dias) || 14))
   const uso = await carregarUsoDaEquipe(supabase as unknown as SupabaseClient, empresaId, dias)
 
-  const mesAtual = new Date().toISOString().slice(0, 7)
-  // Janela pela função única — ver janelaDoPeriodo: o cálculo anterior dava 3h.
-  const { ini: inicioMes, fim: fimMes } = janelaDoPeriodo(mesAtual)
+  // O mês da loja e a janela dele no fuso da empresa (lib/datas): no servidor UTC
+  // o mês virava no último dia às 21h de Brasília.
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const mesAtual = mesNoFuso(undefined, fuso)
+  const janela = limitesDoMes(mesAtual, fuso)
+  const inicioMes = janela.de.toISOString()
+  const fimMes = janela.ate.toISOString()
 
   const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }] = await Promise.all([
     supabase

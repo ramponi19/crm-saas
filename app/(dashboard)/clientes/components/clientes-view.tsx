@@ -12,6 +12,8 @@ import FundirLeadsModal from './fundir-leads-modal'
 import { TIPO_NEGOCIO, STATUS_APROVACAO, rotuloTipoNegocio, statusAprovacao } from './cliente-imob-tipos'
 import { iniciais } from '@/lib/sem-nome'
 import type { Cliente as ClienteDaCamada } from '@/lib/clientes'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 /** O cliente da camada (lib/clientes.ts), com o nome já resolvido e os números de compra. */
 type Cliente = Omit<ClienteDaCamada, 'nome'> & {
@@ -40,7 +42,7 @@ interface Props {
   motivos?: { id: number; label: string }[]
 }
 
-function fmtUltimaCompra(d: string | null | undefined) {
+function fmtUltimaCompra(d: string | null | undefined, fuso: string) {
   if (!d) return '—'
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
   if (diff === 0) return 'Hoje'
@@ -48,7 +50,7 @@ function fmtUltimaCompra(d: string | null | undefined) {
   if (diff < 7) return `${diff} dias`
   if (diff < 14) return '1 sem'
   if (diff < 30) return `${Math.floor(diff / 7)} sem`
-  return new Date(d).toLocaleDateString('pt-BR')
+  return formatarData(d, undefined, '—', fuso)
 }
 
 function statusBadge(c: Cliente) {
@@ -58,6 +60,7 @@ function statusBadge(c: Cliente) {
 }
 
 export default function ClientesView({ clientes, imob = false, etapas = [], equipe = [], jornada = {}, motivos = [] }: Props) {
+  const fuso = useFuso()
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
@@ -210,7 +213,8 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
       key: 'total', header: 'Total gasto', align: 'right', hideOnMobile: true, className: 'num',
       render: (c) => (c.valor_total ?? 0) > 0 ? <span className="font-semibold text-ink">{formatCurrency(c.valor_total!)}</span> : <span className="text-ink-3">—</span>,
     },
-    { key: 'ultima', header: 'Última', align: 'right', hideOnMobile: true, render: (c) => <span className="text-ink-2">{fmtUltimaCompra(c.ultima_compra)}</span> },
+    { key: 'ultima', header: 'Última', align: 'right', hideOnMobile: true, render: (c) => <span className="text-ink-2">{fmtUltimaCompra(c.ultima_compra, fuso)}
+</span> },
     { key: 'status', header: 'Status', align: 'right', render: (c) => statusBadge(c) },
   ]
 

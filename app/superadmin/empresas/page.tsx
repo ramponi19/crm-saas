@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { Search, ChevronRight, Building2 } from 'lucide-react'
 import { Card, Badge, Table, EmptyState, type Column } from '@/components/ui'
+import { formatarData, FUSO_PADRAO } from '@/lib/datas'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -34,9 +35,9 @@ function getInitials(nome: string) {
   return nome.slice(0, 2).toUpperCase()
 }
 
+// Superadmin não é de uma empresa: o dia de Brasília (o servidor roda em UTC).
 function fmtData(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatarData(d, { day: '2-digit', month: 'short', year: 'numeric' }, '—', FUSO_PADRAO)
 }
 
 interface PageProps {

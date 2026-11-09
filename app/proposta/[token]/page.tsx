@@ -2,6 +2,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { PrintButton } from './print-button'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { formatarData } from '@/lib/datas'
 
 export const metadata = { title: 'Proposta' }
 
@@ -16,20 +18,25 @@ export default async function PropostaPublicaPage({ params }: { params: Promise<
   const svc = createServiceClient()
   const { data } = await svc
     .from('vendas_propostas')
-    .select('cliente_nome, itens, observacoes, total, status, created_at, empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
+    .select('empresa_id, cliente_nome, itens, observacoes, total, status, created_at, empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
     .eq('token', token)
     .maybeSingle()
 
   if (!data) notFound()
 
   const d = data as unknown as {
+    empresa_id: number | null
     cliente_nome: string; itens: unknown; observacoes: string | null; total: number; created_at: string | null
     empresa: Embed<{ nome: string; wl_logo_url: string | null; wl_cor: string | null; wl_whatsapp: string | null }>
   }
   const empresa = one(d.empresa)
   const itens = (Array.isArray(d.itens) ? d.itens : []) as unknown as Item[]
   const cor = empresa?.wl_cor || '#2E5CE6'
-  const dataFmt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : ''
+  // A data da proposta no fuso da loja que a emitiu — não no do servidor (UTC), que
+  // das 21h à meia-noite já está "amanhã".
+  const fuso = await fusoDaEmpresa(svc, d.empresa_id)
+  const dataFmt = formatarData(d.created_at, { day: '2-digit', month: 'long', year: 'numeric' }, '', fuso)
+
 
   return (
     <div className="min-h-screen bg-bg px-4 py-8 text-ink">

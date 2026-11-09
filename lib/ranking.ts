@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { FUSO_PADRAO, limitesDoMes } from '@/lib/datas'
 
 /**
  * Ranking gamificado (Sprint 3.1) — métricas por vendedor no período + score.
@@ -44,9 +45,11 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
  * mês ANTERIOR, e o "fim" acaba poucas horas depois do início em vez de um mês.
  * Medido em America/Sao_Paulo: janela de 3 horas.
  */
-export function janelaDoPeriodo(periodo: string): { ini: string; fim: string } {
-  const [ano, mes] = periodo.split('-').map(Number)
-  return { ini: new Date(ano, mes - 1, 1).toISOString(), fim: new Date(ano, mes, 1).toISOString() }
+export function janelaDoPeriodo(periodo: string, fuso: string = FUSO_PADRAO): { ini: string; fim: string } {
+  // No fuso DA LOJA: `new Date(ano, mes, 1)` no servidor (UTC) abria o mês às 21h do
+  // último dia do anterior.
+  const { de, ate } = limitesDoMes(periodo, fuso)
+  return { ini: de.toISOString(), fim: ate.toISOString() }
 }
 
 export async function calcularRanking(

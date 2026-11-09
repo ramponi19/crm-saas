@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Download, Users, Target, ShoppingBag } from 'lucide-react'
 import { Card, Button, notify } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso } from '@/lib/datas'
 
 const TIPOS = [
   { tipo: 'leads', label: 'Leads', desc: 'Nome, telefone, origem, etapa do funil', Icon: Target },
@@ -11,6 +13,7 @@ const TIPOS = [
 ] as const
 
 export function ExportarDadosCard() {
+  const fuso = useFuso()
   const [baixando, setBaixando] = useState<string | null>(null)
 
   async function exportar(tipo: string) {
@@ -25,7 +28,8 @@ export function ExportarDadosCard() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${tipo}-${new Date().toISOString().slice(0, 10)}.csv`
+      // O dia da loja: às 22h ainda é hoje, não o amanhã do UTC.
+      a.download = `${tipo}-${diaNoFuso(agora(), fuso)}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()

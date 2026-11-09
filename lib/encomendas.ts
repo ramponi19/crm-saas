@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { agora, diaNoFuso, diasEntre, FUSO_PADRAO, paraData } from '@/lib/datas'
 
 /**
  * A ENCOMENDA — produto que a loja vende antes de ter.
@@ -74,34 +75,28 @@ export interface Diagnostico {
   tom: 'ok' | 'warn' | 'bad' | 'neutro' | 'acc'
 }
 
-/** Meia-noite local do dia de uma data `YYYY-MM-DD`, sem escorregar de fuso. */
-function diaLocal(iso: string): Date {
-  const [a, m, d] = iso.slice(0, 10).split('-').map(Number)
-  return new Date(a, m - 1, d)
-}
-
 /**
  * O que mostrar para esta encomenda, e com qual cor.
  *
  * ⚠️ A COMPARAÇÃO É DE DIA, NÃO DE INSTANTE. `new Date('2026-09-18')` é
  * meia-noite UTC, que em Brasília é dia 17 às 21h: comparado com "agora", o
  * prazo aparece vencido um dia antes da hora — e quem recebe a cobrança é o
- * vendedor. Mesma armadilha já paga em `lib/chave-imovel.ts`.
+ * vendedor. Mesma armadilha já paga em `lib/chave-imovel.ts`. Os dois dias — o
+ * prometido e o de hoje — são lidos no fuso da empresa (`fuso`).
  *
  * "Chegou" vence o prazo: uma encomenda que já está na loja não é atrasada, é
  * uma entrega esperando o cliente aparecer.
  */
-export function diagnosticar(e: EncomendaAberta, hoje = new Date()): Diagnostico {
+export function diagnosticar(e: EncomendaAberta, hoje: Date = agora(), fuso: string = FUSO_PADRAO): Diagnostico {
   if (e.status_pedido === 'recebido' || e.unidade_id != null) {
     return { situacao: 'chegou', dias: null, rotulo: 'Chegou — avisar o cliente', tom: 'ok' }
   }
-  if (!e.previsao_entrega) {
+  const prevista = paraData(e.previsao_entrega)
+  if (!prevista) {
     return { situacao: 'sem_prazo', dias: null, rotulo: 'Sem prazo combinado', tom: 'neutro' }
   }
 
-  const alvo = diaLocal(e.previsao_entrega)
-  const agora = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
-  const dias = Math.round((agora.getTime() - alvo.getTime()) / 86_400_000)
+  const dias = diasEntre(diaNoFuso(prevista, fuso), diaNoFuso(hoje, fuso))
 
   if (dias > 0) return { situacao: 'atrasada', dias, rotulo: `${dias} ${dias === 1 ? 'dia' : 'dias'} de atraso`, tom: 'bad' }
   if (dias === 0) return { situacao: 'vence_hoje', dias: 0, rotulo: 'Prometida para hoje', tom: 'warn' }
@@ -133,13 +128,13 @@ export function agruparPorEncomenda<T extends { id: number; grupo_pdv?: string |
 }
 
 /** Atrasada e sem prazo primeiro: é o que precisa de alguém. */
-export function ordenarPorUrgencia<T extends EncomendaAberta>(lista: T[], hoje = new Date()): T[] {
+export function ordenarPorUrgencia<T extends EncomendaAberta>(lista: T[], hoje: Date = agora(), fuso: string = FUSO_PADRAO): T[] {
   const peso: Record<Situacao, number> = {
     atrasada: 0, vence_hoje: 1, chegou: 2, sem_prazo: 3, no_prazo: 4,
   }
   return [...lista].sort((a, b) => {
-    const da = diagnosticar(a, hoje)
-    const db = diagnosticar(b, hoje)
+    const da = diagnosticar(a, hoje, fuso)
+    const db = diagnosticar(b, hoje, fuso)
     if (peso[da.situacao] !== peso[db.situacao]) return peso[da.situacao] - peso[db.situacao]
     // Dentro do mesmo grupo: o mais vencido (ou o que vence antes) na frente.
     return (db.dias ?? -9999) - (da.dias ?? -9999)

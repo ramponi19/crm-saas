@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, ExternalLink, Copy, FileText } from 'lucide-react'
 import { Card, Button, Input, Textarea, Badge, Modal, EmptyState, notify } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarData } from '@/lib/datas'
 
 interface Item { descricao: string; qtd: number; valor: number }
 export interface Proposta {
@@ -26,6 +28,7 @@ const STATUS: Record<string, { label: string; tone: 'neutro' | 'ok' | 'warn' | '
 }
 
 export function PropostasView({ initial, baseUrl }: { initial: Proposta[]; baseUrl: string }) {
+  const fuso = useFuso()
   const router = useRouter()
   const [editando, setEditando] = useState<Proposta | 'nova' | null>(null)
   const [cliente, setCliente] = useState('')
@@ -93,7 +96,8 @@ export function PropostasView({ initial, baseUrl }: { initial: Proposta[]; baseU
                   <div key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                     <div className="min-w-[160px] flex-1">
                       <button onClick={() => abrir(p)} className="text-[14px] font-semibold text-ink hover:text-accent">{p.cliente_nome || 'Sem cliente'}</button>
-                      <div className="num text-[12px] text-ink-3">{brl(Number(p.total))} · {new Date(p.created_at).toLocaleDateString('pt-BR')}</div>
+                      <div className="num text-[12px] text-ink-3">{brl(Number(p.total))} · {formatarData(p.created_at, undefined, '', fuso)}
+</div>
                     </div>
                     <Badge tone={st.tone}>{st.label}</Badge>
                     <div className="flex items-center gap-1">

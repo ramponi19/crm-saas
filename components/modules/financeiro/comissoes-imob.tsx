@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { Table, Badge, Button, Input, Select, Card, Modal, Textarea, EmptyState, notify, type Column } from '@/components/ui'
-import { formatarData } from '@/lib/datas'
+import { agora, diaNoFuso, formatarData } from '@/lib/datas'
+import { useFuso } from '@/components/fuso-provider'
 import { TAXAS_PADRAO, calcularComissaoPorPercentual, cashbackCabe, type TaxasComissao } from '@/lib/comissao-imob'
 import { Handshake, Percent, Plus, Search, SlidersHorizontal } from 'lucide-react'
 
@@ -80,6 +81,7 @@ export function ComissoesImob({
   /** Aprovar, pagar, cancelar e lançar são atos de caixa: só dono e admin (a rota confere de novo). */
   podeQuitar: boolean
 }) {
+  const fuso = useFuso()
   const [lista, setLista] = useState(negocios)
   const [form, setForm] = useState({
     percentual_venda: String(taxas.percentual_venda),
@@ -158,8 +160,8 @@ export function ComissoesImob({
     const j = await res.json().catch(() => ({}))
     setMexendo(null)
     if (!res.ok) { notify.bad('Não foi possível atualizar', j?.error); return }
-    const hoje = new Date()
-    const iso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+    // O dia da loja (não o do computador de quem clicou), como a rota grava.
+    const iso = diaNoFuso(agora(), fuso)
     setLista((l) => l.map((n) => (n.id === id ? {
       ...n,
       comissao_status,
@@ -229,7 +231,7 @@ export function ComissoesImob({
         return (
           <span className="block">
             <Badge tone={tomStatus(s)}>{rotuloStatus(s)}</Badge>
-            {quando && <span className="num mt-0.5 block text-[11px] text-ink-3">{formatarData(quando, { day: '2-digit', month: '2-digit', year: '2-digit' }, '')}</span>}
+            {quando && <span className="num mt-0.5 block text-[11px] text-ink-3">{formatarData(quando, { day: '2-digit', month: '2-digit', year: '2-digit' }, '', fuso)}</span>}
           </span>
         )
       },
@@ -237,7 +239,7 @@ export function ComissoesImob({
     {
       key: 'assinado_em', header: 'Data', align: 'right', className: 'num',
       /** Data do negócio; sem assinatura registrada, a do lançamento. */
-      render: (n) => formatarData(n.assinado_em ?? n.created_at, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—'),
+      render: (n) => formatarData(n.assinado_em ?? n.created_at, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—', fuso),
     },
     {
       key: 'id', header: 'Ações', align: 'right',

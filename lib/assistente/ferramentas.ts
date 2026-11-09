@@ -4,6 +4,8 @@ import { buscarTudo } from '@/lib/zapintel/conversas'
 import { VERSAO_DO_PERFIL } from '@/lib/zapintel/perfil'
 import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import type { Acesso } from './acesso'
+import { agora, diaNoFuso, formatarDataHora, instanteLocal, paraData, somarDias } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 /**
  * AS CONSULTAS QUE O ASSISTENTE PODE FAZER — TODAS SÓ DE LEITURA.
@@ -29,6 +31,8 @@ export interface Contexto {
   db: SupabaseClient
   svc: SupabaseClient
   acesso: Acesso
+  /** Fuso da empresa. Ausente, é lido de `configuracoes_sistema` (uma vez por requisição). */
+  fuso?: string
 }
 
 /** O que a tela mostra enquanto a ferramenta roda. */
@@ -41,7 +45,7 @@ export const ROTULO: Record<string, string> = {
   analises_pendentes: 'Conferindo análises pendentes',
 }
 
-const DATA = { type: 'string', description: 'Data no formato AAAA-MM-DD (horário de Brasília).' } as const
+const DATA = { type: 'string', description: 'Data no formato AAAA-MM-DD (dia no fuso da loja).' } as const
 const FILIAL = {
   type: 'string',
   description: 'Nome ou cidade da loja (ex.: "Jaguariúna", "Mogi Guaçu"). Omitir = todas as lojas que o usuário vê.',
@@ -143,19 +147,18 @@ function saida(obj: unknown): string {
 }
 
 const dataValida = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
-/** Início do dia em Brasília (o Brasil não tem horário de verão desde 2019). */
-const inicio = (d: string) => `${d}T00:00:00-03:00`
-const fimInclusivo = (d: string) => {
-  const t = new Date(`${d}T12:00:00-03:00`)
-  t.setUTCDate(t.getUTCDate() + 1)
-  return `${t.toISOString().slice(0, 10)}T00:00:00-03:00`
+/** O fuso da empresa de quem pergunta: o do contexto, ou o salvo em configurações. */
+async function fusoDe(c: Contexto): Promise<string> {
+  return c.fuso ?? fusoDaEmpresa(c.svc, c.acesso.empresaId)
 }
-const RELOGIO = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-})
-const quando = (iso: string | null | undefined) => (iso ? RELOGIO.format(new Date(iso)) : null)
-const diaDe = (iso: string) =>
-  new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
+/** Meia-noite do dia `d` no fuso da loja (ISO). */
+const inicio = (d: string, fuso: string) => instanteLocal(d, '00:00', fuso).toISOString()
+/** Meia-noite do dia SEGUINTE a `d`: o `ate` é inclusivo para quem pergunta, o filtro usa `<`. */
+const fimInclusivo = (d: string, fuso: string) => instanteLocal(somarDias(d, 1), '00:00', fuso).toISOString()
+/** Instante do banco em ms — comparar texto ISO com deslocamentos diferentes erra a ordem. */
+const ms = (iso: string) => paraData(iso)?.getTime() ?? 0
+const quando = (iso: string | null | undefined, fuso: string) => (iso ? formatarDataHora(iso, undefined, '', fuso) || null : null)
+const diaDe = (iso: string, fuso: string) => diaNoFuso(paraData(iso) ?? agora(), fuso)
 const diasDesde = (iso: string | null | undefined) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : null
 const reais = (n: number) => Math.round(n * 100) / 100
@@ -344,6 +347,7 @@ async function contarMensagensDoLead(c: Contexto, lead: LeadVisivel): Promise<{ 
 type Entrada = Record<string, unknown>
 
 async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
+  const fuso = await fusoDe(c)
   if (!dataValida(e.de) || !dataValida(e.ate)) return saida({ erro: 'de/ate precisam ser AAAA-MM-DD' })
   const lojas = await filiais(c)
   const filialId = filialPorNome(lojas, e.filial)
@@ -359,7 +363,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     let q = c.db.from('vendas_vendas')
       .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id')
       .eq('empresa_id', c.acesso.empresaId)
-      .gte('data_venda', inicio(e.de as string)).lt('data_venda', fimInclusivo(e.ate as string))
+      .gte('data_venda', inicio(e.de as string, fuso)).lt('data_venda', fimInclusivo(e.ate as string, fuso))
     if (filialId) q = q.eq('filial_id', filialId)
     if (c.acesso.soMinhasVendas) q = q.eq('vendedor_id', c.acesso.userId)
     return q.order('id', { ascending: true }).range(de, ate)
@@ -412,7 +416,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
 
   const chave = (v: V): string => {
     switch (e.agrupar_por) {
-      case 'dia': return diaDe(v.data_venda ?? v.created_at)
+      case 'dia': return diaDe(v.data_venda ?? v.created_at, fuso)
       case 'vendedor': return (v.vendedor_id && equipe.get(v.vendedor_id)) || 'sem vendedor'
       case 'produto': return (v.produto_id && produtos.get(v.produto_id)) || 'sem produto'
       case 'forma_pagamento': return v.forma_pagamento || 'não informada'
@@ -447,7 +451,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
       .sort((a, b) => ((a.data_venda ?? a.created_at) < (b.data_venda ?? b.created_at) ? 1 : -1))
       .slice(0, 40)
       .map((v) => ({
-        quando: quando(v.data_venda ?? v.created_at),
+        quando: quando(v.data_venda ?? v.created_at, fuso),
         produto: (v.produto_id && produtos.get(v.produto_id)) || null,
         valor: reais(Number(v.valor_venda ?? 0)),
         ...(fin && lucroDe(v) != null ? { lucro: reais(lucroDe(v)!) } : {}),
@@ -465,6 +469,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
 }
 
 async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
+  const fuso = await fusoDe(c)
   const lojas = await filiais(c)
   const filialId = filialPorNome(lojas, e.filial)
   if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
@@ -491,8 +496,8 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
     if (e.esperando_loja === true && !esperando) return false
     if (e.esperando_loja === false && esperando) return false
     if (Number(e.parado_ha_dias_min) > 0 && (diasDesde(ultima) ?? 0) < Number(e.parado_ha_dias_min)) return false
-    if (dataValida(e.criado_de) && l.created_at < inicio(e.criado_de)) return false
-    if (dataValida(e.criado_ate) && l.created_at >= fimInclusivo(e.criado_ate)) return false
+    if (dataValida(e.criado_de) && ms(l.created_at) < ms(inicio(e.criado_de, fuso))) return false
+    if (dataValida(e.criado_ate) && ms(l.created_at) >= ms(fimInclusivo(e.criado_ate, fuso))) return false
     return true
   })
 
@@ -516,9 +521,9 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
       interesse: l.produto_interessado,
       responsavel: (l.responsavel_id && equipe.get(l.responsavel_id)) || null,
       mensagens: s?.mensagens ?? 0,
-      ultima_mensagem: quando(ultima),
+      ultima_mensagem: quando(ultima, fuso),
       esperando_loja: esperando,
-      esperando_desde: esperando ? quando(s?.ultima_recebida) : null,
+      esperando_desde: esperando ? quando(s?.ultima_recebida, fuso) : null,
       analise_ia: f ? {
         classificacao: f.classificacao, score: f.score ? Number(f.score) : null, urgencia: f.urgencia,
         perfil: f.rotulo, proxima_acao: f.acao,
@@ -529,6 +534,7 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
 }
 
 async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
+  const fuso = await fusoDe(c)
   if (!dataValida(e.de) || !dataValida(e.ate)) return saida({ erro: 'de/ate precisam ser AAAA-MM-DD' })
   const lojas = await filiais(c)
   const filialId = filialPorNome(lojas, e.filial)
@@ -545,15 +551,15 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
       .then(({ data }) => new Map(((data ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label]))),
   ])
   const nomeFilial = new Map(lojas.map((f) => [f.id, f.rotulo]))
-  const ini = inicio(e.de as string), fim = fimInclusivo(e.ate as string)
-  const noPeriodo = todos.filter((l) => l.created_at >= ini && l.created_at < fim)
+  const ini = ms(inicio(e.de as string, fuso)), fim = ms(fimInclusivo(e.ate as string, fuso))
+  const noPeriodo = todos.filter((l) => ms(l.created_at) >= ini && ms(l.created_at) < fim)
 
   const chave = (l: LeadVisivel): string => {
     switch (e.agrupar_por) {
       case 'origem': return l.origem || 'não informada'
       case 'filial': return (l.filial_id && nomeFilial.get(l.filial_id)) || 'sem loja'
       case 'etapa': return l.kanban_status || 'sem etapa'
-      case 'dia': return diaDe(l.created_at)
+      case 'dia': return diaDe(l.created_at, fuso)
       case 'responsavel': return (l.responsavel_id && equipe.get(l.responsavel_id)) || 'sem responsável'
       case 'motivo_perda': return l.motivo_perda_id ? motivos.get(l.motivo_perda_id) ?? 'outro' : 'não perdido'
       default: return ''
@@ -579,6 +585,7 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
 }
 
 async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
+  const fuso = await fusoDe(c)
   let id = Number(e.lead_id)
   if (!Number.isInteger(id) || id <= 0) {
     const nome = typeof e.nome === 'string' ? e.nome.trim() : ''
@@ -599,7 +606,7 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
       .slice(0, 8)
     if (!achados.length) return saida({ erro: `nenhum lead com "${nome}" no nome` })
     if (achados.length > 1) {
-      return saida({ varios: achados.map((a) => ({ lead_id: a.id, nome: a.nome, ultima_mensagem: quando(a.ultima_mensagem_at) })) })
+      return saida({ varios: achados.map((a) => ({ lead_id: a.id, nome: a.nome, ultima_mensagem: quando(a.ultima_mensagem_at, fuso) })) })
     }
     id = achados[0].id
   }
@@ -621,10 +628,10 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
     origem: lead.origem,
     interesse: lead.produto_interessado,
     responsavel: (lead.responsavel_id && equipe.get(lead.responsavel_id)) || null,
-    entrou_em: quando(lead.created_at),
+    entrou_em: quando(lead.created_at, fuso),
     mensagens_na_conversa: count ?? null,
     analise_ia: f ? {
-      escrita_em: quando(f.gerado_em),
+      escrita_em: quando(f.gerado_em, fuso),
       desatualizada: (count ?? 0) !== f.mensagens || f.versao !== VERSAO_DO_PERFIL,
       mensagens_quando_escrita: f.mensagens,
       ...f.perfil,
@@ -633,6 +640,7 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
 }
 
 async function conversaLer(c: Contexto, e: Entrada): Promise<string> {
+  const fuso = await fusoDe(c)
   const id = Number(e.lead_id)
   if (!Number.isInteger(id) || id <= 0) return saida({ erro: 'lead_id inválido' })
   const lead = await leadSeVisivel(c, id)
@@ -656,12 +664,13 @@ async function conversaLer(c: Contexto, e: Entrada): Promise<string> {
       const fala = m.transcricao?.trim()
       const quem = m.direcao === 'enviada' ? 'Loja' : 'Cliente'
       const corpo = fala || m.conteudo || `[${m.tipo || 'anexo'}]`
-      return `[${quando(m.created_at)}] ${quem}${fala ? ' (áudio transcrito)' : ''}: ${corpo.slice(0, 1200)}`
+      return `[${quando(m.created_at, fuso)}] ${quem}${fala ? ' (áudio transcrito)' : ''}: ${corpo.slice(0, 1200)}`
     }),
   })
 }
 
 async function analisesPendentes(c: Contexto): Promise<string> {
+  const fuso = await fusoDe(c)
   type Pendente = {
     lead_id: number; nome: string | null; filial: string | null; tem_ficha: boolean; gerado_em: string | null
     mensagens_na_ficha: number | null; mensagens_agora: number; loja_deve: boolean | null
@@ -690,7 +699,7 @@ async function analisesPendentes(c: Contexto): Promise<string> {
     leads: desat.slice(0, 40).map((l) => ({
       lead_id: Number(l.lead_id), nome: l.nome, loja: l.filial,
       mensagens_novas: Math.max(0, l.mensagens_agora - (l.mensagens_na_ficha ?? 0)),
-      analise_de: quando(l.gerado_em), esperando_loja: !!l.loja_deve,
+      analise_de: quando(l.gerado_em, fuso), esperando_loja: !!l.loja_deve,
     })),
   })
 }

@@ -9,6 +9,8 @@ import { Button, IconButton, Input, Select, Textarea, Modal, Card, Badge, EmptyS
 import type { Tables } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { embedLead } from '@/lib/leads'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDataHora, instanteLocal } from '@/lib/datas'
 
 type Tarefa = Tables<'tarefas'> & { lead_nome: string | null }
 type LeadMin = { id: number; nome: string | null }
@@ -23,12 +25,14 @@ const TIPOS = [
 ]
 const iconTipo = (t: string) => (TIPOS.find(x => x.v === t)?.icon ?? CircleDot)
 const labelTipo = (t: string) => (TIPOS.find(x => x.v === t)?.l ?? t)
-const fmtData = (s: string | null) => s ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem prazo'
+const fmtData = (s: string | null, fuso: string) =>
+  formatarDataHora(s, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, 'sem prazo', fuso)
 
 export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId, isGestor }: {
   inicial: Tarefa[]; leads: LeadMin[]; usuarios: UsuarioMin[]; empresaId: number; meuId: string; isGestor: boolean
 }) {
   const supabase = createClient()
+  const fuso = useFuso()
   const [lista, setLista] = useState<Tarefa[]>(inicial)
   const [modal, setModal] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -41,7 +45,8 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
     setLoading(true)
     const payload = {
       empresa_id: empresaId, titulo: form.titulo.trim(), tipo: form.tipo,
-      vencimento: form.vencimento ? new Date(form.vencimento).toISOString() : null,
+      // O campo datetime-local é o relógio da loja: 09:00 digitado = 09:00 no fuso da empresa.
+      vencimento: form.vencimento ? instanteLocal(form.vencimento.slice(0, 10), form.vencimento.slice(11, 16), fuso).toISOString() : null,
       lead_id: form.lead_id ? Number(form.lead_id) : null,
       responsavel_id: form.responsavel_id || meuId,
       descricao: form.descricao || null,
@@ -101,7 +106,8 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
           <div className={cn('truncate text-[13px] font-medium', t.concluida ? 'text-ink-3 line-through' : 'text-ink')}>{t.titulo}</div>
           {t.lead_nome && <div className="truncate text-[11.5px] text-ink-3">Lead: {t.lead_nome}</div>}
         </div>
-        <span className={cn('num shrink-0 text-[11.5px]', atrasada ? 'font-semibold text-bad' : 'text-ink-3')}>{fmtData(t.vencimento)}</span>
+        <span className={cn('num shrink-0 text-[11.5px]', atrasada ? 'font-semibold text-bad' : 'text-ink-3')}>{fmtData(t.vencimento, fuso)}
+</span>
         <IconButton aria-label="Excluir" variant="danger" size="sm" onClick={() => excluir(t)}><Trash2 size={14} strokeWidth={1.7} /></IconButton>
       </div>
     )

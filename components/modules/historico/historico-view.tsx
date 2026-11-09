@@ -11,6 +11,8 @@ import { contratosDaVenda, emitirContrato, type DocumentoDisponivel, type Contra
 import { descreverPagamentos, type PagamentoGravado } from '@/lib/pdv-pagamentos'
 import { finalizarEncomenda } from '@/lib/encomendas'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
+import { useFuso } from '@/components/fuso-provider'
+import { agora, diaNoFuso, formatarData } from '@/lib/datas'
 
 interface Venda {
   id: number
@@ -68,10 +70,10 @@ const csvCell = (v: string | number) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-function exportCSV(rows: Venda[]) {
+function exportCSV(rows: Venda[], fuso: string) {
   const header = 'Data,Cliente,Produto,Qtd,Vendedor,Canal,Pagamento,Valor,Lucro,Status'
   const lines = rows.map((v) => [
-    v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '',
+    formatarData(v.data_venda, undefined, '', fuso),
     v.cliente_nome ?? '', v.produto_nome ?? '', v.quantidade ?? 1, v.vendedor_nome ?? '',
     CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
     descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas), v.valor_venda, v.lucro ?? 0, v.status ?? '',
@@ -80,11 +82,13 @@ function exportCSV(rows: Venda[]) {
   const blob = new Blob(['﻿' + [header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `historico_${new Date().toISOString().slice(0, 10)}.csv`
+  // O dia da loja: às 22h ainda é hoje, não o amanhã do UTC.
+  a.download = `historico_${diaNoFuso(agora(), fuso)}.csv`
   a.click()
 }
 
 export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [] }: Props) {
+  const fuso = useFuso()
   const [filtro, setFiltro] = useState('all')
   const [finalizando, setFinalizando] = useState<number | null>(null)
   const [transf, setTransf] = useState<Venda | null>(null)
@@ -191,7 +195,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
   )
 
   const cols: Column<Venda>[] = [
-    { key: 'data', header: 'Data', className: 'num w-[100px]', render: (v) => <span className="text-ink-2">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '—'}</span> },
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: (v) => <span className="text-ink-2">{formatarData(v.data_venda, undefined, '—', fuso)}</span> },
     { key: 'cliente', header: 'Cliente', render: (v) => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
     // Acessório é venda sem produto_id: a descrição vive em `observacoes`.
     // O fallback anterior era `forma_pagamento`, que imprimia "credito" na
@@ -265,7 +269,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs items={CHIPS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
-          <Button variant="outline" size="sm" icon={<Download size={14} strokeWidth={1.7} />} onClick={() => exportCSV(filtered)}>Exportar</Button>
+          <Button variant="outline" size="sm" icon={<Download size={14} strokeWidth={1.7} />} onClick={() => exportCSV(filtered, fuso)}>Exportar</Button>
         </div>
 
         <Card flush>
@@ -292,7 +296,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
                   <Button key={c.id} variant="outline" className="w-full justify-start"
                     icon={<FileText size={14} strokeWidth={1.7} />}
                     onClick={() => { if (!imprimirContratoHTML(c.html)) notify.warn('Permita pop-ups para imprimir') }}>
-                    2ª via de {c.nome ?? 'documento anterior à biblioteca'} · {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                    2ª via de {c.nome ?? 'documento anterior à biblioteca'} · {formatarData(c.created_at, undefined, '', fuso)}
                   </Button>
                 ))}
               </div>

@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils'
 import { useEmpresa } from '@/lib/empresa-context'
 import { createClient } from '@/lib/supabase/client'
 import { meusFollowUps, type ResultadoVendas, type DadosPainel, type FunilDoPainel } from '@/lib/painel/metricas'
+import { useFuso } from '@/components/fuso-provider'
+import { formatarDiaMes } from '@/lib/datas'
 
 /**
  * Tudo vem pronto do servidor (lib/painel/metricas.ts → painelCompleto), inclusive
@@ -26,12 +28,11 @@ const PERIOD_LABELS: Record<string, string> = {
   hoje: 'hoje', '7d': 'últimos 7 dias', '30d': 'últimos 30 dias', mes: 'este mês', ano: 'este ano',
 }
 
-/**
- * Datas em fuso FIXO: a página é desenhada no servidor (UTC) e depois no
- * navegador (São Paulo). Sem fuso, de 21h à meia-noite a data saía diferente
+/*
+ * Datas no FUSO DA EMPRESA (useFuso + lib/datas): a página é desenhada no servidor
+ * (UTC) e depois no navegador. Sem fuso, de 21h à meia-noite a data saía diferente
  * nos dois lados, e o React acusava o #418.
  */
-const FUSO = 'America/Sao_Paulo'
 
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 
@@ -224,6 +225,7 @@ function FollowupsCard() {
   type Task = { id: number; titulo: string; vencimento: string | null; lead_nome: string | null }
   const [tarefas, setTarefas] = useState<Task[]>([])
   const [loaded, setLoaded] = useState(false)
+  const fuso = useFuso()
   // Relógio congelado no mount: `Date.now()` em render deixa o componente impuro.
   const [nowMs] = useState(() => Date.now())
 
@@ -238,7 +240,7 @@ function FollowupsCard() {
   }, [])
 
   if (!loaded || tarefas.length === 0) return null
-  const diaMes = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const diaMes = (iso: string) => formatarDiaMes(iso, '', fuso)
 
   return (
     <Card title="Meus follow-ups" actions={<Link href="/tarefas" className="text-[12px] font-semibold text-accent hover:underline">Ver tarefas →</Link>}>
@@ -265,6 +267,7 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
 
 export function DashboardView({ data }: { data: DashboardData }) {
   const {} = useEmpresa()
+  const fuso = useFuso()
   const router = useRouter()
   const [activePeriod, setActivePeriod] = useState('mes')
   const { faturamentoMensal, vendasRecentes, topVendedores, contagens: globais } = data
@@ -346,7 +349,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
                 <div>
                   {vendasRecentes.map((v) => {
                     const canal = CANAIS_VENDA.find((c) => c.value === v.canal_venda)
-                    const data = v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO }) : '—'
+                    const data = formatarDiaMes(v.data_venda, '—', fuso)
                     return (
                       <div key={v.id} className="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-0 hover:bg-raised">
                         <span className="num w-[46px] flex-none text-[12px] text-ink-3">{data}</span>

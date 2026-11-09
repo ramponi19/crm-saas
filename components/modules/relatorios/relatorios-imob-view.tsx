@@ -5,6 +5,8 @@ import { Card, StatCard, Badge } from '@/components/ui'
 import { RelatorioPerdas } from './relatorio-perdas'
 import { RelatoriosFiltros } from './relatorios-filtros'
 import { lerFechamentos } from '@/lib/fechamentos'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { agora, diaNoFuso, formatarData, instanteLocal, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -40,25 +42,22 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
    * Sem filtro, vale o mês corrente — que era o comportamento antigo e é o que o
    * dono olha no dia a dia. Com filtro, vale o que ele pediu.
    *
-   * As datas vêm como `YYYY-MM-DD` e são convertidas em horário LOCAL: montar a
-   * borda com `new Date('2026-08-01')` daria meia-noite UTC, e no Brasil o dia 1º
-   * cairia dentro de julho — o relatório perderia (ou ganharia) um dia inteiro na
-   * virada do mês.
+   * As datas vêm como `YYYY-MM-DD` e viram instante à meia-noite NO FUSO DA LOJA:
+   * `new Date('2026-08-01')` daria meia-noite UTC (o dia 1º cairia dentro de julho), e
+   * `new Date(ano, mes, 1)` corta no fuso de quem roda — no servidor (UTC) a borda
+   * ficava 3h adiantada e, depois das 21h do último dia, "este mês" já era o seguinte.
    */
-  const agora = new Date()
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const hoje = diaNoFuso(agora(), fuso)
   const soData = /^\d{4}-\d{2}-\d{2}$/
-  const localDe = (t: string) => { const [a, m, d] = t.split('-').map(Number); return new Date(a, m - 1, d) }
-  const inicioJanela = soData.test(de) ? localDe(de) : new Date(agora.getFullYear(), agora.getMonth(), 1)
+  const diaInicio = soData.test(de) ? de : primeiroDoMes(hoje)
   // Fim EXCLUSIVO no dia seguinte: senão o próprio dia escolhido ficaria de fora.
-  const fimJanela = soData.test(ate)
-    ? new Date(localDe(ate).getTime() + 86400000)
-    : new Date(agora.getFullYear(), agora.getMonth() + 1, 1)
-  const inicioMes = inicioJanela.toISOString()
-  const fimMes = fimJanela.toISOString()
-  const fmtDia = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const diaFimExclusivo = soData.test(ate) ? somarDias(ate, 1) : primeiroDoMes(hoje, 1)
+  const inicioMes = instanteLocal(diaInicio, '00:00', fuso).toISOString()
+  const fimMes = instanteLocal(diaFimExclusivo, '00:00', fuso).toISOString()
   const nomeMes = (soData.test(de) || soData.test(ate))
-    ? `${fmtDia(inicioJanela)} a ${fmtDia(new Date(fimJanela.getTime() - 86400000))}`
-    : agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    ? `${formatarData(diaInicio)} a ${formatarData(somarDias(diaFimExclusivo, -1))}`
+    : rotuloDoMes(hoje)
 
   /**
    * O filtro de corretor recorta lead e visita, não o acervo.

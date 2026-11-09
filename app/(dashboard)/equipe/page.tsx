@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
-import { janelaDoPeriodo } from '@/lib/ranking'
+import { limitesDoMes, mesNoFuso } from '@/lib/datas'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { sinaisDePresenca } from '@/lib/presenca'
 import EquipeView from './components/equipe-view'
 import type { Tables } from '@/types/database'
@@ -12,10 +13,13 @@ export default async function EquipePage() {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const mesAtual = new Date().toISOString().slice(0, 7) // "2026-06"
-  // Janela do mês pela função única — o cálculo que estava aqui rendia 3 horas
-  // em vez de um mês (ver janelaDoPeriodo).
-  const { ini: inicioMes, fim: fimMes } = janelaDoPeriodo(mesAtual)
+  // O mês da loja ("2026-06") e a janela dele no fuso da empresa (lib/datas): no
+  // servidor UTC o mês virava no último dia às 21h de Brasília.
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const mesAtual = mesNoFuso(undefined, fuso)
+  const janela = limitesDoMes(mesAtual, fuso)
+  const inicioMes = janela.de.toISOString()
+  const fimMes = janela.ate.toISOString()
 
   const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }] = await Promise.all([
     supabase

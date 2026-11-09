@@ -11,6 +11,8 @@ import {
 import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
+import { useFuso } from "@/components/fuso-provider";
+import { agora, diaNoFuso, primeiroDoMes, rotuloDoMes } from "@/lib/datas";
 
 /**
  * O DASHBOARD DO ZAPINTEL — RECONSTRUÍDO EM 14/10/2026 SOBRE AS ANÁLISES.
@@ -280,9 +282,12 @@ function Pulso({ rotulo, valor, linha, rodape, cor = "var(--txt)", onClick, dest
 }
 
 function Comparacao({ atual, anterior }: { atual: number; anterior: number }) {
+  const fuso = useFuso();
   if (!anterior) return <>primeiro mês com venda registrada</>;
   const pct = Math.round(((atual - anterior) / anterior) * 100);
-  const mes = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  // O mês anterior no calendário da loja (no servidor, depois das 21h do último dia,
+  // o UTC já estava no mês seguinte e o rótulo saía um mês adiantado).
+  const mes = rotuloDoMes(primeiroDoMes(diaNoFuso(agora(), fuso), -1), { month: "short" }).replace(".", "");
   return (
     <span style={{ color: pct >= 0 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>
       {pct >= 0 ? "+" : ""}{pct}% <span style={{ color: "var(--muted)", fontWeight: 400 }}>sobre {mes} até o mesmo dia</span>

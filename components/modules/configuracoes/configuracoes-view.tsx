@@ -12,6 +12,7 @@ import { AssinaturaCard } from './assinatura-card'
 import { DevolucaoCard } from './devolucao-card'
 import { RetornoClienteCard } from './retorno-cliente-card'
 import { HorarioCard } from './horario-card'
+import { FusoCard } from './fuso-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
 import { MotivosPerdaCard } from './motivos-perda-card'
@@ -298,6 +299,7 @@ export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
         {aba === 'automacoes' && <AutomacoesCard />}
 
         {/* ── HORÁRIO DE FUNCIONAMENTO ── */}
+        {aba === 'horario' && <FusoCard />}
         {aba === 'horario' && <HorarioCard />}
 
         {/* ── MODELOS DE MENSAGEM ── */}
