@@ -21,6 +21,11 @@ export async function reativarFrios(svc: Db, empresaId: number): Promise<{ reati
   const cfg = await carregarReativacao(svc, empresaId)
   const cadenciaId = cfg.cadencia_id
   if (!cadenciaId) return { reativados: 0 }
+  // Segunda trava: configuração gravada antes da conferência na rota pode apontar para a
+  // cadência de outra empresa. Sem ser desta empresa, não inscreve ninguém.
+  const { data: daEmpresa } = await svc.from('cadencias').select('id')
+    .eq('id', cadenciaId).eq('empresa_id', empresaId).maybeSingle()
+  if (!daEmpresa) return { reativados: 0 }
 
   const dias = Math.max(1, Number(cfg.dias_frio) || 30)
   const corte = new Date(Date.now() - dias * 86400000).toISOString()

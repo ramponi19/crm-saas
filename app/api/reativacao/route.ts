@@ -33,6 +33,16 @@ export async function POST(req: Request) {
     cadencia_id: body.cadencia_id ? Number(body.cadencia_id) : null,
   }
   const svc = createServiceClient()
+  /**
+   * A cadência precisa ser DESTA empresa (porte do eaa1460, auditoria de 16/10). O job
+   * lê os passos dela e inscreve os leads frios nela pelo cliente de SERVIÇO: com o id
+   * de uma cadência de outra empresa, as inscrições iam para a cadência do outro tenant.
+   */
+  if (config.cadencia_id != null) {
+    const { data: cad } = await svc.from('cadencias').select('id')
+      .eq('id', config.cadencia_id).eq('empresa_id', empresaId).maybeSingle()
+    if (!cad) return NextResponse.json({ error: 'Cadência não encontrada nesta empresa' }, { status: 404 })
+  }
   const { error } = await svc.from('configuracoes_sistema').upsert(
     { empresa_id: empresaId, chave: 'reativacao', valor: config as never },
     { onConflict: 'empresa_id,chave' },

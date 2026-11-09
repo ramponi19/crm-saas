@@ -18,6 +18,12 @@
 const SO_DATA = /^\d{4}-\d{2}-\d{2}$/
 
 /**
+ * O fuso das lojas. Hoje todas estão no horário de Brasília; fuso por empresa ainda
+ * não existe (mesma decisão de lib/horario-util.ts e lib/zapintel/montar.ts).
+ */
+export const FUSO = 'America/Sao_Paulo'
+
+/**
  * Converte o valor do banco em Date. Data pura é montada no fuso LOCAL, para o
  * dia 18 continuar sendo dia 18 em qualquer lugar do mundo.
  */
@@ -42,8 +48,21 @@ export function formatarData(
   opcoes: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' },
   vazio = '',
 ): string {
+  /**
+   * O fuso entra SEMPRE, para o texto sair igual no servidor (UTC na Vercel) e no
+   * navegador (Brasília). Sem ele, um timestamp depois das 21h saía com o dia
+   * seguinte no servidor e o certo no navegador: dia errado na página e o erro de
+   * hidratação #418 na troca (porte do eaa1460, auditoria de 16/10).
+   *
+   * Data pura é montada e formatada em UTC: o dia 18 continua 18 nos dois lados.
+   * Timestamp é formatado no fuso da loja.
+   */
+  if (typeof valor === 'string' && SO_DATA.test(valor.trim())) {
+    const [ano, mes, dia] = valor.trim().split('-').map(Number)
+    return new Date(Date.UTC(ano, mes - 1, dia)).toLocaleDateString('pt-BR', { ...opcoes, timeZone: 'UTC' })
+  }
   const d = paraData(valor)
-  return d ? d.toLocaleDateString('pt-BR', opcoes) : vazio
+  return d ? d.toLocaleDateString('pt-BR', { timeZone: FUSO, ...opcoes }) : vazio
 }
 
 /** Só dia e mês — o formato curto das listas. */

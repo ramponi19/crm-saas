@@ -79,8 +79,11 @@ export async function GET(
         if (!process.env.STRIPE_SECRET_KEY) {
           return NextResponse.json({ ok: true, job, nota: 'Stripe não configurado' })
         }
-        const { atualizadas } = await reconciliarAssinaturas(supabase)
-        return NextResponse.json({ ok: true, job, atualizadas })
+        // Os erros por empresa voltam na resposta e no log: antes eram descartados aqui,
+        // e o Stripe fora do ar passava como "0 atualizadas, ok" (porte do eaa1460).
+        const { atualizadas, erros } = await reconciliarAssinaturas(supabase)
+        if (erros.length) console.error('[cron sync-stripe] falhas:', erros)
+        return NextResponse.json({ ok: erros.length === 0, job, atualizadas, erros })
       }
 
       case 'sync-fipe': {
@@ -141,12 +144,20 @@ export async function GET(
           .from('empresa_modulos').select('empresa_id').eq('modulo', MODULO_INTELIGENCIA).eq('ativo', true)
         if (error) throw error
         const resultado: { empresa: number; vendas: number; gravadas: number }[] = []
+        // Uma empresa que falha não impede as outras: antes a primeira falha abortava o
+        // job inteiro e ninguém recebia a ponte do dia (porte do eaa1460).
+        const falhas: { empresa: number; erro: string }[] = []
         for (const { empresa_id } of (ativas ?? []) as { empresa_id: number }[]) {
-          const linhas = await montarPonte(supabase as unknown as SupabaseClient, empresa_id)
-          const gravadas = await gravarPonte(supabase as unknown as SupabaseClient, linhas)
-          resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
+          try {
+            const linhas = await montarPonte(supabase as unknown as SupabaseClient, empresa_id)
+            const gravadas = await gravarPonte(supabase as unknown as SupabaseClient, linhas)
+            resultado.push({ empresa: empresa_id, vendas: linhas.length, gravadas })
+          } catch (e) {
+            falhas.push({ empresa: empresa_id, erro: e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e) })
+          }
         }
-        return NextResponse.json({ ok: true, job, resultado })
+        if (falhas.length) console.error('[cron ponte-vendas] falhas:', falhas)
+        return NextResponse.json({ ok: falhas.length === 0, job, resultado, falhas })
       }
 
       /**

@@ -113,11 +113,13 @@ export async function reconciliarAssinaturas(supabase: any): Promise<{ atualizad
       const sub = await stripe.subscriptions.retrieve(emp.stripe_subscription_id)
       const priceId = sub.items.data[0]?.price?.id ?? null
       const { plano, status, stripe_status } = await stripeStatusToPlano(sub.status, priceId)
-      await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+      // Update recusado pelo banco não é "atualizada": vira erro da empresa (porte do eaa1460).
+      const { error: uErr } = await supabase.from('empresas').update({ plano, status, stripe_status }).eq('id', emp.id)
+      if (uErr) throw uErr
       atualizadas++
     } catch (err) {
       // Assinatura cancelada ou inválida: segue para a próxima.
-      erros.push(`empresa ${emp.id}: ${err instanceof Error ? err.message : String(err)}`)
+      erros.push(`empresa ${emp.id}: ${err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err)}`)
     }
   }
   return { atualizadas, erros }

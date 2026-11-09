@@ -344,6 +344,7 @@ v "PDV nao chama recebido de venda"   "app/(dashboard)/pdv/components/pdv-view.t
 v "pagina publica mostra o item"      "app/orcamento/[token]/orcamento-view.tsx" "dados.tipo === 'venda' &&"
 v "encomenda copia a serie"           "lib/encomendas.ts" "serieDaUnidade"
 v "datas: helper existe"              "lib/datas.ts" "SO_DATA"
+v "datas: timestamp no fuso da loja"  "lib/datas.ts" "timeZone: FUSO, ...opcoes"
 v "compras usa o helper"              "app/(dashboard)/compras/components/compras-view.tsx" "formatarDiaMes"
 # A tela /chaves saiu (21/08/2026); a regra da data pura mudou de casa junto.
 v "chave usa o helper de data"         "lib/chave-imovel.ts" "paraData"
@@ -422,6 +423,7 @@ v "follow-up abre as sugestoes"        "app/(dashboard)/gestao-leads/gestao-lead
 v "regiao vem do perfil de busca"      "app/(dashboard)/gestao-leads/page.tsx" "imoveis_perfis_busca"
 n "faixa nao usa opacidade sobre soft" "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "bg-warn-soft/"
 v "rodar reativacao recarrega numero"  "app/(dashboard)/gestao-leads/gestao-leads-view.tsx" "router.refresh()"
+v "reativacao: cadencia da empresa"    "lib/reativacao.ts" ".eq('id', cadenciaId).eq('empresa_id', empresaId)"
 v "texto da mensagem e da loja"        "app/(dashboard)/gestao-leads/page.tsx" "mensagens_templates"
 n "menu nao renomeia mais conversao"   "supabase/migrations/20261029000100_presets_completos.sql" '"/conversao":"Gest'
 
@@ -565,6 +567,7 @@ n "configuracoes sem aba integracoes"   "components/modules/configuracoes/config
 v "legado do admin e permanente"        "proxy.ts" "NextResponse.redirect(url, 308)"
 v "stripe reconcilia num lugar so"      "app/api/superadmin/sync-stripe/route.ts" "reconciliarAssinaturas("
 v "cron usa a mesma reconciliacao"      "app/api/cron/[job]/route.ts" "reconciliarAssinaturas(supabase)"
+v "stripe: update recusado e erro"      "lib/stripe.ts" "if (uErr) throw uErr"
 v "previews do superadmin num lugar so" "app/api/superadmin/laboratorio/preview/route.ts" "entrarNaEmpresaDePreview(null)"
 v "relatorio conta lucro so com custo"  "components/modules/relatorios/relatorios-view.tsx" "resultadoDasVendas("
 # 21/10/2026 (etapa 0, 2.5): modulo desligado = vitrine (rewrite), nao redirect;
