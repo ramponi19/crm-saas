@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "./canalZapintel";
 import { INTERVALO_MINIMO, avisoRefaz, esperaDaVolta, esperaDoAviso } from "./ritmo";
+import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
 
 /**
  * UMA CONSULTA AO BANCO QUE SE ATUALIZA SOZINHA — SEM PULSO E SEM VERCEL.
@@ -78,8 +79,11 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     atrasado.current = false;
     ultimaConsulta.current = Date.now();
     setAtualizando(true);
+    const inicio = Date.now();
     const { data, error } = await supabase.rpc(rpc as never, JSON.parse(chave) as never);
     setAtualizando(false);
+    // Tempo esgotado vira evento (lib/zapintel/tempo-esgotado.ts): o banco não registra as canceladas.
+    void registrarTempoEsgotado(supabase, error, { funcao: rpc, empresa, inicio, params: JSON.parse(chave) });
     // Um aviso disparou esta consulta na página 1; a pessoa foi para a página 2
     // e a 2 respondeu antes. Sem esta linha, a página 1 chegava por último e
     // tomava a tela (esmaecida, como "carregando", até o próximo aviso).
@@ -88,7 +92,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     setErro(null);
     setDados(data as T);
     setChaveDosDados(chave);
-  }, [supabase, rpc, chave]);
+  }, [supabase, rpc, chave, empresa]);
 
   // Busca ao abrir e a cada parâmetro novo. Se falhar, tenta mais duas vezes
   // antes de mostrar erro: em 14/10/2026 a primeira consulta do dia estourou o
@@ -97,7 +101,9 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     let vivo = true;
     let espera: ReturnType<typeof setTimeout> | null = null;
     const tentar = (n: number) => {
+      const inicio = Date.now();
       supabase.rpc(rpc as never, JSON.parse(chave) as never).then(({ data, error }) => {
+        void registrarTempoEsgotado(supabase, error, { funcao: rpc, empresa, inicio, params: JSON.parse(chave), tentativa: n });
         if (!vivo) return;
         if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); return; }
         // Permissão negada não melhora tentando de novo. Tempo esgotado (57014)
@@ -119,7 +125,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     };
     tentar(0);
     return () => { vivo = false; if (espera) clearTimeout(espera); };
-  }, [supabase, rpc, chave, tentativa]);
+  }, [supabase, rpc, chave, tentativa, empresa]);
 
   // O canal ao vivo. Só se inscreve quando sabe a empresa — vem do servidor
   // (contexto) ou, na falta dele, da própria resposta do banco.

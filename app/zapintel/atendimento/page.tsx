@@ -13,6 +13,7 @@ import type { Classe } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, num, ha } from "@/components/zapintel/rotulos";
 import { formatarDiaMes, formatarNoFuso } from "@/lib/datas";
 import { useFuso } from "@/components/fuso-provider";
+import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
 
 /**
  * ATENDIMENTO — COMO A LOJA ATENDE. Substitui Performance I e II (15/10/2026).
@@ -396,8 +397,11 @@ function ComoConversa({ dias, loja, empresa }: { dias: number | null; loja: numb
     setCarregando(true);
     const p_recalcular = forcar.current;
     forcar.current = false;
-    createClient().rpc("zapintel_conversa" as never, { p_dias: diasConta, p_filial: loja, p_empresa: empresa, p_recalcular } as never)
+    const cliente = createClient();
+    const inicio = Date.now();
+    cliente.rpc("zapintel_conversa" as never, { p_dias: diasConta, p_filial: loja, p_empresa: empresa, p_recalcular } as never)
       .then(({ data, error }) => {
+        void registrarTempoEsgotado(cliente, error, { funcao: "zapintel_conversa", empresa, inicio, params: { p_filial: loja, p_dias: diasConta } });
         if (!vivo) return;
         if (error) setErro(/timeout|canceling|57014/i.test(error.message) ? "A conta demorou demais. Tente 7 dias." : mensagemDeErroDeTela(error.message));
         else { setD(data as unknown as Conversa); setErro(null); }

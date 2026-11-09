@@ -1,6 +1,7 @@
 "use client";
 import { useCallback } from "react";
 import { useRpcAoVivo } from "./useRpcAoVivo";
+import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
 
 /**
  * O DASHBOARD DO ZAPINTEL AO VIVO — SEM PULSO E SEM VERCEL.
@@ -66,9 +67,11 @@ export function useDashboardAoVivo(filial: number | null, empresa: number | null
     useRpcAoVivo<Dashboard>("zapintel_dashboard", { p_filial: filial, p_empresa: empresa }, empresa);
 
   const lista = useCallback(async (tipo: string, valor?: string | null) => {
+    const inicio = Date.now();
     const { data, error } = await supabase.rpc("zapintel_dashboard_lista" as never, {
       p_tipo: tipo, p_valor: valor ?? null, p_filial: filial, p_empresa: empresa,
     } as never);
+    void registrarTempoEsgotado(supabase, error, { funcao: "zapintel_dashboard_lista", empresa, inicio, params: { p_filial: filial } });
     if (error) throw new Error(error.message);
     return data as unknown as { total: number; leads: LeadDaLista[] };
   }, [supabase, filial, empresa]);
