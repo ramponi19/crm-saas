@@ -61,3 +61,12 @@ deno.lock
 # Prints de tela (Kommo e Nexus em producao) — tem dado de cliente: nunca no git
 /docs/reconstrucao-nexus/kommo/
 /docs/reconstrucao-nexus/nexus/
+
+# e2e locais (tests/e2e): dependência própria e arquivos com e-mail real / chaves do Supabase LOCAL
+/tests/e2e/node_modules/
+/tests/e2e/usuarios.local.json
+/tests/e2e/status.local.env
+/tests/e2e/saida/
+# saídas das ferramentas (gate, fotos de saúde da produção)
+/.gate/
+/tools/saude/fotos/

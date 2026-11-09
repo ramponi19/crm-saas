@@ -60,7 +60,7 @@ describe('banco (BANCO=1)', { skip: !ligado && 'defina BANCO=1 para rodar' }, ()
 
   /**
    * O bucket `contratos` é público DE PROPÓSITO — e este teste trava as duas
-   * metades da decisão (docs/DECISAO-BUCKET-CONTRATOS-20261016.md).
+   * metades da decisão (docs/reconstrucao-nexus/RESUMO-RECONSTRUCAO.md, seção 4).
    *
    * Ele guarda só os fundos dos modelos (capa e papel timbrado; o importador
    * remove o texto do PDF antes de gerar a imagem). O contrato emitido é HTML que

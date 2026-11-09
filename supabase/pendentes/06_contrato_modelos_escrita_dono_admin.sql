@@ -1,7 +1,7 @@
 -- PENDENTE — APLICAR SÓ COM AUTORIZAÇÃO DO LUCAS.
 --
 -- Assunto único: quem pode ESCREVER nos modelos de contrato.
--- Ver docs/ACHADO-CONTRATOS-ESCRITA-20261016.md.
+-- Ver docs/reconstrucao-nexus/RESUMO-RECONSTRUCAO.md, seção 3.
 --
 -- Hoje (conferido no catálogo em 16/10/2026): as políticas de INSERT/UPDATE/DELETE
 -- de `contrato_documentos` e de INSERT/UPDATE de `contrato_modelos` exigem só

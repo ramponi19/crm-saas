@@ -1,0 +1,8 @@
+{
+  "name": "nexus-e2e",
+  "private": true,
+  "description": "Testes ponta a ponta contra o app e o Supabase LOCAIS. Ver LEIA-ME.md.",
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

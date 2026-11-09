@@ -8,7 +8,9 @@ import nextTs from 'eslint-config-next/typescript'
 const config = defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'supabase/functions/**', 'arquivos/**']),
+  // tests/e2e e tools: scripts de operação que rodam fora do app (Playwright contra o local,
+  // dump, gate) e não entram no build; o teto de avisos (scripts/avisos-congelados.json) é do app.
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'supabase/functions/**', 'tests/e2e/**', 'tools/**']),
   {
     rules: {
       'no-unused-vars': 'off',

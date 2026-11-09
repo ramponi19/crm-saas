@@ -1,0 +1,49 @@
+[
+  {
+    "nome": "dono",
+    "email": "dono@exemplo.test",
+    "papel": "owner",
+    "lojas": [
+      {
+        "id": 3,
+        "nome": "Mogi",
+        "lead": 0
+      },
+      {
+        "id": 6,
+        "nome": "Jaguariuna",
+        "lead": 0
+      }
+    ]
+  },
+  {
+    "nome": "vend-mogi",
+    "email": "vend-mogi@exemplo.test",
+    "papel": "vendedor",
+    "lojas": [
+      {
+        "id": 3,
+        "nome": "Mogi",
+        "lead": 0
+      }
+    ]
+  },
+  {
+    "nome": "vend-jag",
+    "email": "vend-jag@exemplo.test",
+    "papel": "vendedor",
+    "lojas": [
+      {
+        "id": 6,
+        "nome": "Jaguariuna",
+        "lead": 0
+      }
+    ]
+  },
+  {
+    "nome": "superadmin",
+    "email": "superadmin@exemplo.test",
+    "papel": "superadmin",
+    "lojas": []
+  }
+]

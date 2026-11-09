@@ -1,5 +1,5 @@
 /**
- * Lote de estabilidade de 17/10/2026 (ver docs/ZAPINTEL-INVENTARIO-QUALIDADE-20261017.md):
+ * Lote de estabilidade de 17/10/2026 (ver docs/reconstrucao-nexus/RESUMO-RECONSTRUCAO.md, seção 6):
  *
  *   1. a contagem do robô: falha → "indisponível", nunca "em dia"; cache de 60 s;
  *   2. dado do CRM que não pôde ser lido entra no prompt como "informação

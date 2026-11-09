@@ -2,8 +2,7 @@
  * Os scripts .mts compilam (17/10/2026). O tsconfig.json principal não os
  * inclui — e o next build também não —, então um script quebrado passava
  * calado: foi assim que `calibrar-zapintel.mts` ficou lendo campos que não
- * existem mais. Os quebrados conhecidos estão excluídos em
- * tsconfig.scripts.json e marcados no cabeçalho.
+ * existem mais (os dois quebrados saíram do repositório em 09/11/2026).
  *
  *   npm test
  */
