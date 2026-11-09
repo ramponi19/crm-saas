@@ -10,7 +10,9 @@ const config = defineConfig([
   ...nextTs,
   // tests/e2e e tools: scripts de operação que rodam fora do app (Playwright contra o local,
   // dump, gate) e não entram no build; o teto de avisos (scripts/avisos-congelados.json) é do app.
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'supabase/functions/**', 'tests/e2e/**', 'tools/**']),
+  // .claude/: worktrees de outras sessões (cópias do repositório) — sem isto o check no
+  // repositório principal conta cada aviso duas vezes.
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'supabase/functions/**', 'tests/e2e/**', 'tools/**', '.claude/**']),
   {
     rules: {
       'no-unused-vars': 'off',

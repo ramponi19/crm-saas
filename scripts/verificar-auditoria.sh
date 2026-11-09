@@ -809,7 +809,7 @@ v "reconectar segue o caminho do canal" "components/modules/canais/canais-view.t
 v "assina o webhook na conta"         "lib/canais/instagram-login.ts" "me/subscribed_apps"
 v "state confere na volta"            "app/api/canais/instagram/retorno/route.ts" "state !== esperado"
 v "recusa ambiente local"             "app/api/canais/instagram/iniciar/route.ts" "if (local) {"
-v "conta de outro tenant e recusada"  "app/api/canais/instagram/retorno/route.ts" "existente.empresa_id !== empresaId"
+v "conta de outro tenant e recusada"  "app/api/canais/instagram/retorno/route.ts" "achados.some((c) => c.empresa_id !== empresaId)"
 v "retorno resolvido no servidor"     "app/api/canais/instagram/retorno/route.ts" "const curto = await trocarCodigo"
 v "envio escolhe o host pelo via"     "supabase/functions/webhook-leads/index.ts" "graph.instagram.com/"
 v "pagina do IG sem maybeSingle"      "supabase/functions/webhook-leads/index.ts" "order(\"conectado_em\", { ascending: false }).limit(1)"
