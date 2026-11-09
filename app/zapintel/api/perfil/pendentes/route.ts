@@ -6,6 +6,7 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import { VERSAO_DO_PERFIL } from '@/lib/zapintel/perfil'
 import { iaDoCrmLigada } from '@/lib/zapintel/ia'
 import { lerCachePendentes, gravarCachePendentes } from '@/lib/zapintel/cache-pendentes'
+import { registrarTempoEsgotado } from '@/lib/zapintel/tempo-esgotado'
 
 /**
  * QUAIS FICHAS FICARAM PARA TRÁS — SEM PERGUNTAR NADA À IA.
@@ -64,8 +65,12 @@ class FalhaDePendentes extends Error {
   constructor(motivo: 'timeout' | 'erro_rpc' | 'erro_leads', mensagem: string) { super(mensagem); this.motivo = motivo }
 }
 
-function falhou(e: unknown, empresaId: number, userId: string) {
+async function falhou(e: unknown, empresaId: number, userId: string, db: ReturnType<typeof rastrDb>, inicio: number) {
   const f = e instanceof FalhaDePendentes ? e : new FalhaDePendentes('erro_rpc', e instanceof Error ? e.message : String(e))
+  // Tempo esgotado também vira evento, como nas telas (lib/zapintel/tempo-esgotado.ts, 10/11/2026).
+  if (f.motivo === 'timeout') {
+    await registrarTempoEsgotado(db, { code: '57014' }, { funcao: 'zapintel_analises_pendentes', empresa: empresaId, inicio })
+  }
   console.error(JSON.stringify({ evento: 'zapintel.pendentes.falha', motivo: f.motivo, empresa_id: empresaId, user_id: userId, erro: f.message }))
   if (typeof Sentry.captureException === 'function') {
     Sentry.captureException(f, { tags: { modulo: 'zapintel', rota: 'perfil/pendentes', motivo: f.motivo, empresa_id: String(empresaId) } })
@@ -88,6 +93,7 @@ export async function GET(req: Request) {
   }
 
   const db = rastrDb()
+  const inicio = Date.now()
   try {
     // Paginado e em ordem: a API devolve no máximo 1.000 linhas por chamada e
     // corta calada. Hoje a fila tem dezenas, mas na próxima troca de
@@ -141,6 +147,6 @@ export async function GET(req: Request) {
     gravarCachePendentes(chave, resposta)
     return NextResponse.json(resposta)
   } catch (e) {
-    return falhou(e, empresaId, userId)
+    return await falhou(e, empresaId, userId, db, inicio)
   }
 }

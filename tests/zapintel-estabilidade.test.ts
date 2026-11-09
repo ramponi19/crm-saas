@@ -20,6 +20,7 @@ const estado = {
   rpc: { data: [] as unknown[], error: null as null | { message: string; code?: string } },
   leads: { data: [] as unknown[], error: null as null | { message: string } },
   lojas: [3, 6, 0],
+  inseridos: [] as { tabela: string; dados: Record<string, unknown> }[],
 }
 mock.module('@/lib/zapintel/ctx', {
   namedExports: {
@@ -37,10 +38,11 @@ mock.module('@/lib/rastreamento/db', {
         b.range = () => Promise.resolve(estado.rpc)
         return b
       },
-      from: () => {
+      from: (tabela: string) => {
         const b: Record<string, unknown> = {}
         for (const m of ['select', 'eq']) b[m] = () => b
         b.in = () => Promise.resolve(estado.leads)
+        b.insert = (dados: Record<string, unknown>) => { estado.inseridos.push({ tabela, dados }); return Promise.resolve({ error: null }) }
         return b
       },
     }),
@@ -85,7 +87,7 @@ const LINHA = { lead_id: 10, nome: 'Fulano', filial: 'Mogi', tem_ficha: false, g
 // ── 1. pendentes ────────────────────────────────────────────────────────────
 describe('GET /zapintel/api/perfil/pendentes: falha não é "em dia"', () => {
   beforeEach(() => {
-    limparCachePendentes(); sentry.capturas = []; estado.rpcChamadas = 0
+    limparCachePendentes(); sentry.capturas = []; estado.rpcChamadas = 0; estado.inseridos = []
     estado.rpc = { data: [LINHA], error: null }; estado.leads = { data: [{ id: 10, filial_id: 3 }], error: null }
   })
 
@@ -101,6 +103,14 @@ describe('GET /zapintel/api/perfil/pendentes: falha não é "em dia"', () => {
     assert.equal(ev.length, 1)
     assert.equal(sentry.capturas.length, 1)
     assert.equal(sentry.capturas[0].ctx.tags?.modulo, 'zapintel')
+    // E vira evento (10/11/2026): o pg_stat_statements não registra as canceladas.
+    assert.equal(estado.inseridos.length, 1)
+    assert.equal(estado.inseridos[0].tabela, 'eventos')
+    const ins = estado.inseridos[0].dados as { empresa_id: number; tipo: string; dados: { funcao: string; duracao_ms: number } }
+    assert.equal(ins.empresa_id, 1)
+    assert.equal(ins.tipo, 'zapintel.tempo_esgotado')
+    assert.equal(ins.dados.funcao, 'zapintel_analises_pendentes')
+    assert.equal(typeof ins.dados.duracao_ms, 'number')
   })
 
   test('erro ao ler `leads` (o caso que virava "em dia") → indisponível, motivo erro_leads', async () => {
@@ -109,6 +119,7 @@ describe('GET /zapintel/api/perfil/pendentes: falha não é "em dia"', () => {
     const d = await r.json() as { indisponivel: boolean; motivo: string }
     assert.equal(d.indisponivel, true)
     assert.equal(d.motivo, 'erro_leads')
+    assert.equal(estado.inseridos.length, 0, 'só tempo esgotado vira evento')
   })
 
   test('cache: a 2ª chamada em 60 s não consulta o banco e o log diz que veio do cache', async () => {
