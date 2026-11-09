@@ -46,7 +46,7 @@ export default async function ClientesPage() {
   type ClienteRow = { id: number; lead_id: number | null; corretor_id: string | null }
   const idsLead = [...new Set((clientes as ClienteRow[]).map((c) => c.lead_id).filter((x): x is number => x != null))]
 
-  const [leadsRaw, { data: etapasRaw }, { data: membrosRaw }, { data: scoreRow }] = await Promise.all([
+  const [leadsRaw, { data: etapasRaw }, { data: membrosRaw }, { data: scoreRow }, { data: motivosRaw }] = await Promise.all([
     idsLead.length ? lerJornadaDosLeads(supabase, empresaId, idsLead) : Promise.resolve([]),
     // Etapas do funil PADRÃO: os rótulos que o dono editou, não os do código.
     supabase.from('funil_etapas').select('slug, label, tipo, ordem, funis!inner(padrao)')
@@ -54,6 +54,8 @@ export default async function ClientesPage() {
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)')
       .eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle(),
+    // Mover para uma etapa de perda pede o motivo, como no quadro: /api/leads/mover recusa perda sem ele.
+    supabase.from('motivos_perda').select('id, label').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
   ])
 
   type Embed<T> = T | T[] | null
@@ -108,6 +110,7 @@ export default async function ClientesPage() {
       etapas={etapas.map((e) => ({ id: e.id, label: e.label, tipo: e.tipo ?? null }))}
       equipe={equipe}
       jornada={jornada}
+      motivos={(motivosRaw ?? []) as { id: number; label: string }[]}
     />
   )
 }

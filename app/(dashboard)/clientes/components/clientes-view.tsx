@@ -36,6 +36,8 @@ interface Props {
   etapas?: { id: string; label: string; tipo: string | null }[]
   equipe?: { id: string; nome: string }[]
   jornada?: Record<number, ClienteImob>
+  /** Motivos de perda da empresa: o modal da imobiliária pede um ao mover para etapa de perda. */
+  motivos?: { id: number; label: string }[]
 }
 
 function fmtUltimaCompra(d: string | null | undefined) {
@@ -55,7 +57,7 @@ function statusBadge(c: Cliente) {
   return <Badge tone="ok" dot>Ativo</Badge>
 }
 
-export default function ClientesView({ clientes, imob = false, etapas = [], equipe = [], jornada = {} }: Props) {
+export default function ClientesView({ clientes, imob = false, etapas = [], equipe = [], jornada = {}, motivos = [] }: Props) {
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
@@ -318,6 +320,7 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
           isNew={isNew}
           etapas={etapas}
           equipe={equipe}
+          motivos={motivos}
           jornada={clienteSelecionado ? jornada[clienteSelecionado.id] : undefined}
           onClose={() => setModalOpen(false)}
         />

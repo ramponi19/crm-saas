@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { formatarData } from '@/lib/datas'
 import { avisoDocumento, documentoMudou } from '@/lib/documento'
+import { MotivoPerdaModal } from '@/components/modules/leads/motivo-perda-modal'
 import {
   TIPO_NEGOCIO, STATUS_APROVACAO, ORIGENS_IMOB, TIPOS_IMOVEL, CARACTERISTICAS,
   rotuloTipoNegocio, statusAprovacao,
@@ -98,11 +99,12 @@ const ICONE_HISTORICO = {
   negocio: Handshake,
 } as const
 
-export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jornada, onClose }: {
+export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motivos = [], jornada, onClose }: {
   cliente: Cliente | null
   isNew: boolean
   etapas: { id: string; label: string; tipo: string | null }[]
   equipe: { id: string; nome: string }[]
+  motivos?: { id: number; label: string }[]
   jornada?: Jornada
   onClose: () => void
 }) {
@@ -113,6 +115,9 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
   const [salvando, setSalvando] = useState(false)
   const [etapaAtual, setEtapaAtual] = useState<string | null>(jornada?.etapaId ?? null)
   const [leadId, setLeadId] = useState<number | null>(cliente?.lead_id ?? null)
+  /** Etapa de perda escolhida, esperando o motivo (o mesmo modal do quadro). */
+  const [perdaPendente, setPerdaPendente] = useState<string | null>(null)
+  const [salvandoPerda, setSalvandoPerda] = useState(false)
 
   const vazio = {
     nome: '', cpf_cnpj: '', telefone: '', email: '',
@@ -266,20 +271,41 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
    * É a mesma rota que o kanban usa ao arrastar (/api/leads/mover), então mover aqui e
    * mover lá são a mesma ação — não existem duas etapas para a mesma pessoa, e as
    * automações de "entrou na etapa" rodam igual nos dois lugares.
+   *
+   * Etapa de PERDA pede o motivo antes (o mesmo modal do quadro): a rota recusa perda
+   * sem motivo, e sem a pergunta aqui o botão só devolvia erro.
    */
-  async function moverEtapa(id: string) {
-    if (leadId == null) return
+  async function moverEtapa(id: string, extra?: { motivo_perda_id: number; perdido_em: string; justificativa?: string }) {
+    if (leadId == null) return false
+    if (!extra && id !== etapaAtual && etapas.find((e) => e.id === id)?.tipo === 'perdido') {
+      setPerdaPendente(id)
+      return false
+    }
     const antes = etapaAtual
     setEtapaAtual(id)
     const r = await fetch('/api/leads/mover', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId, kanban_status: id }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId, kanban_status: id, ...extra }),
     }).catch(() => null)
     if (!r?.ok) {
       setEtapaAtual(antes)
       notify.bad('Não foi possível mover', ((await r?.json().catch(() => null)) as { error?: string } | null)?.error)
-      return
+      return false
     }
-    notify.ok('Etapa atualizada')
+    notify.ok(extra ? 'Lead marcado como perdido' : 'Etapa atualizada')
+    return true
+  }
+
+  async function confirmarPerda(motivoId: number, observacao: string) {
+    if (!perdaPendente) return
+    setSalvandoPerda(true)
+    // A justificativa é emendada nas observações do contato pelo servidor, como no quadro.
+    const ok = await moverEtapa(perdaPendente, {
+      motivo_perda_id: motivoId,
+      perdido_em: new Date().toISOString(),
+      ...(observacao ? { justificativa: observacao } : {}),
+    })
+    setSalvandoPerda(false)
+    if (ok) setPerdaPendente(null)
   }
 
   /** Cria o lead da pessoa e amarra ao cliente — a ponte que faltava no nosso modelo. */
@@ -515,6 +541,17 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, jorna
             </div>
           )}
         </div>
+      )}
+
+      {/* Etapa de perda: motivo + justificativa antes de mover. Cancelar não mexe na etapa. */}
+      {perdaPendente && (
+        <MotivoPerdaModal
+          leadNome={cliente?.nome ?? ''}
+          motivos={motivos}
+          loading={salvandoPerda}
+          onConfirm={confirmarPerda}
+          onCancel={() => setPerdaPendente(null)}
+        />
       )}
     </Modal>
   )
