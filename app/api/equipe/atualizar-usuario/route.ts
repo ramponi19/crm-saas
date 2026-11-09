@@ -8,7 +8,7 @@ const ROLES_ATRIBUIVEIS = ['admin', 'vendedor', 'tecnico'] as const
 type RoleAtribuivel = (typeof ROLES_ATRIBUIVEIS)[number]
 
 // Hierarquia: um caller só pode atribuir roles abaixo do seu próprio.
-const HIERARQUIA: Record<string, number> = { owner: 3, admin: 2, vendedor: 1, tecnico: 1 }
+const HIERARQUIA: Record<string, number> = { superadmin: 4, owner: 3, admin: 2, vendedor: 1, tecnico: 1 }
 
 function podeAtribuir(callerRole: string, targetRole: string): boolean {
   return (HIERARQUIA[callerRole] ?? 0) > (HIERARQUIA[targetRole] ?? 0)
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  let callerRole = 'owner' // super_admin tem permissão total
+  let callerRole = 'superadmin'
   if (!usuarioAtual?.is_super_admin) {
     const { data: eu } = await supabase
       .from('empresa_usuarios')
@@ -67,18 +67,26 @@ export async function PATCH(req: NextRequest) {
   if (!alvo)
     return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
-  // Impede rebaixar outro owner (só o próprio owner pode transferir ownership)
-  if (alvo.role === 'owner' && callerRole !== 'owner')
-    return NextResponse.json({ error: 'Sem permissão para alterar um owner' }, { status: 403 })
+  /**
+   * Quem chama precisa estar ACIMA do papel atual do alvo, nao so do papel novo.
+   * Antes so o papel novo era conferido: um admin rebaixava outro admin a
+   * vendedor, e um dono rebaixava outro dono (ou a si mesmo) e a empresa podia
+   * ficar sem dono. Dono so muda por transferencia de propriedade, fora daqui.
+   */
+  if ((HIERARQUIA[callerRole] ?? 0) <= (HIERARQUIA[alvo.role] ?? 0))
+    return NextResponse.json({ error: 'Sem permissão para alterar este usuário' }, { status: 403 })
+
+  // Superadmin pode mexer num dono, mas nunca deixar a empresa sem nenhum.
+  if (alvo.role === 'owner') {
+    const { count } = await createServiceClient()
+      .from('empresa_usuarios').select('usuario_id', { count: 'exact', head: true })
+      .eq('empresa_id', empresaId).eq('role', 'owner').eq('ativo', true).neq('usuario_id', id)
+    if (!count)
+      return NextResponse.json({ error: 'A empresa ficaria sem dono' }, { status: 409 })
+  }
 
   // Usa service client para garantir a escrita mesmo com RLS
   const service = createServiceClient()
-
-  const { error: uErr } = await service
-    .from('usuarios')
-    .update({ nome })
-    .eq('id', id)
-  if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 })
 
   /**
    * A loja da pessoa entra no MESMO update do papel.
@@ -103,6 +111,14 @@ export async function PATCH(req: NextRequest) {
       patch.filial_id = filialId
     }
   }
+
+  // O nome so e gravado depois de tudo validado: antes, uma loja invalida
+  // devolvia 400 com o nome ja trocado.
+  const { error: uErr } = await service
+    .from('usuarios')
+    .update({ nome })
+    .eq('id', id)
+  if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 })
 
   const { error: euErr } = await service
     .from('empresa_usuarios')

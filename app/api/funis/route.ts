@@ -1,6 +1,7 @@
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { createServiceClient } from '@/lib/supabase/service'
 
 /**
  * Funis são configuração da LOJA, não ferramenta de atendimento.
@@ -76,12 +77,17 @@ export async function PATCH(req: Request) {
 
   if (body.padrao === true) {
     const { data: f } = await supabase.from('funis').select('interno').eq('id', body.id).eq('empresa_id', empresaId).maybeSingle()
-    if (f?.interno) return NextResponse.json({ error: 'Um funil interno não pode ser o padrão.' }, { status: 400 })
-    // Só um padrão por empresa.
-    await supabase.from('funis').update({ padrao: false }).eq('empresa_id', empresaId)
+    // Antes um id inexistente (ou de outra empresa) passava: desmarcava o padrao de
+    // todos, marcava ninguem e a empresa ficava sem funil padrao.
+    if (!f) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
+    if (f.interno) return NextResponse.json({ error: 'Um funil interno não pode ser o padrão.' }, { status: 400 })
+    // Só um padrão por empresa. Marca o novo ANTES de desmarcar os outros: se a
+    // segunda escrita falhar, sobram dois padroes por um instante, nunca nenhum.
     const { data: gravadas, error } = await supabase.from('funis').update({ padrao: true }).eq('id', body.id).eq('empresa_id', empresaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (nadaGravado(gravadas)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
+    const { error: e2 } = await supabase.from('funis').update({ padrao: false }).eq('empresa_id', empresaId).neq('id', body.id)
+    if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })
@@ -99,8 +105,15 @@ export async function DELETE(req: Request) {
   if (!funil) return NextResponse.json({ error: 'Funil não encontrado' }, { status: 404 })
   if (funil.padrao) return NextResponse.json({ error: 'Não é possível excluir o funil padrão.' }, { status: 400 })
 
-  // Negócios do funil, ativos ou não (como a view `leads`, que caiu, contava).
-  const { count } = await supabase.from('negocios').select('*', { count: 'exact', head: true }).eq('funil_id', body.id)
+  /**
+   * Negócios do funil, ativos ou não, da EMPRESA inteira — não só os da loja
+   * selecionada. Com a sessão, a RLS de negocios filtra pela loja do seletor: um
+   * admin com a Loja 1 aberta via 0 num funil cheio de negócios da Loja 2 e
+   * conseguia excluir. Por isso o serviço, com o filtro de empresa explícito.
+   */
+  const { count, error: eCount } = await createServiceClient().from('negocios')
+    .select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('funil_id', body.id)
+  if (eCount) return NextResponse.json({ error: eCount.message }, { status: 500 })
   if ((count ?? 0) > 0) {
     return NextResponse.json({ error: `Este funil tem ${count} lead(s). Mova-os antes de excluir.` }, { status: 409 })
   }

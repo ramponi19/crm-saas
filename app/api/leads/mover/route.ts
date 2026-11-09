@@ -90,6 +90,21 @@ export async function POST(req: Request) {
   }
   const { data: etapaRow } = funilAlvo == null ? { data: null } : await supabase.from('funil_etapas')
     .select('id, tipo').eq('funil_id', funilAlvo).eq('slug', etapa).maybeSingle()
+
+  /**
+   * A etapa de destino precisa existir no funil do negócio (porte do 58d7d3f).
+   *
+   * Antes qualquer texto era aceito: uma etapa de OUTRO funil ou digitada errada
+   * gravava o negócio sem etapa, e ele sumia do quadro. O slug guardado em
+   * `dados._lead.kanban_status` continua valendo só para funil sem etapa nenhuma.
+   */
+  if (!etapaRow && funilAlvo != null) {
+    const { count: etapasDoFunil } = await supabase.from('funil_etapas')
+      .select('id', { count: 'exact', head: true }).eq('funil_id', funilAlvo)
+    if ((etapasDoFunil ?? 0) > 0) {
+      return NextResponse.json({ error: 'Etapa não encontrada neste funil' }, { status: 400 })
+    }
+  }
   const status = etapaRow?.tipo === 'ganho' ? 'ganho'
     : etapaRow?.tipo === 'perdido' ? 'perdido'
     : !etapaRow && (body.perdido_em ?? n.perdido_em) ? 'perdido' : 'aberto'
@@ -110,8 +125,26 @@ export async function POST(req: Request) {
     ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : agora) : null,
   }
   if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
-  if (body.motivo_perda_id != null) patch.motivo_perda_id = body.motivo_perda_id
-  if (body.perdido_em) patch.perdido_em = body.perdido_em
+
+  /**
+   * Perda exige motivo da EMPRESA — a regra estava só na tela (porte do 58d7d3f).
+   * Um POST direto mandava o negócio para Perdido sem motivo, e o relatório de
+   * perdas o contava sem causa. Sair da perda limpa motivo e data: sem isso o
+   * ZapIntel e o assistente continuavam contando-o como perdido.
+   */
+  if (status === 'perdido') {
+    if (body.motivo_perda_id == null) {
+      return NextResponse.json({ error: 'Informe o motivo da perda' }, { status: 400 })
+    }
+    const { data: motivo } = await supabase.from('motivos_perda').select('id')
+      .eq('id', body.motivo_perda_id).eq('empresa_id', n.empresa_id).maybeSingle()
+    if (!motivo) return NextResponse.json({ error: 'Motivo de perda inválido' }, { status: 400 })
+    patch.motivo_perda_id = body.motivo_perda_id
+    patch.perdido_em = body.perdido_em || (n.status === 'perdido' && n.perdido_em ? n.perdido_em : agora)
+  } else {
+    patch.motivo_perda_id = null
+    patch.perdido_em = null
+  }
 
   /**
    * A justificativa da perda mora nas observações do contato (onde o vendedor a lê).

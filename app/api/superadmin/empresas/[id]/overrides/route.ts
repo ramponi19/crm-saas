@@ -29,13 +29,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const patch: Record<string, unknown> = {}
-  if ('limite_usuarios' in body) patch.limite_usuarios = Math.max(0, Math.floor(Number(body.limite_usuarios) || 0))
-  if ('limite_leads' in body) patch.limite_leads = Math.max(0, Math.floor(Number(body.limite_leads) || 0))
+  /**
+   * Limite invalido e recusado, nao convertido. Em lib/limites.ts 0 significa
+   * ILIMITADO: com `Number(x) || 0`, um campo com lixo virava "sem limite" em
+   * silencio. Zero continua aceito quando vem escrito como zero.
+   */
+  for (const campo of ['limite_usuarios', 'limite_leads'] as const) {
+    if (!(campo in body)) continue
+    const n = Number(body[campo])
+    if (body[campo] === null || !Number.isFinite(n) || n < 0) {
+      return NextResponse.json({ error: `${campo} inválido` }, { status: 400 })
+    }
+    patch[campo] = Math.floor(n)
+  }
   if (Object.keys(patch).length === 0 && !('menu_override' in body) && !('modulos_override' in body)) {
     return NextResponse.json({ error: 'Nada a atualizar' }, { status: 400 })
   }
 
   const svc = createServiceClient()
+  // Empresa inexistente: 404 antes de gravar menu ou modulos para um id que nao existe.
+  const { data: existe } = await svc.from('empresas').select('id').eq('id', empresaId).maybeSingle()
+  if (!existe) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
   if (Object.keys(patch).length) {
     const { error } = await svc.from('empresas').update(patch as never).eq('id', empresaId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

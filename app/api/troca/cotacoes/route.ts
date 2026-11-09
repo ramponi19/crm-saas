@@ -126,10 +126,27 @@ export async function POST(req: Request) {
   }
 
   if (b.id) {
+    /**
+     * Cotacao ja USADA no PDV nao muda: o valor dela foi abatido numa venda, e a
+     * rota promete valores congelados. Antes o update reescrevia modelo e valor de
+     * uma cotacao ja abatida, e um id que nao batia respondia ok sem gravar nada.
+     */
     const { data, error } = await supabase.from('avaliacao_cotacoes')
-      .update(dados as never).eq('id', b.id).select('numero').maybeSingle()
+      .update(dados as never).eq('id', b.id).eq('empresa_id', empresaId).is('usada_em', null)
+      .select('numero').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, id: b.id, numero: data?.numero ?? null, ...conta })
+    if (!data) {
+      const { data: existe } = await supabase.from('avaliacao_cotacoes').select('usada_em')
+        .eq('id', b.id).eq('empresa_id', empresaId).maybeSingle()
+      if (existe?.usada_em) {
+        return NextResponse.json({ error: 'Cotação já usada numa venda — não pode mais ser alterada.' }, { status: 409 })
+      }
+      // Visível mas não gravou: a RLS barrou a escrita.
+      return existe
+        ? NextResponse.json({ error: NADA_GRAVADO }, { status: 403 })
+        : NextResponse.json({ error: 'Cotação não encontrada' }, { status: 404 })
+    }
+    return NextResponse.json({ ok: true, id: b.id, numero: data.numero ?? null, ...conta })
   }
 
   // `usuario_id` só na criação, como em orçamentos: é o dono da cotação, e o
@@ -149,10 +166,13 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
+  if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
   // RLS decide o que este usuário alcança — a cláusula de empresa/loja está na
-  // política, não aqui.
-  const { data: apagou, error } = await supabase.from('avaliacao_cotacoes').delete().eq('id', id).select('id')
+  // política, não aqui. Cotacao ja usada numa venda nao e apagada: a venda
+  // perderia o registro do valor que abateu.
+  const { data: apagou, error } = await supabase.from('avaliacao_cotacoes').delete()
+    .eq('id', id).is('usada_em', null).is('venda_id', null).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
+  if (nadaGravado(apagou)) return NextResponse.json({ error: 'Cotação não encontrada ou já usada numa venda' }, { status: 409 })
   return NextResponse.json({ ok: true })
 }

@@ -70,9 +70,28 @@ export async function POST(req: Request) {
       )
     }
 
+    const svc = createServiceClient()
+
+    /**
+     * Pagina ja conectada em OUTRA empresa: recusa, como o Instagram e o WhatsApp.
+     *
+     * O upsert la embaixo e por (tipo, external_id), a unica chave unica: com ela o
+     * upsert vira UPDATE e trocaria o `empresa_id` e o token do canal de outro
+     * tenant, sem erro nenhum, e as mensagens dos clientes dele passariam a cair
+     * aqui. Confere ANTES de assinar o webhook da Pagina, para nao mexer em nada
+     * do canal alheio. O gatilho `canais_empresa_fixa` no banco e a segunda trava.
+     */
+    const { data: dono } = await svc.from('canais').select('empresa_id')
+      .eq('tipo', 'messenger').eq('external_id', pagina.id).maybeSingle()
+    if (dono && dono.empresa_id !== empresaId) {
+      return NextResponse.json(
+        { error: 'Esta Página já está conectada em outra conta do sistema.' },
+        { status: 409 },
+      )
+    }
+
     const validade = await inspecionarToken(pagina.token)
     const v = ehErro(validade) ? null : validade
-    const svc = createServiceClient()
     const cifrado = cifrarToken(pagina.token)
     const agora = new Date().toISOString()
     const avisos: string[] = []
@@ -164,7 +183,8 @@ export async function POST(req: Request) {
       .upsert(linhas, { onConflict: 'tipo,external_id' })
 
     if (error) {
-      const conflito = error.code === '23505' || /duplicate|unique/i.test(error.message)
+      // 23505 = chave unica; a mensagem 'outra empresa' vem do gatilho canais_empresa_fixa.
+      const conflito = error.code === '23505' || /duplicate|unique|outra empresa/i.test(error.message)
       return NextResponse.json(
         { error: conflito ? 'Esta Página já está conectada em outra conta do sistema.' : error.message },
         { status: conflito ? 409 : 500 },

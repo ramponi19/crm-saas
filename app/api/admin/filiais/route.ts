@@ -106,10 +106,17 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     // Quem estava nesta loja fica sem loja, e a tela mostra isso para o dono realocar.
-    await svc.from('empresa_usuarios').update({ filial_id: null } as never)
+    const { error: eEquipe } = await svc.from('empresa_usuarios').update({ filial_id: null } as never)
       .eq('empresa_id', empresaId).eq('filial_id', b.id)
     // Ninguém pode ficar com uma loja desativada selecionada no topo.
-    await svc.from('usuarios').update({ filial_atual_id: null } as never).eq('filial_atual_id', b.id)
+    const { error: eSel } = await svc.from('usuarios').update({ filial_atual_id: null } as never).eq('filial_atual_id', b.id)
+    // A loja ja esta desativada; se soltar as pessoas falhou, o dono precisa saber
+    // em vez de ver "ok" com gente presa a uma loja que nao existe mais.
+    if (eEquipe || eSel) {
+      return NextResponse.json({
+        error: `Loja desativada, mas não consegui soltar a equipe dela: ${(eEquipe ?? eSel)!.message}`,
+      }, { status: 500 })
+    }
     return NextResponse.json({ ok: true })
   }
 

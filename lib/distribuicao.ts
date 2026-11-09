@@ -97,5 +97,17 @@ export async function distribuirExistente(
     p_negocio: lead.id, p_responsavel: escolhido, p_acao: 'distribuir', p_por: null,
   } as never)
   if (error) throw new Error(`distribuir lead ${lead.id}: ${error.message}`)
+
+  /**
+   * Claim atomico: 'distribuir' so grava se o negocio AINDA estiver sem dono
+   * (migracao 20261109000400). O `responsavel_id` acima foi lido antes; entre a
+   * leitura e a escrita, outra distribuicao (a esteira do admin rodando junto com a
+   * do cadastro) ou alguem pegando o lead a mao pode te-lo atribuido. Quem perdeu a
+   * corrida devolve o dono real, nao o escolhido aqui.
+   */
+  const { data: atual } = await svc.from('negocios').select('responsavel_id')
+    .eq('id', lead.id).eq('empresa_id', empresaId).maybeSingle()
+  const dono = (atual as { responsavel_id: string | null } | null)?.responsavel_id ?? null
+  if (dono !== escolhido) return dono
   return escolhido
 }
