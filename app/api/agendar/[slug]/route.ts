@@ -4,6 +4,8 @@ import { escolherResponsavel } from '@/lib/distribuicao'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { criarLead } from '@/lib/leads'
+import { horarioDaAgenda, horarioOferecido } from '@/lib/agendar-slots'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 
@@ -40,6 +42,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const dataHora = b.data_hora ? new Date(b.data_hora) : null
   if (!nome || !dataHora || isNaN(dataHora.getTime())) return NextResponse.json({ error: 'Dados incompletos' }, { status: 400, headers: CORS })
   if (dataHora.getTime() < Date.now()) return NextResponse.json({ error: 'Horário no passado' }, { status: 400, headers: CORS })
+
+  /**
+   * Só um horário que a tela OFERECE (dia de funcionamento, dentro do expediente, de
+   * 30 em 30 min, no fuso da empresa). Antes qualquer instante entrava: 03:17 de
+   * domingo virava consulta, e o "ocupado" da tela não o reconheceria.
+   */
+  const [{ data: horarioRow }, fuso] = await Promise.all([
+    svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresa.id).eq('chave', 'horario_comercial').maybeSingle(),
+    fusoDaEmpresa(svc, empresa.id),
+  ])
+  if (!horarioOferecido(dataHora, horarioDaAgenda(horarioRow?.valor), fuso)) {
+    return NextResponse.json({ error: 'Horário fora da agenda' }, { status: 400, headers: CORS })
+  }
 
   // Evita marcar em cima de outra consulta no mesmo horário.
   const { data: conflito } = await svc.from('visitas')

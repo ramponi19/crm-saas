@@ -1,45 +1,33 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { diaDaSemana, formatarHora, formatarNoFuso, rotuloDoMes } from '@/lib/datas'
+import { chavesOcupadas, diasDeAgenda, horariosDoDia, type HorarioAgenda } from '@/lib/agendar-slots'
 
-export interface Horario { inicio: string; fim: string; dias: number[] }
+/** O tipo de sempre, agora em lib/agendar-slots (a API usa a mesma regra). */
+export type Horario = HorarioAgenda
 
 const DIA_LABEL = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
-function gerarDias(dias: number[]): Date[] {
-  const out: Date[] = []
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
-  for (let i = 0; i < 21 && out.length < 14; i++) {
-    const d = new Date(hoje); d.setDate(hoje.getDate() + i)
-    if (dias.includes(d.getDay())) out.push(d)
-  }
-  return out
-}
-
-function gerarSlots(dia: Date, inicio: string, fim: string): Date[] {
-  const [hi, mi] = inicio.split(':').map(Number)
-  const [hf, mf] = fim.split(':').map(Number)
-  const slots: Date[] = []
-  const cur = new Date(dia); cur.setHours(hi || 0, mi || 0, 0, 0)
-  const end = new Date(dia); end.setHours(hf || 0, mf || 0, 0, 0)
-  while (cur < end) { slots.push(new Date(cur)); cur.setMinutes(cur.getMinutes() + 30) }
-  return slots
-}
-
-export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug: string; nome: string; cor: string; logo: string | null; horario: Horario; ocupadas: string[] }) {
-  const dias = useMemo(() => gerarDias(horario.dias), [horario.dias])
+/**
+ * Tudo no FUSO DA EMPRESA e no "agora" do servidor (`agoraMs`): servidor e navegador
+ * calculam os mesmos dias, os mesmos horários e os mesmos passados — sem #418 e sem
+ * horário livre aparecendo bloqueado (ou ocupado aparecendo livre).
+ */
+export function AgendarView({ slug, nome, cor, logo, horario, ocupadas, fuso, agoraMs }: {
+  slug: string; nome: string; cor: string; logo: string | null; horario: Horario; ocupadas: string[]; fuso: string; agoraMs: number
+}) {
+  const dias = useMemo(() => diasDeAgenda(horario, agoraMs, fuso), [horario, agoraMs, fuso])
   const [diaIdx, setDiaIdx] = useState(0)
-  // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
-  const [agora] = useState(() => Date.now())
   const [slotIso, setSlotIso] = useState('')
   const [nomePac, setNomePac] = useState('')
   const [tel, setTel] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [pronto, setPronto] = useState(false)
 
-  const ocupadasSet = useMemo(() => new Set(ocupadas), [ocupadas])
-  const slots = useMemo(() => (dias[diaIdx] ? gerarSlots(dias[diaIdx], horario.inicio, horario.fim) : []), [dias, diaIdx, horario.inicio, horario.fim])
+  // Pelo INSTANTE (ms), não pelo texto: o banco devolve `…+00:00`, o navegador `….000Z`.
+  const ocupadasSet = useMemo(() => chavesOcupadas(ocupadas), [ocupadas])
+  const slots = useMemo(() => (dias[diaIdx] ? horariosDoDia(dias[diaIdx], horario, fuso) : []), [dias, diaIdx, horario, fuso])
 
 
   async function confirmar() {
@@ -59,7 +47,6 @@ export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug
   }
 
   if (pronto) {
-    const d = new Date(slotIso)
     return (
       <Casca nome={nome} cor={cor} logo={logo}>
         <div className="text-center">
@@ -67,7 +54,7 @@ export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           </div>
           <h2 className="text-[18px] font-semibold text-ink">Agendamento confirmado!</h2>
-          <p className="mt-1 text-[14px] text-ink-2">{DIA_LABEL[d.getDay()]}, {d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {hhmm(d)}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{formatarNoFuso(slotIso, { weekday: 'short', day: '2-digit', month: '2-digit' }, '', fuso)} às {formatarHora(slotIso, '', fuso)}</p>
           <p className="mt-3 text-[12.5px] text-ink-3">Você receberá a confirmação. Se precisar remarcar, entre em contato.</p>
         </div>
       </Casca>
@@ -84,12 +71,12 @@ export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug
         {dias.map((d, i) => {
           const sel = i === diaIdx
           return (
-            <button key={i} onClick={() => { setDiaIdx(i); setSlotIso('') }}
+            <button key={d} onClick={() => { setDiaIdx(i); setSlotIso('') }}
               className="flex min-w-[58px] flex-col items-center rounded-control border px-2 py-2 text-center transition-colors"
               style={sel ? { borderColor: cor, background: `${cor}12` } : { borderColor: 'var(--line, #e5e5e5)' }}>
-              <span className="text-[11px] text-ink-3">{DIA_LABEL[d.getDay()]}</span>
-              <span className="num text-[15px] font-semibold text-ink">{d.getDate()}</span>
-              <span className="text-[10px] text-ink-3">{d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</span>
+              <span className="text-[11px] text-ink-3">{DIA_LABEL[diaDaSemana(d)]}</span>
+              <span className="num text-[15px] font-semibold text-ink">{Number(d.slice(8, 10))}</span>
+              <span className="text-[10px] text-ink-3">{rotuloDoMes(d, { month: 'short' }).replace('.', '')}</span>
             </button>
           )
         })}
@@ -99,13 +86,13 @@ export function AgendarView({ slug, nome, cor, logo, horario, ocupadas }: { slug
       <div className="mb-5 grid grid-cols-4 gap-2 sm:grid-cols-5">
         {slots.map((s) => {
           const iso = s.toISOString()
-          const indisp = ocupadasSet.has(iso) || s.getTime() < agora
+          const indisp = ocupadasSet.has(s.getTime()) || s.getTime() < agoraMs
           const sel = slotIso === iso
           return (
             <button key={iso} disabled={indisp} onClick={() => setSlotIso(iso)}
               className={`rounded-control border py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${sel ? 'text-white' : 'text-ink'}`}
               style={sel ? { background: cor, borderColor: cor } : { borderColor: 'var(--line, #e5e5e5)' }}>
-              {hhmm(s)}
+              {formatarHora(s, '', fuso)}
             </button>
           )
         })}
