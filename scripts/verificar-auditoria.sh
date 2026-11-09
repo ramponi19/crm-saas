@@ -39,7 +39,7 @@ v "custo editavel na lista"             "components/modules/pdv/encomendas-abert
 v "encomenda grava o prazo prometido"    "components/modules/pdv/encomenda-form.tsx" "previsao_entrega: prazo"
 v "entrega registra o pagamento"        "lib/encomendas.ts" "registrouPagamento"
 v "pedido feito nao troca a data"       "components/modules/pdv/encomendas-abertas.tsx" "solicitado_em., null"
-v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "function diaLocal"
+v "prazo compara DIA, nao instante"      "lib/encomendas.ts" "diasEntre(diaNoFuso(prevista, fuso), diaNoFuso(hoje, fuso))"
 v "item da encomenda escreve por funcao" "components/modules/pdv/encomenda-itens.tsx" "onChange((xs) =>"
 n "item da encomenda nao parte da lista do render" "components/modules/pdv/encomenda-itens.tsx" "onChange(itens"
 v "busca global ordena o lead"        "components/layout/command-palette.tsx" "out.sort((a, b) => (b.ultima_mensagem_at"
@@ -92,7 +92,7 @@ n "lista nao manda pro wa.me"       "app/zapintel/leads/page.tsx" "https://wa.me
 n "posvenda nao manda pro wa.me"    "app/zapintel/posvenda/page.tsx" "https://wa.me/"
 v "lista abre a conversa no CRM"    "app/zapintel/leads/page.tsx" "abrir conversa no CRM</a>"
 v "lead de outra loja avisa"        "components/modules/leads/leads-view.tsx" "setForaDaLoja(leadNaUrl)"
-v "dias contam o calendario da loja" "lib/zapintel/montar.ts" "RELOGIO.format(d).slice(0, 10)"
+v "dias contam o calendario da loja" "lib/zapintel/montar.ts" "diasEntre(diaNoFuso(new Date(iso), fuso), diaNoFuso(agora(), fuso))"
 n "ficha sem ha 0 dias"             "lib/zapintel/ficha.ts" "não voltou — há "
 # 15/10/2026: como a loja conversa, por vendedor (apresentacao no audio + Pegar lead)
 v "conversa le o banco"             "app/zapintel/atendimento/page.tsx" "rpc(\"zapintel_conversa\""
@@ -207,7 +207,7 @@ v "saudacao nao conta como pedido"   "lib/zapintel/ficha.ts" "SAUDACAO.test(soLe
 # -- o caminho de importacao manual saiu em 10/10/2026 --------------------
 # O negocio e online; manter o import era guardar duas verdades sobre o mesmo
 # lead e pagar o parser de CSV no meio de cada recalculo.
-v "le as tabelas direto, sem CSV"    "lib/zapintel/conversas.ts" "montarLeads(porId, msgs)"
+v "le as tabelas direto, sem CSV"    "lib/zapintel/conversas.ts" "montarLeads(porId, msgs, await fusoDaEmpresa(db, empresaId))"
 n "nao existe mais parser de CSV"    "lib/zapintel/conversas.ts" "parseCombinedCSV"
 # O padrao olha a DECLARACAO: o arquivo cita o numero no comentario que explica
 # por que ele saiu, e esse aviso deve continuar la.
@@ -236,7 +236,7 @@ n "matcher nao e concatenacao"          "proxy.ts" "' +$"
 echo "== o ponto onde a venda travou + o dia da loja (12/10) =="
 # O relogio: `getHours()` devolvia a hora do PROCESSO (UTC na Vercel), e o
 # painel guardado dizia pico as 14h quando o real e 11h.
-v "data e hora no fuso da loja"      "lib/zapintel/montar.ts" "FUSO_DA_LOJA = 'America/Sao_Paulo'"
+v "data e hora no fuso da loja"      "lib/zapintel/montar.ts" "const dataEHora = (iso: string, fuso: string)"
 n "nao formata hora pelo processo"   "lib/zapintel/montar.ts" "d.getHours()"
 # A fala que encerrou tem que vir DEPOIS no fio: `ehFala` descarta audio e
 # mensagem de 3 letras, e comparar por HORA dava "ele sumiu" com a resposta
@@ -344,7 +344,7 @@ v "PDV nao chama recebido de venda"   "app/(dashboard)/pdv/components/pdv-view.t
 v "pagina publica mostra o item"      "app/orcamento/[token]/orcamento-view.tsx" "dados.tipo === 'venda' &&"
 v "encomenda copia a serie"           "lib/encomendas.ts" "serieDaUnidade"
 v "datas: helper existe"              "lib/datas.ts" "SO_DATA"
-v "datas: timestamp no fuso da loja"  "lib/datas.ts" "timeZone: FUSO, ...opcoes"
+v "datas: timestamp no fuso da loja"  "lib/datas.ts" "toLocaleDateString('pt-BR', { ...opcoes, timeZone: tz })"
 v "compras usa o helper"              "app/(dashboard)/compras/components/compras-view.tsx" "formatarDiaMes"
 # A tela /chaves saiu (21/08/2026); a regra da data pura mudou de casa junto.
 v "chave usa o helper de data"         "lib/chave-imovel.ts" "paraData"
@@ -387,7 +387,7 @@ v "conversao segue sendo por lead"    "lib/ranking.ts" "l.conversao = l.captacoe
 echo "== agenda em calendario (19/08) =="
 v "agenda trava por modulo ligado"     "app/(dashboard)/agenda/page.tsx" "if (!ligados.has('/agenda')) return <VitrineDoModulo"
 n "agenda nao olha nome de segmento"   "app/(dashboard)/agenda/page.tsx" "seg !== 'imobiliaria'"
-v "agenda usa dia LOCAL"               "app/(dashboard)/agenda/agenda-view.tsx" "const chaveLocal"
+v "agenda usa dia DA LOJA"             "app/(dashboard)/agenda/agenda-view.tsx" "const chaveDoInstante = (iso: string, fuso: string) => diaNoFuso("
 v "agenda tem aba supervisao"          "app/(dashboard)/agenda/agenda-view.tsx" "aba === 'supervisao'"
 v "agenda avisa fim em outro dia"      "app/(dashboard)/agenda/agenda-view.tsx" "const faixa ="
 v "compromisso tem tipo e fim"         "app/(dashboard)/agenda/agenda-view.tsx" "participantes: form.participantes.trim"
@@ -528,7 +528,7 @@ v "superadmin nao apaga habilitados"   "app/api/superadmin/empresas/[id]/overrid
 v "painel conta lucro so com custo"     "lib/painel/metricas.ts" "comCusto.length"
 n "pagina do painel nao le a view"      "app/(dashboard)/dashboard/page.tsx" "from('vendas')"
 # 21/10/2026: o painel calcula uma vez, no servidor; /api/dashboard saiu.
-v "painel calcula uma vez so"           "app/(dashboard)/dashboard/page.tsx" "return painelCompleto(supabase, empresaId, escopo)"
+v "painel calcula uma vez so"           "app/(dashboard)/dashboard/page.tsx" "return painelCompleto(supabase, empresaId, escopo, fuso)"
 n "painel nao refaz a conta no navegador" "components/modules/dashboard/dashboard-view.tsx" "fetch('/api/dashboard')"
 n "card nao divide lucro por receita"   "components/modules/dashboard/dashboard-view.tsx" "lucro / receita"
 v "card mostra sem custo lancado"       "components/modules/dashboard/dashboard-view.tsx" "sem custo lançado"
@@ -628,10 +628,11 @@ v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx
 v "secao de modulo pelo modulo ligado"  "components/modules/configuracoes/secao-configuracoes.tsx" "ABAS_DE_MODULO.includes(abaReal) && !abas.includes(abaReal)"
 v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "ligadosDaEmpresa("
 # 22/10/2026: "segmento" nao entra em codigo novo; a lista de excecoes so encolhe.
-v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:modulos && npm run check:gravacao && next build"
-v "build reprova rota fora de modulo"  "package.json" "npm run check:modulos && npm run check:gravacao && next build"
+v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:modulos && npm run check:gravacao && npm run check:datas && next build"
+v "build reprova rota fora de modulo"  "package.json" "npm run check:modulos && npm run check:gravacao && npm run check:datas && next build"
 # 05/11/2026: gravação do app sem conferir as linhas reprova o build; a lista de exceções só encolhe.
-v "build reprova gravacao sem conferencia" "package.json" "npm run check:gravacao && next build"
+v "build reprova gravacao sem conferencia" "package.json" "npm run check:gravacao && npm run check:datas && next build"
+v "build reprova data fora da lib/datas" "package.json" "npm run check:datas && next build"
 v "configuracoes so dono ou admin"     "app/(dashboard)/configuracoes/(admin)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 v "insights e automacoes so dono/admin" "app/(dashboard)/(gestao)/layout.tsx" "requireEmpresaRole(..owner., .admin..)"
 n "abas do /admin sem redirecionamento" "next.config.ts" "DESTINO_DA_ABA"
@@ -655,8 +656,8 @@ echo "== chave e atributo do imovel (21/08) =="
 n "nao existe mais tela de chaves"     "lib/menu.ts" "href: '/chaves'"
 v "rota antiga cai em imoveis"         "proxy.ts" "'/chaves': '/imoveis'"
 v "estado da chave tem fonte unica"    "lib/chave-imovel.ts" "export function estadoDaChave"
-v "atraso conta so o dia passado"      "lib/chave-imovel.ts" "prevista < new Date(agora.getFullYear()"
-v "pior noticia ganha no imovel"       "lib/chave-imovel.ts" "chaves.some(chaveAtrasada)"
+v "atraso conta so o dia passado"      "lib/chave-imovel.ts" "diaNoFuso(prevista, fuso) < diaNoFuso(agora(), fuso)"
+v "pior noticia ganha no imovel"       "lib/chave-imovel.ts" "chaves.some((c) => chaveAtrasada(c, fuso))"
 v "lista de imoveis filtra por chave"  "app/(dashboard)/imoveis/imoveis-view.tsx" "estadoDaChave(chavesPorImovel.get(im.id)"
 v "emprestimo mora na ficha"           "app/(dashboard)/imoveis/imoveis-view.tsx" "async function emprestarChave"
 n "campo de texto de chave saiu"       "app/(dashboard)/imoveis/imoveis-view.tsx" "status_chaves"
