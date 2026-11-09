@@ -465,6 +465,16 @@ O **core** não se instala nem se tira: Dashboard, Leads/Funil, Clientes, Tarefa
 4. **Vitrine quando desligado:** a rota mostra `/vitrine/<modulo>`, com o que o módulo faz e o botão de instalar ou pedir, em vez de redirecionar ou dar 404.
 5. **Aparece na Central** (`/modulos`), no grupo do manifesto. Instalar liga junto o que ele `requer`, e desinstalar fica bloqueado enquanto outro módulo ligado depender dele.
 
+## Datas e fuso horário (regra permanente do Lucas, 10/11/2026)
+
+**Toda data passa pela `lib/datas.ts`, no fuso da empresa.** O servidor roda em UTC; a loja, no fuso dela; o navegador, no de quem abre. Até 09/11 isso dava: KPI "Hoje" zerando às 21h, hora da visita +3h, mês virando no dia 30 às 21h, CSV com um dia a menos (06, seção 37).
+
+1. **O fuso da empresa** mora em `configuracoes_sistema`, chave `fuso` (`{"fuso": "<IANA>"}`), padrão `America/Sao_Paulo` quando não há linha. Sem coluna nova. O dono ou admin troca em Configurações → Horário (`/api/empresa/fuso`, que valida o nome).
+2. **No servidor:** `fusoDaEmpresa(db, empresaId)` (`lib/fuso-empresa.ts`, uma leitura por requisição). **No navegador:** `useFuso()` (`components/fuso-provider.tsx`, nos layouts do painel e do ZapIntel). Página pública: o fuso da empresa da página, lido no servidor e passado à tela. Superadmin (várias empresas): `FUSO_PADRAO`.
+3. **Na biblioteca:** "agora" (`agora`), "que dia é" (`diaNoFuso`, `mesNoFuso`), limites de período sempre `[início, fim)` (`inicioDoDia`, `periodo('hoje'|'7d'|'mes'…)`, `limitesDosDias`, `limitesDoMes`), dia + hora digitados para instante (`instanteLocal`), formatação (`formatarData`, `formatarHora`, `formatarDataHora`, `formatarNoFuso`), comparação de instantes (`mesmoInstante`, `chaveDoInstante`). Coluna `date` é DIA PURO: compara como `YYYY-MM-DD` e mostra com `formatarData`, nunca `new Date('YYYY-MM-DD')`.
+4. **No banco:** função que corta por dia ou mês usa `at time zone public.empresa_fuso(<empresa>)`, lido uma vez por chamada (variável na plpgsql, CTE materializada na sql). Nunca `current_date`, `date_trunc` ou `::date` sem fuso.
+5. **Trava no build:** `scripts/check-datas.mjs` (no `check` e no `build`) reprova `getDate`/`setHours`/`toDateString`, `toLocale…` de data sem `timeZone`, `toISOString()` cortado como dia, `new Date(ano, mês, …)`, o fuso escrito à mão (`'America/Sao_Paulo'`, `-03:00`) e, em migração a partir de 20261110, `date_trunc`/`current_date`/`::date` sem `at time zone`. Exceções em `scripts/datas-excecoes.json`, com motivo, numa lista que só encolhe — em 10/11 ela está **vazia**.
+
 ## 04/11/2026 à noite: fase final das views — lotes 1 e 2 (15 views caídas, restam 26)
 
 **Pedido do Lucas:** zerar as 41 views de compatibilidade em lotes: troca das leituras para as tabelas do core, e2e da tela, deploy do app e só então a migração de drop (DDL com IOwait abaixo de 10%), com a API conferida. Detalhe e números no 06, seção 23.
