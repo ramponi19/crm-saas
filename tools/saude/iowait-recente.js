@@ -4,6 +4,10 @@
 async () => {
   let card, svg;
   for (let t = 0; t < 40 && !svg; t++) {
+    // Os gráficos carregam ao aparecer: rola até o de CPU (ou pelos títulos até ele existir).
+    const alvo = [...document.querySelectorAll('h3')].find(e => e.textContent.trim().startsWith('CPU usage'));
+    if (alvo) alvo.scrollIntoView({ block: 'center' });
+    else [...document.querySelectorAll('h3,h2')].forEach((e, i) => { if (i === t % 6) e.scrollIntoView() });
     await new Promise(s => setTimeout(s, 1000));
     const h = [...document.querySelectorAll('h3')].find(e => e.textContent.trim().startsWith('CPU usage'));
     card = h; for (let i = 0; i < 8 && card && !card.querySelector('svg.recharts-surface'); i++) card = card.parentElement;
