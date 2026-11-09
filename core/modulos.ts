@@ -90,6 +90,13 @@ export interface ModuloManifesto {
   abasConfiguracoes?: string[]
   /** O que o módulo liga nas outras telas (ver CapacidadesDoModulo). */
   capacidades?: CapacidadesDoModulo
+  /**
+   * Tabelas que as telas do módulo assinam pelo realtime (`postgres_changes`). Tirar da
+   * publicação `supabase_realtime` o que ninguém usa economiza o decodificador de WAL;
+   * por isso ativar o módulo exige a tabela DE VOLTA na publicação, por migração:
+   * `alter publication supabase_realtime add table public.<tabela>` (09/11/2026).
+   */
+  realtime?: string[]
   /** Painéis do card do lead, na ordem. */
   paineisDoLead?: PainelDoLead[]
   /**
@@ -163,7 +170,9 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
     capacidades: { usaComanda: true },
     frase: 'O cardápio com preços e o pedido do cliente pelo celular.' },
-  { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true,
+  // `pedidos` saiu da publicação do realtime em 09/11/2026 (ninguém usava o KDS):
+  // ativar o KDS exige pôr de volta (ver `realtime` no ModuloManifesto).
+  { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true, realtime: ['pedidos'],
     frase: 'A tela da cozinha com os pedidos na ordem em que entraram.' },
 
   { chave: 'garantia', href: '/garantia', nome: 'Garantia', grupo: 'posvenda',

@@ -288,7 +288,7 @@ Migrações pelo `apply_migration` do MCP, uma por vez, com `GET /rest/v1/` (ano
   - a Central mostra a recusa do último pedido ao dono e oferece "Pedir de novo".
   
   Smoke na empresa 5, ver o 06, seção 17.
-- **Os 134 UPDATE/DELETE/upsert que não conferem linhas** (cliente do usuário, 70 arquivos): `docs/reconstrucao-nexus/lista-update-sem-contagem-20261104.txt`. Pelo banco, só o `contatos` tinha o SELECT mais largo que o UPDATE. Nos outros, a política de escrita é de papel (admin/dono), e o risco é a tela deixar outro papel tentar. A regra para código novo é pedir `.select('id')` e passar por `nadaGravado()`.
+- **Os 134 UPDATE/DELETE/upsert que não conferem linhas** (cliente do usuário, 70 arquivos): a lista `lista-update-sem-contagem-20261104.txt` foi superada pela trava `check:gravacao` em 05/11 (06, seção 32) e saiu do repositório em 09/11. Pelo banco, só o `contatos` tinha o SELECT mais largo que o UPDATE. Nos outros, a política de escrita é de papel (admin/dono), e o risco é a tela deixar outro papel tentar. A regra para código novo é pedir `.select('id')` e passar por `nadaGravado()`.
 - **`contatos_delete`** continua só pela loja do próprio contato, mais estreito que o SELECT. Hoje não há DELETE de contato pelo cliente do usuário (fusão e desfazer usam a service_role).
 
 ## 04/11/2026 de dia: Inbox única (`3e3b47d`, só app, loja aberta)
@@ -323,7 +323,7 @@ Nenhuma das duas zerou, então não há migração de drop.
 - As 8 leituras passam para `conversas`, `mensagens` e `mensagem_registrar`.
 - Teste no local, depois republicar a Edge e fazer smoke de Direct e de WhatsApp.
 
-**Os 134 UPDATE sem conferir linhas** (`lista-update-sem-contagem-20261104.txt`) ficam com o Claude.
+**Os 134 UPDATE sem conferir linhas**: resolvidos pela trava `check:gravacao` (05/11; exceções em `scripts/gravacao-excecoes.json`).
 - Primeiro os que estão em fluxo de usuário: card, quadro, inbox, PDV e tarefa.
 - Saem em lotes junto com as entregas, e a lista marca o que já foi feito.
 
@@ -458,7 +458,8 @@ O **core** não se instala nem se tira: Dashboard, Leads/Funil, Clientes, Tarefa
    - itens de menu, que nascem pelo `href` e pelo catálogo de `lib/menu.ts`, com o grupo em `GRUPO_DO_HREF`;
    - `abasConfiguracoes`: as seções de Configurações que o módulo traz;
    - `paineisDoLead`: os painéis no card do lead;
-   - `capacidades`: o que ele liga nas telas dos outros.
+   - `capacidades`: o que ele liga nas telas dos outros;
+   - `realtime`: as tabelas que as telas dele assinam por `postgres_changes`. Elas precisam estar na publicação `supabase_realtime`; ativar o módulo inclui a migração `alter publication supabase_realtime add table public.<tabela>` quando ela não estiver lá. Caso de hoje: o **KDS** (`pedidos`, fora da publicação desde 09/11/2026).
 2. **Rotas e telas protegidas por "módulo ligado" no servidor.** A tela e a API conferem `empresa_modulos` (por `lib/empresa-config.ts` ou pela trava de rota do proxy). Esconder o menu não protege nada. Desde o item 5 desta lista, o build reprova a rota que não pertence ao core nem a um módulo, ou a tela de módulo sem a conferência (`scripts/check-modulos.mjs`, com uma lista de exceções que só encolhe).
 3. **Tabelas com o prefixo do módulo** (`estoque_*`, `vendas_*`, `assistencia_*`, `avaliacao_*`, `financeiro_*`, `imoveis_*`). Nunca view de compatibilidade nova; toda view leva `security_invoker = true`.
 4. **Vitrine quando desligado:** a rota mostra `/vitrine/<modulo>`, com o que o módulo faz e o botão de instalar ou pedir, em vez de redirecionar ou dar 404.
@@ -668,7 +669,7 @@ Aprovação do Lucas no chat nas duas migrações.
 - **Smoke na produção (superadmin, aba isolada, saiu no fim):** 20 telas com 200 nas duas lojas antes e depois do drop, 0 erro de console; badge Leads de Mogi = core (750 → 752); Clientes Mogi 71; mensagens entrando depois do drop sem negócio duplicado. Tarefas mostra 0 ao superadmin impersonando: a tela filtra pelo responsável de quem não é dono/admin em `empresa_usuarios` (regra antiga, igual em `d32d30f`).
 - **Testes (local, sem as views):** e2e `ferramentas/ultimo-lote/views-ultimo-lote-e2e.mjs` 64/64 (18 telas, novo lead pela tela, mesmo telefone, chat manual, atribuir, mover, ⌘K, ficha imob, vendedores das duas lojas e RLS, LGPD completa contra o banco, job de 24 h); lote 8 47/47. Gate depois de tirar os tipos: check (tsc), 227 testes, menu 15/15, verificador 592/5 antigas, build.
 - **Tipos:** as 5 views (com 127 relações) e 3 funções saíram de `types/database.gerado.ts`; `negocios.ativo` entrou. Sem view de compatibilidade, a correção de `types/database.ts` (`views-espelho.ts`, `ColunasObrigatorias`) e as ferramentas dela (`scripts/tipos-espelho.mjs`, `supabase/testes/views_espelho.sql`) saíram.
-- **Realtime e variável:** nenhum ramo legado sobrou (o app só assina `negocios`, `contatos`, `conversas`, `mensagens`, `mensagens_internas`, `acessos`, `pedidos`); `NEXT_PUBLIC_DB_CORE` com 0 referências no código; na Vercel ela existia só em Production — **a remover pelo Lucas no painel** (o conector da Vercel não apaga variável). Sem efeito enquanto não sai: nenhum código a lê.
+- **Realtime e variável:** nenhum ramo legado sobrou (o app só assina `negocios`, `contatos`, `conversas`, `mensagens`, `mensagens_internas`, `acessos`, `pedidos`; `pedidos` é só do KDS e saiu da publicação em 09/11, ver "Como nasce um módulo"); `NEXT_PUBLIC_DB_CORE` com 0 referências no código; na Vercel ela existia só em Production — **a remover pelo Lucas no painel** (o conector da Vercel não apaga variável). Sem efeito enquanto não sai: nenhum código a lê.
 - **Picos de IOwait de 11h11 a 13h23** (20–33% a cada 8–10 min, entre eles 2–7%): **não são consultas** — entre as fotos canônicas do `pg_stat_statements` das 12h46 e 13h21 (`D:/Nexus-Copia/saude/pgss-20261105-*.json`, tiradas pela `supabase db query --remote --read-only` direto em arquivo), todas as consultas juntas escreveram 4,9 MB de WAL e leram ~1,6 MB do disco; nem autovacuum (só tabelas < 3,5 MB). **O arquivamento do WAL NÃO se confirmou como causa:** ele roda a cada ~2 min (`archive_timeout` 2 min; 4 segmentos de 13h20min58s a 13h29min01s), mas os picos não seguem esse ritmo (13h25–13h30 sem pico com 2 arquivamentos). Causa em aberto: fora do Postgres das consultas (infra do plano free).
 - **O cliente que volta (05/11, 15h14; detalhe no 06, seção 31):** um card por contato por loja (decisão do Matheus). A `core_negocio_do_canal` decide dentro da trava: aberto em qualquer funil recebe sem mover; ganho há até N dias recebe (pós-venda; `configuracoes_sistema.retorno_cliente.pos_venda_dias`, padrão 30); senão o MESMO negócio volta à 1ª etapa do seu funil, depois de gravar o fechamento em `negocio_historico.detalhe`; sem negócio, cria. A Edge (v75) manda toda recebida por identidade. Relatórios por `lib/fechamentos.ts` (atual + reabertos). Volta: `volta-retorno-cliente.sql` + Edge v74 (código da v72). A v73 (negócio novo) foi revertida; o único duplicado que criou foi fundido.
 - **Lista de morte: ZERO views de compatibilidade.** As 41 do corte caíram (lotes 1–8 e este). No `public` sobra só `storage_orfaos` (não é de compatibilidade; lê o core). (escrito em 22/10/2026 — NÃO executar sem o ok do Lucas pelo chat)
