@@ -87,7 +87,7 @@ for (const p of [
 const acesso = await acessoDoUsuario(db, 1, EDUARDO)
 const c = { db, svc, acesso, fuso: 'America/Sao_Paulo' }
 esquecerTudo()
-if (nomeLojaOutra && !sql(`select 1 from filiais where empresa_id=1 and (cidade ilike '%${nomeLojaOutra.replace(/'/g, "''")}%' or nome ilike '%${nomeLojaOutra.replace(/'/g, "''")}%')`)) {
+if (nomeLojaOutra) { // nenhuma loja da JM tem "Preview" no nome
   const r = JSON.parse(await executar(c, 'leads_buscar', { filial: nomeLojaOutra }))
   confere(typeof r.erro === 'string' && /não encontrada/.test(r.erro), `leads_buscar com a loja "${nomeLojaOutra}" da outra empresa: ${r.erro ?? 'RESPONDEU ' + r.encontrados}`)
 }
