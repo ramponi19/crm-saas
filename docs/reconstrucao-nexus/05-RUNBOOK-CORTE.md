@@ -475,6 +475,16 @@ O **core** não se instala nem se tira: Dashboard, Leads/Funil, Clientes, Tarefa
 4. **No banco:** função que corta por dia ou mês usa `at time zone public.empresa_fuso(<empresa>)`, lido uma vez por chamada (variável na plpgsql, CTE materializada na sql). Nunca `current_date`, `date_trunc` ou `::date` sem fuso.
 5. **Trava no build:** `scripts/check-datas.mjs` (no `check` e no `build`) reprova `getDate`/`setHours`/`toDateString`, `toLocale…` de data sem `timeZone`, `toISOString()` cortado como dia, `new Date(ano, mês, …)`, o fuso escrito à mão (`'America/Sao_Paulo'`, `-03:00`) e, em migração a partir de 20261110, `date_trunc`/`current_date`/`::date` sem `at time zone`. Exceções em `scripts/datas-excecoes.json`, com motivo, numa lista que só encolhe — em 10/11 ela está **vazia**.
 
+## Abas de smoke com a conta do Lucas (regra permanente do Lucas, 10/11/2026)
+
+**Toda aba de smoke aberta com a conta do Lucas é fechada ao fim do teste** (`tabs_close` no navegador do app, ou fechar a janela do chrome-devtools). Aba esquecida não é inofensiva: as telas do ZapIntel ficam "ao vivo" e continuam consultando o banco a cada aviso, com a conta dele.
+
+Em 09/11 a aba do smoke do ZapIntel ficou aberta das 20h40 às 21h25. Ela gerou quase todas as chamadas da foto Q2 de 1 hora e os dois estouros do dashboard (20h45 e 21h03), que foram lidos como "uso real da loja" até os logs da API mostrarem um só usuário e uma só sessão (06, seção 39).
+
+1. **Ao terminar** o smoke: fechar cada aba aberta para ele, antes de tirar foto, contar eventos ou medir qualquer coisa.
+2. **Antes de medir** uso real: conferir nos logs da API (janela ≤ 15 min, filtrada) que nenhuma chamada é da sessão do smoke.
+3. Vale também para a regra do superadmin: sair da empresa impersonada ao fim de cada rodada.
+
 ## 04/11/2026 à noite: fase final das views — lotes 1 e 2 (15 views caídas, restam 26)
 
 **Pedido do Lucas:** zerar as 41 views de compatibilidade em lotes: troca das leituras para as tabelas do core, e2e da tela, deploy do app e só então a migração de drop (DDL com IOwait abaixo de 10%), com a API conferida. Detalhe e números no 06, seção 23.
