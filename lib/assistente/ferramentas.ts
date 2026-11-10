@@ -343,14 +343,13 @@ function statusEFichas(c: Contexto, f: FiltroDoStatus): Promise<Map<number, { s:
  */
 async function leadsQueCitam(c: Contexto, texto: string): Promise<Set<number>> {
   const padrao = `%${texto.replace(/[%_,()]/g, ' ').trim().replace(/\s+/g, '%')}%`
-  const [{ data: msgs }, { data: diag }, { data: rel }] = await Promise.all([
-    c.db.from('mensagens').select('contato_id, filial_id')
-      .eq('empresa_id', c.acesso.empresaId).or(`conteudo.ilike.${padrao},transcricao.ilike.${padrao}`).limit(3000),
-    c.svc.from('zapintel_lead_perfil').select('lead_id')
-      .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>diagnostico', padrao).limit(1000),
-    c.svc.from('zapintel_lead_perfil').select('lead_id')
-      .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>relato', padrao).limit(1000),
-  ])
+  // Em fila, não juntas (10/11/2026): a pergunta nunca tem duas leituras no ar.
+  const { data: msgs } = await c.db.from('mensagens').select('contato_id, filial_id')
+    .eq('empresa_id', c.acesso.empresaId).or(`conteudo.ilike.${padrao},transcricao.ilike.${padrao}`).limit(3000)
+  const { data: diag } = await c.svc.from('zapintel_lead_perfil').select('lead_id')
+    .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>diagnostico', padrao).limit(1000)
+  const { data: rel } = await c.svc.from('zapintel_lead_perfil').select('lead_id')
+    .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>relato', padrao).limit(1000)
   // Mensagem → negócio principal do contato na loja (o `lead_id` da antiga view).
   const achadas = (msgs ?? []) as { contato_id: number; filial_id: number | null }[]
   // Falha aqui vale o que valia o erro da consulta antiga: nenhuma conversa citando.
