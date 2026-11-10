@@ -289,6 +289,8 @@ export const CATALOGO: MenuGroupBase[] = [
       // Inbox única (04/11/2026): WhatsApp, Instagram e Messenger numa tela só. Núcleo — toda empresa conversa.
       { href: '/comunicacao', label: 'Comunicação', icon: 'MessageSquareText' },
       { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true, badge: 'chat' },
+      // Transmissão (10/11/2026): modelo aprovado para uma lista da loja. Vendedor vê o resultado.
+      { href: '/transmissao', label: 'Transmissão', icon: 'Megaphone', opcional: true },
     ],
   },
   {
@@ -653,7 +655,7 @@ export const GRUPOS_MENU: { id: GrupoMenuId; label: string; icon: string }[] = [
  */
 export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/dashboard': 'inicio', '/tarefas': 'inicio', '/agenda': 'inicio',
-  '/comunicacao': 'comunicacao', '/chat': 'comunicacao',
+  '/comunicacao': 'comunicacao', '/chat': 'comunicacao', '/transmissao': 'comunicacao',
   '/leads': 'pipeline', '/clientes': 'pipeline', '/fila': 'pipeline', '/gestao-leads': 'pipeline',
   '/orcamentos': 'vendas', '/propostas': 'vendas', '/pdv': 'vendas', '/historico': 'vendas',
   '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',

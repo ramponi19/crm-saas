@@ -46,6 +46,15 @@ export const VITRINES: Record<string, VitrineModulo> = {
       { valor: 'R$ 46 mil', rotulo: 'em negociação parada' },
     ],
   },
+  '/transmissao': {
+    nome: 'Transmissão',
+    frase: 'Manda um modelo aprovado do WhatsApp para uma lista da loja — quem está parado, quem comprou, quem sumiu — e mostra quem recebeu, leu e respondeu.',
+    numeros: [
+      { valor: '180', rotulo: 'contatos na lista, montada por filtro' },
+      { valor: '64%', rotulo: 'leram a mensagem' },
+      { valor: '23', rotulo: 'responderam e voltaram para o card' },
+    ],
+  },
 }
 
 export function temVitrine(href: string): boolean {

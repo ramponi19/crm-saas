@@ -1374,3 +1374,75 @@ responder ficam para 11/11 de manhã (anotar aqui o resultado).
   - **"Esperando resposta" do Assistente ≠ o do painel:** 547 em Mogi (sem corte de tempo, desde agosto) contra 91 no painel (janela recente). O modelo não aplica janela se ninguém pede.
   - Na 1ª resposta o modelo citou "2.238 leads" sem ter consultado e se corrigiu sozinho na 2ª.
 - **Pendente:** `assistente_status_conversas` está na lista de morte do 05 (critério "nenhum leitor no código e no banco"; no código já são 0) — conferir `pg_proc`/views/`cron.job` e o pg_stat_statements sem chamadas desde o deploy, e derrubar na próxima migração, com aprovação.
+
+## 42. 10/11: módulo Transmissão (branch `feat/transmissao`, só local — nada em produção)
+
+Um modelo **aprovado** da Meta para uma lista de contatos de **uma loja**, pelo WhatsApp **dela**. Nasce como módulo
+(`transmissao`, grupo Comunicação, item opcional no menu, vitrine, tile na Central), desligado em todas as empresas.
+
+### Como funciona
+
+- **Lista por filtro** (`lib/transmissao/filtro.ts` + `transmissao_publico` no banco): funil, etapa, situação
+  (aberto/ganho/perdido), origem do contato, "sem mensagem há mais de N dias" (ou nunca conversou), "com mensagem
+  nos últimos N dias". Um contato por linha (o negócio mais recente que casa). **É o embrião do módulo Públicos**:
+  a função é a que ele herda.
+- **Prévia antes de enviar** (`transmissao_previa`): quantos recebem e quantos ficam fora, por motivo (opt-out,
+  bloqueado, sem telefone, mesmo modelo há menos de 7 dias), com 5 nomes de exemplo (só o final do número).
+- **Disparar** congela a lista (`transmissao_montar`: aptos `pendente`, os de fora `pulada` com o motivo; lista sem
+  nenhum apto é recusada) e começa já (`after()`, primeiro lote logo depois da resposta) ou **agenda** (dia + hora da
+  loja). Loja sem WhatsApp conectado não dispara.
+- **Travas do Automatize, repetidas:** só modelo aprovado (rota, banco e Edge); opt-out e bloqueado fora (na
+  montagem e de novo na hora do envio); horário de atendimento da loja no fuso da empresa; **teto por hora por
+  empresa** (configurações `transmissao` → `teto_hora`, padrão 50, 1–1000, somando todas as transmissões); fila que
+  não descarta; **1 envio do mesmo modelo por contato a cada 7 dias, contando Automatize e Transmissão juntos** (o
+  Automatize passou a olhar `transmissao_envios` também); **pausar / retomar / encerrar** (encerrar marca o que não
+  saiu como "não enviado").
+- **Fila:** sem job novo. O `automacoes-hora` do pg_cron (minuto 17) chama `/api/cron/automacoes`, que agora roda
+  também `processarTransmissoes` com o tempo que sobra até ~55 s (o `net.http_get` espera 60 s). Reserva por
+  `FOR UPDATE SKIP LOCKED` (`transmissao_reservar`, só service_role): disparo e cron juntos não mandam duas vezes.
+  Agendada começa na primeira rodada depois do horário (precisão de 1 h).
+- **Envio:** caminho de serviço novo na Edge, irmão do `send_template_automacao`: `?action=send_template_transmissao`
+  (só a chave de serviço; confere envio reservado, transmissão `enviando` — pausar barra o que estiver em voo —, modelo
+  da transmissão aprovado, contato sem opt-out/bloqueio; número e negócio vêm do banco, não do corpo). **Não cai no
+  WhatsApp de outra loja** (o `canalDaLoja` cai, para a transmissão é recusado). Mensagem gravada com `origem =
+  'transmissao'`. Erro 4xx da Meta = falha; rede/5xx = nova tentativa (até 3); "Meta não respondeu" = falha sem
+  reenviar (pode ter chegado).
+- **Acompanhamento:** enviadas, entregues, lidas (de `mensagens.status_entrega`, que o webhook de status já mantém),
+  responderam e falhas, por transmissão (`transmissao_numeros`, com a RLS de quem pede) e por contato
+  (`/api/transmissao/[id]`). A tela relê a cada 20 s só enquanto envia e só com a aba à vista.
+- **Respondeu → card:** gatilho `mensagens_transmissao_resposta` (AFTER INSERT em `mensagens`, só `recebida`): a
+  primeira resposta em até 7 dias marca o envio e põe `dados._transmissao` ({id, nome, respondeu_em}) no card do
+  contato na loja + `negocio_historico` `respondeu_transmissao`. O card mostra "origem: transmissão · <nome>"
+  (link para o acompanhamento). **A `origem` do contato NÃO muda**: ela é o canal por onde a tela responde.
+- **Quem pode:** dono e admin criam, veem a prévia e disparam (rota + RLS + funções definer conferindo
+  `is_empresa_admin`); vendedor vê as transmissões e o acompanhamento **da loja dele**, sem botões.
+
+### O que entra (migração `20261111000100_transmissao`, volta `supabase/scripts/volta/volta-transmissao.sql`)
+
+`transmissoes`, `transmissao_envios` (RLS por empresa + loja visível; envios só service_role grava), funções
+`transmissao_publico`, `transmissao_loja_ok`, `transmissao_origens`, `transmissao_numeros` (invoker),
+`transmissao_previa`, `transmissao_montar`, `transmissao_reservar`, `transmissao_resposta` + gatilho em `mensagens`.
+**DDL em `mensagens` (o gatilho)**: tabela quente — com a loja fechada e o gate de IOwait. Custo do gatilho por
+mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta_idx`).
+
+### Provas (local, 10/11)
+
+- `npm test`: 340/340 (8 novos em `tests/transmissao-filtro.test.ts`); travas do build ok.
+- `tests/e2e/transmissao-e2e.mjs` (**65/65**): empresa, lojas, usuários, contatos e modelo DE TESTE criados no banco
+  local e apagados no fim; Edge no deno; Graph falsa que só aceita 5519900…. Cobre vitrine desligado → Central
+  instala → API; prévia (5 aptos, 4 fora pelos 4 motivos, incluindo o modelo mandado pelo Automatize há 3 dias);
+  tela do dono do filtro ao disparo; teto 3 (3 saem, 2 esperam, o cron da hora seguinte manda o resto e conclui;
+  rodar de novo não manda); entregue/lida pelo webhook de status; resposta → envio marcado, card com a origem, quem
+  não recebeu e escreveu não ganha marca; 7 dias na transmissão seguinte; pausar (cron não manda, Edge recusa em voo
+  com 409), retomar; fora do horário (nada sai, a tela diz quando volta); encerrar; Loja B sem WhatsApp (409); lista
+  vazia (400); agendar; vendedor vê e não dispara (API 403, RLS 0 linhas, montar e reservar negados); vendedor da
+  outra loja não vê; Edge sem chave de serviço ou com a anônima = 401; **todos os 9 envios para número de teste**.
+
+### Pendências e decisões
+
+- **Etiqueta: o CRM não tem.** Nem tabela, nem campo, nem no `dados` (conferido no esquema em 10/11). O filtro saiu
+  sem ela. Decisão do Lucas: criar etiqueta no core (tabela + tela no card) ou deixar para Públicos.
+- Produção: migração (loja fechada, IOwait < 20%) → Edge `webhook-leads` com o código desta branch → push do app.
+  Ordem no 05, "Transmissão".
+- Smoke em produção só com o número do Lucas e um modelo aprovado de teste.
+- A Meta cobra por conversa de modelo de marketing e mede a qualidade do número: começar com lista pequena.

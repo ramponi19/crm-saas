@@ -184,10 +184,17 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
     const telefone = (contato.telefone_e164 || contato.telefone || '').replace(/\D/g, '')
     if (telefone.length < 10) return { resultado: 'pulada', motivo: 'contato sem telefone' }
 
-    const { data: ult } = await db.from('automacao_execucoes').select('executada_em')
-      .eq('contato_id', contato.id).eq('modelo_id', modelo.id).eq('acao', 'enviar_modelo').eq('status', 'executada')
-      .order('executada_em', { ascending: false }).limit(1)
-    const ultimo = (ult?.[0] as { executada_em: string | null } | undefined)?.executada_em
+    // A trava é do MODELO para o contato, venha de automação ou de transmissão (10/11/2026).
+    const [{ data: ult }, { data: ultT }] = await Promise.all([
+      db.from('automacao_execucoes').select('executada_em')
+        .eq('contato_id', contato.id).eq('modelo_id', modelo.id).eq('acao', 'enviar_modelo').eq('status', 'executada')
+        .order('executada_em', { ascending: false }).limit(1),
+      db.from('transmissao_envios').select('enviada_em')
+        .eq('contato_id', contato.id).eq('modelo_id', modelo.id).eq('status', 'enviada')
+        .order('enviada_em', { ascending: false }).limit(1),
+    ])
+    const ultimo = [(ult?.[0] as { executada_em: string | null } | undefined)?.executada_em, (ultT?.[0] as { enviada_em: string | null } | undefined)?.enviada_em]
+      .filter((x): x is string => !!x).sort().pop()
     if (modeloRecente(ultimo ? new Date(ultimo) : null, agora)) {
       return { resultado: 'pulada', motivo: 'este contato já recebeu este modelo nos últimos 7 dias' }
     }

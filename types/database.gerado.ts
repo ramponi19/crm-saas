@@ -2335,6 +2335,88 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"transmissao_envios": {
+                  Row: {
+                    "contato_id": number,"created_at": string,"empresa_id": number,"enviada_em": string | null,"filial_id": number | null,"id": number,"mensagem_id": number | null,"modelo_id": number | null,"motivo": string | null,"negocio_id": number | null,"reservada_em": string | null,"respondida_em": string | null,"resposta_mensagem_id": number | null,"status": string,"telefone": string | null,"tentativas": number,"transmissao_id": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contato_id": number,"created_at"?: string,"empresa_id": number,"enviada_em"?: string | null,"filial_id"?: number | null,"id"?: never,"mensagem_id"?: number | null,"modelo_id"?: number | null,"motivo"?: string | null,"negocio_id"?: number | null,"reservada_em"?: string | null,"respondida_em"?: string | null,"resposta_mensagem_id"?: number | null,"status"?: string,"telefone"?: string | null,"tentativas"?: number,"transmissao_id": number
+                  }
+                  Update: {
+                    "contato_id"?: number,"created_at"?: string,"empresa_id"?: number,"enviada_em"?: string | null,"filial_id"?: number | null,"id"?: never,"mensagem_id"?: number | null,"modelo_id"?: number | null,"motivo"?: string | null,"negocio_id"?: number | null,"reservada_em"?: string | null,"respondida_em"?: string | null,"resposta_mensagem_id"?: number | null,"status"?: string,"telefone"?: string | null,"tentativas"?: number,"transmissao_id"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "transmissao_envios_contato_id_fkey"
+      columns: ["contato_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissao_envios_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissao_envios_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissao_envios_modelo_id_fkey"
+      columns: ["modelo_id"]
+isOneToOne: false
+      referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissao_envios_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissao_envios_transmissao_id_fkey"
+      columns: ["transmissao_id"]
+isOneToOne: false
+      referencedRelation: "transmissoes"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"transmissoes": {
+                  Row: {
+                    "agendada_para": string | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"status": string,"total": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"status"?: string,"total"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"status"?: string,"total"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "transmissoes_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissoes_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissoes_modelo_id_fkey"
+      columns: ["modelo_id"]
+isOneToOne: false
+      referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"usuarios": {
                   Row: {
                     "created_at": string | null,"email": string | null,"filial_atual_id": number | null,"id": string,"impersonando_empresa_id": number | null,"impersonando_expires_at": string | null,"is_super_admin": boolean,"modulos_acesso": (string)[] | null,"nome": string,"permissoes": Json | null,"role": string,"ultimo_acesso": string | null
@@ -3196,6 +3278,54 @@ isOneToOne: true
 "zapintel_resumo":
 { Args: { "p_empresa"?: number }; Returns: Json
                            },
+"transmissao_loja_ok":
+{ Args: { "p_empresa": number,"p_filial": number }; Returns: boolean
+                           },
+"transmissao_montar":
+{ Args: { "p_transmissao": number }; Returns: number
+                           },
+"transmissao_numeros":
+{ Args: { "p_ids": (number)[] }; Returns: {
+              "entregues": number,"enviadas": number,"falhas": number,"lidas": number,"pendentes": number,"puladas": number,"respondidas": number,"total": number,"transmissao_id": number
+            }[]
+                           },
+"transmissao_origens":
+{ Args: Record<PropertyKey, never>; Returns: (string)[]
+                           },
+"transmissao_previa":
+{ Args: { "p_filial": number,"p_filtro": Json,"p_modelo"?: number }; Returns: Json
+                           },
+"transmissao_publico":
+{ Args: { "p_empresa": number,"p_filial": number,"p_filtro": Json,"p_modelo": number }; Returns: {
+              "contato_id": number,"fora": string,"negocio_id": number,"nome": string,"telefone": string
+            }[]
+                           },
+"transmissao_reservar":
+{ Args: { "p_lote"?: number,"p_transmissao": number }; Returns: {
+              "contato_id": number,
+"created_at": string,
+"empresa_id": number,
+"enviada_em": string | null,
+"filial_id": number | null,
+"id": number,
+"mensagem_id": number | null,
+"modelo_id": number | null,
+"motivo": string | null,
+"negocio_id": number | null,
+"reservada_em": string | null,
+"respondida_em": string | null,
+"resposta_mensagem_id": number | null,
+"status": string,
+"telefone": string | null,
+"tentativas": number,
+"transmissao_id": number
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "transmissao_envios"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
 "zapintel_turnos":
 { Args: { "p_desde": string,"p_emp": number,"p_lojas": (number)[] }; Returns: {
               "aberto": boolean,"chegou": string,"dow": number,"espera": number,"filial_id": number,"hora": number,"lead_id": number

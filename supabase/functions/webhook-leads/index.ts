@@ -1678,6 +1678,54 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
   return await enviarModelo(canal, { ...body, leadId: negocioId, modelo: m.nome, idioma: m.idioma }, null, "automacao");
 }
 
+/**
+ * ENVIO DE TRANSMISSÃO (módulo Transmissão, 10/11/2026). O mesmo caminho de serviço do
+ * Automatize: só a chave de serviço, chamado pelo servidor do app (lib/transmissao/motor.ts),
+ * que já aplicou horário, teto por hora e 7 dias. Aqui a Edge confere de novo o que não pode
+ * passar: o envio existe e está 'enviando' (reservado agora pelo app); a transmissão é da
+ * mesma empresa e está 'enviando' (pausar barra o que estiver em voo); o modelo é o da
+ * transmissão, desta empresa e APROVADO; o contato não pediu opt-out nem está bloqueado.
+ * O número e o negócio vêm do envio no banco, nunca do corpo. A mensagem é gravada com
+ * origem 'transmissao'.
+ */
+async function envioTransmissao(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const auth = req.headers.get("authorization") ?? "";
+  const chave = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (!(await mesmoSegredo(chave, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""))) return json({ error: "não autorizado" }, 401);
+
+  const envioId = Number(body.envioId);
+  if (!envioId) return json({ error: "envioId é obrigatório" }, 400);
+  const { data: e } = await db.from("transmissao_envios")
+    .select("id, empresa_id, transmissao_id, contato_id, negocio_id, telefone, status").eq("id", envioId).maybeSingle();
+  if (!e) return json({ error: "envio não encontrado" }, 404);
+  if (e.status !== "enviando") return json({ error: "envio não está reservado" }, 409);
+  const empresaId = e.empresa_id as number;
+
+  const { data: t } = await db.from("transmissoes").select("id, empresa_id, filial_id, status, modelo_id")
+    .eq("id", e.transmissao_id).eq("empresa_id", empresaId).maybeSingle();
+  if (!t || t.status !== "enviando") return json({ error: "transmissão pausada, encerrada ou de outra empresa" }, 409);
+  const { data: m } = await db.from("modelos_mensagem").select("id, nome, idioma, status")
+    .eq("id", t.modelo_id).eq("empresa_id", empresaId).maybeSingle();
+  if (!m || m.status !== "aprovado") return json({ error: "modelo não aprovado" }, 409);
+  const { data: c } = await db.from("contatos").select("id, ativo, opt_out_em")
+    .eq("id", e.contato_id).eq("empresa_id", empresaId).maybeSingle();
+  if (!c || c.opt_out_em || c.ativo === false) return json({ error: "contato com opt-out, bloqueado ou inexistente" }, 409);
+  if (!e.negocio_id || !e.telefone) return json({ error: "envio sem negócio ou sem telefone" }, 409);
+
+  const lojaT = (t.filial_id as number | null) ?? null;
+  const canal = await canalDaLoja(empresaId, "whatsapp", lojaT);
+  // canalDaLoja cai no WhatsApp de OUTRA loja quando esta não tem: na transmissão, não — a
+  // lista é da loja e sai pelo número dela (canal sem loja, o da empresa inteira, vale).
+  if (!canal || (lojaT != null && canal.filial_id != null && canal.filial_id !== lojaT)) {
+    return json({ error: "WhatsApp não conectado nesta loja" }, 502);
+  }
+  console.log(`envio de transmissão: transmissão ${t.id}, envio ${envioId}, modelo ${m.nome}`);
+  return await enviarModelo(canal, {
+    leadId: e.negocio_id, number: e.telefone, modelo: m.nome, idioma: m.idioma,
+    parametros: body.parametros, previa: body.previa,
+  }, null, "transmissao");
+}
+
 async function enviarMeta(canal: Canal, origemId: string, body: Record<string, unknown>, assinatura = "", usuarioId: string | null = null) {
   const leadId = body.leadId as string;
   const texto = body.texto as string | undefined;
@@ -1836,6 +1884,11 @@ serve(async (req: Request) => {
   if (action === "send_template_automacao") {
     try { return await envioAutomatico(req, body); }
     catch (e) { console.error("envio automático:", e); return json({ error: "falha no envio automático" }, 500); }
+  }
+  // ── Envio de transmissão: só a chave de serviço ─────────────────────────────
+  if (action === "send_template_transmissao") {
+    try { return await envioTransmissao(req, body); }
+    catch (e) { console.error("envio de transmissão:", e); return json({ error: "falha no envio da transmissão" }, 500); }
   }
 
   // ── Envio pelo CRM ────────────────────────────────────────────────────────

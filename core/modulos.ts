@@ -120,6 +120,9 @@ export const GRUPOS_MODULO: { id: GrupoModulo; label: string }[] = [
 export const MODULOS: ModuloManifesto[] = [
   { chave: 'chat', href: '/chat', nome: 'Chat da equipe', grupo: 'comunicacao',
     frase: 'Conversa interna da equipe, com aviso de mensagem nova no menu.' },
+  // Módulo Transmissão (10/11/2026): o filtro da lista é o embrião do módulo Públicos.
+  { chave: 'transmissao', href: '/transmissao', nome: 'Transmissão', grupo: 'comunicacao',
+    frase: 'Manda um modelo aprovado do WhatsApp para uma lista da loja e mostra quem recebeu, leu e respondeu.' },
 
   { chave: 'fila', href: '/fila', nome: 'Fila do dia', grupo: 'pipeline',
     frase: 'O que cada vendedor precisa fazer hoje: retornos, tarefas e leads esperando resposta.' },

@@ -9,6 +9,7 @@ import { timingSafeEqual } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { processarFila } from '@/lib/automacoes'
+import { processarTransmissoes } from '@/lib/transmissao/motor'
 import { limparExportacoes } from '@/lib/lgpd/exportacao'
 
 // ============================================================
@@ -167,8 +168,16 @@ export async function GET(
        * CRON_SECRET lido do Vault. Idempotente: a reserva é FOR UPDATE SKIP LOCKED.
        */
       case 'automacoes': {
+        const t0 = Date.now()
         const r = await processarFila(supabase as unknown as SupabaseClient)
-        return NextResponse.json({ ok: true, job, ...r })
+        // TRANSMISSÃO (10/11/2026): a fila das transmissões roda no MESMO job do pg_cron
+        // (`automacoes-hora`), sem job novo. Uma falha aqui não esconde a rodada das automações.
+        // O net.http_get do job espera 60 s (supabase/scripts/automatize-cron.sql): a rodada usa o
+        // que sobra até ~55 s; o que não couber fica na fila para a hora seguinte.
+        let transmissoes: Awaited<ReturnType<typeof processarTransmissoes>> | { erro: string }
+        try { transmissoes = await processarTransmissoes(supabase as unknown as SupabaseClient, { limiteMs: Math.max(10_000, 55_000 - (Date.now() - t0)) }) }
+        catch (e) { transmissoes = { erro: e instanceof Error ? e.message : String(e) } }
+        return NextResponse.json({ ok: !('erro' in transmissoes), job, ...r, transmissoes })
       }
 
       /**

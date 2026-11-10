@@ -1363,6 +1363,14 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               ? <a key={o.filialId} href={`/leads?lead=${o.leadId}`} title={titulo} className={`${estilo} hover:text-ink`}>{rotulo}</a>
               : <span key={o.filialId} title={titulo} className={estilo}>{rotulo}</span>
           })}
+          {/* Respondeu a uma transmissão: a origem DESTA conversa (o canal do contato não muda). */}
+          {card.transmissao && (
+            <a href={`/transmissao?id=${card.transmissao.id}`} data-transmissao-card={card.transmissao.id}
+              title={`Respondeu à transmissão "${card.transmissao.nome}"`}
+              className="rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-ink-2 hover:text-ink">
+              origem: transmissão · {card.transmissao.nome}
+            </a>
+          )}
           <div className="flex-1" />
           {gereLojas && (
             <Button variant="ghost" size="sm" onClick={() => setFundindo(true)} disabled={saving} icon={<Merge size={15} strokeWidth={1.7} />}>

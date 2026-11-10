@@ -41,6 +41,8 @@ export interface CardDoLead {
   filialId: number | null
   outrasLojas: OutraLoja[]
   campos: CampoDoCard[]
+  /** Respondeu a uma transmissão (módulo Transmissão): a marca que o gatilho põe em dados._transmissao. */
+  transmissao: { id: number; nome: string; respondeu_em: string } | null
 }
 
 /** Campos que o card já tem em campo próprio — não aparecem de novo na lista de personalizados. */
@@ -160,7 +162,9 @@ export async function carregarCardDoLead(
     foto_url: c.foto_url,
   }
 
-  return { lead, contatoId: c.id, filialId: n.filial_id, outrasLojas: [...porLoja.values()], campos: camposDoCard }
+  const tx = ((n.dados ?? {})._transmissao ?? null) as { id?: unknown; nome?: unknown; respondeu_em?: unknown } | null
+  const transmissao = tx && Number(tx.id) ? { id: Number(tx.id), nome: String(tx.nome ?? ''), respondeu_em: String(tx.respondeu_em ?? '') } : null
+  return { lead, contatoId: c.id, filialId: n.filial_id, outrasLojas: [...porLoja.values()], campos: camposDoCard, transmissao }
 }
 
 /** O que o card grava (cada chave ausente fica como está). */

@@ -446,6 +446,27 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
   - banco: `cron.unschedule('automacoes-hora')`, depois `supabase/scripts/volta/volta-automatize.sql`, depois `drop extension pg_net`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8, sem mudança.
 
+## Transmissão (branch `feat/transmissao`, ainda NÃO aplicada — ordem para quando o Lucas der o ok)
+
+O que é e as provas: 06, seção 42. Nada muda para empresa nenhuma até o dono instalar o módulo na Central.
+
+1. **Migração** `20261111000100_transmissao` pelo MCP `apply_migration`, **com a loja fechada** e IOwait < 20%:
+   cria um gatilho em `mensagens` (tabela quente) e faz o PostgREST recarregar o schema. Conferir depois:
+   `select count(*) from transmissoes` (0), o gatilho `mensagens_transmissao_resposta` em `pg_trigger`, e que
+   `transmissao_reservar`/`transmissao_publico` não têm EXECUTE para `authenticated` nem `anon`. API ok.
+2. **Edge** `webhook-leads` do commit da branch (`bash tools/deploy-edge.sh <commit>`). Antes do app, de propósito:
+   o caminho novo só é chamado pela rota nova, e o resto da Edge não muda. Sem credencial ou com a chave
+   anônima, `?action=send_template_transmissao` dá 401; `send_template_automacao`, `send`, `send_meta` e
+   `send_template` sem corpo seguem dando 400; GET de verificação com token errado, 403.
+3. **App** (push = deploy; IOwait < 20%). A rota do cron só passa a ler transmissão depois da migração: nunca o
+   app antes do banco (o `automacoes-hora` das :17 daria erro na parte da transmissão — a das automações segue).
+4. **Smoke** numa empresa de teste ou na JM com o módulo instalado pelo dono: só o número do Lucas na lista
+   (filtro que pegue só o contato dele), um modelo aprovado de teste, teto baixo. Conferir enviada → entregue →
+   lida no acompanhamento, responder do celular e ver o card com "origem: transmissão". Desinstalar ao fim se
+   não for ficar.
+- **Voltas:** app: Instant Rollback; Edge: republicar a versão anterior (o caminho novo só é usado pela rota nova);
+  banco: `supabase/scripts/volta/volta-transmissao.sql` (apaga transmissões e acompanhamento).
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
