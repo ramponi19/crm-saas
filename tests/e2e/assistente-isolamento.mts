@@ -31,13 +31,31 @@ const db = createClient(env.API_URL, env.ANON_KEY, { ...opts, global: { headers:
 const anon = createClient(env.API_URL, env.ANON_KEY, opts)
 const svc = createClient(env.API_URL, env.SERVICE_ROLE_KEY, opts)
 
-// A outra empresa: a que tem mais negócios ativos fora a JM.
-const [outra, lojaOutra, nomeLojaOutra, ativosOutra] = sql(`select n.empresa_id, min(n.filial_id), (select coalesce(nullif(trim(f.cidade),''), f.nome) from filiais f where f.empresa_id = n.empresa_id order by f.id limit 1), count(*)
-  from negocios n where n.empresa_id <> 1 and n.ativo group by n.empresa_id order by count(*) desc limit 1`).split('|')
-const OUTRA = Number(outra), LOJA_OUTRA = lojaOutra ? Number(lojaOutra) : (Number(sql(`select id from filiais where empresa_id=${OUTRA} order by id limit 1`)) || null)
+// A outra empresa: a 5 (Preview · Loja), que na cópia não tem lead. Ganha um lead COM conversa e ficha
+// (marca PROVA ISOLAMENTO), apagado no fim, passe ou falhe — senão "nada da outra empresa" não provaria nada.
+const OUTRA = 5
+const MARCA = 'PROVA ISOLAMENTO'
+const limpar = () => {
+  sql(`delete from zapintel_lead_perfil where empresa_id=${OUTRA} and perfil->>'marca_teste' = '${MARCA}'`)
+  sql(`delete from mensagens where empresa_id=${OUTRA} and conteudo = '${MARCA}'`)
+  sql(`delete from negocios where empresa_id=${OUTRA} and dados->>'marca_teste' = '${MARCA}'`)
+  sql(`delete from conversas where empresa_id=${OUTRA} and contato_id in (select id from contatos where empresa_id=${OUTRA} and nome = '${MARCA}')`)
+  sql(`delete from contatos where empresa_id=${OUTRA} and nome = '${MARCA}'`)
+}
+limpar()
+// Apaga o cenário ao sair, passe, falhe ou estoure.
+process.on('exit', () => { try { limpar(); console.log(`cenário apagado (contatos de teste restantes: ${sql(`select count(*) from contatos where empresa_id=${OUTRA} and nome = '${MARCA}'`)})`) } catch (e) { console.log('FALHA ao apagar o cenário: ' + String(e).slice(0, 200)) } })
+const LOJA_OUTRA = Number(sql(`select id from filiais where empresa_id=${OUTRA} order by id limit 1`))
+const nomeLojaOutra = sql(`select coalesce(nullif(trim(cidade),''), nome) from filiais where id=${LOJA_OUTRA}`)
+sql(`with c as (insert into contatos (empresa_id, nome, filial_id) values (${OUTRA}, '${MARCA}', ${LOJA_OUTRA}) returning id),
+  cv as (insert into conversas (empresa_id, contato_id, filial_id) select ${OUTRA}, id, ${LOJA_OUTRA} from c returning id, contato_id),
+  n as (insert into negocios (empresa_id, contato_id, filial_id, ativo, dados) select ${OUTRA}, id, ${LOJA_OUTRA}, true, '{"marca_teste": "${MARCA}"}' from c returning id),
+  m as (insert into mensagens (empresa_id, conversa_id, contato_id, filial_id, direcao, conteudo) select ${OUTRA}, cv.id, cv.contato_id, ${LOJA_OUTRA}, 'recebida', '${MARCA}' from cv returning id)
+  insert into zapintel_lead_perfil (lead_id, empresa_id, perfil, mensagens, versao)
+  select n.id, ${OUTRA}, '{"classificacao": "hot", "marca_teste": "${MARCA}"}', 1, 'p2' from n, m`)
 const comConversa = Number(sql(`select jsonb_array_length(public.assistente_status_leads(${OUTRA}))`))
-console.log(`outra empresa: ${OUTRA} (${ativosOutra} negócios ativos, ${comConversa} com conversa; loja ${LOJA_OUTRA} "${nomeLojaOutra}")`)
-if (!(Number(ativosOutra) > 0)) throw new Error('a cópia local não tem outra empresa com negócios — o teste não prova nada')
+console.log(`outra empresa: ${OUTRA}, loja ${LOJA_OUTRA} "${nomeLojaOutra}", ${comConversa} lead com conversa e ficha (cenário do teste)`)
+if (comConversa < 1) { limpar(); throw new Error('o cenário da outra empresa não montou — o teste não prova nada') }
 
 const falhas: string[] = []
 const confere = (c: boolean, m: string) => { if (c) console.log('ok  ', m); else { falhas.push(m); console.log('FALHA', m) } }
