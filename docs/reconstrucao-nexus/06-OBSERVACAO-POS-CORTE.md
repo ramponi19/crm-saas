@@ -1288,3 +1288,73 @@ Nenhuma das duas views zerou, então não há migração de drop.
   - **Eventos `zapintel.tempo_esgotado`:** 5 — três na primeira carga do smoke (20h12) e dois do dashboard às 20h45 (11,0 s) e 21h03 (9,4 s).
   - **CORREÇÃO (21h30, pelos logs da API, janela ≤ 15 min filtrada):** as chamadas de 20h41 a 21h03 — os dois estouros incluídos — vieram TODAS de um só usuário e uma só sessão: a aba de smoke deixada aberta no navegador do app (conta do Lucas), refazendo dashboard + resumo a cada aviso. **Não foi uso da loja**, e a média "depois" é quase só dessa aba, à noite. Padrão nos logs: chamada que chega minutos depois da anterior é lenta (dashboard 6–11 s, resumo 5–6 s); 10–20 s depois da anterior, rápida (dashboard 1,4 s, resumo 0,7 s). Teste às 21h28 (só leitura, aba sem o ZapIntel): resumo 0,86 s depois de 30 s parado × 0,32 s na sequência; dashboard + resumo juntos 2,5 + 0,8 s depois de 35 s parado × 1,4 + 0,6 s na sequência — conexão fria pesa, mas não explica sozinha os 6–11 s depois de minutos parado.
   - **Leitura:** o que a migração prometia (disco temporário e a insights estourando) está resolvido. O comportamento do dashboard com a loja aberta ainda não foi medido: medição de concorrência pedida pelo Lucas para 10/11 às 11h (pico de ~295 mensagens/h), só leitura.
+
+## 40. 10/11: o painel do ZapIntel estourando, a causa (memória, não CPU), a troca para a Small e o cache que NÃO subiu
+
+- **O sintoma (smoke de 10/11 13h54):** só ABRIR o painel disparava dashboard, resumo e pendentes ao mesmo tempo;
+  com o banco lento, os três passavam dos 8 s juntos (9 `tempo_esgotado` em 16 s). 14h25–14h43: ~70 estouros de
+  30 a 146 s em todas as telas; 164 entre 12h e 15h55.
+- **A causa:** memória. Nano com 408 MB de RAM e `shared_buffers` de 224 MB: swap de 673–919 MB (até 206% da RAM),
+  commit 1,8 GB para 1,4 GB de capacidade, IOwait 13–89%. A mesma consulta, com as mesmas 56.546 páginas "em
+  cache" (que estavam no swap), levou 2,4 s, depois 31,2 s, depois mais de 60 s. CPU pura (`generate_series`)
+  105 ms, onde se esperava ~20. Notas: `cache-painel-e-cpu.md` (pasta de notas da sessão hopeful-carson).
+- **A decisão:** o Lucas trocou para Pro + Small (07; ~36 min fora do ar). Depois: swap 0, IOwait 0,2–3,6%, dashboard
+  848 ms a frio e 788 ms a quente, resumo 163 ms, zero estouro. **O cache do painel não subiu** ("não sobe", Lucas,
+  10/11). A branch `feat/zapintel-cache-painel` (`b9ae358`, nunca foi ao GitHub) foi apagada; o código inteiro está
+  em `anexos/cache-painel-20261110.patch`. **Se os estouros voltarem**, refazer a partir daqui.
+
+### O que a solução faz (para refazer)
+
+1. **Banco (migração `20261110000400_zapintel_cache_painel`, no patch; volta em
+   `supabase/scripts/volta/volta-zapintel-cache-painel.sql`).** Sem tabela nem coluna nova: reusa
+   `zapintel_conversa_cache` (`empresa_id`, `chave`, `dados`, `gerado_em`; já fechada para anon e authenticated),
+   com chaves que começam por `painel:` (as de "Como a loja conversa" são `<dias>:<lojas>` e não se cruzam).
+   - `zapintel_dashboard`, `zapintel_resumo` e `zapintel_analises_pendentes` são **renomeadas** para `*_calc` (corpo,
+     ACL e `SET work_mem` intactos; execução tirada de todo mundo). Funções **novas com o mesmo nome e assinatura**
+     chamam primeiro `zapintel_escopo` (a trava de acesso continua antes de tudo) e depois
+     `zapintel_cache_painel(empresa, chave, sql_do_calculo, 60 s)`.
+   - Chaves: `painel:dashboard:<versão>:<lojas>`, `painel:resumo:<lojas>`, `painel:pendentes:<versão>` (lojas =
+     `zapintel_cache_lojas(array)`, ordenadas e sem repetição).
+   - `zapintel_cache_painel`: guardado com menos de 60 s → devolve (select pela chave primária). Senão
+     `pg_try_advisory_xact_lock` por empresa+chave: **um cálculo por vez por chave**; quem chega enquanto outro
+     calcula recebe o guardado anterior (ou espera, se não houver). Cálculo cortado pelo `statement_timeout`
+     (57014) com guardado → devolve o guardado com `atrasado: true` e grava `eventos` `zapintel.calculo_cortado`
+     (`chave`, `guardado_em`, `duracao_ms`). Sem guardado (primeira vez da chave), o erro sobe como antes.
+   - `zapintel_analises_pendentes_expirar(p_empresa)` (só service_role): a rota `/zapintel/api/perfil/pendentes?atualizar=1`
+     expira a chave depois de um lote do robô.
+   - **Ordem do deploy:** migração primeiro (os wrappers funcionam com o app antigo), depois o app.
+2. **App.** `hooks/zapintel/fila.ts`: uma consulta do ZapIntel por vez na aba, prioridade tela (0) < menu (1) <
+   robô (2), começando na volta seguinte do laço (a ordem não depende de quem montou primeiro). `useRpcAoVivo`
+   ganhou `prioridade`; o resumo do menu ficou `soVisivel`; o robô espera `quandoVisivel()`. O painel mostra
+   "números de X atrás (banco lento)" quando `atrasado`.
+3. **Testes:** `tests/zapintel-fila.test.ts` (5), o caso de expirar em `tests/zapintel-estabilidade.test.ts`, a
+   lista da seção 6 de `supabase/testes/zapintel_acesso.sql`, e o e2e `tests/e2e/painel-frio-lento.mjs` (Docker,
+   Supabase local, CPU do banco estrangulada com `docker update --cpus`).
+
+### Os números do teste (local, cópia da produção, empresa 1, 10/11)
+
+| Cenário | Resultado |
+|---|---|
+| Calibração | dashboard 925 ms com CPU livre; 2.757 ms com `--cpus 0.25` |
+| A — como era (as três juntas, 8 s, `--cpus 0.25`) | dashboard 4.640 ms, resumo 2.025 ms, pendentes 3.816 ms, em paralelo |
+| B — abertura a frio com o cache e a fila | dashboard sai em 0,8–3,9 s → resumo 3,9–4,5 s → pendentes 4,5–6,1 s (contado do início da página), uma por vez, todas 200, **0 `tempo_esgotado`**; reabrir: 66 ms |
+| C — duas sessões abrindo juntas | o mesmo `geradoEm` nas duas: **um cálculo só** |
+| D — `--cpus 0.08` (o cálculo leva 8.117 ms, passa dos 8 s) | abre com os números guardados e "banco lento", **0 `tempo_esgotado`**, 1 `calculo_cortado` |
+| Gate | `npm test` 337/337; check e eslint ok; verificador 600/5 (as 5 de sempre, iguais na `main`) |
+
+### Pendências se for refeito
+
+- **A chave de visibilidade.** A chave é empresa + lojas + versão e **não leva quem pede**. Hoje está certo: o
+  `zapintel_escopo` só deixa passar dono, admin e superadmin, os três enxergam todas as lojas, e os `*_calc` não
+  olham `auth.uid()` (conferido em 10/11 na produção). **Se o ZapIntel abrir para gerente ou vendedor com alcance
+  menor** (só a loja dele, só os leads dele), a chave tem de ganhar essa dimensão (por exemplo, o
+  `zapintel_escopo` devolver um "recorte de visibilidade" que entra na chave). Sem isso, um gerente veria o número
+  calculado para o dono, e vice-versa.
+- **A primeira vez de uma chave** ainda pode estourar num banco muito lento (não há guardado para devolver).
+- O patch foi feito sobre a `main` `a19ab58`; refazer com `git apply --3way` e conferir os corpos dos `*_calc`
+  contra a produção (md5) antes de aplicar, porque a migração renomeia o que estiver lá.
+
+### O buraco de mensagens da troca (15:57–16:33)
+
+A Edge não gravou nada nesses 36 min. A conferência das reentregas da Meta e a lista por loja para a equipe
+responder ficam para 11/11 de manhã (anotar aqui o resultado).

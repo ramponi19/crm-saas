@@ -486,6 +486,19 @@ Em 09/11 a aba do smoke do ZapIntel ficou aberta das 20h40 às 21h25. Ela gerou 
 2. **Antes de medir** uso real: conferir nos logs da API (janela ≤ 15 min, filtrada) que nenhuma chamada é da sessão do smoke.
 3. Vale também para a regra do superadmin: sair da empresa impersonada ao fim de cada rodada.
 
+## Troca de instância do banco (regra permanente do Lucas, 10/11/2026)
+
+**Troca de instância (Compute and Disk) só com a loja fechada, prevendo até 40 min fora do ar.** A Supabase diz
+"menos de 2 minutos"; a troca Nano → Small de 10/11 ficou **~36 min** fora (15:57–16:33, com a loja aberta). Nesse
+tempo a Edge `webhook-leads` não grava nada (546/503/504) e o que a Meta não reentregar se perde.
+
+1. **Janela:** loja fechada, sem deploy, com 40 min de folga antes de abrir. IOwait < 10% antes.
+2. **Antes:** dump único (`tools/banco/dump-unico.ps1`) e a foto leve do "antes" (07, passo 4).
+3. **Depois:** o checklist do 07 inteiro — são **4 jobs** do pg_cron (`automacoes-hora`, `zapintel-conversa-aquecer`,
+   `retencao-diaria`, `lgpd-exportacoes-limpar`), não 3.
+4. **Mensagens do buraco:** comparar o recebido por loja com o ritmo normal e listar para a equipe as conversas que
+   estavam ativas antes da queda (06, seção 40).
+
 ## 04/11/2026 à noite: fase final das views — lotes 1 e 2 (15 views caídas, restam 26)
 
 **Pedido do Lucas:** zerar as 41 views de compatibilidade em lotes: troca das leituras para as tabelas do core, e2e da tela, deploy do app e só então a migração de drop (DDL com IOwait abaixo de 10%), com a API conferida. Detalhe e números no 06, seção 23.

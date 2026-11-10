@@ -1,0 +1,872 @@
+diff --git a/app/zapintel/api/perfil/pendentes/route.ts b/app/zapintel/api/perfil/pendentes/route.ts
+index ddc403bc..cdc3ebd3 100644
+--- a/app/zapintel/api/perfil/pendentes/route.ts
++++ b/app/zapintel/api/perfil/pendentes/route.ts
+@@ -39,6 +39,14 @@ import { registrarTempoEsgotado } from '@/lib/zapintel/tempo-esgotado'
+  * resposta fica 60 s na memória da instância (`zapintel.pendentes.cache` no
+  * log quando serve dela). Falha não entra no cache. `?atualizar=1` pula o cache
+  * — é o que o robô usa ao terminar um lote, para não mostrar a fila antiga.
++ *
++ * ══ CACHE NO BANCO, PARTILHADO (10/11/2026) ═══════════════════════════════
++ *
++ * O de cima é da instância da Vercel (some num cold start, cada instância tem
++ * o seu). Desde a migração 20261110000400 a própria `zapintel_analises_pendentes`
++ * serve de um guardado de 60 s por empresa no banco (`zapintel_cache_painel`),
++ * o mesmo para todas as pessoas, o Assistente e cada página da paginação.
++ * `?atualizar=1` vence também esse (`zapintel_analises_pendentes_expirar`).
+  */
+ export const dynamic = 'force-dynamic'
+ 
+@@ -95,6 +103,12 @@ export async function GET(req: Request) {
+   const db = rastrDb()
+   const inicio = Date.now()
+   try {
++    // O banco guarda a lista 60 s, partilhada pela empresa (migração 20261110000400).
++    // Depois de um lote (`?atualizar=1`) o guardado vence agora: o robô não mostra a fila antiga.
++    if (pular) {
++      const { error } = await db.rpc('zapintel_analises_pendentes_expirar', { p_empresa: empresaId })
++      if (error) throw new FalhaDePendentes('erro_rpc', error.message)
++    }
+     // Paginado e em ordem: a API devolve no máximo 1.000 linhas por chamada e
+     // corta calada. Hoje a fila tem dezenas, mas na próxima troca de
+     // VERSAO_DO_PERFIL todas as ~1.800 fichas ficam pendentes de uma vez — e o
+diff --git a/components/zapintel/painel-ao-vivo.tsx b/components/zapintel/painel-ao-vivo.tsx
+index 31381402..de52c305 100644
+--- a/components/zapintel/painel-ao-vivo.tsx
++++ b/components/zapintel/painel-ao-vivo.tsx
+@@ -118,6 +118,9 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
+           <span className="pv-sep">·</span>
+           <span>última mensagem <RelogioVivo iso={ultimaMensagem} /></span>
+           {atualizando && <span className="pv-sep">· atualizando</span>}
++          {/* O banco cortou o recálculo pelo tempo e devolveu o último cálculo guardado
++              (zapintel_cache_painel, 10/11/2026): os números são de antes, e a tela diz. */}
++          {d.atrasado && <span className="pv-sep" title="O banco está lento: estes são os números do último cálculo guardado. Atualizam no próximo recálculo.">· números de {ha(d.geradoEm, agora).replace("há ", "")} atrás (banco lento)</span>}
+         </div>
+         </div>
+       </header>
+diff --git a/components/zapintel/robo-analises.tsx b/components/zapintel/robo-analises.tsx
+index 1a140cf8..3e2198f1 100644
+--- a/components/zapintel/robo-analises.tsx
++++ b/components/zapintel/robo-analises.tsx
+@@ -4,6 +4,7 @@ import { mensagemPorStatus } from "@/lib/zapintel/mensagem-erro";
+ import { RefreshCw, Sparkles, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+ import { formatarDiaMes } from "@/lib/datas";
+ import { useFuso } from "@/components/fuso-provider";
++import { PRIORIDADE, filaZapintel, quandoVisivel } from "@/hooks/zapintel/fila";
+ 
+ /**
+  * QUANTAS FICHAS FICARAM PARA TRÁS — O BLOCO NO TOPO DO CHAT DO ZAPINTEL.
+@@ -56,7 +57,12 @@ const SEM_CONTAGEM: Contagem = { desatualizadas: [], semAnalise: [], iaDisponive
+  */
+ async function buscarContagem(atualizar = false): Promise<Contagem> {
+   try {
+-    const r = await fetch(`/zapintel/api/perfil/pendentes${atualizar ? "?atualizar=1" : ""}`, { cache: "no-store" });
++    // 10/11/2026: o robô monta junto com o painel e contava no mesmo instante que o
++    // dashboard e o menu. Agora espera a aba estar visível e entra no fim da fila da
++    // aba (`hooks/zapintel/fila.ts`): depois da tela e do menu, nunca junto.
++    await quandoVisivel();
++    const r = await filaZapintel.naFila(PRIORIDADE.robo, () =>
++      fetch(`/zapintel/api/perfil/pendentes${atualizar ? "?atualizar=1" : ""}`, { cache: "no-store" }));
+     const d = await r.json();
+     if (!r.ok || d?.indisponivel || !Array.isArray(d?.desatualizadas) || !Array.isArray(d?.semAnalise)) return SEM_CONTAGEM;
+     return {
+diff --git a/hooks/zapintel/fila.ts b/hooks/zapintel/fila.ts
+new file mode 100644
+index 00000000..29e7d878
+--- /dev/null
++++ b/hooks/zapintel/fila.ts
+@@ -0,0 +1,91 @@
++/**
++ * A FILA DE CONSULTAS DO ZAPINTEL NA ABA (10/11/2026, pedido do Lucas).
++ *
++ * Smoke de 10/11 13h54: só ABRIR o painel disparava três consultas pesadas no mesmo
++ * instante — o dashboard (a página), o resumo (o menu, no layout) e as análises
++ * pendentes (o robô, também no layout). Com o banco lento as três passaram dos 8 s
++ * juntas (9 tempo_esgotado em 16 s); o dashboard sozinho, no mesmo minuto, levou 5,6 s.
++ *
++ * Agora toda consulta do ZapIntel desta aba entra numa fila: UMA por vez, a de menor
++ * `prioridade` primeiro (a tela, depois o menu, depois o robô), e na mesma prioridade
++ * por ordem de chegada. A fila só começa a andar na volta seguinte do laço de eventos:
++ * os efeitos de uma mesma renderização (página, menu e robô montam juntos) entram
++ * todos antes de a primeira sair — assim a ordem não depende de quem montou primeiro.
++ *
++ * Sem React, para o teste medir a mesma regra (tests/zapintel-fila.test.ts).
++ */
++export const PRIORIDADE = {
++  /** A consulta da tela aberta (dashboard, lista de leads, insights…). */
++  tela: 0,
++  /** O menu do ZapIntel (`zapintel_resumo`). */
++  menu: 1,
++  /** O robô das análises pendentes. */
++  robo: 2,
++} as const;
++
++type Item = { prioridade: number; ordem: number; rodar: () => Promise<void> };
++
++export interface Fila {
++  /** Põe `fn` na fila; a promessa resolve (ou rejeita) com o resultado dela. */
++  naFila<T>(prioridade: number, fn: () => Promise<T>): Promise<T>;
++  /** Para o teste: quantas esperam e se há uma rodando. */
++  estado(): { esperando: number; rodando: boolean };
++}
++
++export function criarFila(proximaVolta: (f: () => void) => void = (f) => { setTimeout(f, 0); }): Fila {
++  const itens: Item[] = [];
++  let rodando = false;
++  let agendada = false;
++  let contador = 0;
++
++  const andar = () => {
++    agendada = false;
++    if (rodando || itens.length === 0) return;
++    itens.sort((a, b) => a.prioridade - b.prioridade || a.ordem - b.ordem);
++    const item = itens.shift()!;
++    rodando = true;
++    item.rodar().finally(() => {
++      rodando = false;
++      agendar();
++    });
++  };
++  const agendar = () => {
++    if (agendada || rodando || itens.length === 0) return;
++    agendada = true;
++    proximaVolta(andar);
++  };
++
++  return {
++    naFila<T>(prioridade: number, fn: () => Promise<T>): Promise<T> {
++      return new Promise<T>((resolve, reject) => {
++        itens.push({
++          prioridade,
++          ordem: contador++,
++          rodar: () => {
++            let p: Promise<T>;
++            try { p = fn(); } catch (e) { p = Promise.reject(e); }
++            return p.then(resolve, reject).then(() => undefined);
++          },
++        });
++        agendar();
++      });
++    },
++    estado: () => ({ esperando: itens.length, rodando }),
++  };
++}
++
++/** A fila desta aba (um módulo = uma aba). */
++export const filaZapintel = criarFila();
++
++/** Resolve quando a aba estiver visível (na hora, se já estiver). */
++export function quandoVisivel(): Promise<void> {
++  if (typeof document === "undefined" || !document.hidden) return Promise.resolve();
++  return new Promise((resolve) => {
++    const ver = () => {
++      if (document.hidden) return;
++      document.removeEventListener("visibilitychange", ver);
++      resolve();
++    };
++    document.addEventListener("visibilitychange", ver);
++  });
++}
+diff --git a/hooks/zapintel/useDashboardAoVivo.ts b/hooks/zapintel/useDashboardAoVivo.ts
+index bc891e0a..b0300352 100644
+--- a/hooks/zapintel/useDashboardAoVivo.ts
++++ b/hooks/zapintel/useDashboardAoVivo.ts
+@@ -24,7 +24,10 @@ export interface ItemFila {
+ }
+ export interface Pendencia { leadId: number; nome: string | null; loja: string | null; texto: string; urgencia: Urgencia; um: string }
+ export interface Dashboard {
++  /** Quando o banco calculou estes números (o cache partilhado guarda até 60 s — migração 20261110000400). */
+   geradoEm: string;
++  /** O recálculo foi cortado pelo tempo e o banco devolveu o último guardado (`zapintel_cache_painel`). */
++  atrasado?: boolean;
+   empresa: number;
+   ultimaMensagem: string | null;
+   lojas: { id: number; nome: string }[];
+diff --git a/hooks/zapintel/useLeads.tsx b/hooks/zapintel/useLeads.tsx
+index 363dc87f..ad823240 100644
+--- a/hooks/zapintel/useLeads.tsx
++++ b/hooks/zapintel/useLeads.tsx
+@@ -2,6 +2,7 @@
+ import { createContext, useContext, useState, type ReactNode } from "react";
+ import { papelDoPreset } from "@/lib/zapintel/papel";
+ import { useRpcAoVivo } from "./useRpcAoVivo";
++import { PRIORIDADE } from "./fila";
+ 
+ /**
+  * O CONTEXTO DO ZAPINTEL: A EMPRESA, AS LOJAS E A LOJA ESCOLHIDA — AO VIVO.
+@@ -64,8 +65,13 @@ export function LeadProvider({ children, empresa }: { children: ReactNode; empre
+    * a cada aviso — inclusive de ficha refeita e de venda, que não mudam nada aqui.
+    * Com a aba em segundo plano não consulta (regra do useRpcAoVivo).
+    */
++  /*
++   * 10/11/2026: o menu espera a vez — depois da consulta da tela, na fila da aba
++   * (`fila.ts`), e só com a aba visível, nem na carga inicial. No banco ele sai de
++   * um cache de 60 s partilhado pela empresa (migração 20261110000400).
++   */
+   const { dados: resumo, aoVivo } = useRpcAoVivo<Resumo>("zapintel_resumo", { p_empresa: empresa }, empresa,
+-    { eventos: ["mensagens"], intervaloMinimo: 30_000 });
++    { eventos: ["mensagens"], intervaloMinimo: 30_000, soVisivel: true, prioridade: PRIORIDADE.menu });
+ 
+   const valor: Contexto = {
+     lojas: resumo?.lojas ?? [],
+diff --git a/hooks/zapintel/useRpcAoVivo.ts b/hooks/zapintel/useRpcAoVivo.ts
+index 38a3e37f..a2f4339c 100644
+--- a/hooks/zapintel/useRpcAoVivo.ts
++++ b/hooks/zapintel/useRpcAoVivo.ts
+@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
+ import { ouvirZapintel } from "./canalZapintel";
+ import { INTERVALO_MINIMO, avisoRefaz, decidirDisparo, esperaComSorteio, esperaDaVolta, esperaDoAviso, sorteioEntre } from "./ritmo";
+ import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
++import { PRIORIDADE, filaZapintel } from "./fila";
+ 
+ /**
+  * UMA CONSULTA AO BANCO QUE SE ATUALIZA SOZINHA — SEM PULSO E SEM VERCEL.
+@@ -61,6 +62,12 @@ export interface OpcoesAoVivo {
+    * resultado chega a todas. Só serve dados dos MESMOS parâmetros (loja, filtro).
+    */
+   partilhar?: boolean;
++  /**
++   * Lugar na fila da aba (`fila.ts`, 10/11/2026): toda consulta daqui espera a vez —
++   * uma por vez, a da tela (0, o padrão) antes do menu (1) e do robô (2). Abrir o
++   * painel deixou de disparar dashboard, resumo e pendentes no mesmo instante.
++   */
++  prioridade?: number;
+ }
+ 
+ /** O que as abas trocam pelo BroadcastChannel. */
+@@ -73,6 +80,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
+   const sorteioMax = opcoes.sorteio?.[1] ?? null;
+   const soVisivel = !!opcoes.soVisivel;
+   const partilhar = !!opcoes.partilhar;
++  const prioridade = opcoes.prioridade ?? PRIORIDADE.tela;
+   const chave = JSON.stringify(params);
+   const [dados, setDados] = useState<T | null>(null);
+   const [chaveDosDados, setChaveDosDados] = useState<string | null>(null);
+@@ -138,8 +146,12 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
+     ultimaConsulta.current = Date.now();
+     avisarAbas({ tipo: "inicio", chave, em: ultimaConsulta.current });
+     setAtualizando(true);
+-    const inicio = Date.now();
+-    const { data, error } = await supabase.rpc(rpc as never, JSON.parse(chave) as never);
++    let inicio = Date.now();
++    // Na fila da aba; o tempo do evento de estouro conta de quando a consulta SAIU da fila.
++    const { data, error } = await filaZapintel.naFila(prioridade, async () => {
++      inicio = Date.now();
++      return await supabase.rpc(rpc as never, JSON.parse(chave) as never);
++    });
+     setAtualizando(false);
+     // Tempo esgotado vira evento (lib/zapintel/tempo-esgotado.ts): o banco não registra as canceladas.
+     void registrarTempoEsgotado(supabase, error, { funcao: rpc, empresa, inicio, params: JSON.parse(chave) });
+@@ -152,7 +164,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
+     setDados(data as T);
+     setChaveDosDados(chave);
+     avisarAbas({ tipo: "dados", chave, em: inicio, dados: data });
+-  }, [supabase, rpc, chave, empresa, avisarAbas]);
++  }, [supabase, rpc, chave, empresa, avisarAbas, prioridade]);
+ 
+   // Busca ao abrir e a cada parâmetro novo. Se falhar, tenta mais duas vezes
+   // antes de mostrar erro: em 14/10/2026 a primeira consulta do dia estourou o
+@@ -161,10 +173,14 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
+     let vivo = true;
+     let espera: ReturnType<typeof setTimeout> | null = null;
+     const tentar = (n: number) => {
+-      const inicio = Date.now();
++      let inicio = Date.now();
+       // Com a trava (sorteio), a carga inicial conta para o teto e avisa as irmãs.
+       if (sorteioMin !== null) { ultimaConsulta.current = inicio; avisarAbas({ tipo: "inicio", chave, em: inicio }); }
+-      supabase.rpc(rpc as never, JSON.parse(chave) as never).then(({ data, error }) => {
++      // Na fila da aba (`fila.ts`): a tela primeiro, o menu e o robô depois — nunca juntas.
++      filaZapintel.naFila(prioridade, async () => {
++        inicio = Date.now();
++        return await supabase.rpc(rpc as never, JSON.parse(chave) as never);
++      }).then(({ data, error }) => {
+         void registrarTempoEsgotado(supabase, error, { funcao: rpc, empresa, inicio, params: JSON.parse(chave), tentativa: n });
+         if (!vivo) return;
+         if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); avisarAbas({ tipo: "dados", chave, em: inicio, dados: data }); return; }
+@@ -209,7 +225,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
+       if (espera) clearTimeout(espera);
+       if (aoVoltar) document.removeEventListener("visibilitychange", aoVoltar);
+     };
+-  }, [supabase, rpc, chave, tentativa, empresa, soVisivel, sorteioMin, intervalo, avisarAbas]);
++  }, [supabase, rpc, chave, tentativa, empresa, soVisivel, sorteioMin, intervalo, avisarAbas, prioridade]);
+ 
+   // O canal ao vivo. Só se inscreve quando sabe a empresa (`empresaDoCanal`, lá em cima).
+   useEffect(() => {
+diff --git a/supabase/migrations/20261110000400_zapintel_cache_painel.sql b/supabase/migrations/20261110000400_zapintel_cache_painel.sql
+new file mode 100644
+index 00000000..0a33d469
+--- /dev/null
++++ b/supabase/migrations/20261110000400_zapintel_cache_painel.sql
+@@ -0,0 +1,209 @@
++-- O CUSTO DA ABERTURA DO PAINEL DO ZAPINTEL: CACHE NO BANCO, PARTILHADO (10/11/2026, pedido do Lucas).
++--
++-- Smoke de 10/11 13h54, loja aberta: só ABRIR o painel deu 9 tempo_esgotado em 16 s — dashboard 9,2–10,3 s,
++-- resumo 8,9–9,7 s, pendentes 9,6–9,7 s, as três juntas, cada aba e cada pessoa recalculando a sua. O teto do
++-- authenticated é 8 s. O dashboard sozinho, no mesmo minuto, levou 5,6 s (em 09/11: 0,8–1,1 s).
++--
++-- Aqui: zapintel_dashboard, zapintel_resumo e zapintel_analises_pendentes passam a servir de um cache por
++-- EMPRESA + LOJAS (o escopo já resolvido) + versão da ficha, calculado no máximo 1 vez por minuto e
++-- partilhado entre todas as pessoas e abas da empresa.
++--
++-- A TABELA: a zapintel_conversa_cache, que já existe (empresa_id, chave text, dados jsonb, gerado_em; chave
++-- primária empresa_id + chave; fechada para anon e authenticated, lida só por função security definer). As
++-- chaves de "Como a loja conversa" são "<dias>:<lojas>"; as daqui começam por "painel:" e não se cruzam.
++-- Nenhuma tabela nova, nenhuma coluna nova.
++--
++-- AS FUNÇÕES: o corpo de cada uma NÃO muda — é renomeada para *_calc (mesmo md5 do corpo, mesmo work_mem,
++-- execução só do dono) e uma função nova com o nome de sempre e a MESMA assinatura faz o cache. O app e os
++-- testes chamam os mesmos nomes com os mesmos parâmetros; só a rota das pendentes ganha o "expirar".
++--
++-- AS REGRAS DO CACHE (zapintel_cache_painel):
++--   1. guardado com menos de 60 s: devolve o guardado (um select por chave primária);
++--   2. senão, UMA sessão por chave calcula (trava consultiva da transação); quem chegar enquanto ela
++--      calcula recebe o guardado anterior, se houver, ou espera o cálculo dela — nunca dois cálculos juntos;
++--   3. o cálculo cortado pelo statement_timeout (57014) com um guardado anterior devolve o guardado com
++--      "atrasado": true (só nos objetos; a lista das pendentes volta como estava) e grava o evento
++--      zapintel.calculo_cortado — a pessoa não vê erro, o painel não some, e o corte continua contado.
++--      Sem guardado nenhum (a primeira vez da chave) o erro sobe como antes.
++--   Atenção: capturar query_canceled também engole um pg_cancel_backend durante o cálculo. É de propósito:
++--   o cálculo pesado já foi interrompido; o que sobra é um select pela chave primária e o return.
++--
++-- Volta: supabase/scripts/volta/volta-zapintel-cache-painel.sql (voltar o app antes, se ele já usar o
++-- zapintel_analises_pendentes_expirar).
++
++-- ------------------------------------------------------------------ o cache genérico
++create or replace function public.zapintel_cache_painel(
++  p_emp     bigint,
++  p_chave   text,
++  p_calculo text,
++  p_ttl     interval default interval '60 seconds'
++)
++returns jsonb
++language plpgsql
++volatile
++security definer
++set search_path = public
++as $$
++declare
++  v_dados jsonb;
++  v_em    timestamptz;
++  v_novo  jsonb;
++  v_trava bigint := hashtextextended('zapintel_cache_painel|' || p_emp::text || '|' || p_chave, 0);
++begin
++  select c.dados, c.gerado_em into v_dados, v_em
++    from zapintel_conversa_cache c where c.empresa_id = p_emp and c.chave = p_chave;
++  if v_em > now() - p_ttl then return v_dados; end if;
++
++  if not pg_try_advisory_xact_lock(v_trava) then
++    -- Outra sessão da empresa está calculando esta chave agora.
++    if v_dados is not null then return v_dados; end if;
++    perform pg_advisory_xact_lock(v_trava);
++    -- Cada comando de uma função volátil vê o que já foi confirmado: o cálculo da outra sessão.
++    select c.dados, c.gerado_em into v_dados, v_em
++      from zapintel_conversa_cache c where c.empresa_id = p_emp and c.chave = p_chave;
++    if v_em > now() - p_ttl then return v_dados; end if;
++  end if;
++
++  begin
++    execute p_calculo into v_novo;
++  exception when query_canceled then
++    if v_dados is null then raise; end if;
++    insert into eventos (empresa_id, tipo, entidade, dados)
++    values (p_emp, 'zapintel.calculo_cortado', 'rpc', jsonb_build_object(
++      'chave', p_chave,
++      'guardado_em', v_em,
++      'duracao_ms', round(extract(epoch from clock_timestamp() - now()) * 1000)));
++    return case when jsonb_typeof(v_dados) = 'object' then v_dados || jsonb_build_object('atrasado', true) else v_dados end;
++  end;
++
++  insert into zapintel_conversa_cache (empresa_id, chave, dados, gerado_em)
++  values (p_emp, p_chave, v_novo, now())
++  on conflict (empresa_id, chave) do update set dados = excluded.dados, gerado_em = excluded.gerado_em;
++  return v_novo;
++end;
++$$;
++
++comment on function public.zapintel_cache_painel(bigint, text, text, interval) is
++  'Cache do painel do ZapIntel em zapintel_conversa_cache (chaves "painel:..."): no máximo 1 cálculo por chave a cada p_ttl, um de cada vez; cálculo cortado pelo tempo devolve o guardado (+ atrasado) e grava zapintel.calculo_cortado. 10/11/2026.';
++
++revoke all on function public.zapintel_cache_painel(bigint, text, text, interval) from public, anon, authenticated, service_role;
++
++-- As lojas do escopo, em ordem, como texto (a chave não depende da ordem do array).
++create or replace function public.zapintel_cache_lojas(p_lojas bigint[])
++returns text
++language sql
++immutable
++set search_path = public
++as $$
++  select array_to_string(array(select distinct x from unnest(p_lojas) x order by x), ',')
++$$;
++
++revoke all on function public.zapintel_cache_lojas(bigint[]) from public, anon, authenticated, service_role;
++
++-- ------------------------------------------------------------------ dashboard
++alter function public.zapintel_dashboard(bigint, bigint, text) rename to zapintel_dashboard_calc;
++revoke all on function public.zapintel_dashboard_calc(bigint, bigint, text) from public, anon, authenticated, service_role;
++
++create function public.zapintel_dashboard(p_filial bigint default null, p_empresa bigint default null, p_versao text default 'p2')
++returns jsonb
++language plpgsql
++volatile
++security definer
++set search_path = public
++as $$
++declare
++  v_emp   bigint;
++  v_lojas bigint[];
++begin
++  -- Mesma checagem de sempre (empresa, ZapIntel ativo, papel, loja ao alcance) ANTES de olhar o cache.
++  select e.empresa, e.filiais into v_emp, v_lojas from zapintel_escopo(p_filial, p_empresa) e;
++  return zapintel_cache_painel(
++    v_emp,
++    'painel:dashboard:' || coalesce(p_versao, '') || ':' || zapintel_cache_lojas(v_lojas),
++    format('select public.zapintel_dashboard_calc(%L::bigint, %L::bigint, %L::text)', p_filial, p_empresa, p_versao));
++end;
++$$;
++
++comment on function public.zapintel_dashboard(bigint, bigint, text) is
++  'O painel do ZapIntel (zapintel_dashboard_calc) pelo cache partilhado de 60 s por empresa + lojas + versão (zapintel_cache_painel). 10/11/2026.';
++
++revoke all on function public.zapintel_dashboard(bigint, bigint, text) from public, anon;
++grant execute on function public.zapintel_dashboard(bigint, bigint, text) to authenticated, service_role;
++
++-- ------------------------------------------------------------------ resumo (o menu)
++alter function public.zapintel_resumo(bigint) rename to zapintel_resumo_calc;
++revoke all on function public.zapintel_resumo_calc(bigint) from public, anon, authenticated, service_role;
++
++create function public.zapintel_resumo(p_empresa bigint default null)
++returns jsonb
++language plpgsql
++volatile
++security definer
++set search_path = public
++as $$
++declare
++  v_emp   bigint;
++  v_lojas bigint[];
++begin
++  select e.empresa, e.filiais into v_emp, v_lojas from zapintel_escopo(null, p_empresa) e;
++  return zapintel_cache_painel(
++    v_emp,
++    'painel:resumo:' || zapintel_cache_lojas(v_lojas),
++    format('select public.zapintel_resumo_calc(%L::bigint)', p_empresa));
++end;
++$$;
++
++comment on function public.zapintel_resumo(bigint) is
++  'O menu do ZapIntel (zapintel_resumo_calc) pelo cache partilhado de 60 s por empresa + lojas (zapintel_cache_painel). 10/11/2026.';
++
++revoke all on function public.zapintel_resumo(bigint) from public, anon;
++grant execute on function public.zapintel_resumo(bigint) to authenticated, service_role;
++
++-- ------------------------------------------------------------------ análises pendentes (robô e Assistente)
++-- Só o service_role chama (a rota e o Assistente passam a empresa da sessão). A lista inteira fica num
++-- jsonb; a paginação do PostgREST (order + range) continua valendo sobre as linhas devolvidas — e cada
++-- página passa a ler o guardado em vez de recalcular a função inteira.
++alter function public.zapintel_analises_pendentes(bigint, text) rename to zapintel_analises_pendentes_calc;
++revoke all on function public.zapintel_analises_pendentes_calc(bigint, text) from public, anon, authenticated, service_role;
++
++create function public.zapintel_analises_pendentes(p_empresa bigint, p_versao text)
++returns table(lead_id bigint, nome text, filial text, tem_ficha boolean, gerado_em timestamp with time zone,
++              mensagens_na_ficha integer, mensagens_agora integer, ultima timestamp with time zone, loja_deve boolean)
++language sql
++volatile
++security definer
++set search_path = public
++as $$
++  select x.lead_id, x.nome, x.filial, x.tem_ficha, x.gerado_em, x.mensagens_na_ficha, x.mensagens_agora, x.ultima, x.loja_deve
++  from jsonb_to_recordset(public.zapintel_cache_painel(
++         p_empresa,
++         'painel:pendentes:' || coalesce(p_versao, ''),
++         format('select coalesce(jsonb_agg(to_jsonb(a)), ''[]''::jsonb) from public.zapintel_analises_pendentes_calc(%L::bigint, %L::text) a',
++                p_empresa, p_versao)))
++       as x(lead_id bigint, nome text, filial text, tem_ficha boolean, gerado_em timestamp with time zone,
++            mensagens_na_ficha integer, mensagens_agora integer, ultima timestamp with time zone, loja_deve boolean)
++$$;
++
++comment on function public.zapintel_analises_pendentes(bigint, text) is
++  'Leads com ficha de IA desatualizada ou sem ficha (zapintel_analises_pendentes_calc), pelo cache partilhado de 60 s por empresa + versão (zapintel_cache_painel). 10/11/2026.';
++
++revoke all on function public.zapintel_analises_pendentes(bigint, text) from public, anon, authenticated;
++grant execute on function public.zapintel_analises_pendentes(bigint, text) to service_role;
++
++-- Depois de um lote de fichas o robô reconta sem esperar o minuto: o guardado vence agora (os dados ficam,
++-- para o caso de o recálculo ser cortado pelo tempo).
++create function public.zapintel_analises_pendentes_expirar(p_empresa bigint)
++returns void
++language sql
++volatile
++security definer
++set search_path = public
++as $$
++  update zapintel_conversa_cache set gerado_em = '-infinity'
++   where empresa_id = p_empresa and chave like 'painel:pendentes:%'
++$$;
++
++revoke all on function public.zapintel_analises_pendentes_expirar(bigint) from public, anon, authenticated;
++grant execute on function public.zapintel_analises_pendentes_expirar(bigint) to service_role;
++
++notify pgrst, 'reload schema';
+diff --git a/supabase/scripts/volta/volta-zapintel-cache-painel.sql b/supabase/scripts/volta/volta-zapintel-cache-painel.sql
+new file mode 100644
+index 00000000..09bb23ef
+--- /dev/null
++++ b/supabase/scripts/volta/volta-zapintel-cache-painel.sql
+@@ -0,0 +1,26 @@
++-- Volta de 20261110000400_zapintel_cache_painel. ANTES, voltar o app (o novo chama
++-- zapintel_analises_pendentes_expirar depois de um lote; o de antes não). Depois, numa transação:
++-- os nomes de sempre voltam a ser as funções de cálculo, com as permissões de antes.
++begin;
++
++drop function if exists public.zapintel_dashboard(bigint, bigint, text);
++alter function public.zapintel_dashboard_calc(bigint, bigint, text) rename to zapintel_dashboard;
++grant execute on function public.zapintel_dashboard(bigint, bigint, text) to authenticated, service_role;
++
++drop function if exists public.zapintel_resumo(bigint);
++alter function public.zapintel_resumo_calc(bigint) rename to zapintel_resumo;
++grant execute on function public.zapintel_resumo(bigint) to authenticated, service_role;
++
++drop function if exists public.zapintel_analises_pendentes(bigint, text);
++alter function public.zapintel_analises_pendentes_calc(bigint, text) rename to zapintel_analises_pendentes;
++grant execute on function public.zapintel_analises_pendentes(bigint, text) to service_role;
++
++drop function if exists public.zapintel_analises_pendentes_expirar(bigint);
++drop function if exists public.zapintel_cache_painel(bigint, text, text, interval);
++drop function if exists public.zapintel_cache_lojas(bigint[]);
++
++-- O guardado do painel (as chaves "Como a loja conversa" ficam).
++delete from public.zapintel_conversa_cache where chave like 'painel:%';
++
++commit;
++notify pgrst, 'reload schema';
+diff --git a/supabase/testes/zapintel_acesso.sql b/supabase/testes/zapintel_acesso.sql
+index f4450624..54c79ad8 100644
+--- a/supabase/testes/zapintel_acesso.sql
++++ b/supabase/testes/zapintel_acesso.sql
+@@ -82,7 +82,11 @@ begin
+ 
+   -- 6. Funções internas não são chamáveis por usuário logado.
+   foreach procedure_ok in array array['zapintel_analises_pendentes(bigint,text)', 'zapintel_turnos(bigint,bigint[],timestamptz)',
+-                                      'zapintel_conversa_calc(bigint,bigint[],integer)', 'rate_limit_bump(text,timestamptz)'] loop
++                                      'zapintel_conversa_calc(bigint,bigint[],integer)', 'rate_limit_bump(text,timestamptz)',
++                                      -- 10/11/2026: o cache do painel e os cálculos por trás dele.
++                                      'zapintel_cache_painel(bigint,text,text,interval)', 'zapintel_dashboard_calc(bigint,bigint,text)',
++                                      'zapintel_resumo_calc(bigint)', 'zapintel_analises_pendentes_calc(bigint,text)',
++                                      'zapintel_analises_pendentes_expirar(bigint)'] loop
+     if not has_function_privilege('authenticated', ('public.' || procedure_ok)::regprocedure, 'execute')
+        and not has_function_privilege('anon', ('public.' || procedure_ok)::regprocedure, 'execute')
+       then ok := ok + 1; else falhas := falhas || format(' [%s aberta a logado/anônimo]', procedure_ok); end if;
+diff --git a/tests/e2e/painel-frio-lento.mjs b/tests/e2e/painel-frio-lento.mjs
+new file mode 100644
+index 00000000..8f83ea41
+--- /dev/null
++++ b/tests/e2e/painel-frio-lento.mjs
+@@ -0,0 +1,167 @@
++// O CUSTO DA ABERTURA DO PAINEL DO ZAPINTEL, COM A MÁQUINA LENTA (10/11/2026). LOCAL, empresa 1, dono.
++//   node tests/e2e/painel-frio-lento.mjs [http://localhost:3010] [cpus=0.25] [cpus_muito_lento=0.08]
++// Precisa: Supabase local com a migração 20261110000400 e o app local (:3010) buildado com a fila.
++// Estrangula a CPU do contêiner do Postgres (docker update --cpus) para imitar o banco de 10/11 13h54
++// e confere, contando os eventos e as chamadas do navegador:
++//   A. ANTES (a abertura antiga, no banco): dashboard, resumo e pendentes calculados JUNTOS com teto de
++//      8 s — quantos estouram;
++//   B. DEPOIS, a frio (sem guardado nenhum): o painel abre sem NENHUM zapintel.tempo_esgotado; o dashboard
++//      termina antes de o resumo sair, e o resumo antes das pendentes (uma por vez);
++//   C. duas sessões abrindo juntas, a frio: UM cálculo do dashboard (o cache é da empresa, não da aba);
++//   D. máquina MUITO lenta (o cálculo passa dos 8 s) com um guardado vencido: o painel abre com o guardado,
++//      diz "banco lento", nenhum tempo_esgotado, e o corte vira zapintel.calculo_cortado.
++// No fim: CPU do contêiner de volta e o guardado "painel:" apagado. Não grava nada além disso (e os eventos).
++import { E } from './_usuarios.mjs'
++import { chromium } from 'playwright-core'
++import { execFileSync, spawn } from 'node:child_process'
++const BASE = process.argv[2] || 'http://localhost:3010', SENHA = 'teste-local-22'
++const CPUS = Number(process.argv[3] || 0.25), CPUS_MUITO = Number(process.argv[4] || 0.08)
++const PSQL = 'C:/Ferramentas/pgsql-18.4/bin/psql.exe'
++const CONN = `host=127.0.0.1 port=${process.env.DB_PORT || 54322} dbname=postgres user=postgres password=postgres`
++const sql = (q) => execFileSync(PSQL, [CONN, '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-c', q], { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' } }).trim().replace(/\r/g, '')
++const falhas = []; const ok = (m) => console.log('ok  ', m); const falha = (m) => { falhas.push(m); console.log('FALHA', m) }
++const confere = (c, m) => (c ? ok(m) : falha(m))
++const DONO = 'a632db2c-c42b-4973-8008-2d5ca2dbf479'
++const docker = (...a) => execFileSync('docker', a, { encoding: 'utf8' }).trim()
++const DB = docker('ps', '--format', '{{.Names}}').split(/\r?\n/).find((n) => /^supabase_db_/.test(n))
++if (!DB) { console.error('Supabase local não está de pé (sem contêiner supabase_db_*).'); process.exit(2) }
++const CPU_ORIGINAL = Number(docker('inspect', '-f', '{{.HostConfig.NanoCpus}}', DB))
++const cpu = (n) => docker('update', '--cpus', String(n), DB)
++const restaurarCpu = () => { try { cpu(CPU_ORIGINAL ? CPU_ORIGINAL / 1e9 : 2) } catch (e) { console.log('não restaurou a CPU:', String(e).slice(0, 200)) } }
++
++// Uma sessão "como o PostgREST": papel authenticated, o JWT do dono, teto de 8 s.
++const comoDono = (q) => `set statement_timeout = '8s'; select set_config('request.jwt.claims', '${JSON.stringify({ sub: DONO, role: 'authenticated' })}', false); ${q}`
++// Tempo de uma consulta numa sessão própria (processo psql à parte), sem travar o node.
++function cronometrar(rotulo, q) {
++  return new Promise((ok) => {
++    const t = Date.now()
++    const p = spawn(PSQL, [CONN, '-X', '-A', '-t', '-q', '-c', comoDono(q)], { env: { ...process.env, PGCLIENTENCODING: 'UTF8' } })
++    let err = ''
++    p.stdout.on('data', () => {}); p.stderr.on('data', (d) => { err += d })
++    p.on('close', (code) => ok({ rotulo, ms: Date.now() - t, estourou: /statement timeout/.test(err), erro: code ? err.trim().split('\n')[0] : null }))
++  })
++}
++const eventos = (tipo, desde) => Number(sql(`select count(*) from eventos where empresa_id = 1 and tipo = '${tipo}' and em >= '${desde}'`))
++const agoraBanco = () => sql(`select now()::text`)
++const limparGuardado = () => sql(`delete from zapintel_conversa_cache where empresa_id = 1 and chave like 'painel:%'`)
++
++const browser = await chromium.launch({ channel: 'msedge', headless: true })
++async function abrirPainel(ctx, rotulo) {
++  const t0 = Date.now(); const rede = []
++  const p = await ctx.newPage()
++  const qual = (u) => (/\/rpc\/zapintel_dashboard(\?|$)/.test(u) ? 'dashboard' : /\/rpc\/zapintel_resumo(\?|$)/.test(u) ? 'resumo' : /\/zapintel\/api\/perfil\/pendentes/.test(u) ? 'pendentes' : null)
++  p.on('request', (r) => { const q = qual(r.url()); if (q) rede.push({ q, r, ini: Date.now() - t0, fim: null, status: null }) })
++  const fim = async (r) => {
++    const c = rede.find((x) => x.r === r); if (!c) return; c.fim = Date.now() - t0
++    try { const resp = await r.response(); c.status = resp?.status() ?? 'falhou'; if (c.q === 'dashboard' && c.status === 200) c.geradoEm = (await resp.json())?.geradoEm ?? null } catch { c.status = c.status ?? 'falhou' }
++  }
++  p.on('requestfinished', fim); p.on('requestfailed', fim)
++  await p.goto(BASE + '/zapintel', { waitUntil: 'domcontentloaded', timeout: 240000 })
++  // Espera as três terminarem (ou 60 s).
++  for (let i = 0; i < 120 && !(['dashboard', 'resumo', 'pendentes'].every((q) => rede.some((x) => x.q === q && x.fim != null))); i++) await p.waitForTimeout(500)
++  const linhas = rede.map(({ q, ini, fim, status }) => `${q} ${(ini / 1000).toFixed(1)}–${fim == null ? '?' : (fim / 1000).toFixed(1)} s (${status})`)
++  console.log(`  [${rotulo}] ${linhas.join(' | ')}`)
++  return { p, rede }
++}
++async function logar(ctx) {
++  const login = await ctx.newPage()
++  await login.goto(BASE + '/login', { timeout: 240000 })
++  await login.fill('input[type="email"]', E.dono); await login.fill('input[type="password"]', SENHA)
++  await Promise.all([login.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 240000 }), login.click('button[type="submit"]')])
++  await login.close()
++}
++
++try {
++  confere(sql(`select count(*) from pg_proc where proname in ('zapintel_dashboard_calc', 'zapintel_cache_painel')`) === '2', 'migração 20261110000400 no banco local')
++  sql(`update usuarios set filial_atual_id = null where id = '${DONO}'`)
++
++  // ── calibração ──────────────────────────────────────────────────────────
++  limparGuardado()
++  const livre = await cronometrar('dashboard_calc', `select length(public.zapintel_dashboard_calc(null, null, 'p2')::text)`)
++  cpu(CPUS)
++  const lento = await cronometrar('dashboard_calc', `select length(public.zapintel_dashboard_calc(null, null, 'p2')::text)`)
++  console.log(`calibração: dashboard sozinho ${livre.ms} ms com a CPU livre, ${lento.ms} ms com --cpus ${CPUS}${lento.estourou ? ' (ESTOUROU)' : ''}`)
++
++  // ── A. antes: as três juntas, no banco ─────────────────────────────────
++  {
++    const desde = agoraBanco()
++    const r = await Promise.all([
++      cronometrar('dashboard', `select length(public.zapintel_dashboard_calc(null, null, 'p2')::text)`),
++      cronometrar('resumo', `select length(public.zapintel_resumo_calc(null)::text)`),
++      cronometrar('pendentes', `select count(*) from public.zapintel_analises_pendentes_calc(1, 'p2')`),
++    ])
++    console.log(`A. ANTES (as três juntas, --cpus ${CPUS}): ${r.map((x) => `${x.rotulo} ${x.ms} ms${x.estourou ? ' ESTOUROU' : ''}`).join(' · ')}`)
++    void desde
++  }
++
++  // ── B. depois, a frio, uma sessão ──────────────────────────────────────
++  {
++    limparGuardado()
++    const desde = agoraBanco()
++    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, locale: 'pt-BR' })
++    await logar(ctx)
++    const { p, rede } = await abrirPainel(ctx, `B. DEPOIS a frio, --cpus ${CPUS}`)
++    const pega = (q) => rede.find((x) => x.q === q)
++    const d = pega('dashboard'), r = pega('resumo'), pe = pega('pendentes')
++    confere(d && r && pe, 'abriu as três: dashboard, resumo, pendentes')
++    confere(eventos('zapintel.tempo_esgotado', desde) === 0, `nenhum zapintel.tempo_esgotado (${eventos('zapintel.tempo_esgotado', desde)})`)
++    confere([d, r, pe].every((x) => x?.status === 200), 'as três responderam 200')
++    confere(d && r && d.fim <= r.ini, 'o resumo só saiu depois de o dashboard terminar')
++    confere(r && pe && r.fim <= pe.ini, 'as pendentes só saíram depois de o resumo terminar')
++    const texto = await p.locator('body').innerText()
++    confere(/esperando resposta/i.test(texto), 'o painel mostra os números')
++    // Reabrir dentro do minuto: sai do guardado.
++    const t = Date.now(); const reab = await abrirPainel(ctx, 'B2. reabrir dentro do minuto')
++    const d2 = reab.rede.find((x) => x.q === 'dashboard')
++    confere(d2 && d2.fim - d2.ini < Math.max(1500, lento.ms / 3), `reabrir em menos de 1 min vem do guardado (${d2 ? d2.fim - d2.ini : '?'} ms; o cálculo leva ${lento.ms} ms)`)
++    void t
++    await ctx.close()
++  }
++
++  // ── C. duas sessões juntas, a frio: um cálculo só ──────────────────────
++  {
++    limparGuardado()
++    const desde = agoraBanco()
++    const [c1, c2] = [await browser.newContext({ locale: 'pt-BR' }), await browser.newContext({ locale: 'pt-BR' })]
++    await logar(c1); await logar(c2)
++    const [a1, a2] = await Promise.all([abrirPainel(c1, 'C. sessão 1'), abrirPainel(c2, 'C. sessão 2')])
++    // Um cálculo só: as duas recebem o MESMO geradoEm (o instante do cálculo guardado).
++    const g = [a1, a2].map((a) => a.rede.find((x) => x.q === 'dashboard')?.geradoEm)
++    console.log(`  geradoEm: ${g.join(' / ')}`)
++    confere(g[0] && g[0] === g[1], 'duas sessões abrindo juntas = UM cálculo do dashboard (mesmo geradoEm; antes: um por sessão)')
++    confere(eventos('zapintel.tempo_esgotado', desde) === 0, 'nenhum zapintel.tempo_esgotado com as duas')
++    await c1.close(); await c2.close()
++  }
++
++  // ── D. máquina MUITO lenta, guardado vencido ───────────────────────────
++  {
++    sql(`update zapintel_conversa_cache set gerado_em = now() - interval '10 minutes' where empresa_id = 1 and chave like 'painel:%'`)
++    cpu(CPUS_MUITO)
++    const desde = agoraBanco()
++    const muito = await cronometrar('dashboard_calc', `select length(public.zapintel_dashboard_calc(null, null, 'p2')::text)`)
++    console.log(`D. calibração: dashboard sozinho com --cpus ${CPUS_MUITO}: ${muito.ms} ms${muito.estourou ? ' (estoura os 8 s)' : ''}`)
++    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, locale: 'pt-BR' })
++    await logar(ctx)
++    const desdeAbertura = agoraBanco()
++    const { p, rede } = await abrirPainel(ctx, `D. --cpus ${CPUS_MUITO}, guardado de 10 min`)
++    const texto = await p.locator('body').innerText()
++    confere(eventos('zapintel.tempo_esgotado', desdeAbertura) === 0, `nenhum zapintel.tempo_esgotado na abertura (${eventos('zapintel.tempo_esgotado', desdeAbertura)})`)
++    confere(/esperando resposta/i.test(texto), 'o painel abre com os números guardados')
++    if (muito.estourou) {
++      confere(/banco lento/.test(texto), 'e diz que são de antes ("banco lento")')
++      confere(eventos('zapintel.calculo_cortado', desdeAbertura) >= 1, `o corte ficou contado (zapintel.calculo_cortado = ${eventos('zapintel.calculo_cortado', desdeAbertura)})`)
++    } else {
++      console.log('  (com esta CPU o cálculo coube nos 8 s: o caminho do guardado não foi exercido — rode com cpus_muito_lento menor)')
++    }
++    void rede; void desde
++    await ctx.close()
++  }
++} catch (e) {
++  falha('erro: ' + String(e).slice(0, 400))
++} finally {
++  restaurarCpu()
++  try { limparGuardado() } catch { /* banco fora */ }
++  await browser.close()
++}
++console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\ntudo ok')
++process.exit(falhas.length ? 1 : 0)
+diff --git a/tests/zapintel-estabilidade.test.ts b/tests/zapintel-estabilidade.test.ts
+index f639a713..9b1cd7c9 100644
+--- a/tests/zapintel-estabilidade.test.ts
++++ b/tests/zapintel-estabilidade.test.ts
+@@ -21,6 +21,8 @@ const estado = {
+   leads: { data: [] as unknown[], error: null as null | { message: string } },
+   lojas: [3, 6, 0],
+   inseridos: [] as { tabela: string; dados: Record<string, unknown> }[],
++  /** Chamadas ao `zapintel_analises_pendentes_expirar` (o cache do banco, 10/11/2026). */
++  expirados: [] as unknown[],
+ }
+ mock.module('@/lib/zapintel/ctx', {
+   namedExports: {
+@@ -31,7 +33,8 @@ mock.module('@/lib/zapintel/ctx', {
+ mock.module('@/lib/rastreamento/db', {
+   namedExports: {
+     rastrDb: () => ({
+-      rpc: () => {
++      rpc: (nome: string, args: unknown) => {
++        if (nome === 'zapintel_analises_pendentes_expirar') { estado.expirados.push(args); return Promise.resolve({ error: null }) }
+         estado.rpcChamadas++
+         const b: Record<string, unknown> = {}
+         b.order = () => b
+@@ -87,7 +90,7 @@ const LINHA = { lead_id: 10, nome: 'Fulano', filial: 'Mogi', tem_ficha: false, g
+ // ── 1. pendentes ────────────────────────────────────────────────────────────
+ describe('GET /zapintel/api/perfil/pendentes: falha não é "em dia"', () => {
+   beforeEach(() => {
+-    limparCachePendentes(); sentry.capturas = []; estado.rpcChamadas = 0; estado.inseridos = []
++    limparCachePendentes(); sentry.capturas = []; estado.rpcChamadas = 0; estado.inseridos = []; estado.expirados = []
+     estado.rpc = { data: [LINHA], error: null }; estado.leads = { data: [{ id: 10, filial_id: 3 }], error: null }
+   })
+ 
+@@ -138,8 +141,11 @@ describe('GET /zapintel/api/perfil/pendentes: falha não é "em dia"', () => {
+     Date.now = () => agora() + CACHE_PENDENTES_MS + 1
+     try { await pedir() } finally { Date.now = agora }
+     assert.equal(estado.rpcChamadas, 2)
++    assert.equal(estado.expirados.length, 0, 'sem ?atualizar=1 o guardado do banco fica')
+     await pedir('?atualizar=1')
+     assert.equal(estado.rpcChamadas, 3)
++    // E vence também o guardado de 60 s do banco (migração 20261110000400), da empresa da sessão.
++    assert.deepEqual(estado.expirados, [{ p_empresa: 1 }])
+   })
+ 
+   test('falha não entra no cache: a próxima chamada tenta o banco de novo', async () => {
+diff --git a/tests/zapintel-fila.test.ts b/tests/zapintel-fila.test.ts
+new file mode 100644
+index 00000000..44bc0b8f
+--- /dev/null
++++ b/tests/zapintel-fila.test.ts
+@@ -0,0 +1,91 @@
++/**
++ * A fila de consultas do ZapIntel na aba (hooks/zapintel/fila.ts, 10/11/2026).
++ *
++ * Smoke de 10/11 13h54: abrir o painel disparava dashboard, resumo e pendentes no
++ * mesmo instante; com o banco lento, as três passaram dos 8 s juntas. A regra:
++ * uma por vez, a tela antes do menu e do robô, seja qual for a ordem de montagem.
++ *
++ *   npm test
++ */
++import { test, describe } from 'node:test'
++import assert from 'node:assert/strict'
++import { PRIORIDADE, criarFila } from '@/hooks/zapintel/fila'
++
++/** Uma consulta de mentira que só termina quando o teste manda. */
++function consulta(nome: string, log: string[]) {
++  let terminar!: (v: string) => void
++  let falhar!: (e: Error) => void
++  const fn = () => {
++    log.push(`começa ${nome}`)
++    return new Promise<string>((ok, erro) => { terminar = ok; falhar = erro }).finally(() => log.push(`termina ${nome}`))
++  }
++  return { fn, terminar: () => terminar(nome), falhar: (m: string) => falhar(new Error(m)) }
++}
++/** Duas voltas do laço: a da fila (que agenda a próxima com setTimeout 0) e mais uma. */
++const volta = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)) }
++
++describe('fila do ZapIntel', () => {
++  test('abertura do painel: robô e menu montam ANTES da tela e mesmo assim a tela sai primeiro, uma por vez', async () => {
++    const fila = criarFila()
++    const log: string[] = []
++    const robo = consulta('pendentes', log), menu = consulta('resumo', log), tela = consulta('dashboard', log)
++    // A ordem de montagem é a pior possível: o robô e o menu (layout) pedem primeiro.
++    const pr = fila.naFila(PRIORIDADE.robo, robo.fn)
++    const pm = fila.naFila(PRIORIDADE.menu, menu.fn)
++    const pt = fila.naFila(PRIORIDADE.tela, tela.fn)
++    assert.deepEqual(log, [], 'nada sai na mesma volta do laço: todos os efeitos da renderização entram antes')
++    await volta()
++    assert.deepEqual(log, ['começa dashboard'])
++    assert.deepEqual(fila.estado(), { esperando: 2, rodando: true })
++    tela.terminar(); assert.equal(await pt, 'dashboard'); await volta()
++    assert.deepEqual(log.slice(-2), ['termina dashboard', 'começa resumo'], 'o menu só depois da tela')
++    menu.terminar(); await pm; await volta()
++    assert.deepEqual(log.slice(-2), ['termina resumo', 'começa pendentes'], 'o robô por último')
++    robo.terminar(); await pr; await volta()
++    assert.deepEqual(fila.estado(), { esperando: 0, rodando: false })
++    // Nunca duas ao mesmo tempo: cada "começa" vem logo depois do "termina" da anterior.
++    const l: string[] = [...log]
++    for (let i = 1; i < l.length - 1; i += 2) assert.ok(l[i].startsWith('termina') && l[i + 1].startsWith('começa'))
++  })
++
++  test('mesma prioridade: ordem de chegada', async () => {
++    const fila = criarFila()
++    const log: string[] = []
++    const a = consulta('a', log), b = consulta('b', log)
++    const pa = fila.naFila(PRIORIDADE.tela, a.fn), pb = fila.naFila(PRIORIDADE.tela, b.fn)
++    await volta(); a.terminar(); await pa; await volta(); b.terminar(); await pb
++    assert.deepEqual(log, ['começa a', 'termina a', 'começa b', 'termina b'])
++  })
++
++  test('uma que falha (57014) devolve o erro a quem pediu e não trava a fila', async () => {
++    const fila = criarFila()
++    const log: string[] = []
++    const a = consulta('dashboard', log), b = consulta('resumo', log)
++    const pa = fila.naFila(PRIORIDADE.tela, a.fn), pb = fila.naFila(PRIORIDADE.menu, b.fn)
++    await volta(); a.falhar('canceling statement due to statement timeout')
++    await assert.rejects(pa, /statement timeout/)
++    await volta(); b.terminar()
++    assert.equal(await pb, 'resumo')
++  })
++
++  test('função que lança na hora (sem promessa) também não trava a fila', async () => {
++    const fila = criarFila()
++    const p = fila.naFila(0, () => { throw new Error('síncrono') })
++    const q = fila.naFila(0, async () => 'depois')
++    await assert.rejects(p, /síncrono/)
++    assert.equal(await q, 'depois')
++  })
++
++  test('a que chega enquanto outra roda espera a vez, mesmo com prioridade maior', async () => {
++    const fila = criarFila()
++    const log: string[] = []
++    const menu = consulta('resumo', log), tela = consulta('dashboard', log)
++    const pm = fila.naFila(PRIORIDADE.menu, menu.fn)
++    await volta()
++    const pt = fila.naFila(PRIORIDADE.tela, tela.fn)
++    await volta()
++    assert.deepEqual(log, ['começa resumo'], 'não interrompe nem corre junto')
++    menu.terminar(); await pm; await volta(); tela.terminar(); await pt
++    assert.deepEqual(log, ['começa resumo', 'termina resumo', 'começa dashboard', 'termina dashboard'])
++  })
++})
