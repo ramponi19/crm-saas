@@ -38,7 +38,7 @@ const MARCA = 'PROVA ISOLAMENTO'
 const limpar = () => {
   sql(`delete from zapintel_lead_perfil where empresa_id=${OUTRA} and perfil->>'marca_teste' = '${MARCA}'`)
   sql(`delete from mensagens where empresa_id=${OUTRA} and conteudo = '${MARCA}'`)
-  sql(`delete from negocios where empresa_id=${OUTRA} and dados->>'marca_teste' = '${MARCA}'`)
+  sql(`delete from negocios where empresa_id=${OUTRA} and contato_id in (select id from contatos where empresa_id=${OUTRA} and nome = '${MARCA}')`)
   sql(`delete from conversas where empresa_id=${OUTRA} and contato_id in (select id from contatos where empresa_id=${OUTRA} and nome = '${MARCA}')`)
   sql(`delete from contatos where empresa_id=${OUTRA} and nome = '${MARCA}'`)
 }
@@ -49,7 +49,7 @@ const LOJA_OUTRA = Number(sql(`select id from filiais where empresa_id=${OUTRA} 
 const nomeLojaOutra = sql(`select coalesce(nullif(trim(cidade),''), nome) from filiais where id=${LOJA_OUTRA}`)
 sql(`with c as (insert into contatos (empresa_id, nome, filial_id) values (${OUTRA}, '${MARCA}', ${LOJA_OUTRA}) returning id),
   cv as (insert into conversas (empresa_id, contato_id, filial_id) select ${OUTRA}, id, ${LOJA_OUTRA} from c returning id, contato_id),
-  n as (insert into negocios (empresa_id, contato_id, filial_id, dados) select ${OUTRA}, id, ${LOJA_OUTRA}, '{"marca_teste": "${MARCA}"}' from c returning id),
+  n as (insert into negocios (empresa_id, contato_id, filial_id, dados) select ${OUTRA}, id, ${LOJA_OUTRA}, '{"produto_interessado": "${MARCA}"}' from c returning id),
   m as (insert into mensagens (empresa_id, conversa_id, contato_id, filial_id, direcao, conteudo) select ${OUTRA}, cv.id, cv.contato_id, ${LOJA_OUTRA}, 'recebida', '${MARCA}' from cv returning id)
   insert into zapintel_lead_perfil (lead_id, empresa_id, perfil, mensagens, versao)
   select n.id, ${OUTRA}, '{"classificacao": "hot", "marca_teste": "${MARCA}"}', 1, 'p2' from n, m`)
