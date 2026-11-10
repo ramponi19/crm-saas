@@ -102,7 +102,7 @@ export async function GET(req: Request) {
     const [data, iaDisponivel] = await Promise.all([
       buscarTudo<Linha>((de, ate) =>
         db.rpc('zapintel_analises_pendentes', { p_empresa: empresaId, p_versao: VERSAO_DO_PERFIL })
-          .order('lead_id').range(de, ate)),
+          .order('lead_id').range(de, ate), { funcao: true }),
       iaDoCrmLigada(),
     ]).catch((e: Error) => {
       throw new FalhaDePendentes(/statement timeout|canceling statement|57014/i.test(e.message) ? 'timeout' : 'erro_rpc', e.message)

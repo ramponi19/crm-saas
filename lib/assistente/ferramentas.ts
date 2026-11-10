@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buscarTudo } from '@/lib/zapintel/conversas'
+import { lembrar } from './cache'
 import { VERSAO_DO_PERFIL } from '@/lib/zapintel/perfil'
 import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import type { Acesso } from './acesso'
@@ -185,15 +186,18 @@ function filialPorNome(lista: Filial[], nome: unknown): number | undefined | nul
   return achou ? achou.id : null
 }
 
-async function nomesDaEquipe(c: Contexto): Promise<Map<string, string>> {
-  const { data } = (await c.svc.from('empresa_usuarios').select('usuario_id, usuarios(nome)')
-    .eq('empresa_id', c.acesso.empresaId)) as { data: { usuario_id: string; usuarios: unknown }[] | null }
-  const m = new Map<string, string>()
-  for (const r of data ?? []) {
-    const u = (Array.isArray(r.usuarios) ? r.usuarios[0] : r.usuarios) as { nome?: string } | null
-    if (u?.nome?.trim()) m.set(r.usuario_id, u.nome.trim())
-  }
-  return m
+/** Nomes da equipe — da empresa, guardados 60 s (ver `cache.ts`). */
+function nomesDaEquipe(c: Contexto): Promise<Map<string, string>> {
+  return lembrar(`equipe:${c.acesso.empresaId}`, async () => {
+    const { data } = (await c.svc.from('empresa_usuarios').select('usuario_id, usuarios(nome)')
+      .eq('empresa_id', c.acesso.empresaId)) as { data: { usuario_id: string; usuarios: unknown }[] | null }
+    const m = new Map<string, string>()
+    for (const r of data ?? []) {
+      const u = (Array.isArray(r.usuarios) ? r.usuarios[0] : r.usuarios) as { nome?: string } | null
+      if (u?.nome?.trim()) m.set(r.usuario_id, u.nome.trim())
+    }
+    return m
+  })
 }
 
 type LeadVisivel = {
@@ -222,18 +226,22 @@ const leadDaLinha = (r: LinhaLead): LeadVisivel => ({
   convertido_em: r.convertido_em == null ? null : Number(r.convertido_em),
 })
 
-/** Os leads que ESTA pessoa vê — RLS de loja + "só os meus" do papel. */
+/**
+ * Os leads que ESTA pessoa vê — RLS de loja + "só os meus" do papel.
+ *
+ * Numa ida ao banco (`assistente_leads_visiveis`, security invoker: a RLS de
+ * quem pergunta vale lá dentro). Eram 1 a 4 páginas de 1.000 do mesmo select
+ * (`SELECT_LEAD`); os campos são os mesmos, e `leadDaLinha` monta igual.
+ */
 async function leadsVisiveis(c: Contexto, filialId?: number): Promise<LeadVisivel[]> {
-  const linhas = await buscarTudo<LinhaLead>((de, ate) => {
-    let q = c.db.from('negocios')
-      .select(SELECT_LEAD)
-      .eq('empresa_id', c.acesso.empresaId).eq('ativo', true)
-    if (filialId) q = q.eq('filial_id', filialId)
+  const { data, error } = await c.db.rpc('assistente_leads_visiveis', {
+    p_empresa: c.acesso.empresaId,
+    p_filial: filialId ?? null,
     // Lead sem responsável é da esteira, de todos — mesma regra da tela de leads.
-    if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
-    return q.order('id', { ascending: true }).range(de, ate)
+    p_responsavel: c.acesso.soMeusLeads ? c.acesso.userId : null,
   })
-  return linhas.map(leadDaLinha)
+  if (error) throw new Error(`leads visíveis: ${error.message}`)
+  return ((data ?? []) as LinhaLead[]).map(leadDaLinha)
 }
 
 const chaveLoja = (contato: number, filial: number | null) => `${contato}:${filial ?? -1}`
@@ -273,23 +281,56 @@ async function leadTemConversa(c: Contexto, lead: LeadVisivel): Promise<boolean>
 
 type Status = { lead_id: number; ultima_recebida: string | null; ultima_enviada: string | null; mensagens: number }
 
-async function statusDasConversas(c: Contexto): Promise<Map<number, Status>> {
-  const linhas = await buscarTudo<Status>((de, ate) =>
-    c.svc.rpc('assistente_status_conversas', { p_empresa: c.acesso.empresaId }).order('lead_id').range(de, ate))
-  return new Map(linhas.map((s) => [Number(s.lead_id), s]))
-}
-
 type FichaCurta = {
-  lead_id: number; gerado_em: string; mensagens: number
+  lead_id: number; mensagens: number
   classificacao: string | null; score: string | null; urgencia: string | null; rotulo: string | null; acao: string | null
 }
 
-async function fichasCurtas(c: Contexto): Promise<Map<number, FichaCurta>> {
-  const linhas = await buscarTudo<FichaCurta>((de, ate) =>
-    c.svc.from('zapintel_lead_perfil')
-      .select('lead_id, gerado_em, mensagens, classificacao:perfil->>classificacao, score:perfil->>score, urgencia:perfil->>urgencia, rotulo:perfil->>perfil, acao:perfil->>proximaAcao')
-      .eq('empresa_id', c.acesso.empresaId).order('lead_id').range(de, ate))
-  return new Map(linhas.map((f) => [Number(f.lead_id), f]))
+/** O filtro da pergunta que o banco já aplica (pré-seleção; a regra exata segue em `leadsBuscar`). */
+export interface FiltroDoStatus {
+  filial: number | null; esperando: boolean | null; ativoDias: number | null; paradoDias: number | null; classificacao: string | null
+}
+
+/** Os parâmetros de `leads_buscar` que viram filtro no SQL. Nunca mais estreito que a regra do app. */
+export function filtroDoStatus(e: Entrada, filialId: number | undefined): FiltroDoStatus {
+  const ativo = Number(e.ativo_nos_ultimos_dias)
+  const parado = Number(e.parado_ha_dias_min)
+  return {
+    filial: filialId ?? null,
+    esperando: e.esperando_loja === true ? true : e.esperando_loja === false ? false : null,
+    // floor(dias) <= 2,5 equivale a floor(dias) <= 2; arredondar para cima só alarga. Acima de 100 anos, sem pré-seleção.
+    ativoDias: ativo > 0 && ativo <= 36_500 ? Math.ceil(ativo) : null,
+    paradoDias: parado > 0 && parado <= 36_500 ? Math.floor(parado) : null,
+    classificacao: typeof e.classificacao === 'string' ? e.classificacao : null,
+  }
+}
+
+type LinhaStatus = [number, string | null, string | null, number, number | null, string | null, string | null, string | null, string | null, string | null, boolean]
+
+/**
+ * Status da conversa + ficha curta de cada lead ativo que passa no filtro —
+ * NUMA execução de `assistente_status_leads` (era `assistente_status_conversas`
+ * paginada em ondas de 8, cada página recalculando tudo, mais 4 a 8 páginas
+ * paralelas das fichas). Da empresa, guardado 60 s por filtro (`cache.ts`).
+ */
+function statusEFichas(c: Contexto, f: FiltroDoStatus): Promise<Map<number, { s: Status; f?: FichaCurta }>> {
+  const chave = `status:${c.acesso.empresaId}:${f.filial ?? ''}:${f.esperando ?? ''}:${f.ativoDias ?? ''}:${f.paradoDias ?? ''}:${f.classificacao ?? ''}`
+  return lembrar(chave, async () => {
+    const { data, error } = await c.svc.rpc('assistente_status_leads', {
+      p_empresa: c.acesso.empresaId, p_filial: f.filial, p_esperando: f.esperando,
+      p_ativo_dias: f.ativoDias, p_parado_dias: f.paradoDias, p_classificacao: f.classificacao,
+    })
+    if (error) throw new Error(`status das conversas: ${error.message}`)
+    const m = new Map<number, { s: Status; f?: FichaCurta }>()
+    for (const [id, rec, env, n, fm, cls, score, urg, rotulo, acao, temFicha] of (data ?? []) as LinhaStatus[]) {
+      const lead_id = Number(id)
+      m.set(lead_id, {
+        s: { lead_id, ultima_recebida: rec, ultima_enviada: env, mensagens: n },
+        f: temFicha ? { lead_id, mensagens: fm as number, classificacao: cls, score, urgencia: urg, rotulo, acao } : undefined,
+      })
+    }
+    return m
+  })
 }
 
 /**
@@ -359,9 +400,11 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     vendedor_id: string | null; produto_id: number | null; quantidade: number | null; filial_id: number | null
     grupo_pdv: string | null; cliente_id: number | null
   }
-  const vendas = await buscarTudo<V>((de, ate) => {
+  // A contagem vem com a primeira página: depois, só as páginas que existem.
+  const vendas = await buscarTudo<V>((de, ate, primeira) => {
     let q = c.db.from('vendas_vendas')
-      .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id')
+      .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
+        primeira ? { count: 'exact' } : undefined)
       .eq('empresa_id', c.acesso.empresaId)
       .gte('data_venda', inicio(e.de as string, fuso)).lt('data_venda', fimInclusivo(e.ate as string, fuso))
     if (filialId) q = q.eq('filial_id', filialId)
@@ -473,17 +516,20 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
   const lojas = await filiais(c)
   const filialId = filialPorNome(lojas, e.filial)
   if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
-  const [leads, status, fichas, equipe] = await Promise.all([
-    leadsVisiveis(c, filialId), statusDasConversas(c), fichasCurtas(c), nomesDaEquipe(c),
-  ])
+  // Em FILA, nunca juntas (10/11/2026): status + fichas numa execução, já
+  // filtrados pela pergunta; os leads que a pessoa vê, numa; a equipe. As duas
+  // da empresa ficam guardadas 60 s. Sem lead com conversa no filtro, nem lê os leads.
+  const conversas = await statusEFichas(c, filtroDoStatus(e, filialId))
+  const leads = conversas.size ? await leadsVisiveis(c, filialId) : []
+  const equipe = await nomesDaEquipe(c)
   const nomeFilial = new Map(lojas.map((f) => [f.id, f.rotulo]))
   const texto = typeof e.texto === 'string' && e.texto.trim() ? semAcento(e.texto) : null
   const limite = Math.min(40, Math.max(1, Number(e.limite) || 20))
   const citados = texto ? await leadsQueCitam(c, String(e.texto).trim()) : null
 
   const linhas = leads.map((l) => {
-    const s = status.get(l.id)
-    const f = fichas.get(l.id)
+    const s = conversas.get(l.id)?.s
+    const f = conversas.get(l.id)?.f
     const ultima = [s?.ultima_recebida, s?.ultima_enviada].filter(Boolean).sort().pop() ?? null
     const esperando = !!s?.ultima_recebida && (!s.ultima_enviada || s.ultima_recebida > s.ultima_enviada)
     return { l, s, f, ultima, esperando }
@@ -539,17 +585,16 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
   const lojas = await filiais(c)
   const filialId = filialPorNome(lojas, e.filial)
   if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
-  const [todos, equipe, compraram, motivos] = await Promise.all([
-    leadsVisiveis(c, filialId),
-    nomesDaEquipe(c),
-    // Quem COMPROU vem da ponte venda↔conversa, não do funil: em 14/10/2026
-    // nenhum dos 432 leads de outubro estava marcado "convertido", embora a
-    // loja tenha registrado 19 vendas no mês.
-    c.svc.from('zapintel_venda_lead').select('lead_id').eq('empresa_id', c.acesso.empresaId)
-      .then(({ data }) => new Set(((data ?? []) as { lead_id: number }[]).map((r) => Number(r.lead_id)))),
-    c.db.from('motivos_perda').select('id, label').eq('empresa_id', c.acesso.empresaId)
-      .then(({ data }) => new Map(((data ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label]))),
-  ])
+  // Em fila, não juntas (10/11/2026): uma pergunta não abre quatro leituras de uma vez.
+  const todos = await leadsVisiveis(c, filialId)
+  const equipe = await nomesDaEquipe(c)
+  // Quem COMPROU vem da ponte venda↔conversa, não do funil: em 14/10/2026
+  // nenhum dos 432 leads de outubro estava marcado "convertido", embora a
+  // loja tenha registrado 19 vendas no mês.
+  const compraram = await c.svc.from('zapintel_venda_lead').select('lead_id').eq('empresa_id', c.acesso.empresaId)
+    .then(({ data }) => new Set(((data ?? []) as { lead_id: number }[]).map((r) => Number(r.lead_id))))
+  const motivos = await c.db.from('motivos_perda').select('id, label').eq('empresa_id', c.acesso.empresaId)
+    .then(({ data }) => new Map(((data ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label])))
   const nomeFilial = new Map(lojas.map((f) => [f.id, f.rotulo]))
   const ini = ms(inicio(e.de as string, fuso)), fim = ms(fimInclusivo(e.ate as string, fuso))
   const noPeriodo = todos.filter((l) => ms(l.created_at) >= ini && ms(l.created_at) < fim)
@@ -680,12 +725,11 @@ async function analisesPendentes(c: Contexto): Promise<string> {
   let visiveis: Awaited<ReturnType<typeof leadsVisiveis>>
   let data: Pendente[]
   try {
-    ;[visiveis, data] = await Promise.all([
-      leadsVisiveis(c),
-      buscarTudo<Pendente>((de, ate) =>
-        c.svc.rpc('zapintel_analises_pendentes', { p_empresa: c.acesso.empresaId, p_versao: VERSAO_DO_PERFIL })
-          .order('lead_id').range(de, ate)),
-    ])
+    // Função: páginas em fila (cada uma reexecuta a função). E as duas leituras em fila.
+    data = await buscarTudo<Pendente>((de, ate) =>
+      c.svc.rpc('zapintel_analises_pendentes', { p_empresa: c.acesso.empresaId, p_versao: VERSAO_DO_PERFIL })
+        .order('lead_id').range(de, ate), { funcao: true })
+    visiveis = await leadsVisiveis(c)
   } catch {
     return saida({ erro: 'não consegui contar agora' })
   }

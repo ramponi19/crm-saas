@@ -124,7 +124,7 @@ function leadsComConversa(db: SupabaseClient, empresaId: number): Promise<LeadCo
   return buscarTudo<LeadComConversa>((de, ate) =>
     db.rpc('zapintel_leads_com_conversa', { p_empresa: empresaId })
       .order('id', { ascending: true })
-      .range(de, ate))
+      .range(de, ate), { funcao: true })
 }
 
 /**

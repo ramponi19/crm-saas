@@ -80,7 +80,8 @@ export type LeadBanco = {
   anuncio: unknown
 }
 
-type Consulta = (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>
+/** `primeira` = é a página 0: quem quiser só as páginas que existem pede `count: 'exact'` nela. */
+type Consulta = (de: number, ate: number, primeira: boolean) => PromiseLike<{ data: unknown; error: unknown; count?: number | null }>
 
 /**
  * O lead é o negócio + contato + etapa (a view `leads` caiu, 05/11/2026). Etapa
@@ -104,20 +105,58 @@ const colher = <T,>({ data, error }: { data: unknown; error: unknown }): T[] => 
   return (data ?? []) as T[]
 }
 
-/** Lê tudo em ondas paralelas. Ver o cabeçalho para o porquê de não contar antes. */
-export async function buscarTudo<T>(consulta: Consulta): Promise<T[]> {
+export interface ComoBuscar {
+  /**
+   * A fonte é uma FUNÇÃO (rpc): cada página reexecuta a função inteira. Então
+   * as páginas vão UMA DE CADA VEZ e param na primeira que não vem cheia —
+   * nunca oito execuções da mesma função ao mesmo tempo. Medido em 10/11/2026:
+   * `assistente_status_conversas` em ondas de 8 era 9 execuções de 0,7–3,8 s
+   * por pergunta ao Assistente; cinco perguntas em 2 minutos derrubaram o
+   * dashboard e o resumo de quem perguntava.
+   */
+  funcao?: boolean
+}
+
+/**
+ * Lê tudo. Tabela: em ondas paralelas (ver o cabeçalho para o porquê de não
+ * contar antes) — mas, se a consulta pediu a contagem na primeira página
+ * (`count: 'exact'` quando o 3º argumento é true), pede SÓ as páginas que
+ * existem. Função: em fila (ver `ComoBuscar.funcao`).
+ */
+export async function buscarTudo<T>(consulta: Consulta, como: ComoBuscar = {}): Promise<T[]> {
   // A primeira página vai sozinha. O caminho incremental (um lead, dezenas de
   // mensagens) termina aqui com UMA ida ao banco, em vez de oito para buscar o
   // que cabe numa.
-  const primeira = colher<T>(await consulta(0, PAGINA - 1))
+  const r0 = await consulta(0, PAGINA - 1, true)
+  const primeira = colher<T>(r0)
   if (primeira.length < PAGINA) return primeira
 
   const fora = primeira
+  if (como.funcao) {
+    for (let pagina = 1; ; pagina++) {
+      const lote = colher<T>(await consulta(pagina * PAGINA, (pagina + 1) * PAGINA - 1, false))
+      fora.push(...lote)
+      if (lote.length < PAGINA) return fora
+    }
+  }
+
+  // Com a contagem em mãos, as páginas que faltam são exatamente estas.
+  const total = (r0 as { count?: unknown }).count
+  if (typeof total === 'number') {
+    const paginas = Math.ceil(total / PAGINA)
+    for (let p = 1; p < paginas; p += ONDA) {
+      const pedidos = []
+      for (let i = p; i < Math.min(paginas, p + ONDA); i++) pedidos.push(consulta(i * PAGINA, (i + 1) * PAGINA - 1, false))
+      for (const r of await Promise.all(pedidos)) fora.push(...colher<T>(r))
+    }
+    return fora
+  }
+
   for (let onda = 0; ; onda++) {
     const pedidos = []
     for (let i = 0; i < ONDA; i++) {
       const de = (1 + onda * ONDA + i) * PAGINA
-      pedidos.push(consulta(de, de + PAGINA - 1))
+      pedidos.push(consulta(de, de + PAGINA - 1, false))
     }
     const respostas = await Promise.all(pedidos)
 
