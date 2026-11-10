@@ -51,8 +51,8 @@ sql(`with c as (insert into contatos (empresa_id, nome, filial_id) values (${OUT
   cv as (insert into conversas (empresa_id, contato_id, filial_id) select ${OUTRA}, id, ${LOJA_OUTRA} from c returning id, contato_id),
   n as (insert into negocios (empresa_id, contato_id, filial_id, dados) select ${OUTRA}, id, ${LOJA_OUTRA}, '{"produto_interessado": "${MARCA}"}' from c returning id),
   m as (insert into mensagens (empresa_id, conversa_id, contato_id, filial_id, direcao, conteudo) select ${OUTRA}, cv.id, cv.contato_id, ${LOJA_OUTRA}, 'recebida', '${MARCA}' from cv returning id)
-  insert into zapintel_lead_perfil (lead_id, empresa_id, perfil, mensagens, versao)
-  select n.id, ${OUTRA}, '{"classificacao": "hot", "marca_teste": "${MARCA}"}', 1, 'p2' from n, m`)
+  insert into zapintel_lead_perfil (lead_id, empresa_id, perfil, marca, mensagens, versao)
+  select n.id, ${OUTRA}, '{"classificacao": "hot", "marca_teste": "${MARCA}"}', m.id, 1, 'p2' from n, m`)
 const comConversa = Number(sql(`select jsonb_array_length(public.assistente_status_leads(${OUTRA}))`))
 console.log(`outra empresa: ${OUTRA}, loja ${LOJA_OUTRA} "${nomeLojaOutra}", ${comConversa} lead com conversa e ficha (cenário do teste)`)
 if (comConversa < 1) { limpar(); throw new Error('o cenário da outra empresa não montou — o teste não prova nada') }
