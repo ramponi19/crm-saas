@@ -1,6 +1,7 @@
 "use client";
 import { useCallback } from "react";
 import { useRpcAoVivo } from "./useRpcAoVivo";
+import { TRAVA_DO_DASHBOARD } from "./ritmo";
 import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
 
 /**
@@ -63,8 +64,18 @@ export interface LeadDaLista {
 }
 
 export function useDashboardAoVivo(filial: number | null, empresa: number | null) {
+  /*
+   * A TRAVA DO DASHBOARD (10/11/2026, pedido do Lucas). Era: todo aviso
+   * (mensagem, ficha, venda), teto de 20 s, respiro fixo de 2,5 s — todas as
+   * abas abertas disparavam juntas a cada mensagem. Agora: só aviso de mensagem;
+   * no máximo 1 recálculo a cada 60 s por aba; nunca com a aba escondida, nem na
+   * carga inicial; sorteio de 0 a 5 s para as abas não dispararem juntas; e as
+   * abas da mesma pessoa partilham a consulta (ver `useRpcAoVivo`, `ritmo.ts`).
+   * Ficha refeita e venda aparecem no próximo recálculo (a loja recebe uma
+   * mensagem a cada ~12 s no horário de pico).
+   */
   const { dados, erro, aoVivo, ultimoAviso, atualizando, mensagemAvisada, supabase, carregando, tentarDeNovo } =
-    useRpcAoVivo<Dashboard>("zapintel_dashboard", { p_filial: filial, p_empresa: empresa }, empresa);
+    useRpcAoVivo<Dashboard>("zapintel_dashboard", { p_filial: filial, p_empresa: empresa }, empresa, TRAVA_DO_DASHBOARD);
 
   const lista = useCallback(async (tipo: string, valor?: string | null) => {
     const inicio = Date.now();

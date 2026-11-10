@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ouvirZapintel } from "./canalZapintel";
-import { INTERVALO_MINIMO, avisoRefaz, esperaDaVolta, esperaDoAviso } from "./ritmo";
+import { INTERVALO_MINIMO, avisoRefaz, decidirDisparo, esperaComSorteio, esperaDaVolta, esperaDoAviso, sorteioEntre } from "./ritmo";
 import { registrarTempoEsgotado } from "@/lib/zapintel/tempo-esgotado";
 
 /**
@@ -46,11 +46,33 @@ export interface OpcoesAoVivo {
   eventos?: string[];
   /** Mínimo entre duas consultas desta aba, em ms. Ausente = 20 s. */
   intervaloMinimo?: number;
+  /**
+   * Sorteio [mín, máx] em ms SOMADO ao que faltar do teto, no lugar do respiro
+   * fixo de 2,5 s — as abas deixam de disparar juntas (ver `ritmo.ts`). Com ele,
+   * a carga inicial conta para o teto e o disparo confere se uma consulta mais
+   * nova que o aviso já começou (`decidirDisparo`).
+   */
+  sorteio?: [number, number];
+  /** Nunca consulta com a aba escondida — nem na carga inicial (espera ficar visível). */
+  soVisivel?: boolean;
+  /**
+   * As abas do mesmo navegador (a mesma pessoa: a sessão é um cookie só)
+   * partilham a consulta por BroadcastChannel: quem começa avisa as irmãs, e o
+   * resultado chega a todas. Só serve dados dos MESMOS parâmetros (loja, filtro).
+   */
+  partilhar?: boolean;
 }
+
+/** O que as abas trocam pelo BroadcastChannel. */
+type MsgAbas = { tipo: "inicio"; chave: string; em: number } | { tipo: "dados"; chave: string; em: number; dados: unknown };
 
 export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, empresa: number | null, opcoes: OpcoesAoVivo = {}) {
   const intervalo = opcoes.intervaloMinimo ?? INTERVALO_MINIMO;
   const eventosAceitos = opcoes.eventos?.join(",") ?? null;
+  const sorteioMin = opcoes.sorteio?.[0] ?? null;
+  const sorteioMax = opcoes.sorteio?.[1] ?? null;
+  const soVisivel = !!opcoes.soVisivel;
+  const partilhar = !!opcoes.partilhar;
   const chave = JSON.stringify(params);
   const [dados, setDados] = useState<T | null>(null);
   const [chaveDosDados, setChaveDosDados] = useState<string | null>(null);
@@ -73,11 +95,48 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
   useEffect(() => { chaveAtual.current = chave; }, [chave]);
   /** Já esteve conectado: uma queda depois disso pode ter perdido avisos. */
   const conectou = useRef(false);
+  /** Quando chegou o último aviso que ESTA consulta aceita (a trava com sorteio decide por ele). */
+  const avisoAceitoEm = useRef(0);
+  /** De que parâmetros são os dados na tela (para a volta do segundo plano não repetir a consulta). */
+  const chaveDosDadosRef = useRef<string | null>(null);
+  useEffect(() => { chaveDosDadosRef.current = chaveDosDados; }, [chaveDosDados]);
+  /** O canal entre as abas do mesmo navegador (`partilhar`). */
+  const abas = useRef<BroadcastChannel | null>(null);
+  const avisarAbas = useCallback((msg: MsgAbas) => {
+    try { abas.current?.postMessage(msg); } catch { /* aba fechando: sem problema */ }
+  }, []);
+
+  // A empresa vem do servidor (contexto) ou, na falta dele, da própria resposta do banco.
+  const empresaDoCanal = empresa ?? (dados as { empresa?: number } | null)?.empresa ?? null;
+
+  // Antes da carga inicial, para o "inicio" dela já sair pelo canal.
+  // `partilhar`: as abas do mesmo navegador conversam. "inicio" de uma irmã conta
+  // como consulta desta aba (o teto e o `decidirDisparo` olham para ele); "dados"
+  // dos mesmos parâmetros entram na tela sem ir ao banco.
+  useEffect(() => {
+    if (!partilhar || !empresaDoCanal || typeof BroadcastChannel === "undefined") return;
+    const canal = new BroadcastChannel(`zapintel:${rpc}:${empresaDoCanal}`);
+    abas.current = canal;
+    canal.onmessage = (e: MessageEvent<MsgAbas>) => {
+      const m = e.data;
+      if (!m || m.chave !== chaveAtual.current) return;
+      ultimaConsulta.current = Math.max(ultimaConsulta.current, m.em);
+      if (m.tipo === "dados") {
+        setErro(null);
+        setDados(m.dados as T);
+        setChaveDosDados(m.chave);
+        // A irmã consultou depois do último aviso: não há o que buscar na volta.
+        if (m.em >= avisoAceitoEm.current) atrasado.current = false;
+      }
+    };
+    return () => { canal.close(); if (abas.current === canal) abas.current = null; };
+  }, [partilhar, rpc, empresaDoCanal]);
 
   const buscar = useCallback(async () => {
     if (typeof document !== "undefined" && document.hidden) { atrasado.current = true; return; }
     atrasado.current = false;
     ultimaConsulta.current = Date.now();
+    avisarAbas({ tipo: "inicio", chave, em: ultimaConsulta.current });
     setAtualizando(true);
     const inicio = Date.now();
     const { data, error } = await supabase.rpc(rpc as never, JSON.parse(chave) as never);
@@ -92,7 +151,8 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     setErro(null);
     setDados(data as T);
     setChaveDosDados(chave);
-  }, [supabase, rpc, chave, empresa]);
+    avisarAbas({ tipo: "dados", chave, em: inicio, dados: data });
+  }, [supabase, rpc, chave, empresa, avisarAbas]);
 
   // Busca ao abrir e a cada parâmetro novo. Se falhar, tenta mais duas vezes
   // antes de mostrar erro: em 14/10/2026 a primeira consulta do dia estourou o
@@ -102,10 +162,12 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
     let espera: ReturnType<typeof setTimeout> | null = null;
     const tentar = (n: number) => {
       const inicio = Date.now();
+      // Com a trava (sorteio), a carga inicial conta para o teto e avisa as irmãs.
+      if (sorteioMin !== null) { ultimaConsulta.current = inicio; avisarAbas({ tipo: "inicio", chave, em: inicio }); }
       supabase.rpc(rpc as never, JSON.parse(chave) as never).then(({ data, error }) => {
         void registrarTempoEsgotado(supabase, error, { funcao: rpc, empresa, inicio, params: JSON.parse(chave), tentativa: n });
         if (!vivo) return;
-        if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); return; }
+        if (!error) { setErro(null); setDados(data as T); setChaveDosDados(chave); avisarAbas({ tipo: "dados", chave, em: inicio, dados: data }); return; }
         // Permissão negada não melhora tentando de novo. Tempo esgotado (57014)
         // tenta UMA vez, e só depois de 5 s: em 15/10/2026, com várias telas
         // abertas, cada consulta cortada aos 8 s era repetida mais duas vezes —
@@ -123,13 +185,33 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
         setErro(error.message);
       });
     };
-    tentar(0);
-    return () => { vivo = false; if (espera) clearTimeout(espera); };
-  }, [supabase, rpc, chave, tentativa, empresa]);
+    // `soVisivel`: aba aberta em segundo plano não consulta nem para carregar —
+    // espera ficar visível. Se uma aba irmã entregou estes dados nesse meio-tempo
+    // (`partilhar`) e eles ainda estão dentro do teto, nem consulta.
+    let aoVoltar: (() => void) | null = null;
+    if (soVisivel && typeof document !== "undefined" && document.hidden) {
+      aoVoltar = () => {
+        if (document.hidden || !vivo) return;
+        document.removeEventListener("visibilitychange", aoVoltar!);
+        aoVoltar = null;
+        // A carga (ou os dados da irmã) já cobrem o que ficou para trás escondido.
+        atrasado.current = false;
+        if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+        const fresco = chaveDosDadosRef.current === chave && Date.now() - ultimaConsulta.current < intervalo;
+        if (!fresco) tentar(0);
+      };
+      document.addEventListener("visibilitychange", aoVoltar);
+    } else {
+      tentar(0);
+    }
+    return () => {
+      vivo = false;
+      if (espera) clearTimeout(espera);
+      if (aoVoltar) document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, [supabase, rpc, chave, tentativa, empresa, soVisivel, sorteioMin, intervalo, avisarAbas]);
 
-  // O canal ao vivo. Só se inscreve quando sabe a empresa — vem do servidor
-  // (contexto) ou, na falta dele, da própria resposta do banco.
-  const empresaDoCanal = empresa ?? (dados as { empresa?: number } | null)?.empresa ?? null;
+  // O canal ao vivo. Só se inscreve quando sabe a empresa (`empresaDoCanal`, lá em cima).
   useEffect(() => {
     if (!empresaDoCanal) return;
     let ativo = true;
@@ -140,6 +222,21 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       // Aviso que não muda esta consulta não a refaz (ver `eventos`).
       if (!avisoRefaz(evento?.event, eventosAceitos ? eventosAceitos.split(",") : null)) return;
       if (timer.current) clearTimeout(timer.current);
+      if (sorteioMin !== null && sorteioMax !== null) {
+        // A trava: o que faltar do teto MAIS um sorteio; no disparo, confere se
+        // uma consulta (desta aba ou de uma irmã) mais nova que o aviso já começou.
+        avisoAceitoEm.current = agora;
+        const disparar = () => {
+          if (!ativo) return;
+          const d = decidirDisparo(Date.now(), ultimaConsulta.current, avisoAceitoEm.current, intervalo);
+          if (d === "consultar") { buscar(); return; }
+          if (d === "esperar") {
+            timer.current = setTimeout(disparar, esperaComSorteio(Date.now(), ultimaConsulta.current, intervalo, sorteioEntre(sorteioMin, sorteioMax)));
+          }
+        };
+        timer.current = setTimeout(disparar, esperaComSorteio(agora, ultimaConsulta.current, intervalo, sorteioEntre(sorteioMin, sorteioMax)));
+        return;
+      }
       // O que vier por último: o respiro da rajada, ou o fim do intervalo mínimo.
       const espera = esperaDoAviso(agora, ultimaConsulta.current, intervalo);
       timer.current = setTimeout(() => { if (ativo) buscar(); }, espera);
@@ -164,7 +261,7 @@ export function useRpcAoVivo<T>(rpc: string, params: Record<string, unknown>, em
       if (timer.current) clearTimeout(timer.current);
       sair();
     };
-  }, [supabase, empresaDoCanal, buscar, intervalo, eventosAceitos]);
+  }, [supabase, empresaDoCanal, buscar, intervalo, eventosAceitos, sorteioMin, sorteioMax]);
 
   // Aba escondida não consulta; ao voltar, se ficou algo para trás, consulta —
   // dentro do teto: se a última consulta foi há menos que o intervalo, espera o resto.
