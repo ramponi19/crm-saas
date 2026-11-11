@@ -27,6 +27,7 @@ import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/ca
 import { EmojiPicker } from './emoji-picker'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
+import { EtiquetasPanel, HistoricoNegocioPanel } from './etiquetas-panel'
 import { FundirContatoModal } from './fundir-contato-modal'
 import { useRouter } from 'next/navigation'
 import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
@@ -422,6 +423,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   const fuso = useFuso()
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  /** Sobe a cada mudança feita no card (etiqueta, responsável): o histórico do negócio relê. */
+  const [versaoHist, setVersaoHist] = useState(0)
   /**
    * Os funis da empresa, para TROCAR o lead de funil (15/10/2026). Antes só se
    * mudava a etapa dentro do funil atual — um funil novo (ex.: "Equipe", marcado
@@ -1487,13 +1490,16 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               )
             })}
 
+            <EtiquetasPanel negocioId={lead.id} ids={lead.etiqueta_ids ?? []}
+              onMudou={(ids) => { onUpdate({ ...lead, etiqueta_ids: ids }); setVersaoHist((v) => v + 1) }} />
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} agendaVisitas={perfil.agendaVisitas} />}
             <ResponsavelPanel
               leadId={lead.id}
               usuarios={usuarios}
               responsavel={lead.responsavel_id}
-              onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }) }}
+              onChange={(id) => { setForm((f) => ({ ...f, responsavel: id ?? '' })); onUpdate({ ...lead, responsavel_id: id }); setVersaoHist((v) => v + 1) }}
             />
+            <HistoricoNegocioPanel negocioId={lead.id} usuarios={usuarios} versao={versaoHist} />
             {/* Painéis próprios, na ordem que o perfil declara. Acrescentar um
                 painel não abre mais este arquivo. */}
             <PaineisDaVertical nomes={perfil.paineis} leadId={lead.id} />

@@ -68,6 +68,7 @@ interface LinhaNegocio {
   contato: {
     id: number; nome: string | null; telefone: string | null; instagram: string | null
     origem: string | null; observacoes: string | null; foto_url: string | null; dados: Json | null
+    etiqueta_ids?: number[] | null
   } | null
 }
 
@@ -77,7 +78,7 @@ const SELECT_OUTRAS_LOJAS: string = 'id, filial_id, status, created_at, filial:f
 const SELECT_NEGOCIO: string = `id, empresa_id, contato_id, filial_id, funil_id, responsavel_id, status, valor_estimado,
   motivo_perda_id, perdido_em, created_at, dados,
   etapa:funil_etapas!negocios_etapa_id_fkey(slug),
-  contato:contatos!negocios_contato_id_fkey(id, nome, telefone, instagram, origem, observacoes, foto_url, dados)`
+  contato:contatos!negocios_contato_id_fkey(id, nome, telefone, instagram, origem, observacoes, foto_url, dados, etiqueta_ids)`
 
 const texto = (v: unknown) => (v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v))
 const lead_ = (n: LinhaNegocio) => ((n.dados ?? {})._lead ?? {}) as Json
@@ -160,6 +161,7 @@ export async function carregarCardDoLead(
     perdido_em: n.perdido_em,
     funil_id: n.funil_id,
     foto_url: c.foto_url,
+    etiqueta_ids: c.etiqueta_ids ?? [],
   }
 
   const tx = ((n.dados ?? {})._transmissao ?? null) as { id?: unknown; nome?: unknown; respondeu_em?: unknown } | null

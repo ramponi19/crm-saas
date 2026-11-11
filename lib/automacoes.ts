@@ -43,6 +43,7 @@ export interface AutomacaoRow {
   ativo?: boolean
   espera_dias?: number
   modelo_id?: number | null
+  etiqueta_id?: number | null
 }
 
 export interface Execucao {
@@ -163,6 +164,12 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
   if (saiu) {
     return { resultado: 'pulada', motivo: `saiu da etapa (${neg.etapa_slug})` }
   }
+  // "Recebeu etiqueta" com espera: se a etiqueta saiu do contato, a ação não vale mais.
+  if (a.gatilho === 'recebeu_etiqueta' && a.etiqueta_id != null) {
+    const { data: ct } = await db.from('contatos').select('etiqueta_ids').eq('id', neg.contato_id ?? 0).maybeSingle()
+    const tem = ((ct as { etiqueta_ids?: number[] } | null)?.etiqueta_ids ?? []).includes(a.etiqueta_id)
+    if (!tem) return { resultado: 'pulada', motivo: 'a etiqueta saiu do contato' }
+  }
 
   if (a.acao === 'atribuir_responsavel') {
     const novo = (a.config?.responsavel_id as string | undefined) ?? null
@@ -278,11 +285,35 @@ export async function executarEntradaEtapa(db: Db, empresaId: number, lead: Lead
   if (await automacoesPausadas(db, empresaId)) return
   const neg = await lerNegocio(db, lead.id)
   if (!neg) return
+  await agendarERodar(db, empresaId, neg, lista, 'substituída: entrou de novo na etapa')
+}
+
+/**
+ * "Recebeu etiqueta" (11/11/2026): para cada negócio cujo contato acabou de receber a etiqueta
+ * (o que `etiquetas_aplicar` devolve), agenda as automações ligadas daquela etiqueta, como a
+ * entrada na etapa — mesma fila, mesmas travas (horário, teto, 7 dias, opt-out, modelo aprovado
+ * na loja). Quem já tinha a etiqueta não dispara de novo (a função só devolve quem mudou).
+ */
+export async function executarRecebeuEtiqueta(db: Db, empresaId: number, negocioIds: number[], etiquetaId: number) {
+  if (!negocioIds.length) return
+  const { data } = await db.from('automacoes')
+    .select('id, etapa_slug, etapa_id, acao, espera_dias, modelo_id, etiqueta_id')
+    .eq('empresa_id', empresaId).eq('gatilho', 'recebeu_etiqueta').eq('etiqueta_id', etiquetaId).eq('ativo', true)
+  const lista = (data ?? []) as AutomacaoRow[]
+  if (!lista.length) return
+  if (await automacoesPausadas(db, empresaId)) return
+  for (const id of negocioIds.slice(0, 500)) {
+    const neg = await lerNegocio(db, id)
+    if (neg) await agendarERodar(db, empresaId, neg, lista, 'substituída: recebeu a etiqueta de novo')
+  }
+}
+
+async function agendarERodar(db: Db, empresaId: number, neg: NegocioMin, lista: AutomacaoRow[], motivoSubstituida: string) {
   const agora = new Date()
-  // Entrou de novo na etapa: o que ainda esperava desta mesma automação para este
-  // negócio é substituído pelo agendamento novo (senão "esperar 2 dias" rodaria duas vezes).
+  // Disparou de novo: o que ainda esperava desta mesma automação para este negócio é
+  // substituído pelo agendamento novo (senão "esperar 2 dias" rodaria duas vezes).
   await db.from('automacao_execucoes')
-    .update({ status: 'pulada', motivo: 'substituída: entrou de novo na etapa' } as never)
+    .update({ status: 'pulada', motivo: motivoSubstituida } as never)
     .eq('negocio_id', neg.id).eq('status', 'agendada').in('automacao_id', lista.map((a) => a.id))
   const { data: criadas, error } = await db.from('automacao_execucoes').insert(lista.map((a) => ({
     empresa_id: empresaId, filial_id: neg.filial_id, automacao_id: a.id, negocio_id: neg.id, contato_id: neg.contato_id,

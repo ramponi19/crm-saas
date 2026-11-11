@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { consultaClientes } from '@/lib/clientes'
 import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import { OrigemIcon } from '@/components/modules/conversa/canal-icone'
+import { EtiquetasDoContato, FiltroEtiquetasLinha } from '@/components/modules/etiquetas/etiquetas'
+import { FILTRO_ETIQUETAS_VAZIO, filtroEtiquetasAtivo, type FiltroEtiquetas } from '@/lib/etiquetas'
 
 interface SearchResult {
   tipo: 'cliente' | 'lead' | 'estoque'
@@ -18,6 +20,8 @@ interface SearchResult {
   href: string
   /** Canais do contato (whatsapp, instagram, messenger) — um resultado por pessoa e loja. */
   canais?: string[]
+  /** Etiquetas do contato (leads). */
+  etiquetas?: number[]
 }
 
 interface Acao {
@@ -64,7 +68,7 @@ const LOTE = 50
 /** Quantos negócios que batem com a busca entram na ordenação pela última mensagem. */
 const TETO_BUSCA_LEADS = 200
 
-type LeadAchado = { id: number; nome: string | null; produto_interessado: string | null; telefone: string | null; ultima_mensagem_at: string | null; loja: string | null; canais: string[] }
+type LeadAchado = { id: number; nome: string | null; produto_interessado: string | null; telefone: string | null; ultima_mensagem_at: string | null; loja: string | null; canais: string[]; etiquetas: number[] }
 
 const ORDEM_CANAIS = ['whatsapp', 'instagram', 'messenger']
 /** Os canais pelas identidades do contato; sem identidade, pelo que a ficha tem (telefone, @). */
@@ -80,12 +84,17 @@ function canaisDoContato(c: { telefone: string | null; instagram: string | null;
  * conversa mora em `conversas` (só o negócio principal do contato na loja a leva),
  * então a ordem é feita aqui sobre os TETO_BUSCA_LEADS mais novos que batem.
  */
-async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string): Promise<{ data: LeadAchado[] }> {
-  const SELECT_BUSCA: string = 'id, empresa_id, contato_id, filial_id, created_at, produto_interessado:dados->>produto_interessado, filial:filiais!negocios_filial_id_fkey(nome), contato:contatos!contato_id!inner(nome, telefone, instagram, identidades:contato_identidades(canal_tipo))'
-  const { data } = await supabase.from('negocios').select(SELECT_BUSCA)
-    .or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`, { referencedTable: 'contato' })
-    .eq('ativo', true).order('created_at', { ascending: false }).limit(TETO_BUSCA_LEADS)
-  type Linha = { id: number; empresa_id: number; contato_id: number; filial_id: number | null; created_at: string; produto_interessado: string | null; filial: { nome: string | null } | null; contato: { nome: string | null; telefone: string | null; instagram: string | null; identidades: { canal_tipo: string | null }[] | null } | null }
+async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string, etiquetas: FiltroEtiquetas = FILTRO_ETIQUETAS_VAZIO): Promise<{ data: LeadAchado[] }> {
+  const SELECT_BUSCA: string = 'id, empresa_id, contato_id, filial_id, created_at, produto_interessado:dados->>produto_interessado, filial:filiais!negocios_filial_id_fkey(nome), contato:contatos!contato_id!inner(nome, telefone, instagram, etiqueta_ids, identidades:contato_identidades(canal_tipo))'
+  // Tipo solto: o construtor reatribuído com relação embutida estoura o tsc (TS2589).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let consulta: any = supabase.from('negocios').select(SELECT_BUSCA)
+  // Sem texto, só com etiqueta: "os leads com a etiqueta X" (11/11/2026).
+  if (q) consulta = consulta.or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`, { referencedTable: 'contato' })
+  if (etiquetas.com.length) consulta = consulta.overlaps('contato.etiqueta_ids', etiquetas.com)
+  if (etiquetas.sem.length) consulta = consulta.not('contato.etiqueta_ids', 'ov', `{${etiquetas.sem.join(',')}}`)
+  const { data } = await consulta.eq('ativo', true).order('created_at', { ascending: false }).limit(TETO_BUSCA_LEADS)
+  type Linha = { id: number; empresa_id: number; contato_id: number; filial_id: number | null; created_at: string; produto_interessado: string | null; filial: { nome: string | null } | null; contato: { nome: string | null; telefone: string | null; instagram: string | null; etiqueta_ids?: number[] | null; identidades: { canal_tipo: string | null }[] | null } | null }
   // UM RESULTADO POR PESSOA E LOJA (06/11/2026): o contato fundido (Instagram + WhatsApp)
   // ficou com dois negócios abertos na mesma loja e aparecia duas vezes, os dois abrindo
   // o mesmo cartão. Fica o negócio principal (a mesma regra do quadro).
@@ -102,7 +111,7 @@ async function buscarLeads(supabase: ReturnType<typeof createClient>, q: string)
   const out: LeadAchado[] = linhas.map((l) => ({
     id: l.id, nome: l.contato?.nome ?? null, produto_interessado: l.produto_interessado,
     telefone: l.contato?.telefone ?? null, ultima_mensagem_at: ultima.get(l.id) ?? null,
-    loja: l.filial?.nome ?? null, canais: canaisDoContato(l.contato),
+    loja: l.filial?.nome ?? null, canais: canaisDoContato(l.contato), etiquetas: l.contato?.etiqueta_ids ?? [],
   }))
   out.sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
   return { data: out.slice(0, LOTE) }
@@ -124,6 +133,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const [searching, setSearching] = useState(false)
   const [temMais, setTemMais] = useState(false)
   const [sel, setSel] = useState(0)
+  /** Filtro de etiqueta dos leads (11/11/2026). Ligado sem texto = "os leads com a etiqueta". */
+  const [filtroEt, setFiltroEt] = useState<FiltroEtiquetas>(FILTRO_ETIQUETAS_VAZIO)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listaRef = useRef<HTMLDivElement>(null)
@@ -141,7 +152,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   }, [onOpenChange])
 
   useEffect(() => {
-    if (open) { setQuery(''); setResults([]); setSel(0); setTimeout(() => inputRef.current?.focus(), 30) }
+    if (open) { setQuery(''); setResults([]); setSel(0); setFiltroEt(FILTRO_ETIQUETAS_VAZIO); setTimeout(() => inputRef.current?.focus(), 30) }
   }, [open])
 
   /**
@@ -155,11 +166,21 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   // Busca com debounce (portada do topbar)
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
-    if (!query.trim() || query.length < 2) { setResults([]); return }
+    const comEtiqueta = filtroEtiquetasAtivo(filtroEt)
+    if ((!query.trim() || query.length < 2) && !comEtiqueta) { setResults([]); return }
     timer.current = setTimeout(async () => {
       setSearching(true)
       const supabase = createClient()
       const q = query.trim()
+      // Só a etiqueta, sem texto: lista os leads dela (clientes e estoque não têm etiqueta).
+      if (q.length < 2) {
+        const { data } = await buscarLeads(supabase, '', filtroEt)
+        setTemMais(data.length >= LOTE)
+        setResults(data.map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: [l.loja, l.produto_interessado ?? l.telefone ?? 'sem produto'].filter(Boolean).join(' · '), href: `/leads?lead=${l.id}`, canais: l.canais, etiquetas: l.etiquetas })))
+        setSel(0)
+        setSearching(false)
+        return
+      }
       /**
        * "#5836" (ou "5836"): o lead por NÚMERO — o que fichas e relatórios citam.
        * Pedido do Lucas em 15/10/2026: *"#5836 faz assim e eu ja procuro"*. Vai
@@ -167,16 +188,18 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
        * topo e esconderia o lead da outra loja (supabase/funcoes/buscar_lead_por_numero.sql).
        */
       const numero = /^#?\s*(\d{1,9})$/.exec(q)?.[1]
+      // Com filtro de etiqueta, a busca é só de leads (cliente e estoque não têm etiqueta).
+      const vazio = Promise.resolve({ data: [] as never[] })
       const [{ data: clientes }, { data: leads }, { data: estoque }, { data: produtosMatch }, { data: peloNumero }] = await Promise.all([
-        consultaClientes(supabase, 'id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
+        comEtiqueta ? vazio : consultaClientes(supabase, 'id, nome, telefone').or(`nome.ilike.%${q}%,telefone.ilike.%${q}%`).eq('ativo', true).order('nome').limit(LOTE),
         // O lead também atende por telefone: quem liga para a loja é procurado pelo
         // número, e antes só quem já era cliente aparecia nessa busca.
         // Lead = negócio ativo; nome/telefone no contato (o !inner faz o filtro valer
         // para o negócio). A ordem pela última mensagem é feita abaixo, em buscarLeads.
-        buscarLeads(supabase, q),
-        supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
-        supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
-        numero
+        buscarLeads(supabase, q, filtroEt),
+        comEtiqueta ? vazio : supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
+        comEtiqueta ? vazio : supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
+        numero && !comEtiqueta
           ? supabase.rpc('buscar_lead_por_numero' as never, { p_id: Number(numero) } as never)
           : Promise.resolve({ data: [] }),
       ])
@@ -218,14 +241,14 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         // `?lead=` abre a conversa. Sem isso o resultado mandava para `/leads`
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
-        ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: [variasLojas ? l.loja : null, l.produto_interessado ?? l.telefone ?? 'sem produto'].filter(Boolean).join(' · '), href: `/leads?lead=${l.id}`, canais: l.canais })),
+        ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: [variasLojas ? l.loja : null, l.produto_interessado ?? l.telefone ?? 'sem produto'].filter(Boolean).join(' · '), href: `/leads?lead=${l.id}`, canais: l.canais, etiquetas: l.etiquetas })),
         ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
       setSearching(false)
     }, 300)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [query])
+  }, [query, filtroEt])
 
   // As ferramentas liberadas para esta empresa entram como ação: é o caminho
   // delas fora da tela-casa, já que não estão mais no menu.
@@ -275,6 +298,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             className="w-full bg-transparent py-3.5 text-[14.5px] text-ink placeholder:text-ink-3 outline-none"
           />
         </div>
+        <FiltroEtiquetasLinha valor={filtroEt} onChange={setFiltroEt} className="border-b border-line-soft px-4 py-2" />
 
         <div ref={listaRef} className="max-h-[min(52vh,17rem)] overflow-y-auto py-1.5 scrollbar-thin">
           {acoesFiltradas.length > 0 && (
@@ -321,6 +345,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-[13px] font-medium text-ink">{r.titulo}</span>
                     {r.canais?.map((c) => <span key={c} data-canal={c} title={c}><OrigemIcon origem={c} size={13} /></span>)}
+                    <EtiquetasDoContato ids={r.etiquetas} max={2} className="ml-1 flex-nowrap" />
                   </span>
                   <span className="block truncate text-[11px] text-ink-3">{r.sub}</span>
                 </span>
@@ -333,7 +358,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             </div>
           )}
           {query.trim().length >= 2 && !searching && results.length === 0 && (
-            <div className="px-4 py-2 text-[12px] text-ink-3">Nenhum resultado para “{query}”.</div>
+            <div className="px-4 py-2 text-[12px] text-ink-3">Nenhum resultado para “{query}”{filtroEtiquetasAtivo(filtroEt) ? ' com essas etiquetas' : ''}.</div>
+          )}
+          {query.trim().length < 2 && filtroEtiquetasAtivo(filtroEt) && !searching && results.length === 0 && (
+            <div className="px-4 py-2 text-[12px] text-ink-3">Nenhum lead com essas etiquetas.</div>
           )}
         </div>
 

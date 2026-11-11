@@ -66,8 +66,8 @@ export async function GET(req: Request) {
   if (funilId) qEtapas = qEtapas.eq('funil_id', funilId)
   const [{ data: etapas }, { data: autos }, { data: cads }, { data: pausa }, { data: modelos }, { data: equipe }] = await Promise.all([
     qEtapas,
-    supabase.from('automacoes').select('id, etapa_slug, etapa_id, gatilho, acao, ativo, espera_dias, modelo_id, config')
-      .eq('empresa_id', empresaId).eq('gatilho', 'entrou_na_etapa').order('id'),
+    supabase.from('automacoes').select('id, etapa_slug, etapa_id, etiqueta_id, gatilho, acao, ativo, espera_dias, modelo_id, config')
+      .eq('empresa_id', empresaId).in('gatilho', ['entrou_na_etapa', 'recebeu_etiqueta']).order('id'),
     supabase.from('cadencias').select('id, nome, ativo, gatilho_etapa_slug').eq('empresa_id', empresaId).order('id'),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', CHAVE_PAUSA).maybeSingle(),
     supabase.from('modelos_mensagem').select('id, nome, idioma, status, corpo').eq('empresa_id', empresaId).order('nome'),
@@ -97,7 +97,7 @@ export async function GET(req: Request) {
     id: e.id as number,
     slug: e.slug as string,
     label: e.label as string,
-    automacoes: (autos ?? []).filter((a) => (a.etapa_id != null ? a.etapa_id === e.id : a.etapa_slug === e.slug)).map((a) => ({
+    automacoes: (autos ?? []).filter((a) => a.gatilho === 'entrou_na_etapa' && (a.etapa_id != null ? a.etapa_id === e.id : a.etapa_slug === e.slug)).map((a) => ({
       id: a.id, acao: a.acao, ativo: a.ativo, espera_dias: a.espera_dias ?? 0, modelo_id: a.modelo_id, config: a.config,
       na_fila: nFila.get(a.id as number) ?? 0, executadas_hoje: nHoje.get(a.id as number) ?? 0,
     })),
@@ -106,10 +106,18 @@ export async function GET(req: Request) {
     })),
   }))
 
+  // "Recebeu etiqueta" (11/11/2026): não são de etapa; vêm numa lista à parte, com a etiqueta.
+  const porEtiqueta = (autos ?? []).filter((a) => a.gatilho === 'recebeu_etiqueta').map((a) => ({
+    id: a.id, etiqueta_id: a.etiqueta_id as number, acao: a.acao, ativo: a.ativo, espera_dias: a.espera_dias ?? 0,
+    modelo_id: a.modelo_id, config: a.config,
+    na_fila: nFila.get(a.id as number) ?? 0, executadas_hoje: nHoje.get(a.id as number) ?? 0,
+  }))
+
   return NextResponse.json({
     podeEditar: role === 'owner' || role === 'admin',
     pausado: !!(pausa?.valor as { pausado?: boolean } | null)?.pausado,
     etapas: porEtapa,
+    porEtiqueta,
     modelos: await (async () => {
       const onde = await modelosPorLoja(empresaId)
       return (modelos ?? []).map((m) => ({ ...m, ...onde(m.id as number) })).filter((m) => m.lojas.length > 0)
@@ -152,13 +160,24 @@ export async function POST(req: Request) {
   if (b.op === 'criar') {
     const acao = String(b.acao) as Acao
     if (!ACOES.includes(acao)) return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
-    // Pelo id da etapa (o slug só é único dentro de um funil); o slug fica de reserva.
-    const etapaId = Number(b.etapa_id) || null
-    const etapaSlug = String(b.etapa_slug ?? '')
-    const { data: etapa } = etapaId
-      ? await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('id', etapaId).maybeSingle()
-      : await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('slug', etapaSlug).maybeSingle()
-    if (!etapa) return NextResponse.json({ error: 'Etapa não encontrada.' }, { status: 400 })
+    // Gatilho: "entrou na etapa" (padrão) ou "recebeu etiqueta" (11/11/2026).
+    const porEtiqueta = b.gatilho === 'recebeu_etiqueta'
+    let etapa: { id: number; slug: string } | null = null
+    let etiquetaId: number | null = null
+    if (porEtiqueta) {
+      etiquetaId = Number(b.etiqueta_id) || null
+      const { data: etq } = await supabase.from('etiquetas').select('id').eq('empresa_id', empresaId).eq('id', etiquetaId ?? 0).maybeSingle()
+      if (!etq) return NextResponse.json({ error: 'Escolha a etiqueta.' }, { status: 400 })
+    } else {
+      // Pelo id da etapa (o slug só é único dentro de um funil); o slug fica de reserva.
+      const etapaId = Number(b.etapa_id) || null
+      const etapaSlug = String(b.etapa_slug ?? '')
+      const { data } = etapaId
+        ? await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('id', etapaId).maybeSingle()
+        : await supabase.from('funil_etapas').select('id, slug').eq('empresa_id', empresaId).eq('slug', etapaSlug).maybeSingle()
+      etapa = data as { id: number; slug: string } | null
+      if (!etapa) return NextResponse.json({ error: 'Etapa não encontrada.' }, { status: 400 })
+    }
     const espera = Math.max(0, Math.min(90, Math.floor(Number(b.espera_dias) || 0)))
     const config: Record<string, unknown> = {}
     let modeloId: number | null = null
@@ -183,7 +202,8 @@ export async function POST(req: Request) {
       config.parametros = Array.isArray(b.parametros) ? (b.parametros as unknown[]).map(String).slice(0, 10) : []
     }
     const { data, error } = await supabase.from('automacoes').insert({
-      empresa_id: empresaId, etapa_slug: etapa.slug, etapa_id: etapa.id, gatilho: 'entrou_na_etapa', acao, config,
+      empresa_id: empresaId, etapa_slug: etapa?.slug ?? null, etapa_id: etapa?.id ?? null, etiqueta_id: etiquetaId,
+      gatilho: porEtiqueta ? 'recebeu_etiqueta' : 'entrou_na_etapa', acao, config,
       espera_dias: espera, modelo_id: modeloId, ativo: true,
     } as never).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })

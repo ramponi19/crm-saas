@@ -31,6 +31,8 @@ export interface Lead {
   funil_id?: number | null
   /** Foto de perfil (Instagram/Messenger). WhatsApp não expõe foto. */
   foto_url?: string | null
+  /** Etiquetas do contato (contatos.etiqueta_ids, 11/11/2026). */
+  etiqueta_ids?: number[]
 }
 
 /** Funil (Fase 4.1) — uma empresa pode ter vários. */

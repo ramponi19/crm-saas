@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import { conversaEsperando, lerEsperando, type MapaEsperando } from '@/lib/esperando'
+import { FILTRO_ETIQUETAS_VAZIO, filtroEtiquetasAtivo, type FiltroEtiquetas } from '@/lib/etiquetas'
 
 /**
  * A INBOX ÚNICA LÊ O CORE DIRETO (04/11/2026): `conversas`, `contatos`,
@@ -37,11 +38,13 @@ export interface FiltrosInbox {
   /** id do usuário dono do negócio do contato; 'nenhum' = sem responsável. */
   responsavel: string | null
   busca: string
+  /** Etiqueta do contato: contém alguma de `com`, não contém nenhuma de `sem` (11/11/2026). */
+  etiquetas: FiltroEtiquetas
 }
 
-export const FILTROS_VAZIOS: FiltrosInbox = { canal: null, naoLidas: false, aguardando: false, antigos: false, responsavel: null, busca: '' }
+export const FILTROS_VAZIOS: FiltrosInbox = { canal: null, naoLidas: false, aguardando: false, antigos: false, responsavel: null, busca: '', etiquetas: FILTRO_ETIQUETAS_VAZIO }
 
-export interface ContatoInbox { id: number; nome: string | null; telefone: string | null; instagram: string | null; foto_url: string | null }
+export interface ContatoInbox { id: number; nome: string | null; telefone: string | null; instagram: string | null; foto_url: string | null; etiqueta_ids?: number[] }
 export interface CanalInbox { id: number; tipo: CanalTipo; nome_exibicao: string | null; filial_id: number | null }
 
 export interface ConversaInbox {
@@ -64,7 +67,7 @@ export const POR_PAGINA = 40
 const TETO_AGUARDANDO = 1000
 
 const COLUNAS_CONVERSA = 'id, contato_id, canal_id, filial_id, nao_lidas, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at'
-const COLUNAS_CONTATO = 'id, nome, telefone, instagram, foto_url'
+const COLUNAS_CONTATO = 'id, nome, telefone, instagram, foto_url, etiqueta_ids'
 const COLUNAS_CANAL = 'id, tipo, nome_exibicao, filial_id'
 
 /**
@@ -199,9 +202,11 @@ export async function listarConversas(
 
   // Responsável = dono do negócio do contato (a RLS mostra só os negócios da loja).
   const comResp = f.responsavel != null
+  // Filtro de etiqueta = filtro no contato embutido: precisa do !inner para cortar a conversa.
+  const comEtiqueta = filtroEtiquetasAtivo(f.etiquetas)
   const embedContato = comResp
     ? `contato:contatos!inner(${COLUNAS_CONTATO}, negocios!negocios_contato_id_fkey!inner(responsavel_id))`
-    : `contato:contatos(${COLUNAS_CONTATO})`
+    : comEtiqueta ? `contato:contatos!inner(${COLUNAS_CONTATO})` : `contato:contatos(${COLUNAS_CONTATO})`
 
   /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
   const completa: string = `${COLUNAS_CONVERSA}, ${embedContato}, canal:canais(${COLUNAS_CANAL})`
@@ -216,11 +221,13 @@ export async function listarConversas(
     if (comResp) q = f.responsavel === 'nenhum'
       ? q.is('contato.negocios.responsavel_id', null)
       : q.eq('contato.negocios.responsavel_id', f.responsavel as string)
+    if (comEtiqueta && f.etiquetas.com.length) q = q.overlaps('contato.etiqueta_ids', f.etiquetas.com)
+    if (comEtiqueta && f.etiquetas.sem.length) q = q.not('contato.etiqueta_ids', 'ov', `{${f.etiquetas.sem.join(',')}}`)
     if (desde) q = q.or(filtroDoCursor(desde))
     return q.order('ultima_mensagem_at', { ascending: false }).order('id', { ascending: false }).limit(limite)
   }
   const limpar = (linhas: unknown[]) => (linhas as (ConversaInbox & { contato: (ContatoInbox & { negocios?: unknown }) | null })[])
-    .map(({ contato, ...c }) => ({ ...c, contato: contato ? { id: contato.id, nome: contato.nome, telefone: contato.telefone, instagram: contato.instagram, foto_url: contato.foto_url } : null }))
+    .map(({ contato, ...c }) => ({ ...c, contato: contato ? { id: contato.id, nome: contato.nome, telefone: contato.telefone, instagram: contato.instagram, foto_url: contato.foto_url, etiqueta_ids: contato.etiqueta_ids ?? [] } : null }))
 
   if (f.antigos) {
     /**

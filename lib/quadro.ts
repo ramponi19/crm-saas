@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Lead } from '@/components/modules/leads/types'
+import { filtroEtiquetasAtivo, type FiltroEtiquetas } from '@/lib/etiquetas'
 
 /**
  * O QUADRO DE LEADS LÊ O CORE (04/11/2026).
@@ -34,6 +35,8 @@ export interface FiltrosDoQuadro {
   esteira?: boolean
   /** Sem "ver leads de outros": os do usuário e a esteira. */
   soMeus?: string | null
+  /** Etiqueta do contato: contém alguma de `com`, não contém nenhuma de `sem` (11/11/2026). */
+  etiquetas?: FiltroEtiquetas | null
 }
 
 export interface ContagemDaEtapa { total: number; valor: number; aguardando: number }
@@ -84,6 +87,7 @@ export function decodificar(p: Pagina | null): (Lead & { contato_id: number })[]
     produto_interessado: v(l, 'produto_interessado'),
     valor_estimado: v(l, 'valor_estimado') == null ? null : Number(v(l, 'valor_estimado')),
     convertido_em: null,
+    etiqueta_ids: (idx.etiqueta_ids == null ? [] : (v(l, 'etiqueta_ids') ?? [])) as number[],
   }))
 }
 
@@ -92,6 +96,11 @@ const params = (f: FiltrosDoQuadro) => ({
   p_responsavel: f.responsavelId || null,
   p_esteira: !!f.esteira,
   p_so_meus: f.soMeus || null,
+  // Só quando há filtro: assim o app também conversa com o banco de antes da migração de etiquetas.
+  ...(filtroEtiquetasAtivo(f.etiquetas) ? {
+    p_etiquetas_com: f.etiquetas!.com.length ? f.etiquetas!.com : null,
+    p_etiquetas_sem: f.etiquetas!.sem.length ? f.etiquetas!.sem : null,
+  } : {}),
 })
 
 export async function contagensDoQuadro(db: Db, f: FiltrosDoQuadro): Promise<Contagens> {

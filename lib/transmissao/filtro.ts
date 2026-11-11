@@ -6,8 +6,8 @@
  * regra em `transmissao_publico` (migração 20261111000100); aqui só o formato, a limpeza
  * do que vem da tela e o texto que descreve a regra. Funções puras, testadas sozinhas.
  *
- * Etiqueta NÃO está aqui: o CRM não tem etiqueta hoje (nem tabela, nem campo). Ver o 06,
- * seção da Transmissão.
+ * Etiqueta (11/11/2026, migração 20261111000500_etiquetas): etiquetas_com = o contato tem
+ * ALGUMA delas; etiquetas_sem = não tem NENHUMA delas (a mesma regra do quadro e da Comunicação).
  */
 
 export type Situacao = 'aberto' | 'ganho' | 'perdido'
@@ -27,6 +27,10 @@ export interface FiltroPublico {
   sem_mensagem_ha_dias?: number
   /** A última mensagem da conversa na loja é dos últimos N dias. */
   com_mensagem_nos_dias?: number
+  /** O contato tem alguma destas etiquetas. */
+  etiquetas_com?: number[]
+  /** O contato não tem nenhuma destas etiquetas. */
+  etiquetas_sem?: number[]
 }
 
 const MAX_DIAS = 3650
@@ -61,6 +65,11 @@ export function normalizarFiltro(bruto: unknown): FiltroPublico {
   if (sem) f.sem_mensagem_ha_dias = sem
   const com = inteiro(b.com_mensagem_nos_dias, 1, MAX_DIAS)
   if (com) f.com_mensagem_nos_dias = com
+  // Etiqueta nas duas listas: "não contém" vence.
+  const etqSem = ids(b.etiquetas_sem)
+  const etqCom = ids(b.etiquetas_com)?.filter((x) => !etqSem?.includes(x))
+  if (etqCom?.length) f.etiquetas_com = etqCom
+  if (etqSem) f.etiquetas_sem = etqSem
   return f
 }
 
@@ -75,6 +84,7 @@ export function filtroImpossivel(f: FiltroPublico): string | null {
 export interface NomesDoFiltro {
   funis: Map<number, string>
   etapas: Map<number, string>
+  etiquetas?: Map<number, string>
 }
 
 /** A regra em português, para a lista e para o acompanhamento. */
@@ -86,6 +96,9 @@ export function descreverFiltro(f: FiltroPublico, nomes: NomesDoFiltro): string 
   if (f.origens?.length) partes.push(`origem ${f.origens.join(' ou ')}`)
   if (f.sem_mensagem_ha_dias) partes.push(`sem mensagem há mais de ${f.sem_mensagem_ha_dias} dias`)
   if (f.com_mensagem_nos_dias) partes.push(`com mensagem nos últimos ${f.com_mensagem_nos_dias} dias`)
+  const etq = (id: number) => nomes.etiquetas?.get(id) ?? `#${id}`
+  if (f.etiquetas_com?.length) partes.push(`com etiqueta ${f.etiquetas_com.map(etq).join(' ou ')}`)
+  if (f.etiquetas_sem?.length) partes.push(`sem etiqueta ${f.etiquetas_sem.map(etq).join(' nem ')}`)
   return partes.length ? partes.join(' · ') : 'todos os contatos da loja'
 }
 

@@ -15,6 +15,9 @@ import { NewLeadModal } from './new-lead-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { ScoreConfigProvider } from './score-config-context'
 import { EsperandoProvider } from './esperando-contexto'
+import { SelecaoProvider } from './selecao-contexto'
+import { EscolherEtiqueta, FiltroEtiquetasBotao, aplicarEtiqueta } from '@/components/modules/etiquetas/etiquetas'
+import { FILTRO_ETIQUETAS_VAZIO, type Etiqueta, type FiltroEtiquetas } from '@/lib/etiquetas'
 import { MAPA_VAZIO, lerEsperando, type MapaEsperando } from '@/lib/esperando'
 import { DEFAULT_SCORE_CONFIG, type ScoreConfig } from '@/lib/lead-score'
 import type { PerfilDoLead } from '@/lib/empresa-config'
@@ -91,6 +94,11 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   const auto = useAutomatize(funilId, automatize)
   /** '' = toda a equipe. Filtro de quem gerencia a equipe. */
   const [responsavelId, setResponsavelId] = useState('')
+  /** Filtro por etiqueta do contato: contém / não contém (11/11/2026). */
+  const [filtroEtiquetas, setFiltroEtiquetas] = useState<FiltroEtiquetas>(FILTRO_ETIQUETAS_VAZIO)
+  /** Seleção para etiquetar em lote. Nulo = fora do modo (clique abre o lead). */
+  const [selecao, setSelecao] = useState<Set<number> | null>(null)
+  const [loteOcupado, setLoteOcupado] = useState(false)
 
   /**
    * O lead do endereço que o usuário não vê (outra loja, arquivado). A tela diz
@@ -133,7 +141,8 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
     responsavelId: soEsteira ? null : responsavelId || null,
     esteira: soEsteira,
     soMeus: restringe ? meuId ?? null : null,
-  }), [funilId, soEsteira, responsavelId, restringe, meuId])
+    etiquetas: filtroEtiquetas,
+  }), [funilId, soEsteira, responsavelId, restringe, meuId, filtroEtiquetas])
   const filtrosRef = useRef(filtros)
   useEffect(() => { filtrosRef.current = filtros }, [filtros])
 
@@ -272,6 +281,40 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
     pedirRecontagem()
   }
 
+  /** Clique no cartão: no modo de seleção marca/desmarca; fora dele, abre o lead. */
+  function clicarNoCartao(l: Lead) {
+    if (!selecao) { setSelectedId(l.id); return }
+    setSelecao(prev => {
+      const s = new Set(prev ?? [])
+      if (s.has(l.id)) s.delete(l.id); else s.add(l.id)
+      return s
+    })
+  }
+
+  /** Etiquetar / tirar a etiqueta dos cartões selecionados (o banco grava o histórico). */
+  async function etiquetarLote(e: Etiqueta, aplicar: boolean) {
+    const ids = [...(selecao ?? [])]
+    if (!ids.length) { notify.bad('Selecione pelo menos um lead'); return }
+    setLoteOcupado(true)
+    const r = await aplicarEtiqueta(ids, e.id, aplicar)
+    setLoteOcupado(false)
+    if (!r.ok) { notify.bad('Não foi possível etiquetar', r.erro); return }
+    // Na tela na hora: a etiqueta é do contato, então vale para todo cartão dele.
+    const contatos = new Set(r.contatos)
+    setLeads(prev => prev.map(l => {
+      if (l.contato_id == null || !contatos.has(l.contato_id)) return l
+      const atual = l.etiqueta_ids ?? []
+      return { ...l, etiqueta_ids: aplicar ? [...new Set([...atual, e.id])].sort((a, b) => a - b) : atual.filter(x => x !== e.id) }
+    }))
+    const fora = r.pedidos - r.alcancados
+    notify.ok(`${aplicar ? 'Etiqueta aplicada' : 'Etiqueta tirada'}: ${e.nome}`,
+      `${r.contatos.length} contato${r.contatos.length === 1 ? '' : 's'} mudaram${fora > 0 ? ` · ${fora} lead${fora === 1 ? '' : 's'} fora do seu alcance` : ''}`)
+    setSelecao(null)
+    // Com filtro de etiqueta ligado, quem deixou de passar sai da coluna.
+    if (filtroEtiquetas.com.length || filtroEtiquetas.sem.length) { setCarregando(true); setFiltroEtiquetas(f => ({ ...f })) }
+    pedirRecontagem()
+  }
+
   function handleLeadCreate(created: Lead) {
     setLeads(prev => [created, ...prev])
     setShowNewLead(false)
@@ -286,6 +329,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   return (
     <ScoreConfigProvider value={scoreConfig}>
     <EsperandoProvider value={esperando}>
+    <SelecaoProvider value={selecao}>
     <div className="flex flex-col h-full min-h-0">
 
       <Topbar title="Leads" />
@@ -335,6 +379,15 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
           >
             Esteira{contagens.esteira > 0 ? ` (${contagens.esteira})` : ''}
           </button>
+          <FiltroEtiquetasBotao valor={filtroEtiquetas} onChange={(f) => { setCarregando(true); setFiltroEtiquetas(f) }} />
+          <button
+            data-selecionar-cartoes
+            onClick={() => setSelecao(s => s ? null : new Set())}
+            aria-pressed={!!selecao}
+            className={`whitespace-nowrap rounded-control border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${selecao ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-card text-ink-2 hover:text-ink'}`}
+          >
+            Selecionar
+          </button>
           <button
             onClick={() => setAutomatize((v) => !v)}
             aria-pressed={automatize}
@@ -371,6 +424,22 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
         </div>
       )}
 
+      {selecao && (
+        <div data-barra-lote className="mx-6 mb-2 flex flex-wrap items-center gap-2 rounded-card border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px] text-ink-2">
+          <span className="num font-semibold text-ink">{selecao.size} selecionado{selecao.size === 1 ? '' : 's'}</span>
+          <span className="text-ink-3">Clique nos cartões para marcar.</span>
+          <button type="button" className="font-medium text-accent hover:underline"
+            onClick={() => setSelecao(new Set(leads.map(l => l.id)))}>
+            Marcar os {leads.length} da tela
+          </button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <EscolherEtiqueta rotulo="Etiquetar" alinhar="direita" desabilitado={loteOcupado || selecao.size === 0} onEscolher={(e) => etiquetarLote(e, true)} />
+            <EscolherEtiqueta rotulo="Tirar etiqueta" alinhar="direita" desabilitado={loteOcupado || selecao.size === 0} onEscolher={(e) => etiquetarLote(e, false)} />
+            <Button size="sm" variant="ghost" onClick={() => setSelecao(null)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
       {automatize && <AutomatizeBarra dados={auto.dados} recarregar={auto.recarregar} />}
 
       {/* Kanban */}
@@ -379,7 +448,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
           leads={leads}
           usuarios={usuarios}
           columns={columns}
-          onLeadClick={(l) => setSelectedId(l.id)}
+          onLeadClick={clicarNoCartao}
           onLeadUpdate={handleLeadUpdate}
           sla={sla}
           motivos={motivos}
@@ -423,6 +492,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
         />
       )}
     </div>
+    </SelecaoProvider>
     </EsperandoProvider>
     </ScoreConfigProvider>
   )

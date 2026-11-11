@@ -7,6 +7,7 @@ import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal } from '@/lib/datas'
 import { SITUACOES, descreverFiltro, variaveisDoModelo, type FiltroPublico, type Situacao } from '@/lib/transmissao/filtro'
 import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
+import { FiltroEtiquetasLinha, useEtiquetas } from '@/components/modules/etiquetas/etiquetas'
 
 // ── O que a API devolve ──────────────────────────────────────────────────────
 type Status = 'rascunho' | 'agendada' | 'enviando' | 'pausada' | 'concluida' | 'encerrada'
@@ -203,10 +204,12 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   const dias = (chave: 'sem_mensagem_ha_dias' | 'com_mensagem_nos_dias', v: string) =>
     setFiltro((f) => ({ ...f, [chave]: Number(v) > 0 ? Math.floor(Number(v)) : undefined }))
 
+  const todasEtiquetas = useEtiquetas()
   const nomes = useMemo(() => ({
     funis: new Map(dados.funis.map((f) => [f.id, f.nome])),
     etapas: new Map(dados.etapas.map((e) => [e.id, e.label])),
-  }), [dados.funis, dados.etapas])
+    etiquetas: new Map(todasEtiquetas.map((e) => [e.id, e.nome])),
+  }), [dados.funis, dados.etapas, todasEtiquetas])
 
   const pronta = !!nome.trim() && !!modelo && (!precisaLoja || !!loja) && parametros.slice(0, nVars).filter((p) => p?.trim()).length === nVars
   const agendarPara = quando === 'agendar' ? instanteLocal(dia, hora, fuso) : null
@@ -293,6 +296,14 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
                 </div>
               </div>
             )}
+            {todasEtiquetas.length > 0 && (
+              <div data-filtro-etiquetas-transmissao>
+                <div className="mb-1.5 text-[12px] font-medium text-ink-2">Etiqueta <span className="font-normal text-ink-3">(clique: contém; de novo: não contém)</span></div>
+                <FiltroEtiquetasLinha className="flex-wrap"
+                  valor={{ com: filtro.etiquetas_com ?? [], sem: filtro.etiquetas_sem ?? [] }}
+                  onChange={(e) => setFiltro((f) => ({ ...f, etiquetas_com: e.com.length ? e.com : undefined, etiquetas_sem: e.sem.length ? e.sem : undefined }))} />
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <Input label="Sem mensagem há mais de (dias)" type="number" min={1} value={filtro.sem_mensagem_ha_dias ?? ''} onChange={(e) => dias('sem_mensagem_ha_dias', e.target.value)} data-filtro-sem />
               <Input label="Com mensagem nos últimos (dias)" type="number" min={1} value={filtro.com_mensagem_nos_dias ?? ''} onChange={(e) => dias('com_mensagem_nos_dias', e.target.value)} data-filtro-com />
@@ -370,6 +381,7 @@ const ENTREGA: Record<string, string> = { enviada: 'enviada', entregue: 'entregu
 
 function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: number; dados: Dados; fuso: string; voltar: () => void; recarregarLista: () => Promise<void> }) {
   const [d, setD] = useState<Detalhe | null>(null)
+  const todasEtiquetas = useEtiquetas()
   const [situacao, setSituacao] = useState('')
   const [pagina, setPagina] = useState(0)
   const [acao, setAcao] = useState<'' | 'pausar' | 'retomar' | 'encerrar' | 'disparar' | 'apagar'>('')
@@ -411,7 +423,7 @@ function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: numb
   const n = d.numeros
   const modelo = dados.modelos.find((m) => m.id === t.modelo_id)
   const loja = dados.lojas.find((l) => l.id === t.filial_id)
-  const nomes = { funis: new Map(dados.funis.map((f) => [f.id, f.nome])), etapas: new Map(dados.etapas.map((e) => [e.id, e.label])) }
+  const nomes = { funis: new Map(dados.funis.map((f) => [f.id, f.nome])), etapas: new Map(dados.etapas.map((e) => [e.id, e.label])), etiquetas: new Map(todasEtiquetas.map((e) => [e.id, e.nome])) }
   const naLista = n ? Number(n.total) - Number(n.puladas) : 0
 
   return (

@@ -79,6 +79,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
         { href: '/configuracoes/funis', label: 'Funis' },
         { href: '/configuracoes/sla', label: 'SLA de atendimento' },
         { href: '/configuracoes/motivos', label: 'Motivos de perda' },
+        { href: '/configuracoes/etiquetas', label: 'Etiquetas' },
         { href: '/configuracoes/horario', label: 'Horário' },
         ...(tem('agendamento') ? [{ href: '/configuracoes/agendamento', label: 'Agendamento' }] : []),
       ] },

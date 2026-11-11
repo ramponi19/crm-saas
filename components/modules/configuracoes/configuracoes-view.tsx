@@ -16,6 +16,7 @@ import { FusoCard } from './fuso-card'
 import { ExportarDadosCard } from './exportar-dados-card'
 import { NotificacoesCard } from './notificacoes-card'
 import { MotivosPerdaCard } from './motivos-perda-card'
+import { EtiquetasCard } from './etiquetas-card'
 import { AutomacoesCard } from './automacoes-card'
 import { FunisCard } from './funis-card'
 import { PortaisCard } from './portais-card'
@@ -294,6 +295,9 @@ export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
 
         {/* ── MOTIVOS DE PERDA ── */}
         {aba === 'motivos' && <MotivosPerdaCard />}
+
+        {/* ── ETIQUETAS (11/11/2026) ── */}
+        {aba === 'etiquetas' && <EtiquetasCard />}
 
         {/* ── AUTOMAÇÕES ── */}
         {aba === 'automacoes' && <AutomacoesCard />}

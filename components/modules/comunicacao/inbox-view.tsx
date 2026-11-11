@@ -17,6 +17,8 @@ import type { PerfilDoLead } from '@/lib/empresa-config'
 import { useFuso } from '@/components/fuso-provider'
 import { FUSO_PADRAO, agora, formatarDiaMes, formatarHora, mesmoDia, paraData } from '@/lib/datas'
 import { ConversaPainel } from './conversa-painel'
+import { EtiquetasDoContato, FiltroEtiquetasBotao } from '@/components/modules/etiquetas/etiquetas'
+import { filtroEtiquetasAtivo, filtroEtiquetasDaUrl, filtroEtiquetasNaUrl, passaNoFiltro } from '@/lib/etiquetas'
 
 export type EtapaDoCard = KanbanColumn
 
@@ -65,6 +67,7 @@ function passaNosFiltrosLocais(c: ConversaInbox, f: FiltrosInbox, esperando: Map
   if (f.naoLidas && !(c.nao_lidas > 0)) return false
   if (f.aguardando && !conversaEsperando(c, esperando)) return false
   if (f.antigos && !conversaAntigaLocal(c)) return false
+  if (filtroEtiquetasAtivo(f.etiquetas) && !passaNoFiltro(c.contato?.etiqueta_ids, f.etiquetas)) return false
   return true
 }
 
@@ -94,6 +97,7 @@ function lerFiltrosDaUrl(p: URLSearchParams): FiltrosInbox {
     antigos: filtro === 'aguardando_72h',
     responsavel: p.get('resp'),
     busca: p.get('q') ?? '',
+    etiquetas: filtroEtiquetasDaUrl(p),
   }
 }
 
@@ -130,6 +134,7 @@ export function InboxView(props: InboxProps) {
     else if (filtros.antigos) p.set('filtro', 'aguardando_72h')
     if (filtros.responsavel) p.set('resp', filtros.responsavel)
     if (filtros.busca) p.set('q', filtros.busca)
+    filtroEtiquetasNaUrl(p, filtros.etiquetas)
     if (aberta) p.set('c', String(aberta))
     const qs = p.toString()
     window.history.replaceState(null, '', qs ? `/comunicacao?${qs}` : '/comunicacao')
@@ -329,6 +334,7 @@ export function InboxView(props: InboxProps) {
               {usuarios.filter((u) => u.id !== meuId).map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </Select>
           </div>
+          <FiltroEtiquetasBotao valor={filtros.etiquetas} onChange={(etiquetas) => mudarFiltros({ etiquetas })} />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin" data-lista-conversas>
@@ -338,7 +344,7 @@ export function InboxView(props: InboxProps) {
             <div className="px-5 py-8 text-center text-[13px] text-bad">Não foi possível carregar: {erro}</div>
           ) : lista.length === 0 ? (
             <div className="px-5 py-10 text-center text-[13px] text-ink-3">
-              {filtros.busca || filtros.canal || filtros.naoLidas || filtros.aguardando || filtros.antigos || filtros.responsavel
+              {filtros.busca || filtros.canal || filtros.naoLidas || filtros.aguardando || filtros.antigos || filtros.responsavel || filtroEtiquetasAtivo(filtros.etiquetas)
                 ? 'Nenhuma conversa com esses filtros.'
                 : 'Nenhuma conversa nesta loja ainda.'}
             </div>
@@ -385,6 +391,7 @@ export function InboxView(props: InboxProps) {
                           </span>
                         )}
                       </span>
+                      <EtiquetasDoContato ids={c.contato?.etiqueta_ids} className="mt-1" />
                     </span>
                   </button>
                 )

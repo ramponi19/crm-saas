@@ -102,9 +102,8 @@ try {
     confere(rmv.status === 200 && sql(`select e.slug from negocios n join funil_etapas e on e.id=n.etapa_id where n.id=${nid}`) === etapa2, `mover para "${etapa2}"`)
   }
 
-  // ── buscar_lead_por_numero (⌘K) e assistente_status_conversas reescritas
+  // ── buscar_lead_por_numero (⌘K). A assistente_status_conversas saiu em 20261111000500 (lista de morte).
   confere(comoRls(DONO, `select count(*) from buscar_lead_por_numero(${nid})`) === '1', 'buscar_lead_por_numero acha o negócio')
-  confere(Number(sql(`select count(*) from assistente_status_conversas(1)`)) > 0, 'assistente_status_conversas responde')
 
   // ── exportação de leads da empresa (CSV)
   const ex = await dono.api('/api/exportar?tipo=leads')

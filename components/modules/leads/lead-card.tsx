@@ -11,6 +11,9 @@ import { useScoreConfig } from './score-config-context'
 import { useEsperando } from './esperando-contexto'
 import { assinarRelogio, instanteDoRelogio } from './relogio'
 import { OrigemIcon } from '@/components/modules/conversa/canal-icone'
+import { EtiquetasDoContato } from '@/components/modules/etiquetas/etiquetas'
+import { useSelecao } from './selecao-contexto'
+import { Check } from 'lucide-react'
 
 const TIER_CHIP: Record<string, { label: string; cls: string }> = {
   quente: { label: 'Quente', cls: 'bg-accent-soft text-accent' },
@@ -108,15 +111,24 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
   const slaTone = tom as SlaTone
   const score = Number(scoreTxt)
   const chip = TIER_CHIP[tier]
+  // Modo de seleção do quadro (etiquetar em lote): o clique marca o cartão em vez de abrir.
+  const selecao = useSelecao()
+  const selecionado = !!selecao?.has(lead.id)
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick} data-lead-id={lead.id} className="cursor-grab select-none active:cursor-grabbing">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick} data-lead-id={lead.id}
+      data-selecionado={selecao ? String(selecionado) : undefined} className="cursor-grab select-none active:cursor-grabbing">
       <div
-        className="rounded-[10px] border border-line bg-card p-3 transition-all hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]"
+        className={`rounded-[10px] border bg-card p-3 transition-all hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)] ${selecionado ? 'border-accent ring-2 ring-accent/30' : 'border-line'}`}
         style={{ opacity: isSortableDragging || isDragging ? 0.4 : 1 }}
       >
         {/* Nome + origem + valor */}
         <div className="flex items-center gap-2">
+          {selecao && (
+            <span aria-hidden className={`grid h-4 w-4 flex-none place-items-center rounded border ${selecionado ? 'border-accent bg-accent text-white' : 'border-line bg-card'}`}>
+              {selecionado && <Check size={11} strokeWidth={2.4} />}
+            </span>
+          )}
           <OrigemIcon origem={lead.origem ?? 'manual'} size={16} />
           <span className={`min-w-0 flex-1 truncate text-[12.5px] ${lead.nome ? 'font-semibold text-ink' : 'font-medium text-ink-3'}`}>
             {lead.nome || CANAL_FALLBACK[lead.origem ?? 'manual'] || 'Novo contato'}
@@ -130,6 +142,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
         <div className="mt-1 mb-2.5 truncate text-[11px] text-ink-3">
           {lead.produto_interessado || 'Sem produto definido'}
         </div>
+
+        {/* Etiquetas do contato (11/11/2026) */}
+        <EtiquetasDoContato ids={lead.etiqueta_ids} className="-mt-1 mb-2" />
 
         {/* Rodapé: (avatar + tier) à esquerda · (não-lidas + SLA) à direita */}
         <div className="flex items-center justify-between gap-2">
