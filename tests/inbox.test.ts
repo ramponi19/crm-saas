@@ -9,7 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
-import { aguardandoResposta, filtroDoCursor, termosDaBusca } from '@/lib/inbox/consultas'
+import { aguardandoResposta, conversasAntigas, filtroDoCursor, termosDaBusca } from '@/lib/inbox/consultas'
 import { aplicarNoSino, ordenarSino, type LinhaConversa } from '@/lib/inbox/sino'
 import { GRUPO_DO_HREF, hrefsLigados } from '@/lib/menu'
 
@@ -20,6 +20,32 @@ test('aguardando resposta: a última mensagem é do cliente', () => {
   assert.equal(aguardandoResposta({ ultima_recebida_at: '2026-11-04T10:00:00Z', ultima_enviada_at: '2026-11-04T10:05:00Z' }), false)
   // Formatos diferentes do mesmo instante (Realtime x PostgREST) não confundem.
   assert.equal(aguardandoResposta({ ultima_recebida_at: '2026-11-04 10:00:00+00', ultima_enviada_at: '2026-11-04T10:00:00.000Z' }), false)
+})
+
+test('sem resposta há mais de 72 h: por contato + loja, fora da janela, envio falho não conta', () => {
+  const agora = Date.parse('2026-11-11T12:00:00Z')
+  const h = (horas: number) => new Date(agora - horas * 3_600_000).toISOString()
+  const c = (id: number, contato: number, filial: number, rec: string | null, env: string | null) =>
+    ({ id, contato_id: contato, filial_id: filial, ultima_mensagem_at: [rec, env].filter(Boolean).sort().pop() ?? null, ultima_recebida_at: rec, ultima_enviada_at: env })
+  const ids = (linhas: ReturnType<typeof c>[], envios: Parameters<typeof conversasAntigas>[1] = []) =>
+    conversasAntigas(linhas, envios, agora).map((x) => x.id).sort()
+  // 5 dias sem resposta: entra. Dentro das 72 h: é do "aguardando", não daqui.
+  assert.deepEqual(ids([c(1, 10, 3, h(120), h(130)), c(2, 11, 3, h(10), null)]), [1])
+  // Respondido depois (mesmo que em outro canal da loja): sai.
+  assert.deepEqual(ids([c(1, 10, 3, h(120), null), c(3, 10, 3, null, h(100))]), [])
+  // Mesma pessoa, outra loja: é outra conversa da loja.
+  assert.deepEqual(ids([c(1, 10, 3, h(120), null), c(4, 10, 6, null, h(100))]), [1])
+  // Falou de novo noutro canal dentro das 72 h: não é antigo.
+  assert.deepEqual(ids([c(1, 10, 3, h(120), null), c(5, 10, 3, h(5), null)]), [])
+  // Entra a conversa do canal em que o cliente falou por último.
+  assert.deepEqual(ids([c(1, 10, 3, h(200), null), c(6, 10, 3, h(150), null)]), [6])
+  // A coluna diz que a loja mandou depois, mas o envio FALHOU: continua sem resposta.
+  const falho = [{ contato_id: 10, filial_id: 3, created_at: h(110), status_entrega: 'falhou' }]
+  assert.deepEqual(ids([c(1, 10, 3, h(120), h(110))], falho), [1])
+  const deuCerto = [...falho, { contato_id: 10, filial_id: 3, created_at: h(105), status_entrega: 'entregue' }]
+  assert.deepEqual(ids([c(1, 10, 3, h(120), h(105))], deuCerto), [])
+  // Nunca falou: não entra.
+  assert.deepEqual(ids([c(7, 12, 3, null, h(200))]), [])
 })
 
 test('busca: telefone, @instagram e nome', () => {

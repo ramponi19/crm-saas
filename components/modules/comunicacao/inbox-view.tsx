@@ -8,7 +8,7 @@ import { Button, Select } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useTempoReal, type EventoTR } from '@/components/layout/tempo-real-empresa'
 import {
-  CANAIS, lerCanais, lerConversa, listarConversas,
+  CANAIS, JANELA_ESPERANDO_MS, lerCanais, lerConversa, listarConversas,
   type CanalInbox, type CanalTipo, type ConversaInbox, type Cursor, type FiltrosInbox,
 } from '@/lib/inbox/consultas'
 import { MAPA_VAZIO, conversaEsperando, lerEsperando, type MapaEsperando } from '@/lib/esperando'
@@ -64,7 +64,24 @@ function passaNosFiltrosLocais(c: ConversaInbox, f: FiltrosInbox, esperando: Map
   if (f.canal && c.canal?.tipo !== f.canal) return false
   if (f.naoLidas && !(c.nao_lidas > 0)) return false
   if (f.aguardando && !conversaEsperando(c, esperando)) return false
+  if (f.antigos && !conversaAntigaLocal(c)) return false
   return true
+}
+
+/**
+ * Para o tempo real: a conversa segue "sem resposta há mais de 72 h"? Conta só desta conversa
+ * (a lista vem do servidor com a regra completa); mensagem nova do cliente ou da loja tira daqui.
+ */
+function conversaAntigaLocal(c: ConversaInbox): boolean {
+  if (!c.ultima_recebida_at) return false
+  const rec = new Date(c.ultima_recebida_at).getTime()
+  if (rec >= Date.now() - JANELA_ESPERANDO_MS) return false
+  return !c.ultima_enviada_at || new Date(c.ultima_enviada_at).getTime() < rec
+}
+
+/** "há 5 d" desde a última mensagem do cliente. */
+function diasSemResposta(c: ConversaInbox): number {
+  return c.ultima_recebida_at ? Math.floor((Date.now() - new Date(c.ultima_recebida_at).getTime()) / 86_400_000) : 0
 }
 
 function lerFiltrosDaUrl(p: URLSearchParams): FiltrosInbox {
@@ -74,6 +91,7 @@ function lerFiltrosDaUrl(p: URLSearchParams): FiltrosInbox {
     canal: CANAIS.some((c) => c.tipo === canal) ? (canal as CanalTipo) : null,
     naoLidas: filtro === 'nao_lidas',
     aguardando: filtro === 'aguardando',
+    antigos: filtro === 'aguardando_72h',
     responsavel: p.get('resp'),
     busca: p.get('q') ?? '',
   }
@@ -109,6 +127,7 @@ export function InboxView(props: InboxProps) {
     if (filtros.canal) p.set('canal', filtros.canal)
     if (filtros.naoLidas) p.set('filtro', 'nao_lidas')
     else if (filtros.aguardando) p.set('filtro', 'aguardando')
+    else if (filtros.antigos) p.set('filtro', 'aguardando_72h')
     if (filtros.responsavel) p.set('resp', filtros.responsavel)
     if (filtros.busca) p.set('q', filtros.busca)
     if (aberta) p.set('c', String(aberta))
@@ -285,13 +304,18 @@ export function InboxView(props: InboxProps) {
           <div className="flex gap-1.5">
             <Select
               aria-label="Situação"
-              value={filtros.naoLidas ? 'nao_lidas' : filtros.aguardando ? 'aguardando' : ''}
-              onChange={(e) => mudarFiltros({ naoLidas: e.target.value === 'nao_lidas', aguardando: e.target.value === 'aguardando' })}
+              value={filtros.naoLidas ? 'nao_lidas' : filtros.aguardando ? 'aguardando' : filtros.antigos ? 'aguardando_72h' : ''}
+              onChange={(e) => mudarFiltros({
+                naoLidas: e.target.value === 'nao_lidas',
+                aguardando: e.target.value === 'aguardando',
+                antigos: e.target.value === 'aguardando_72h',
+              })}
               className="h-8 flex-1 text-[12px]"
             >
               <option value="">Todas as conversas</option>
               <option value="nao_lidas">Não lidas</option>
               <option value="aguardando">Aguardando resposta</option>
+              <option value="aguardando_72h">Aguardando há mais de 72 h</option>
             </Select>
             <Select
               aria-label="Responsável"
@@ -314,7 +338,7 @@ export function InboxView(props: InboxProps) {
             <div className="px-5 py-8 text-center text-[13px] text-bad">Não foi possível carregar: {erro}</div>
           ) : lista.length === 0 ? (
             <div className="px-5 py-10 text-center text-[13px] text-ink-3">
-              {filtros.busca || filtros.canal || filtros.naoLidas || filtros.aguardando || filtros.responsavel
+              {filtros.busca || filtros.canal || filtros.naoLidas || filtros.aguardando || filtros.antigos || filtros.responsavel
                 ? 'Nenhuma conversa com esses filtros.'
                 : 'Nenhuma conversa nesta loja ainda.'}
             </div>
@@ -354,6 +378,11 @@ export function InboxView(props: InboxProps) {
                         )}
                         {!naoLidas && conversaEsperando(c, esperando) && (
                           <span className="ml-auto flex-none text-[10.5px] font-medium text-warn">aguardando</span>
+                        )}
+                        {!naoLidas && filtros.antigos && (
+                          <span className="ml-auto flex-none text-[10.5px] font-medium text-ink-3" title="Sem resposta da loja desde a última mensagem do cliente">
+                            sem resposta há {diasSemResposta(c)} d
+                          </span>
                         )}
                       </span>
                     </span>

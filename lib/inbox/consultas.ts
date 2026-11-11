@@ -26,14 +26,20 @@ export const CANAIS: { tipo: CanalTipo; nome: string }[] = [
 export interface FiltrosInbox {
   canal: CanalTipo | null
   naoLidas: boolean
-  /** A última mensagem da conversa é do cliente (mesmo que já lida). */
+  /** Esperando resposta pela regra única (últimas 72 h; `lib/esperando.ts`). */
   aguardando: boolean
+  /**
+   * Sem resposta há MAIS de 72 h (11/11/2026, pedido do Lucas): saíram da janela do "esperando"
+   * e não podem sumir de vista. Mesma regra, fora da janela: canais da loja juntos, envio que
+   * falhou não conta. O contador do topo do quadro continua só com as 72 h.
+   */
+  antigos: boolean
   /** id do usuário dono do negócio do contato; 'nenhum' = sem responsável. */
   responsavel: string | null
   busca: string
 }
 
-export const FILTROS_VAZIOS: FiltrosInbox = { canal: null, naoLidas: false, aguardando: false, responsavel: null, busca: '' }
+export const FILTROS_VAZIOS: FiltrosInbox = { canal: null, naoLidas: false, aguardando: false, antigos: false, responsavel: null, busca: '' }
 
 export interface ContatoInbox { id: number; nome: string | null; telefone: string | null; instagram: string | null; foto_url: string | null }
 export interface CanalInbox { id: number; tipo: CanalTipo; nome_exibicao: string | null; filial_id: number | null }
@@ -69,6 +75,78 @@ export function aguardandoResposta(c: Pick<ConversaInbox, 'ultima_recebida_at' |
   if (!c.ultima_recebida_at) return false
   if (!c.ultima_enviada_at) return true
   return new Date(c.ultima_recebida_at).getTime() > new Date(c.ultima_enviada_at).getTime()
+}
+
+// ── Sem resposta há mais de 72 h ────────────────────────────────────────────
+
+/** A janela do "esperando resposta" (a mesma da função `esperando_resposta`). */
+export const JANELA_ESPERANDO_MS = 72 * 3_600_000
+const FALHAS_DE_ENVIO = ['falhou', 'falha_envio']
+
+type LinhaAntiga = Pick<ConversaInbox, 'id' | 'contato_id' | 'filial_id' | 'ultima_mensagem_at' | 'ultima_recebida_at' | 'ultima_enviada_at'>
+type Envio = { contato_id: number | null; filial_id: number | null; created_at: string; status_entrega: string | null }
+
+/**
+ * Das conversas (todas as da sessão), as de quem está sem resposta há mais de 72 h. Pura, para testar.
+ * Por contato + loja (canais juntos): a última do cliente é anterior à janela e nenhum envio da loja
+ * depois dela deu certo. Entra a conversa do canal em que o cliente falou por último.
+ * `envios` = os envios da loja posteriores a alguma última do cliente que só têm envio FALHO na
+ * conversa (o app não sabe pela coluna `ultima_enviada_at`, que o gatilho grava mesmo se falhou).
+ */
+export function conversasAntigas(linhas: LinhaAntiga[], envios: Envio[], agora: number): LinhaAntiga[] {
+  const porChave = new Map<string, { rec: number; env: number; conversa: LinhaAntiga }>()
+  for (const c of linhas) {
+    if (c.contato_id == null) continue
+    const k = `${c.contato_id}:${c.filial_id ?? 0}`
+    const rec = c.ultima_recebida_at ? new Date(c.ultima_recebida_at).getTime() : -Infinity
+    const env = c.ultima_enviada_at ? new Date(c.ultima_enviada_at).getTime() : -Infinity
+    const g = porChave.get(k)
+    if (!g) { porChave.set(k, { rec, env, conversa: c }); continue }
+    if (rec > g.rec) { g.rec = rec; g.conversa = c }
+    g.env = Math.max(g.env, env)
+  }
+  const enviosPorChave = new Map<string, Envio[]>()
+  for (const e of envios) {
+    const k = `${e.contato_id}:${e.filial_id ?? 0}`
+    enviosPorChave.set(k, [...(enviosPorChave.get(k) ?? []), e])
+  }
+  const out: LinhaAntiga[] = []
+  for (const [k, g] of porChave) {
+    if (!Number.isFinite(g.rec) || g.rec >= agora - JANELA_ESPERANDO_MS) continue
+    if (g.env >= g.rec) {
+      // A coluna diz que a loja mandou depois; vale só se algum desses envios não falhou.
+      const lista = enviosPorChave.get(k)
+      if (!lista) continue
+      const respondeu = lista.some((e) => new Date(e.created_at).getTime() >= g.rec && !FALHAS_DE_ENVIO.includes(e.status_entrega ?? ''))
+      if (respondeu) continue
+    }
+    out.push(g.conversa)
+  }
+  return out
+}
+
+async function lerAntigas(db: Db): Promise<LinhaAntiga[]> {
+  const linhas: LinhaAntiga[] = []
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await db.from('conversas')
+      .select('id, contato_id, filial_id, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at')
+      .not('ultima_recebida_at', 'is', null).order('id').range(de, de + 999)
+    if (error) throw new Error(error.message)
+    linhas.push(...((data ?? []) as LinhaAntiga[]))
+    if ((data ?? []).length < 1000) break
+  }
+  // Quem só tem envio FALHO depois da última do cliente: poucos (falha é rara). Lê os envios deles.
+  const { data: falhas } = await db.from('mensagens').select('contato_id, filial_id')
+    .eq('direcao', 'enviada').in('status_entrega', FALHAS_DE_ENVIO).limit(1000)
+  const comFalha = [...new Set(((falhas ?? []) as { contato_id: number | null }[]).map((f) => f.contato_id).filter((x): x is number => x != null))]
+  let envios: Envio[] = []
+  if (comFalha.length) {
+    const { data } = await db.from('mensagens').select('contato_id, filial_id, created_at, status_entrega')
+      .eq('direcao', 'enviada').in('contato_id', comFalha)
+      .gte('created_at', new Date(Date.now() - 400 * 86_400_000).toISOString()).limit(5000)
+    envios = (data ?? []) as Envio[]
+  }
+  return conversasAntigas(linhas, envios, Date.now())
 }
 
 /** Busca: só dígitos vira telefone; "@algo" vira Instagram; o resto procura nos três. */
@@ -127,10 +205,11 @@ export async function listarConversas(
 
   /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
   const completa: string = `${COLUNAS_CONVERSA}, ${embedContato}, canal:canais(${COLUNAS_CANAL})`
-  const consulta = (selecao: string, desde: Cursor | null, limite: number) => {
+  const consulta = (selecao: string, desde: Cursor | null, limite: number, soIds?: number[]) => {
     // Tipo solto de propósito: o construtor reatribuído com relação embutida estoura o tsc (TS2589).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let q: any = db.from('conversas').select(selecao).not('ultima_mensagem_at', 'is', null)
+    if (soIds) q = q.in('id', soIds)
     if (idsCanal) q = q.in('canal_id', idsCanal)
     if (f.naoLidas) q = q.gt('nao_lidas', 0)
     if (contatos) q = q.in('contato_id', contatos)
@@ -142,6 +221,35 @@ export async function listarConversas(
   }
   const limpar = (linhas: unknown[]) => (linhas as (ConversaInbox & { contato: (ContatoInbox & { negocios?: unknown }) | null })[])
     .map(({ contato, ...c }) => ({ ...c, contato: contato ? { id: contato.id, nome: contato.nome, telefone: contato.telefone, instagram: contato.instagram, foto_url: contato.foto_url } : null }))
+
+  if (f.antigos) {
+    /**
+     * Sem resposta há mais de 72 h: a lista sai das conversas (colunas mínimas, a RLS limita à
+     * loja), em ordem de última mensagem; a página traz só as 40 da vez, completas.
+     */
+    let antigas = await lerAntigas(db)
+    if (contatos) antigas = antigas.filter((c) => contatos!.includes(c.contato_id as number))
+    const ordem = (a: Pick<ConversaInbox, 'id' | 'ultima_mensagem_at'>, b: Pick<ConversaInbox, 'id' | 'ultima_mensagem_at'>) =>
+      (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? '') || b.id - a.id
+    antigas.sort(ordem)
+    if (cursor) antigas = antigas.filter((c) => (c.ultima_mensagem_at ?? '') < cursor.momento
+      || ((c.ultima_mensagem_at ?? '') === cursor.momento && c.id < cursor.id))
+    const ids = antigas.map((c) => c.id)
+    // Canal, não lidas e responsável continuam valendo: a consulta completa os aplica, 200 ids por vez.
+    const itens: ConversaInbox[] = []
+    let i = 0
+    while (i < ids.length && itens.length <= POR_PAGINA) {
+      const { data, error } = await consulta(completa, null, 200, ids.slice(i, i + 200))
+      if (error) throw new Error(error.message)
+      itens.push(...limpar(data ?? []))
+      i += 200
+    }
+    itens.sort(ordem)
+    const pagina = itens.slice(0, POR_PAGINA)
+    const ultima = pagina[pagina.length - 1]
+    const temMais = itens.length > POR_PAGINA || (itens.length === POR_PAGINA && i < ids.length)
+    return { itens: pagina, proximo: temMais && ultima ? { momento: ultima.ultima_mensagem_at as string, id: ultima.id } : null }
+  }
 
   if (!f.aguardando) {
     const { data, error } = await consulta(completa, cursor ?? null, POR_PAGINA)
