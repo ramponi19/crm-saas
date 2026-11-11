@@ -490,7 +490,7 @@ branches abertas antes de numerar).
    mesmo número do painel; Comunicação "aguardando" e topo do quadro = painel da loja.
 4. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-esperando-resposta.sql`.
 
-## Etiquetas no core (migração 20261111000500; 06 seção 44)
+## Etiquetas no core (APLICADA 11/11 17h20; app fea2018 17h23; smoke ok — 06 seção 44)
 
 O que é e as provas: 06, seção 44. Próxima migração livre depois desta: **20261111000600** (conferir main e
 branches abertas antes de numerar).
