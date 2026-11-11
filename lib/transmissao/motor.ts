@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { horarioValido, modeloRecente, proximoHorario } from '@/lib/automatize/travas'
 import { CHAVE_CONFIG, renderizar, tetoValido } from '@/lib/transmissao/filtro'
 
@@ -86,12 +87,10 @@ async function modeloNosUltimos7Dias(svc: Db, e: Envio, agora: Date): Promise<bo
 }
 
 async function chamarEdge(envioId: number, parametros: string[], previa: string): Promise<{ ok: boolean; status: number; erro?: string; codigo?: string; mensagemId?: number | null }> {
-  // EDGE_WEBHOOK_URL só no teste local (Edge rodando no deno); em produção é a Edge do Supabase.
-  const base = process.env.EDGE_WEBHOOK_URL || `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook-leads`
   try {
-    const r = await fetch(`${base}?action=send_template_transmissao`, {
+    const r = await fetch(urlEdgeWebhook('send_template_transmissao'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+      headers: cabecalhosEdgeInterna(),
       body: JSON.stringify({ envioId, parametros, previa }),
       signal: AbortSignal.timeout(30_000),
     })

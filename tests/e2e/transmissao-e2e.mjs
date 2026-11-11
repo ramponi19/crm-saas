@@ -21,6 +21,7 @@ import fs from 'node:fs'
 const BASE = 'http://localhost:3010', SENHA = 'teste-local-22', CRON = 'cron-local-de-teste'
 const EDGE = 'http://127.0.0.1:8000', GRAPH_PORTA = 54999, APP_SECRET = 'segredo-e2e-transmissao'
 const CHAVE_CANAL = 'e2e0'.repeat(16) // a mesma de tools/dev-local.sh (só de teste)
+const SEGREDO_EDGE = 'edge-interna-local-de-teste' // o mesmo de tools/dev-local.sh (só de teste)
 const PSQL = 'C:/Ferramentas/pgsql-18.4/bin/psql.exe'
 const CONN = `host=127.0.0.1 port=${process.env.DB_PORT ?? 54322} dbname=postgres user=postgres password=postgres`
 const env = Object.fromEntries(fs.readFileSync(`${import.meta.dirname}/status.local.env`, 'utf8').split(/\r?\n/)
@@ -55,7 +56,7 @@ const servidorGraph = createServer((req, res) => {
 // ── Edge LOCAL no deno ────────────────────────────────────────────────────────
 const edge = spawn('deno', ['run', '--allow-net', '--allow-env', '--allow-read', 'supabase/functions/webhook-leads/index.ts'], {
   env: {
-    ...process.env, SUPABASE_URL: env.API_URL, SUPABASE_SERVICE_ROLE_KEY: env.SERVICE_ROLE_KEY, SUPABASE_ANON_KEY: env.ANON_KEY,
+    ...process.env, SUPABASE_URL: env.API_URL, SUPABASE_SERVICE_ROLE_KEY: env.SERVICE_ROLE_KEY, SUPABASE_ANON_KEY: env.ANON_KEY, EDGE_INTERNAL_SECRET: SEGREDO_EDGE,
     META_GRAPH_BASE: `http://127.0.0.1:${GRAPH_PORTA}`, META_APP_SECRET: APP_SECRET, WEBHOOK_VERIFY_TOKEN: 'e2e', CHANNEL_ENCRYPTION_KEY: CHAVE_CANAL,
   }, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32',
 })
@@ -262,11 +263,15 @@ try {
   await cron()
   confere(conta(TX2, 'enviada') === 1 && conta(TX2, 'pendente') === 2, `pausada: o cron não manda (${envios(TX2)})`)
   const emVoo = um(`update transmissao_envios set status='enviando', reservada_em=now() where id = (select id from transmissao_envios where transmissao_id=${TX2} and status='pendente' order by id limit 1) returning id`)
-  let ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.SERVICE_ROLE_KEY}` }, body: JSON.stringify({ envioId: Number(emVoo), parametros: ['x'], previa: 'x' }) })
+  let ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-edge-internal-secret': SEGREDO_EDGE }, body: JSON.stringify({ envioId: Number(emVoo), parametros: ['x'], previa: 'x' }) })
   confere(ed.status === 409, `Edge recusa envio de transmissão pausada (${ed.status})`)
   sql(`update transmissao_envios set status='pendente', reservada_em=null where id=${emVoo}`)
   ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envioId: Number(emVoo) }) })
-  confere(ed.status === 401, `Edge sem chave de serviço: ${ed.status}`)
+  confere(ed.status === 401, `Edge sem o segredo interno: ${ed.status}`)
+  ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.SERVICE_ROLE_KEY}` }, body: JSON.stringify({ envioId: Number(emVoo) }) })
+  confere(ed.status === 401, `Edge com a chave de serviço (caminho antigo, fechado): ${ed.status}`)
+  ed = await fetch(`${EDGE}?action=send_template_automacao`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-edge-internal-secret': 'errado' }, body: '{}' })
+  confere(ed.status === 401, `Automatize com segredo errado: ${ed.status}`)
   ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.ANON_KEY}` }, body: JSON.stringify({ envioId: Number(emVoo) }) })
   confere(ed.status === 401, `Edge com a chave anônima: ${ed.status}`)
   r = await tx(dono, { op: 'teto', teto_hora: 50 })

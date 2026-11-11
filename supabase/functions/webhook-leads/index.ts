@@ -24,6 +24,7 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { timingSafeEqual } from "node:crypto";
 import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1627,32 +1628,39 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
   return json({ success: true, modelo: nome, mensagemId });
 }
 
-/** Comparação em tempo constante de dois textos (a chave de serviço). */
-async function mesmoSegredo(a: string, b: string): Promise<boolean> {
-  if (!a || !b) return false;
+/**
+ * SEGREDO INTERNO servidor do app → Edge (11/11/2026).
+ *
+ * Os dois caminhos sem usuário logado (Automatize e Transmissão) conferiam a chave de serviço
+ * por igualdade de texto com a SUPABASE_SERVICE_ROLE_KEY que o Supabase injeta na Edge. A da
+ * Vercel é válida, mas não é a MESMA string: no smoke de 11/11 todo envio voltou 401 e nada
+ * saiu. Agora é um segredo próprio, EDGE_INTERNAL_SECRET, gravado na Vercel (Production) e nos
+ * segredos da Edge; o app manda no cabeçalho `x-edge-internal-secret`. Sem o segredo na Edge,
+ * tudo é recusado (falha fechada). Comparação em tempo constante sobre o SHA-256 dos dois
+ * (o timingSafeEqual exige o mesmo tamanho).
+ */
+async function segredoInternoOk(req: Request): Promise<boolean> {
+  const recebido = (req.headers.get("x-edge-internal-secret") ?? "").trim();
+  const esperado = (Deno.env.get("EDGE_INTERNAL_SECRET") ?? "").trim();
+  if (!recebido || !esperado) return false;
   const enc = new TextEncoder();
-  const [ha, hb] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(a)), crypto.subtle.digest("SHA-256", enc.encode(b))]);
-  const x = new Uint8Array(ha), y = new Uint8Array(hb);
-  let dif = 0;
-  for (let i = 0; i < x.length; i++) dif |= x[i] ^ y[i];
-  return dif === 0;
+  const [ha, hb] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(recebido)), crypto.subtle.digest("SHA-256", enc.encode(esperado))]);
+  return timingSafeEqual(new Uint8Array(ha), new Uint8Array(hb));
 }
 
 /**
  * ENVIO AUTOMÁTICO DE MODELO (Automatize, decisões do Lucas, 04/11/2026).
  *
  * O único caminho de envio SEM usuário logado. Quem chama é o servidor do app
- * (lib/automacoes.ts), com a chave de serviço. As travas de volume, horário e 7 dias
+ * (lib/automacoes.ts), com o segredo interno (EDGE_INTERNAL_SECRET). As travas de volume, horário e 7 dias
  * moram lá; aqui a Edge confere de novo o que não pode passar de jeito nenhum:
- * chave de serviço; automação existente, LIGADA, desta empresa, do tipo
+ * segredo interno; automação existente, LIGADA, desta empresa, do tipo
  * enviar_modelo e com ESTE modelo; modelo desta empresa com status APROVADO; contato
  * sem opt-out e não bloqueado. A mensagem é gravada com origem 'automacao' (o id da
  * automação fica em automacao_execucoes.mensagem_id).
  */
 async function envioAutomatico(req: Request, body: Record<string, unknown>): Promise<Response> {
-  const auth = req.headers.get("authorization") ?? "";
-  const chave = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-  if (!(await mesmoSegredo(chave, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""))) return json({ error: "não autorizado" }, 401);
+  if (!(await segredoInternoOk(req))) return json({ error: "não autorizado" }, 401);
 
   const negocioId = Number(body.leadId), modeloId = Number(body.modeloId), automacaoId = Number(body.automacaoId);
   if (!negocioId || !modeloId || !automacaoId) return json({ error: "leadId, modeloId e automacaoId são obrigatórios" }, 400);
@@ -1680,7 +1688,7 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
 
 /**
  * ENVIO DE TRANSMISSÃO (módulo Transmissão, 10/11/2026). O mesmo caminho de serviço do
- * Automatize: só a chave de serviço, chamado pelo servidor do app (lib/transmissao/motor.ts),
+ * Automatize: só o segredo interno, chamado pelo servidor do app (lib/transmissao/motor.ts),
  * que já aplicou horário, teto por hora e 7 dias. Aqui a Edge confere de novo o que não pode
  * passar: o envio existe e está 'enviando' (reservado agora pelo app); a transmissão é da
  * mesma empresa e está 'enviando' (pausar barra o que estiver em voo); o modelo é o da
@@ -1689,9 +1697,7 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
  * origem 'transmissao'.
  */
 async function envioTransmissao(req: Request, body: Record<string, unknown>): Promise<Response> {
-  const auth = req.headers.get("authorization") ?? "";
-  const chave = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-  if (!(await mesmoSegredo(chave, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""))) return json({ error: "não autorizado" }, 401);
+  if (!(await segredoInternoOk(req))) return json({ error: "não autorizado" }, 401);
 
   const envioId = Number(body.envioId);
   if (!envioId) return json({ error: "envioId é obrigatório" }, 400);
@@ -1880,12 +1886,12 @@ serve(async (req: Request) => {
 
   const action = url.searchParams.get("action");
 
-  // ── Envio automático (Automatize): só a chave de serviço ────────────────────
+  // ── Envio automático (Automatize): só o segredo interno ──────────────────────
   if (action === "send_template_automacao") {
     try { return await envioAutomatico(req, body); }
     catch (e) { console.error("envio automático:", e); return json({ error: "falha no envio automático" }, 500); }
   }
-  // ── Envio de transmissão: só a chave de serviço ─────────────────────────────
+  // ── Envio de transmissão: só o segredo interno ───────────────────────────────
   if (action === "send_template_transmissao") {
     try { return await envioTransmissao(req, body); }
     catch (e) { console.error("envio de transmissão:", e); return json({ error: "falha no envio da transmissão" }, 500); }
