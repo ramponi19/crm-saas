@@ -102,27 +102,6 @@ export function InboxView(props: InboxProps) {
   const geracao = useRef(0)
   const { assinar, aoReconectar } = useTempoReal()
   const supabase = useMemo(() => createClient(), [])
-  /**
-   * Quem espera resposta, pela regra única do banco (`lib/esperando.ts`): o selo
-   * "aguardando" e o filtro. Relido a cada mensagem (com 2 s de folga, uma leitura
-   * por rajada) e a cada reconexão.
-   */
-  const [esperando, setEsperando] = useState<MapaEsperando>(MAPA_VAZIO)
-  const esperandoRef = useRef(esperando)
-  const [releEsperando, setReleEsperando] = useState(0)
-  useEffect(() => {
-    let vivo = true
-    const t = setTimeout(() => {
-      lerEsperando(supabase).then((m) => {
-        if (!vivo) return
-        esperandoRef.current = m
-        setEsperando(m)
-        // Com o filtro "aguardando", quem entrou ou saiu da regra muda a lista: relê a página.
-        if (releEsperando && filtrosRef.current.aguardando) setRecarga((n) => n + 1)
-      }).catch(() => {})
-    }, releEsperando ? 2_000 : 0)
-    return () => { vivo = false; clearTimeout(t) }
-  }, [supabase, releEsperando])
 
   // A URL acompanha filtros e conversa aberta (sem navegar: só troca o endereço).
   useEffect(() => {
@@ -210,6 +189,28 @@ export function InboxView(props: InboxProps) {
   useEffect(() => { listaRef.current = lista }, [lista])
   const abertaRef = useRef(aberta)
   useEffect(() => { abertaRef.current = aberta }, [aberta])
+
+  /**
+   * Quem espera resposta, pela regra única do banco (`lib/esperando.ts`): o selo
+   * "aguardando" e o filtro. Relido a cada mensagem (com 2 s de folga, uma leitura
+   * por rajada) e a cada reconexão.
+   */
+  const [esperando, setEsperando] = useState<MapaEsperando>(MAPA_VAZIO)
+  const esperandoRef = useRef(esperando)
+  const [releEsperando, setReleEsperando] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    const t = setTimeout(() => {
+      lerEsperando(supabase).then((m) => {
+        if (!vivo) return
+        esperandoRef.current = m
+        setEsperando(m)
+        // Com o filtro "aguardando", quem entrou ou saiu da regra muda a lista: relê a página.
+        if (releEsperando && filtrosRef.current.aguardando) setRecarga((n) => n + 1)
+      }).catch(() => {})
+    }, releEsperando ? 2_000 : 0)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [supabase, releEsperando])
 
   useEffect(() => assinar(async (e: EventoTR) => {
     if (e.tabela === 'mensagens' && e.tipo === 'INSERT' && e.novo.conversa_id != null) {
