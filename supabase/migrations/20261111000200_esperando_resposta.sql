@@ -1,6 +1,6 @@
 -- "ESPERANDO RESPOSTA": UMA DEFINIÇÃO SÓ (11/11/2026). Pedido e aprovação do Lucas (10/11, noite):
 -- no smoke de 10/11 o Assistente disse 547 leads esperando em Mogi e o painel, 91 — cada tela tinha a
--- sua conta (levantamento no 06, seção 42):
+-- sua conta (levantamento no 06, seção 43):
 --   painel do ZapIntel  última recebida > última enviada, nas últimas 72 h, candidatos à parte;
 --   Assistente          a mesma comparação, SEM janela (desde agosto);
 --   Comunicação         por conversa (contato + CANAL): quem escreveu no Instagram e foi respondido no
