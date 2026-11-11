@@ -86,7 +86,10 @@ export function HistoricoNegocioPanel({ negocioId, usuarios, versao }: { negocio
           if (etiqueta) texto = etiqueta
           else if (h.acao === 'etapa') texto = `Etapa: ${h.de?.label ?? '—'} → ${h.para?.label ?? '—'}`
           else texto = FRASE[h.acao] ?? h.acao
-          if (['transferir', 'atribuir', 'distribuir', 'atribuicao'].includes(h.acao)) texto += ` → ${nome(h.para_responsavel)}`
+          // Responsável nulo = voltou para a esteira; "o sistema" é só para quem FEZ a ação sem usuário.
+          if (['transferir', 'atribuir', 'distribuir', 'atribuicao'].includes(h.acao)) {
+            texto += ` → ${h.para_responsavel ? nome(h.para_responsavel) : 'esteira (sem dono)'}`
+          }
           return (
             <div key={h.id} data-historico-acao={h.acao} className="flex flex-wrap items-center gap-x-1 text-[11.5px] text-ink-3">
               {etiqueta
