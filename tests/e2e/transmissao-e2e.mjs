@@ -39,6 +39,8 @@ const fone = (n) => `5519900${String(T).slice(-3)}${String(n).padStart(3, '0')}`
 
 // ── Graph FALSA: só número de teste; guarda o que recebeu ─────────────────────
 const graph = []
+// O que a Graph falsa diz que existe em cada WABA (preenchido depois de criar os modelos).
+const MODELOS_NA_META = {}
 const servidorGraph = createServer((req, res) => {
   let b = ''
   req.on('data', (c) => { b += c })
@@ -46,6 +48,9 @@ const servidorGraph = createServer((req, res) => {
     const j = (() => { try { return JSON.parse(b) } catch { return {} } })()
     res.setHeader('Content-Type', 'application/json')
     // Só o envio conta (POST …/messages); perfil e mídia, se a Edge pedir, recebem vazio.
+    // Lista de modelos por WABA (a sincronização do app): cada número tem os seus.
+    const lista = String(req.url).match(/\/(WABA_E2E[A-Z_]*)\/message_templates/)
+    if (req.method === 'GET' && lista) { res.end(JSON.stringify({ data: MODELOS_NA_META[lista[1]] ?? [] })); return }
     if (req.method !== 'POST' || !String(req.url).endsWith('/messages')) { res.end('{}'); return }
     graph.push({ url: req.url, auth: req.headers.authorization, ...j })
     if (!String(j.to ?? '').startsWith('5519900')) { res.statusCode = 400; res.end(JSON.stringify({ error: { code: 131026, message: 'número fora do teste' } })); return }
@@ -76,6 +81,8 @@ async function usuarioAuth(email, nome) {
 const E = um(`insert into empresas (nome, slug, plano, status) values ('TESTE Transmissão ${T}', 'teste-tx-${T}', 'pro', 'ativo') returning id`)
 const LA = um(`insert into filiais (empresa_id, nome, matriz) values (${E}, 'Loja A ${T}', true) returning id`)
 const LB = um(`insert into filiais (empresa_id, nome, matriz) values (${E}, 'Loja B ${T}', false) returning id`)
+// Loja C: outro número, OUTRA WABA (como Mogi × Jaguariúna na JM). Sem contatos.
+const LC = um(`insert into filiais (empresa_id, nome, matriz) values (${E}, 'Loja C ${T}', false) returning id`)
 const U = {
   dono: await usuarioAuth(`dono.tx.${T}@teste.local`, 'Dono TX'),
   vendA: await usuarioAuth(`venda.tx.${T}@teste.local`, 'Vendedor A TX'),
@@ -92,6 +99,14 @@ const MP = um(`insert into modelos_mensagem (empresa_id, nome, idioma, categoria
 const PHONE = `PHONE_E2E_${T}`
 const CANAL = um(`insert into canais (empresa_id, filial_id, tipo, external_id, waba_id, nome_exibicao, access_token_enc, status, via, conectado_em)
   values (${E}, ${LA}, 'whatsapp', '${PHONE}', 'WABA_E2E', 'WhatsApp Loja A', '${cifrar('token-falso-e2e')}', 'ativo', 'pagina', now()) returning id`)
+sql(`insert into canais (empresa_id, filial_id, tipo, external_id, waba_id, nome_exibicao, access_token_enc, status, via, conectado_em)
+  values (${E}, ${LC}, 'whatsapp', 'PHONE_E2E_C_${T}', 'WABA_E2E_C', 'WhatsApp Loja C', '${cifrar('token-falso-e2e')}', 'ativo', 'pagina', now() - interval '1 day')`)
+// MODELO POR NÚMERO (11/11/2026): M aprovado na WABA da Loja A e RECUSADO na da C; MC só na C.
+const MC = um(`insert into modelos_mensagem (empresa_id, nome, idioma, categoria, corpo, status) values (${E}, 'tx_e2e_so_c_${T}', 'pt_BR', 'MARKETING', 'Oi da C', 'aprovado') returning id`)
+sql(`insert into modelos_mensagem_wabas (modelo_id, empresa_id, waba_id, status) values (${M}, ${E}, 'WABA_E2E', 'aprovado'), (${MP}, ${E}, 'WABA_E2E', 'pendente'), (${MC}, ${E}, 'WABA_E2E_C', 'aprovado')`)
+const corpoMeta = (nome, status, texto) => ({ id: `meta_${nome}`, name: nome, language: 'pt_BR', category: 'MARKETING', status, components: [{ type: 'BODY', text: texto }] })
+MODELOS_NA_META.WABA_E2E = [corpoMeta(`tx_e2e_${T}`, 'APPROVED', 'Oi {{1}}, chegou novidade na loja.'), corpoMeta(`tx_e2e_pendente_${T}`, 'PENDING', 'Oi')]
+MODELOS_NA_META.WABA_E2E_C = [corpoMeta(`tx_e2e_${T}`, 'REJECTED', 'Oi {{1}}, chegou novidade na loja.'), corpoMeta(`tx_e2e_so_c_${T}`, 'APPROVED', 'Oi da C')]
 sql(`insert into configuracoes_sistema (empresa_id, chave, valor) values (${E}, 'horario_comercial', '{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}')`)
 // A lista do menu que o cadastro grava (a trava de rota do proxy só barra empresa que tem uma).
 sql(`insert into empresa_menu (empresa_id, itens) values (${E}, '{"base":{"habilitados":["/dashboard","/tarefas","/comunicacao","/leads","/clientes"]}}')`)
@@ -161,6 +176,34 @@ try {
   await dono.goto(BASE + '/modulos', { waitUntil: 'networkidle' })
   confere(await dono.getByText('Transmissão', { exact: true }).count() > 0, 'tile na Central')
 
+  // ── 1b. Modelo por número (WABA): sincronização, oferta e recusa ──────────
+  r = await api(dono, '/api/modelos?sync=1')
+  const porWaba = () => sql(`select string_agg(m.nome || '@' || w.waba_id || '=' || w.status, ' | ' order by m.nome, w.waba_id) from modelos_mensagem_wabas w join modelos_mensagem m on m.id = w.modelo_id where w.empresa_id = ${E}`)
+  confere(r.status === 200 && !(r.j.errosSync ?? []).length, `sincronizou os 2 números (${r.status} ${JSON.stringify(r.j.errosSync)})`)
+  confere(porWaba() === `tx_e2e_${T}@WABA_E2E=aprovado | tx_e2e_${T}@WABA_E2E_C=rejeitado | tx_e2e_pendente_${T}@WABA_E2E=pendente | tx_e2e_so_c_${T}@WABA_E2E_C=aprovado`,
+    `status gravado por número: ${porWaba()}`)
+  confere(um(`select status from modelos_mensagem where id=${M}`) === 'aprovado', 'resumo do modelo = o melhor entre os números (aprovado)')
+  const mTela = (r.j.modelos ?? []).find((m) => String(m.id) === String(M))
+  confere(mTela?.numeros?.length === 2 && mTela.numeros.some((n) => n.lojas.includes('Loja A') && n.status === 'aprovado') && mTela.numeros.some((n) => n.lojas.includes('Loja C') && n.status === 'rejeitado'),
+    `tela de modelos mostra o status de cada número: ${JSON.stringify(mTela?.numeros)}`)
+  r = await api(dono, '/api/transmissao')
+  const em = (id) => (r.j.modelos ?? []).find((m) => String(m.id) === String(id))?.aprovado_em ?? []
+  confere(em(M).includes(String(LA)) && !em(M).includes(String(LC)) && !em(M).includes(String(LB)), `M oferecido só para a Loja A: ${JSON.stringify(em(M))}`)
+  confere(em(MC).includes(String(LC)) && !em(MC).includes(String(LA)), `MC oferecido só para a Loja C: ${JSON.stringify(em(MC))}`)
+  r = await tx(dono, { op: 'criar', nome: 'x', filial_id: Number(LA), modelo_id: Number(MC), parametros: [], filtro: {} })
+  confere(r.status === 400 && /desta loja/.test(r.j.error), `criar com modelo de outro número: ${r.status} ${r.j.error}`)
+  const TXC = um(`insert into transmissoes (empresa_id, filial_id, nome, modelo_id, parametros, filtro, criado_por) values (${E}, ${LA}, 'TXC ${T}', ${MC}, '[]', '{}', '${U.dono}') returning id`)
+  r = await tx(dono, { op: 'disparar', id: Number(TXC) })
+  confere(r.status === 400 && /desta loja/.test(r.j.error) && conta(TXC, 'pendente') === 0, `montar recusa modelo que não está aprovado no número da loja: ${r.status} ${r.j.error}`)
+  sql(`delete from transmissoes where id=${TXC}`)
+  r = await api(dono, '/api/automatize')
+  const au = (id) => (r.j.modelos ?? []).find((m) => String(m.id) === String(id))
+  confere(au(M)?.lojas?.some((l) => l.includes('Loja A')) && au(M)?.faltam?.some((l) => l.includes('Loja C')) && au(M)?.faltam?.some((l) => l.includes('Loja B')),
+    `Automatize diz onde o modelo está e onde falta: ${JSON.stringify(au(M) && { lojas: au(M).lojas, faltam: au(M).faltam })}`)
+  confere(!au(MP), 'Automatize não oferece modelo sem aprovação em número nenhum')
+  r = await api(dono, '/api/automatize', { op: 'criar', acao: 'enviar_modelo', etapa_id: Number(ET.novo), modelo_id: Number(MP), parametros: [] })
+  confere(r.status === 400 && /pelo menos uma loja/.test(r.j.error), `Automatize recusa modelo sem aprovação: ${r.status} ${r.j.error}`)
+
   // ── 2. Prévia ─────────────────────────────────────────────────────────────
   r = await tx(dono, { op: 'previa', filial_id: Number(LA), filtro: FILTRO1, modelo_id: Number(M) })
   const pv = r.j.previa ?? {}
@@ -183,6 +226,7 @@ try {
   await dono.getByLabel('Modelo aprovado').selectOption(String(M))
   confere(await dono.locator('[data-modelo-corpo]').innerText() === 'Oi {{1}}, chegou novidade na loja.', 'o corpo do modelo aparece')
   confere(await dono.getByLabel('Modelo aprovado').locator(`option[value="${MP}"]`).count() === 0, 'modelo pendente não é oferecido')
+  confere(await dono.getByLabel('Modelo aprovado').locator(`option[value="${MC}"]`).count() === 0, 'modelo aprovado só no número da Loja C não é oferecido na Loja A')
   await dono.getByLabel('Variável {{1}}').fill('{{nome}}')
   await dono.locator(`[data-filtro-etapa="${ET.proposta}"]`).click()
   await dono.getByLabel('Sem mensagem há mais de (dias)').fill('30')
@@ -277,6 +321,14 @@ try {
   r = await tx(dono, { op: 'teto', teto_hora: 50 })
   r = await tx(dono, { op: 'retomar', id: Number(TX2) })
   confere(r.status === 200 && await esperaAte(() => um(`select status from transmissoes where id=${TX2}`) === 'concluida'), `retomada: conclui (${envios(TX2)})`)
+  // A Edge confere o modelo NA WABA do canal que envia: sem a linha da WABA da Loja A, recusa.
+  const envX = um(`select id from transmissao_envios where transmissao_id=${TX2} and status='enviada' order by id limit 1`)
+  sql(`update transmissoes set status='enviando' where id=${TX2}; update transmissao_envios set status='enviando' where id=${envX}; delete from modelos_mensagem_wabas where modelo_id=${M} and waba_id='WABA_E2E'`)
+  const antesX = graph.length
+  ed = await fetch(`${EDGE}?action=send_template_transmissao`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-edge-internal-secret': SEGREDO_EDGE }, body: JSON.stringify({ envioId: Number(envX), parametros: ['x'], previa: 'x' }) })
+  const jX = await ed.json().catch(() => ({}))
+  confere(ed.status === 409 && /desta loja/.test(jX.error ?? '') && graph.length === antesX, `Edge recusa modelo não aprovado no número da loja: ${ed.status} ${jX.error}`)
+  sql(`insert into modelos_mensagem_wabas (modelo_id, empresa_id, waba_id, status) values (${M}, ${E}, 'WABA_E2E', 'aprovado'); update transmissao_envios set status='enviada' where id=${envX}; update transmissoes set status='concluida' where id=${TX2}`)
 
   // ── 9. Horário de atendimento e encerrar ──────────────────────────────────
   const amanha = (new Date().getUTCDay() + 2) % 7 // um dia que não é hoje no fuso da loja
@@ -293,8 +345,10 @@ try {
   sql(`update configuracoes_sistema set valor='{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}' where empresa_id=${E} and chave='horario_comercial'`)
 
   // ── 10. Loja sem WhatsApp não dispara; agendar ────────────────────────────
+  // Rascunho direto no banco: pela rota, o criar já recusa (o modelo não está aprovado em número nenhum da Loja B).
   r = await tx(dono, { op: 'criar', nome: `TX4 ${T}`, filial_id: Number(LB), modelo_id: Number(M), parametros: ['{{nome}}'], filtro: {} })
-  const TX4 = String(r.j.id)
+  confere(r.status === 400 && /desta loja/.test(r.j.error), `Loja B sem número: o criar recusa o modelo (${r.status} ${r.j.error})`)
+  const TX4 = um(`insert into transmissoes (empresa_id, filial_id, nome, modelo_id, parametros, filtro, criado_por) values (${E}, ${LB}, 'TX4 ${T}', ${M}, '["{{nome}}"]', '{}', '${U.dono}') returning id`)
   r = await tx(dono, { op: 'disparar', id: Number(TX4) })
   confere(r.status === 409 && /WhatsApp/.test(r.j.error), `Loja B sem WhatsApp: ${r.status} ${r.j.error}`)
   r = await tx(dono, { op: 'criar', nome: `TX6 ${T}`, filial_id: Number(LA), modelo_id: Number(M), parametros: ['{{nome}}'], filtro: { etapa_ids: [Number(ET.novo)] } })
@@ -341,6 +395,21 @@ try {
   confere(r.status === 404, `vendedor B abre a da Loja A pelo id: ${r.status}`)
 
   // ── 12. Nada a número que não é de teste ──────────────────────────────────
+  // ── 12. Automatize por número: o motor só manda pelo número que tem o modelo aprovado ──
+  const nina = pessoa(16, 'Nina', { loja: LC, dias: null }) // Loja C (WABA_E2E_C)
+  const AUT = um(`insert into automacoes (empresa_id, etapa_slug, etapa_id, gatilho, acao, config, ativo, espera_dias, modelo_id)
+    values (${E}, 'proposta', ${ET.proposta}, 'entrou_na_etapa', 'enviar_modelo', '{"parametros":[]}', true, 0, ${MC}) returning id`)
+  const exec = (p, loja) => um(`insert into automacao_execucoes (empresa_id, filial_id, automacao_id, negocio_id, contato_id, acao, modelo_id, status, agendada_para)
+    values (${E}, ${loja}, ${AUT}, ${p.neg}, ${p.c}, 'enviar_modelo', ${MC}, 'agendada', now() - interval '1 minute') returning id`)
+  const exA = exec(P.bia, LA), exC = exec(nina, LC)
+  const antesA = graph.length
+  await cron()
+  const stEx = (id) => um(`select status || '|' || coalesce(motivo, '') from automacao_execucoes where id=${id}`)
+  confere(stEx(exA) === 'pulada|modelo não aprovado no WhatsApp da loja deste negócio', `Automatize: negócio da Loja A pulado (modelo só no número da C): ${stEx(exA)}`)
+  const novos = graph.slice(antesA)
+  confere(stEx(exC).startsWith('executada') && novos.length === 1 && novos[0].url.includes(`/PHONE_E2E_C_${T}/messages`) && novos[0].template?.name === `tx_e2e_so_c_${T}` && novos[0].to === nina.fone,
+    `Automatize: negócio da Loja C sai pelo número da C (${stEx(exC)}; ${novos.map((g) => g.url).join(', ')})`)
+
   confere(graph.length > 0 && graph.every((g) => String(g.to).startsWith('5519900')), `Graph falsa: ${graph.length} envios, todos para 5519900…`)
 } catch (e) {
   falha(`erro: ${e?.stack ?? e}`)

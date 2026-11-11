@@ -16,6 +16,8 @@ type Modelo = {
   status: 'rascunho' | 'pendente' | 'aprovado' | 'rejeitado' | 'pausado' | 'desativado'
   motivo_recusa: string | null
   ultima_sync_em: string | null
+  /** O status em cada número de WhatsApp da empresa (11/11/2026: a Meta aprova por WABA). */
+  numeros?: { lojas: string; status: Modelo['status'] | 'ausente'; motivo: string | null }[]
 }
 
 const TOM: Record<Modelo['status'], 'ok' | 'warn' | 'bad' | 'neutro'> = {
@@ -154,6 +156,17 @@ export function ModelosView() {
                       <span className="text-[11px] uppercase tracking-wide text-ink-3">{m.categoria}</span>
                     </div>
                     <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] text-ink-2">{m.corpo}</p>
+                    {(m.numeros?.length ?? 0) > 1 && (
+                      <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-ink-3" data-modelo-numeros>
+                        {m.numeros!.map((n) => (
+                          <li key={n.lojas}>
+                            {n.lojas}: <span className={n.status === 'aprovado' ? 'text-ok' : n.status === 'ausente' || n.status === 'rejeitado' ? 'text-bad' : 'text-ink-2'}>
+                              {n.status === 'ausente' ? 'não existe neste número' : ROTULO[n.status]}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {m.motivo_recusa && (
                       <p className="mt-1 text-[11.5px] text-bad">
                         Motivo da recusa: {m.motivo_recusa.replace(/_/g, ' ').toLowerCase()}

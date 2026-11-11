@@ -9,7 +9,8 @@
 const V = process.env.META_GRAPH_VERSION || 'v25.0'
 const APP_ID = process.env.META_APP_ID ?? ''
 const APP_SECRET = process.env.META_APP_SECRET ?? ''
-const G = `https://graph.facebook.com/${V}`
+// META_GRAPH_BASE só no teste local (Graph falsa do e2e), como na Edge.
+const G = `${(process.env.META_GRAPH_BASE || 'https://graph.facebook.com').replace(/\/$/, '')}/${V}`
 
 export function metaConfigurada(): boolean {
   return !!(APP_ID && APP_SECRET)

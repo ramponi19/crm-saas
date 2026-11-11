@@ -1649,13 +1649,27 @@ async function segredoInternoOk(req: Request): Promise<boolean> {
 }
 
 /**
+ * MODELO APROVADO É POR NÚMERO (11/11/2026). A Meta aprova cada modelo dentro de uma WABA; a
+ * sincronização do app grava o status de cada uma em modelos_mensagem_wabas. Os caminhos de
+ * serviço conferem o status NA WABA DO CANAL QUE VAI ENVIAR — nunca o resumo da empresa
+ * (modelos_mensagem.status), que dizia "aprovado" para a JM inteira com o modelo existindo só no
+ * número de Jaguariúna.
+ */
+async function aprovadoNoNumero(empresaId: number, modeloId: number, canal: Canal): Promise<boolean> {
+  if (!canal.waba_id || !modeloId) return false;
+  const { data } = await db.from("modelos_mensagem_wabas").select("status")
+    .eq("empresa_id", empresaId).eq("modelo_id", modeloId).eq("waba_id", canal.waba_id).maybeSingle();
+  return data?.status === "aprovado";
+}
+
+/**
  * ENVIO AUTOMÁTICO DE MODELO (Automatize, decisões do Lucas, 04/11/2026).
  *
  * O único caminho de envio SEM usuário logado. Quem chama é o servidor do app
  * (lib/automacoes.ts), com o segredo interno (EDGE_INTERNAL_SECRET). As travas de volume, horário e 7 dias
  * moram lá; aqui a Edge confere de novo o que não pode passar de jeito nenhum:
  * segredo interno; automação existente, LIGADA, desta empresa, do tipo
- * enviar_modelo e com ESTE modelo; modelo desta empresa com status APROVADO; contato
+ * enviar_modelo e com ESTE modelo; modelo APROVADO no número (WABA) do canal que envia; contato
  * sem opt-out e não bloqueado. A mensagem é gravada com origem 'automacao' (o id da
  * automação fica em automacao_execucoes.mensagem_id).
  */
@@ -1676,12 +1690,13 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
   }
   const { data: m } = await db.from("modelos_mensagem").select("id, nome, idioma, status")
     .eq("id", modeloId).eq("empresa_id", empresaId).maybeSingle();
-  if (!m || m.status !== "aprovado") return json({ error: "modelo não aprovado" }, 409);
+  if (!m) return json({ error: "modelo não encontrado" }, 409);
   const { data: c } = await db.from("contatos").select("id, ativo, opt_out_em").eq("id", neg.contato_id ?? 0).maybeSingle();
   if (!c || c.opt_out_em || c.ativo === false) return json({ error: "contato com opt-out, bloqueado ou inexistente" }, 409);
 
   const canal = await canalDaLoja(empresaId, "whatsapp", (neg.filial_id as number | null) ?? null);
   if (!canal) return json({ error: "WhatsApp não conectado nesta loja" }, 502);
+  if (!(await aprovadoNoNumero(empresaId, modeloId, canal))) return json({ error: "modelo não aprovado no WhatsApp desta loja" }, 409);
   console.log(`envio automático: automação ${automacaoId}, modelo ${m.nome}, negócio ${negocioId}`);
   return await enviarModelo(canal, { ...body, leadId: negocioId, modelo: m.nome, idioma: m.idioma }, null, "automacao");
 }
@@ -1712,7 +1727,7 @@ async function envioTransmissao(req: Request, body: Record<string, unknown>): Pr
   if (!t || t.status !== "enviando") return json({ error: "transmissão pausada, encerrada ou de outra empresa" }, 409);
   const { data: m } = await db.from("modelos_mensagem").select("id, nome, idioma, status")
     .eq("id", t.modelo_id).eq("empresa_id", empresaId).maybeSingle();
-  if (!m || m.status !== "aprovado") return json({ error: "modelo não aprovado" }, 409);
+  if (!m) return json({ error: "modelo não encontrado" }, 409);
   const { data: c } = await db.from("contatos").select("id, ativo, opt_out_em")
     .eq("id", e.contato_id).eq("empresa_id", empresaId).maybeSingle();
   if (!c || c.opt_out_em || c.ativo === false) return json({ error: "contato com opt-out, bloqueado ou inexistente" }, 409);
@@ -1725,6 +1740,7 @@ async function envioTransmissao(req: Request, body: Record<string, unknown>): Pr
   if (!canal || (lojaT != null && canal.filial_id != null && canal.filial_id !== lojaT)) {
     return json({ error: "WhatsApp não conectado nesta loja" }, 502);
   }
+  if (!(await aprovadoNoNumero(empresaId, Number(t.modelo_id), canal))) return json({ error: "modelo não aprovado no WhatsApp desta loja" }, 409);
   console.log(`envio de transmissão: transmissão ${t.id}, envio ${envioId}, modelo ${m.nome}`);
   return await enviarModelo(canal, {
     leadId: e.negocio_id, number: e.telefone, modelo: m.nome, idioma: m.idioma,

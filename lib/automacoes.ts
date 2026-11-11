@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
+import { aprovadoNaLoja } from '@/lib/canais/modelos-waba'
 import {
   agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
 } from '@/lib/automatize/travas'
@@ -174,7 +175,12 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
   if (a.acao === 'enviar_modelo') {
     const { data: m } = await db.from('modelos_mensagem').select('id, nome, idioma, corpo, status').eq('id', a.modelo_id ?? 0).maybeSingle()
     const modelo = m as { id: number; nome: string; idioma: string; corpo: string | null; status: string } | null
-    if (!modelo || modelo.status !== 'aprovado') return { resultado: 'pulada', motivo: 'modelo não aprovado' }
+    if (!modelo) return { resultado: 'pulada', motivo: 'modelo apagado' }
+    // Aprovado NO NÚMERO que envia por esta loja (11/11/2026: a Meta aprova por WABA; o status
+    // da empresa é só resumo). Mesma regra de canal da Edge: o da loja, senão o último de qualquer loja.
+    if (!(await aprovadoNaLoja(db, e.empresa_id, modelo.id, neg.filial_id, true))) {
+      return { resultado: 'pulada', motivo: 'modelo não aprovado no WhatsApp da loja deste negócio' }
+    }
     const { data: c } = await db.from('contatos').select('id, telefone, telefone_e164, ativo, opt_out_em').eq('id', neg.contato_id ?? 0).maybeSingle()
     const contato = c as { id: number; telefone: string | null; telefone_e164: string | null; ativo: boolean | null; opt_out_em: string | null } | null
     if (!contato) return { resultado: 'pulada', motivo: 'sem contato' }

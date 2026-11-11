@@ -18,7 +18,8 @@ interface Numeros {
   transmissao_id: number; total: number; pendentes: number; enviadas: number; entregues: number; lidas: number
   respondidas: number; falhas: number; puladas: number
 }
-interface Modelo { id: number; nome: string; idioma: string; categoria: string; corpo: string; status: string }
+// aprovado_em: lojas (id, ou 'null' = empresa sem loja) cujo NÚMERO tem o modelo aprovado (11/11/2026).
+interface Modelo { id: number; nome: string; idioma: string; categoria: string; corpo: string; status: string; aprovado_em?: string[] }
 interface Loja { id: number; nome: string }
 interface Funil { id: number; nome: string; padrao: boolean }
 interface Etapa { id: number; funil_id: number; label: string }
@@ -152,9 +153,11 @@ function Teto({ form, fuso, recarregar }: { form: Form; fuso: string; recarregar
 // ── Nova transmissão: modelo, lista por filtro com prévia, envio ─────────────
 function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: string; fechar: () => void; pronto: (id: number | null) => Promise<void> }) {
   const lojas = dados.form?.lojas ?? []
-  const aprovados = dados.modelos.filter((m) => m.status === 'aprovado')
   const [nome, setNome] = useState('')
   const [loja, setLoja] = useState<number | ''>(lojas.length === 1 ? lojas[0].id : '')
+  // Só o que está aprovado NO NÚMERO da loja escolhida: a Meta aprova por conta de WhatsApp.
+  const chaveLoja = loja ? String(loja) : 'null'
+  const aprovados = dados.modelos.filter((m) => (m.aprovado_em ?? []).includes(chaveLoja))
   const [modeloId, setModeloId] = useState<number | ''>(aprovados[0]?.id ?? '')
   const [parametros, setParametros] = useState<string[]>([])
   const [filtro, setFiltro] = useState<FiltroPublico>({})
@@ -168,6 +171,11 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   const [salvando, setSalvando] = useState(false)
 
   const modelo = aprovados.find((m) => m.id === modeloId) ?? null
+  // Trocou a loja e o modelo escolhido não existe no número dela: cai no primeiro que existe.
+  useEffect(() => {
+    if (modeloId && aprovados.some((m) => m.id === modeloId)) return
+    setModeloId(aprovados[0]?.id ?? ''); setParametros([])
+  }, [chaveLoja]) // eslint-disable-line react-hooks/exhaustive-deps
   const nVars = variaveisDoModelo(modelo?.corpo)
   const etapasDoFunil = dados.etapas.filter((e) => !filtro.funil_id || e.funil_id === filtro.funil_id)
   const precisaLoja = lojas.length > 1 || dados.lojas.length > 1
@@ -234,8 +242,10 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
 
           <section className="space-y-3">
             <h4 className="text-[12px] font-semibold text-ink">Mensagem</h4>
-            {aprovados.length === 0 ? (
-              <p className="text-[12.5px] text-warn">Nenhum modelo aprovado pela Meta. Crie e espere a aprovação em Automações → Modelos.</p>
+            {precisaLoja && !loja ? (
+              <p className="text-[12.5px] text-ink-3">Escolha a loja: cada número de WhatsApp tem os seus modelos aprovados.</p>
+            ) : aprovados.length === 0 ? (
+              <p className="text-[12.5px] text-warn">Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Automações → Modelos.</p>
             ) : (
               <>
                 <Select label="Modelo aprovado" value={modeloId} onChange={(e) => { setModeloId(Number(e.target.value) || ''); setParametros([]) }}>

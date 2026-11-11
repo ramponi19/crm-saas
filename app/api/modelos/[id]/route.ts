@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
-import { decifrarToken } from '@/lib/canais/crypto'
-import { apagarModelo, ehErro } from '@/lib/canais/meta'
+import { apagarEmTodosOsNumeros } from '@/lib/canais/modelos-waba'
 
 /**
- * Apaga o modelo. Tenta apagar na Meta primeiro; se lá já não existe (ou o
- * WhatsApp foi desconectado), remove só o espelho — deixar linha órfã na tela
- * seria pior, porque o usuário veria um modelo que não existe mais.
+ * Apaga o modelo. Tenta apagar na Meta primeiro, em CADA número de WhatsApp da empresa (o
+ * modelo existe em cada WABA); se lá já não existe (ou o WhatsApp foi desconectado), remove só
+ * o espelho — deixar linha órfã na tela seria pior, porque o usuário veria um modelo que não
+ * existe mais.
  */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -23,22 +23,8 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
       .eq('id', Number(id)).eq('empresa_id', empresaId).maybeSingle()
     if (!modelo) return NextResponse.json({ error: 'Modelo não encontrado.' }, { status: 404 })
 
-    const { data: canais } = await svc
-      .from('canais')
-      .select('waba_id, access_token_enc')
-      .eq('empresa_id', empresaId).eq('tipo', 'whatsapp')
-      .order('conectado_em', { ascending: false }).limit(1)
-
-    const canal = canais?.[0]
-    let avisoMeta: string | null = null
-    if (canal?.waba_id && canal.access_token_enc) {
-      try {
-        const r = await apagarModelo(String(canal.waba_id), decifrarToken(canal.access_token_enc), modelo.nome)
-        if (ehErro(r)) avisoMeta = `Removido do CRM, mas a Meta respondeu: ${r.erro}`
-      } catch {
-        avisoMeta = 'Removido do CRM, mas não foi possível confirmar a remoção na Meta.'
-      }
-    }
+    const avisos = await apagarEmTodosOsNumeros(svc, empresaId, modelo.id, modelo.nome)
+    const avisoMeta = avisos.length ? `Removido do CRM, mas a Meta respondeu: ${avisos.join(' · ')}` : null
 
     const { error } = await svc.from('modelos_mensagem')
       .delete().eq('id', Number(id)).eq('empresa_id', empresaId)

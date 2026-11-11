@@ -23,7 +23,8 @@ export interface DadosAutomatize {
   podeEditar: boolean
   pausado: boolean
   etapas: { id: number; slug: string; label: string; automacoes: AutoDaEtapa[]; cadencias: CadDaEtapa[] }[]
-  modelos: { id: number; nome: string; idioma: string; corpo: string | null }[]
+  // lojas/faltam: onde o modelo está aprovado NO NÚMERO da loja (11/11/2026: a Meta aprova por WABA).
+  modelos: { id: number; nome: string; idioma: string; corpo: string | null; lojas: string[]; faltam: string[] }[]
   equipe: { id: string; nome: string }[]
 }
 
@@ -193,6 +194,15 @@ function NovaAutomacao({ slug, label, dados, onFechar, onCriou }: {
               <option value="">— escolha —</option>
               {dados.modelos.map((m) => <option key={m.id} value={m.id}>{m.nome} ({m.idioma})</option>)}
             </Select>
+            {(() => {
+              const m = dados.modelos.find((x) => String(x.id) === modelo)
+              if (!m || !m.faltam.length) return null
+              return (
+                <p className="text-[11px] leading-snug text-warn" data-modelo-faltam>
+                  Aprovado só no WhatsApp de {m.lojas.join(', ')}. Negócio de {m.faltam.join(', ')} não recebe (o número de lá não tem este modelo aprovado).
+                </p>
+              )
+            })()}
             <Input label="Variáveis ({{1}}|{{2}}…; use {{nome}})" value={parametros} onChange={(e) => setParametros(e.target.value)} placeholder="{{nome}}" />
             <p className="text-[11px] leading-snug text-ink-3">
               Vai de verdade para o cliente, no horário de atendimento, no máximo 1 vez por modelo a cada 7 dias e até 50 por hora na empresa. Quem pediu para não receber não recebe.

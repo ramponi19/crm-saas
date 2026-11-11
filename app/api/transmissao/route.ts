@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { aprovadoNaLoja, aprovadosPorLoja } from '@/lib/canais/modelos-waba'
 import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { CHAVE_CONFIG, TETO_MAX, filtroImpossivel, normalizarFiltro, tetoValido, variaveisDoModelo } from '@/lib/transmissao/filtro'
 import { enviadasNaHora, processarTransmissao, proximaJanela } from '@/lib/transmissao/motor'
@@ -61,9 +62,14 @@ export async function GET() {
     supabase.from('funil_etapas').select('id, funil_id, label, ordem').eq('empresa_id', empresaId).eq('ativo', true).order('ordem'),
   ])
 
+  // MODELO POR NÚMERO (11/11/2026): cada modelo diz em que loja está aprovado NO NÚMERO dela
+  // (chave = id da loja, ou 'null' para a empresa sem loja). A tela só oferece o da loja escolhida.
+  const svc = createServiceClient()
+  const porLoja = await aprovadosPorLoja(svc, empresaId)
+  const aprovadoEm = (id: number) => [...porLoja].filter(([, ids]) => ids.has(id)).map(([k]) => k)
+
   let form = null
   if (admin) {
-    const svc = createServiceClient()
     const [{ data: origens }, { data: cfg }, janela, naHora] = await Promise.all([
       supabase.rpc('transmissao_origens'),
       supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', CHAVE_CONFIG).maybeSingle(),
@@ -86,7 +92,8 @@ export async function GET() {
     transmissoes: lista ?? [],
     numeros: numeros ?? [],
     lojas: lojas ?? [],
-    modelos: (modelos ?? []).filter((m) => admin || ids.length === 0 || (lista ?? []).some((t) => t.modelo_id === m.id)),
+    modelos: (modelos ?? []).filter((m) => admin || ids.length === 0 || (lista ?? []).some((t) => t.modelo_id === m.id))
+      .map((m) => ({ ...m, aprovado_em: aprovadoEm(m.id as number) })),
     funis: funis ?? [],
     etapas: etapas ?? [],
     form,
@@ -136,7 +143,10 @@ export async function POST(req: Request) {
       const { data: m } = await supabase.from('modelos_mensagem').select('id, corpo, status')
         .eq('empresa_id', empresaId).eq('id', Number(b.modelo_id) || 0).maybeSingle()
       if (!m) return recusa('Escolha um modelo.')
-      if (m.status !== 'aprovado') return recusa('Só modelo aprovado pela Meta pode ser transmitido.')
+      // Aprovado NO NÚMERO da loja que envia (o status da empresa é só um resumo).
+      if (!(await aprovadoNaLoja(createServiceClient(), empresaId, m.id as number, loja.filial ?? null))) {
+        return recusa('Este modelo não está aprovado pela Meta no WhatsApp desta loja.')
+      }
       const parametros = (Array.isArray(b.parametros) ? b.parametros : []).map((p) => String(p ?? '').trim().slice(0, 200))
       const pede = variaveisDoModelo(m.corpo as string)
       if (parametros.length !== pede || parametros.some((p) => !p)) return recusa(`O modelo tem ${pede} variável(is): preencha todas.`)

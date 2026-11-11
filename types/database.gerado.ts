@@ -1875,6 +1875,33 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"modelos_mensagem_wabas": {
+                  Row: {
+                    "empresa_id": number,"meta_id": string | null,"modelo_id": number,"motivo_recusa": string | null,"status": string,"ultima_sync_em": string | null,"updated_at": string,"waba_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "empresa_id": number,"meta_id"?: string | null,"modelo_id": number,"motivo_recusa"?: string | null,"status"?: string,"ultima_sync_em"?: string | null,"updated_at"?: string,"waba_id": string
+                  }
+                  Update: {
+                    "empresa_id"?: number,"meta_id"?: string | null,"modelo_id"?: number,"motivo_recusa"?: string | null,"status"?: string,"ultima_sync_em"?: string | null,"updated_at"?: string,"waba_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "modelos_mensagem_wabas_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },
+                    {
+      foreignKeyName: "modelos_mensagem_wabas_modelo_id_fkey"
+      columns: ["modelo_id"]
+isOneToOne: false
+      referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"modulo_pedidos": {
                   Row: {
                     "atendido_em": string | null,"atendido_por": string | null,"empresa_id": number,"id": number,"modulo": string,"pedido_em": string,"pedido_por": string | null,"recusado_em": string | null,"recusado_por": string | null,"status": string
@@ -3283,6 +3310,17 @@ isOneToOne: true
                            },
 "transmissao_montar":
 { Args: { "p_transmissao": number }; Returns: number
+                           },
+"modelo_aprovado_na_loja":
+{ Args: { "p_empresa": number,"p_filial": number | null,"p_modelo": number,"p_qualquer_loja"?: boolean }; Returns: boolean
+                           },
+"modelos_aprovados_por_loja":
+{ Args: { "p_empresa": number }; Returns: {
+              "filial_id": number | null,"modelo_id": number
+            }[]
+                           },
+"whatsapp_waba_da_loja":
+{ Args: { "p_empresa": number,"p_filial": number | null,"p_qualquer_loja"?: boolean }; Returns: string
                            },
 "transmissao_numeros":
 { Args: { "p_ids": (number)[] }; Returns: {

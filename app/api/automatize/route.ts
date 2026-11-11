@@ -4,6 +4,27 @@ import { agora, inicioDoDia } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import { CHAVE_PAUSA } from '@/lib/automacoes'
+import { createServiceClient } from '@/lib/supabase/service'
+import { aprovadosPorLoja } from '@/lib/canais/modelos-waba'
+
+/**
+ * MODELO POR NÚMERO (11/11/2026): a automação é da empresa, mas o envio sai pelo WhatsApp da loja
+ * do negócio. Oferece só modelo aprovado no número de pelo menos uma loja, dizendo em quais está
+ * (e em quais falta); o motor pula, com o motivo, o negócio de loja onde ele não está aprovado.
+ */
+async function modelosPorLoja(empresaId: number) {
+  const svc = createServiceClient()
+  const [porLoja, { data: filiais }] = await Promise.all([
+    aprovadosPorLoja(svc, empresaId),
+    svc.from('filiais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+  ])
+  const lojas = (filiais ?? []) as { id: number; nome: string }[]
+  return (modeloId: number) => {
+    if (!lojas.length) return { lojas: porLoja.get('null')?.has(modeloId) ? ['Empresa'] : [], faltam: [] as string[] }
+    const em = lojas.filter((l) => porLoja.get(String(l.id))?.has(modeloId))
+    return { lojas: em.map((l) => l.nome), faltam: lojas.filter((l) => !em.includes(l)).map((l) => l.nome) }
+  }
+}
 
 /**
  * AUTOMATIZE NO FUNIL (04/11/2026): o que cada etapa faz sozinha.
@@ -48,7 +69,7 @@ export async function GET(req: Request) {
       .eq('empresa_id', empresaId).eq('gatilho', 'entrou_na_etapa').order('id'),
     supabase.from('cadencias').select('id, nome, ativo, gatilho_etapa_slug').eq('empresa_id', empresaId).order('id'),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', CHAVE_PAUSA).maybeSingle(),
-    supabase.from('modelos_mensagem').select('id, nome, idioma, status, corpo').eq('empresa_id', empresaId).eq('status', 'aprovado').order('nome'),
+    supabase.from('modelos_mensagem').select('id, nome, idioma, status, corpo').eq('empresa_id', empresaId).order('nome'),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
@@ -88,7 +109,10 @@ export async function GET(req: Request) {
     podeEditar: role === 'owner' || role === 'admin',
     pausado: !!(pausa?.valor as { pausado?: boolean } | null)?.pausado,
     etapas: porEtapa,
-    modelos: modelos ?? [],
+    modelos: await (async () => {
+      const onde = await modelosPorLoja(empresaId)
+      return (modelos ?? []).map((m) => ({ ...m, ...onde(m.id as number) })).filter((m) => m.lojas.length > 0)
+    })(),
     equipe: ((equipe ?? []) as unknown as { usuario_id: string; usuarios: { nome: string | null } | null }[])
       .map((u) => ({ id: u.usuario_id, nome: u.usuarios?.nome ?? '—' })),
   })
@@ -149,8 +173,10 @@ export async function POST(req: Request) {
     }
     if (acao === 'enviar_modelo') {
       modeloId = Number(b.modelo_id) || null
-      const { data: m } = await supabase.from('modelos_mensagem').select('id, status').eq('empresa_id', empresaId).eq('id', modeloId ?? 0).maybeSingle()
-      if (!m || (m as { status: string }).status !== 'aprovado') return NextResponse.json({ error: 'Só modelo aprovado pela Meta.' }, { status: 400 })
+      const { data: m } = await supabase.from('modelos_mensagem').select('id').eq('empresa_id', empresaId).eq('id', modeloId ?? 0).maybeSingle()
+      if (!m || !(await modelosPorLoja(empresaId))(modeloId as number).lojas.length) {
+        return NextResponse.json({ error: 'Só modelo aprovado pela Meta no WhatsApp de pelo menos uma loja.' }, { status: 400 })
+      }
       config.parametros = Array.isArray(b.parametros) ? (b.parametros as unknown[]).map(String).slice(0, 10) : []
     }
     const { data, error } = await supabase.from('automacoes').insert({
