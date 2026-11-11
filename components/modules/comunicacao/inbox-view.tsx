@@ -8,9 +8,10 @@ import { Button, Select } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useTempoReal, type EventoTR } from '@/components/layout/tempo-real-empresa'
 import {
-  CANAIS, aguardandoResposta, lerCanais, lerConversa, listarConversas,
+  CANAIS, lerCanais, lerConversa, listarConversas,
   type CanalInbox, type CanalTipo, type ConversaInbox, type Cursor, type FiltrosInbox,
 } from '@/lib/inbox/consultas'
+import { MAPA_VAZIO, conversaEsperando, lerEsperando, type MapaEsperando } from '@/lib/esperando'
 import type { KanbanColumn, Motivo, Usuario } from '@/components/modules/leads/types'
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import { useFuso } from '@/components/fuso-provider'
@@ -59,10 +60,10 @@ function previaDoTexto(p: Previa | undefined): string {
 }
 
 /** A conversa entra/sai da lista por conta própria? Só os filtros que dá para conferir aqui. */
-function passaNosFiltrosLocais(c: ConversaInbox, f: FiltrosInbox): boolean {
+function passaNosFiltrosLocais(c: ConversaInbox, f: FiltrosInbox, esperando: MapaEsperando): boolean {
   if (f.canal && c.canal?.tipo !== f.canal) return false
   if (f.naoLidas && !(c.nao_lidas > 0)) return false
-  if (f.aguardando && !aguardandoResposta(c)) return false
+  if (f.aguardando && !conversaEsperando(c, esperando)) return false
   return true
 }
 
@@ -101,6 +102,27 @@ export function InboxView(props: InboxProps) {
   const geracao = useRef(0)
   const { assinar, aoReconectar } = useTempoReal()
   const supabase = useMemo(() => createClient(), [])
+  /**
+   * Quem espera resposta, pela regra única do banco (`lib/esperando.ts`): o selo
+   * "aguardando" e o filtro. Relido a cada mensagem (com 2 s de folga, uma leitura
+   * por rajada) e a cada reconexão.
+   */
+  const [esperando, setEsperando] = useState<MapaEsperando>(MAPA_VAZIO)
+  const esperandoRef = useRef(esperando)
+  const [releEsperando, setReleEsperando] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    const t = setTimeout(() => {
+      lerEsperando(supabase).then((m) => {
+        if (!vivo) return
+        esperandoRef.current = m
+        setEsperando(m)
+        // Com o filtro "aguardando", quem entrou ou saiu da regra muda a lista: relê a página.
+        if (releEsperando && filtrosRef.current.aguardando) setRecarga((n) => n + 1)
+      }).catch(() => {})
+    }, releEsperando ? 2_000 : 0)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [supabase, releEsperando])
 
   // A URL acompanha filtros e conversa aberta (sem navegar: só troca o endereço).
   useEffect(() => {
@@ -193,6 +215,7 @@ export function InboxView(props: InboxProps) {
     if (e.tabela === 'mensagens' && e.tipo === 'INSERT' && e.novo.conversa_id != null) {
       const m = e.novo
       setPrevias((p) => ({ ...p, [m.conversa_id as number]: { conteudo: m.conteudo, direcao: m.direcao, tipo: m.tipo } }))
+      setReleEsperando((n) => n + 1)
       return
     }
     if (e.tabela !== 'conversas') return
@@ -210,7 +233,7 @@ export function InboxView(props: InboxProps) {
       setLista((l) => {
         const resto = l.filter((c) => c.id !== n.id)
         // Saiu do filtro (ex.: lida no filtro "não lidas")? Fica até a próxima carga se for a aberta.
-        if (!passaNosFiltrosLocais(atualizada, f) && n.id !== abertaRef.current) return resto
+        if (!passaNosFiltrosLocais(atualizada, f, esperandoRef.current) && n.id !== abertaRef.current) return resto
         return ordenar([atualizada, ...resto])
       })
       return
@@ -221,12 +244,12 @@ export function InboxView(props: InboxProps) {
     const topo = listaRef.current[0]?.ultima_mensagem_at
     if (topo && n.ultima_mensagem_at && ms(n.ultima_mensagem_at) < ms(topo) && listaRef.current.length >= 10) return
     const completa = await lerConversa(supabase, n.id)
-    if (!completa || !passaNosFiltrosLocais(completa, f)) return
+    if (!completa || !passaNosFiltrosLocais(completa, f, esperandoRef.current)) return
     setLista((l) => (l.some((c) => c.id === completa.id) ? l : ordenar([completa, ...l])))
   }), [assinar, supabase])
 
   // Caiu e voltou: recarrega a página atual da lista.
-  useEffect(() => aoReconectar(() => setRecarga((n) => n + 1)), [aoReconectar])
+  useEffect(() => aoReconectar(() => { setRecarga((n) => n + 1); setReleEsperando((n) => n + 1) }), [aoReconectar])
 
   const conversaAberta = lista.find((c) => c.id === aberta) ?? null
 
@@ -328,7 +351,7 @@ export function InboxView(props: InboxProps) {
                             {c.nao_lidas > 99 ? '99+' : c.nao_lidas}
                           </span>
                         )}
-                        {!naoLidas && aguardandoResposta(c) && (
+                        {!naoLidas && conversaEsperando(c, esperando) && (
                           <span className="ml-auto flex-none text-[10.5px] font-medium text-warn">aguardando</span>
                         )}
                       </span>

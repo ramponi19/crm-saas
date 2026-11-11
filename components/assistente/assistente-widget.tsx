@@ -244,6 +244,8 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
             if (ev.t === 'txt') { acc += ev.v; setConsultando(null); escrever(acc) }
             else if (ev.t === 'tool') { setConsultando(ev.v); if (acc && !acc.endsWith('\n')) { acc += '\n\n'; escrever(acc) } }
             else if (ev.t === 'erro') erro = ev.v
+            // O servidor tirou da resposta um número sem fundamento: o texto inteiro passa a ser este.
+            else if (ev.t === 'troca') { acc = ev.v; escrever(acc) }
           } catch { /* linha parcial */ }
         }
       }

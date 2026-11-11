@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado } from '@/lib/linhas-afetadas'
+import { conversaEsperando, lerEsperando, type MapaEsperando } from '@/lib/esperando'
 
 /**
  * A INBOX ÚNICA LÊ O CORE DIRETO (04/11/2026): `conversas`, `contatos`,
@@ -53,16 +54,17 @@ export interface ConversaInbox {
 export interface Cursor { momento: string; id: number }
 
 export const POR_PAGINA = 40
-/** Lote de varredura do filtro "aguardando resposta" (comparação de duas colunas, feita aqui). */
-const LOTE_VARREDURA = 500
-/** Teto de lotes por página no "aguardando": acima disso a página volta curta e o "carregar mais" continua. */
-const LOTES_MAX = 4
+/** Teto de conversas lidas no filtro "aguardando resposta" (a regra de 72 h deixa poucas centenas). */
+const TETO_AGUARDANDO = 1000
 
 const COLUNAS_CONVERSA = 'id, contato_id, canal_id, filial_id, nao_lidas, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at'
 const COLUNAS_CONTATO = 'id, nome, telefone, instagram, foto_url'
 const COLUNAS_CANAL = 'id, tipo, nome_exibicao, filial_id'
 
-/** A última mensagem é do cliente: ninguém respondeu depois dela. */
+/**
+ * A última mensagem DESTA conversa é do cliente. Comparação bruta, só da conversa (um canal) —
+ * o filtro e o selo "aguardando" da tela usam a regra única (`lib/esperando.ts`), não esta.
+ */
 export function aguardandoResposta(c: Pick<ConversaInbox, 'ultima_recebida_at' | 'ultima_enviada_at'>): boolean {
   if (!c.ultima_recebida_at) return false
   if (!c.ultima_enviada_at) return true
@@ -107,7 +109,7 @@ export async function lerCanais(db: Db): Promise<CanalInbox[]> {
  * em lotes e guarda só as que batem; o cursor segue a última linha VARRIDA.
  */
 export async function listarConversas(
-  db: Db, f: FiltrosInbox, canais: CanalInbox[], cursor?: Cursor | null,
+  db: Db, f: FiltrosInbox, canais: CanalInbox[], cursor?: Cursor | null, esperando?: MapaEsperando,
 ): Promise<{ itens: ConversaInbox[]; proximo: Cursor | null }> {
   let contatos: number[] | null = null
   if (f.busca.trim()) {
@@ -131,7 +133,6 @@ export async function listarConversas(
     let q: any = db.from('conversas').select(selecao).not('ultima_mensagem_at', 'is', null)
     if (idsCanal) q = q.in('canal_id', idsCanal)
     if (f.naoLidas) q = q.gt('nao_lidas', 0)
-    if (f.aguardando) q = q.not('ultima_recebida_at', 'is', null)
     if (contatos) q = q.in('contato_id', contatos)
     if (comResp) q = f.responsavel === 'nenhum'
       ? q.is('contato.negocios.responsavel_id', null)
@@ -151,39 +152,23 @@ export async function listarConversas(
   }
 
   /**
-   * "Aguardando resposta": a varredura traz só as datas (≈ 10 KB por lote de 200,
-   * contra ≈ 90 KB com contato e canal) e o detalhe vem depois, só das que entram
-   * na página. Medido no local em 04/11 com a JM inteira: a varredura completa caiu
-   * de 330 ms por página; a página tem no máximo POR_PAGINA conversas.
+   * "Aguardando resposta" = a regra única (`esperando_resposta`, 11/11/2026): última do cliente nas
+   * últimas 72 h, canais da loja juntos, sem resposta da loja depois (envio que falhou não conta).
+   * O banco devolve os contatos + lojas que esperam (poucas centenas); daqui vêm só as conversas
+   * deles, e entra a do canal em que o cliente falou por último. Antes: varredura em lotes de 500
+   * comparando duas colunas de cada conversa, por canal e sem janela.
    */
-  const leve: string = comResp
-    ? 'id, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at, contato:contatos!inner(id, negocios!negocios_contato_id_fkey!inner(responsavel_id))'
-    : 'id, ultima_mensagem_at, ultima_recebida_at, ultima_enviada_at'
-  type Leve = Pick<ConversaInbox, 'id' | 'ultima_mensagem_at' | 'ultima_recebida_at' | 'ultima_enviada_at'>
-  const achadas: Leve[] = []
-  let atual = cursor ?? null
-  let acabou = false
-  for (let volta = 0; volta < LOTES_MAX && achadas.length < POR_PAGINA; volta++) {
-    const { data, error } = await consulta(leve, atual, LOTE_VARREDURA)
-    if (error) throw new Error(error.message)
-    const linhas = (data ?? []) as Leve[]
-    for (const l of linhas) if (aguardandoResposta(l)) achadas.push(l)
-    const ultima = linhas[linhas.length - 1]
-    atual = ultima ? { momento: ultima.ultima_mensagem_at as string, id: ultima.id } : null
-    if (linhas.length < LOTE_VARREDURA) { acabou = true; break }
-  }
-  // Página com no máximo POR_PAGINA: se sobrou, a próxima recomeça depois da última que entrou.
-  const pagina = achadas.slice(0, POR_PAGINA)
-  const cortou = achadas.length > POR_PAGINA
-  const ultimaDaPagina = pagina[pagina.length - 1]
-  const proximo = cortou && ultimaDaPagina ? { momento: ultimaDaPagina.ultima_mensagem_at as string, id: ultimaDaPagina.id }
-    : acabou ? null : atual
-  if (!pagina.length) return { itens: [], proximo }
-  const { data, error } = await db.from('conversas').select(`${COLUNAS_CONVERSA}, contato:contatos(${COLUNAS_CONTATO}), canal:canais(${COLUNAS_CANAL})` as string)
-    .in('id', pagina.map((c) => c.id))
+  const mapa = esperando ?? await lerEsperando(db)
+  const quem = [...new Set([...mapa.porContatoLoja.keys()].map((k) => Number(k.split(':')[0])))]
+  const alvo = contatos ? quem.filter((id) => contatos!.includes(id)) : quem
+  if (!alvo.length) return { itens: [], proximo: null }
+  contatos = alvo
+  const { data, error } = await consulta(completa, cursor ?? null, TETO_AGUARDANDO)
   if (error) throw new Error(error.message)
-  const porId = new Map(limpar(data ?? []).map((c) => [c.id, c]))
-  return { itens: pagina.map((c) => porId.get(c.id)).filter((c): c is ConversaInbox => !!c), proximo }
+  const achadas = limpar(data ?? []).filter((c) => conversaEsperando(c, mapa))
+  const itens = achadas.slice(0, POR_PAGINA)
+  const ultima = itens[itens.length - 1]
+  return { itens, proximo: achadas.length > POR_PAGINA && ultima ? { momento: ultima.ultima_mensagem_at as string, id: ultima.id } : null }
 }
 
 /** Uma conversa pelo id (a RLS devolve nada se for de outra loja). */

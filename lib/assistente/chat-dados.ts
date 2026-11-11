@@ -4,7 +4,7 @@ import { mensagemDoProvedor } from '@/lib/assistente-erros'
 import type { Acesso } from './acesso'
 import { negocioDoPreset } from './negocio'
 import { executar, FERRAMENTAS, ROTULO, type Recorte } from './ferramentas'
-import { AVISO_SEM_CONSULTA, numerosAfirmados, semNumeros } from './numeros'
+import { AVISO_SEM_CONSULTA, avisoSemFundamento, numerosAfirmados, semFundamento, semNumeros, trocarTrechos } from './numeros'
 import { formatarNoFuso } from '@/lib/datas'
 
 /**
@@ -23,6 +23,7 @@ import { formatarNoFuso } from '@/lib/datas'
  *   {"t":"txt","v":"…"}       pedaço da resposta, para ir aparecendo
  *   {"t":"tool","v":"…"}      o assistente foi consultar algo ("Consultando vendas")
  *   {"t":"erro","v":"…"}      falhou — a frase já é para o usuário
+ *   {"t":"troca","v":"…"}     o texto inteiro da resposta até aqui passa a ser este (saiu número sem fundamento)
  *
  * Texto puro (o formato antigo do Gemini) não serve: a tela precisa saber a
  * diferença entre resposta e "estou consultando", ou o usuário fica olhando
@@ -103,6 +104,8 @@ export function respostaDoChat(o: {
   recorte?: Recorte
   /** Para os testes: um cliente falso no lugar da Anthropic. */
   cliente?: Pick<Anthropic, 'messages'>
+  /** Para os testes: as ferramentas no lugar do banco. */
+  executor?: typeof executar
   acesso: Acesso
   turnos: Turno[]
   modelo: string
@@ -140,17 +143,28 @@ export function respostaDoChat(o: {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const enviar = (t: string, v: string) => controller.enqueue(enc.encode(JSON.stringify({ t, v }) + '\n'))
+      /** Tudo o que já foi para a tela nesta resposta — `troca` reescreve a partir daqui. */
+      let mostrado = ''
+      const enviarTxt = (v: string) => { mostrado += v; enviar('txt', v) }
+      const trocar = (v: string) => { mostrado = v; enviar('troca', v) }
       let tokIn = 0, tokOut = 0
       /**
-       * NÚMERO SÓ DE CONSULTA (`numeros.ts`). Enquanto nenhuma ferramenta foi
-       * chamada nesta resposta, o texto fica SEGURO aqui, sem ir para a tela.
-       * Se a rodada chama ferramenta, o texto (o "vou consultar…") sai e o resto
-       * da resposta corre ao vivo. Se a resposta termina sem consulta e afirma
-       * número, o modelo é mandado consultar (uma vez); se insistir, os números
-       * saem trocados por "[número não consultado]".
+       * NÚMERO SÓ DE CONSULTA E COM FUNDAMENTO (`numeros.ts`).
+       *
+       * Sem consulta: enquanto nenhuma ferramenta foi chamada nesta resposta, o
+       * texto fica SEGURO aqui, sem ir para a tela. Se a rodada chama ferramenta,
+       * o texto (o "vou consultar…") sai e o resto corre ao vivo.
+       *
+       * Com consulta: a resposta final corre ao vivo e, no fim, cada contagem,
+       * valor ou percentual é conferido contra os resultados das ferramentas
+       * DESTA resposta (ou soma direta deles). Faltou fundamento: a resposta sai
+       * da tela (`troca`) e o modelo é mandado corrigir, uma vez; se insistir, o
+       * número fica como "[número não consultado]".
        */
       let consultou = false
       let correcoes = 0
+      /** Os resultados das ferramentas desta resposta: o fundamento dos números. */
+      const fundamento: string[] = []
       try {
         for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
           const s = client.messages.stream({
@@ -162,8 +176,9 @@ export function respostaDoChat(o: {
             output_config: { effort: 'medium' },
           })
           const segurar = !consultou
-          let seguro = ''
-          s.on('text', (delta) => { if (segurar) seguro += delta; else enviar('txt', delta) })
+          const antes = mostrado
+          let daRodada = ''
+          s.on('text', (delta) => { daRodada += delta; if (!segurar) enviarTxt(delta) })
           const msg = await s.finalMessage()
           const u = msg.usage
           tokIn += (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
@@ -172,21 +187,23 @@ export function respostaDoChat(o: {
           if (msg.stop_reason === 'refusal') { enviar('erro', 'Não consigo ajudar com esse pedido.'); break }
           const usos = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
           if (msg.stop_reason !== 'tool_use' || !usos.length) {
-            if (segurar) {
-              const achados = numerosAfirmados(seguro)
-              if (achados.length && correcoes < 1 && rodada < MAX_RODADAS - 1) {
-                correcoes++
-                console.error('[assistente] número sem consulta, pedindo consulta:', achados.slice(0, 5).join(' | '))
-                messages.push({ role: 'assistant', content: msg.content })
-                messages.push({ role: 'user', content: AVISO_SEM_CONSULTA })
-                continue
-              }
-              if (seguro) enviar('txt', achados.length ? semNumeros(seguro) : seguro)
+            const sem = consultou ? semFundamento(daRodada, fundamento) : numerosAfirmados(daRodada)
+            if (sem.length && correcoes < 1 && rodada < MAX_RODADAS - 1) {
+              correcoes++
+              console.error(`[assistente] número ${consultou ? 'sem fundamento' : 'sem consulta'}, pedindo correção:`, sem.slice(0, 5).join(' | '))
+              if (!segurar) trocar(antes)
+              messages.push({ role: 'assistant', content: msg.content })
+              messages.push({ role: 'user', content: consultou ? avisoSemFundamento(sem) : AVISO_SEM_CONSULTA })
+              continue
             }
-            if (msg.stop_reason === 'max_tokens') enviar('txt', '\n\n_(resposta cortada por tamanho — peça a continuação)_')
+            if (sem.length) {
+              const limpo = consultou ? trocarTrechos(daRodada, sem) : semNumeros(daRodada)
+              if (segurar) enviarTxt(limpo); else trocar(antes + limpo)
+            } else if (segurar && daRodada) enviarTxt(daRodada)
+            if (msg.stop_reason === 'max_tokens') enviarTxt('\n\n_(resposta cortada por tamanho — peça a continuação)_')
             break
           }
-          if (segurar && seguro) enviar('txt', seguro)
+          if (segurar && daRodada) enviarTxt(daRodada)
           consultou = true
 
           // O conteúdo inteiro volta, inclusive o pensamento: a Anthropic exige
@@ -195,17 +212,20 @@ export function respostaDoChat(o: {
           const resultados: Anthropic.ToolResultBlockParam[] = []
           for (const uso of usos) {
             enviar('tool', ROTULO[uso.name] ?? 'Consultando o sistema')
+            // A tela separa o texto de antes da consulta com uma linha em branco; o `mostrado` acompanha.
+            if (mostrado && !mostrado.endsWith('\n')) mostrado += '\n\n'
             let conteudo: string
             try {
-              conteudo = await executar({ db: o.db, svc: o.svc, ler: o.ler, recorte: o.recorte, acesso: o.acesso, fuso: o.fuso }, uso.name, uso.input)
+              conteudo = await (o.executor ?? executar)({ db: o.db, svc: o.svc, ler: o.ler, recorte: o.recorte, acesso: o.acesso, fuso: o.fuso }, uso.name, uso.input)
             } catch (e) {
               console.error(`[assistente] ferramenta ${uso.name} falhou:`, e)
               conteudo = JSON.stringify({ erro: 'a consulta falhou; diga ao usuário que não foi possível ler esse dado agora' })
             }
             resultados.push({ type: 'tool_result', tool_use_id: uso.id, content: conteudo })
+            fundamento.push(conteudo)
           }
           messages.push({ role: 'user', content: resultados })
-          if (rodada === MAX_RODADAS - 1) enviar('txt', '\n\n_(parei de consultar para não gastar demais — refine a pergunta)_')
+          if (rodada === MAX_RODADAS - 1) enviarTxt('\n\n_(parei de consultar para não gastar demais — refine a pergunta)_')
         }
       } catch (e) {
         if (e instanceof Anthropic.APIError) {

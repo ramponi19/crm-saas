@@ -32,9 +32,16 @@ const PADROES: RegExp[] = [
 
 /** Os trechos do texto que afirmam contagem, valor ou percentual. */
 export function numerosAfirmados(texto: string): string[] {
-  const achados: string[] = []
-  for (const p of PADROES) for (const m of texto.matchAll(p)) achados.push(m[0].trim())
-  return [...new Set(achados)]
+  // Um trecho por lugar do texto: "R$ 95 mil" não conta de novo como "95 mil".
+  const achados: { ini: number; fim: number; t: string }[] = []
+  for (const p of PADROES) {
+    for (const m of texto.matchAll(p)) {
+      const ini = m.index ?? 0, fim = ini + m[0].length
+      if (achados.some((a) => ini < a.fim && fim > a.ini)) continue
+      achados.push({ ini, fim, t: m[0].trim() })
+    }
+  }
+  return [...new Set(achados.sort((a, b) => a.ini - b.ini).map((a) => a.t))]
 }
 
 /** Troca cada número afirmado por um aviso — último recurso, quando o modelo insiste sem consultar. */
@@ -43,6 +50,115 @@ export function semNumeros(texto: string): string {
   for (const p of PADROES) t = t.replace(p, '[número não consultado]')
   return t
 }
+
+// ── FUNDAMENTO (11/11/2026) ──────────────────────────────────────────────────
+//
+// Consultar não basta: no smoke de 10/11 o "2.238 leads" veio DEPOIS de uma
+// busca que não trazia esse número. Pedido do Lucas: todo número de contagem,
+// valor ou percentual da resposta final tem de aparecer nos resultados das
+// ferramentas daquela resposta, ou ser soma direta deles.
+
+/** "2.238" → 2238; "89,6" → 89.6; "2.5" → 2.5. Devolve também quantas casas decimais o texto mostra. */
+function numeroBr(t: string): { v: number; casas: number } | null {
+  const s = t.trim()
+  if (!s) return null
+  if (s.includes(',')) {
+    const [int, dec] = s.split(',')
+    const v = Number(`${int.replace(/\./g, '')}.${dec}`)
+    return Number.isFinite(v) ? { v, casas: dec.length } : null
+  }
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return { v: Number(s.replace(/\./g, '')), casas: 0 }
+  const v = Number(s)
+  return Number.isFinite(v) ? { v, casas: s.includes('.') ? s.split('.')[1].length : 0 } : null
+}
+
+export interface Afirmado { trecho: string; valor: number; tolerancia: number }
+
+/** Cada número afirmado com o valor e a tolerância do arredondamento que o texto mostra. */
+export function valoresAfirmados(texto: string): Afirmado[] {
+  const out: Afirmado[] = []
+  for (const trecho of numerosAfirmados(texto)) {
+    const m = trecho.match(/\d[\d.,]*/)
+    const n = m ? numeroBr(m[0].replace(/[.,]$/, '')) : null
+    if (!n) continue
+    const mult = /milh[õo]es|\bmi\b/i.test(trecho) ? 1_000_000 : /\bmil\b/i.test(trecho) ? 1_000 : 1
+    out.push({ trecho, valor: n.v * mult, tolerancia: Math.max(0.005, 0.5 * 10 ** -n.casas * mult) })
+  }
+  return out
+}
+
+const TETO_NUMEROS = 400
+
+/**
+ * Os números que as ferramentas devolveram nesta resposta — e o que sai deles
+ * sem conta do modelo: tamanho de lista, soma de um campo numa lista, quantos
+ * itens de uma lista têm um campo com um valor (ex.: esperando_loja = true), e
+ * somas diretas de dois deles.
+ */
+export function numerosDasFerramentas(resultados: string[]): number[] {
+  const nums: number[] = []
+  const add = (v: number) => { if (Number.isFinite(v)) nums.push(v) }
+  const doTexto = (s: string) => {
+    for (const m of s.matchAll(/\d[\d.,]*\d|\d/g)) { const n = numeroBr(m[0]); if (n) add(n.v) }
+  }
+  const andar = (x: unknown): void => {
+    if (typeof x === 'number') return add(x)
+    if (typeof x === 'string') return doTexto(x)
+    if (Array.isArray(x)) {
+      add(x.length)
+      const objs = x.filter((i): i is Record<string, unknown> => !!i && typeof i === 'object' && !Array.isArray(i))
+      if (objs.length) {
+        const somas = new Map<string, number>()
+        const contagens = new Map<string, number>()
+        const contar = (prefixo: string, o: Record<string, unknown>) => {
+          for (const [k, v] of Object.entries(o)) {
+            if (typeof v === 'number') somas.set(prefixo + k, (somas.get(prefixo + k) ?? 0) + v)
+            else if (typeof v === 'boolean' || typeof v === 'string') {
+              const ch = `${prefixo}${k}=${v}`
+              contagens.set(ch, (contagens.get(ch) ?? 0) + 1)
+            } else if (v && typeof v === 'object' && !Array.isArray(v) && !prefixo) contar(`${k}.`, v as Record<string, unknown>)
+          }
+        }
+        for (const o of objs) contar('', o)
+        for (const v of somas.values()) add(v)
+        for (const v of contagens.values()) add(v)
+      }
+      for (const i of x) andar(i)
+      return
+    }
+    if (x && typeof x === 'object') for (const v of Object.values(x)) andar(v)
+  }
+  for (const r of resultados) {
+    try { andar(JSON.parse(r)) } catch { doTexto(r) }
+  }
+  const base = [...new Set(nums)].slice(0, TETO_NUMEROS)
+  const comSomas = new Set(base)
+  for (let i = 0; i < base.length; i++) for (let j = i + 1; j < base.length; j++) comSomas.add(base[i] + base[j])
+  return [...comSomas]
+}
+
+/** Os trechos da resposta cujo número não aparece nos resultados (nem como soma direta). */
+export function semFundamento(texto: string, resultados: string[]): string[] {
+  const afirmados = valoresAfirmados(texto)
+  if (!afirmados.length) return []
+  const base = numerosDasFerramentas(resultados)
+  return afirmados
+    .filter((a) => !base.some((n) => Math.abs(n - a.valor) <= a.tolerancia))
+    .map((a) => a.trecho)
+}
+
+/** Troca só os trechos sem fundamento. */
+export function trocarTrechos(texto: string, trechos: string[]): string {
+  let t = texto
+  for (const tr of [...trechos].sort((a, b) => b.length - a.length)) t = t.split(tr).join('[número não consultado]')
+  return t
+}
+
+/** O que o chat diz ao modelo quando um número da resposta não está nos resultados das ferramentas. */
+export const avisoSemFundamento = (trechos: string[]) =>
+  '[verificação automática do sistema, não do usuário] Estes números da sua resposta não aparecem nos resultados '
+  + `das ferramentas desta resposta, nem como soma direta deles: ${trechos.slice(0, 8).join('; ')}. `
+  + 'Refaça a resposta usando só números que as ferramentas trouxeram — consulte de novo se precisar — ou retire o número.'
 
 /** O que o chat diz ao modelo quando ele responde com número sem ter consultado. */
 export const AVISO_SEM_CONSULTA = '[verificação automática do sistema, não do usuário] Sua resposta afirma contagem, valor ou '

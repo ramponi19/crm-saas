@@ -14,6 +14,8 @@ import { LeadModal } from './lead-modal'
 import { NewLeadModal } from './new-lead-modal'
 import { Topbar } from '@/components/layout/topbar'
 import { ScoreConfigProvider } from './score-config-context'
+import { EsperandoProvider } from './esperando-contexto'
+import { MAPA_VAZIO, lerEsperando, type MapaEsperando } from '@/lib/esperando'
 import { DEFAULT_SCORE_CONFIG, type ScoreConfig } from '@/lib/lead-score'
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import {
@@ -63,6 +65,8 @@ const SEM_CONTAGENS: Contagens = { etapas: {}, esteira: 0 }
 export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, funis, scoreConfig = DEFAULT_SCORE_CONFIG, restringe = false, meuId, equipeLabel = 'Vendedor', agora }: LeadsViewProps) {
   const [leads,          setLeads]          = useState<LeadDoQuadro[]>([])
   const [contagens,      setContagens]      = useState<Contagens>(SEM_CONTAGENS)
+  /** Quem espera resposta (regra única do banco): os cartões leem daqui. */
+  const [esperando,      setEsperando]      = useState<MapaEsperando>(MAPA_VAZIO)
   const [carregando,     setCarregando]     = useState(true)
   const [carregandoMais, setCarregandoMais] = useState<Record<string, boolean>>({})
   const [selectedId,     setSelectedId]     = useState<number | null>(null)
@@ -137,8 +141,8 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   useEffect(() => {
     let vivo = true
     const db = createClient()
-    Promise.all([contagensDoQuadro(db, filtros), aberturaDoQuadro(db, filtros)])
-      .then(([c, l]) => { if (vivo) { setContagens(c); setLeads(l); setCarregando(false) } })
+    Promise.all([contagensDoQuadro(db, filtros), aberturaDoQuadro(db, filtros), lerEsperando(db).catch(() => MAPA_VAZIO)])
+      .then(([c, l, e]) => { if (vivo) { setContagens(c); setLeads(l); setEsperando(e); setCarregando(false) } })
       .catch((e) => { if (vivo) { setCarregando(false); notify.bad('Não foi possível carregar o funil', (e as Error).message) } })
     return () => { vivo = false }
   }, [filtros])
@@ -148,7 +152,10 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   const pedirRecontagem = useCallback(() => {
     if (recontar.current) clearTimeout(recontar.current)
     recontar.current = setTimeout(() => {
-      contagensDoQuadro(createClient(), filtrosRef.current).then(setContagens).catch(() => {})
+      const db = createClient()
+      contagensDoQuadro(db, filtrosRef.current).then(setContagens).catch(() => {})
+      // O selo "cliente há X" de cada cartão segue a mesma regra do contador do topo.
+      lerEsperando(db).then(setEsperando).catch(() => {})
     }, 600)
   }, [])
 
@@ -278,6 +285,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
 
   return (
     <ScoreConfigProvider value={scoreConfig}>
+    <EsperandoProvider value={esperando}>
     <div className="flex flex-col h-full min-h-0">
 
       <Topbar title="Leads" />
@@ -339,7 +347,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
             {' · '}<span className="font-semibold text-ink">{fmtK(stats.negoc)}</span> em negociação
             {' · '}conversão {stats.taxa}%
             {stats.precisam > 0 && (
-              <span className="font-semibold text-bad"> · {stats.precisam} aguardando resposta</span>
+              <span className="font-semibold text-bad" title="Última mensagem do cliente nas últimas 72 h, sem resposta da loja (a mesma regra do ZapIntel, da Comunicação e do Assistente)"> · {stats.precisam} esperando resposta</span>
             )}
           </div>
         </div>
@@ -415,6 +423,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
         />
       )}
     </div>
+    </EsperandoProvider>
     </ScoreConfigProvider>
   )
 }

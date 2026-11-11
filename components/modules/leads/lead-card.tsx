@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { calcularScore } from '@/lib/lead-score'
 import { aguardandoResposta } from '@/lib/esteira'
 import { useScoreConfig } from './score-config-context'
+import { useEsperando } from './esperando-contexto'
 import { assinarRelogio, instanteDoRelogio } from './relogio'
 import { OrigemIcon } from '@/components/modules/conversa/canal-icone'
 
@@ -84,7 +85,9 @@ export function LeadCard({ lead, usuarios, onClick, isDragging = false, sla, ago
 
   const responsavel = usuarios.find((u) => u.id === lead.responsavel_id)
   const temMsgs = (lead.msgs_nao_lidas ?? 0) > 0
-  const esperandoDesde = aguardandoDesde(lead)
+  // A regra única do banco quando o quadro a fornece; fora do quadro, a comparação de antes.
+  const mapaEsperando = useEsperando()
+  const esperandoDesde = mapaEsperando ? (mapaEsperando.porNegocio.get(lead.id) ?? null) : aguardandoDesde(lead)
   const scoreCfg = useScoreConfig()
 
   /**

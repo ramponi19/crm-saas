@@ -108,7 +108,7 @@ export const FERRAMENTAS: Anthropic.Tool[] = [
         filial: FILIAL,
         etapa: { type: 'string', description: 'Etapa do funil (kanban), ex.: novo, em_contato, orcamento, negociando, convertido, perdido, pos_venda.' },
         classificacao: { type: 'string', enum: ['customer', 'hot', 'warm', 'followup', 'stalled', 'lost', 'unqualified'], description: 'Classificação da análise de IA: customer=cliente, hot=quente, warm=morno, followup, stalled=parado, lost=perdido, unqualified=sem perfil.' },
-        esperando_loja: { type: 'boolean', description: 'true = só leads cuja última mensagem é do cliente (a loja deve resposta).' },
+        esperando_loja: { type: 'boolean', description: 'true = só leads ESPERANDO RESPOSTA, pela regra única do sistema (a mesma do painel, da Comunicação e do quadro): a última mensagem do cliente chegou nas últimas 72 h e a loja não respondeu depois (envio que falhou não conta); candidatos à vaga e não-clientes ficam de fora. Diga essa definição ao responder.' },
         parado_ha_dias_min: { type: 'integer', description: 'Só leads sem nenhuma mensagem há pelo menos N dias.' },
         criado_de: DATA,
         criado_ate: DATA,
@@ -349,7 +349,11 @@ async function leadTemConversa(c: Contexto, lead: LeadVisivel): Promise<boolean>
   return principais.get(chaveLoja(lead.contato_id, lead.filial_id)) === lead.id
 }
 
-type Status = { lead_id: number; ultima_recebida: string | null; ultima_enviada: string | null; mensagens: number }
+/** `esperando` e `esperando_desde` vêm da regra única do banco (`esperando_resposta`, 11/11/2026). */
+type Status = {
+  lead_id: number; ultima_recebida: string | null; ultima_enviada: string | null; mensagens: number
+  esperando: boolean; esperando_desde: string | null
+}
 
 type FichaCurta = {
   lead_id: number; mensagens: number
@@ -375,7 +379,7 @@ export function filtroDoStatus(e: Entrada, filialId: number | undefined): Filtro
   }
 }
 
-type LinhaStatus = [number, string | null, string | null, number, number | null, string | null, string | null, string | null, string | null, string | null, boolean]
+type LinhaStatus = [number, string | null, string | null, number, number | null, string | null, string | null, string | null, string | null, string | null, boolean, boolean?, (string | null)?]
 
 /**
  * Status da conversa + ficha curta de cada lead ativo que passa no filtro —
@@ -392,10 +396,10 @@ function statusEFichas(c: Contexto, f: FiltroDoStatus): Promise<Map<number, { s:
     })
     if (error) throw new Error(`status das conversas: ${error.message}`)
     const m = new Map<number, { s: Status; f?: FichaCurta }>()
-    for (const [id, rec, env, n, fm, cls, score, urg, rotulo, acao, temFicha] of (data ?? []) as LinhaStatus[]) {
+    for (const [id, rec, env, n, fm, cls, score, urg, rotulo, acao, temFicha, esperando, desde] of (data ?? []) as LinhaStatus[]) {
       const lead_id = Number(id)
       m.set(lead_id, {
-        s: { lead_id, ultima_recebida: rec, ultima_enviada: env, mensagens: n },
+        s: { lead_id, ultima_recebida: rec, ultima_enviada: env, mensagens: n, esperando: esperando === true, esperando_desde: desde ?? null },
         f: temFicha ? { lead_id, mensagens: fm as number, classificacao: cls, score, urgencia: urg, rotulo, acao } : undefined,
       })
     }
@@ -607,7 +611,8 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
     const s = conversas.get(l.id)?.s
     const f = conversas.get(l.id)?.f
     const ultima = [s?.ultima_recebida, s?.ultima_enviada].filter(Boolean).sort().pop() ?? null
-    const esperando = !!s?.ultima_recebida && (!s.ultima_enviada || s.ultima_recebida > s.ultima_enviada)
+    // A regra única (esperando_resposta): última do cliente nas últimas 72 h sem resposta da loja; candidatos à parte.
+    const esperando = !!s?.esperando
     return { l, s, f, ultima, esperando }
   }).filter(({ l, s, f, ultima, esperando }) => {
     if (!s) return false // sem conversa nenhuma
@@ -627,7 +632,7 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
   linhas.sort((a, b) => {
     if (ord === 'score') return Number(b.f?.score ?? -1) - Number(a.f?.score ?? -1)
     if (ord === 'mais_antigos_sem_resposta') {
-      return (a.s?.ultima_recebida ?? '') < (b.s?.ultima_recebida ?? '') ? -1 : 1
+      return (a.s?.esperando_desde ?? a.s?.ultima_recebida ?? '') < (b.s?.esperando_desde ?? b.s?.ultima_recebida ?? '') ? -1 : 1
     }
     return (a.ultima ?? '') < (b.ultima ?? '') ? 1 : -1
   })
@@ -646,7 +651,7 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
       mensagens: s?.mensagens ?? 0,
       ultima_mensagem: quando(ultima, fuso),
       esperando_loja: esperando,
-      esperando_desde: esperando ? quando(s?.ultima_recebida, fuso) : null,
+      esperando_desde: esperando ? quando(s?.esperando_desde ?? s?.ultima_recebida, fuso) : null,
       analise_ia: f ? {
         classificacao: f.classificacao, score: f.score ? Number(f.score) : null, urgencia: f.urgencia,
         perfil: f.rotulo, proxima_acao: f.acao,

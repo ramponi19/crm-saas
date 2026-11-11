@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { numerosAfirmados, semNumeros } from '@/lib/assistente/numeros'
+import { numerosAfirmados, semFundamento, semNumeros, trocarTrechos } from '@/lib/assistente/numeros'
 import { respostaDoChat } from '@/lib/assistente/chat-dados'
 import { rotuloDaRede } from '@/lib/assistente/recorte'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -84,11 +84,11 @@ function falso(rodadas: Rodada[]) {
   return { cliente: cliente as never, recebidas, chamadas: () => i }
 }
 
-async function conversar(rodadas: Rodada[], pergunta: string) {
+async function conversar(rodadas: Rodada[], pergunta: string, resultado = '{"erro":"sem dado"}') {
   const f = falso(rodadas)
   const nada = {} as SupabaseClient
   const r = respostaDoChat({
-    db: nada, svc: nada, cliente: f.cliente,
+    db: nada, svc: nada, cliente: f.cliente, executor: async () => resultado,
     recorte: { alcance: [1, 2, 0], loja: null, rotulo: 'Rede JM', escolheLoja: true },
     acesso: { empresaId: 1, userId: 'u', nome: 'Teste', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
     turnos: [{ role: 'user', text: pergunta }],
@@ -100,8 +100,8 @@ async function conversar(rodadas: Rodada[], pergunta: string) {
   return { f, texto: eventos.filter((e) => e.t === 'txt').map((e) => e.v).join(''), eventos }
 }
 
-// Ferramenta que o executor não conhece: devolve erro sem tocar no banco.
-const CONSULTA: Bloco = { type: 'tool_use', id: 't1', name: 'ferramenta_de_teste', input: {} }
+// O executor falso devolve `resultado` (o que a ferramenta teria trazido do banco).
+const CONSULTA: Bloco = { type: 'tool_use', id: 't1', name: 'leads_numeros', input: {} }
 
 test('pergunta de contagem respondida SEM consulta: o número não chega à tela, o modelo é mandado consultar', async () => {
   const { f, texto, eventos } = await conversar([
@@ -131,7 +131,7 @@ test('número DEPOIS de consulta na mesma resposta: passa ao vivo', async () => 
   const { f, texto } = await conversar([
     [{ type: 'text', text: 'Consultando.' }, CONSULTA],
     [{ type: 'text', text: '**Rede JM · 01/11 a 10/11**\nEntraram 240 leads.' }],
-  ], 'Quantos leads entraram no mês?')
+  ], 'Quantos leads entraram no mês?', JSON.stringify({ total: 240, grupos: [{ grupo: 'whatsapp', leads: 191 }, { grupo: 'instagram', leads: 49 }] }))
   assert.equal(f.chamadas(), 2)
   assert.match(texto, /240 leads/)
 })
@@ -149,4 +149,62 @@ test('o recorte da tela vai nas instruções', async () => {
   const fonte = readFileSync('lib/assistente/chat-dados.ts', 'utf8')
   assert.match(fonte, /A PRIMEIRA LINHA de toda resposta é o recorte usado/)
   assert.match(fonte, /NÚMERO SÓ DE CONSULTA/)
+})
+
+// ── fundamento: o número tem de estar nos resultados desta resposta ─────────
+
+test('fundamento: número que a ferramenta trouxe passa; inventado não', () => {
+  const r = [JSON.stringify({ recorte: 'Mogi Guaçu', encontrados: 547, mostrando: 40, leads: [{ esperando_loja: true }, { esperando_loja: false }] })]
+  assert.deepEqual(semFundamento('Há 547 leads esperando.', r), [])
+  assert.deepEqual(semFundamento('Os dados são de Mogi (2.238 leads).', r), ['2.238 leads'])
+})
+
+test('fundamento: soma direta, total de campo numa lista, contagem de itens e arredondamento', () => {
+  const r = [JSON.stringify({ grupos: [{ grupo: 'whatsapp', leads: 191, compraram: 6 }, { grupo: 'instagram', leads: 48, compraram: 0 }, { grupo: 'messenger', leads: 1, compraram: 0 }] })]
+  assert.deepEqual(semFundamento('Entraram 240 leads e 6 vendas.', r), [], 'soma do campo leads')
+  assert.deepEqual(semFundamento('WhatsApp com 191 leads e Instagram com 48 leads: 239 leads.', r), [], 'soma de dois')
+  const v = [JSON.stringify({ totais: { vendas: 15, faturamento: 89612.4, margem: '33%' } })]
+  assert.deepEqual(semFundamento('Foram R$ 89,6 mil em 15 vendas, margem de 33%.', v), [])
+  assert.deepEqual(semFundamento('Foram R$ 95 mil.', v), ['R$ 95 mil'])
+  const l = [JSON.stringify({ leads: [{ esperando_loja: true }, { esperando_loja: true }, { esperando_loja: false }] })]
+  assert.deepEqual(semFundamento('Destes, 2 leads estão esperando.', l), [], 'contagem de itens com o campo')
+})
+
+test('fundamento: percentual calculado pelo modelo (não é soma direta) não passa', () => {
+  const r = [JSON.stringify({ total: 240, grupos: [{ leads: 191 }, { leads: 49 }] })]
+  assert.deepEqual(semFundamento('O WhatsApp concentra 80% da entrada.', r), ['80%'])
+})
+
+test('trocarTrechos troca só o que não tem fundamento', () => {
+  assert.equal(trocarTrechos('Há 547 leads; 2.238 leads no total.', ['2.238 leads']), 'Há 547 leads; [número não consultado] no total.')
+})
+
+test('consultou, mas inventou (o caso do 2.238): sai da tela, o modelo corrige', async () => {
+  const resultado = JSON.stringify({ recorte: 'Mogi Guaçu', encontrados: 0 })
+  const { f, texto, eventos } = await conversar([
+    [{ type: 'text', text: 'Procurando.' }, CONSULTA],
+    [{ type: 'text', text: '**Mogi Guaçu · 01/01 a 10/11**\nNenhum em Jaguariúna; Mogi tem 2.238 leads.' }],
+    [{ type: 'text', text: '**Mogi Guaçu · 01/01 a 10/11**\nNenhum lead em Jaguariúna.' }],
+  ], 'Leads de Jaguariúna?', resultado)
+  assert.equal(f.chamadas(), 3)
+  assert.ok(eventos.some((e) => e.t === 'troca'), 'a resposta sem fundamento saiu da tela')
+  // O que a tela mostra no fim: o último "troca" e o texto depois dele.
+  let tela = ''
+  for (const e of eventos) { if (e.t === 'troca') tela = e.v; else if (e.t === 'txt') tela += e.v }
+  assert.ok(!tela.includes('2.238'), tela)
+  assert.match(tela, /Nenhum lead em Jaguariúna/)
+  assert.match(JSON.stringify(f.recebidas[2]), /não aparecem nos resultados/)
+  void texto
+})
+
+test('consultou, inventou e insistiu: o número fica "[número não consultado]"', async () => {
+  const { eventos } = await conversar([
+    [{ type: 'text', text: 'Procurando.' }, CONSULTA],
+    [{ type: 'text', text: '**Rede JM · agora**\nSão 2.238 leads.' }],
+    [{ type: 'text', text: '**Rede JM · agora**\nSão 2.238 leads, confirmo.' }],
+  ], 'Quantos leads?', JSON.stringify({ encontrados: 3 }))
+  let tela = ''
+  for (const e of eventos) { if (e.t === 'troca') tela = e.v; else if (e.t === 'txt') tela += e.v }
+  assert.ok(!tela.includes('2.238'), tela)
+  assert.match(tela, /\[número não consultado\]/)
 })
