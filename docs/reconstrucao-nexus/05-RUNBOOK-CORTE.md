@@ -473,7 +473,7 @@ Meta depois de aceitar vira falha na fila) → push do app. Voltas: `volta-model
 - **Voltas:** app: Instant Rollback; Edge: republicar a versão anterior (o caminho novo só é usado pela rota nova);
   banco: `supabase/scripts/volta/volta-transmissao.sql` (apaga transmissões e acompanhamento).
 
-## "Esperando resposta" único + recorte do Assistente (11/11, branch `fix/assistente-escopo`)
+## "Esperando resposta" único + recorte do Assistente (APLICADA 11/11 ~13h43; app 08e503c 13h49; smoke ok — 06 seção 43)
 
 O que é e as provas: 06, seção 43. Próxima migração livre depois desta: **20261111000500** (conferir main e
 branches abertas antes de numerar).
