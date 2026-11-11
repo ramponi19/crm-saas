@@ -767,6 +767,12 @@ v "transmissao confere recusa ja chegada"  "lib/transmissao/motor.ts" "await rec
 v "automatize confere recusa ja chegada"   "lib/automacoes.ts" "await recusadaPelaMeta(db, r.mensagemId)"
 v "aviso de pagamento na transmissao"      "app/api/transmissao/route.ts" "avisosDePagamento(svc, empresaId)"
 v "aviso de pagamento no automatize"       "app/api/automatize/route.ts" "avisosDePagamento(createServiceClient(), empresaId)"
+# 11/11/2026 erro de CONTA (pagamento) no envio não derruba o canal; modelo manual confere o número
+n "pagamento nao marca o canal"            "supabase/functions/webhook-leads/index.ts" "marcarErroNoCanal(canal.id, msg, \"erro\")"
+v "erro de conta devolve codigo"           "supabase/functions/webhook-leads/index.ts" "codigo: \"sem_pagamento\""
+v "modelo manual confere o numero"         "supabase/functions/webhook-leads/index.ts" "codigo: \"modelo_fora_do_numero\""
+v "comunicacao oferece modelo do numero"   "components/modules/comunicacao/conversa-painel.tsx" "/api/modelos?negocio="
+v "card oferece modelo do numero"          "components/modules/leads/lead-modal.tsx" "/api/modelos?negocio="
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

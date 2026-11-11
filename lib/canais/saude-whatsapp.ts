@@ -22,7 +22,7 @@ const CHAVE = 'whatsapp_saude'
 const VALIDADE_MS = 10 * 60_000
 
 type Registro = { pagamento_ok: boolean; checado_em: string; erro?: string | null }
-export type AvisoPagamento = { filial_id: number | null; loja: string; texto: string }
+export type AvisoPagamento = { filial_id: number | null; waba_id: string; loja: string; texto: string }
 
 export const textoSemPagamento = (loja: string) => `Conta da Meta de ${loja} sem forma de pagamento`
 
@@ -79,7 +79,7 @@ export async function avisosDePagamento(svc: Db, empresaId: number, agora = new 
   for (const n of bloqueadas) {
     for (const f of new Set(n.filiais)) {
       const loja = f == null ? 'toda a empresa' : (nome.get(Number(f)) ?? `loja ${f}`)
-      avisos.push({ filial_id: f, loja, texto: textoSemPagamento(loja) })
+      avisos.push({ filial_id: f, waba_id: n.wabaId, loja, texto: textoSemPagamento(loja) })
     }
   }
   return avisos.sort((a, b) => a.loja.localeCompare(b.loja, 'pt-BR'))

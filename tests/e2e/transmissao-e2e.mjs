@@ -12,6 +12,8 @@
 // vendedor de outra loja não vê; Edge sem chave de serviço = 401.
 // 11/11/2026: "failed" da Meta depois de aceitar → item da fila falha (teto e 7 dias liberados),
 // na Transmissão e no Automatize; aviso "Conta da Meta de <loja> sem forma de pagamento" por loja.
+// 11/11 (2): recusa de conta (131042) NO PRÓPRIO envio não marca o canal; mensagem comum sai logo
+// depois; modelo manual (Comunicação/card) só o aprovado no número da loja, com o aviso antes.
 //
 //   node tests/e2e/transmissao-e2e.mjs
 import { chromium } from 'playwright-core'
@@ -43,6 +45,8 @@ const fone = (n) => `5519900${String(T).slice(-3)}${String(n).padStart(3, '0')}`
 const graph = []
 // O que a Graph falsa diz que existe em cada WABA (preenchido depois de criar os modelos).
 const MODELOS_NA_META = {}
+// Número de teste cuja conta "não tem forma de pagamento": a Graph recusa MODELO para ele (131042).
+let FONE_SEM_PAGAMENTO = ''
 // Saúde de envio por WABA (health_status): a da Loja C está sem forma de pagamento (141006).
 const SAUDE = { WABA_E2E_C: { health_status: { can_send_message: 'BLOCKED', entities: [{ entity_type: 'WABA', id: 'WABA_E2E_C', can_send_message: 'BLOCKED', errors: [{ error_code: 141006, error_description: 'There is an error with the payment method. This will block business initiated conversations.' }] }] } } }
 const servidorGraph = createServer((req, res) => {
@@ -59,6 +63,9 @@ const servidorGraph = createServer((req, res) => {
     if (req.method === 'GET' && saude) { res.end(JSON.stringify(SAUDE[saude[1]] ?? { health_status: { can_send_message: 'AVAILABLE', entities: [] } })); return }
     if (req.method !== 'POST' || !String(req.url).endsWith('/messages')) { res.end('{}'); return }
     graph.push({ url: req.url, auth: req.headers.authorization, ...j })
+    if (j.type === 'template' && FONE_SEM_PAGAMENTO && j.to === FONE_SEM_PAGAMENTO) {
+      res.statusCode = 400; res.end(JSON.stringify({ error: { code: 131042, message: 'Business eligibility payment issue' } })); return
+    }
     if (!String(j.to ?? '').startsWith('5519900')) { res.statusCode = 400; res.end(JSON.stringify({ error: { code: 131026, message: 'número fora do teste' } })); return }
     res.end(JSON.stringify({ messaging_product: 'whatsapp', messages: [{ id: `wamid.E2E${T}.${graph.length}` }] }))
   })
@@ -451,6 +458,35 @@ try {
   st = await webhook({ statuses: [{ id: wamNina, status: 'failed', timestamp: String(Math.floor(Date.now() / 1000)), recipient_id: nina.fone, errors: [{ code: 131042, title: 'Business eligibility payment issue' }] }] })
   confere(await esperaAte(() => stEx(exC) === 'falhou|A Meta recusou depois de aceitar: A conta da Meta está sem forma de pagamento.'),
     `Automatize: "failed" da Meta vira falha na execução (${stEx(exC)})`)
+
+  // ── 13. Recusa de CONTA no próprio envio não derruba o canal; modelo manual por número ──
+  const otto = pessoa(18, 'Otto', { dias: 40 }) // Loja A, sem mensagem há 40 dias (janela fechada)
+  const tk = await (await fetch(`${env.API_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: env.ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `dono.tx.${T}@teste.local`, password: SENHA }) })).json()
+  const comoDono = async (action, corpo) => { const x = await fetch(`${EDGE}?action=${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk.access_token}` }, body: JSON.stringify(corpo) }); return { status: x.status, j: await x.json().catch(() => ({})) } }
+  // Começa limpo: sem recusa antiga e sem cache (a Graph falsa diz que a WABA da Loja A está ok).
+  sql(`delete from mensagens where empresa_id=${E} and erro_envio ilike '%forma de pagamento%'; delete from configuracoes_sistema where empresa_id=${E} and chave='whatsapp_saude'`)
+  r = await api(dono, `/api/modelos?negocio=${otto.neg}`)
+  confere(r.status === 200 && r.j.envio?.aprovados?.includes(Number(M)) && !r.j.envio?.aprovados?.includes(Number(MC)) && (r.j.envio?.avisosPagamento ?? []).length === 0,
+    `modelo manual: só o aprovado no número da Loja A, sem aviso ainda (${JSON.stringify(r.j.envio)})`)
+  let ed2 = await comoDono('send_template', { leadId: otto.neg, number: otto.fone, modelo: `tx_e2e_so_c_${T}`, idioma: 'pt_BR', parametros: [], previa: 'Oi da C' })
+  confere(ed2.status === 409 && ed2.j.codigo === 'modelo_fora_do_numero', `Edge: modelo manual aprovado só em outro número é recusado (${ed2.status} ${ed2.j.error})`)
+  FONE_SEM_PAGAMENTO = otto.fone
+  ed2 = await comoDono('send_template', { leadId: otto.neg, number: otto.fone, modelo: `tx_e2e_${T}`, idioma: 'pt_BR', parametros: ['Otto'], previa: 'Oi Otto, chegou novidade na loja.' })
+  confere(ed2.status === 400 && ed2.j.codigo === 'sem_pagamento' && /forma de pagamento/.test(ed2.j.error), `modelo recusado por pagamento no próprio envio: ${ed2.status} ${ed2.j.error}`)
+  const canalA = () => um(`select status || '|' || coalesce(ultimo_erro, '') from canais where id=${CANAL}`)
+  confere(canalA() === 'ativo|', `o canal NÃO é marcado como erro (${canalA()})`)
+  const antesTxt = graph.length
+  ed2 = await comoDono('send', { leadId: otto.neg, number: otto.fone, text: 'Oi Otto, tudo bem? Aqui é da loja.' })
+  const txt = graph.slice(antesTxt)
+  confere(ed2.status === 200 && txt.length === 1 && txt[0].type === 'text' && txt[0].to === otto.fone && txt[0].url.includes(`/${PHONE}/messages`),
+    `mensagem comum logo depois sai pelo mesmo número (${ed2.status} ${JSON.stringify(ed2.j).slice(0, 120)})`)
+  confere(um(`select count(*) from mensagens m join conversas c on c.id = m.conversa_id where c.contato_id=${otto.c} and m.direcao='enviada' and m.tipo='texto' and m.conteudo like '%tudo bem%'`) === '1', 'a mensagem comum ficou na conversa')
+  r = await api(dono, `/api/modelos?negocio=${otto.neg}`)
+  confere(JSON.stringify((r.j.envio?.avisosPagamento ?? []).map((a) => a.texto)) === JSON.stringify([AVISO('Loja A')]), `aviso da Loja A logo depois da recusa: ${JSON.stringify(r.j.envio?.avisosPagamento)}`)
+  await dono.goto(`${BASE}/leads?lead=${otto.neg}`, { waitUntil: 'networkidle' })
+  await dono.getByRole('button', { name: /modelo/i }).first().click()
+  confere(await esperaAte(async () => (await dono.locator(`[data-aviso-pagamento-loja="${LA}"]`).count()) === 1, 60000), 'card do lead: o aviso aparece antes de enviar o modelo')
+  await dono.screenshot({ path: FOTOS + '/transmissao-4-modelo-manual-aviso.png' })
 
   confere(graph.length > 0 && graph.every((g) => String(g.to).startsWith('5519900')), `Graph falsa: ${graph.length} envios, todos para 5519900…`)
 } catch (e) {

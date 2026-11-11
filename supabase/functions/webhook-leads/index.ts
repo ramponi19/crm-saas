@@ -299,6 +299,41 @@ async function canalDaLoja(empresaId: number, tipo: string, filialId: number | n
   return linha ? montar(linha, await decifrarToken(linha.access_token_enc as string | null)) : null;
 }
 
+/**
+ * ERRO DE CONTA NÃO DERRUBA O CANAL (11/11/2026, pedido urgente do Lucas).
+ *
+ * Até aqui a recusa síncrona 131042 (conta da Meta sem forma de pagamento) fazia
+ * `marcarErroNoCanal(…, "erro")`: o canal saía de `canalDaLoja` (que exige status 'ativo') e a
+ * loja parava de mandar ATÉ mensagem comum de atendimento — que a Meta não cobra e continuaria
+ * saindo. Pagamento só bloqueia conversa iniciada pela empresa (modelo). Regra agora: o canal só é
+ * marcado quando a falha impede TODO envio — token inválido (190, "expirado") e número
+ * desconectado (account_update OFFBOARD…, "desconectado"). Erro de conta: o envio falha com um
+ * motivo claro e `codigo: "sem_pagamento"`; o aviso por loja vem de lib/canais/saude-whatsapp.ts.
+ */
+const ERRO_DE_CONTA: Record<number, string> = {
+  131042: "A conta da Meta desta loja está sem forma de pagamento: modelo não sai até cadastrar um cartão no WhatsApp Manager. Mensagem comum de atendimento continua saindo.",
+  141006: "A conta da Meta desta loja está sem forma de pagamento: modelo não sai até cadastrar um cartão no WhatsApp Manager. Mensagem comum de atendimento continua saindo.",
+};
+
+/**
+ * Recusa de CONTA no envio: anota a WABA como "sem pagamento" no cache de saúde que o app lê
+ * (configuracoes_sistema `whatsapp_saude`, lib/canais/saude-whatsapp.ts) — o aviso por loja aparece
+ * na hora, sem esperar a próxima leitura da Graph (que em 10 min confirma ou limpa).
+ */
+async function marcarSemPagamento(canal: Canal) {
+  if (!canal.waba_id) return;
+  try {
+    const { data } = await db.from("configuracoes_sistema").select("valor")
+      .eq("empresa_id", canal.empresa_id).eq("chave", "whatsapp_saude").maybeSingle();
+    const atual = data?.valor && typeof data.valor === "object" ? data.valor as Record<string, unknown> : {};
+    const agora = new Date().toISOString();
+    await db.from("configuracoes_sistema").upsert({
+      empresa_id: canal.empresa_id, chave: "whatsapp_saude", updated_at: agora,
+      valor: { ...atual, [canal.waba_id]: { pagamento_ok: false, checado_em: agora, erro: null, fonte: "recusa no envio" } },
+    }, { onConflict: "empresa_id,chave" });
+  } catch (e) { console.error("marcarSemPagamento:", e); }
+}
+
 async function marcarErroNoCanal(canalId: number, erro: string, status = "erro") {
   if (!canalId) return;
   await db.from("canais")
@@ -1530,12 +1565,12 @@ async function enviarWhatsApp(canal: Canal, body: Record<string, unknown>, assin
       let msg = data?.error?.message ?? "erro ao enviar pelo WhatsApp";
       if (cod === 190) {
         await marcarErroNoCanal(canal.id, msg, "expirado");
-      } else if (cod === 131042) {
-        // A Meta cobra o uso da API do titular da conta. Sem cartão cadastrado
-        // ela recusa o envio — e o erro cru não diz isso a ninguém.
-        msg = "O WhatsApp está conectado, mas a conta da Meta não tem forma de pagamento. "
-            + "Cadastre um cartão no WhatsApp Manager para conseguir enviar mensagens.";
-        await marcarErroNoCanal(canal.id, msg, "erro");
+      } else if (ERRO_DE_CONTA[cod ?? 0]) {
+        // Erro de CONTA (pagamento): NÃO marca o canal — ver ERRO_DE_CONTA.
+        msg = ERRO_DE_CONTA[cod!];
+        console.error("envio_whatsapp_erro_de_conta", JSON.stringify({ canal: canal.id, filial: canal.filial_id, codigo: cod }));
+        await marcarSemPagamento(canal);
+        return json({ error: msg, codigo: "sem_pagamento" }, r.status);
       } else if (cod === 131047 || cod === 131051) {
         msg = "Faz mais de 24 horas desde a última mensagem do cliente. "
             + "Nesse caso o WhatsApp só permite responder por modelo aprovado.";
@@ -1608,9 +1643,11 @@ async function enviarModelo(canal: Canal, body: Record<string, unknown>, usuario
     if (cod === 132001) msg = "Este modelo não está aprovado (ou o idioma não bate). Confira em Modelos.";
     if (cod === 132000) msg = "O número de variáveis não bate com o modelo aprovado.";
     if (cod === 190) await marcarErroNoCanal(canal.id, msg, "expirado");
-    if (cod === 131042) {
-      msg = "A conta da Meta não tem forma de pagamento. Cadastre um cartão no WhatsApp Manager para enviar.";
-      await marcarErroNoCanal(canal.id, msg, "erro");
+    // Erro de CONTA (pagamento): o modelo falha, o canal NÃO é marcado — ver ERRO_DE_CONTA.
+    if (ERRO_DE_CONTA[cod ?? 0]) {
+      console.error("envio_modelo_erro_de_conta", JSON.stringify({ canal: canal.id, filial: canal.filial_id, codigo: cod, modelo: nome }));
+      await marcarSemPagamento(canal);
+      return json({ error: ERRO_DE_CONTA[cod!], codigo: "sem_pagamento" }, r.status);
     }
     return json({ error: msg }, r.status);
   }
@@ -1957,6 +1994,13 @@ serve(async (req: Request) => {
       if (action === "send_template") {
         const canal = await canalDaLoja(empresaId, "whatsapp", lojaDoLead);
         if (!canal) return json({ error: "WhatsApp não conectado nesta empresa" }, 502);
+        // Envio manual (Comunicação / card do lead, 11/11/2026): o modelo tem de estar aprovado NO
+        // NÚMERO (WABA) que envia por esta loja — a Meta aprova por conta, não por empresa.
+        const { data: mm } = await db.from("modelos_mensagem").select("id")
+          .eq("empresa_id", empresaId).eq("nome", String(body.modelo ?? "")).eq("idioma", String(body.idioma ?? "pt_BR")).maybeSingle();
+        if (!mm || !(await aprovadoNoNumero(empresaId, Number(mm.id), canal))) {
+          return json({ error: "Este modelo não está aprovado pela Meta no WhatsApp desta loja.", codigo: "modelo_fora_do_numero" }, 409);
+        }
         return await enviarModelo(canal, body, usuario.id);
       }
 
@@ -2180,6 +2224,7 @@ serve(async (req: Request) => {
                 };
                 patch.erro_envio = (conhecidos[cod]
                   ?? String(erro.title ?? erro.message ?? "falha no envio")).slice(0, 300);
+                if (ERRO_DE_CONTA[cod]) await marcarSemPagamento(canal);
               }
               const { data: tocadas } = await db.from("mensagens").update(patch)
                 .eq("empresa_id", canal.empresa_id).eq("external_id", id).select("id, origem");

@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi, requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { metaConfigurada } from '@/lib/canais/meta'
-import { criarEmTodosOsNumeros, numerosWhatsApp, sincronizarModelos } from '@/lib/canais/modelos-waba'
+import { aprovadosNoNumeroDaLoja, criarEmTodosOsNumeros, numerosWhatsApp, sincronizarModelos } from '@/lib/canais/modelos-waba'
+import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
 
 /**
  * Lista os modelos. `?sync=1` confere o estado da análise na Meta antes — em CADA número de
  * WhatsApp da empresa (11/11/2026: o status é por WABA; `numeros` diz onde cada um está aprovado).
+ * `?negocio=ID` (envio manual pela Comunicação / card do lead): `envio` diz quais modelos estão
+ * aprovados NO NÚMERO que envia pela loja daquele negócio e o aviso de pagamento desse número.
  */
 export async function GET(req: Request) {
   try {
@@ -28,6 +31,20 @@ export async function GET(req: Request) {
     ])
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    // Envio manual: o negócio pela RLS de quem pede (outra loja / outra empresa = não acha).
+    const negocioId = Number(new URL(req.url).searchParams.get('negocio')) || null
+    let envio: { filial_id: number | null; aprovados: number[]; avisosPagamento: Awaited<ReturnType<typeof avisosDePagamento>> } | null = null
+    if (negocioId) {
+      const { data: neg } = await supabase.from('negocios').select('id, filial_id').eq('id', negocioId).eq('empresa_id', empresaId).maybeSingle()
+      if (!neg) return NextResponse.json({ error: 'Negócio não encontrado.' }, { status: 404 })
+      const filial = (neg as { filial_id: number | null }).filial_id ?? null
+      const [{ wabaId, ids }, avisos] = await Promise.all([
+        aprovadosNoNumeroDaLoja(svc, empresaId, filial),
+        avisosDePagamento(svc, empresaId).catch((e) => { console.error('avisosDePagamento:', e); return [] }),
+      ])
+      envio = { filial_id: filial, aprovados: ids, avisosPagamento: wabaId ? avisos.filter((a) => a.waba_id === wabaId) : [] }
+    }
+
     // Nome do número = as lojas que enviam por ele (o waba_id não diz nada ao lojista).
     const nomeLoja = new Map(((filiais ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]))
     const rotulo = new Map(numeros.map((n) => [n.wabaId,
@@ -48,6 +65,7 @@ export async function GET(req: Request) {
       whatsappConectado: numeros.length > 0,
       metaPronta: metaConfigurada(),
       errosSync,
+      envio,
     })
   } catch {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

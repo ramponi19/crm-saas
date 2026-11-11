@@ -23,6 +23,7 @@ import { LeadOrcamentoPanel } from './lead-orcamento-panel'
 import { LeadReservaPanel } from './lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
 import { formatarTextoChat } from '@/lib/texto-whatsapp'
+import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
 import { EmojiPicker } from './emoji-picker'
 import { LeadAcoesPanel } from './lead-acoes-panel'
 import { ResponsavelPanel } from './responsavel-panel'
@@ -626,6 +627,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   const [modelosAbertos, setModelosAbertos] = useState(false)
   const [carregandoModelos, setCarregandoModelos] = useState(false)
   const [modelosAprovados, setModelosAprovados] = useState<ModeloAprovado[]>([])
+  const [avisosPagamento, setAvisosPagamento] = useState<AvisoPagamento[]>([])
   const [modeloEscolhido, setModeloEscolhido] = useState<ModeloAprovado | null>(null)
   const [paramsModelo, setParamsModelo] = useState<string[]>([])
   const [enviandoModelo, setEnviandoModelo] = useState(false)
@@ -640,11 +642,15 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     setModeloEscolhido(null)
     setCarregandoModelos(true)
     try {
-      const r = await fetch('/api/modelos')
+      // Só o aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta aprova por
+      // WABA) + o aviso de conta sem forma de pagamento desse número.
+      setAvisosPagamento([])
+      const r = await fetch(`/api/modelos?negocio=${lead.id}`)
       const j = await r.json()
-      setModelosAprovados(
-        ((j.modelos ?? []) as (ModeloAprovado & { status: string })[]).filter((m) => m.status === 'aprovado'),
-      )
+      if (!r.ok) throw new Error(j.error)
+      const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])
+      setModelosAprovados(((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id)))
+      setAvisosPagamento((j.envio?.avisosPagamento ?? []) as AvisoPagamento[])
     } catch {
       notify.bad('Não foi possível carregar os modelos.')
     } finally {
@@ -1681,13 +1687,14 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
 
             {/* Escolha do modelo + preenchimento das variáveis, sem sair da conversa. */}
             <Modal open={modelosAbertos} onClose={() => setModelosAbertos(false)} title="Retomar a conversa" size="sm">
+              {!carregandoModelos && <AvisoPagamentoMeta avisos={avisosPagamento} className="mb-3" />}
               {carregandoModelos ? (
                 <div className="flex items-center gap-2 py-6 text-[13px] text-ink-3">
                   <Loader2 size={15} className="animate-spin" /> Buscando modelos aprovados…
                 </div>
               ) : modelosAprovados.length === 0 ? (
                 <div className="py-2 text-[13px] text-ink-2">
-                  <p className="font-semibold text-ink">Nenhum modelo aprovado ainda.</p>
+                  <p className="font-semibold text-ink">Nenhum modelo aprovado no WhatsApp desta loja.</p>
                   <p className="mt-1">
                     Modelos são criados em <strong>Sistema → Modelos</strong> e passam por análise da Meta.
                     Enquanto não houver um aprovado, a única forma de reabrir a conversa é o cliente escrever

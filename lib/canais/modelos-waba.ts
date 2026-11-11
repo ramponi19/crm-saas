@@ -165,6 +165,21 @@ export async function aprovadosPorLoja(svc: Db, empresaId: number): Promise<Map<
   return mapa
 }
 
+/**
+ * Envio MANUAL de modelo (Comunicação e card do lead, 11/11/2026): o número que envia pela loja do
+ * negócio — a mesma regra do canalDaLoja da Edge (o da loja; sem ele, o último de qualquer loja) — e
+ * os modelos aprovados NELE. A Edge confere de novo (aprovadoNoNumero).
+ */
+export async function aprovadosNoNumeroDaLoja(svc: Db, empresaId: number, filialId: number | null): Promise<{ wabaId: string | null; ids: number[] }> {
+  const { data: waba, error } = await svc.rpc('whatsapp_waba_da_loja', { p_empresa: empresaId, p_filial: filialId, p_qualquer_loja: true } as never)
+  if (error) throw new Error(`whatsapp_waba_da_loja: ${error.message}`)
+  const wabaId = (waba as string | null) ?? null
+  if (!wabaId) return { wabaId: null, ids: [] }
+  const { data } = await svc.from('modelos_mensagem_wabas').select('modelo_id')
+    .eq('empresa_id', empresaId).eq('waba_id', wabaId).eq('status', 'aprovado')
+  return { wabaId, ids: ((data ?? []) as { modelo_id: number }[]).map((r) => Number(r.modelo_id)) }
+}
+
 /** Aprovado no número que envia pela loja (p_qualquer_loja = a regra do Automatize). */
 export async function aprovadoNaLoja(svc: Db, empresaId: number, modeloId: number, filialId: number | null, qualquerLoja = false): Promise<boolean> {
   const { data, error } = await svc.rpc('modelo_aprovado_na_loja', {

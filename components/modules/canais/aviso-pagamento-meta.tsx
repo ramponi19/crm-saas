@@ -1,8 +1,8 @@
 import { TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-/** Vem de GET /api/transmissao e /api/automatize (lib/canais/saude-whatsapp.ts). */
-export type AvisoPagamento = { filial_id: number | null; loja: string; texto: string }
+/** Vem de GET /api/transmissao, /api/automatize e /api/modelos?negocio= (lib/canais/saude-whatsapp.ts). */
+export type AvisoPagamento = { filial_id: number | null; waba_id?: string; loja: string; texto: string }
 
 /**
  * CONTA DA META SEM FORMA DE PAGAMENTO, por loja (11/11/2026). Modelo abre conversa paga: sem
@@ -19,7 +19,7 @@ export function AvisoPagamentoMeta({ avisos, filial, className }: { avisos?: Avi
       <div className="min-w-0 space-y-0.5">
         {lista.map((a) => <p key={`${a.filial_id}`} className="font-semibold" data-aviso-pagamento-loja={a.filial_id ?? 'empresa'}>{a.texto}</p>)}
         <p className="text-ink-2">
-          Modelo (Transmissão e Automatize) não chega: a Meta aceita e depois recusa. Cadastre um cartão em
+          Modelo (Transmissão, Automatize e envio manual) não chega: a Meta recusa. Cadastre um cartão em
           WhatsApp Manager → Configurações de pagamento. Responder cliente na conversa continua funcionando.
         </p>
       </div>

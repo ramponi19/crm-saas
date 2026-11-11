@@ -1482,10 +1482,19 @@ mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta
     por pagamento numa mensagem do número depois da última leitura boa (`lib/canais/saude-whatsapp.ts`).
 - **PENDENTE até a primeira transmissão real depois do pagamento:** entregue, lida e respondida em produção (e a
   "origem: transmissão" no card, que só grava na resposta). Cobertos no e2e local; em produção, não vistos.
+- **Corrigido em seguida (pedido urgente do Lucas, 11/11 ~10h40):**
+  - **erro de conta no próprio envio não marca mais o canal.** A recusa síncrona 131042 fazia
+    `marcarErroNoCanal(…, "erro")`: o canal saía de `canalDaLoja` (exige `status = 'ativo'`) e a loja parava de
+    mandar até mensagem comum de atendimento. Agora (`ERRO_DE_CONTA` na Edge: 131042, 141006) o envio falha com
+    `codigo: "sem_pagamento"` e motivo claro, a WABA é anotada "sem pagamento" no cache de saúde (o aviso por loja
+    aparece na hora) e o canal fica `ativo`. O canal só é marcado quando a falha impede todo envio: token
+    inválido (190 → `expirado`) e número desconectado (`account_update` → `desconectado`).
+    **Produção em 11/11 ~10h45: os 5 canais da JM `ativo`, nenhum com `ultimo_erro`** (o canal não guarda
+    histórico de marcações anteriores);
+  - **modelo manual (Comunicação e card do lead) confere o número:** `GET /api/modelos?negocio=` devolve só o
+    aprovado na WABA que envia pela loja do negócio (mesma regra do `canalDaLoja`) e o aviso de pagamento dessa
+    WABA, mostrado antes de enviar; a Edge recusa com `codigo: "modelo_fora_do_numero"` (409).
 - **Achados para propor (não mexidos):**
-  - recusa **síncrona** 131042 (envio manual e `enviarMeta`) faz `marcarErroNoCanal(…, "erro")`: o canal sai de
-    `canalDaLoja` (que exige `status = 'ativo'`) e para de enviar até mensagem de sessão, que é grátis;
-  - o `send_template` manual da caixa de entrada não confere a aprovação por número (WABA);
   - o gatilho de resposta escolhe o card por ordem diferente de `core_negocio_do_canal`;
   - `transmissao_publico` não filtra `negocios.ativo`;
   - verificação do negócio (141010) limita o volume de conversas iniciadas pela empresa.

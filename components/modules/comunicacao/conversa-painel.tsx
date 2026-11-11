@@ -17,6 +17,7 @@ import {
 import { LeadModal } from '@/components/modules/leads/lead-modal'
 import { ICONE_CANAL, horaCurta, nomeDoContato, type InboxProps } from './inbox-view'
 import { useFuso } from '@/components/fuso-provider'
+import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
 
 const NOME_CANAL = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger' } as const
 const JANELA_WHATSAPP_MS = 24 * 60 * 60 * 1000
@@ -56,6 +57,7 @@ export function ConversaPainel({
   const [card, setCard] = useState<{ leadId: number; funilId: number | null } | null>(null)
   const [modelosAbertos, setModelosAbertos] = useState(false)
   const [modelos, setModelos] = useState<ModeloAprovado[] | null>(null)
+  const [avisosPagamento, setAvisosPagamento] = useState<AvisoPagamento[]>([])
   const [modelo, setModelo] = useState<ModeloAprovado | null>(null)
   const [params, setParams] = useState<string[]>([])
   const fimRef = useRef<HTMLDivElement>(null)
@@ -272,12 +274,17 @@ export function ConversaPainel({
   }
 
   async function abrirModelos() {
-    setModelosAbertos(true); setModelo(null); setParams([])
-    if (modelos) return
+    if (!negocio) return
+    setModelosAbertos(true); setModelo(null); setParams([]); setModelos(null); setAvisosPagamento([])
     try {
-      const r = await fetch('/api/modelos')
+      // Só o que está aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta
+      // aprova por WABA) + o aviso de conta sem forma de pagamento desse número.
+      const r = await fetch(`/api/modelos?negocio=${negocio.id}`)
       const j = await r.json()
-      setModelos(((j.modelos ?? []) as (ModeloAprovado & { status: string })[]).filter((m) => m.status === 'aprovado'))
+      if (!r.ok) throw new Error(j.error)
+      const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])
+      setModelos(((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id)))
+      setAvisosPagamento((j.envio?.avisosPagamento ?? []) as AvisoPagamento[])
     } catch {
       setModelos([]); notify.bad('Não foi possível carregar os modelos.')
     }
@@ -457,9 +464,13 @@ export function ConversaPainel({
         {modelos === null ? (
           <div className="flex items-center gap-2 text-[13px] text-ink-3"><Loader2 size={14} className="animate-spin" /> Carregando modelos…</div>
         ) : modelos.length === 0 ? (
-          <p className="text-[13px] text-ink-3">Nenhum modelo aprovado. Crie e envie para aprovação em Modelos.</p>
+          <div className="flex flex-col gap-3">
+            <AvisoPagamentoMeta avisos={avisosPagamento} />
+            <p className="text-[13px] text-ink-3" data-sem-modelo-no-numero>Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Modelos.</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
+            <AvisoPagamentoMeta avisos={avisosPagamento} />
             <Select value={modelo?.id ?? ''} onChange={(e) => { const m = modelos.find((x) => x.id === Number(e.target.value)) ?? null; setModelo(m); setParams([]) }}>
               <option value="">Escolha o modelo</option>
               {modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
