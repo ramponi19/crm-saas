@@ -490,6 +490,29 @@ branches abertas antes de numerar).
    mesmo número do painel; Comunicação "aguardando" e topo do quadro = painel da loja.
 4. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-esperando-resposta.sql`.
 
+## Etiquetas no core (migração 20261111000500; 06 seção 44)
+
+O que é e as provas: 06, seção 44. Próxima migração livre depois desta: **20261111000600** (conferir main e
+branches abertas antes de numerar).
+
+1. **Antes:** md5(prosrc) em produção = repositório para `quadro_leads`, `quadro_pagina`, `quadro_contagens`,
+   `transmissao_publico` e `core_fundir_contatos` (a última bate pela versão CRLF de 20/10; as outras, LF). Se
+   diferir, alguém mexeu direto em produção: parar. `assistente_status_conversas` sem leitor (código, `pg_proc`,
+   views, `cron.job`) e sem chamada no pgss desde o último restart.
+2. **Migração** `20261111000500_etiquetas` pelo MCP `apply_migration`, IOwait < 10% (leitura de 65 s separada),
+   com aprovação do Lucas. Mexe em `contatos` (coluna com padrão constante, sem reescrita; índice GIN; 3 gatilhos
+   com WHEN que só disparam quando `etiqueta_ids` muda) e derruba/recria as 3 do quadro. Depois: `etiquetas` com
+   RLS (escrita só `is_empresa_admin`); `etiquetas_aplicar` com EXECUTE para `authenticated`, sem `anon`; as 3 do
+   quadro com EXECUTE para `authenticated`/`service_role`, sem `anon`; `assistente_status_conversas` não existe;
+   quadro aberto em Mogi devolve o mesmo total de antes (sem filtro).
+3. **App** (push = deploy; IOwait < 20%). Banco antes do app: o app novo lê `contatos.etiqueta_ids`. O app antigo
+   segue com o banco novo (as 3 do quadro aceitam a chamada antiga: os parâmetros novos têm padrão nulo).
+4. **Smoke** com o Lucas: criar 2 etiquetas de teste em Configurações → Etiquetas; aplicar no card do número do
+   Lucas; lote em 2 cartões; filtro contém/não contém no quadro e na Comunicação; ⌘K só com a etiqueta;
+   histórico do negócio; apagar as etiquetas de teste (o histórico fica).
+5. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-etiquetas.sql` (apaga as
+   etiquetas aplicadas; o histórico fica; recria `assistente_status_conversas`).
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
