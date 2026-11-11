@@ -2,15 +2,17 @@
 // A aba precisa estar visível e com altura: o gráfico só renderiza quando aparece na tela.
 // O painel mostra "IOwait 0.22 %" (com espaço antes do %): por isso o "\s*" na regex (09/11/2026).
 async () => {
+  // 11/11/2026: o título deixou de ser h3 — procura a folha cujo texto começa por "CPU usage".
+  const achar = () => [...document.querySelectorAll('h1,h2,h3,h4,span,p,div')].find(e => e.children.length === 0 && e.textContent.trim().startsWith('CPU usage'));
   let card, svg;
   for (let t = 0; t < 40 && !svg; t++) {
     // Os gráficos carregam ao aparecer: rola até o de CPU (ou pelos títulos até ele existir).
-    const alvo = [...document.querySelectorAll('h3')].find(e => e.textContent.trim().startsWith('CPU usage'));
+    const alvo = achar();
     if (alvo) alvo.scrollIntoView({ block: 'center' });
     else [...document.querySelectorAll('h3,h2')].forEach((e, i) => { if (i === t % 6) e.scrollIntoView() });
     await new Promise(s => setTimeout(s, 1000));
-    const h = [...document.querySelectorAll('h3')].find(e => e.textContent.trim().startsWith('CPU usage'));
-    card = h; for (let i = 0; i < 8 && card && !card.querySelector('svg.recharts-surface'); i++) card = card.parentElement;
+    const h = achar();
+    card = h; for (let i = 0; i < 10 && card && !card.querySelector('svg.recharts-surface'); i++) card = card.parentElement;
     svg = card?.querySelector('svg.recharts-surface');
   }
   if (!svg) return 'sem grafico';
