@@ -473,6 +473,23 @@ Meta depois de aceitar vira falha na fila) → push do app. Voltas: `volta-model
 - **Voltas:** app: Instant Rollback; Edge: republicar a versão anterior (o caminho novo só é usado pela rota nova);
   banco: `supabase/scripts/volta/volta-transmissao.sql` (apaga transmissões e acompanhamento).
 
+## "Esperando resposta" único + recorte do Assistente (11/11, branch `fix/assistente-escopo`)
+
+O que é e as provas: 06, seção 43. Próxima migração livre depois desta: **20261111000500** (conferir main e
+branches abertas antes de numerar).
+
+1. **Migração** `20261111000400_esperando_resposta` pelo MCP `apply_migration`, IOwait < 10%, com aprovação do
+   Lucas. Antes: md5 dos corpos de `zapintel_dashboard`, `zapintel_dashboard_lista`, `zapintel_leads_lista`,
+   `assistente_status_leads` e `quadro_contagens` em produção = repositório (se diferir, alguém mexeu direto em
+   produção: parar). Depois: as 5 com o mesmo `proconfig` (as 3 do ZapIntel com `work_mem=16MB`);
+   `esperando_resposta` sem EXECUTE para `authenticated`/`anon`; `esperando_resposta_visiveis` sem `anon`; o
+   painel da rede = `count(*)` de `esperando_resposta(1)` sem os à parte.
+2. **App** (push = deploy; IOwait < 20%). Banco antes do app: o app novo chama `esperando_resposta_visiveis`; o
+   app antigo segue funcionando com o banco novo (assinaturas iguais).
+3. **Smoke:** ZapIntel em "toda a rede" e numa loja — "quem está esperando resposta?" abre com o recorte e dá o
+   mesmo número do painel; Comunicação "aguardando" e topo do quadro = painel da loja.
+4. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-esperando-resposta.sql`.
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
@@ -765,7 +782,8 @@ Ordem das próximas telas, na branch, cada uma lendo **só o core** e derrubando
 
 ## Supabase local (`supabase start`) — desde 21/10/2026
 
-- **O que é:** Docker Desktop + `npx supabase start` na raiz do repo sobe Postgres, Auth, PostgREST, Storage e Realtime locais e aplica `supabase/migrations` num banco limpo. Desde 21/10 o resultado é **igual à produção** no `public` (103 tabelas, 46 views, 375 índices, 179 políticas, 71 gatilhos, RLS, 82 funções ignorando ``, EXECUTE, 422 grants de tabela e 12 por coluna) e fora dele (5 buckets, 13 políticas de storage, a de `realtime.messages`, publicação com 7 tabelas, 2 jobs do cron, `ops`, extensões, event triggers). Comparação feita por catálogo, sem dado. **Desatualizada desde a noite de 21/10:** a produção passou a 101 tabelas, 45 views e 86 funções (Etapa 0 + ZapIntel); refazer a comparação antes do próximo uso.
+- **O que é:** Docker Desktop + `npx supabase start` na raiz do repo sobe Postgres, Auth, PostgREST, Storage e Realtime locais e aplica `supabase/migrations` num banco limpo. Desde 21/10 o resultado é **igual à produção** no `public` (103 tabelas, 46 views, 375 índices, 179 políticas, 71 gatilhos, RLS, 82 funções ignorando `
+`, EXECUTE, 422 grants de tabela e 12 por coluna) e fora dele (5 buckets, 13 políticas de storage, a de `realtime.messages`, publicação com 7 tabelas, 2 jobs do cron, `ops`, extensões, event triggers). Comparação feita por catálogo, sem dado. **Desatualizada desde a noite de 21/10:** a produção passou a 101 tabelas, 45 views e 86 funções (Etapa 0 + ZapIntel); refazer a comparação antes do próximo uso.
 - **Para poupar memória:** `npx supabase start -x imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor`. Portas padrão 543xx: não sobe junto com o PostgREST/gateway da cópia (54322/54323). Desligar com `npx supabase stop --no-backup`; a VM do Docker só devolve a memória fechando o Docker Desktop.
 - **Dados para teste:** `pg_dump --data-only --disable-triggers -n public` da cópia (sem as tabelas que já saíram) + `auth.users` à parte, carregados como `supabase_admin` (com `on_auth_user_created` desligado durante a carga). JWT de teste: HS256 com o segredo local que o `supabase start` imprime.
 - **⚠ NUNCA `supabase link` + `supabase db push` (ou `migration repair`) contra a produção.** O histórico de migrações da produção guarda o horário em que o MCP aplicou cada uma, não o nome do arquivo; a CLI acharia todas pendentes. Migração em produção continua pelo `apply_migration` do MCP.
