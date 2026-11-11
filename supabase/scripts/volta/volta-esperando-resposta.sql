@@ -1,4 +1,4 @@
--- VOLTA de 20261111000300_esperando_resposta (11/11/2026). Rodar com o app de ANTES no ar (o app novo
+-- VOLTA de 20261111000400_esperando_resposta (11/11/2026). Rodar com o app de ANTES no ar (o app novo
 -- chama esperando_resposta_visiveis). Devolve os corpos exatos de antes: ZapIntel (20261110000200, com os
 -- work_mem de 16 MB), assistente_status_leads (20261110000300) e quadro_contagens (20261104000200).
 begin;

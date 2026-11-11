@@ -2,7 +2,7 @@
 // Mede, com o login do Eduardo (admin da JM, RLS dele), quantos "esperando resposta" cada tela mostra:
 //   painel do ZapIntel (rede e por loja), Assistente (leads_buscar esperando_loja), Comunicação (filtro
 //   "aguardando") e o contador do topo do quadro (funil padrão).
-// Roda uma vez ANTES da migração 20261111000300 e outra DEPOIS; a segunda imprime a tabela comparando.
+// Roda uma vez ANTES da migração 20261111000400 e outra DEPOIS; a segunda imprime a tabela comparando.
 //   node --import ./tests/alias.mjs tests/e2e/esperando-antes-depois.mts antes
 //   (aplicar a migração no local)
 //   node --import ./tests/alias.mjs tests/e2e/esperando-antes-depois.mts depois

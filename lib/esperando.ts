@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 /**
  * "ESPERANDO RESPOSTA" — UMA DEFINIÇÃO SÓ (11/11/2026, aprovada pelo Lucas).
  *
- * A regra mora no banco (`esperando_resposta`, migração 20261111000300): a
+ * A regra mora no banco (`esperando_resposta`, migração 20261111000400): a
  * última mensagem do CLIENTE, com os canais da loja juntos, chegou nas últimas
  * 72 h e a loja não respondeu depois dela — envio que falhou não conta como
  * resposta. Por negócio principal (contato + loja), ativo, fora de funil
