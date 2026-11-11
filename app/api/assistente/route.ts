@@ -5,6 +5,7 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 import { melhorModelo } from '@/lib/assistente-modelos'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { acessoDoUsuario } from '@/lib/assistente/acesso'
+import { recorteDoServidor } from '@/lib/assistente/recorte'
 import { respostaDoChat, MODELO_CHAT_PADRAO, type Turno } from '@/lib/assistente/chat-dados'
 import { negocioDoPreset } from '@/lib/assistente/negocio'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
   const comDados = !!process.env.ANTHROPIC_API_KEY
   if (!apiKey && !comDados) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
-  const body = (await req.json().catch(() => ({}))) as { mensagens?: Msg[]; contexto?: string }
+  const body = (await req.json().catch(() => ({}))) as { mensagens?: Msg[]; contexto?: string; recorte?: unknown }
   const mensagens = (Array.isArray(body.mensagens) ? body.mensagens : [])
     .filter((m) => m && (m.role === 'user' || m.role === 'model') && typeof m.text === 'string' && m.text.trim())
     .slice(-12)
@@ -86,28 +87,30 @@ export async function POST(req: Request) {
   const usoId = (uso as { id?: number } | null)?.id ?? null
 
   if (comDados) {
-    const [acesso, { data: empresa }, { data: visiveis }, { data: lojasRaw }] = await Promise.all([
+    const [acesso, { data: empresa }] = await Promise.all([
       acessoDoUsuario(supabase, empresaId, user.id),
       supabase.from('empresas').select('nome, preset_onboarding').eq('id', empresaId).maybeSingle(),
-      supabase.rpc('filiais_visiveis'),
-      supabase.from('filiais').select('id, nome, cidade').eq('empresa_id', empresaId),
     ])
-    // Só as lojas que a pessoa enxerga entram no prompt. Se a consulta falhar,
-    // nenhuma entra — citar a outra loja seria vazar o que a RLS esconde.
-    const pode = new Set(((visiveis ?? []) as number[]).map(Number))
-    const lojas = ((lojasRaw ?? []) as { id: number; nome: string; cidade: string | null }[])
-      .filter((f) => pode.has(Number(f.id)))
-      .map((f) => f.cidade?.trim() || f.nome.split('·')[1]?.trim() || f.nome)
+    const empresaNome = (empresa?.nome as string | undefined) ?? 'Empresa'
+    // O recorte (loja ou rede) é decidido aqui, com a sessão: empresa de
+    // getEmpresaId(), alcance pelo banco. Do corpo só vem qual loja a tela mostra.
+    const r = await recorteDoServidor({
+      db: supabase as unknown as SupabaseClient, svc: svc as unknown as SupabaseClient,
+      empresaId, empresaNome, acesso, pedido: body.recorte,
+    })
+    if ('erro' in r) return NextResponse.json({ error: r.erro }, { status: r.status })
     const modelo = (cfg?.modelo as string | undefined)?.startsWith('claude-') ? (cfg!.modelo as string) : MODELO_CHAT_PADRAO
     return respostaDoChat({
       db: supabase as unknown as SupabaseClient,
       svc: svc as unknown as SupabaseClient,
+      ler: r.ler,
+      recorte: r.recorte,
       acesso,
       turnos: alternados(mensagens),
       modelo,
-      empresa: (empresa?.nome as string | undefined) ?? 'Empresa',
+      empresa: empresaNome,
       preset: (empresa?.preset_onboarding as string | null | undefined) ?? null,
-      lojas,
+      lojas: r.lojas,
       tela: body.contexto ? String(body.contexto).slice(0, 60) : null,
       extra: cfg?.system_extra ?? null,
       fuso: await fusoDaEmpresa(supabase, empresaId),

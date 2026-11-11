@@ -84,6 +84,11 @@ export function LeadProvider({ children, empresa }: { children: ReactNode; empre
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 
+/** O mesmo contexto, sem exigir o provider: o assistente roda no CRM e no ZapIntel. */
+export function useLeadsOpcional(): Contexto | null {
+  return useContext(Ctx);
+}
+
 export function useLeads() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useLeads must be inside LeadProvider");

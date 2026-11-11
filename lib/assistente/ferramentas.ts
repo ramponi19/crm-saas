@@ -28,13 +28,41 @@ import { fusoDaEmpresa } from '@/lib/fuso-empresa'
  * vêm de `Acesso` e são aplicadas aqui, em cada ferramenta.
  */
 
+/**
+ * O RECORTE DA PERGUNTA — decidido no servidor, nunca pelo corpo da requisição
+ * (10/11/2026, pedido do Lucas: "o Assistente usa o recorte selecionado na tela
+ * do ZapIntel").
+ *
+ *   alcance — as lojas que a pessoa PODE ver (ids; 0 = sem loja).
+ *   loja    — a escolhida na tela; null = todas do alcance (a rede).
+ *   rotulo  — como o recorte abre a resposta: "Rede JM", "Mogi Guaçu".
+ *
+ * No ZapIntel o alcance vem de `zapintel_escopo` (dono, admin e suporte: todas
+ * as lojas) e a leitura (`ler`) é o service role, sempre com `empresa_id`. No
+ * CRM o alcance é `filiais_visiveis()` e a leitura é a sessão (RLS), como antes.
+ */
+export interface Recorte {
+  alcance: number[]
+  loja: number | null
+  rotulo: string
+  /** Quem escolhe a loja num seletor (dono, admin, suporte) — muda o texto de "fora do alcance". */
+  escolheLoja: boolean
+}
+
 export interface Contexto {
   db: SupabaseClient
   svc: SupabaseClient
   acesso: Acesso
   /** Fuso da empresa. Ausente, é lido de `configuracoes_sistema` (uma vez por requisição). */
   fuso?: string
+  /** Quem lê leads, mensagens e vendas. Ausente = `db` (a sessão, sob a RLS). */
+  ler?: SupabaseClient
+  /** Ausente = o alcance da RLS (`filiais_visiveis`), sem loja escolhida. */
+  recorte?: Recorte
 }
+
+/** O cliente de leitura do recorte. Toda consulta por ele filtra `empresa_id`. */
+const ler = (c: Contexto): SupabaseClient => c.ler ?? c.db
 
 /** O que a tela mostra enquanto a ferramenta roda. */
 export const ROTULO: Record<string, string> = {
@@ -167,14 +195,19 @@ const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 
 type Filial = { id: number; nome: string; rotulo: string }
 
+/** O nome que a equipe usa é a cidade — "JM Store Importados" repete a loja. */
+export const rotuloDaLoja = (f: { nome: string; cidade: string | null }): string =>
+  f.cidade?.trim() || f.nome.split('·')[1]?.trim() || f.nome
+
+/**
+ * TODAS as lojas da empresa, só nome e cidade — para reconhecer a loja pedida
+ * e dizer "fora do seu alcance" em vez de "não existe". O que cada uma tem de
+ * dado continua atrás do alcance (`lojaDaPergunta`).
+ */
 async function filiais(c: Contexto): Promise<Filial[]> {
-  const { data } = await c.db.from('filiais').select('id, nome, cidade').eq('empresa_id', c.acesso.empresaId)
-  return ((data ?? []) as { id: number; nome: string; cidade: string | null }[]).map((f) => ({
-    id: f.id,
-    nome: f.nome,
-    // O nome que a equipe usa é a cidade — "JM Store Importados" repete a loja.
-    rotulo: f.cidade?.trim() || f.nome.split('·')[1]?.trim() || f.nome,
-  }))
+  const { data } = await c.svc.from('filiais').select('id, nome, cidade').eq('empresa_id', c.acesso.empresaId)
+  return ((data ?? []) as { id: number; nome: string; cidade: string | null }[])
+    .map((f) => ({ id: f.id, nome: f.nome, rotulo: rotuloDaLoja(f) }))
 }
 
 /** "Jaguariúna" → id. `undefined` = sem filtro; `null` = nome que não existe. */
@@ -184,6 +217,43 @@ function filialPorNome(lista: Filial[], nome: unknown): number | undefined | nul
   const achou = lista.find((f) => semAcento(f.rotulo).includes(alvo) || semAcento(f.nome).includes(alvo)
     || alvo.includes(semAcento(f.rotulo)))
   return achou ? achou.id : null
+}
+
+/** As lojas que a pessoa pode ver: as do recorte do servidor ou, sem ele, as da RLS. */
+async function alcanceDe(c: Contexto): Promise<number[]> {
+  if (c.recorte) return c.recorte.alcance
+  const { data } = await c.db.rpc('filiais_visiveis')
+  return ((data ?? []) as number[]).map(Number)
+}
+
+type LojaDaPergunta = { filialId: number | undefined; recorte: string } | { erro: string; lojas_que_voce_ve: string[] }
+
+/**
+ * A loja da pergunta. Pedida pelo nome: tem de existir e estar no alcance —
+ * fora dele, a resposta DIZ que está fora (não finge que não existe). Sem nome:
+ * a loja escolhida na tela (o recorte), ou todas as do alcance.
+ */
+async function lojaDaPergunta(c: Contexto, lojas: Filial[], nome: unknown): Promise<LojaDaPergunta> {
+  const alcance = await alcanceDe(c)
+  const pode = new Set(alcance)
+  const visiveis = lojas.filter((f) => pode.has(f.id)).map((f) => f.rotulo)
+  const pedida = filialPorNome(lojas, nome)
+  if (pedida === null) return { erro: `loja "${nome}" não encontrada`, lojas_que_voce_ve: visiveis }
+  if (pedida !== undefined) {
+    if (!pode.has(pedida)) {
+      const rotulo = lojas.find((f) => f.id === pedida)?.rotulo ?? String(nome)
+      return {
+        erro: c.recorte?.escolheLoja && !c.ler
+          ? `${rotulo} está fora da loja selecionada no CRM; para ver, escolha ${rotulo} ou "Rede" no seletor de loja`
+          : `${rotulo} está fora do seu alcance: seu acesso é só a ${visiveis.join(', ') || 'nenhuma loja'}`,
+        lojas_que_voce_ve: visiveis,
+      }
+    }
+    return { filialId: pedida, recorte: lojas.find((f) => f.id === pedida)?.rotulo ?? String(nome) }
+  }
+  const tela = c.recorte?.loja ?? null
+  if (tela != null) return { filialId: tela, recorte: c.recorte!.rotulo }
+  return { filialId: undefined, recorte: c.recorte?.rotulo ?? 'todas as lojas que você vê' }
 }
 
 /** Nomes da equipe — da empresa, guardados 60 s (ver `cache.ts`). */
@@ -234,7 +304,7 @@ const leadDaLinha = (r: LinhaLead): LeadVisivel => ({
  * (`SELECT_LEAD`); os campos são os mesmos, e `leadDaLinha` monta igual.
  */
 async function leadsVisiveis(c: Contexto, filialId?: number): Promise<LeadVisivel[]> {
-  const { data, error } = await c.db.rpc('assistente_leads_visiveis', {
+  const { data, error } = await ler(c).rpc('assistente_leads_visiveis', {
     p_empresa: c.acesso.empresaId,
     p_filial: filialId ?? null,
     // Lead sem responsável é da esteira, de todos — mesma regra da tela de leads.
@@ -275,7 +345,7 @@ async function principaisDosContatos(db: SupabaseClient, empresaId: number, cont
  * outros negócios do mesmo contato na mesma loja ficavam sem conversa).
  */
 async function leadTemConversa(c: Contexto, lead: LeadVisivel): Promise<boolean> {
-  const principais = await principaisDosContatos(c.db, c.acesso.empresaId, [lead.contato_id])
+  const principais = await principaisDosContatos(ler(c), c.acesso.empresaId, [lead.contato_id])
   return principais.get(chaveLoja(lead.contato_id, lead.filial_id)) === lead.id
 }
 
@@ -344,7 +414,7 @@ function statusEFichas(c: Contexto, f: FiltroDoStatus): Promise<Map<number, { s:
 async function leadsQueCitam(c: Contexto, texto: string): Promise<Set<number>> {
   const padrao = `%${texto.replace(/[%_,()]/g, ' ').trim().replace(/\s+/g, '%')}%`
   // Em fila, não juntas (10/11/2026): a pergunta nunca tem duas leituras no ar.
-  const { data: msgs } = await c.db.from('mensagens').select('contato_id, filial_id')
+  const { data: msgs } = await ler(c).from('mensagens').select('contato_id, filial_id')
     .eq('empresa_id', c.acesso.empresaId).or(`conteudo.ilike.${padrao},transcricao.ilike.${padrao}`).limit(3000)
   const { data: diag } = await c.svc.from('zapintel_lead_perfil').select('lead_id')
     .eq('empresa_id', c.acesso.empresaId).ilike('perfil->>diagnostico', padrao).limit(1000)
@@ -353,7 +423,7 @@ async function leadsQueCitam(c: Contexto, texto: string): Promise<Set<number>> {
   // Mensagem → negócio principal do contato na loja (o `lead_id` da antiga view).
   const achadas = (msgs ?? []) as { contato_id: number; filial_id: number | null }[]
   // Falha aqui vale o que valia o erro da consulta antiga: nenhuma conversa citando.
-  const principais = await principaisDosContatos(c.db, c.acesso.empresaId, achadas.map((m) => m.contato_id))
+  const principais = await principaisDosContatos(ler(c), c.acesso.empresaId, achadas.map((m) => m.contato_id))
     .catch(() => new Map<string, number>())
   const daConversa = achadas.map((m) => principais.get(chaveLoja(m.contato_id, m.filial_id)))
     .filter((id): id is number => id != null)
@@ -362,12 +432,16 @@ async function leadsQueCitam(c: Contexto, texto: string): Promise<Set<number>> {
 
 /** O lead está entre os que esta pessoa vê? Toda leitura por id passa aqui. */
 async function leadSeVisivel(c: Contexto, id: number): Promise<LeadVisivel | null> {
-  let q = c.db.from('negocios')
+  let q = ler(c).from('negocios')
     .select(SELECT_LEAD)
     .eq('empresa_id', c.acesso.empresaId).eq('id', id)
   if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
   const { data } = await q.maybeSingle()
-  return data ? leadDaLinha(data as unknown as LinhaLead) : null
+  if (!data) return null
+  const lead = leadDaLinha(data as unknown as LinhaLead)
+  // Defesa em profundidade: lida pelo service role (ZapIntel), a loja do lead tem de estar no alcance.
+  if (c.recorte && !c.recorte.alcance.includes(lead.filial_id ?? 0)) return null
+  return lead
 }
 
 /** Quantas mensagens a conversa do lead tem (0 se ele não é o negócio principal na loja). */
@@ -376,7 +450,7 @@ async function contarMensagensDoLead(c: Contexto, lead: LeadVisivel): Promise<{ 
   const tem = await leadTemConversa(c, lead).catch(() => null)
   if (tem === null) return { count: null }
   if (!tem) return { count: 0 }
-  const base = c.db.from('mensagens').select('id', { count: 'exact', head: true })
+  const base = ler(c).from('mensagens').select('id', { count: 'exact', head: true })
     .eq('empresa_id', c.acesso.empresaId).eq('contato_id', lead.contato_id)
   const { count } = await (lead.filial_id == null ? base.is('filial_id', null) : base.eq('filial_id', lead.filial_id))
   return { count }
@@ -390,8 +464,9 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   const fuso = await fusoDe(c)
   if (!dataValida(e.de) || !dataValida(e.ate)) return saida({ erro: 'de/ate precisam ser AAAA-MM-DD' })
   const lojas = await filiais(c)
-  const filialId = filialPorNome(lojas, e.filial)
-  if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
+  const loja = await lojaDaPergunta(c, lojas, e.filial)
+  if ('erro' in loja) return saida(loja)
+  const filialId = loja.filialId
 
   type V = {
     id: number; data_venda: string | null; created_at: string; valor_venda: number | null; valor_custo: number | null
@@ -401,7 +476,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   }
   // A contagem vem com a primeira página: depois, só as páginas que existem.
   const vendas = await buscarTudo<V>((de, ate, primeira) => {
-    let q = c.db.from('vendas_vendas')
+    let q = ler(c).from('vendas_vendas')
       .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
         primeira ? { count: 'exact' } : undefined)
       .eq('empresa_id', c.acesso.empresaId)
@@ -416,7 +491,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     (async () => {
       const ids = [...new Set(vendas.map((v) => v.produto_id).filter((x): x is number => !!x))]
       if (!ids.length) return new Map<number, string>()
-      const { data } = await c.db.from('estoque_produtos').select('id, nome').in('id', ids.slice(0, 300))
+      const { data } = await ler(c).from('estoque_produtos').select('id, nome').in('id', ids.slice(0, 300))
       return new Map(((data ?? []) as { id: number; nome: string }[]).map((p) => [p.id, p.nome]))
     })(),
   ])
@@ -503,6 +578,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   }
 
   return saida({
+    recorte: loja.recorte,
     periodo: `${e.de} a ${e.ate}`,
     escopo: c.acesso.soMinhasVendas ? 'só as vendas deste usuário (permissão do papel)' : 'todas as vendas que o usuário pode ver',
     ...(fin ? {} : { aviso: 'custo e lucro ocultos: este usuário não tem permissão financeira' }),
@@ -513,8 +589,9 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
 async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
   const fuso = await fusoDe(c)
   const lojas = await filiais(c)
-  const filialId = filialPorNome(lojas, e.filial)
-  if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
+  const loja = await lojaDaPergunta(c, lojas, e.filial)
+  if ('erro' in loja) return saida(loja)
+  const filialId = loja.filialId
   // Em FILA, nunca juntas (10/11/2026): status + fichas numa execução, já
   // filtrados pela pergunta; os leads que a pessoa vê, numa; a equipe. As duas
   // da empresa ficam guardadas 60 s. Sem lead com conversa no filtro, nem lê os leads.
@@ -556,6 +633,7 @@ async function leadsBuscar(c: Contexto, e: Entrada): Promise<string> {
   })
 
   return saida({
+    recorte: loja.recorte,
     encontrados: linhas.length,
     mostrando: Math.min(limite, linhas.length),
     leads: linhas.slice(0, limite).map(({ l, s, f, ultima, esperando }) => ({
@@ -582,8 +660,9 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
   const fuso = await fusoDe(c)
   if (!dataValida(e.de) || !dataValida(e.ate)) return saida({ erro: 'de/ate precisam ser AAAA-MM-DD' })
   const lojas = await filiais(c)
-  const filialId = filialPorNome(lojas, e.filial)
-  if (filialId === null) return saida({ erro: `loja "${e.filial}" não encontrada`, lojas: lojas.map((f) => f.rotulo) })
+  const loja = await lojaDaPergunta(c, lojas, e.filial)
+  if ('erro' in loja) return saida(loja)
+  const filialId = loja.filialId
   // Em fila, não juntas (10/11/2026): uma pergunta não abre quatro leituras de uma vez.
   const todos = await leadsVisiveis(c, filialId)
   const equipe = await nomesDaEquipe(c)
@@ -592,7 +671,7 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
   // loja tenha registrado 19 vendas no mês.
   const compraram = await c.svc.from('zapintel_venda_lead').select('lead_id').eq('empresa_id', c.acesso.empresaId)
     .then(({ data }) => new Set(((data ?? []) as { lead_id: number }[]).map((r) => Number(r.lead_id))))
-  const motivos = await c.db.from('motivos_perda').select('id, label').eq('empresa_id', c.acesso.empresaId)
+  const motivos = await ler(c).from('motivos_perda').select('id, label').eq('empresa_id', c.acesso.empresaId)
     .then(({ data }) => new Map(((data ?? []) as { id: number; label: string }[]).map((m) => [m.id, m.label])))
   const nomeFilial = new Map(lojas.map((f) => [f.id, f.rotulo]))
   const ini = ms(inicio(e.de as string, fuso)), fim = ms(fimInclusivo(e.ate as string, fuso))
@@ -619,6 +698,7 @@ async function leadsNumeros(c: Contexto, e: Entrada): Promise<string> {
     g.set(k, a)
   }
   return saida({
+    recorte: loja.recorte,
     periodo: `${e.de} a ${e.ate}`,
     escopo: c.acesso.soMeusLeads ? 'só os leads deste usuário e os sem responsável (permissão do papel)' : 'todos os leads que o usuário pode ver',
     total: noPeriodo.length,
@@ -637,13 +717,13 @@ async function leadDetalhes(c: Contexto, e: Entrada): Promise<string> {
     // O nome é do contato; a última mensagem, da conversa dele na loja (só no
     // negócio principal). A ordem por ela é feita aqui, sobre até 1.000 nomes
     // que batem — a view ordenava no banco.
-    let q = c.db.from('negocios').select('id, contato_id, filial_id, created_at, contato:contatos!contato_id!inner(nome)')
+    let q = ler(c).from('negocios').select('id, contato_id, filial_id, created_at, contato:contatos!contato_id!inner(nome)')
       .eq('empresa_id', c.acesso.empresaId).eq('ativo', true).ilike('contato.nome', `%${nome.replace(/[%_,()]/g, ' ')}%`)
     if (c.acesso.soMeusLeads) q = q.or(`responsavel_id.eq.${c.acesso.userId},responsavel_id.is.null`)
     const { data } = await q.limit(1000)
     // Um por contato e loja: o contato fundido com dois negócios abertos não vira "vários".
     const batem = umPorContatoELoja((data ?? []) as unknown as { id: number; contato_id: number; filial_id: number | null; created_at: string; contato: { nome: string } | null }[])
-    const conversas = batem.length ? await conversasDosLeads(c.db, c.acesso.empresaId, batem) : new Map()
+    const conversas = batem.length ? await conversasDosLeads(ler(c), c.acesso.empresaId, batem) : new Map()
     const achados = batem
       .map((n) => ({ id: n.id, nome: n.contato?.nome ?? '', ultima_mensagem_at: (conversas.get(n.id)?.ultima_mensagem_at ?? null) as string | null }))
       .sort((a, b) => (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
@@ -693,7 +773,7 @@ async function conversaLer(c: Contexto, e: Entrada): Promise<string> {
   // A conversa do contato na loja do negócio — só se ele é o principal ali.
   let data: unknown[] | null = []
   if (await leadTemConversa(c, lead)) {
-    const base = c.db.from('mensagens')
+    const base = ler(c).from('mensagens')
       .select('direcao, conteudo, tipo, transcricao, created_at')
       .eq('empresa_id', c.acesso.empresaId).eq('contato_id', lead.contato_id)
     const daLoja = lead.filial_id == null ? base.is('filial_id', null) : base.eq('filial_id', lead.filial_id)
@@ -728,7 +808,7 @@ async function analisesPendentes(c: Contexto): Promise<string> {
     data = await buscarTudo<Pendente>((de, ate) =>
       c.svc.rpc('zapintel_analises_pendentes', { p_empresa: c.acesso.empresaId, p_versao: VERSAO_DO_PERFIL })
         .order('lead_id').range(de, ate), { funcao: true })
-    visiveis = await leadsVisiveis(c)
+    visiveis = await leadsVisiveis(c, c.recorte?.loja ?? undefined)
   } catch {
     return saida({ erro: 'não consegui contar agora' })
   }
@@ -736,6 +816,7 @@ async function analisesPendentes(c: Contexto): Promise<string> {
   const linhas = data.filter((l) => pode.has(Number(l.lead_id)))
   const desat = linhas.filter((l) => l.tem_ficha)
   return saida({
+    recorte: c.recorte?.rotulo ?? 'todas as lojas que você vê',
     desatualizadas: desat.length,
     sem_analise: linhas.length - desat.length,
     como_gerar: 'Na tela: botão "Gerar nova análise" no lead, ou "Gerar análises" no topo deste chat (só no ZapIntel).',

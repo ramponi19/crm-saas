@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { X, Send, Bot, Trash2, Copy, Check, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AnalisesPendentes } from '@/components/zapintel/robo-analises'
+import { useLeadsOpcional } from '@/hooks/zapintel/useLeads'
 
 /**
  * O ASSISTENTE — UM CHAT SÓ PARA O CRM E O ZAPINTEL.
@@ -134,6 +135,8 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
   const scrollRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const zi = variante === 'zapintel'
+  // No ZapIntel, a loja escolhida no menu (null = toda a rede). O servidor confere contra o alcance.
+  const lojaDoZapIntel = useLeadsOpcional()?.lojaAtiva ?? null
   const cheio = zi ? 'bg-[#7c5cfc]' : 'bg-accent'
   const borda = zi ? 'hover:border-[#7c5cfc] hover:text-[#6d28d9]' : 'hover:border-accent hover:text-accent'
 
@@ -209,7 +212,10 @@ export function AssistenteWidget({ variante = 'crm' }: { variante?: Variante }) 
       const res = await fetch('/api/assistente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mensagens: base, contexto: telaLabel(pathname) }),
+        body: JSON.stringify({
+          mensagens: base, contexto: telaLabel(pathname),
+          ...(zi ? { recorte: { zapintel: true, filial: lojaDoZapIntel } } : {}),
+        }),
       })
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}))

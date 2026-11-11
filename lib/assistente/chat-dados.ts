@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { mensagemDoProvedor } from '@/lib/assistente-erros'
 import type { Acesso } from './acesso'
 import { negocioDoPreset } from './negocio'
-import { executar, FERRAMENTAS, ROTULO } from './ferramentas'
+import { executar, FERRAMENTAS, ROTULO, type Recorte } from './ferramentas'
+import { AVISO_SEM_CONSULTA, numerosAfirmados, semNumeros } from './numeros'
 import { formatarNoFuso } from '@/lib/datas'
 
 /**
@@ -50,6 +51,7 @@ export interface Turno { role: 'user' | 'model'; text: string }
 
 function instrucoes(o: {
   empresa: string; preset: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null; fuso: string
+  recorte: string
 }): string {
   // "Agora" no relógio DA LOJA: é o que o assistente usa para "hoje", "ontem" e "este mês".
   const agora = formatarNoFuso(new Date(), {
@@ -64,19 +66,26 @@ function instrucoes(o: {
   return `Você é o assistente do Nexus CRM da empresa "${o.empresa}", uma ${negocioDoPreset(o.preset) ?? 'pequena empresa'}.
 Agora é ${agora} (horário de Brasília).
 Quem está perguntando: ${o.acesso.nome} (papel: ${o.acesso.papel || 'não identificado'}).
-Lojas que essa pessoa enxerga: ${o.lojas.length ? o.lojas.join(', ') : 'uma loja'}.
+Lojas que essa pessoa pode ver: ${o.lojas.length ? o.lojas.join(', ') : 'uma loja'}.
+Recorte escolhido na tela: ${o.recorte}. Sem loja pedida na pergunta, as ferramentas já usam esse recorte.
 ${limites.length ? `Permissões: esta pessoa ${limites.join('; ')}. As ferramentas já aplicam isso — se pedirem algo fora disso, explique que é uma permissão definida pelo dono no CRM.` : 'Permissões: vê tudo da empresa.'}
 ${o.tela ? `Tela aberta agora: ${o.tela}.` : ''}
 
 O QUE VOCÊ FAZ
-1. RELATÓRIOS E ANÁLISES COM OS DADOS DO SISTEMA — use as ferramentas para consultar vendas, leads, conversas e as análises de IA dos leads. Nunca invente número: todo número da resposta vem de uma ferramenta. Se a ferramenta não tem o dado, diga isso.
+1. RELATÓRIOS E ANÁLISES COM OS DADOS DO SISTEMA — use as ferramentas para consultar vendas, leads, conversas e as análises de IA dos leads. Se a ferramenta não tem o dado, diga isso.
 2. AJUDA DE USO — onde fica cada tela e como fazer as tarefas no CRM.
 3. TEXTOS — rascunho de mensagem para cliente, post, descrição de produto. O usuário copia e envia; você NUNCA envia nada nem altera nada no sistema. Não ofereça fazer isso.
 
+NÚMERO SÓ DE CONSULTA (regra dura)
+- Contagem, valor ou percentual só aparecem na resposta se uma ferramenta foi chamada NESTA resposta e trouxe esse número (ou ele sai de conta direta sobre números dela, como um percentual de dois totais que ela trouxe).
+- Número de uma resposta anterior não vale: consulte de novo. Sem consulta, responda sem números.
+- Nunca estime nem arredonde para "cerca de" um número que não consultou.
+
 COMO RESPONDER
-- Português do Brasil, direto. Comece pela resposta; o detalhe vem depois.
+- A PRIMEIRA LINHA de toda resposta é o recorte usado, em negrito: **<recorte> · <período>** — ex.: **Rede JM · últimos 30 dias**, **Mogi Guaçu · 01/11 a 10/11**. O recorte é o campo \`recorte\` da ferramenta (se consultou mais de uma loja, junte: **Mogi Guaçu e Jaguariúna · …**); sem consulta (ajuda de uso, texto), use **${o.recorte}**. O período é o que a consulta usou; sem período, escreva "agora".
+- Se a ferramenta disser que a loja está fora do alcance ou fora da loja selecionada, diga isso ao usuário com essas palavras — não procure em outra loja no lugar.
+- Português do Brasil, direto. Depois da linha do recorte, a resposta; o detalhe vem depois.
 - Use **negrito** para o essencial e listas curtas. Tabela só com poucas colunas.
-- Sempre diga o período e a loja a que os números se referem.
 - Ao citar um lead, escreva o link no formato [Nome do lead](lead:ID) — a tela transforma em link para abrir o lead.
 - Datas sem ano ambíguo: "13/10", "ontem (13/10)".
 - Ao analisar uma conversa, separe o que está escrito do que você deduz.
@@ -88,6 +97,12 @@ COMO RESPONDER
 export function respostaDoChat(o: {
   db: SupabaseClient
   svc: SupabaseClient
+  /** Leitura do recorte (service role no ZapIntel, depois de `zapintel_escopo`). Ausente = `db`. */
+  ler?: SupabaseClient
+  /** O recorte decidido no servidor (`recorte.ts`). */
+  recorte?: Recorte
+  /** Para os testes: um cliente falso no lugar da Anthropic. */
+  cliente?: Pick<Anthropic, 'messages'>
   acesso: Acesso
   turnos: Turno[]
   modelo: string
@@ -101,14 +116,17 @@ export function respostaDoChat(o: {
   /** Registro de uso (tokens) para o painel do superadmin. */
   registrar: (tokensIn: number, tokensOut: number) => Promise<void>
 }): Response {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 2 })
+  const client = o.cliente ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 2 })
   const enc = new TextEncoder()
 
   // O prompt e as ferramentas são iguais em toda rodada da mesma pergunta —
   // e entre perguntas da mesma pessoa. Cache neles.
   const system: Anthropic.TextBlockParam[] = [{
     type: 'text',
-    text: instrucoes({ empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra, fuso: o.fuso }),
+    text: instrucoes({
+      empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra, fuso: o.fuso,
+      recorte: o.recorte?.rotulo ?? (o.lojas.length === 1 ? o.lojas[0] : 'todas as lojas que a pessoa vê'),
+    }),
     cache_control: { type: 'ephemeral' },
   }]
   const tools: Anthropic.Tool[] = FERRAMENTAS.map((t, i) =>
@@ -123,6 +141,16 @@ export function respostaDoChat(o: {
     async start(controller) {
       const enviar = (t: string, v: string) => controller.enqueue(enc.encode(JSON.stringify({ t, v }) + '\n'))
       let tokIn = 0, tokOut = 0
+      /**
+       * NÚMERO SÓ DE CONSULTA (`numeros.ts`). Enquanto nenhuma ferramenta foi
+       * chamada nesta resposta, o texto fica SEGURO aqui, sem ir para a tela.
+       * Se a rodada chama ferramenta, o texto (o "vou consultar…") sai e o resto
+       * da resposta corre ao vivo. Se a resposta termina sem consulta e afirma
+       * número, o modelo é mandado consultar (uma vez); se insistir, os números
+       * saem trocados por "[número não consultado]".
+       */
+      let consultou = false
+      let correcoes = 0
       try {
         for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
           const s = client.messages.stream({
@@ -133,7 +161,9 @@ export function respostaDoChat(o: {
             messages,
             output_config: { effort: 'medium' },
           })
-          s.on('text', (delta) => enviar('txt', delta))
+          const segurar = !consultou
+          let seguro = ''
+          s.on('text', (delta) => { if (segurar) seguro += delta; else enviar('txt', delta) })
           const msg = await s.finalMessage()
           const u = msg.usage
           tokIn += (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
@@ -142,9 +172,22 @@ export function respostaDoChat(o: {
           if (msg.stop_reason === 'refusal') { enviar('erro', 'Não consigo ajudar com esse pedido.'); break }
           const usos = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
           if (msg.stop_reason !== 'tool_use' || !usos.length) {
+            if (segurar) {
+              const achados = numerosAfirmados(seguro)
+              if (achados.length && correcoes < 1 && rodada < MAX_RODADAS - 1) {
+                correcoes++
+                console.error('[assistente] número sem consulta, pedindo consulta:', achados.slice(0, 5).join(' | '))
+                messages.push({ role: 'assistant', content: msg.content })
+                messages.push({ role: 'user', content: AVISO_SEM_CONSULTA })
+                continue
+              }
+              if (seguro) enviar('txt', achados.length ? semNumeros(seguro) : seguro)
+            }
             if (msg.stop_reason === 'max_tokens') enviar('txt', '\n\n_(resposta cortada por tamanho — peça a continuação)_')
             break
           }
+          if (segurar && seguro) enviar('txt', seguro)
+          consultou = true
 
           // O conteúdo inteiro volta, inclusive o pensamento: a Anthropic exige
           // os blocos de raciocínio intactos entre uma consulta e a resposta.
@@ -154,7 +197,7 @@ export function respostaDoChat(o: {
             enviar('tool', ROTULO[uso.name] ?? 'Consultando o sistema')
             let conteudo: string
             try {
-              conteudo = await executar({ db: o.db, svc: o.svc, acesso: o.acesso }, uso.name, uso.input)
+              conteudo = await executar({ db: o.db, svc: o.svc, ler: o.ler, recorte: o.recorte, acesso: o.acesso, fuso: o.fuso }, uso.name, uso.input)
             } catch (e) {
               console.error(`[assistente] ferramenta ${uso.name} falhou:`, e)
               conteudo = JSON.stringify({ erro: 'a consulta falhou; diga ao usuário que não foi possível ler esse dado agora' })
