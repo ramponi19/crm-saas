@@ -170,9 +170,25 @@ test('fundamento: soma direta, total de campo numa lista, contagem de itens e ar
   assert.deepEqual(semFundamento('Destes, 2 leads estão esperando.', l), [], 'contagem de itens com o campo')
 })
 
-test('fundamento: percentual calculado pelo modelo (não é soma direta) não passa', () => {
+test('fundamento: percentual pela divisão de duas quantidades, inteiro ou uma casa', () => {
   const r = [JSON.stringify({ total: 240, grupos: [{ leads: 191 }, { leads: 49 }] })]
-  assert.deepEqual(semFundamento('O WhatsApp concentra 80% da entrada.', r), ['80%'])
+  // 191 ÷ 240 = 79,58…%
+  assert.deepEqual(semFundamento('O WhatsApp concentra 80% da entrada.', r), [], 'inteiro')
+  assert.deepEqual(semFundamento('O WhatsApp concentra 79,6% da entrada.', r), [], 'uma casa')
+  assert.deepEqual(semFundamento('O Instagram é 20,4% da entrada.', r), [], '49 ÷ 240')
+  assert.deepEqual(semFundamento('O WhatsApp concentra 79,58% da entrada.', r), ['79,58%'], 'duas casas não passa por divisão')
+  assert.deepEqual(semFundamento('O WhatsApp concentra 81% da entrada.', r), ['81%'], 'arredondado errado')
+  assert.deepEqual(semFundamento('Converteu 37% dos leads.', r), ['37%'], 'inventado')
+  // Divisão não vale para contagem nem valor: "80 leads" não sai de 191 ÷ 240.
+  assert.deepEqual(semFundamento('São 80 leads.', r), ['80 leads'])
+})
+
+test('fundamento: id, telefone e número dentro de texto não entram na divisão', () => {
+  const r = [JSON.stringify({ leads: [{ id: 74, telefone: 200, nome: 'Ana', criado: '2026-11-10' }] })]
+  // 74 ÷ 200 daria 37%, mas um é id e o outro telefone; e 10 ÷ 2026 etc. vêm de texto.
+  assert.deepEqual(semFundamento('Converteu 37% dos leads.', r), ['37%'])
+  const q = [JSON.stringify({ total: 200, convertidos: 74 })]
+  assert.deepEqual(semFundamento('Converteu 37% dos leads.', q), [], 'quantidades de verdade passam')
 })
 
 test('trocarTrechos troca só o que não tem fundamento', () => {

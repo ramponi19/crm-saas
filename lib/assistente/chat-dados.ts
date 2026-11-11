@@ -78,7 +78,7 @@ O QUE VOCÊ FAZ
 3. TEXTOS — rascunho de mensagem para cliente, post, descrição de produto. O usuário copia e envia; você NUNCA envia nada nem altera nada no sistema. Não ofereça fazer isso.
 
 NÚMERO SÓ DE CONSULTA (regra dura)
-- Contagem, valor ou percentual só aparecem na resposta se uma ferramenta foi chamada NESTA resposta e trouxe esse número (ou ele sai de conta direta sobre números dela, como um percentual de dois totais que ela trouxe).
+- Contagem, valor ou percentual só aparecem na resposta se uma ferramenta foi chamada NESTA resposta e trouxe esse número (ou ele sai de conta direta sobre números dela: a soma de dois deles, ou um percentual que é a divisão de duas quantidades que ela trouxe, arredondado para inteiro ou uma casa — "79,6%", nunca "79,58%").
 - Número de uma resposta anterior não vale: consulte de novo. Sem consulta, responda sem números.
 - Nunca estime nem arredonde para "cerca de" um número que não consultou.
 
@@ -157,7 +157,8 @@ export function respostaDoChat(o: {
        *
        * Com consulta: a resposta final corre ao vivo e, no fim, cada contagem,
        * valor ou percentual é conferido contra os resultados das ferramentas
-       * DESTA resposta (ou soma direta deles). Faltou fundamento: a resposta sai
+       * DESTA resposta (ou soma direta deles, ou percentual da divisão de dois,
+       * inteiro ou uma casa). Faltou fundamento: a resposta sai
        * da tela (`troca`) e o modelo é mandado corrigir, uma vez; se insistir, o
        * número fica como "[número não consultado]".
        */
