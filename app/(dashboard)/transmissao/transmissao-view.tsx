@@ -158,7 +158,9 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   // Só o que está aprovado NO NÚMERO da loja escolhida: a Meta aprova por conta de WhatsApp.
   const chaveLoja = loja ? String(loja) : 'null'
   const aprovados = dados.modelos.filter((m) => (m.aprovado_em ?? []).includes(chaveLoja))
-  const [modeloId, setModeloId] = useState<number | ''>(aprovados[0]?.id ?? '')
+  const [modeloEscolhido, setModeloId] = useState<number | ''>(aprovados[0]?.id ?? '')
+  // Trocou a loja e o modelo escolhido não existe no número dela: vale o primeiro que existe.
+  const modeloId: number | '' = aprovados.some((m) => m.id === modeloEscolhido) ? modeloEscolhido : (aprovados[0]?.id ?? '')
   const [parametros, setParametros] = useState<string[]>([])
   const [filtro, setFiltro] = useState<FiltroPublico>({})
   const [previa, setPrevia] = useState<Previa | null>(null)
@@ -171,11 +173,6 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   const [salvando, setSalvando] = useState(false)
 
   const modelo = aprovados.find((m) => m.id === modeloId) ?? null
-  // Trocou a loja e o modelo escolhido não existe no número dela: cai no primeiro que existe.
-  useEffect(() => {
-    if (modeloId && aprovados.some((m) => m.id === modeloId)) return
-    setModeloId(aprovados[0]?.id ?? ''); setParametros([])
-  }, [chaveLoja]) // eslint-disable-line react-hooks/exhaustive-deps
   const nVars = variaveisDoModelo(modelo?.corpo)
   const etapasDoFunil = dados.etapas.filter((e) => !filtro.funil_id || e.funil_id === filtro.funil_id)
   const precisaLoja = lojas.length > 1 || dados.lojas.length > 1
@@ -233,7 +230,7 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nome (só para a loja)" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Retorno de quem sumiu — novembro" maxLength={120} />
             {precisaLoja && (
-              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => setLoja(Number(e.target.value) || '')}>
+              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => { setLoja(Number(e.target.value) || ''); setParametros([]) }}>
                 <option value="">Escolha a loja</option>
                 {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
               </Select>
