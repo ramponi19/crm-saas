@@ -761,6 +761,12 @@ v "transmissao respeita horario"          "lib/transmissao/motor.ts" "proximaJan
 v "transmissao respeita 7 dias por modelo" "lib/transmissao/motor.ts" "modeloNosUltimos7Dias("
 v "automatize conta a transmissao nos 7 dias" "lib/automacoes.ts" "from('transmissao_envios')"
 v "pausar todas trava o agendamento"      "lib/automacoes.ts" "if (await automacoesPausadas(db, empresaId)) return"
+# 11/11/2026 "failed" da Meta depois de aceitar: o item da fila falha (teto e 7 dias liberados); aviso de pagamento
+v "edge passa recusa da meta para a fila"  "supabase/functions/webhook-leads/index.ts" "await falhaDepoisDeAceita(canal.empresa_id"
+v "transmissao confere recusa ja chegada"  "lib/transmissao/motor.ts" "await recusadaPelaMeta(svc, f.mensagemId)"
+v "automatize confere recusa ja chegada"   "lib/automacoes.ts" "await recusadaPelaMeta(db, r.mensagemId)"
+v "aviso de pagamento na transmissao"      "app/api/transmissao/route.ts" "avisosDePagamento(svc, empresaId)"
+v "aviso de pagamento no automatize"       "app/api/automatize/route.ts" "avisosDePagamento(createServiceClient(), empresaId)"
 # 04/11/2026 lote 1 dos UPDATE sem conferir linhas (tarefa e card): 0 linhas avisa, nunca "ok"
 v "tarefa concluir confere linhas"      "app/(dashboard)/tarefas/tarefas-view.tsx" "update({ concluida: nova, concluida_em: nova ? new Date().toISOString() : null }).eq(.id., t.id).select(.id.)"
 v "tarefa excluir confere linhas"       "app/(dashboard)/tarefas/tarefas-view.tsx" "delete().eq(.id., t.id).select(.id.)"

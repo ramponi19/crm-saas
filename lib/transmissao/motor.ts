@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
+import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { horarioValido, modeloRecente, proximoHorario } from '@/lib/automatize/travas'
 import { CHAVE_CONFIG, renderizar, tetoValido } from '@/lib/transmissao/filtro'
 
@@ -134,6 +135,11 @@ async function concluirEnvio(svc: Db, e: Envio, f: Fim) {
       ? { status: 'pendente', reservada_em: null, motivo: f.motivo, ...(f.parar ? { tentativas: Math.max(0, e.tentativas - 1) } : {}) }
       : { status: f.status, motivo: f.motivo }
   await svc.from('transmissao_envios').update(patch as never).eq('id', e.id).eq('status', 'enviando')
+  // O "failed" da Meta pode ter chegado antes deste update (lib/canais/falha-meta.ts).
+  if (f.status === 'enviada') {
+    const recusa = await recusadaPelaMeta(svc, f.mensagemId)
+    if (recusa) await svc.from('transmissao_envios').update({ status: 'falhou', motivo: recusa } as never).eq('id', e.id).eq('status', 'enviada').select('id')
+  }
 }
 
 /** Uma transmissão: o que cabe agora (horário + teto), até `limiteMs`. */

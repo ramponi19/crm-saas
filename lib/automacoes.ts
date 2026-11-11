@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
+import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { aprovadoNaLoja } from '@/lib/canais/modelos-waba'
 import {
   agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
@@ -229,6 +230,11 @@ async function concluir(db: Db, e: Execucao, r: Saida) {
     ? { status: 'agendada', agendada_para: (r.quando ?? new Date(Date.now() + 3_600_000)).toISOString(), reservada_em: null, motivo: r.motivo ?? null }
     : { status: r.resultado, executada_em: r.resultado === 'executada' ? new Date().toISOString() : null, motivo: r.motivo ?? null, mensagem_id: r.mensagemId ?? null }
   await db.from('automacao_execucoes').update(patch as never).eq('id', e.id).eq('status', 'executando')
+  // O "failed" da Meta pode ter chegado antes deste update (lib/canais/falha-meta.ts).
+  if (r.resultado === 'executada' && r.mensagemId) {
+    const recusa = await recusadaPelaMeta(db, r.mensagemId)
+    if (recusa) await db.from('automacao_execucoes').update({ status: 'falhou', motivo: recusa } as never).eq('id', e.id).eq('status', 'executada').select('id')
+  }
 }
 
 /** Executa um conjunto já reservado; erro numa não para as outras. */

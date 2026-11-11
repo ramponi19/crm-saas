@@ -1375,7 +1375,7 @@ responder ficam para 11/11 de manhã (anotar aqui o resultado).
   - Na 1ª resposta o modelo citou "2.238 leads" sem ter consultado e se corrigiu sozinho na 2ª.
 - **Pendente:** `assistente_status_conversas` está na lista de morte do 05 (critério "nenhum leitor no código e no banco"; no código já são 0) — conferir `pg_proc`/views/`cron.job` e o pg_stat_statements sem chamadas desde o deploy, e derrubar na próxima migração, com aprovação.
 
-## 42. 10/11: módulo Transmissão (branch `feat/transmissao`, só local — nada em produção)
+## 42. 10/11: módulo Transmissão (em produção desde 10/11 21h; resultado do smoke de 11/11 no fim da seção)
 
 Um modelo **aprovado** da Meta para uma lista de contatos de **uma loja**, pelo WhatsApp **dela**. Nasce como módulo
 (`transmissao`, grupo Comunicação, item opcional no menu, vitrine, tile na Central), desligado em todas as empresas.
@@ -1446,3 +1446,46 @@ mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta
   Ordem no 05, "Transmissão".
 - Smoke em produção só com o número do Lucas e um modelo aprovado de teste.
 - A Meta cobra por conversa de modelo de marketing e mede a qualidade do número: começar com lista pequena.
+
+### Produção e smoke (10–11/11)
+
+- **10/11 ~21h:** migração `20261111000100_transmissao`, Edge e app (`ac8d441`) no ar.
+- **Smoke 1 (11/11 ~06h, Mogi): todo envio voltou 401 da Edge.** A Edge comparava a chave de serviço por igualdade
+  de texto com a `SUPABASE_SERVICE_ROLE_KEY` que o Supabase injeta; a da Vercel é válida mas **não é a mesma
+  string**. Troca (decisão do Lucas): segredo próprio `EDGE_INTERNAL_SECRET` (Vercel Production + segredos da
+  Edge, sem exibir), cabeçalho `x-edge-internal-secret`, comparação em tempo constante sobre o SHA-256; vale para
+  `send_template_transmissao` e `send_template_automacao`; o caminho pela chave de serviço saiu (`a23ff5b`).
+- **RLS de `modelos_mensagem`** só aceitava membro da empresa: superadmin em impersonação via "nenhum modelo
+  aprovado". Migração `20261111000200_modelos_mensagem_rls_empresa` (aplicada 11/11 ~06h22): segue `get_empresa_id()`.
+- **Modelo é aprovado por WABA, não por empresa.** A JM tem uma WABA por loja; o `retorno_atendimento` estava
+  aprovado só em Jaguariúna. Migração `20261111000300_modelos_por_waba` (`modelos_mensagem_wabas`, status por
+  número; `modelos_mensagem.status` vira resumo); a sincronização grava o status de cada número; Transmissão e
+  Automatize só oferecem e só enviam o que está aprovado no número da loja (rota, `transmissao_montar`, motor e Edge).
+  **Aplicada 11/11 ~10h19 (IOwait 0,15%, pelo endpoint Prometheus do projeto).** Sincronização logo em seguida
+  (função nova, daqui): `retorno_atendimento` **aprovado nas duas WABAs** — Mogi saiu de pendente durante a manhã
+  (meta_id `1133021199655838`); Jaguariúna `974790525693669`. A Graph (`message_templates`) confirma os dois APPROVED.
+- **Smoke 2 (11/11, Jaguariúna, cron das 09h17): a Meta ACEITOU e 8 s depois devolveu `failed` 131042 — "a conta
+  da Meta está sem forma de pagamento".** Modelo abre conversa paga; mensagem de sessão segue normal (5 mil+ de
+  Jaguariúna em 30 dias, nenhuma falha de pagamento). O acompanhamento contou certo (1 enviada, 1 falha).
+  **Graph API (`health_status`, 11/11):** as **duas** WABAs (Mogi `1052104950804382` e Jaguariúna
+  `2080511762855117`) estão `BLOCKED` com **141006** (erro na forma de pagamento); a empresa (Business) está
+  `LIMITED` com **141010** (verificação do negócio não feita). `primary_funding_id` só é lido por BSP.
+- **Correções do smoke 2:**
+  - `failed` da Meta depois de aceitar → o item da fila vira **falha** (`transmissao_envios` e
+    `automacao_execucoes`), com o motivo "A Meta recusou depois de aceitar: …": devolve a vaga do teto por hora e
+    não conta na regra de 7 dias (as duas só olham `enviada`/`executada`). A Edge faz no webhook de status
+    (`falhaDepoisDeAceita`); o app confere de novo depois de gravar `enviada` (`lib/canais/falha-meta.ts`) para o
+    caso de o status chegar primeiro.
+  - **Aviso por loja** "Conta da Meta de <loja> sem forma de pagamento" na Transmissão (topo, mensagem do
+    formulário e acompanhamento) e no Automatize (barra, quando alguma automação manda modelo, e no criar).
+    Fonte: `health_status` da Graph, guardado 10 min em `configuracoes_sistema` (`whatsapp_saude`), mais a recusa
+    por pagamento numa mensagem do número depois da última leitura boa (`lib/canais/saude-whatsapp.ts`).
+- **PENDENTE até a primeira transmissão real depois do pagamento:** entregue, lida e respondida em produção (e a
+  "origem: transmissão" no card, que só grava na resposta). Cobertos no e2e local; em produção, não vistos.
+- **Achados para propor (não mexidos):**
+  - recusa **síncrona** 131042 (envio manual e `enviarMeta`) faz `marcarErroNoCanal(…, "erro")`: o canal sai de
+    `canalDaLoja` (que exige `status = 'ativo'`) e para de enviar até mensagem de sessão, que é grátis;
+  - o `send_template` manual da caixa de entrada não confere a aprovação por número (WABA);
+  - o gatilho de resposta escolhe o card por ordem diferente de `core_negocio_do_canal`;
+  - `transmissao_publico` não filtra `negocios.ativo`;
+  - verificação do negócio (141010) limita o volume de conversas iniciadas pela empresa.

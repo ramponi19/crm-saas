@@ -446,9 +446,15 @@ Nenhuma das duas views zerou, então não há migração de drop. As 21 leituras
   - banco: `cron.unschedule('automacoes-hora')`, depois `supabase/scripts/volta/volta-automatize.sql`, depois `drop extension pg_net`.
 - **Grep das views:** `leads` 85/47 e `lead_mensagens` 15/8, sem mudança.
 
-## Transmissão (branch `feat/transmissao`, ainda NÃO aplicada — ordem para quando o Lucas der o ok)
+## Transmissão (APLICADA: 10/11 21h; complementos de 11/11 abaixo)
 
 O que é e as provas: 06, seção 42. Nada muda para empresa nenhuma até o dono instalar o módulo na Central.
+
+**11/11 — complementos, nesta ordem (IOwait < 10%):** `20261111000200_modelos_mensagem_rls_empresa` (aplicada
+~06h22) → `20261111000300_modelos_por_waba` → sincronização de modelos nas WABAs da JM logo em seguida (conferir o
+status de cada número contra a Graph) → Edge `webhook-leads` (segredo interno, aprovação por número, recusa da
+Meta depois de aceitar vira falha na fila) → push do app. Voltas: `volta-modelos-rls.sql`,
+`volta-modelos-por-waba.sql`; Edge: republicar a anterior. Próxima migração livre: **20261111000400**.
 
 1. **Migração** `20261111000100_transmissao` pelo MCP `apply_migration`, **com a loja fechada** e IOwait < 20%:
    cria um gatilho em `mensagens` (tabela quente) e faz o PostgREST recarregar o schema. Conferir depois:

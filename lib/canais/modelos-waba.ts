@@ -20,23 +20,25 @@ export interface NumeroWhatsApp {
   token: string
   /** Lojas cujo canal de WhatsApp está nesta WABA (nulo = canal da empresa inteira). */
   filiais: (number | null)[]
+  /** Os canais (ids) desta WABA — para ligar uma mensagem ao número. */
+  canais: number[]
 }
 
 /** As WABAs de WhatsApp da empresa (canais ativos com token), uma entrada por WABA. */
 export async function numerosWhatsApp(svc: Db, empresaId: number): Promise<NumeroWhatsApp[]> {
   const { data } = await svc.from('canais')
-    .select('waba_id, filial_id, access_token_enc, conectado_em')
+    .select('id, waba_id, filial_id, access_token_enc, conectado_em')
     .eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
     .order('conectado_em', { ascending: false })
   const porWaba = new Map<string, NumeroWhatsApp>()
-  for (const c of (data ?? []) as { waba_id: string | null; filial_id: number | null; access_token_enc: string | null }[]) {
+  for (const c of (data ?? []) as { id: number; waba_id: string | null; filial_id: number | null; access_token_enc: string | null }[]) {
     const waba = (c.waba_id ?? '').trim()
     if (!waba || !c.access_token_enc) continue
     const ja = porWaba.get(waba)
-    if (ja) { ja.filiais.push(c.filial_id); continue }
+    if (ja) { ja.filiais.push(c.filial_id); ja.canais.push(Number(c.id)); continue }
     let token: string
     try { token = decifrarToken(c.access_token_enc) } catch { continue }
-    porWaba.set(waba, { wabaId: waba, token, filiais: [c.filial_id] })
+    porWaba.set(waba, { wabaId: waba, token, filiais: [c.filial_id], canais: [Number(c.id)] })
   }
   return [...porWaba.values()]
 }

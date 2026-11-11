@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bot, Pause, Play, Plus, Workflow } from 'lucide-react'
 import { Button, Input, Modal, Select, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
 
 export interface AutoDaEtapa {
   id: number; acao: string; ativo: boolean; espera_dias: number; modelo_id: number | null
@@ -26,6 +27,7 @@ export interface DadosAutomatize {
   // lojas/faltam: onde o modelo está aprovado NO NÚMERO da loja (11/11/2026: a Meta aprova por WABA).
   modelos: { id: number; nome: string; idioma: string; corpo: string | null; lojas: string[]; faltam: string[] }[]
   equipe: { id: string; nome: string }[]
+  avisosPagamento?: AvisoPagamento[]
 }
 
 const ROTULO: Record<string, string> = {
@@ -74,7 +76,11 @@ export function AutomatizeBarra({ dados, recarregar }: { dados: DadosAutomatize 
   if (!dados) return <div className="mx-6 mb-2 text-[12px] text-ink-3">Carregando automações…</div>
   const ligadas = dados.etapas.reduce((s, e) => s + e.automacoes.filter((a) => a.ativo).length + e.cadencias.filter((c) => c.ativo).length, 0)
   const hoje = dados.etapas.reduce((s, e) => s + e.automacoes.reduce((x, a) => x + a.executadas_hoje, 0) + e.cadencias.reduce((x, c) => x + c.executadas_hoje, 0), 0)
+  // Só pesa se alguma automação manda modelo: sem pagamento na conta da Meta, ela falha.
+  const mandaModelo = dados.etapas.some((e) => e.automacoes.some((a) => a.acao === 'enviar_modelo'))
   return (
+    <>
+    {mandaModelo && <AvisoPagamentoMeta avisos={dados.avisosPagamento} className="mx-6 mb-2" />}
     <div data-automatize-barra className={cn('mx-6 mb-2 flex flex-wrap items-center gap-3 rounded-card border px-3 py-2 text-[12.5px]',
       dados.pausado ? 'border-warn/40 bg-warn-soft text-warn' : 'border-line bg-card text-ink-2')}>
       <Workflow size={15} strokeWidth={1.7} />
@@ -89,6 +95,7 @@ export function AutomatizeBarra({ dados, recarregar }: { dados: DadosAutomatize 
         </Button>
       )}
     </div>
+    </>
   )
 }
 
@@ -203,6 +210,7 @@ function NovaAutomacao({ slug, label, dados, onFechar, onCriou }: {
                 </p>
               )
             })()}
+            <AvisoPagamentoMeta avisos={dados.avisosPagamento} />
             <Input label="Variáveis ({{1}}|{{2}}…; use {{nome}})" value={parametros} onChange={(e) => setParametros(e.target.value)} placeholder="{{nome}}" />
             <p className="text-[11px] leading-snug text-ink-3">
               Vai de verdade para o cliente, no horário de atendimento, no máximo 1 vez por modelo a cada 7 dias e até 50 por hora na empresa. Quem pediu para não receber não recebe.

@@ -6,6 +6,7 @@ import { Badge, Button, Card, ConfirmDialog, Input, Select, StatCard, notify } f
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal } from '@/lib/datas'
 import { SITUACOES, descreverFiltro, variaveisDoModelo, type FiltroPublico, type Situacao } from '@/lib/transmissao/filtro'
+import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
 
 // ── O que a API devolve ──────────────────────────────────────────────────────
 type Status = 'rascunho' | 'agendada' | 'enviando' | 'pausada' | 'concluida' | 'encerrada'
@@ -27,6 +28,7 @@ interface Form { lojas: Loja[]; origens: string[]; teto: number; tetoMax: number
 interface Dados {
   admin: boolean; transmissoes: Transmissao[]; numeros: Numeros[]; lojas: Loja[]; modelos: Modelo[]
   funis: Funil[]; etapas: Etapa[]; form: Form | null
+  avisosPagamento?: AvisoPagamento[]
 }
 interface Previa { total: number; aptos: number; opt_out: number; bloqueado: number; sem_telefone: number; modelo_7_dias: number; amostra: { nome: string | null; final: string }[] }
 
@@ -77,6 +79,7 @@ export function TransmissaoView() {
 
   return (
     <div className="space-y-4">
+      <AvisoPagamentoMeta avisos={dados.avisosPagamento} />
       {dados.admin && dados.form && <Teto form={dados.form} fuso={fuso} recarregar={carregar} />}
 
       {dados.admin && (criando
@@ -239,6 +242,7 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
 
           <section className="space-y-3">
             <h4 className="text-[12px] font-semibold text-ink">Mensagem</h4>
+            {(!precisaLoja || !!loja) && <AvisoPagamentoMeta avisos={dados.avisosPagamento} filial={precisaLoja ? (loja || null) : undefined} />}
             {precisaLoja && !loja ? (
               <p className="text-[12.5px] text-ink-3">Escolha a loja: cada número de WhatsApp tem os seus modelos aprovados.</p>
             ) : aprovados.length === 0 ? (
@@ -424,6 +428,7 @@ function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: numb
             {t.status === 'agendada' && t.agendada_para ? ` · começa em ${formatarDataHora(t.agendada_para, undefined, '', fuso)}` : ''}
           </p>
         </div>
+        <AvisoPagamentoMeta avisos={dados.avisosPagamento} filial={dados.lojas.length > 1 ? (t.filial_id ?? null) : undefined} className="basis-full" />
         {dados.admin && (
           <div className="flex gap-2">
             {t.status === 'rascunho' && <Button size="sm" icon={<Send size={14} />} onClick={() => setAcao('disparar')}>Disparar</Button>}

@@ -10,6 +10,8 @@
 // resposta → envio marcado + card com a origem "transmissão"; pausar/retomar (a Edge recusa em voo);
 // horário de atendimento; encerrar; loja sem WhatsApp; vendedor vê e não dispara (API e RLS);
 // vendedor de outra loja não vê; Edge sem chave de serviço = 401.
+// 11/11/2026: "failed" da Meta depois de aceitar → item da fila falha (teto e 7 dias liberados),
+// na Transmissão e no Automatize; aviso "Conta da Meta de <loja> sem forma de pagamento" por loja.
 //
 //   node tests/e2e/transmissao-e2e.mjs
 import { chromium } from 'playwright-core'
@@ -41,6 +43,8 @@ const fone = (n) => `5519900${String(T).slice(-3)}${String(n).padStart(3, '0')}`
 const graph = []
 // O que a Graph falsa diz que existe em cada WABA (preenchido depois de criar os modelos).
 const MODELOS_NA_META = {}
+// Saúde de envio por WABA (health_status): a da Loja C está sem forma de pagamento (141006).
+const SAUDE = { WABA_E2E_C: { health_status: { can_send_message: 'BLOCKED', entities: [{ entity_type: 'WABA', id: 'WABA_E2E_C', can_send_message: 'BLOCKED', errors: [{ error_code: 141006, error_description: 'There is an error with the payment method. This will block business initiated conversations.' }] }] } } }
 const servidorGraph = createServer((req, res) => {
   let b = ''
   req.on('data', (c) => { b += c })
@@ -51,6 +55,8 @@ const servidorGraph = createServer((req, res) => {
     // Lista de modelos por WABA (a sincronização do app): cada número tem os seus.
     const lista = String(req.url).match(/\/(WABA_E2E[A-Z_]*)\/message_templates/)
     if (req.method === 'GET' && lista) { res.end(JSON.stringify({ data: MODELOS_NA_META[lista[1]] ?? [] })); return }
+    const saude = String(req.url).match(/\/(WABA_E2E[A-Z_]*)\?fields=health_status/)
+    if (req.method === 'GET' && saude) { res.end(JSON.stringify(SAUDE[saude[1]] ?? { health_status: { can_send_message: 'AVAILABLE', entities: [] } })); return }
     if (req.method !== 'POST' || !String(req.url).endsWith('/messages')) { res.end('{}'); return }
     graph.push({ url: req.url, auth: req.headers.authorization, ...j })
     if (!String(j.to ?? '').startsWith('5519900')) { res.statusCode = 400; res.end(JSON.stringify({ error: { code: 131026, message: 'número fora do teste' } })); return }
@@ -140,9 +146,11 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true })
 async function entrar(email) {
   const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage()
   page.on('pageerror', (e) => falha('pageerror: ' + String(e).slice(0, 160)))
+  // Servidor de dev frio compila cada rota na primeira visita (até minutos nesta máquina).
+  page.setDefaultNavigationTimeout(300000); page.setDefaultTimeout(180000)
   await page.goto(BASE + '/login')
   await page.fill('input[type="email"]', email); await page.fill('input[type="password"]', SENHA)
-  await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 90000 }), page.click('button[type="submit"]')])
+  await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 240000 }), page.click('button[type="submit"]')])
   return page
 }
 const api = (page, url, corpo) => page.evaluate(async ([u, c]) => { const r = await fetch(u, c ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) } : undefined); return { status: r.status, j: await r.json().catch(() => ({})) } }, [url, corpo])
@@ -204,6 +212,15 @@ try {
   r = await api(dono, '/api/automatize', { op: 'criar', acao: 'enviar_modelo', etapa_id: Number(ET.novo), modelo_id: Number(MP), parametros: [] })
   confere(r.status === 400 && /pelo menos uma loja/.test(r.j.error), `Automatize recusa modelo sem aprovação: ${r.status} ${r.j.error}`)
 
+  // ── 1c. Conta da Meta sem forma de pagamento: aviso por loja (health_status) ──
+  const AVISO = (loja) => `Conta da Meta de ${loja} ${T} sem forma de pagamento`
+  r = await tx(dono)
+  let avisos = (r.j.avisosPagamento ?? []).map((a) => a.texto)
+  confere(avisos.length === 1 && avisos[0] === AVISO('Loja C'), `Transmissão: aviso só da Loja C (141006 na WABA dela): ${JSON.stringify(avisos)}`)
+  confere(/WABA_E2E_C/.test(um(`select valor::text from configuracoes_sistema where empresa_id=${E} and chave='whatsapp_saude'`)), 'saúde dos números guardada (cache de 10 min)')
+  r = await api(dono, '/api/automatize')
+  confere(JSON.stringify((r.j.avisosPagamento ?? []).map((a) => a.texto)) === JSON.stringify([AVISO('Loja C')]), `Automatize: o mesmo aviso (${JSON.stringify(r.j.avisosPagamento)})`)
+
   // ── 2. Prévia ─────────────────────────────────────────────────────────────
   r = await tx(dono, { op: 'previa', filial_id: Number(LA), filtro: FILTRO1, modelo_id: Number(M) })
   const pv = r.j.previa ?? {}
@@ -222,7 +239,13 @@ try {
   await dono.goto(BASE + '/transmissao', { waitUntil: 'networkidle' })
   await dono.getByRole('button', { name: 'Nova transmissão' }).click()
   await dono.getByLabel('Nome (só para a loja)').fill(`TX1 ${T}`)
+  confere(await dono.locator(`[data-aviso-pagamento-loja="${LC}"]`).count() === 1 && await dono.locator(`[data-aviso-pagamento-loja="${LA}"]`).count() === 0,
+    'tela: aviso de pagamento da Loja C no topo, nada da Loja A')
+  await dono.getByLabel('Loja (o WhatsApp que envia)').selectOption(String(LC))
+  confere(await esperaAte(async () => (await dono.locator(`[data-aviso-pagamento-loja="${LC}"]`).count()) === 2), 'escolheu a Loja C: o aviso aparece também na mensagem')
+  await dono.screenshot({ path: FOTOS + '/transmissao-0-aviso-pagamento.png', fullPage: true })
   await dono.getByLabel('Loja (o WhatsApp que envia)').selectOption(String(LA))
+  confere(await dono.locator(`[data-aviso-pagamento-loja="${LC}"]`).count() === 1, 'voltou para a Loja A: aviso da C só no topo')
   await dono.getByLabel('Modelo aprovado').selectOption(String(M))
   confere(await dono.locator('[data-modelo-corpo]').innerText() === 'Oi {{1}}, chegou novidade na loja.', 'o corpo do modelo aparece')
   confere(await dono.getByLabel('Modelo aprovado').locator(`option[value="${MP}"]`).count() === 0, 'modelo pendente não é oferecido')
@@ -267,6 +290,20 @@ try {
   const num = () => sql(`select row_to_json(x)::text from transmissao_numeros(array[${TX1}]::bigint[]) x`)
   confere(await esperaAte(() => /"entregues":2/.test(num()) && /"lidas":1/.test(num())), `números: ${num()}`)
 
+  // ── 5b. A Meta aceita e DEPOIS recusa (sem forma de pagamento) ────────────
+  r = await tx(dono)
+  const naHoraAntes = r.j.form?.enviadasNaHora
+  const recusado = um(`select contato_id from transmissao_envios where transmissao_id=${TX1} and status='enviada' and enviada_em > now() - interval '1 hour' order by id limit 1`)
+  st = await webhook({ statuses: [{ id: wam(recusado), status: 'failed', timestamp: String(Math.floor(Date.now() / 1000)), recipient_id: '5519900', errors: [{ code: 131042, title: 'Business eligibility payment issue' }] }] })
+  const envRec = () => um(`select status || '|' || coalesce(motivo, '') from transmissao_envios where transmissao_id=${TX1} and contato_id=${recusado}`)
+  confere(st === 200 && await esperaAte(() => envRec().startsWith('falhou|')), `"failed" da Meta: o item da fila vira falha (${envRec()})`)
+  confere(envRec() === 'falhou|A Meta recusou depois de aceitar: A conta da Meta está sem forma de pagamento.', `motivo claro: ${envRec()}`)
+  confere(/"enviadas":4/.test(num()) && /"falhas":1/.test(num()), `números com a recusa: ${num()}`)
+  r = await tx(dono)
+  confere(naHoraAntes >= 1 && r.j.form?.enviadasNaHora === naHoraAntes - 1, `a vaga do teto por hora volta: ${naHoraAntes} → ${r.j.form?.enviadasNaHora}`)
+  avisos = (r.j.avisosPagamento ?? []).map((a) => a.texto)
+  confere(avisos.includes(AVISO('Loja A')) && avisos.includes(AVISO('Loja C')), `a recusa por pagamento depois da última leitura acende o aviso da Loja A: ${JSON.stringify(avisos)}`)
+
   // ── 6. Resposta: o envio marca e o card ganha a origem transmissão ────────
   st = await webhook({ contacts: [{ profile: { name: 'Ana' }, wa_id: P.ana.fone }], messages: [{ from: P.ana.fone, id: `wamid.IN${T}a`, timestamp: String(agoraS), type: 'text', text: { body: 'quero saber mais' } }] })
   confere(st === 200, `resposta da Ana chegou (${st})`)
@@ -285,13 +322,14 @@ try {
   await dono.waitForSelector('[data-numeros]', { timeout: 30000 })
   await dono.screenshot({ path: FOTOS + '/transmissao-2-acompanhamento.png', fullPage: true })
   const tela = async (k) => (await dono.locator(`[data-numero="${k}"]`).innerText()).split('\n')
-  confere((await tela('respondidas')).includes('1') && (await tela('lidas')).includes('1') && (await tela('entregues')).includes('2') && (await tela('enviadas')).includes('5'),
+  confere((await tela('respondidas')).includes('1') && (await tela('lidas')).includes('1') && (await tela('entregues')).includes('2') && (await tela('enviadas')).includes('4'),
     `acompanhamento na tela: enviadas ${await tela('enviadas')} · entregues ${await tela('entregues')} · lidas ${await tela('lidas')} · responderam ${await tela('respondidas')}`)
 
   // ── 7. A trava de 7 dias vale para a próxima transmissão ──────────────────
   // (sem o "sem mensagem há 30": quem recebeu agora tem mensagem nova na conversa)
   r = await tx(dono, { op: 'previa', filial_id: Number(LA), filtro: { etapa_ids: [Number(ET.proposta)] }, modelo_id: Number(M) })
-  confere(r.j.previa?.aptos === 1 && r.j.previa?.modelo_7_dias === 6, `proposta de novo: só o Bruno; 6 com o modelo há menos de 7 dias (5 da TX1 + Automatize) ${JSON.stringify({ ...r.j.previa, amostra: undefined })}`)
+  confere(r.j.previa?.aptos === 2 && r.j.previa?.modelo_7_dias === 5,
+    `proposta de novo: Bruno e quem a Meta recusou (falha não conta nos 7 dias); 5 com o modelo há menos de 7 dias (4 da TX1 + Automatize) ${JSON.stringify({ ...r.j.previa, amostra: undefined })}`)
 
   // ── 8. Pausar e retomar (a Edge recusa o que estiver em voo) ──────────────
   sql(`update transmissao_envios set enviada_em = enviada_em - interval '2 hours' where transmissao_id=${TX1}`)
@@ -409,6 +447,10 @@ try {
   const novos = graph.slice(antesA)
   confere(stEx(exC).startsWith('executada') && novos.length === 1 && novos[0].url.includes(`/PHONE_E2E_C_${T}/messages`) && novos[0].template?.name === `tx_e2e_so_c_${T}` && novos[0].to === nina.fone,
     `Automatize: negócio da Loja C sai pelo número da C (${stEx(exC)}; ${novos.map((g) => g.url).join(', ')})`)
+  const wamNina = um(`select m.external_id from automacao_execucoes a join mensagens m on m.id = a.mensagem_id where a.id=${exC}`)
+  st = await webhook({ statuses: [{ id: wamNina, status: 'failed', timestamp: String(Math.floor(Date.now() / 1000)), recipient_id: nina.fone, errors: [{ code: 131042, title: 'Business eligibility payment issue' }] }] })
+  confere(await esperaAte(() => stEx(exC) === 'falhou|A Meta recusou depois de aceitar: A conta da Meta está sem forma de pagamento.'),
+    `Automatize: "failed" da Meta vira falha na execução (${stEx(exC)})`)
 
   confere(graph.length > 0 && graph.every((g) => String(g.to).startsWith('5519900')), `Graph falsa: ${graph.length} envios, todos para 5519900…`)
 } catch (e) {
@@ -421,7 +463,10 @@ try {
   }
   const sobra = um(`select count(*) from empresas where id=${E}`)
   console.log(sobra === '0' ? 'limpeza: empresa de teste apagada' : 'limpeza: SOBROU a empresa de teste')
-  await browser.close(); servidorGraph.close(); edge.kill()
+  await browser.close(); servidorGraph.close()
+  // No Windows o deno roda sob um shell: kill() mata só o shell e o deno fica preso na :8000 com o
+  // código velho (11/11: a rodada seguinte testou a Edge antiga). Mata a árvore.
+  if (process.platform === 'win32') { try { execFileSync('taskkill', ['/pid', String(edge.pid), '/T', '/F'], { stdio: 'ignore' }) } catch { /* já saiu */ } } else edge.kill()
   fs.mkdirSync(`${import.meta.dirname}/../../.gate`, { recursive: true })
   if (falhas.length) fs.writeFileSync(`${import.meta.dirname}/../../.gate/transmissao-edge.log`, logEdge)
 }

@@ -6,6 +6,7 @@ import { nadaGravado } from '@/lib/linhas-afetadas'
 import { CHAVE_PAUSA } from '@/lib/automacoes'
 import { createServiceClient } from '@/lib/supabase/service'
 import { aprovadosPorLoja } from '@/lib/canais/modelos-waba'
+import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
 
 /**
  * MODELO POR NÚMERO (11/11/2026): a automação é da empresa, mas o envio sai pelo WhatsApp da loja
@@ -115,6 +116,8 @@ export async function GET(req: Request) {
     })(),
     equipe: ((equipe ?? []) as unknown as { usuario_id: string; usuarios: { nome: string | null } | null }[])
       .map((u) => ({ id: u.usuario_id, nome: u.usuarios?.nome ?? '—' })),
+    // Conta da Meta sem forma de pagamento, por loja (11/11/2026): o "enviar modelo" falha lá.
+    avisosPagamento: await avisosDePagamento(createServiceClient(), empresaId).catch((e) => { console.error('avisosDePagamento:', e); return [] }),
   })
 }
 

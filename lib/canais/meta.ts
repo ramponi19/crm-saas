@@ -369,6 +369,28 @@ export async function apagarModelo(wabaId: string, token: string, nome: string):
   return true
 }
 
+/**
+ * SAÚDE DE ENVIO DA WABA (11/11/2026). `health_status` diz se a conta pode iniciar conversa
+ * (modelo). Sem forma de pagamento a Meta devolve `can_send_message: BLOCKED` com o erro 141006
+ * na entidade WABA — foi o que bloqueou o smoke da Transmissão na JM. `primary_funding_id` seria
+ * a leitura direta do pagamento, mas só é liberado para BSP; por isso a leitura é pela saúde.
+ */
+export async function saudeDaWaba(wabaId: string, token: string): Promise<{
+  podeIniciar: 'AVAILABLE' | 'LIMITED' | 'BLOCKED' | string
+  pagamentoOk: boolean
+  erros: { entidade: string; codigo: number | null; descricao: string }[]
+} | Erro> {
+  const r = await fetch(`${G}/${wabaId}?fields=health_status`, { headers: { Authorization: `Bearer ${token}` } })
+  const j = await r.json().catch(() => ({}))
+  const h = j?.health_status as { can_send_message?: string; entities?: Record<string, unknown>[] } | undefined
+  if (!r.ok || !h) return falha(j, 'Não foi possível ler a saúde do número na Meta.')
+  const erros = (h.entities ?? []).flatMap((e) => ((e.errors as Record<string, unknown>[] | undefined) ?? []).map((x) => ({
+    entidade: String(e.entity_type ?? ''), codigo: x.error_code != null ? Number(x.error_code) : null, descricao: String(x.error_description ?? ''),
+  })))
+  const pagamento = erros.some((x) => x.codigo === 141006 || /payment/i.test(x.descricao))
+  return { podeIniciar: String(h.can_send_message ?? ''), pagamentoOk: !pagamento, erros }
+}
+
 // Status da Meta → status guardado aqui.
 export function statusDoModelo(metaStatus: string): string {
   const m: Record<string, string> = {

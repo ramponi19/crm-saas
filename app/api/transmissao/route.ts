@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { aprovadoNaLoja, aprovadosPorLoja } from '@/lib/canais/modelos-waba'
+import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
 import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { CHAVE_CONFIG, TETO_MAX, filtroImpossivel, normalizarFiltro, tetoValido, variaveisDoModelo } from '@/lib/transmissao/filtro'
 import { enviadasNaHora, processarTransmissao, proximaJanela } from '@/lib/transmissao/motor'
@@ -65,7 +66,11 @@ export async function GET() {
   // MODELO POR NÚMERO (11/11/2026): cada modelo diz em que loja está aprovado NO NÚMERO dela
   // (chave = id da loja, ou 'null' para a empresa sem loja). A tela só oferece o da loja escolhida.
   const svc = createServiceClient()
-  const porLoja = await aprovadosPorLoja(svc, empresaId)
+  // Conta da Meta sem forma de pagamento, por loja (11/11/2026): modelo sai "aceito" e volta falhou.
+  const [porLoja, avisosPagamento] = await Promise.all([
+    aprovadosPorLoja(svc, empresaId),
+    avisosDePagamento(svc, empresaId).catch((e) => { console.error('avisosDePagamento:', e); return [] }),
+  ])
   const aprovadoEm = (id: number) => [...porLoja].filter(([, ids]) => ids.has(id)).map(([k]) => k)
 
   let form = null
@@ -97,6 +102,7 @@ export async function GET() {
     funis: funis ?? [],
     etapas: etapas ?? [],
     form,
+    avisosPagamento,
   })
 }
 

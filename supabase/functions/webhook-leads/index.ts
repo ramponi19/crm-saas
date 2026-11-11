@@ -1655,6 +1655,29 @@ async function segredoInternoOk(req: Request): Promise<boolean> {
  * (modelos_mensagem.status), que dizia "aprovado" para a JM inteira com o modelo existindo só no
  * número de Jaguariúna.
  */
+/**
+ * A META ACEITOU E DEPOIS RECUSOU (11/11/2026, smoke da Transmissão: "sem forma de pagamento").
+ * O envio da transmissão / a execução do Automatize daquela mensagem passa de 'enviada' /
+ * 'executada' para 'falhou' — devolve a vaga do teto por hora e não conta na regra de 7 dias
+ * (as duas só olham enviada/executada). Se o status chegar antes de o app gravar 'enviada', o
+ * app confere depois de gravar (lib/canais/falha-meta.ts) — mesmo texto de motivo.
+ */
+async function falhaDepoisDeAceita(empresaId: number, msgs: { id: number; origem: string | null }[], erro: string | null) {
+  const motivo = `A Meta recusou depois de aceitar: ${(erro ?? "").trim() || "sem motivo informado"}`.slice(0, 300);
+  const tx = msgs.filter((m) => m.origem === "transmissao").map((m) => m.id);
+  const au = msgs.filter((m) => m.origem === "automacao").map((m) => m.id);
+  if (tx.length) {
+    const { error } = await db.from("transmissao_envios").update({ status: "falhou", motivo })
+      .eq("empresa_id", empresaId).in("mensagem_id", tx).eq("status", "enviada");
+    if (error) console.error("falha depois de aceita (transmissão):", error.message);
+  }
+  if (au.length) {
+    const { error } = await db.from("automacao_execucoes").update({ status: "falhou", motivo })
+      .eq("empresa_id", empresaId).in("mensagem_id", au).eq("status", "executada");
+    if (error) console.error("falha depois de aceita (Automatize):", error.message);
+  }
+}
+
 async function aprovadoNoNumero(empresaId: number, modeloId: number, canal: Canal): Promise<boolean> {
   if (!canal.waba_id || !modeloId) return false;
   const { data } = await db.from("modelos_mensagem_wabas").select("status")
@@ -2158,8 +2181,12 @@ serve(async (req: Request) => {
                 patch.erro_envio = (conhecidos[cod]
                   ?? String(erro.title ?? erro.message ?? "falha no envio")).slice(0, 300);
               }
-              await db.from("mensagens").update(patch)
-                .eq("empresa_id", canal.empresa_id).eq("external_id", id);
+              const { data: tocadas } = await db.from("mensagens").update(patch)
+                .eq("empresa_id", canal.empresa_id).eq("external_id", id).select("id, origem");
+              if (status === "falhou") {
+                await falhaDepoisDeAceita(canal.empresa_id, (tocadas ?? []) as { id: number; origem: string | null }[],
+                  (patch.erro_envio as string | undefined) ?? null);
+              }
             }
           }
 
