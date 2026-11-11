@@ -1354,10 +1354,73 @@ Nenhuma das duas views zerou, então não há migração de drop.
 - O patch foi feito sobre a `main` `a19ab58`; refazer com `git apply --3way` e conferir os corpos dos `*_calc`
   contra a produção (md5) antes de aplicar, porque a migração renomeia o que estiver lá.
 
+### Small × Micro: fica na Small (decisão do Lucas, 11/11 ~14h, antecipada)
+
+A regra era: pico de uso real abaixo de ~650 MB e swap perto de zero → voltar para a Micro (1 GB) numa noite com
+a loja fechada; acima disso, ficar na Small. As medições vieram do painel Observability → Database, minuto a minuto,
+uma leitura por hora com a loja aberta (`tools/saude/memoria-cpu-recente.js`, rodado no Chrome do Lucas, porque o
+navegador do app dá "Unable to load data"). Os números:
+
+| janela | usada máx (hora) | usada méd | swap máx | IOwait méd / máx |
+|---|---|---|---|---|
+| 10/11 17:14–18:14 | 493 MB (17:35) | 424 | 0 | 0,1% / 0,2% |
+| 10/11 18:03–19:03 | 461 MB (18:58) | 416 | 0 | 0,1% / 0,2% |
+| 10/11 19:03–20:03 | 432 MB (19:06) | 402 | 0 | 0,0% / 0,1% |
+| 10/11 20:17–21:16 | 548 MB (20:55) | 387 | 0 | 0,0% / 0,1% |
+| 11/11 08:02–09:02 | 435 MB (08:14) | 421 | 0 | 0,1% / 0,1% |
+| 11/11 09:03–10:02 | 588 MB (09:52)¹ | 440 | 0,06 MB | 0,1% / 0,8% |
+| 11/11 10:03–11:02 | 492 MB (10:17) | 441 | 0,06 MB | 0,1% / 0,2% |
+| 11/11 11:03–12:02 | 572 MB (11:43) | 463 | 0,06 MB | 0,1% / 0,2% |
+| 11/11 12:03–13:02 | 503 MB (12:25) | 467 | 0,06 MB | 0,1% / 0,2% |
+| 11/11 13:03–14:02 | **606 MB (13:35)** | 471 | 0,06 MB | 0,1% / 0,2% |
+
+¹ Essa hora inclui as consultas do levantamento do buraco de mensagens (09:15–09:50). Às 13:35 não rodei nada.
+
+Nas mesmas horas:
+- **Cache:** máximo entre 1.198 e 1.239 MB.
+- **Commit:** máximo entre 1,7 e 2,0 GB, com capacidade de 2,79 GB.
+- **Eventos:** zero `zapintel.tempo_esgotado` e zero `zapintel.calculo_cortado` de 10/11 16:33 até 11/11 14h.
+- **Fora da medição:** a noite das 21:16 às 08:02, porque as leituras eram só das 8h às 20h.
+
+**Por que não cabe na Micro:**
+- O "Used" do painel **não inclui o `shared_buffers`**, que fica contado em Cache. Na Micro o `shared_buffers`
+  seria ~256 MB.
+- O pico de 606 MB com mais ~256 MB dá **~860 MB de 1 GB**. Sobrariam ~150 MB para o cache de disco, e a média
+  sobe ao longo do dia (em 11/11, de 421 MB às 8h para 471 MB às 13h).
+- Foi exatamente esse aperto que levou a Nano ao swap e ao IOwait de 13–89% em 10/11.
+
+**Custo de ficar na Small:** US$ 0,0206/h, ~US$ 14,83 no ciclo de 10/11 a 10/12. São US$ 4,83 além do crédito de
+computação de US$ 10, o que dá **~US$ 29,83 no mês com o Pro** (o painel projetou US$ 29,42). A Micro custaria
+US$ 25,00.
+
+**Reavaliar a Micro só se:**
+- o uso real cair de forma sustentada (pico abaixo de ~400 MB numa semana inteira); ou
+- o custo pesar mais que a folga.
+- Nos dois casos, a troca segue a regra do 05: loja fechada, até 40 min fora do ar.
+
 ### O buraco de mensagens da troca (15:57–16:33)
 
-A Edge não gravou nada nesses 36 min. A conferência das reentregas da Meta e a lista por loja para a equipe
-responder ficam para 11/11 de manhã (anotar aqui o resultado).
+A Edge não gravou nada nesses 36 min. O levantamento do lado do banco foi feito em 11/11 de manhã; a lista completa
+está em `buraco-15h57-mensagens.md`, na pasta de notas da sessão hopeful-carson.
+
+- **Esperado no buraco:** ~45–80 mensagens recebidas, pelo ritmo de 10/11 das 15h às 15h57 e pelo de 03/11.
+  - WhatsApp Mogi: ~19–48.
+  - WhatsApp Jaguariúna: ~25–30.
+  - Instagram: até 5.
+- **Reentrega da Meta:** houve, pelo menos em parte, no **WhatsApp Mogi**.
+  - 11 avisos de status (entregue/lida) com hora da Meta dentro do buraco foram gravados depois que o banco
+    voltou, o primeiro às 16:37. Isso só pode vir de reentrega.
+  - A Edge teve ~60 entregas 200 entre 16:34 e 16:37, contra ~7 por minuto no normal.
+  - O WA Mogi recebeu 134 mensagens entre 16:30 e 17:30, contra 72 em 03/11.
+- **No WhatsApp Jaguariúna, nenhum sinal de reentrega:** 20 recebidas contra 39 em 03/11, e nenhum status do buraco.
+- **O banco não prova o que a Meta nunca reentregou.** A mensagem ao vivo é gravada com a hora da gravação; só o
+  histórico de sincronização usa a hora da Meta.
+- **Lista para conferir nos celulares (coexistência): 35 conversas.**
+  - Mogi tem 30: 2 em que o cliente falou por último, 1 em que a loja falou por último antes do buraco, 4 já
+    retomadas e 23 follow-ups em massa.
+  - Jaguariúna tem 5: 3 em que o cliente falou por último, 1 em que a loja falou por último e 1 já retomada.
+  - Instagram e Messenger não têm nenhuma.
+- **Pendente:** o resultado da conferência nos celulares, que o Lucas traz numa sessão futura. Anotar aqui.
 
 ## 41. 10/11: o Assistente numa execução só e a trava do dashboard (`5b88e41`, `732585a`, `09d7d3c`, `a19ab58`) — smoke da noite passou
 

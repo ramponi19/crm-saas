@@ -62,8 +62,9 @@ o reinício, o `pg_stat_statements` e o cache do banco são zerados.
 
 - **Banco não volta depois de 10 min:** abrir chamado no suporte da Supabase (no Pro há suporte por e-mail) e
   avisar a loja. O dump do passo 3 é a garantia.
-- **Small instável:** dá para voltar para Micro (1 GB) pela mesma tela, com outra queda de ~2 min. A Nano não
-  existe no plano pago.
+- **Small instável:** a troca de instância é pela mesma tela, com outra queda (em 10/11 foram ~36 min: só com a loja
+  fechada, regra do 05). A Nano não existe no plano pago. Voltar para a Micro (1 GB) **não** resolve aperto de
+  memória: em 11/11 o pico real com a loja aberta foi 606 MB, mais ~256 MB de `shared_buffers` (ver "Decisão" abaixo).
 - **Realtime sem avisos** (slot inativo): reiniciar o Realtime em Settings → Realtime antes de mexer no banco.
 
 ## Como foi em 10/11/2026 (Nano → Small, com a loja aberta)
@@ -81,4 +82,15 @@ o reinício, o `pg_stat_statements` e o cache do banco são zerados.
 - **pgss** zerado às 16:33:43: base pós-troca = lista vazia (`tools/saude/fotos/pgss-20261110-1633-pos-troca-reset.json`).
 - **Custo** (preço oficial; ciclo 10/11–10/12, 720 h): Small US$ 0,0206/h (US$ 14,83 no mês, US$ 4,83 além do
   crédito de US$ 10 → ~US$ 29,83 com o Pro; o painel projetou US$ 29,42); Micro US$ 0,01344/h (US$ 9,68, coberto
-  pelo crédito → US$ 25,00). A decisão Small × Micro sai da medição de 24 h (11/11 16h52).
+  pelo crédito → US$ 25,00).
+- **Decisão (Lucas, 11/11 ~14h, antecipada): fica na Small.** Medição de hora em hora com a loja aberta, de 10/11
+  17h a 11/11 14h:
+  - **Memória usada:** pico de **606 MB** (11/11 13:35); média por hora entre 387 e 471 MB, subindo ao longo do dia.
+  - **Swap:** de 0 a 0,06 MB.
+  - **IOwait:** média de 0,0–0,1% e máximo de 0,8%.
+  - **Commit:** máximo de 2,0 GB, com capacidade de 2,79 GB.
+  - **Eventos:** zero `tempo_esgotado` e zero `calculo_cortado`.
+  - **Por que não volta para a Micro:** o "Used" do painel não conta o `shared_buffers`. Na Micro (~256 MB de
+    `shared_buffers`), o pico daria ~860 MB de 1 GB, sem folga e no caminho do swap que derrubou a Nano.
+  - **Custo:** ~US$ 29,83 no mês com o Pro.
+  - Tabela hora a hora e o critério para reavaliar: 06, seção 40, "Small × Micro".
