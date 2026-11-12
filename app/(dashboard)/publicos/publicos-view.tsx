@@ -101,7 +101,8 @@ export function PublicosView() {
         title="Apagar o público?" confirmLabel="Apagar"
         description={apagar ? <>
           O público <strong>{apagar.nome}</strong> some.
-          {apagar.automacoes > 0 ? <> As <strong>{apagar.automacoes}</strong> automação(ões) de “entrou no público” dele também são apagadas.</> : null}
+          {apagar.automacoes === 1 ? <> A automação de “entrou no público” dele também é apagada.</> : null}
+          {apagar.automacoes > 1 ? <> As <strong>{apagar.automacoes}</strong> automações de “entrou no público” dele também são apagadas.</> : null}
           {' '}Transmissões já feitas com ele ficam, com a regra que usaram.
         </> : null} />
     </div>
@@ -118,7 +119,7 @@ function ListaLinha({ p, dados, loja, quando, ocupado, editar, atualizar, apagar
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-[13px] font-semibold text-ink">{p.nome}</span>
-          {p.gatilhos > 0 && <Badge tone="acc" dot>{p.gatilhos} automação{p.gatilhos > 1 ? 'ões' : ''}</Badge>}
+          {p.gatilhos > 0 && <Badge tone="acc" dot>{p.gatilhos} {p.gatilhos > 1 ? 'automações' : 'automação'}</Badge>}
           {p.agendadas > 0 && <Badge tone="acc">{p.agendadas} transmissão agendada</Badge>}
         </div>
         <div className="mt-0.5 text-[11.5px] text-ink-3">{loja} · {descreverFiltro(p.filtro ?? {}, nomes)}</div>
