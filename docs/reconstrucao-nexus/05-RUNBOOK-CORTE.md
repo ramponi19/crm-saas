@@ -513,7 +513,7 @@ branches abertas antes de numerar).
 5. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-etiquetas.sql` (apaga as
    etiquetas aplicadas; o histórico fica; recria `assistente_status_conversas`).
 
-## Módulo Públicos (NÃO APLICADA — aguarda aprovação do Lucas; 06 seção 45)
+## Módulo Públicos (APLICADA 12/11 14h48; app 92a36be 14h58; smoke ok — 06 seção 45)
 
 O que é e as provas: 06, seção 45. Próxima migração livre depois desta: **20261111000700** (conferir main e
 branches abertas antes de numerar).
