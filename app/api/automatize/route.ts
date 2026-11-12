@@ -232,6 +232,13 @@ export async function POST(req: Request) {
       if (!titulo) return NextResponse.json({ error: 'Escreva o título da tarefa.' }, { status: 400 })
       config.titulo = titulo.slice(0, 200)
       if (acao === 'criar_tarefa') config.prazo_dias = Math.max(0, Math.min(30, Math.floor(Number(b.prazo_dias) || 0)))
+      // Negócio sem dono (12/11/2026): para quem vai a tarefa. Vazio = ninguém ("sem responsável").
+      const semDono = acao === 'criar_tarefa' ? String(b.responsavel_sem_dono ?? '').trim() : ''
+      if (semDono) {
+        const { data: membro } = await supabase.from('empresa_usuarios').select('usuario_id').eq('empresa_id', empresaId).eq('usuario_id', semDono).eq('ativo', true).maybeSingle()
+        if (!membro) return NextResponse.json({ error: 'Quem recebe a tarefa sem dono tem de ser alguém ativo da equipe.' }, { status: 400 })
+        config.responsavel_sem_dono = semDono
+      }
     }
     if (acao === 'atribuir_responsavel') {
       const resp = String(b.responsavel_id ?? '')

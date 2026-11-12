@@ -52,7 +52,12 @@ function frase(a: AutoDaEtapa, d: DadosAutomatize): string {
   const c = a.config ?? {}
   if (a.acao === 'enviar_modelo') return quando + `enviar "${d.modelos.find((m) => m.id === a.modelo_id)?.nome ?? 'modelo'}"`
   if (a.acao === 'atribuir_responsavel') return quando + `passar para ${d.equipe.find((u) => u.id === c.responsavel_id)?.nome ?? '—'}`
-  if (a.acao === 'criar_tarefa' || a.acao === 'notificar_gestor') return quando + `${ROTULO[a.acao].toLowerCase()} "${String(c.titulo ?? '')}"`
+  if (a.acao === 'criar_tarefa' || a.acao === 'notificar_gestor') {
+    // Sem dono (12/11/2026): para quem vai a tarefa quando o negócio não tem responsável.
+    const semDono = a.acao === 'criar_tarefa' && c.responsavel_sem_dono
+      ? ` (sem dono: ${d.equipe.find((u) => u.id === c.responsavel_sem_dono)?.nome ?? '—'})` : ''
+    return quando + `${ROTULO[a.acao].toLowerCase()} "${String(c.titulo ?? '')}"` + semDono
+  }
   return quando + (ROTULO[a.acao] ?? a.acao).toLowerCase()
 }
 
@@ -252,11 +257,12 @@ function NovaAutomacao({ slug, label, dados, porEtiqueta, porPublico, onFechar, 
   const [modelo, setModelo] = useState('')
   const [parametros, setParametros] = useState('')
   const [resp, setResp] = useState('')
+  const [semDono, setSemDono] = useState('')
   const [salvando, setSalvando] = useState(false)
   async function salvar() {
     setSalvando(true)
     const ok = await postar({
-      op: 'criar', acao, espera_dias: Number(espera) || 0, titulo, prazo_dias: Number(prazo) || 0,
+      op: 'criar', acao, espera_dias: Number(espera) || 0, titulo, prazo_dias: Number(prazo) || 0, responsavel_sem_dono: semDono || null,
       ...(porPublico
         ? { gatilho: 'entrou_no_publico', publico_id: Number(publico) || null }
         : porEtiqueta
@@ -276,7 +282,7 @@ function NovaAutomacao({ slug, label, dados, porEtiqueta, porPublico, onFechar, 
               <option value="">— escolha —</option>
               {(dados.publicos ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </Select>
-            <p className="text-[11px] leading-snug text-ink-3">Vale para quem entrar daqui para a frente: quem já está no público agora não dispara. A entrada é conferida de hora em hora; se o contato sair do público antes da espera acabar, a ação é pulada.</p>
+            <p className="text-[11px] leading-snug text-ink-3">Vale para quem entrar daqui para a frente: quem já está no público agora não dispara. A entrada é conferida de hora em hora (ou na hora, pelo “Atualizar” em Públicos); se o contato sair do público antes da espera acabar, a ação é pulada.</p>
           </>
         ) : porEtiqueta ? (
           <>
@@ -302,6 +308,12 @@ function NovaAutomacao({ slug, label, dados, porEtiqueta, porPublico, onFechar, 
           <>
             <Input label="Título da tarefa" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ligar para {{nome}}" />
             {acao === 'criar_tarefa' && <Input label="Prazo (dias)" type="number" value={prazo} onChange={(e) => setPrazo(e.target.value)} />}
+            {acao === 'criar_tarefa' && (
+              <Select label="Se o negócio estiver sem dono, atribuir a" value={semDono} onChange={(e) => setSemDono(e.target.value)} data-tarefa-sem-dono>
+                <option value="">Ninguém — aparece como “sem responsável” para a loja</option>
+                {dados.equipe.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              </Select>
+            )}
           </>
         )}
         {acao === 'atribuir_responsavel' && (

@@ -17,7 +17,8 @@ import { recalcularPublico, rodadaDoPublico } from '@/lib/publicos/rodada'
  *   'editar'    nome e/ou filtro → filtro novo reconta na hora, de novo sem disparar: quem passou a
  *               valer pela regra nova não "entrou";
  *   'atualizar' reconta agora COM disparo: quem entrou desde a última conta ganha as automações
- *               (o mesmo que a rodada de hora em hora faria);
+ *               (o mesmo que a rodada de hora em hora faria), e as de espera 0 executam na hora,
+ *               como as da etiqueta;
  *   'apagar'    leva junto as automações "entrou no público" dele (como a etiqueta); recusado se
  *               uma transmissão agendada depende dele.
  */
@@ -177,7 +178,8 @@ export async function POST(req: Request) {
       // A RLS diz se quem pede alcança o público (loja visível).
       const { data: p } = await supabase.from('publicos').select('id').eq('empresa_id', empresaId).eq('id', id).maybeSingle()
       if (!p) return recusa('Público não encontrado.', 404)
-      const r = await rodadaDoPublico(svc, empresaId, id)
+      // Na hora, como a etiqueta (12/11/2026): as de espera 0 executam já, com as travas de sempre.
+      const r = await rodadaDoPublico(svc, empresaId, id, { rodarJa: true })
       return NextResponse.json({ ok: true, ...r })
     }
 

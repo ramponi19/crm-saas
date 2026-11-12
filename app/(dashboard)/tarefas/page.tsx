@@ -21,7 +21,9 @@ export default async function TarefasPage() {
   // a lista vinha vazia e criar tarefa falhava, sem erro na tela. O nome vem do contato.
   const SELECT_TAREFA: string = `*, ${embedLead('tarefas_lead_id_fkey')}`
   let q = supabase.from('tarefas').select(SELECT_TAREFA).eq('empresa_id', empresaId)
-  if (!isGestor) q = q.eq('responsavel_id', user!.id)
+  // O vendedor vê as dele e as SEM responsável (12/11/2026: tarefa de automação em negócio sem dono);
+  // a RLS de tarefas já limita às lojas que ele alcança.
+  if (!isGestor) q = q.or(`responsavel_id.eq.${user!.id},responsavel_id.is.null`)
 
   const [{ data: tarefasRaw }, leads, { data: membros }] = await Promise.all([
     q.order('concluida').order('vencimento', { nullsFirst: false }),

@@ -44,10 +44,10 @@ const novo = (n, loja, ativo = true) => {
   return { c, neg }
 }
 // M1, M2: com X desde o início. M4: com X, mas o negócio está INATIVO. J1: com X, em Jaguariúna.
-// M3, M6, M7, M8: entram depois. M5: só com Y (passa a valer quando a regra muda).
+// M3, M6, M7, M8, MA: entram depois. M5: só com Y (passa a valer quando a regra muda). Todos sem dono.
 const M1 = novo(1, MOGI), M2 = novo(2, MOGI), M3 = novo(3, MOGI), M4 = novo(4, MOGI, false), M5 = novo(5, MOGI)
-const M6 = novo(6, MOGI), M7 = novo(7, MOGI), M8 = novo(8, MOGI), J1 = novo(9, JAG)
-const TODOS = [M1, M2, M3, M4, M5, M6, M7, M8, J1]
+const M6 = novo(6, MOGI), M7 = novo(7, MOGI), M8 = novo(8, MOGI), J1 = novo(9, JAG), MA = novo(10, MOGI)
+const TODOS = [M1, M2, M3, M4, M5, M6, M7, M8, J1, MA]
 const negs = TODOS.map((x) => x.neg).join(','), cons = TODOS.map((x) => x.c).join(',')
 const etq = (x, ...ids) => sql(`update contatos set etiqueta_ids = '{${ids.join(',')}}'::bigint[] where id=${x.c}`)
 etq(M1, X); etq(M2, X); etq(M4, X); etq(J1, X); etq(M5, Y)
@@ -155,9 +155,29 @@ try {
   etq(M6, Y)
   const at = await pub(dono, { op: 'atualizar', id: P })
   confere(at.status === 200 && at.j.entraram === 1 && at.j.agendadas === 1, `atualizar: M6 entrou (${JSON.stringify(at.j)})`)
-  confere(execs(A1).includes(`${M6.neg}:agendada`), 'M6 agendada na fila (roda na rodada)')
-  await cron()
-  confere(execs(A1).includes(`${M6.neg}:executada`), 'rodada executou M6')
+  confere(execs(A1).includes(`${M6.neg}:executada`), `Atualizar: M6 executou NA HORA, sem esperar a rodada (${execs(A1)})`)
+  confere(sql(`select count(*) from tarefas where negocio_id=${M6.neg} and responsavel_id is null`) === '1', 'tarefa de M6 sem responsável (negócio sem dono)')
+
+  // ── 5b. Tarefa de negócio sem dono: "atribuir a" na automação; sem ninguém, a loja vê ────────────
+  const ruim = await api(dono, '/api/automatize', 'POST', { op: 'criar', gatilho: 'entrou_no_publico', publico_id: P, acao: 'criar_tarefa', titulo: `x ${T}`, responsavel_sem_dono: '00000000-0000-0000-0000-000000000000' })
+  confere(ruim.status === 400, `"atribuir a" de quem não é da equipe: recusado (${ruim.j.error})`)
+  const a3 = await api(dono, '/api/automatize', 'POST', { op: 'criar', gatilho: 'entrou_no_publico', publico_id: P, acao: 'criar_tarefa', titulo: `PUB SEM DONO {{nome}} ${T}`, responsavel_sem_dono: VM })
+  const A3 = a3.j.id
+  confere(a3.status === 200 && sql(`select config->>'responsavel_sem_dono' from automacoes where id=${A3}`) === VM, 'A3 grava "se sem dono, atribuir ao vendedor de Mogi"')
+  etq(MA, X)
+  const atA = await pub(dono, { op: 'atualizar', id: P })
+  confere(atA.j.entraram === 1, `MA entrou (${JSON.stringify(atA.j)})`)
+  const tarefasMA = sql(`select coalesce(string_agg(split_part(titulo, ' ', 2) || ':' || coalesce(responsavel_id::text, 'ninguem'), ' | ' order by titulo), '') from tarefas where negocio_id=${MA.neg}`)
+  confere(tarefasMA === `ENTROU:ninguem | SEM:${VM}`, `MA: A1 sem responsável, A3 para o vendedor de Mogi (${tarefasMA})`)
+  await vm.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' })
+  await vm.waitForSelector('[data-tarefa-sem-responsavel]', { timeout: 300000 }).catch(() => {})
+  const telaVM = await vm.locator('body').innerText().catch(() => '')
+  confere(telaVM.includes(`PUB ENTROU Pub 10 ${T}`) && telaVM.includes(`PUB SEM DONO Pub 10 ${T}`) && await vm.locator('[data-tarefa-sem-responsavel]').count() >= 1,
+    'vendedor de Mogi vê em Tarefas a sem responsável (com o selo) e a atribuída a ele')
+  await vj.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' })
+  const telaVJ = await vj.locator('body').innerText().catch(() => '')
+  confere(!telaVJ.includes(`Pub 10 ${T}`), 'vendedor de Jaguariúna não vê as tarefas de Mogi')
+  await api(dono, '/api/automatize', 'POST', { op: 'ligar', tipo: 'automacao', id: A3, ativo: false })
 
   // ── 6. Espera + saiu do público = pulada ─────────────────────────────────────────────────────────
   const a2 = await api(dono, '/api/automatize', 'POST', { op: 'criar', gatilho: 'entrou_no_publico', publico_id: P, acao: 'criar_tarefa', titulo: `PUB 2 DIAS ${T}`, espera_dias: 2 })
@@ -206,6 +226,9 @@ try {
   }
 
   // ── 10. Telas ────────────────────────────────────────────────────────────────────────────────────
+  // O passo 7 desligou e religou o módulo pelo banco; a trava de rota do proxy guarda os módulos da
+  // empresa por 60 s (TTL_MODULOS_MS): antes disso a tela ainda cairia na vitrine.
+  await new Promise((r) => setTimeout(r, 65000))
   await dono.goto(`${BASE}/publicos`, { waitUntil: 'networkidle' })
   await dono.waitForSelector(`[data-publico-linha="${P}"]`, { timeout: 300000 }).then(() => ok('tela /publicos lista P'), () => falha('tela /publicos sem P'))
   const linha = await dono.locator(`[data-publico-linha="${P}"]`).innerText().catch(() => '')

@@ -770,6 +770,9 @@ v "editar filtro nao dispara"            "app/api/publicos/route.ts" "if (filtro
 v "primeiro gatilho nao dispara"         "app/api/automatize/route.ts" "if (!count) await recalcularPublico(createServiceClient(), publicoId, false)"
 v "gatilho de publico so com modulo"     "lib/automacoes.ts" "if (!(await moduloEstaLigado(e.empresa_id, 'publicos')))"
 v "transmissao usa publico so com modulo" "app/api/transmissao/route.ts" "if (await moduloEstaLigado(empresaId, 'publicos'))"
+v "atualizar do publico roda ja"         "app/api/publicos/route.ts" "rodadaDoPublico(svc, empresaId, id, { rodarJa: true })"
+v "vendedor ve tarefa sem responsavel"   "app/(dashboard)/tarefas/page.tsx" "responsavel_id.is.null"
+v "tarefa sem dono so p/ membro ativo"   "lib/automacoes.ts" ".eq('usuario_id', semDono).eq('ativo', true)"
 v "automatize conta a transmissao nos 7 dias" "lib/automacoes.ts" "from('transmissao_envios')"
 v "pausar todas trava o agendamento"      "lib/automacoes.ts" "if (await automacoesPausadas(db, empresaId)) return"
 # 11/11/2026 "failed" da Meta depois de aceitar: o item da fila falha (teto e 7 dias liberados); aviso de pagamento

@@ -22,10 +22,14 @@ export async function recalcularPublico(svc: Db, publicoId: number, disparar: bo
   return ((data ?? []) as Entrada[]).map((x) => ({ contato_id: Number(x.contato_id), negocio_id: x.negocio_id == null ? null : Number(x.negocio_id) }))
 }
 
-/** Conta com disparo: quem entrou ganha as automações do público. */
-export async function rodadaDoPublico(svc: Db, empresaId: number, publicoId: number): Promise<{ entraram: number; agendadas: number }> {
+/**
+ * Conta com disparo: quem entrou ganha as automações do público. `rodarJa` (o "Atualizar" da tela):
+ * as de espera 0 executam na hora, pelo caminho da etiqueta; na rodada de hora em hora a fila roda logo
+ * depois desta conta.
+ */
+export async function rodadaDoPublico(svc: Db, empresaId: number, publicoId: number, { rodarJa = false } = {}): Promise<{ entraram: number; agendadas: number }> {
   const entraram = await recalcularPublico(svc, publicoId, true)
-  const agendadas = entraram.length ? await agendarEntrouNoPublico(svc, empresaId, publicoId, entraram) : 0
+  const agendadas = entraram.length ? await agendarEntrouNoPublico(svc, empresaId, publicoId, entraram, { rodarJa }) : 0
   return { entraram: entraram.length, agendadas }
 }
 

@@ -106,6 +106,7 @@ export default function TarefasView({ inicial, leads, usuarios, empresaId, meuId
           <div className={cn('truncate text-[13px] font-medium', t.concluida ? 'text-ink-3 line-through' : 'text-ink')}>{t.titulo}</div>
           {t.lead_nome && <div className="truncate text-[11.5px] text-ink-3">Lead: {t.lead_nome}</div>}
         </div>
+        {!t.responsavel_id && <Badge tone="warn" className="flex-none" data-tarefa-sem-responsavel>Sem responsável</Badge>}
         <span className={cn('num shrink-0 text-[11.5px]', atrasada ? 'font-semibold text-bad' : 'text-ink-3')}>{fmtData(t.vencimento, fuso)}
 </span>
         <IconButton aria-label="Excluir" variant="danger" size="sm" onClick={() => excluir(t)}><Trash2 size={14} strokeWidth={1.7} /></IconButton>

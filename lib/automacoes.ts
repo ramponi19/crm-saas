@@ -118,6 +118,14 @@ async function criarTarefa(db: Db, e: Execucao, a: AutomacaoRow, neg: NegocioMin
     titulo = render((config.titulo as string) || `Ação: lead ${neg.nome ?? ''}`, neg.nome)
     const prazo = Number(config.prazo_dias) || 0
     if (prazo > 0) vencimento = new Date(Date.now() + prazo * 86_400_000).toISOString()
+    // Negócio sem dono (12/11/2026): a tarefa vai para quem a automação diz, se ainda está ativo na
+    // empresa; sem ninguém configurado, fica "sem responsável" (a loja inteira vê em Tarefas).
+    const semDono = (config.responsavel_sem_dono as string | undefined) || null
+    if (!responsavel && semDono) {
+      const { data: m } = await db.from('empresa_usuarios').select('usuario_id')
+        .eq('empresa_id', e.empresa_id).eq('usuario_id', semDono).eq('ativo', true).maybeSingle()
+      if (m) responsavel = semDono
+    }
   }
   const { error } = await db.from('tarefas').insert({
     empresa_id: e.empresa_id, filial_id: neg.filial_id, lead_id: neg.id, negocio_id: neg.id, contato_id: neg.contato_id,
@@ -320,13 +328,13 @@ export async function executarRecebeuEtiqueta(db: Db, empresaId: number, negocio
 
 /**
  * "Entrou no público" (12/11/2026): quem a conta do público achou como NOVO (publicos_recalcular com
- * disparar) ganha uma execução agendada por automação ligada daquele público — em lote, sem rodar
- * aqui: a fila de sempre executa (na rodada de hora em hora, logo depois desta conta), com as mesmas
- * travas. Quem entrou de novo substitui o que ainda esperava da mesma automação. Devolve quantas
- * execuções agendou.
+ * disparar) ganha uma execução agendada por automação ligada daquele público, em lote. Na rodada de
+ * hora em hora a fila de sempre executa logo depois desta conta; no "Atualizar" da tela (`rodarJa`)
+ * as de espera 0 rodam aqui mesmo, pelo caminho da etiqueta. As travas são as mesmas nos dois. Quem
+ * entrou de novo substitui o que ainda esperava da mesma automação. Devolve quantas agendou.
  */
 export async function agendarEntrouNoPublico(db: Db, empresaId: number, publicoId: number,
-  entraram: { contato_id: number; negocio_id: number | null }[]): Promise<number> {
+  entraram: { contato_id: number; negocio_id: number | null }[], { rodarJa = false } = {}): Promise<number> {
   const comNegocio = entraram.filter((x) => x.negocio_id != null) as { contato_id: number; negocio_id: number }[]
   if (!comNegocio.length) return 0
   const { data } = await db.from('automacoes')
@@ -351,9 +359,11 @@ export async function agendarEntrouNoPublico(db: Db, empresaId: number, publicoI
       agendada_para: agendarPara(agora, a.espera_dias ?? 0).toISOString(),
     })))
     if (!linhas.length) continue
-    const { error } = await db.from('automacao_execucoes').insert(linhas as never)
+    const { data: criadas, error } = await db.from('automacao_execucoes').insert(linhas as never).select('id, automacao_id')
     if (error) throw new Error(`agendar "entrou no público": ${error.message}`)
     n += linhas.length
+    // "Atualizar" da tela (12/11/2026, pedido do Lucas): as de espera 0 rodam na hora, como a etiqueta.
+    if (rodarJa) await rodarAsDeAgora(db, lista, (criadas ?? []) as { id: number; automacao_id: number }[], agora)
   }
   return n
 }
@@ -371,14 +381,24 @@ async function agendarERodar(db: Db, empresaId: number, neg: NegocioMin, lista: 
     agendada_para: agendarPara(agora, a.espera_dias ?? 0).toISOString(),
   })) as never).select('id, automacao_id')
   if (error) throw new Error(`agendar automações: ${error.message}`)
-  // As de espera 0 rodam já, reservadas pelo mesmo estado que o cron usa.
+  await rodarAsDeAgora(db, lista, (criadas ?? []) as { id: number; automacao_id: number }[], agora)
+}
+
+/**
+ * As de espera 0 rodam já, reservadas pelo mesmo estado que o cron usa ('agendada' → 'executando'):
+ * a mesma execução de sempre, com as travas (horário, teto por hora, 7 dias por modelo, opt-out) —
+ * o que não pode sair agora volta 'adiada' para a fila. Devolve quantas rodaram.
+ */
+async function rodarAsDeAgora(db: Db, lista: AutomacaoRow[], criadas: { id: number; automacao_id: number }[], agora: Date): Promise<number> {
   const imediatas = new Set(lista.filter((a) => (a.espera_dias ?? 0) === 0).map((a) => a.id))
-  const ids = ((criadas ?? []) as { id: number; automacao_id: number }[]).filter((x) => imediatas.has(x.automacao_id)).map((x) => x.id)
-  if (!ids.length) return
+  const ids = criadas.filter((x) => imediatas.has(x.automacao_id)).map((x) => x.id)
+  if (!ids.length) return 0
   const { data: reservadas } = await db.from('automacao_execucoes')
     .update({ status: 'executando', reservada_em: agora.toISOString(), tentativas: 1 } as never)
     .in('id', ids).eq('status', 'agendada').select('*')
-  await executarReservadas(db, (reservadas ?? []) as Execucao[])
+  const lote = (reservadas ?? []) as Execucao[]
+  await executarReservadas(db, lote)
+  return lote.length
 }
 
 /**
