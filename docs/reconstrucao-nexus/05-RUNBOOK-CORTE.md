@@ -513,6 +513,30 @@ branches abertas antes de numerar).
 5. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-etiquetas.sql` (apaga as
    etiquetas aplicadas; o histórico fica; recria `assistente_status_conversas`).
 
+## Módulo Públicos (NÃO APLICADA — aguarda aprovação do Lucas; 06 seção 45)
+
+O que é e as provas: 06, seção 45. Próxima migração livre depois desta: **20261111000700** (conferir main e
+branches abertas antes de numerar).
+
+1. **Antes:** md5(prosrc) de `transmissao_publico` em produção = o corpo da `20261111000500_etiquetas` (LF). Se
+   diferir, alguém mexeu direto em produção: parar. `automacoes_gatilho_check` com os 3 gatilhos de hoje.
+2. **Migração** `20261111000600_publicos` pelo MCP `apply_migration`, IOwait < 10% (leitura de 65 s separada),
+   com aprovação do Lucas. Cria `publicos` e `publicos_membros` (vazias), 5 funções novas, troca o corpo de
+   `transmissao_publico` (passa a chamar `publicos_resolver` e a descartar negócio inativo) e põe uma coluna nula
+   em `automacoes` e em `transmissoes` (sem reescrita). Depois: `publicos` com RLS e as 2 políticas;
+   `publicos_membros` com RLS e sem grant para `anon`/`authenticated`; `publicos_previa` com EXECUTE para
+   `authenticated`/`service_role`, sem `anon`; `publicos_resolver`, `publicos_recalcular`, `publicos_rodada`,
+   `transmissao_remontar` e `transmissao_publico` só `service_role`; corpos = md5 do banco local.
+3. **App** (push = deploy; IOwait < 20%). Banco antes do app: o app novo lê `publico_id` e chama `publicos_*`. O
+   app antigo segue com o banco novo (a Transmissão chama `transmissao_publico` com a mesma assinatura; a única
+   diferença é que negócio inativo sai da lista — pedido junto com o módulo).
+4. **Smoke** com o Lucas: instalar Públicos na Central; criar um público de teste numa loja e ver "atualizado
+   agora"; "Usar público salvo" aparecendo na Transmissão; "Quando entra no público" no Automatize; apagar o
+   público de teste; desinstalar se ele não quiser o módulo ligado ainda.
+5. **Volta:** app antes (revert do push), depois `supabase/scripts/volta/volta-publicos.sql` (apaga os públicos
+   e as automações "entrou no público"; as transmissões ficam com o filtro que usaram; `transmissao_publico`
+   volta ao corpo da 0500).
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
