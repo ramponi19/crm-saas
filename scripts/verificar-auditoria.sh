@@ -759,6 +759,17 @@ v "transmissao nao usa whatsapp de outra loja" "supabase/functions/webhook-leads
 v "transmissao respeita teto da empresa"  "lib/transmissao/motor.ts" "enviadasNaHora(svc, t.empresa_id"
 v "transmissao respeita horario"          "lib/transmissao/motor.ts" "proximaJanela(svc, t.empresa_id"
 v "transmissao respeita 7 dias por modelo" "lib/transmissao/motor.ts" "modeloNosUltimos7Dias("
+# 12/11/2026 Publicos: membros so pela chave de servico, regra unica, criar/editar sem disparar, modulo opcional
+v "membros de publico so servico"        "supabase/migrations/20261111000600_publicos.sql" "revoke all on public.publicos_membros from anon, authenticated"
+v "so dono/admin grava publico"          "supabase/migrations/20261111000600_publicos.sql" "create policy publicos_escrita"
+v "recalcular publico so servico"        "supabase/migrations/20261111000600_publicos.sql" "revoke all on function public.publicos_recalcular(bigint, boolean) from public, anon, authenticated"
+v "transmissao usa a regra do publico"   "supabase/migrations/20261111000600_publicos.sql" "from publicos_resolver(p_empresa, p_filial, p_filtro) r"
+v "publico so com negocio ativo"         "supabase/migrations/20261111000600_publicos.sql" "and n.ativo"
+v "criar publico nao dispara"            "app/api/publicos/route.ts" "recalcularPublico(svc, data.id as number, false)"
+v "editar filtro nao dispara"            "app/api/publicos/route.ts" "if (filtroMudou) await recalcularPublico(svc, id, false)"
+v "primeiro gatilho nao dispara"         "app/api/automatize/route.ts" "if (!count) await recalcularPublico(createServiceClient(), publicoId, false)"
+v "gatilho de publico so com modulo"     "lib/automacoes.ts" "if (!(await moduloEstaLigado(e.empresa_id, 'publicos')))"
+v "transmissao usa publico so com modulo" "app/api/transmissao/route.ts" "if (await moduloEstaLigado(empresaId, 'publicos'))"
 v "automatize conta a transmissao nos 7 dias" "lib/automacoes.ts" "from('transmissao_envios')"
 v "pausar todas trava o agendamento"      "lib/automacoes.ts" "if (await automacoesPausadas(db, empresaId)) return"
 # 11/11/2026 "failed" da Meta depois de aceitar: o item da fila falha (teto e 7 dias liberados); aviso de pagamento

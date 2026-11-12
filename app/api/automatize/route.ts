@@ -7,6 +7,8 @@ import { CHAVE_PAUSA } from '@/lib/automacoes'
 import { createServiceClient } from '@/lib/supabase/service'
 import { aprovadosPorLoja } from '@/lib/canais/modelos-waba'
 import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
+import { recalcularPublico } from '@/lib/publicos/rodada'
 
 /**
  * MODELO POR NÚMERO (11/11/2026): a automação é da empresa, mas o envio sai pelo WhatsApp da loja
@@ -43,6 +45,17 @@ async function modelosPorLoja(empresaId: number) {
  */
 
 const ACOES = ['criar_tarefa', 'notificar_gestor', 'enviar_modelo', 'atribuir_responsavel'] as const
+
+/**
+ * "Entrou no público" (12/11/2026): ligar o PRIMEIRO gatilho de um público reconta sem disparar —
+ * quem já estava lá não "entra" (a última conta pode ser de dias atrás, e a rodada de hora em hora
+ * só recontava os públicos com gatilho). Com outro gatilho já ligado, a conta está em dia.
+ */
+async function pontoDePartida(supabase: Awaited<ReturnType<typeof createClient>>, empresaId: number, publicoId: number, automacaoId: number) {
+  const { count } = await supabase.from('automacoes').select('id', { count: 'exact', head: true })
+    .eq('empresa_id', empresaId).eq('gatilho', 'entrou_no_publico').eq('publico_id', publicoId).eq('ativo', true).neq('id', automacaoId)
+  if (!count) await recalcularPublico(createServiceClient(), publicoId, false)
+}
 type Acao = typeof ACOES[number]
 
 
@@ -66,8 +79,8 @@ export async function GET(req: Request) {
   if (funilId) qEtapas = qEtapas.eq('funil_id', funilId)
   const [{ data: etapas }, { data: autos }, { data: cads }, { data: pausa }, { data: modelos }, { data: equipe }] = await Promise.all([
     qEtapas,
-    supabase.from('automacoes').select('id, etapa_slug, etapa_id, etiqueta_id, gatilho, acao, ativo, espera_dias, modelo_id, config')
-      .eq('empresa_id', empresaId).in('gatilho', ['entrou_na_etapa', 'recebeu_etiqueta']).order('id'),
+    supabase.from('automacoes').select('id, etapa_slug, etapa_id, etiqueta_id, publico_id, gatilho, acao, ativo, espera_dias, modelo_id, config')
+      .eq('empresa_id', empresaId).in('gatilho', ['entrou_na_etapa', 'recebeu_etiqueta', 'entrou_no_publico']).order('id'),
     supabase.from('cadencias').select('id, nome, ativo, gatilho_etapa_slug').eq('empresa_id', empresaId).order('id'),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', CHAVE_PAUSA).maybeSingle(),
     supabase.from('modelos_mensagem').select('id, nome, idioma, status, corpo').eq('empresa_id', empresaId).order('nome'),
@@ -113,8 +126,23 @@ export async function GET(req: Request) {
     na_fila: nFila.get(a.id as number) ?? 0, executadas_hoje: nHoje.get(a.id as number) ?? 0,
   }))
 
+  // "Entrou no público" (12/11/2026): só com o módulo Públicos ligado (null = a tela nem mostra).
+  let porPublico = null
+  let publicos = null
+  if (await moduloEstaLigado(empresaId, 'publicos')) {
+    const { data: pubs } = await supabase.from('publicos').select('id, nome, filial_id, total').eq('empresa_id', empresaId).order('nome')
+    publicos = pubs ?? []
+    porPublico = (autos ?? []).filter((a) => a.gatilho === 'entrou_no_publico').map((a) => ({
+      id: a.id, publico_id: a.publico_id as number, acao: a.acao, ativo: a.ativo, espera_dias: a.espera_dias ?? 0,
+      modelo_id: a.modelo_id, config: a.config,
+      na_fila: nFila.get(a.id as number) ?? 0, executadas_hoje: nHoje.get(a.id as number) ?? 0,
+    }))
+  }
+
   return NextResponse.json({
     podeEditar: role === 'owner' || role === 'admin',
+    porPublico,
+    publicos,
     pausado: !!(pausa?.valor as { pausado?: boolean } | null)?.pausado,
     etapas: porEtapa,
     porEtiqueta,
@@ -141,10 +169,20 @@ export async function POST(req: Request) {
 
   if (b.op === 'ligar') {
     const tabela = b.tipo === 'cadencia' ? 'cadencias' : 'automacoes'
+    // Ligar um "entrou no público" exige o módulo ligado e recebe o ponto de partida.
+    let publicoId: number | null = null
+    if (tabela === 'automacoes' && b.ativo) {
+      const { data: a } = await supabase.from('automacoes').select('gatilho, publico_id, ativo').eq('id', Number(b.id)).eq('empresa_id', empresaId).maybeSingle()
+      if (a?.gatilho === 'entrou_no_publico' && !a.ativo) {
+        if (!(await moduloEstaLigado(empresaId, 'publicos'))) return NextResponse.json({ error: 'O módulo Públicos não está instalado nesta empresa.' }, { status: 403 })
+        publicoId = a.publico_id as number
+      }
+    }
     const { data, error } = await supabase.from(tabela).update({ ativo: !!b.ativo } as never)
       .eq('id', Number(b.id)).eq('empresa_id', empresaId).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     if (nadaGravado(data)) return NextResponse.json({ error: 'Nada foi gravado.' }, { status: 403 })
+    if (publicoId) await pontoDePartida(supabase, empresaId, publicoId, Number(b.id))
     return NextResponse.json({ ok: true })
   }
 
@@ -160,11 +198,19 @@ export async function POST(req: Request) {
   if (b.op === 'criar') {
     const acao = String(b.acao) as Acao
     if (!ACOES.includes(acao)) return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
-    // Gatilho: "entrou na etapa" (padrão) ou "recebeu etiqueta" (11/11/2026).
+    // Gatilho: "entrou na etapa" (padrão), "recebeu etiqueta" (11/11/2026) ou "entrou no público"
+    // (12/11/2026, só com o módulo Públicos ligado).
     const porEtiqueta = b.gatilho === 'recebeu_etiqueta'
+    const porPublico = b.gatilho === 'entrou_no_publico'
     let etapa: { id: number; slug: string } | null = null
     let etiquetaId: number | null = null
-    if (porEtiqueta) {
+    let publicoId: number | null = null
+    if (porPublico) {
+      if (!(await moduloEstaLigado(empresaId, 'publicos'))) return NextResponse.json({ error: 'O módulo Públicos não está instalado nesta empresa.' }, { status: 403 })
+      publicoId = Number(b.publico_id) || null
+      const { data: pub } = await supabase.from('publicos').select('id').eq('empresa_id', empresaId).eq('id', publicoId ?? 0).maybeSingle()
+      if (!pub) return NextResponse.json({ error: 'Escolha o público.' }, { status: 400 })
+    } else if (porEtiqueta) {
       etiquetaId = Number(b.etiqueta_id) || null
       const { data: etq } = await supabase.from('etiquetas').select('id').eq('empresa_id', empresaId).eq('id', etiquetaId ?? 0).maybeSingle()
       if (!etq) return NextResponse.json({ error: 'Escolha a etiqueta.' }, { status: 400 })
@@ -203,12 +249,15 @@ export async function POST(req: Request) {
     }
     const { data, error } = await supabase.from('automacoes').insert({
       empresa_id: empresaId, etapa_slug: etapa?.slug ?? null, etapa_id: etapa?.id ?? null, etiqueta_id: etiquetaId,
-      gatilho: porEtiqueta ? 'recebeu_etiqueta' : 'entrou_na_etapa', acao, config,
+      publico_id: publicoId,
+      gatilho: porPublico ? 'entrou_no_publico' : porEtiqueta ? 'recebeu_etiqueta' : 'entrou_na_etapa', acao, config,
       espera_dias: espera, modelo_id: modeloId, ativo: true,
     } as never).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     if (nadaGravado(data)) return NextResponse.json({ error: 'Nada foi gravado.' }, { status: 403 })
-    return NextResponse.json({ ok: true, id: (data as { id: number }[])[0].id })
+    const novoId = (data as { id: number }[])[0].id
+    if (publicoId) await pontoDePartida(supabase, empresaId, publicoId, novoId)
+    return NextResponse.json({ ok: true, id: novoId })
   }
 
   return NextResponse.json({ error: 'Operação desconhecida.' }, { status: 400 })

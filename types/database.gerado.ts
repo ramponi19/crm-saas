@@ -249,14 +249,14 @@ isOneToOne: false
                   ]
                 },"automacoes": {
                   Row: {
-                    "acao": string,"ativo": boolean,"config": NonNullable<Json>,"created_at": string,"empresa_id": number,"espera_dias": number,"etapa_id": number | null,"etapa_slug": string | null,"etiqueta_id": number | null,"gatilho": string,"horas": number | null,"id": number,"modelo_id": number | null
+                    "acao": string,"ativo": boolean,"config": NonNullable<Json>,"created_at": string,"empresa_id": number,"espera_dias": number,"etapa_id": number | null,"etapa_slug": string | null,"etiqueta_id": number | null,"gatilho": string,"horas": number | null,"id": number,"modelo_id": number | null,"publico_id": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "acao": string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id": number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"etiqueta_id"?: number | null,"gatilho": string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null
+                    "acao": string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id": number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"etiqueta_id"?: number | null,"gatilho": string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null,"publico_id"?: number | null
                   }
                   Update: {
-                    "acao"?: string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id"?: number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"etiqueta_id"?: number | null,"gatilho"?: string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null
+                    "acao"?: string,"ativo"?: boolean,"config"?: NonNullable<Json>,"created_at"?: string,"empresa_id"?: number,"espera_dias"?: number,"etapa_id"?: number | null,"etapa_slug"?: string | null,"etiqueta_id"?: number | null,"gatilho"?: string,"horas"?: number | null,"id"?: never,"modelo_id"?: number | null,"publico_id"?: number | null
                   }
                   Relationships: [
                     {
@@ -282,6 +282,12 @@ isOneToOne: false
       columns: ["modelo_id"]
 isOneToOne: false
       referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "automacoes_publico_id_fkey"
+      columns: ["publico_id"]
+isOneToOne: false
+      referencedRelation: "publicos"
       referencedColumns: ["id"]
     }
                   ]
@@ -2171,6 +2177,70 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"publicos": {
+                  Row: {
+                    "calculado_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"nome": string,"total": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "calculado_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"nome": string,"total"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "calculado_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"nome"?: string,"total"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "publicos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "publicos_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"publicos_membros": {
+                  Row: {
+                    "contato_id": number,"empresa_id": number,"entrou_em": string,"negocio_id": number | null,"publico_id": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contato_id": number,"empresa_id": number,"entrou_em"?: string,"negocio_id"?: number | null,"publico_id": number
+                  }
+                  Update: {
+                    "contato_id"?: number,"empresa_id"?: number,"entrou_em"?: string,"negocio_id"?: number | null,"publico_id"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "publicos_membros_contato_id_fkey"
+      columns: ["contato_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "publicos_membros_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "publicos_membros_negocio_id_fkey"
+      columns: ["negocio_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "publicos_membros_publico_id_fkey"
+      columns: ["publico_id"]
+isOneToOne: false
+      referencedRelation: "publicos"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"push_subscriptions": {
                   Row: {
                     "auth": string,"created_at": string | null,"empresa_id": number,"endpoint": string,"id": number,"p256dh": string,"usuario_id": string
@@ -2457,14 +2527,14 @@ isOneToOne: false
                   ]
                 },"transmissoes": {
                   Row: {
-                    "agendada_para": string | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"status": string,"total": number,"updated_at": string
+                    "agendada_para": string | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"publico_id": number | null,"status": string,"total": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -2484,6 +2554,12 @@ isOneToOne: false
       columns: ["modelo_id"]
 isOneToOne: false
       referencedRelation: "modelos_mensagem"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transmissoes_publico_id_fkey"
+      columns: ["publico_id"]
+isOneToOne: false
+      referencedRelation: "publicos"
       referencedColumns: ["id"]
     }
                   ]
@@ -3274,6 +3350,24 @@ isOneToOne: true
 "negocio_atribuir":
 { Args: { "p_acao": string,"p_negocio": number,"p_por"?: string,"p_responsavel": string }; Returns: undefined
                            },
+"publicos_previa":
+{ Args: { "p_filial": number,"p_filtro": Json }; Returns: Json
+                           },
+"publicos_recalcular":
+{ Args: { "p_disparar"?: boolean,"p_publico": number }; Returns: {
+              "contato_id": number,"negocio_id": number
+            }[]
+                           },
+"publicos_resolver":
+{ Args: { "p_empresa": number,"p_filial": number,"p_filtro": Json }; Returns: {
+              "contato_id": number,"negocio_id": number
+            }[]
+                           },
+"publicos_rodada":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "empresa_id": number,"publico_id": number
+            }[]
+                           },
 "quadro_base":
 { Args: { "p_funil": number,"p_so_meus"?: string }; Returns: {
               "contato_id": number,"created_at": string,"filial_id": number,"funil_id": number,"id": number,"instagram": string,"kanban_status": string,"momento": string,"msgs_nao_lidas": number,"nome": string,"origem": string,"produto_interessado": string,"responsavel_id": string,"telefone": string,"tem_primeira_msg": boolean,"ultima_enviada_at": string,"ultima_mensagem_at": string,"ultima_recebida_at": string,"ultima_tratativa": string,"valor_estimado": number
@@ -3323,6 +3417,9 @@ isOneToOne: true
 { Args: { "p_empresa": number,"p_filial": number,"p_filtro": Json,"p_modelo": number }; Returns: {
               "contato_id": number,"fora": string,"negocio_id": number,"nome": string,"telefone": string
             }[]
+                           },
+"transmissao_remontar":
+{ Args: { "p_transmissao": number }; Returns: number
                            },
 "transmissao_reservar":
 { Args: { "p_lote"?: number,"p_transmissao": number }; Returns: {

@@ -1,18 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Megaphone, Pause, Play, Square, Trash2, Send, ArrowLeft } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, Input, Select, StatCard, notify } from '@/components/ui'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal } from '@/lib/datas'
-import { SITUACOES, descreverFiltro, variaveisDoModelo, type FiltroPublico, type Situacao } from '@/lib/transmissao/filtro'
+import { descreverFiltro, variaveisDoModelo, type FiltroPublico } from '@/lib/transmissao/filtro'
 import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
-import { FiltroEtiquetasLinha, useEtiquetas } from '@/components/modules/etiquetas/etiquetas'
+import { FiltroCampos, chip, useNomesDoFiltro } from '@/components/modules/publicos/filtro-campos'
 
 // ── O que a API devolve ──────────────────────────────────────────────────────
 type Status = 'rascunho' | 'agendada' | 'enviando' | 'pausada' | 'concluida' | 'encerrada'
 interface Transmissao {
   id: number; nome: string; filial_id: number | null; modelo_id: number; status: Status; filtro: FiltroPublico
+  publico_id?: number | null
   parametros: string[]; agendada_para: string | null; iniciada_em: string | null; concluida_em: string | null
   total: number; created_at: string
 }
@@ -25,11 +26,14 @@ interface Modelo { id: number; nome: string; idioma: string; categoria: string; 
 interface Loja { id: number; nome: string }
 interface Funil { id: number; nome: string; padrao: boolean }
 interface Etapa { id: number; funil_id: number; label: string }
+/** Público salvo (módulo Públicos, 12/11/2026): só vem com o módulo ligado. */
+interface PublicoOpcao { id: number; nome: string; filial_id: number | null; filtro: FiltroPublico; total: number }
 interface Form { lojas: Loja[]; origens: string[]; teto: number; tetoMax: number; enviadasNaHora: number; abreEm: string | null }
 interface Dados {
   admin: boolean; transmissoes: Transmissao[]; numeros: Numeros[]; lojas: Loja[]; modelos: Modelo[]
   funis: Funil[]; etapas: Etapa[]; form: Form | null
   avisosPagamento?: AvisoPagamento[]
+  publicos?: PublicoOpcao[] | null
 }
 interface Previa { total: number; aptos: number; opt_out: number; bloqueado: number; sem_telefone: number; modelo_7_dias: number; amostra: { nome: string | null; final: string }[] }
 
@@ -166,7 +170,12 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   // Trocou a loja e o modelo escolhido não existe no número dela: vale o primeiro que existe.
   const modeloId: number | '' = aprovados.some((m) => m.id === modeloEscolhido) ? modeloEscolhido : (aprovados[0]?.id ?? '')
   const [parametros, setParametros] = useState<string[]>([])
-  const [filtro, setFiltro] = useState<FiltroPublico>({})
+  const [filtroLivre, setFiltro] = useState<FiltroPublico>({})
+  // Público salvo: a lista é a regra dele (e na agendada, refeita na hora de começar).
+  const publicosDaLoja = (dados.publicos ?? []).filter((p) => (p.filial_id ?? null) === (loja || null))
+  const [publicoEscolhido, setPublicoId] = useState<number | ''>('')
+  const publico = publicosDaLoja.find((p) => p.id === publicoEscolhido) ?? null
+  const filtro: FiltroPublico = publico ? publico.filtro : filtroLivre
   const [previa, setPrevia] = useState<Previa | null>(null)
   const [erroPrevia, setErroPrevia] = useState('')
   const [contando, setContando] = useState(false)
@@ -178,7 +187,6 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
 
   const modelo = aprovados.find((m) => m.id === modeloId) ?? null
   const nVars = variaveisDoModelo(modelo?.corpo)
-  const etapasDoFunil = dados.etapas.filter((e) => !filtro.funil_id || e.funil_id === filtro.funil_id)
   const precisaLoja = lojas.length > 1 || dados.lojas.length > 1
 
   // Prévia da contagem: refeita meio segundo depois da última mudança.
@@ -195,21 +203,7 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
     return () => clearTimeout(t)
   }, [loja, filtro, modeloId, precisaLoja])
 
-  const alterna = <K extends 'etapa_ids' | 'situacoes' | 'origens'>(chave: K, v: NonNullable<FiltroPublico[K]>[number]) =>
-    setFiltro((f) => {
-      const atual = (f[chave] ?? []) as (typeof v)[]
-      const nova = atual.includes(v) ? atual.filter((x) => x !== v) : [...atual, v]
-      return { ...f, [chave]: nova.length ? nova : undefined }
-    })
-  const dias = (chave: 'sem_mensagem_ha_dias' | 'com_mensagem_nos_dias', v: string) =>
-    setFiltro((f) => ({ ...f, [chave]: Number(v) > 0 ? Math.floor(Number(v)) : undefined }))
-
-  const todasEtiquetas = useEtiquetas()
-  const nomes = useMemo(() => ({
-    funis: new Map(dados.funis.map((f) => [f.id, f.nome])),
-    etapas: new Map(dados.etapas.map((e) => [e.id, e.label])),
-    etiquetas: new Map(todasEtiquetas.map((e) => [e.id, e.nome])),
-  }), [dados.funis, dados.etapas, todasEtiquetas])
+  const nomes = useNomesDoFiltro(dados.funis, dados.etapas)
 
   const pronta = !!nome.trim() && !!modelo && (!precisaLoja || !!loja) && parametros.slice(0, nVars).filter((p) => p?.trim()).length === nVars
   const agendarPara = quando === 'agendar' ? instanteLocal(dia, hora, fuso) : null
@@ -217,7 +211,7 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   async function salvar(disparar: boolean) {
     setSalvando(true)
     try {
-      const { id } = await post({ op: 'criar', nome, filial_id: loja || null, modelo_id: modeloId, parametros: parametros.slice(0, nVars), filtro })
+      const { id } = await post({ op: 'criar', nome, filial_id: loja || null, modelo_id: modeloId, parametros: parametros.slice(0, nVars), filtro, publico_id: publico?.id ?? null })
       if (disparar) {
         const j = await post({ op: 'disparar', id, ...(agendarPara ? { agendar_para: agendarPara.toISOString() } : {}) })
         notify.ok(j.status === 'agendada' ? 'Transmissão agendada.' : 'Transmissão disparada.', `${j.contatos} contatos na lista.`)
@@ -227,8 +221,6 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
     finally { setSalvando(false); setConfirmar(false) }
   }
 
-  const chip = (ativo: boolean) => `rounded-full border px-2.5 py-1 text-[11.5px] font-medium ${ativo ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink-2 hover:text-ink'}`
-
   return (
     <Card title="Nova transmissão" actions={<Button variant="ghost" size="sm" onClick={fechar}>Cancelar</Button>} data-transmissao-form>
       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
@@ -236,7 +228,7 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nome (só para a loja)" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Retorno de quem sumiu — novembro" maxLength={120} />
             {precisaLoja && (
-              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => { setLoja(Number(e.target.value) || ''); setParametros([]) }}>
+              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => { setLoja(Number(e.target.value) || ''); setParametros([]); setPublicoId('') }}>
                 <option value="">Escolha a loja</option>
                 {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
               </Select>
@@ -266,48 +258,21 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
 
           <section className="space-y-3">
             <h4 className="text-[12px] font-semibold text-ink">Quem recebe</h4>
-            <Select label="Funil" value={filtro.funil_id ?? ''} onChange={(e) => setFiltro((f) => ({ ...f, funil_id: Number(e.target.value) || undefined, etapa_ids: undefined }))}>
-              <option value="">Qualquer funil</option>
-              {dados.funis.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </Select>
-            <div>
-              <div className="mb-1.5 text-[12px] font-medium text-ink-2">Etapa</div>
-              <div className="flex flex-wrap gap-1.5">
-                {etapasDoFunil.map((e) => (
-                  <button key={e.id} type="button" data-filtro-etapa={e.id} className={chip(!!filtro.etapa_ids?.includes(e.id))} onClick={() => alterna('etapa_ids', e.id)}>{e.label}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="mb-1.5 text-[12px] font-medium text-ink-2">Situação do negócio</div>
-              <div className="flex flex-wrap gap-1.5">
-                {SITUACOES.map((s) => (
-                  <button key={s.id} type="button" data-filtro-situacao={s.id} className={chip(!!filtro.situacoes?.includes(s.id))} onClick={() => alterna('situacoes', s.id as Situacao)}>{s.rotulo}</button>
-                ))}
-              </div>
-            </div>
-            {(dados.form?.origens.length ?? 0) > 0 && (
-              <div>
-                <div className="mb-1.5 text-[12px] font-medium text-ink-2">Origem do contato</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {dados.form!.origens.map((o) => (
-                    <button key={o} type="button" data-filtro-origem={o} className={chip(!!filtro.origens?.includes(o))} onClick={() => alterna('origens', o)}>{o}</button>
-                  ))}
-                </div>
-              </div>
+            {dados.publicos && (
+              <Select label="Usar público salvo" value={publicoEscolhido} data-usar-publico
+                onChange={(e) => setPublicoId(Number(e.target.value) || '')} disabled={precisaLoja && !loja}>
+                <option value="">Não — montar o filtro aqui</option>
+                {publicosDaLoja.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+              </Select>
             )}
-            {todasEtiquetas.length > 0 && (
-              <div data-filtro-etiquetas-transmissao>
-                <div className="mb-1.5 text-[12px] font-medium text-ink-2">Etiqueta <span className="font-normal text-ink-3">(clique: contém; de novo: não contém)</span></div>
-                <FiltroEtiquetasLinha className="flex-wrap"
-                  valor={{ com: filtro.etiquetas_com ?? [], sem: filtro.etiquetas_sem ?? [] }}
-                  onChange={(e) => setFiltro((f) => ({ ...f, etiquetas_com: e.com.length ? e.com : undefined, etiquetas_sem: e.sem.length ? e.sem : undefined }))} />
-              </div>
+            {publico ? (
+              <p className="rounded-control bg-bg px-3 py-2 text-[12px] text-ink-2" data-publico-regra>
+                <strong className="text-ink">{publico.nome}</strong>: {descreverFiltro(publico.filtro, nomes)}. A regra se muda em Públicos.
+                {quando === 'agendar' && ' Agendada, a lista é refeita pelo público na hora de começar.'}
+              </p>
+            ) : (
+              <FiltroCampos filtro={filtroLivre} onChange={setFiltro} funis={dados.funis} etapas={dados.etapas} origens={dados.form?.origens ?? []} />
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Sem mensagem há mais de (dias)" type="number" min={1} value={filtro.sem_mensagem_ha_dias ?? ''} onChange={(e) => dias('sem_mensagem_ha_dias', e.target.value)} data-filtro-sem />
-              <Input label="Com mensagem nos últimos (dias)" type="number" min={1} value={filtro.com_mensagem_nos_dias ?? ''} onChange={(e) => dias('com_mensagem_nos_dias', e.target.value)} data-filtro-com />
-            </div>
           </section>
 
           <section className="space-y-3">
@@ -363,7 +328,8 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
         title={quando === 'agendar' ? 'Agendar transmissão?' : 'Disparar transmissão?'} confirmLabel={quando === 'agendar' ? 'Agendar' : 'Disparar'}
         description={<>
           <strong>{previa?.aptos ?? 0}</strong> contatos recebem o modelo <strong>{modelo?.nome}</strong>
-          {agendarPara ? <> a partir de {formatarDataHora(agendarPara, undefined, '', fuso)}</> : null}. A lista é congelada agora; dá para pausar a qualquer momento.
+          {agendarPara ? <> a partir de {formatarDataHora(agendarPara, undefined, '', fuso)}</> : null}.
+          {publico && agendarPara ? ' A lista é refeita pelo público na hora de começar' : ' A lista é congelada agora'}; dá para pausar a qualquer momento.
         </>} />
     </Card>
   )
@@ -381,7 +347,7 @@ const ENTREGA: Record<string, string> = { enviada: 'enviada', entregue: 'entregu
 
 function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: number; dados: Dados; fuso: string; voltar: () => void; recarregarLista: () => Promise<void> }) {
   const [d, setD] = useState<Detalhe | null>(null)
-  const todasEtiquetas = useEtiquetas()
+  const nomes = useNomesDoFiltro(dados.funis, dados.etapas)
   const [situacao, setSituacao] = useState('')
   const [pagina, setPagina] = useState(0)
   const [acao, setAcao] = useState<'' | 'pausar' | 'retomar' | 'encerrar' | 'disparar' | 'apagar'>('')
@@ -423,7 +389,7 @@ function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: numb
   const n = d.numeros
   const modelo = dados.modelos.find((m) => m.id === t.modelo_id)
   const loja = dados.lojas.find((l) => l.id === t.filial_id)
-  const nomes = { funis: new Map(dados.funis.map((f) => [f.id, f.nome])), etapas: new Map(dados.etapas.map((e) => [e.id, e.label])), etiquetas: new Map(todasEtiquetas.map((e) => [e.id, e.nome])) }
+  const publicoNome = t.publico_id ? (dados.publicos ?? []).find((p) => p.id === t.publico_id)?.nome : null
   const naLista = n ? Number(n.total) - Number(n.puladas) : 0
 
   return (
@@ -436,7 +402,7 @@ function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: numb
             <Badge tone={TOM[t.status]} dot data-status={t.status}>{ROTULO[t.status]}</Badge>
           </div>
           <p className="mt-1 text-[12px] text-ink-3">
-            {loja?.nome ?? 'Loja única'} · modelo {modelo?.nome ?? `#${t.modelo_id}`} · {descreverFiltro(t.filtro ?? {}, nomes)}
+            {loja?.nome ?? 'Loja única'} · modelo {modelo?.nome ?? `#${t.modelo_id}`} · {publicoNome ? `público ${publicoNome}: ` : ''}{descreverFiltro(t.filtro ?? {}, nomes)}
             {t.status === 'agendada' && t.agendada_para ? ` · começa em ${formatarDataHora(t.agendada_para, undefined, '', fuso)}` : ''}
           </p>
         </div>

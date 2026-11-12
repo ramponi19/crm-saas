@@ -10,7 +10,7 @@
  * todas de uma vez; o vendedor vê e não edita (a RLS também barra).
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, Pause, Play, Plus, Tag, Workflow } from 'lucide-react'
+import { Bot, Pause, Play, Plus, Tag, UsersRound, Workflow } from 'lucide-react'
 import { Button, Input, Modal, Select, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useEtiquetas } from '@/components/modules/etiquetas/etiquetas'
@@ -23,11 +23,16 @@ export interface AutoDaEtapa {
 export interface CadDaEtapa { id: number; nome: string; ativo: boolean; inscritos: number; executadas_hoje: number }
 /** Automação de "recebeu etiqueta" (11/11/2026). */
 export type AutoDaEtiqueta = AutoDaEtapa & { etiqueta_id: number }
+/** Automação de "entrou no público" (12/11/2026, módulo Públicos). */
+export type AutoDoPublico = AutoDaEtapa & { publico_id: number }
 export interface DadosAutomatize {
   podeEditar: boolean
   pausado: boolean
   etapas: { id: number; slug: string; label: string; automacoes: AutoDaEtapa[]; cadencias: CadDaEtapa[] }[]
   porEtiqueta?: AutoDaEtiqueta[]
+  /** null = módulo Públicos desligado (a seção nem aparece). */
+  porPublico?: AutoDoPublico[] | null
+  publicos?: { id: number; nome: string; filial_id: number | null; total: number }[] | null
   // lojas/faltam: onde o modelo está aprovado NO NÚMERO da loja (11/11/2026: a Meta aprova por WABA).
   modelos: { id: number; nome: string; idioma: string; corpo: string | null; lojas: string[]; faltam: string[] }[]
   equipe: { id: string; nome: string }[]
@@ -78,13 +83,14 @@ async function postar(corpo: Record<string, unknown>): Promise<boolean> {
 export function AutomatizeBarra({ dados, recarregar }: { dados: DadosAutomatize | null; recarregar: () => Promise<void> }) {
   const [ocupado, setOcupado] = useState(false)
   if (!dados) return <div className="mx-6 mb-2 text-[12px] text-ink-3">Carregando automações…</div>
-  const porEtiqueta = dados.porEtiqueta ?? []
+  // Etiqueta e público: as automações que não são de etapa, somadas no resumo.
+  const avulsas = [...(dados.porEtiqueta ?? []), ...(dados.porPublico ?? [])]
   const ligadas = dados.etapas.reduce((s, e) => s + e.automacoes.filter((a) => a.ativo).length + e.cadencias.filter((c) => c.ativo).length, 0)
-    + porEtiqueta.filter((a) => a.ativo).length
+    + avulsas.filter((a) => a.ativo).length
   const hoje = dados.etapas.reduce((s, e) => s + e.automacoes.reduce((x, a) => x + a.executadas_hoje, 0) + e.cadencias.reduce((x, c) => x + c.executadas_hoje, 0), 0)
-    + porEtiqueta.reduce((x, a) => x + a.executadas_hoje, 0)
+    + avulsas.reduce((x, a) => x + a.executadas_hoje, 0)
   // Só pesa se alguma automação manda modelo: sem pagamento na conta da Meta, ela falha.
-  const mandaModelo = dados.etapas.some((e) => e.automacoes.some((a) => a.acao === 'enviar_modelo')) || porEtiqueta.some((a) => a.acao === 'enviar_modelo')
+  const mandaModelo = dados.etapas.some((e) => e.automacoes.some((a) => a.acao === 'enviar_modelo')) || avulsas.some((a) => a.acao === 'enviar_modelo')
   return (
     <>
     {mandaModelo && <AvisoPagamentoMeta avisos={dados.avisosPagamento} className="mx-6 mb-2" />}
@@ -103,6 +109,7 @@ export function AutomatizeBarra({ dados, recarregar }: { dados: DadosAutomatize 
       )}
     </div>
     <AutomatizeEtiquetas dados={dados} recarregar={recarregar} />
+    <AutomatizePublicos dados={dados} recarregar={recarregar} />
     </>
   )
 }
@@ -140,6 +147,43 @@ function AutomatizeEtiquetas({ dados, recarregar }: { dados: DadosAutomatize; re
         )}
       </div>
       {criando && <NovaAutomacao dados={dados} porEtiqueta onFechar={() => setCriando(false)} onCriou={async () => { setCriando(false); await recarregar() }} />}
+    </div>
+  )
+}
+
+/** "Quando entra no público X" (12/11/2026): só com o módulo Públicos ligado. */
+function AutomatizePublicos({ dados, recarregar }: { dados: DadosAutomatize; recarregar: () => Promise<void> }) {
+  const [criando, setCriando] = useState(false)
+  if (!dados.porPublico || !dados.publicos) return null
+  const lista = dados.porPublico
+  const publicos = dados.publicos
+  if (!lista.length && !dados.podeEditar) return null
+  return (
+    <div data-automatize-publicos className="mx-6 mb-2 rounded-card border border-dashed border-line bg-card/60 p-2">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+        <UsersRound size={12} strokeWidth={1.8} /> Quando entra no público
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {lista.length === 0 && <p className="text-[11.5px] text-ink-3">Nenhuma automação por público.</p>}
+        {lista.map((a) => {
+          const p = publicos.find((x) => x.id === a.publico_id)
+          return (
+            <div key={a.id} className="min-w-[220px] max-w-[320px] flex-1">
+              <Item tipo="automacao" id={a.id} ativo={a.ativo} pode={dados.podeEditar} recarregar={recarregar}
+                titulo={`${p ? `Entrou em "${p.nome}"` : 'Entrou no público'} → ${frase(a, dados).replace(/^Na hora: /, '')}`}
+                numeros={`${a.na_fila} na fila · ${a.executadas_hoje} hoje`} />
+            </div>
+          )
+        })}
+        {dados.podeEditar && (
+          <button type="button" data-nova-automacao-publico onClick={() => setCriando(true)} disabled={!publicos.length}
+            title={publicos.length ? undefined : 'Crie um público em Públicos'}
+            className="flex items-center gap-1 self-start rounded-control border border-line bg-card px-2 py-1 text-[11.5px] font-medium text-ink-2 hover:text-ink disabled:opacity-50">
+            <Plus size={12} strokeWidth={1.8} /> Automação por público
+          </button>
+        )}
+      </div>
+      {criando && <NovaAutomacao dados={dados} porPublico onFechar={() => setCriando(false)} onCriou={async () => { setCriando(false); await recarregar() }} />}
     </div>
   )
 }
@@ -195,11 +239,12 @@ function Item({ tipo, id, ativo, pode, titulo, numeros, recarregar }: {
   )
 }
 
-function NovaAutomacao({ slug, label, dados, porEtiqueta, onFechar, onCriou }: {
-  slug?: string; label?: string; dados: DadosAutomatize; porEtiqueta?: boolean; onFechar: () => void; onCriou: () => Promise<void>
+function NovaAutomacao({ slug, label, dados, porEtiqueta, porPublico, onFechar, onCriou }: {
+  slug?: string; label?: string; dados: DadosAutomatize; porEtiqueta?: boolean; porPublico?: boolean; onFechar: () => void; onCriou: () => Promise<void>
 }) {
   const etiquetas = useEtiquetas()
   const [etiqueta, setEtiqueta] = useState('')
+  const [publico, setPublico] = useState('')
   const [acao, setAcao] = useState('criar_tarefa')
   const [espera, setEspera] = useState('0')
   const [titulo, setTitulo] = useState('')
@@ -212,18 +257,28 @@ function NovaAutomacao({ slug, label, dados, porEtiqueta, onFechar, onCriou }: {
     setSalvando(true)
     const ok = await postar({
       op: 'criar', acao, espera_dias: Number(espera) || 0, titulo, prazo_dias: Number(prazo) || 0,
-      ...(porEtiqueta
-        ? { gatilho: 'recebeu_etiqueta', etiqueta_id: Number(etiqueta) || null }
-        : { etapa_id: dados.etapas.find((x) => x.slug === slug)?.id, etapa_slug: slug }),
+      ...(porPublico
+        ? { gatilho: 'entrou_no_publico', publico_id: Number(publico) || null }
+        : porEtiqueta
+          ? { gatilho: 'recebeu_etiqueta', etiqueta_id: Number(etiqueta) || null }
+          : { etapa_id: dados.etapas.find((x) => x.slug === slug)?.id, etapa_slug: slug }),
       modelo_id: Number(modelo) || null, parametros: parametros ? parametros.split('|').map((p) => p.trim()) : [], responsavel_id: resp,
     })
     setSalvando(false)
     if (ok) { notify.ok('Automação criada'); await onCriou() }
   }
   return (
-    <Modal open onClose={onFechar} title={porEtiqueta ? 'Nova automação · etiqueta' : `Nova automação · ${label}`} size="sm">
+    <Modal open onClose={onFechar} title={porPublico ? 'Nova automação · público' : porEtiqueta ? 'Nova automação · etiqueta' : `Nova automação · ${label}`} size="sm">
       <div className="space-y-3">
-        {porEtiqueta ? (
+        {porPublico ? (
+          <>
+            <Select label="Quando o contato entrar no público" value={publico} onChange={(e) => setPublico(e.target.value)} data-automacao-publico>
+              <option value="">— escolha —</option>
+              {(dados.publicos ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </Select>
+            <p className="text-[11px] leading-snug text-ink-3">Vale para quem entrar daqui para a frente: quem já está no público agora não dispara. A entrada é conferida de hora em hora; se o contato sair do público antes da espera acabar, a ação é pulada.</p>
+          </>
+        ) : porEtiqueta ? (
           <>
             <Select label="Quando o contato receber a etiqueta" value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)}>
               <option value="">— escolha —</option>

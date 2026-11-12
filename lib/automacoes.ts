@@ -3,6 +3,7 @@ import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { aprovadoNaLoja } from '@/lib/canais/modelos-waba'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import {
   agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
 } from '@/lib/automatize/travas'
@@ -44,6 +45,7 @@ export interface AutomacaoRow {
   espera_dias?: number
   modelo_id?: number | null
   etiqueta_id?: number | null
+  publico_id?: number | null
 }
 
 export interface Execucao {
@@ -169,6 +171,14 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
     const { data: ct } = await db.from('contatos').select('etiqueta_ids').eq('id', neg.contato_id ?? 0).maybeSingle()
     const tem = ((ct as { etiqueta_ids?: number[] } | null)?.etiqueta_ids ?? []).includes(a.etiqueta_id)
     if (!tem) return { resultado: 'pulada', motivo: 'a etiqueta saiu do contato' }
+  }
+  // "Entrou no público" (12/11/2026): só com o módulo ligado, e só se o contato ainda está nele
+  // (a última conta do público; com espera, ele pode ter saído).
+  if (a.gatilho === 'entrou_no_publico' && a.publico_id != null) {
+    if (!(await moduloEstaLigado(e.empresa_id, 'publicos'))) return { resultado: 'pulada', motivo: 'módulo Públicos desligado' }
+    const { data: membro } = await db.from('publicos_membros').select('contato_id')
+      .eq('publico_id', a.publico_id).eq('contato_id', neg.contato_id ?? 0).maybeSingle()
+    if (!membro) return { resultado: 'pulada', motivo: 'saiu do público' }
   }
 
   if (a.acao === 'atribuir_responsavel') {
@@ -306,6 +316,46 @@ export async function executarRecebeuEtiqueta(db: Db, empresaId: number, negocio
     const neg = await lerNegocio(db, id)
     if (neg) await agendarERodar(db, empresaId, neg, lista, 'substituída: recebeu a etiqueta de novo')
   }
+}
+
+/**
+ * "Entrou no público" (12/11/2026): quem a conta do público achou como NOVO (publicos_recalcular com
+ * disparar) ganha uma execução agendada por automação ligada daquele público — em lote, sem rodar
+ * aqui: a fila de sempre executa (na rodada de hora em hora, logo depois desta conta), com as mesmas
+ * travas. Quem entrou de novo substitui o que ainda esperava da mesma automação. Devolve quantas
+ * execuções agendou.
+ */
+export async function agendarEntrouNoPublico(db: Db, empresaId: number, publicoId: number,
+  entraram: { contato_id: number; negocio_id: number | null }[]): Promise<number> {
+  const comNegocio = entraram.filter((x) => x.negocio_id != null) as { contato_id: number; negocio_id: number }[]
+  if (!comNegocio.length) return 0
+  const { data } = await db.from('automacoes')
+    .select('id, acao, espera_dias, modelo_id')
+    .eq('empresa_id', empresaId).eq('gatilho', 'entrou_no_publico').eq('publico_id', publicoId).eq('ativo', true)
+  const lista = (data ?? []) as AutomacaoRow[]
+  if (!lista.length) return 0
+  if (await automacoesPausadas(db, empresaId)) return 0
+  const agora = new Date()
+  let n = 0
+  for (let i = 0; i < comNegocio.length; i += 200) {
+    const parte = comNegocio.slice(i, i + 200)
+    const ids = parte.map((x) => x.negocio_id)
+    const { data: negs } = await db.from('negocios').select('id, filial_id').in('id', ids)
+    const loja = new Map(((negs ?? []) as { id: number; filial_id: number | null }[]).map((x) => [x.id, x.filial_id]))
+    await db.from('automacao_execucoes')
+      .update({ status: 'pulada', motivo: 'substituída: entrou no público de novo' } as never)
+      .in('negocio_id', ids).eq('status', 'agendada').in('automacao_id', lista.map((a) => a.id)).select('id')
+    const linhas = parte.filter((x) => loja.has(x.negocio_id)).flatMap((x) => lista.map((a) => ({
+      empresa_id: empresaId, filial_id: loja.get(x.negocio_id) ?? null, automacao_id: a.id, negocio_id: x.negocio_id,
+      contato_id: x.contato_id, acao: a.acao, modelo_id: a.modelo_id ?? null, status: 'agendada',
+      agendada_para: agendarPara(agora, a.espera_dias ?? 0).toISOString(),
+    })))
+    if (!linhas.length) continue
+    const { error } = await db.from('automacao_execucoes').insert(linhas as never)
+    if (error) throw new Error(`agendar "entrou no público": ${error.message}`)
+    n += linhas.length
+  }
+  return n
 }
 
 async function agendarERodar(db: Db, empresaId: number, neg: NegocioMin, lista: AutomacaoRow[], motivoSubstituida: string) {

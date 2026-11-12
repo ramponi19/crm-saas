@@ -291,6 +291,8 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/chat', label: 'Chat', icon: 'MessageSquare', opcional: true, badge: 'chat' },
       // Transmissão (10/11/2026): modelo aprovado para uma lista da loja. Vendedor vê o resultado.
       { href: '/transmissao', label: 'Transmissão', icon: 'Megaphone', opcional: true },
+      // Públicos (12/11/2026): listas salvas por regra, para a Transmissão e o Automatize.
+      { href: '/publicos', label: 'Públicos', icon: 'UsersRound', opcional: true },
     ],
   },
   {
@@ -655,7 +657,7 @@ export const GRUPOS_MENU: { id: GrupoMenuId; label: string; icon: string }[] = [
  */
 export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/dashboard': 'inicio', '/tarefas': 'inicio', '/agenda': 'inicio',
-  '/comunicacao': 'comunicacao', '/chat': 'comunicacao', '/transmissao': 'comunicacao',
+  '/comunicacao': 'comunicacao', '/chat': 'comunicacao', '/transmissao': 'comunicacao', '/publicos': 'comunicacao',
   '/leads': 'pipeline', '/clientes': 'pipeline', '/fila': 'pipeline', '/gestao-leads': 'pipeline',
   '/orcamentos': 'vendas', '/propostas': 'vendas', '/pdv': 'vendas', '/historico': 'vendas',
   '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',

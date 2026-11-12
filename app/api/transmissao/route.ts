@@ -3,7 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { aprovadoNaLoja, aprovadosPorLoja } from '@/lib/canais/modelos-waba'
 import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
-import { exigirModuloLigado } from '@/lib/modulo-ligado'
+import { exigirModuloLigado, moduloEstaLigado } from '@/lib/modulo-ligado'
 import { CHAVE_CONFIG, TETO_MAX, filtroImpossivel, normalizarFiltro, tetoValido, variaveisDoModelo } from '@/lib/transmissao/filtro'
 import { enviadasNaHora, processarTransmissao, proximaJanela } from '@/lib/transmissao/motor'
 import { agora as agoraDe } from '@/lib/datas'
@@ -51,7 +51,7 @@ export async function GET() {
   const { supabase, empresaId, admin } = c
 
   const { data: lista, error } = await supabase.from('transmissoes')
-    .select('id, nome, filial_id, modelo_id, status, filtro, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
+    .select('id, nome, filial_id, modelo_id, status, filtro, publico_id, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
     .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100)
   if (error) return recusa(error.message, 500)
   const ids = (lista ?? []).map((t) => t.id as number)
@@ -92,8 +92,16 @@ export async function GET() {
       abreEm: janela.getTime() > agoraDe().getTime() ? janela.toISOString() : null,
     }
   }
+  // PÚBLICOS (12/11/2026): "usar público salvo" só existe com o módulo Públicos ligado.
+  let publicos = null
+  if (await moduloEstaLigado(empresaId, 'publicos')) {
+    const { data: pubs } = await supabase.from('publicos').select('id, nome, filial_id, filtro, total')
+      .eq('empresa_id', empresaId).order('nome')
+    publicos = pubs ?? []
+  }
   return NextResponse.json({
     admin,
+    publicos,
     transmissoes: lista ?? [],
     numeros: numeros ?? [],
     lojas: lojas ?? [],
@@ -109,6 +117,16 @@ export async function GET() {
 async function lojaUnica(supabase: Sb, empresaId: number): Promise<boolean> {
   const { count } = await supabase.from('filiais').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true)
   return (count ?? 0) < 2
+}
+
+/** O público salvo de uma transmissão: módulo ligado, da empresa e da MESMA loja. */
+async function publicoDaLoja(supabase: Sb, empresaId: number, publicoId: number, filial: number | null):
+  Promise<{ filtro: unknown } | { erro: string; status: number }> {
+  if (!(await moduloEstaLigado(empresaId, 'publicos'))) return { erro: 'O módulo Públicos não está instalado nesta empresa.', status: 403 }
+  const { data } = await supabase.from('publicos').select('filtro, filial_id').eq('empresa_id', empresaId).eq('id', publicoId).maybeSingle()
+  if (!data) return { erro: 'Público não encontrado.', status: 404 }
+  if ((data.filial_id == null ? null : Number(data.filial_id)) !== filial) return { erro: 'O público é de outra loja.', status: 400 }
+  return { filtro: data.filtro }
 }
 
 /** A loja da transmissão: obrigatória em empresa de várias lojas. */
@@ -156,11 +174,18 @@ export async function POST(req: Request) {
       const parametros = (Array.isArray(b.parametros) ? b.parametros : []).map((p) => String(p ?? '').trim().slice(0, 200))
       const pede = variaveisDoModelo(m.corpo as string)
       if (parametros.length !== pede || parametros.some((p) => !p)) return recusa(`O modelo tem ${pede} variável(is): preencha todas.`)
-      const filtro = normalizarFiltro(b.filtro)
+      let filtro = normalizarFiltro(b.filtro)
+      // Público salvo: o filtro é o dele (cópia deste momento) e a loja tem de ser a dele.
+      const publicoId = Number(b.publico_id) || null
+      if (publicoId) {
+        const pub = await publicoDaLoja(supabase, empresaId, publicoId, loja.filial)
+        if ('erro' in pub) return recusa(pub.erro, pub.status)
+        filtro = normalizarFiltro(pub.filtro)
+      }
       const impossivel = filtroImpossivel(filtro)
       if (impossivel) return recusa(impossivel)
       const { data, error } = await supabase.from('transmissoes').insert({
-        empresa_id: empresaId, filial_id: loja.filial, nome, modelo_id: m.id, parametros, filtro, criado_por: user.id,
+        empresa_id: empresaId, filial_id: loja.filial, nome, modelo_id: m.id, parametros, filtro, publico_id: publicoId, criado_por: user.id,
       } as never).select('id').single()
       if (error) return recusa(error.message, error.code === '42501' ? 403 : 400)
       return NextResponse.json({ id: data.id })
@@ -171,8 +196,16 @@ export async function POST(req: Request) {
       if (quando && (Number.isNaN(quando.getTime()) || quando.getTime() < Date.now() - 60_000)) return recusa('A data do agendamento já passou.')
       // A lista é da loja e sai pelo WhatsApp DELA: sem número conectado, nem começa (a Edge
       // recusaria cada envio). Canal sem loja (o da empresa inteira) vale para todas.
-      const { data: tx } = await supabase.from('transmissoes').select('filial_id').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
+      const { data: tx } = await supabase.from('transmissoes').select('filial_id, publico_id, status').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
       if (!tx) return recusa('Transmissão não encontrada.', 404)
+      // Veio de um público: a lista é a regra dele como está agora (o rascunho pode ser de antes).
+      if (tx.publico_id && tx.status === 'rascunho') {
+        const pub = await publicoDaLoja(supabase, empresaId, Number(tx.publico_id), tx.filial_id == null ? null : Number(tx.filial_id))
+        if ('erro' in pub) return recusa(pub.erro, pub.status)
+        const { data: upd, error: eF } = await supabase.from('transmissoes').update({ filtro: normalizarFiltro(pub.filtro) } as never)
+          .eq('id', id).eq('empresa_id', empresaId).eq('status', 'rascunho').select('id')
+        if (eF || !upd?.length) return recusa(eF?.message ?? 'Não deu para atualizar a lista pelo público.', 409)
+      }
       let qCanal = createServiceClient().from('canais').select('id').eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
       if (tx.filial_id != null) qCanal = qCanal.or(`filial_id.eq.${Number(tx.filial_id)},filial_id.is.null`)
       const { data: canais } = await qCanal.limit(1)

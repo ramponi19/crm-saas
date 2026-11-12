@@ -4,6 +4,7 @@ import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { horarioValido, modeloRecente, proximoHorario } from '@/lib/automatize/travas'
 import { CHAVE_CONFIG, renderizar, tetoValido } from '@/lib/transmissao/filtro'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * O MOTOR DA TRANSMISSÃO (módulo Transmissão, 10/11/2026).
@@ -216,6 +217,18 @@ export async function processarTransmissao(svc: Db, id: number, { limiteMs = 60_
 export async function processarTransmissoes(svc: Db, { limiteMs = 120_000 } = {}) {
   const t0 = Date.now()
   const agora = new Date().toISOString()
+  // PÚBLICOS (12/11/2026): a agendada que veio de um público refaz a lista pelo público como ele
+  // está agora, ainda 'agendada' (transmissao_remontar). Com o módulo desligado, vale a lista do
+  // agendamento. Uma que falha aqui começa com a lista que já tinha.
+  const { data: doPublico } = await svc.from('transmissoes').select('id, empresa_id')
+    .eq('status', 'agendada').lte('agendada_para', agora).not('publico_id', 'is', null)
+  const remontadas: { transmissao: number; contatos: number | null }[] = []
+  for (const t of (doPublico ?? []) as { id: number; empresa_id: number }[]) {
+    if (!(await moduloEstaLigado(t.empresa_id, 'publicos'))) continue
+    const { data: n, error } = await svc.rpc('transmissao_remontar', { p_transmissao: t.id })
+    if (error) console.error('[transmissao] remontar pelo público:', t.id, error.message)
+    else remontadas.push({ transmissao: t.id, contatos: n as number | null })
+  }
   await svc.from('transmissoes').update({ status: 'enviando', iniciada_em: agora } as never)
     .eq('status', 'agendada').lte('agendada_para', agora).select('id')
   const { data } = await svc.from('transmissoes').select('id').eq('status', 'enviando').order('id')
@@ -227,5 +240,5 @@ export async function processarTransmissoes(svc: Db, { limiteMs = 120_000 } = {}
     try { rodadas.push(await processarTransmissao(svc, id, { limiteMs: resta })) }
     catch (err) { falhas.push({ transmissao: id, erro: err instanceof Error ? err.message : String(err) }) }
   }
-  return { rodadas, falhas, ms: Date.now() - t0 }
+  return { rodadas, falhas, remontadas, ms: Date.now() - t0 }
 }

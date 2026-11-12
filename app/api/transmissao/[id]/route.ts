@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const pagina = Math.max(0, Number(u.searchParams.get('pagina')) || 0)
 
   const { data: t } = await supabase.from('transmissoes')
-    .select('id, nome, filial_id, modelo_id, status, filtro, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
+    .select('id, nome, filial_id, modelo_id, status, filtro, publico_id, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
     .eq('id', id).eq('empresa_id', empresaId).maybeSingle()
   if (!t) return NextResponse.json({ error: 'Transmissão não encontrada' }, { status: 404 })
 

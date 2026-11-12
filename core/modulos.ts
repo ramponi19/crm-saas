@@ -123,6 +123,10 @@ export const MODULOS: ModuloManifesto[] = [
   // Módulo Transmissão (10/11/2026): o filtro da lista é o embrião do módulo Públicos.
   { chave: 'transmissao', href: '/transmissao', nome: 'Transmissão', grupo: 'comunicacao',
     frase: 'Manda um modelo aprovado do WhatsApp para uma lista da loja e mostra quem recebeu, leu e respondeu.' },
+  // Módulo Públicos (12/11/2026): listas salvas por regra. Não requer nada; o "usar público salvo"
+  // da Transmissão e o gatilho "entrou no público" do Automatize só existem com ele ligado.
+  { chave: 'publicos', href: '/publicos', nome: 'Públicos', grupo: 'comunicacao',
+    frase: 'Listas salvas por regra (funil, etapa, etiqueta, última mensagem) que se atualizam sozinhas, para a Transmissão e o Automatize.' },
 
   { chave: 'fila', href: '/fila', nome: 'Fila do dia', grupo: 'pipeline',
     frase: 'O que cada vendedor precisa fazer hoje: retornos, tarefas e leads esperando resposta.' },

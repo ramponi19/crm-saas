@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { MODULO_INTELIGENCIA } from '@/lib/empresa-config'
 import { processarFila } from '@/lib/automacoes'
 import { processarTransmissoes } from '@/lib/transmissao/motor'
+import { processarPublicos } from '@/lib/publicos/rodada'
 import { limparExportacoes } from '@/lib/lgpd/exportacao'
 
 // ============================================================
@@ -169,7 +170,12 @@ export async function GET(
        */
       case 'automacoes': {
         const t0 = Date.now()
-        const r = await processarFila(supabase as unknown as SupabaseClient)
+        // PÚBLICOS (12/11/2026): antes da fila, para que quem entrou num público com gatilho já rode
+        // nesta mesma rodada. Só os públicos com gatilho ligado ou transmissão agendada.
+        let publicos: Awaited<ReturnType<typeof processarPublicos>> | { erro: string }
+        try { publicos = await processarPublicos(supabase as unknown as SupabaseClient) }
+        catch (e) { publicos = { erro: e instanceof Error ? e.message : String(e) } }
+        const r = await processarFila(supabase as unknown as SupabaseClient, { limiteMs: Math.max(15_000, 45_000 - (Date.now() - t0)) })
         // TRANSMISSÃO (10/11/2026): a fila das transmissões roda no MESMO job do pg_cron
         // (`automacoes-hora`), sem job novo. Uma falha aqui não esconde a rodada das automações.
         // O net.http_get do job espera 60 s (supabase/scripts/automatize-cron.sql): a rodada usa o
@@ -177,7 +183,7 @@ export async function GET(
         let transmissoes: Awaited<ReturnType<typeof processarTransmissoes>> | { erro: string }
         try { transmissoes = await processarTransmissoes(supabase as unknown as SupabaseClient, { limiteMs: Math.max(10_000, 55_000 - (Date.now() - t0)) }) }
         catch (e) { transmissoes = { erro: e instanceof Error ? e.message : String(e) } }
-        return NextResponse.json({ ok: !('erro' in transmissoes), job, ...r, transmissoes })
+        return NextResponse.json({ ok: !('erro' in transmissoes) && !('erro' in publicos), job, ...r, publicos, transmissoes })
       }
 
       /**

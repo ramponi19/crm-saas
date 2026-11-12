@@ -55,6 +55,15 @@ export const VITRINES: Record<string, VitrineModulo> = {
       { valor: '23', rotulo: 'responderam e voltaram para o card' },
     ],
   },
+  '/publicos': {
+    nome: 'Públicos',
+    frase: 'Salva quem você quer alcançar como uma regra — “em Proposta há 15 dias sem falar com a loja”, “com a etiqueta VIP” — e a lista se atualiza sozinha, para a Transmissão e para as automações.',
+    numeros: [
+      { valor: '312', rotulo: 'contatos no público, contados pela regra' },
+      { valor: '+9', rotulo: 'entraram desde a última hora' },
+      { valor: '1', rotulo: 'automação disparada por quem entrou' },
+    ],
+  },
 }
 
 export function temVitrine(href: string): boolean {
