@@ -26,6 +26,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { timingSafeEqual } from "node:crypto";
 import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
+import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -297,6 +298,54 @@ async function canalDaLoja(empresaId: number, tipo: string, filialId: number | n
     .order("conectado_em", { ascending: false }).limit(1);
   const linha = data?.[0];
   return linha ? montar(linha, await decifrarToken(linha.access_token_enc as string | null)) : null;
+}
+
+/**
+ * O CANAL DA RESPOSTA PELO CARD E PELA COMUNICAÇÃO (13/11/2026).
+ *
+ * Com `canalId` (o app manda o canal da conversa, escolhido por lib/canais/resolver-canal.ts):
+ * confere empresa, loja, tipo e status (canal-resposta.ts) e usa ESSE canal — ou recusa com
+ * 409. Nunca troca por outro em silêncio.
+ *
+ * Sem `canalId` (aba aberta antes do deploy, ou modelo num card "sem canal"): o canal da última
+ * mensagem RECEBIDA do cliente nesta loja, daquele tipo; senão `canalDaLoja` (o comportamento de
+ * antes). É o passo 1 do resolvedor do app restrito ao tipo da ação; os passos seguintes dele
+ * dependem de escolha na tela, que este caminho não tem.
+ */
+async function canalDaResposta(
+  negocio: { empresa_id: number; filial_id: number | null; contato_id: number },
+  tipo: TipoCanal, canalId: unknown,
+): Promise<{ canal: Canal | null } | { recusa: Response }> {
+  const id = Number(canalId);
+  if (canalId != null && canalId !== "") {
+    if (!Number.isInteger(id) || id <= 0) return { recusa: json({ error: "canal inválido", codigo: "canal_invalido" }, 400) };
+    const { data } = await db.from("canais").select(`${COLUNAS}, status`).eq("id", id).maybeSingle();
+    const conf = conferirCanalDeResposta(
+      data ? { id: data.id as number, empresa_id: data.empresa_id as number, tipo: String(data.tipo), filial_id: (data.filial_id as number | null) ?? null, status: String(data.status) } : null,
+      negocio, tipo,
+    );
+    if (!conf.ok) {
+      console.error("envio_canal_recusado", JSON.stringify({ canal: id, codigo: conf.codigo, empresa: negocio.empresa_id, filial: negocio.filial_id }));
+      return { recusa: json({ error: conf.erro, codigo: conf.codigo }, conf.status) };
+    }
+    return { canal: montar(data!, await decifrarToken(data!.access_token_enc as string | null)) };
+  }
+
+  let q = db.from("canais").select("id").eq("empresa_id", negocio.empresa_id).eq("tipo", tipo).eq("status", "ativo");
+  q = negocio.filial_id != null ? q.or(`filial_id.is.null,filial_id.eq.${Number(negocio.filial_id)}`) : q.is("filial_id", null);
+  const { data: daLoja } = await q;
+  const ids = (daLoja ?? []).map((c) => c.id as number);
+  if (ids.length) {
+    let m = db.from("mensagens").select("canal_id").eq("contato_id", negocio.contato_id).eq("direcao", "recebida").in("canal_id", ids);
+    m = negocio.filial_id != null ? m.eq("filial_id", negocio.filial_id) : m.is("filial_id", null);
+    const { data: ultima } = await m.order("created_at", { ascending: false }).limit(1);
+    const doCliente = ultima?.[0]?.canal_id as number | undefined;
+    if (doCliente) {
+      const { data } = await db.from("canais").select(COLUNAS).eq("id", doCliente).maybeSingle();
+      if (data) return { canal: montar(data, await decifrarToken(data.access_token_enc as string | null)) };
+    }
+  }
+  return { canal: await canalDaLoja(negocio.empresa_id, tipo, negocio.filial_id) };
 }
 
 /**
@@ -1990,9 +2039,13 @@ serve(async (req: Request) => {
 
       const empresaId = lead.empresa_id as number;
       const lojaDoLead = (lead.filial_id as number | null) ?? null;
+      // O canal da conversa (`canalId`, conferido) ou, sem ele, o do cliente nesta loja.
+      const negocio = { empresa_id: empresaId, filial_id: lojaDoLead, contato_id: lead.contato_id as number };
 
       if (action === "send_template") {
-        const canal = await canalDaLoja(empresaId, "whatsapp", lojaDoLead);
+        const r = await canalDaResposta(negocio, "whatsapp", body.canalId);
+        if ("recusa" in r) return r.recusa;
+        const canal = r.canal;
         if (!canal) return json({ error: "WhatsApp não conectado nesta empresa" }, 502);
         // Envio manual (Comunicação / card do lead, 11/11/2026): o modelo tem de estar aprovado NO
         // NÚMERO (WABA) que envia por esta loja — a Meta aprova por conta, não por empresa.
@@ -2017,7 +2070,9 @@ serve(async (req: Request) => {
          * chegava `undefined` na assinatura. Passou porque esta função fica
          * FORA do `tsc` do projeto (só o Deno a compila, no deploy).
          */
-        const canal: Canal = (await canalDaLoja(empresaId, "whatsapp", lojaDoLead)) ?? {
+        const r = await canalDaResposta(negocio, "whatsapp", body.canalId);
+        if ("recusa" in r) return r.recusa;
+        const canal: Canal = r.canal ?? {
           id: 0, empresa_id: empresaId, tipo: "whatsapp",
           external_id: "", waba_id: null, token: null, coexistencia: false,
           via: "pagina", filial_id: lojaDoLead, nome_exibicao: null,
@@ -2030,20 +2085,24 @@ serve(async (req: Request) => {
         return json({ error: "canal deve ser instagram ou messenger" }, 400);
       }
       if (!body.texto && !body.midiaUrl) return json({ error: "texto ou midiaUrl" }, 400);
-      const canal = await canalDaLoja(empresaId, nomeCanal, lojaDoLead);
+      const r = await canalDaResposta(negocio, nomeCanal, body.canalId);
+      if ("recusa" in r) return r.recusa;
+      const canal = r.canal;
       if (!canal) return json({ error: `${nomeCanal} não conectado nesta empresa` }, 502);
       /**
        * O destinatário é a identidade do contato NESTE canal. O id do Instagram e
        * do Messenger é por conta (a mesma pessoa tem um id em cada página): vale o
-       * da conta que vai enviar; sem ele, o primeiro do tipo. Antes era o
-       * `origem_id` do contato, que é a identidade de ONDE ele chegou primeiro —
-       * para quem chegou pelo WhatsApp, o Direct ia para um número de telefone.
+       * da conta que vai enviar; sem ele, o de antes de as identidades guardarem a
+       * conta. NUNCA o de outra conta (13/11/2026): era o `idents[0]`, e mandar o id
+       * de uma conta pela outra é o `(#100) No matching user found`.
        */
       const { data: idents } = await db.from("contato_identidades").select("external_id, canal_id")
         .eq("empresa_id", empresaId).eq("contato_id", lead.contato_id as number).eq("canal_tipo", nomeCanal)
         .order("id", { ascending: true });
-      const destino = (idents ?? []).find((i) => i.canal_id === canal.id)?.external_id ?? idents?.[0]?.external_id;
-      if (!destino) return json({ error: `contato sem ${nomeCanal} para responder` }, 400);
+      const destino = destinoNaConta((idents ?? []).map((i) => ({ external_id: String(i.external_id), canal_id: (i.canal_id as number | null) ?? null })), canal.id);
+      if (!destino) {
+        return json({ error: `O cliente não tem conversa nesta conta do ${nomeCanal === "instagram" ? "Instagram" : "Messenger"}. Responda pela conta em que ele escreveu.`, codigo: "sem_identidade_na_conta" }, 400);
+      }
       return await enviarMeta(canal, String(destino), body,
         await assinaturaDe(empresaId, usuario.nome, true, canal.filial_id), usuario.id);
     } catch (e) {
