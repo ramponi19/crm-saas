@@ -203,9 +203,9 @@ export function ConversaPainel({
     try {
       if (canal === 'whatsapp') {
         if (!conversa.contato?.telefone) throw new Error('Contato sem telefone para o WhatsApp.')
-        await entregarViaEdge(supabase, 'send', { number: conversa.contato.telefone, text: t, leadId: negocio.id })
+        await entregarViaEdge(supabase, 'send', { number: conversa.contato.telefone, text: t, leadId: negocio.id, canalId: conversa.canal_id })
       } else {
-        await entregarViaEdge(supabase, 'send_meta', { leadId: negocio.id, texto: t, canal })
+        await entregarViaEdge(supabase, 'send_meta', { leadId: negocio.id, texto: t, canal, canalId: conversa.canal_id })
       }
       await assumirSeLivre()
     } catch (e) {
@@ -254,9 +254,9 @@ export function ConversaPainel({
       setOtimistas((o) => [...o, { chave: chave as string, conteudo: `[${tipoDb}]`, tipo: tipoDb, midia_url: up.url as string, created_at: new Date().toISOString(), status: 'enviando' }])
       if (canal === 'whatsapp') {
         if (!conversa.contato?.telefone) throw new Error('Contato sem telefone para o WhatsApp.')
-        await entregarViaEdge(supabase, 'send', { number: conversa.contato.telefone, leadId: negocio.id, midiaUrl: up.url, tipoMidia: up.tipoMidia })
+        await entregarViaEdge(supabase, 'send', { number: conversa.contato.telefone, leadId: negocio.id, canalId: conversa.canal_id, midiaUrl: up.url, tipoMidia: up.tipoMidia })
       } else {
-        await entregarViaEdge(supabase, 'send_meta', { leadId: negocio.id, canal, midiaUrl: up.url, tipoMidia: up.tipoMidia })
+        await entregarViaEdge(supabase, 'send_meta', { leadId: negocio.id, canal, canalId: conversa.canal_id, midiaUrl: up.url, tipoMidia: up.tipoMidia })
       }
       await assumirSeLivre()
     } catch (e) {
@@ -301,6 +301,7 @@ export function ConversaPainel({
       await entregarViaEdge(supabase, 'send_template', {
         leadId: negocio.id, number: conversa.contato.telefone, modelo: modelo.nome,
         idioma: modelo.idioma, parametros: params, previa: previaModelo,
+        ...(conversa.canal?.tipo === 'whatsapp' ? { canalId: conversa.canal_id } : {}),
       })
       setModelosAbertos(false)
       notify.ok('Modelo enviado. A conversa reabre quando o cliente responder.')

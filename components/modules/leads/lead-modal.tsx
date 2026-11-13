@@ -11,6 +11,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { lerReelCard, urlEmbed } from '@/lib/reel-instagram'
 import { urlDeMidia } from '@/lib/storage/midia'
 import { entregarViaEdge, ehTimeoutMeta, TIPO_DB } from '@/lib/envio-edge'
+import { rotuloSemCanal, type CanalDaConversa, type ResolucaoCanal } from '@/lib/canais/resolver-canal'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import type { CardDoLead } from '@/lib/card-do-lead'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
@@ -100,6 +101,12 @@ interface ChatMsg {
   /** id da Meta — é por ele que a confirmação de entrega encontra a bolha. */
   externalId?: string | null
   /**
+   * Por qual canal (número/conta) a mensagem passou (13/11/2026). Nulo nas antigas, de antes de
+   * a mensagem guardar o canal: o rótulo diz o tipo pela `origem`, sem inventar número.
+   */
+  canalId?: number | null
+  origem?: string | null
+  /**
    * O que foi DITO no áudio, transcrito pela máquina.
    *
    * Nunca se mistura com `text`: vai em tipografia própria e rotulada, porque
@@ -126,6 +133,7 @@ type LinhaMsg = {
   id: number; direcao: string; conteudo: string | null; created_at: string; filial_id?: number | null
   lida: boolean | null; tipo: string | null; midia_url: string | null
   status_entrega?: string | null; erro_envio?: string | null; external_id?: string | null
+  canal_id?: number | null; origem?: string | null
 }
 
 // Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
@@ -433,9 +441,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
    */
   const [funis, setFunis] = useState<{ id: number; nome: string; padrao: boolean; interno: boolean }[]>([])
   const [trocandoFunil, setTrocandoFunil] = useState(false)
-  // Relógio congelado no mount: a janela de 24h do WhatsApp era calculada com
-  // `Date.now()` a cada render, o que deixa o componente impuro.
-  const [agora] = useState(() => Date.now())
+  // (A janela de 24h do WhatsApp agora vem calculada do servidor, por número: ver `resolucao`.)
   const [draft, setDraft] = useState('')
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const [meuId, setMeuId] = useState<string | null>(null)
@@ -617,13 +623,49 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   const [fotoQuebrada, setFotoQuebrada] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // A janela de 24h vale só para o WhatsApp: Instagram e Messenger não têm essa
-  // restrição, e avisar onde não se aplica seria ruído.
-  const ultimaDoCliente = [...chat].reverse().find((m) => m.from === 'cliente' && m.iso)?.iso
-  const janelaFechada =
-    lead.origem === 'whatsapp' &&
-    chat.length > 0 &&
-    (!ultimaDoCliente || agora - new Date(ultimaDoCliente).getTime() > 24 * 60 * 60 * 1000)
+  /**
+   * POR ONDE RESPONDER (13/11/2026): o canal da CONVERSA, não a origem do contato.
+   *
+   * Era `lead.origem` — o canal por onde o contato chegou à empresa pela primeira vez, gravado
+   * com qualquer grafia. "WhatsApp" com maiúscula ou "Loja física" faziam a resposta virar
+   * anotação sem aviso; quem chegou pelo Instagram e hoje escreve no WhatsApp recebia no Direct.
+   * Agora o servidor resolve (lib/canais/resolver-canal.ts): o canal da última mensagem do
+   * cliente nesta loja, com fallback; o vendedor pode trocar no "Responder por". A origem fica
+   * só como atribuição (o selo no topo do card).
+   */
+  const [resolucao, setResolucao] = useState<ResolucaoCanal | null>(null)
+  const [erroResolucao, setErroResolucao] = useState(false)
+  const [canalSelId, setCanalSelId] = useState<number | null>(null)
+  /** O vendedor trocou o canal à mão: mensagem nova do cliente não muda a escolha dele. */
+  const escolhaManual = useRef(false)
+  const recarregarCanais = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/leads/${lead.id}/canais`)
+      if (!r.ok) throw new Error(String(r.status))
+      const j = (await r.json()) as ResolucaoCanal
+      setResolucao(j)
+      setErroResolucao(false)
+      setCanalSelId((atual) => {
+        const valeAtual = atual != null && j.canais.some((c) => c.canalId === atual && c.podeResponder)
+        return escolhaManual.current && valeAtual ? atual : (j.sugerido?.canalId ?? null)
+      })
+    } catch {
+      setErroResolucao(true)
+    }
+  }, [lead.id])
+  useEffect(() => { recarregarCanais() }, [recarregarCanais])
+
+  const canaisParaResponder = (resolucao?.canais ?? []).filter((c) => c.podeResponder)
+  const canalEscolhido: CanalDaConversa | null = canaisParaResponder.find((c) => c.canalId === canalSelId) ?? null
+  /** O resolvedor respondeu e não há canal: o texto vira anotação (avisado ANTES de enviar). */
+  const semCanal = !!resolucao && !canalEscolhido
+  const rotuloPorCanal = new Map((resolucao?.canais ?? []).map((c) => [c.canalId, c.rotulo]))
+  const rotuloDaMensagem = (m: ChatMsg) =>
+    m.canalId != null ? (rotuloPorCanal.get(m.canalId) ?? rotuloSemCanal(m.origem)) : rotuloSemCanal(m.origem)
+
+  // A janela de 24h vale só para o WhatsApp, e é do NÚMERO escolhido: a última mensagem do
+  // cliente naquele número (o resolvedor calcula). Instagram e Messenger: sem aviso.
+  const janelaFechada = canalEscolhido?.tipo === 'whatsapp' && canalEscolhido.janela24h !== 'aberta'
 
   // Retomada por modelo aprovado — só carrega a lista quando o vendedor pede.
   type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string }
@@ -669,9 +711,11 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     }
     setEnviandoModelo(true)
     try {
+      // Pelo número escolhido; sem WhatsApp escolhido, a Edge usa o da loja (como antes).
       await entregarViaEdge(supabase, 'send_template', {
         leadId: lead.id, number: lead.telefone, modelo: modeloEscolhido.nome,
         idioma: modeloEscolhido.idioma, parametros: paramsModelo, previa: previaModelo,
+        ...(canalEscolhido?.tipo === 'whatsapp' ? { canalId: canalEscolhido.canalId } : {}),
       })
       setChat((p) => [...p, { from: 'loja', text: previaModelo, time: 'agora', status: 'enviada' }])
       setModelosAbertos(false)
@@ -690,7 +734,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
    * todas; as anteriores vêm sob pedido, 200 por vez ("ver anteriores").
    */
   const POR_PAGINA = 200
-  const COLUNAS_MSG = 'id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em'
+  const COLUNAS_MSG = 'id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em, canal_id, origem'
   const [temAnteriores, setTemAnteriores] = useState(false)
   const [carregandoAnteriores, setCarregandoAnteriores] = useState(false)
   /** Mensagens antigas entram por cima: a conversa não pode pular para o fim. */
@@ -701,6 +745,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     status_entrega: string | null; erro_envio: string | null; external_id: string | null
     usuario_id: string | null; transcricao: string | null
     midia_retida_em: string | null
+    canal_id: number | null; origem: string | null
   }
   const paraChat = (m: MsgRow): ChatMsg => ({
     id: m.id,
@@ -715,6 +760,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     erro: m.erro_envio,
     externalId: m.external_id,
     iso: m.created_at,
+    canalId: m.canal_id,
+    origem: m.origem,
     // Quem atendeu. Nulo = saiu do celular, fora do CRM.
     autor: m.usuario_id ? (usuarios.find((u) => u.id === m.usuario_id)?.nome ?? 'Atendente') : null,
   })
@@ -792,6 +839,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               erro: m.erro_envio ?? null,
               externalId: m.external_id ?? null,
               iso: m.created_at,
+              canalId: m.canal_id ?? null,
+              origem: m.origem ?? null,
             }
             if (novaMsg.from === 'loja') {
               // Substitui a bolha otimista ("agora"): mídia casa pela URL, texto pelo conteúdo.
@@ -803,6 +852,9 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
           if (m.direcao === 'recebida' && !m.lida) {
             supabase.from('mensagens').update({ lida: true }).eq('id', m.id)
           }
+          // O cliente escreveu: a janela daquele número reabriu e, se o vendedor não escolheu
+          // à mão, a resposta passa a sair pelo canal em que ele acabou de escrever.
+          if (m.direcao === 'recebida') recarregarCanais()
         })
       // A confirmação de entrega chega DEPOIS, como alteração da linha. Sem
       // escutar UPDATE, o tique nunca mudaria sem recarregar a conversa.
@@ -856,7 +908,12 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   async function sendMsg(reenvio?: unknown) {
     const ehReenvio = typeof reenvio === 'string'
     const t = (ehReenvio ? reenvio : draft).trim(); if (!t) return
-    const canal = lead.origem ?? 'manual'
+    // Sem a resposta do resolvedor não se envia nem se anota: anotação silenciosa era o defeito.
+    if (!resolucao) {
+      notify.warn('Ainda identificando o canal', erroResolucao ? 'Não foi possível identificar por onde responder. Feche e abra o card.' : 'Tente de novo em instantes.')
+      return
+    }
+    const canal = canalEscolhido
     if (!ehReenvio) {
       setDraft('')
       setRascunhoRestaurado(false)
@@ -883,15 +940,15 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     }
 
     try {
-      if (canal === 'instagram' || canal === 'messenger') {
-        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, texto: t, canal })
-      } else if (canal === 'whatsapp') {
+      if (canal?.tipo === 'instagram' || canal?.tipo === 'messenger') {
+        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, texto: t, canal: canal.tipo, canalId: canal.canalId })
+      } else if (canal?.tipo === 'whatsapp') {
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
-        await entregarViaEdge(supabase, 'send', { number: lead.telefone, text: t, leadId: lead.id })
+        await entregarViaEdge(supabase, 'send', { number: lead.telefone, text: t, leadId: lead.id, canalId: canal.canalId })
       } else {
-        // Canal sem integração (anotação de atendimento presencial): grava pelo
-        // servidor, com o autor, igual aos canais que passam pela Edge.
-        await registrarSemCanal({ conteudo: t, origem: canal })
+        // SEM CANAL de verdade (o resolvedor disse): anotação, avisada na tela antes de
+        // escrever. Grava pelo servidor, com o autor.
+        await registrarSemCanal({ conteudo: t, origem: 'manual' })
       }
       // (Saiu o `leads.update({ ultima_mensagem_at })` daqui: na view essa coluna
       // vem de `conversas` e o gatilho a ignorava — a gravação não fazia nada.)
@@ -960,7 +1017,11 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function sendMedia(file: File) {
-    const canal = lead.origem ?? 'manual'
+    if (!resolucao) {
+      notify.warn('Ainda identificando o canal', 'Tente de novo em instantes.')
+      return
+    }
+    const canal = canalEscolhido
     setEnviandoMidia(true)
     let bolhaUrl: string | null = null
     try {
@@ -974,13 +1035,13 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
       bolhaUrl = url
       setChat((prev) => [...prev, { from: 'loja', text: `[${tipoDb}]`, time: 'agora', tipo: tipoDb, midiaUrl: url }])
 
-      if (canal === 'instagram' || canal === 'messenger') {
-        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, canal, midiaUrl: url, tipoMidia })
-      } else if (canal === 'whatsapp') {
+      if (canal?.tipo === 'instagram' || canal?.tipo === 'messenger') {
+        await entregarViaEdge(supabase, 'send_meta', { leadId: lead.id, canal: canal.tipo, canalId: canal.canalId, midiaUrl: url, tipoMidia })
+      } else if (canal?.tipo === 'whatsapp') {
         if (!lead.telefone) throw new Error('Lead sem telefone para envio no WhatsApp')
-        await entregarViaEdge(supabase, 'send', { number: lead.telefone, leadId: lead.id, midiaUrl: url, tipoMidia })
+        await entregarViaEdge(supabase, 'send', { number: lead.telefone, leadId: lead.id, canalId: canal.canalId, midiaUrl: url, tipoMidia })
       } else {
-        await registrarSemCanal({ conteudo: `[${tipoDb}]`, origem: canal, tipo: tipoDb, midia_url: url })
+        await registrarSemCanal({ conteudo: `[${tipoDb}]`, origem: 'manual', tipo: tipoDb, midia_url: url })
       }
     } catch (e) {
       if (ehTimeoutMeta(e)) {
@@ -1630,6 +1691,10 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
                         : formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[9.5px] text-[#667781]">
+                        {/* Por qual número/conta passou (13/11/2026): com dois canais na loja,
+                            é o que diz ao vendedor onde o cliente escreveu. A bolha otimista
+                            ("agora") ainda não tem linha gravada: sem rótulo até chegar. */}
+                        {m.time !== 'agora' && <span className="mr-1 truncate" title="Canal da mensagem">{rotuloDaMensagem(m)}</span>}
                         <span>{m.time}</span>
                         {/* Confirmação da Meta: um tique saiu, dois chegou, dois
                             claros foi lido. Falha aparece com o motivo no title. */}
@@ -1676,7 +1741,11 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
                 <Clock size={14} strokeWidth={1.8} className="mt-0.5 flex-none text-warn" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11.5px] leading-relaxed text-ink-2">
-                    <strong className="text-ink">Faz mais de 24h que o cliente não escreve.</strong>{' '}
+                    <strong className="text-ink">
+                      {canalEscolhido?.ultimaRecebidaEm
+                        ? `Faz mais de 24h que o cliente não escreve no ${canalEscolhido.rotulo}.`
+                        : `O cliente ainda não escreveu no ${canalEscolhido?.rotulo ?? 'WhatsApp'}.`}
+                    </strong>{' '}
                     O WhatsApp só permite retomar por <strong className="text-ink">modelo aprovado</strong> pela Meta —
                     mensagem livre vai ser recusada.
                   </p>
@@ -1755,6 +1824,43 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               </div>
             )}
 
+            {/* POR ONDE ESTA RESPOSTA SAI (13/11/2026). Pré-selecionado com o canal da última
+                mensagem do cliente nesta loja; com um canal só, texto fixo. Sem canal, o aviso
+                vem ANTES de escrever: a mensagem vira anotação e não chega ao cliente. */}
+            {!resolucao ? (
+              <div className="flex items-center gap-1.5 border-t border-line-soft px-3 pt-2 text-[11.5px] text-ink-3 sm:px-5">
+                {erroResolucao
+                  ? <><AlertTriangle size={12} strokeWidth={1.8} className="shrink-0 text-bad" /> Não foi possível identificar por onde responder. Feche e abra o card.</>
+                  : <><Loader2 size={12} className="shrink-0 animate-spin" /> Identificando por onde responder…</>}
+              </div>
+            ) : semCanal ? (
+              <div className="flex items-start gap-2 border-t border-warn/25 bg-warn-soft px-3 py-2.5 sm:px-5">
+                <AlertTriangle size={14} strokeWidth={1.8} className="mt-0.5 flex-none text-warn" />
+                <p className="text-[11.5px] leading-relaxed text-ink-2">
+                  <strong className="text-ink">Este cliente não tem conversa em nenhum canal desta loja.</strong>{' '}
+                  O que você escrever fica registrado como <strong className="text-ink">anotação</strong> no CRM e não chega a ele.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 border-t border-line-soft px-3 pt-2 text-[11.5px] text-ink-3 sm:px-5">
+                <span>Responder por</span>
+                {canaisParaResponder.length > 1 ? (
+                  <select
+                    aria-label="Responder por"
+                    value={canalSelId ?? ''}
+                    onChange={(e) => { escolhaManual.current = true; setCanalSelId(Number(e.target.value)) }}
+                    className="rounded-control border border-line bg-card px-2 py-0.5 text-[11.5px] text-ink"
+                  >
+                    {canaisParaResponder.map((c) => (
+                      <option key={c.canalId} value={c.canalId}>{c.rotulo}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="font-medium text-ink-2">{canalEscolhido?.rotulo}</span>
+                )}
+              </div>
+            )}
+
             <div className="flex items-end gap-1.5 border-t border-line-soft px-3 py-3.5 sm:gap-2 sm:px-5">
               <input
                 ref={fileRef}
@@ -1791,7 +1897,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
                   e.preventDefault()
                   sendMsg()
                 }}
-                placeholder={gravando ? 'Gravando áudio…' : 'Digite uma mensagem…  (Shift+Enter pula linha)'}
+                placeholder={gravando ? 'Gravando áudio…' : semCanal ? 'Escreva uma anotação (não vai ao cliente)…' : 'Digite uma mensagem…  (Shift+Enter pula linha)'}
                 disabled={gravando}
                 className="max-h-[132px] min-h-[40px] min-w-0 flex-1 resize-none overflow-y-auto rounded-control border border-line bg-card px-3 py-[9px] text-base leading-snug text-ink scrollbar-thin placeholder:text-ink-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 disabled:opacity-60 sm:min-h-[36px] sm:py-[8px] sm:text-[13px]"
               />

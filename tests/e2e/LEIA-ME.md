@@ -20,7 +20,7 @@ Os que recebem arquivos de entrada dizem o uso na primeira linha (`inbox-e2e`, `
 
 ## O que cada um cobre
 
-- **Quadro e card:** `quadro-cliente-e2e` (ordem pela última mensagem do cliente, "cliente há X · você respondeu há Y", carregar mais sem repetir), `quadro-e2e`, `card-e2e`, `perda-e2e`, `ganho-em-e2e`.
+- **Quadro e card:** `quadro-cliente-e2e` (ordem pela última mensagem do cliente, "cliente há X · você respondeu há Y", carregar mais sem repetir), `quadro-e2e`, `card-e2e`, `perda-e2e`, `ganho-em-e2e`, `canal-resposta-e2e` (a resposta sai pelo canal da conversa, não pela origem; "Responder por" com dois números; aviso de anotação; envio interceptado no navegador, com `FOTOS=<pasta>` grava as telas).
 - **Contatos:** `busca-contato-e2e`, `fusao-juncao-e2e`, `fusao-fechado-e2e`, `cpf-e2e`.
 - **Inbox e notas:** `inbox-e2e`, `notas-e2e`, `aguardando-mede.mjs` (mede o tempo de "aguardando resposta").
 - **Gravação conferida:** `gravacao-a-e2e`, `gravacao-bcd-e2e`.
