@@ -5,6 +5,9 @@ import { TempoRealEmpresa } from '@/components/layout/tempo-real-empresa'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
+import { SituacaoBanner } from '@/components/layout/situacao-banner'
+import { agora } from '@/lib/datas'
+import { situacaoDaEmpresa, type EmpresaSituacao } from '@/lib/situacao-empresa'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
@@ -83,6 +86,12 @@ export default async function DashboardLayout({
     plano = vinculoTyped.empresa?.plano ?? undefined
     empresaId = (vinculoTyped.empresa as { id?: number } | null)?.id
   }
+
+  // Situação da assinatura (17/11/2026): teste acabando, pagamento atrasado, modo somente leitura.
+  const { data: situacaoRow } = empresaId
+    ? await supabase.from('empresas').select('status, stripe_status, trial_ends_at, demo').eq('id', empresaId).maybeSingle()
+    : { data: null }
+  const situacao = situacaoDaEmpresa(situacaoRow as EmpresaSituacao | null, agora())
 
   // Avisos da plataforma (banner) — filtra por alvo: todos | plano | empresa.
   const { data: avisosRaw } = await supabase
@@ -186,6 +195,7 @@ export default async function DashboardLayout({
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
+          <SituacaoBanner situacao={situacao} podePagar={role === 'owner' || role === 'admin'} />
           <LimiteBanner />
           {/*
             Os rótulos da empresa chegam à barra do topo de cada tela.

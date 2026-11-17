@@ -1,8 +1,9 @@
 // Bloco 1 da frente "pronto para vender" (17/11/2026): em preparação fora, trava de módulo no servidor,
 // seções de Configurações de módulo, rotas antigas — com DUAS empresas.
 //   A = empresa 1 (JM, dono do usuarios.local.json): Orçamentos, PDV e Estoque ligados.
-//   B = empresa nova, criada pelo /api/register com o preset Imobiliária (só liga módulos em preparação
-//       + Financeiro e Relatórios) e apagada no fim.
+//   B = empresa nova, criada pelo /api/register (preset padrão, o CRM geral) e apagada no fim. A base dela
+//       ganha à mão os endereços que o antigo preset Imobiliária ligava (módulos em preparação +
+//       Financeiro e Relatórios): é a empresa antiga que nasceu com eles.
 // Rodar: node tests/e2e/pronto-vender-b1-e2e.mjs (app LOCAL :3010, Supabase LOCAL; ver LEIA-ME.md)
 import { E } from './_usuarios.mjs'
 import { chromium } from 'playwright-core'
@@ -55,12 +56,13 @@ const menu = (page) => page.evaluate(() => [...document.querySelectorAll('aside 
 try {
   // ── Empresa B pelo cadastro de verdade ──────────────────────────────────────
   const reg = await fetch(BASE + '/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B', nomeEmpresa: 'Empresa B e2e', plano: 'starter', segmento: 'imobiliaria',
+    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B', nomeEmpresa: 'Empresa B e2e', plano: 'starter', segmento: 'imobiliaria', // inativo desde 20261117000100: cai no padrão
   }) })
   const regJ = await reg.json().catch(() => ({}))
   empresaB = regJ.empresaId ?? null
   confere(reg.status === 200 && empresaB, `cadastro da empresa B: ${reg.status} ${JSON.stringify(regJ)}`)
   if (!empresaB) throw new Error('sem empresa B')
+  sql(`update empresa_menu set itens = jsonb_set(itens, '{base,habilitados}', '["/dashboard","/leads","/clientes","/comunicacao","/tarefas","/agenda","/imoveis","/executivo","/simular-financiamento","/ranking","/financeiro","/relatorios","/chat","/gestao-leads"]'::jsonb) where empresa_id=${empresaB}`)
 
   const pA = await entrar(E.dono)
   const pB = await entrar(EMAIL_B)

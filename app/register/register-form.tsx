@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { markSessionActive } from '@/components/layout/session-guard'
 import { Check, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Input, Button } from '@/components/ui'
+import { erroCnpj, erroTelefone, mascaraCnpj, mascaraTelefone } from '@/lib/mascaras'
 
 type Step = 'plano' | 'loja' | 'conta'
 
@@ -47,7 +48,8 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
 
   const [form, setForm] = useState({
     plano: 'pro',
-    segmento: 'varejo',
+    // O primeiro preset da lista (o CRM geral, ordem -1) é o padrão; os de ramo só ligam módulos.
+    segmento: presets[0]?.chave ?? 'geral',
     nomeEmpresa: '',
     cnpj: '',
     telefone: '',
@@ -97,6 +99,8 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
       setStep('loja')
     } else if (step === 'loja') {
       if (!form.nomeEmpresa.trim()) { setErro('Informe o nome da loja'); return }
+      const e = erroCnpj(form.cnpj) ?? erroTelefone(form.telefone)
+      if (e) { setErro(e); return }
       setStep('conta')
     } else {
       criarConta()
@@ -272,13 +276,15 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
                 <Input
                   label="CNPJ"
                   value={form.cnpj}
-                  onChange={e => set('cnpj', e.target.value)}
+                  inputMode="numeric"
+                  onChange={e => set('cnpj', mascaraCnpj(e.target.value))}
                   placeholder="00.000.000/0000-00"
                 />
                 <Input
                   label="Telefone / WhatsApp"
                   value={form.telefone}
-                  onChange={e => set('telefone', e.target.value)}
+                  inputMode="tel"
+                  onChange={e => set('telefone', mascaraTelefone(e.target.value))}
                   placeholder="(11) 99999-9999"
                 />
               </div>

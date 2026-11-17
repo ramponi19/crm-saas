@@ -4,6 +4,8 @@ import { aplicarPreset, lerPreset } from '@/lib/presets'
 import { enviarEmail, emailBoasVindas } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
+import { soDigitos } from '@/lib/documento'
+import { erroCnpj, erroTelefone, mascaraCnpj, mascaraTelefone } from '@/lib/mascaras'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -74,6 +76,11 @@ export async function POST(req: Request) {
   if (password.length < 8) return NextResponse.json({ error: 'Senha deve ter ao menos 8 caracteres' }, { status: 400 })
   if (!nomeUsuario) return NextResponse.json({ error: 'Informe seu nome' }, { status: 400 })
   if (!nomeEmpresa) return NextResponse.json({ error: 'Informe o nome da loja' }, { status: 400 })
+  // CNPJ e telefone são opcionais; preenchidos, têm de valer (17/11/2026 — a tela já confere, aqui é a regra).
+  const erroDoc = erroCnpj(body.cnpj) ?? erroTelefone(body.telefone)
+  if (erroDoc) return NextResponse.json({ error: erroDoc }, { status: 400 })
+  const cnpj = soDigitos(body.cnpj) ? mascaraCnpj(body.cnpj ?? '') : null
+  const telefone = soDigitos(body.telefone) ? mascaraTelefone(body.telefone ?? '') : null
 
   // 1) cria o usuário de auth já confirmado (sem e-mail, sem rate limit)
   const { data: created, error: createErr } = await svc.auth.admin.createUser({
@@ -123,8 +130,8 @@ export async function POST(req: Request) {
       // para decidir tela (29/10/2026).
       preset_onboarding: preset.chave,
       status: 'ativo',
-      cnpj: body.cnpj || null,
-      telefone: body.telefone || null,
+      cnpj,
+      telefone,
       trial_ends_at: trialEnds,
       limite_usuarios: planoRow?.limite_usuarios ?? null,
       limite_leads: planoRow?.limite_leads ?? null,
@@ -140,12 +147,13 @@ export async function POST(req: Request) {
   // White-label da empresa: o WhatsApp de contato nasce igual ao telefone, como era
   // em empresas.wl_whatsapp (empresa_branding desde 22/10/2026). Falhar aqui não
   // impede o cadastro: o dono preenche em "Minha empresa".
-  const { error: brErr } = await svc.from('empresa_branding').insert({ empresa_id: empresa.id, whatsapp: body.telefone || null })
+  const { error: brErr } = await svc.from('empresa_branding').insert({ empresa_id: empresa.id, whatsapp: telefone })
   if (brErr) console.error('[register] branding:', brErr.message)
 
   // rollback completo: evita órfãos em qualquer falha após criar a empresa
   const rollback = async () => {
     await svc.from('empresa_usuarios').delete().eq('empresa_id', empresa.id)
+    await svc.from('filiais').delete().eq('empresa_id', empresa.id)
     await svc.from('empresas').delete().eq('id', empresa.id)
     await svc.auth.admin.deleteUser(userId)
   }
@@ -162,10 +170,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
-  // 4) vínculo owner (empresa_usuarios não tem trigger de bloqueio)
+  // 4) a loja principal (17/11/2026: a empresa nascia sem loja nenhuma) e o vínculo owner nela
+  //    (empresa_usuarios não tem trigger de bloqueio). Sem a loja, o cadastro desfaz tudo.
+  const { data: loja, error: lojaErr } = await svc
+    .from('filiais')
+    .insert({ empresa_id: empresa.id, nome: nomeEmpresa, matriz: true, ativo: true, cnpj, telefone })
+    .select('id')
+    .single()
+  if (lojaErr || !loja) {
+    await rollback()
+    console.error('[register] criar loja principal:', lojaErr?.message)
+    return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
+  }
   const { error: vinErr } = await svc
     .from('empresa_usuarios')
-    .insert({ empresa_id: empresa.id, usuario_id: userId, role: 'owner', ativo: true })
+    .insert({ empresa_id: empresa.id, usuario_id: userId, role: 'owner', ativo: true, filial_id: loja.id })
   if (vinErr) {
     await rollback()
     console.error('[register] vincular usuário:', vinErr.message)

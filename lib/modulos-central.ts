@@ -39,7 +39,7 @@ export interface TileModulo extends ModuloManifesto {
   faltam: string[]
 }
 
-const NOME_PLANO: Record<string, string> = { free: 'Free', starter: 'Starter', pro: 'Pro' }
+const NOME_PLANO: Record<string, string> = { free: 'Free', starter: 'Starter', pro: 'Pro', unlimited: 'Unlimited' }
 
 export interface EntradaCentral {
   /** Os módulos ligados para a empresa (`hrefsHabilitados`). */

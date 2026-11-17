@@ -107,6 +107,17 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
               </Button>
             )
           })}
+          {statusAtual !== 'ativo' && (
+            // Reativar com um clique (17/11/2026): sai do modo somente leitura sem apagar nada.
+            <Button
+              variant="outline"
+              loading={loading}
+              icon={<Power size={16} strokeWidth={1.7} />}
+              onClick={() => { setErro(null); executar({ tipo: 'alterar_status', status: 'ativo' }) }}
+            >
+              Reativar
+            </Button>
+          )}
           <Button
             onClick={impersonar}
             loading={loading}
@@ -139,7 +150,7 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
 
         {modal === 'plano' && (
           <Select label="Plano" value={novoPlano} onChange={e => setNovoPlano(e.target.value)}>
-            {['free', 'starter', 'pro'].map(p => (
+            {['free', 'starter', 'pro', 'unlimited'].map(p => (
               <option key={p} value={p} className="capitalize">{p}</option>
             ))}
           </Select>

@@ -107,8 +107,12 @@ export interface PresetCompleto {
   motivos_perda: string[] | null
 }
 
-/** Preset que vale quando a escolha não existe (ou está desativada). */
-export const PRESET_PADRAO = 'varejo'
+/**
+ * Preset que vale quando a escolha não existe (ou está desativada): o "CRM geral" (17/11/2026), que não
+ * liga módulo de ramo nenhum. Enquanto a migração 20261117000100 não estiver no banco, vale o antigo.
+ */
+export const PRESET_PADRAO = 'geral'
+const PRESET_PADRAO_ANTIGO = 'varejo'
 
 /** Os presets ativos, na ordem do cadastro, para os botões do /register. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,8 +142,9 @@ export async function lerPreset(db: SupabaseClient<any>, chave: string | null | 
     const { data } = await db.from('presets_onboarding').select(campos).eq('chave', chave).eq('ativo', true).maybeSingle()
     if (data) return data as PresetCompleto
   }
-  const { data } = await db.from('presets_onboarding').select(campos).eq('chave', PRESET_PADRAO).maybeSingle()
-  return (data as PresetCompleto | null) ?? null
+  const { data } = await db.from('presets_onboarding').select(campos).in('chave', [PRESET_PADRAO, PRESET_PADRAO_ANTIGO])
+  const linhas = (data ?? []) as PresetCompleto[]
+  return linhas.find((p) => p.chave === PRESET_PADRAO) ?? linhas.find((p) => p.chave === PRESET_PADRAO_ANTIGO) ?? null
 }
 
 /** Probabilidade de fechamento por tipo de etapa (a mesma conta de /api/funil). */
@@ -179,7 +184,9 @@ export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, 
   }
 
   const ligados = new Set(base.habilitados ?? [])
-  const modulos = MODULOS.filter((m) => ligados.has(m.href)).map((m) => ({ empresa_id: empresaId, modulo: m.chave, origem: 'plano', ativo: true }))
+  // Módulo em preparação não nasce ligado nem traz campos (17/11/2026): a base pode citar o endereço,
+  // mas ele só vale quando o módulo sair da preparação.
+  const modulos = MODULOS.filter((m) => ligados.has(m.href) && !m.emPreparacao).map((m) => ({ empresa_id: empresaId, modulo: m.chave, origem: 'plano', ativo: true }))
   if (modulos.length) {
     const { error } = await db.from('empresa_modulos').upsert(modulos, { onConflict: 'empresa_id,modulo', ignoreDuplicates: true })
     avisar('módulos', error)
@@ -187,7 +194,7 @@ export async function aplicarPreset(db: SupabaseClient<any>, empresaId: number, 
 
   // Os campos do core (o cadastro do cliente) e os dos módulos que o preset liga: sem
   // eles a empresa nova descartava data de nascimento, tipo e origem do cliente.
-  const comCampos = [{ campos: CAMPOS_DO_CORE, dono: null as string | null }, ...MODULOS.filter((m) => ligados.has(m.href) && m.campos?.length).map((m) => ({ campos: m.campos!, dono: m.chave }))]
+  const comCampos = [{ campos: CAMPOS_DO_CORE, dono: null as string | null }, ...MODULOS.filter((m) => ligados.has(m.href) && !m.emPreparacao && m.campos?.length).map((m) => ({ campos: m.campos!, dono: m.chave }))]
   for (const g of comCampos) {
     const { error } = await garantirCampos(db, empresaId, g.campos, g.dono)
     avisar(`campos ${g.dono ?? 'do core'}`, error ? { message: error } : null)
