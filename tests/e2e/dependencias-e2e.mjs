@@ -9,7 +9,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const falhas = []; const ok = (m) => console.log('ok  ', m); const falha = (m) => { falhas.push(m); console.log('FALHA', m) }
 const confere = (c, m) => (c ? ok(m) : falha(m))
 const toasts = (page) => page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((e) => e.innerText.replace(/\n/g, ' ')))
-const MODS = `'estoque','pdv','assistencia','avaliacoes'`
+const MODS = `'estoque','pdv','assistencia','avaliacoes','historico','catalogo','compras','check_imei'`
 const ativo = (m) => sql(`select coalesce((select ativo::text from empresa_modulos where empresa_id=1 and modulo='${m}'),'sem linha')`)
 
 // Foto das linhas de empresa_modulos da JM para devolver no fim.
@@ -30,15 +30,20 @@ try {
   // 1. Estoque com PDV e Assistência ligados: não desinstala, e diz quem usa.
   await page.goto(BASE + '/modulos', { waitUntil: 'networkidle' })
   const tEst = await tile('estoque').innerText()
-  confere(/Usado por PDV, Assistência/.test(tEst), `tile do Estoque diz quem usa (${tEst.replace(/\n/g, ' | ').slice(0, 120)})`)
+  confere(/Usado por PDV, Histórico de vendas, Produtos/.test(tEst), `tile do Estoque diz quem usa (${tEst.replace(/\n/g, ' | ').slice(0, 120)})`)
   confere(await tile('estoque').getByRole('button', { name: 'Desinstalar' }).isDisabled(), 'botão Desinstalar do Estoque desligado')
   let r = await api('/api/modulos/instalar', 'POST', { chave: 'estoque', instalar: false })
-  confere(r.status === 409 && /usado por PDV, Assistência/.test(r.json?.error ?? ''), `API recusa desinstalar Estoque: ${r.status} ${r.json?.error}`)
+  confere(r.status === 409 && /usado por PDV, Histórico de vendas, Produtos.*Assistência/.test(r.json?.error ?? ''), `API recusa desinstalar Estoque: ${r.status} ${r.json?.error}`)
   confere(ativo('estoque') !== 'false', 'Estoque segue ligado no banco')
 
   // 2. Tira Assistência e PDV (sem dependente: passam); aí o Estoque sai.
   r = await api('/api/modulos/instalar', 'POST', { chave: 'assistencia', instalar: false })
   confere(r.status === 200, `desinstalar Assistência: ${r.status}`)
+  // 17/11/2026: Histórico requer PDV; Produtos, Compras e Check IMEI requerem Estoque — saem antes.
+  for (const ch of ['historico', 'catalogo', 'compras', 'check_imei']) {
+    r = await api('/api/modulos/instalar', 'POST', { chave: ch, instalar: false })
+    confere(r.status === 200, `desinstalar ${ch}: ${r.status} ${r.json?.error ?? ''}`)
+  }
   r = await api('/api/modulos/instalar', 'POST', { chave: 'estoque', instalar: false })
   confere(r.status === 409 && /usado por PDV:/.test(r.json?.error ?? ''), `Estoque ainda preso só pelo PDV: ${r.json?.error}`)
   r = await api('/api/modulos/instalar', 'POST', { chave: 'pdv', instalar: false })

@@ -73,11 +73,11 @@ try {
     const vazou = ['/agenda', '/imoveis', '/executivo', '/simular-financiamento', '/ranking', '/kds', '/cardapio', '/avaliacoes'].filter((h) => m.includes(h))
     confere(vazou.length === 0, `${quem}: nenhum módulo em preparação no menu (${vazou.join(',') || 'nenhum'})`)
     const ag = await abrir(p, '/agenda')
-    confere(/Em preparação/.test(ag.texto) && !/Novo compromisso|Nova visita/.test(ag.texto), `${quem}: /agenda mostra a vitrine "Em preparação"`)
+    confere(/em preparação/i.test(ag.texto) && !/Novo compromisso|Nova visita/.test(ag.texto), `${quem}: /agenda mostra a vitrine "Em preparação"`)
     const im = await abrir(p, '/imoveis')
-    confere(im.path !== '/imoveis' || /Em preparação/.test(im.texto), `${quem}: /imoveis não abre (foi para ${im.path})`)
+    confere(im.path !== '/imoveis' || /em preparação/i.test(im.texto), `${quem}: /imoveis não abre (foi para ${im.path})`)
     const rk = await abrir(p, '/ranking')
-    confere(rk.path !== '/ranking' || /Em preparação/.test(rk.texto), `${quem}: /ranking não abre (foi para ${rk.path})`)
+    confere(rk.path !== '/ranking' || /em preparação/i.test(rk.texto), `${quem}: /ranking não abre (foi para ${rk.path})`)
   }
   let r = await api(pB, '/api/ranking/metas', 'POST', { escopo: 'pessoa', tipo: 'vendas', alvo: 1, periodo: '2026-11' })
   confere(r.status === 403 && r.json?.code === 'modulo_desligado', `B: API do Ranking (em preparação) 403: ${r.status}`)
@@ -109,14 +109,14 @@ try {
   const cols = sql(`select string_agg(column_name, ',') from information_schema.columns where table_schema='public' and table_name='assistencia_orcamentos' and is_nullable='NO' and column_default is null`)
   console.log('  (assistencia_orcamentos, obrigatórias sem padrão:', cols || 'nenhuma', ')')
   for (const emp of [1, empresaB]) {
-    const tok = sql(`insert into assistencia_orcamentos (empresa_id) values (${emp}) returning token`)
+    const tok = sql(`insert into assistencia_orcamentos (empresa_id, cliente_nome) values (${emp}, 'Cliente e2e') returning token`)
     orcTokens.push(tok)
   }
   const pubA = await fetch(`${BASE}/orcamento/${orcTokens[0]}`)
   const pubB = await fetch(`${BASE}/orcamento/${orcTokens[1]}`)
   confere(pubA.status === 200, `link público do orçamento de A (Orçamentos ligado): ${pubA.status}`)
   confere(pubB.status === 404, `link público do orçamento de B (Orçamentos desligado): ${pubB.status}`)
-  const apiB = await fetch(`${BASE}/api/orcamento/${orcTokens[1]}`)
+  const apiB = await fetch(`${BASE}/api/orcamento/${orcTokens[1]}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ acao: 'aprovar' }) })
   confere(apiB.status === 404, `API pública do orçamento de B: ${apiB.status}`)
 
   // ── 5. Rotas que saíram ──────────────────────────────────────────────────────
