@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Input, notify } from '@/components/ui'
-import { abaixoDoCatalogo, descricaoConfirmeValor, type LinhaComValor } from '@/lib/valor-abaixo-do-catalogo'
+import { abaixoDoCatalogo, descricaoConfirmeValor, type LinhaComValor, type Referencia } from '@/lib/valor-abaixo-do-catalogo'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
@@ -52,8 +52,8 @@ export interface EncomendaPDV {
   trocas: { descricao: string; imei: string | null; valor: number }[]
   cliente_id: number | null
   grupo_pdv: string | null
-  /** Preço do produto no catálogo (aviso de valor muito abaixo no ajuste); nulo sem produto cadastrado. */
-  preco_catalogo?: number | null
+  /** Referência do aviso de valor muito abaixo no ajuste: preço do catálogo ou mediana das vendas; nula sem nenhum. */
+  referencia?: Referencia | null
 }
 
 /** Uma encomenda na tela: os itens somados, com a lista por dentro. */
@@ -295,7 +295,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     // Abaixo da metade do preço do catálogo: pergunta antes de gravar, não bloqueia.
     const baixos = abaixoDoCatalogo(linhas.map((l) => {
       const item = e.itens.find((i) => i.id === l.id)
-      return { nome: item?.produto_nome ?? 'Item', valor: Number(l.venda) || 0, precoCatalogo: item?.preco_catalogo }
+      return { nome: item?.produto_nome ?? 'Item', valor: Number(l.venda) || 0, referencia: item?.referencia }
     }))
     if (!valorConfirmado && baixos.length > 0) {
       setConfirmarValor({ e, linhas, prazo, baixos })
@@ -359,7 +359,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
           setConfirmarValor(null)
           if (c) void salvarAjuste(c.e, c.linhas, c.prazo, true)
         }}
-        title="Valor bem abaixo do catálogo"
+        title="Valor bem abaixo do normal"
         description={confirmarValor ? descricaoConfirmeValor(confirmarValor.baixos) : ''}
         confirmLabel="O valor está certo, salvar"
         cancelLabel="Corrigir"

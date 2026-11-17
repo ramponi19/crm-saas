@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, ConfirmDialog, notify } from '@/components/ui'
-import { abaixoDoCatalogo, descricaoConfirmeValor } from '@/lib/valor-abaixo-do-catalogo'
+import { abaixoDoCatalogo, descricaoConfirmeValor, referenciaDoProduto, type MedianaVendas } from '@/lib/valor-abaixo-do-catalogo'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
@@ -65,8 +65,10 @@ function umaLinha(c: Pick<Cliente, 'endereco' | 'numero' | 'complemento' | 'bair
   return [rua, compl, c.bairro, cidade, c.cep].filter(Boolean).join(' · ')
 }
 
-export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
+export function EncomendaForm({ clientes, taxas = [], celulares = false, medianas = {} }: {
   clientes: Cli[]; taxas?: Taxa[]
+  /** Mediana das vendas por produto (90 dias, 5+ vendas): referência do aviso quando o catálogo não tem preço. */
+  medianas?: Record<number, MedianaVendas>
   /** Módulo Celulares ligado: oferece aparelho usado como entrada. */
   celulares?: boolean
 }) {
@@ -206,7 +208,8 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
   }
 
   const valoresBaixos = abaixoDoCatalogo(validos.map((i) => ({
-    nome: descreverItem(i), valor: Number(i.valor) || 0, precoCatalogo: i.produtoId ? i.precoCatalogo : null,
+    nome: descreverItem(i), valor: Number(i.valor) || 0,
+    referencia: i.produtoId ? referenciaDoProduto(i.precoCatalogo, medianas[i.produtoId]) : null,
   })))
 
   async function salvar(valorConfirmado = false) {
@@ -579,7 +582,7 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
         open={confirmarValor}
         onClose={() => setConfirmarValor(false)}
         onConfirm={() => { setConfirmarValor(false); void salvar(true) }}
-        title="Valor bem abaixo do catálogo"
+        title="Valor bem abaixo do normal"
         description={descricaoConfirmeValor(valoresBaixos)}
         confirmLabel="O valor está certo, lançar"
         cancelLabel="Corrigir"

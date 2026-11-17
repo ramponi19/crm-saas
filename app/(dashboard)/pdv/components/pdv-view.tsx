@@ -22,7 +22,7 @@ import { textoDoAceite, TOLERANCIA_PADRAO, type PrecoRef } from '@/lib/troca-ref
 import { useTrocaPdv, TrocaPdvBloco, TEXTOS_TROCA_PDV } from '@/components/modules/celulares/pdv-troca'
 import { PDV_CELULAR } from '@/components/modules/celulares/rotulos'
 import { CAMPO_COMANDA } from '@/components/modules/cardapio/rotulos'
-import { abaixoDoCatalogo, descricaoConfirmeValor } from '@/lib/valor-abaixo-do-catalogo'
+import { abaixoDoCatalogo, descricaoConfirmeValor, type MedianaVendas, type Referencia } from '@/lib/valor-abaixo-do-catalogo'
 import {
   resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
   FORMAS_PARCELAVEIS, type LinhaPagamento,
@@ -36,8 +36,8 @@ interface ItemEstoque {
   estado: string | null; preco_custo: number | null; preco_venda: number | null; status: string
   /** Garantia do modelo; null cai no padrão da loja. */
   produto_garantia_dias?: number | null
-  /** Preço do produto no catálogo (`estoque_produtos.preco`): referência do aviso de valor muito abaixo. */
-  produto_preco?: number | null
+  /** Referência do aviso de valor muito abaixo: preço do catálogo, ou a mediana das vendas (lib/valor-abaixo-do-catalogo). */
+  produto_referencia?: Referencia | null
   /** Fotos desta unidade (URLs separadas por vírgula) e foto do modelo. */
   fotos_urls?: string | null
   produto_foto?: string | null
@@ -67,6 +67,8 @@ interface Props {
   /** Módulo Celulares ligado: troca de aparelho, bateria na vitrine, acessórios de celular. */
   celulares?: boolean
   isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[]
+  /** Mediana das vendas por produto (90 dias, 5+ vendas): referência do aviso de valor na encomenda nova. */
+  medianas?: Record<number, MedianaVendas>
 }
 interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /**
@@ -89,7 +91,7 @@ const ACESSORIOS_GENERICOS = ['Acessório']
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, celulares = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, celulares = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [], medianas = {} }: Props) {
   const fuso = useFuso()
   // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
   // por mesa usam o mesmo campo. Vem pronta da página (capacidades dos módulos ligados: Cardápio).
@@ -346,7 +348,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       const cheio = (c.item.preco_venda ?? 0) * c.qtd
       const parteDesconto = sub > 0 ? descontoNum * (cheio / sub) : 0
       const porPeca = c.qtd > 0 ? (cheio - parteDesconto) / c.qtd : 0
-      return { nome: c.item.produto_nome, valor: Math.round(porPeca * 100) / 100, precoCatalogo: c.item.produto_preco }
+      return { nome: c.item.produto_nome, valor: Math.round(porPeca * 100) / 100, referencia: c.item.produto_referencia }
     }))
   }, [carrinho, descontoNum, acessoriosTotal])
 
@@ -914,7 +916,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         open={confirmarValor}
         onClose={() => setConfirmarValor(false)}
         onConfirm={() => { setConfirmarValor(false); finalizarVenda(true, true, true) }}
-        title="Valor bem abaixo do catálogo"
+        title="Valor bem abaixo do normal"
         description={descricaoConfirmeValor(valoresBaixos)}
         confirmLabel="O valor está certo, finalizar"
         cancelLabel="Corrigir"
@@ -978,7 +980,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
         {aba === 'encomenda' ? (
           <div className="mx-auto max-w-[720px] space-y-4">
-            <EncomendaForm clientes={clientes} taxas={taxas} celulares={celulares} />
+            <EncomendaForm clientes={clientes} taxas={taxas} celulares={celulares} medianas={medianas} />
             <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} documentos={documentos} celulares={celulares} />
           </div>
         ) : (

@@ -5,6 +5,9 @@
 //   (B) Encomenda nova com R$ 7,60 → pergunta; "Corrigir" não grava; "O valor está certo" grava R$ 7,60.
 //   (C) Ajuste da encomenda (lápis) para R$ 5 → pergunta; "Corrigir" deixa o valor como estava; R$ 7.000
 //       (acima da metade) salva sem perguntar.
+//   (D) Produto SEM preço no catálogo (17/11 noite): a referência é a mediana das vendas dele em 90 dias, só com
+//       5 ou mais. Com 6 vendas (mediana R$ 7.695) a encomenda de R$ 7,60 pergunta e diz "mediana das últimas 6
+//       vendas: R$ 7.695"; com 4 vendas não há referência e lança sem perguntar.
 // Rodar: node tests/e2e/pdv-valor-catalogo-e2e.mjs (app LOCAL :3010, Supabase LOCAL). Tudo o que cria é apagado.
 import { E } from './_usuarios.mjs'
 import { chromium } from 'playwright-core'
@@ -27,12 +30,20 @@ const unidade = sql(`insert into estoque_unidades (empresa_id, filial_id, produt
   values (1, 3, ${produto}, '${IMEI}', 7.60, 0, 'disponivel', true, 1) returning id`)
 const cliente = sql(`select id from contatos where empresa_id=1 and ativo and nome is not null order by id limit 1`)
 const vendasDoProduto = () => sql(`select count(*) from vendas_vendas where produto_id=${produto}`)
+// D: dois produtos sem preço no catálogo — um com 6 vendas recentes, outro com 4 (vendas antigas de 120 dias não contam)
+const NOME_MED = `Produto Mediana e2e ${T}`, NOME_POUCAS = `Produto Poucas e2e ${T}`
+const prodMed = sql(`insert into estoque_produtos (empresa_id, nome, preco, ativo) values (1, '${NOME_MED}', null, true) returning id`)
+const prodPoucas = sql(`insert into estoque_produtos (empresa_id, nome, preco, ativo) values (1, '${NOME_POUCAS}', null, true) returning id`)
+for (const v of [7695, 7695, 7495, 7895, 7795, 7595]) sql(`insert into vendas_vendas (empresa_id, filial_id, produto_id, valor_venda, valor_custo, status, data_venda) values (1, 3, ${prodMed}, ${v}, 0, 'concluida', now() - interval '10 days')`)
+sql(`insert into vendas_vendas (empresa_id, filial_id, produto_id, valor_venda, valor_custo, status, data_venda) values (1, 3, ${prodMed}, 100, 0, 'concluida', now() - interval '120 days')`)
+for (const v of [7695, 7695, 7495, 7895]) sql(`insert into vendas_vendas (empresa_id, filial_id, produto_id, valor_venda, valor_custo, status, data_venda) values (1, 3, ${prodPoucas}, ${v}, 0, 'concluida', now() - interval '10 days')`)
+const vendasDe = (id) => sql(`select count(*) from vendas_vendas where produto_id=${id}`)
 console.log('produto', produto, '| unidade', unidade, '| cliente', cliente)
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage()
 page.on('pageerror', (e) => falha('pageerror: ' + String(e).slice(0, 160)))
-const dialogo = () => page.locator('[role="dialog"]').filter({ hasText: 'Valor bem abaixo do catálogo' })
+const dialogo = () => page.locator('[role="dialog"]').filter({ hasText: 'Valor bem abaixo do normal' })
 try {
   await page.goto(BASE + '/login', { timeout: 300000 })
   await page.fill('input[type="email"]', E.dono); await page.fill('input[type="password"]', SENHA)
@@ -47,7 +58,7 @@ try {
   await cards.first().click(); await espera(800)
   await page.getByRole('button', { name: /^Finalizar venda/ }).click(); await espera(800)
   const tA = nb(await dialogo().innerText().catch(() => ''))
-  confere(tA.includes('Confirme o valor: R$ 7,60 para um produto de R$ 7.695,00'), `A: o PDV pergunta antes de fechar ("${tA.split('\n').slice(1).join(' ').slice(0, 110)}")`)
+  confere(tA.includes('Confirme o valor: R$ 7,60 para um produto de R$ 7.695,00 (preço do catálogo)'), `A: o PDV pergunta antes de fechar ("${tA.split('\n').slice(1).join(' ').slice(0, 110)}")`)
   await dialogo().getByRole('button', { name: 'Corrigir' }).click(); await espera(800)
   confere(await dialogo().count() === 0 && vendasDoProduto() === '0' && sql(`select status from estoque_unidades where id=${unidade}`) === 'disponivel',
     'A: "Corrigir" fecha a pergunta e nada é gravado (peça disponível)')
@@ -64,7 +75,7 @@ try {
   await preco.fill('7.6')
   await page.getByRole('button', { name: 'Lançar encomenda' }).click(); await espera(800)
   const tB = nb(await dialogo().innerText().catch(() => ''))
-  confere(tB.includes('Confirme o valor: R$ 7,60 para um produto de R$ 7.695,00'), 'B: a encomenda pergunta antes de lançar')
+  confere(tB.includes('Confirme o valor: R$ 7,60 para um produto de R$ 7.695,00 (preço do catálogo)'), 'B: a encomenda pergunta antes de lançar')
   await dialogo().getByRole('button', { name: 'Corrigir' }).click(); await espera(1000)
   confere(vendasDoProduto() === '0', 'B: "Corrigir" não grava nada')
   await page.getByRole('button', { name: 'Lançar encomenda' }).click(); await espera(800)
@@ -83,7 +94,7 @@ try {
   await page.getByLabel('Venda (R$)').first().fill('5')
   await page.getByRole('button', { name: 'Salvar', exact: true }).first().click(); await espera(800)
   const tC = nb(await dialogo().innerText().catch(() => ''))
-  confere(tC.includes('Confirme o valor: R$ 5,00 para um produto de R$ 7.695,00'), 'C: o ajuste pergunta antes de salvar')
+  confere(tC.includes('Confirme o valor: R$ 5,00 para um produto de R$ 7.695,00 (preço do catálogo)'), 'C: o ajuste pergunta antes de salvar')
   await dialogo().getByRole('button', { name: 'Corrigir' }).click(); await espera(1000)
   confere(sql(`select valor_venda from vendas_vendas where id=${vendaB}`) === '7.60', 'C: "Corrigir" deixa o valor como estava')
   await page.getByLabel('Venda (R$)').first().fill('7000')
@@ -91,6 +102,28 @@ try {
   confere(await dialogo().count() === 0, 'C: R$ 7.000 (acima da metade) salva sem perguntar')
   for (let i = 0; i < 40 && sql(`select valor_venda from vendas_vendas where id=${vendaB}`) !== '7000.00'; i++) await espera(250)
   confere(sql(`select valor_venda from vendas_vendas where id=${vendaB}`) === '7000.00', 'C: o ajuste gravou R$ 7.000')
+
+  // ── D. Sem preço no catálogo: mediana das vendas (5+) ───────────────────────
+  async function encomendaDe(nome, valor) {
+    await page.goto(BASE + '/pdv', { waitUntil: 'networkidle', timeout: 300000 })
+    await page.getByRole('button', { name: /^Encomenda/ }).first().click(); await espera(600)
+    await page.getByRole('button', { name: /Nova encomenda/ }).first().click(); await espera(600)
+    await page.getByLabel('Cliente', { exact: true }).first().selectOption(cliente)
+    await page.getByLabel('Produto').first().fill(nome.slice(0, 24)); await espera(1500)
+    await page.getByText(nome, { exact: false }).first().click(); await espera(1000)
+    await page.getByLabel('Preço deste item (R$)').first().fill(valor)
+    await page.getByRole('button', { name: 'Lançar encomenda' }).click(); await espera(1000)
+  }
+  await encomendaDe(NOME_MED, '7.6')
+  const tD = nb(await dialogo().innerText().catch(() => ''))
+  confere(tD.includes('Confirme o valor: R$ 7,60 — referência: mediana das últimas 6 vendas: R$ 7.695'),
+    `D: sem preço no catálogo, a mediana das 6 vendas de 90 dias ("${tD.replace(/\s+/g, ' ').slice(0, 140)}")`)
+  await dialogo().getByRole('button', { name: 'Corrigir' }).click(); await espera(800)
+  confere(vendasDe(prodMed) === '7', 'D: "Corrigir" não grava (só as 7 vendas de teste)')
+  await encomendaDe(NOME_POUCAS, '7.6')
+  confere(await dialogo().count() === 0, 'D: com 4 vendas não há referência — lança sem perguntar')
+  for (let i = 0; i < 40 && vendasDe(prodPoucas) === '4'; i++) await espera(250)
+  confere(vendasDe(prodPoucas) === '5', 'D: a encomenda sem referência foi lançada')
 } catch (e) {
   falha('erro: ' + String(e?.stack ?? e).slice(0, 600))
 } finally {
@@ -103,10 +136,18 @@ try {
       sql(`delete from vendas_vendas where id in (${vendas})`)
       if (pedidos) sql(`delete from compras_pedidos where id in (${pedidos})`)
     }
+    for (const id of [prodMed, prodPoucas]) {
+      const pedidosD = sql(`select coalesce(string_agg(pedido_compra_id::text, ','), '') from vendas_vendas where produto_id=${id} and pedido_compra_id is not null`)
+      sql(`delete from vendas_pagamentos where venda_id in (select id from vendas_vendas where produto_id=${id})`)
+      sql(`delete from vendas_vendas where produto_id=${id}`)
+      if (pedidosD) sql(`delete from compras_pedidos where id in (${pedidosD})`)
+      sql(`delete from estoque_produtos where id=${id}`)
+    }
     sql(`delete from estoque_unidades where id=${unidade}`)
     sql(`delete from estoque_produtos where id=${produto}`)
     sql(`update usuarios set filial_atual_id=${filialAntes || 'null'} where id='${dono}'`)
-    confere(sql(`select count(*) from estoque_produtos where nome='${NOME}'`) === '0' && vendasDoProduto() === '0', 'limpeza: produto, peça e encomenda apagados')
+    confere(sql(`select count(*) from estoque_produtos where nome in ('${NOME}', '${NOME_MED}', '${NOME_POUCAS}')`) === '0' && vendasDoProduto() === '0'
+      && vendasDe(prodMed) === '0' && vendasDe(prodPoucas) === '0', 'limpeza: produtos, peça, vendas e encomendas apagados')
   } catch (e) { falha('limpeza: ' + String(e).slice(0, 300)) }
 }
 console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\ntudo ok')

@@ -11,6 +11,9 @@ import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
 import { consultaClientes } from '@/lib/clientes'
 import { embedLead } from '@/lib/leads'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { agora, inicioDoDiaHaDias } from '@/lib/datas'
+import { DIAS_DA_MEDIANA, medianasPorProduto, referenciaDoProduto } from '@/lib/valor-abaixo-do-catalogo'
 
 export const metadata = { title: 'PDV' }
 
@@ -82,11 +85,23 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome, preco), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, produto_id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome, preco), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
   ])
+
+  /**
+   * A REFERÊNCIA DO AVISO DE VALOR (17/11/2026): sem preço no catálogo, a mediana das vendas do produto nos
+   * últimos 90 dias (só com 5 ou mais). Calculada aqui, uma vez, para o PDV, a encomenda nova e o ajuste.
+   */
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const { data: vendas90 } = await supabase.from('vendas_vendas')
+    .select('produto_id, valor_venda, quantidade')
+    .eq('empresa_id', empresaId!)
+    .not('produto_id', 'is', null).gt('valor_venda', 0).neq('status', 'cancelada')
+    .gte('data_venda', inicioDoDiaHaDias(DIAS_DA_MEDIANA, agora(), fuso).toISOString())
+  const medianas = medianasPorProduto((vendas90 ?? []) as { produto_id: number | null; valor_venda: number | null; quantidade: number | null }[])
 
   const { data: { user } } = await supabase.auth.getUser()
   const [{ data: vinculo }, { data: usuario }] = await Promise.all([
@@ -134,7 +149,7 @@ export default async function PDVPage() {
       produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
-      produto_preco: prod?.preco ?? null,
+      produto_referencia: referenciaDoProduto(prod?.preco, u.produto_id != null ? medianas[u.produto_id] : null),
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       quantidade: u.quantidade ?? 1,
       tipo_formulario: one(prod?.categorias_produtos ?? null)?.tipo_formulario ?? null,
@@ -151,7 +166,7 @@ export default async function PDVPage() {
       produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
-      produto_preco: prod?.preco ?? null,
+      produto_referencia: referenciaDoProduto(prod?.preco, u.produto_id != null ? medianas[u.produto_id] : null),
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       lead_nome: one(u.leads)?.nome ?? '—',
       reservado_lead_id: u.reservado_lead_id ?? 0,
@@ -172,7 +187,7 @@ export default async function PDVPage() {
   }))
 
   type EncomendaRow = {
-    id: number; valor_venda: number | null; valor_custo: number | null; grupo_pdv: string | null; cliente_id: number | null
+    id: number; produto_id: number | null; valor_venda: number | null; valor_custo: number | null; grupo_pdv: string | null; cliente_id: number | null
     previsao_entrega: string | null; status: string | null; observacoes: string | null
     unidade_id: number | null; data_venda: string | null
     clientes: Embed<{ nome: string | null; telefone: string | null }>
@@ -212,7 +227,7 @@ export default async function PDVPage() {
         ?? (v.observacoes?.replace(/^Encomenda:\s*/i, '').split('.')[0]?.trim() || 'Produto não identificado'),
       valor_venda: Number(v.valor_venda) || 0,
       valor_custo: Number(v.valor_custo) || 0,
-      preco_catalogo: one(v.produtos)?.preco ?? null,
+      referencia: referenciaDoProduto(one(v.produtos)?.preco, v.produto_id != null ? medianas[v.produto_id] : null),
       previsao_entrega: v.previsao_entrega,
       status: v.status ?? 'encomenda',
       unidade_id: v.unidade_id,
@@ -245,6 +260,7 @@ export default async function PDVPage() {
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
           encomendas={encomendas}
+          medianas={medianas}
           isAdmin={isAdmin}
         documentos={documentos} />
       </div>
