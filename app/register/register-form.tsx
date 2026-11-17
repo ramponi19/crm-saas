@@ -38,12 +38,14 @@ const STEPS: { id: Step; label: string }[] = [
 ]
 
 /** Os presets ativos (presets_onboarding), lidos pela página no servidor. */
-export function RegisterForm({ presets }: { presets: { chave: string; nome: string }[] }) {
+export function RegisterForm({ presets, pedirAceite = false }: { presets: { chave: string; nome: string }[]; pedirAceite?: boolean }) {
   const router = useRouter()
   const [step, setStep] = useState<Step>('plano')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [showPw, setShowPw] = useState(false)
+  const [confirmar, setConfirmar] = useState<string | null>(null)
+  const [aceite, setAceite] = useState(false)
   const [planos, setPlanos] = useState<PlanoCard[]>(FALLBACK_PLANOS)
 
   const [form, setForm] = useState({
@@ -136,10 +138,17 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
           telefone: form.telefone,
           plano: form.plano,
           segmento: form.segmento,
+          aceite,
         }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || 'Erro ao criar conta')
+      // Confirmação de e-mail ligada (EXIGIR_CONFIRMACAO_EMAIL): entra só depois de abrir o link.
+      if (json?.confirmarEmail) {
+        setErro(null)
+        setConfirmar(form.email)
+        return
+      }
 
       // 2) faz login para estabelecer a sessão no navegador
       const { error: signErr } = await supabase.auth.signInWithPassword({
@@ -347,6 +356,19 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
                   autoComplete="new-password"
                 />
               </div>
+            </div>
+          )}
+
+          {pedirAceite && step === 'conta' && (
+            <label className="mt-4 flex items-start gap-2 text-[12.5px] text-ink-2">
+              <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} className="mt-0.5" />
+              <span>Li e aceito os <a href="/termos" target="_blank" className="underline">termos de uso</a> e a <a href="/privacy" target="_blank" className="underline">política de privacidade</a>.</span>
+            </label>
+          )}
+
+          {confirmar && (
+            <div className="mt-4 rounded-control border border-line bg-raised p-3">
+              <p className="text-[12.5px] text-ink">Conta criada. Mandamos um link para <strong>{confirmar}</strong>: abra o e-mail e confirme para entrar.</p>
             </div>
           )}
 

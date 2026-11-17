@@ -276,15 +276,24 @@ export async function meusFollowUps(db: Db, userId: string, n: number): Promise<
 }
 
 /** Contagens do checklist de primeiros passos. A RLS recorta a empresa. */
+/**
+ * PRIMEIROS PASSOS DE QUALQUER EMPRESA (17/11/2026, "pronto para vender"): loja, equipe, horário, canal de
+ * atendimento e o primeiro lead — nada de ramo (antes: produtos e venda no PDV, de loja de varejo). Lê pela
+ * sessão (a RLS dá a empresa); cada número é só "já fez?".
+ */
 export async function primeirosPassos(db: Db) {
   const head = { count: 'exact' as const, head: true }
-  const [produtos, whatsapp, leads, vendas] = await Promise.all([
-    db.from('estoque_produtos').select('id', head).eq('ativo', true),
-    db.from('canais').select('id', head).eq('tipo', 'whatsapp').eq('status', 'ativo'),
+  const [lojasCompletas, equipe, horario, canais, leads] = await Promise.all([
+    db.from('filiais').select('id', head).eq('ativo', true).not('cidade', 'is', null),
+    db.from('empresa_usuarios').select('id', head).eq('ativo', true),
+    db.from('configuracoes_sistema').select('chave', head).eq('chave', 'horario_comercial'),
+    db.from('canais').select('id', head).eq('status', 'ativo'),
     db.from('negocios').select('id', head).or(NEGOCIO_ATIVO),
-    db.from('vendas_vendas').select('id', head),
   ])
-  return { produtos: produtos.count ?? 0, whatsapp: whatsapp.count ?? 0, leads: leads.count ?? 0, vendas: vendas.count ?? 0 }
+  return {
+    lojasCompletas: lojasCompletas.count ?? 0, equipe: equipe.count ?? 0, horario: horario.count ?? 0,
+    canais: canais.count ?? 0, leads: leads.count ?? 0,
+  }
 }
 
 // ── O painel inteiro, numa ida só ─────────────────────────────────────────

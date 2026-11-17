@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { aplicarPreset, lerPreset } from '@/lib/presets'
-import { enviarEmail, emailBoasVindas } from '@/lib/email'
+import { enviarEmail, emailBoasVindas, emailConfirmacao } from '@/lib/email'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
 import { soDigitos } from '@/lib/documento'
 import { erroCnpj, erroTelefone, mascaraCnpj, mascaraTelefone } from '@/lib/mascaras'
+import { origemDaRequisicao, registrarAceite, versoesVigentes } from '@/lib/termos'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
   let body: {
     email?: string; password?: string; nomeUsuario?: string
     nomeEmpresa?: string; cnpj?: string; telefone?: string; plano?: string
-    segmento?: string
+    segmento?: string; aceite?: boolean
   }
   try {
     body = await req.json()
@@ -79,14 +80,20 @@ export async function POST(req: Request) {
   // CNPJ e telefone são opcionais; preenchidos, têm de valer (17/11/2026 — a tela já confere, aqui é a regra).
   const erroDoc = erroCnpj(body.cnpj) ?? erroTelefone(body.telefone)
   if (erroDoc) return NextResponse.json({ error: erroDoc }, { status: 400 })
+  // Termos e privacidade com versão definida (lib/termos.ts): o cadastro só segue com o aceite.
+  if (versoesVigentes() && body.aceite !== true) return NextResponse.json({ error: 'Aceite os termos de uso e a política de privacidade para continuar.' }, { status: 400 })
   const cnpj = soDigitos(body.cnpj) ? mascaraCnpj(body.cnpj ?? '') : null
   const telefone = soDigitos(body.telefone) ? mascaraTelefone(body.telefone ?? '') : null
 
   // 1) cria o usuário de auth já confirmado (sem e-mail, sem rate limit)
+  // CONFIRMAÇÃO DE E-MAIL (17/11/2026, pronta e DESLIGADA): com EXIGIR_CONFIRMACAO_EMAIL=1 o login só vale
+  // depois de abrir o link mandado pelo provedor (lib/email.ts). Espera a decisão (b) do Lucas: provedor e
+  // domínio — sem eles o link não chega, e por isso o padrão segue "confirmado no cadastro".
+  const exigirConfirmacao = process.env.EXIGIR_CONFIRMACAO_EMAIL === '1'
   const { data: created, error: createErr } = await svc.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: !exigirConfirmacao,
     user_metadata: { nome: nomeUsuario },
   })
   if (createErr || !created?.user) {
@@ -191,6 +198,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
+  // 4b) o aceite dos termos (só com as versões definidas): grava versão, quando, IP e navegador.
+  const { error: aceiteErr } = await registrarAceite(svc, { usuarioId: userId, empresaId: empresa.id, ...origemDaRequisicao(req) })
+  if (aceiteErr) console.error('[register] aceite dos termos:', aceiteErr)
+
   /**
    * 5) o preset vira da empresa: base do menu (tela inicial e vocabulário juntos),
    * módulos, campos de partida, funil e motivos de perda (lib/presets.ts).
@@ -207,7 +218,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
-  // 6) e-mail de boas-vindas (não-bloqueante: nunca falha o cadastro).
+  // 6) e-mail: com confirmação ligada, o link de confirmar; senão, as boas-vindas (não-bloqueante).
+  if (exigirConfirmacao) {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin
+    const { data: link } = await svc.auth.admin.generateLink({ type: 'signup', email, password, options: { redirectTo: `${base}/entrar` } })
+    const acao = link?.properties?.action_link
+    if (acao) await enviarEmail({ to: email, ...emailConfirmacao(nomeUsuario, acao) })
+    return NextResponse.json({ ok: true, empresaId: empresa.id, confirmarEmail: true })
+  }
   const { subject, html } = emailBoasVindas(nomeUsuario, nomeEmpresa)
   enviarEmail({ to: email, subject, html }).catch(() => {/* stub/no-op sem provider */})
 

@@ -84,6 +84,7 @@ const DONOS = {
   '/api/assistente': CORE,
 
   // plataforma
+  '/termos': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
   '/login': PLAT, '/register': PLAT, '/entrar': PLAT, '/reset-senha': PLAT, '/offline': PLAT, '/privacy': PLAT,
   '/superadmin': PLAT, '/vitrine': PLAT, '/design': PLAT, '/para': PLAT, '/landing': PLAT,
   '/i': PLAT, '/track.js': PLAT,

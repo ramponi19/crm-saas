@@ -7,6 +7,7 @@ import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banne
 import { LimiteBanner } from '@/components/layout/limite-banner'
 import { SituacaoBanner } from '@/components/layout/situacao-banner'
 import { agora } from '@/lib/datas'
+import { aceitouVigentes } from '@/lib/termos'
 import { situacaoDaEmpresa, type EmpresaSituacao } from '@/lib/situacao-empresa'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
@@ -34,6 +35,8 @@ export default async function DashboardLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  // Termos e privacidade com versão nova (lib/termos.ts; desligado sem as versões): aceita antes de usar.
+  if (!(await aceitouVigentes(supabase, user.id))) redirect('/aceite')
 
   const { data: usuarioRaw } = await supabase
     .from('usuarios')

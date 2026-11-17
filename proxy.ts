@@ -154,6 +154,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublicRoute = request.nextUrl.pathname === '/' ||
                         request.nextUrl.pathname.startsWith('/privacy') ||
+                        request.nextUrl.pathname.startsWith('/termos') ||
                         request.nextUrl.pathname.startsWith('/para/') ||
                         request.nextUrl.pathname.startsWith('/entrar') ||
                         request.nextUrl.pathname.startsWith('/register') ||
