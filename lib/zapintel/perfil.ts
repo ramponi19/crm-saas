@@ -73,6 +73,10 @@ import { agora, formatarData, formatarNoFuso, FUSO_PADRAO, instanteLocal } from 
  *   (20/10/2026, também SEM subir: o prompt passou a escrever como diretor
  *    comercial — ver `regras`. Os campos são os mesmos; as fichas antigas
  *    ganham o formato novo quando a conversa andar e forem regeradas.)
+ *
+ *   (17/11/2026, também SEM subir: o exemplo e as regras deixaram de falar de
+ *    celular — o ZapIntel é vendido a qualquer empresa e o texto de ramo
+ *    vive no módulo dele. Mesma história, mesmos campos, produto genérico.)
  */
 export const VERSAO_DO_PERFIL = 'p2'
 
@@ -382,8 +386,8 @@ produto, preço, nome nem situação daqui.
   "score": 74,
   "riscoPerda": 20,
   "perfil": "Pesquisador e direto",
-  "diagnostico": "Fato: comprou o aparelho por R$ 3.480 em 10x no dia 05/09 e retirou na loja no dia seguinte, elogiando o atendimento. Perguntou se a loja compra o aparelho antigo dele, e ninguém respondeu.\\n\\nValor em jogo: um seminovo para o estoque (valor não discutido na conversa) e a próxima compra de um cliente que saiu satisfeito.\\n\\nLeitura (confiança média): não há venda a fechar; há uma pergunta dele sem resposta que vale dinheiro. Responder agora é retomar algo que ele mesmo pediu, não insistir.",
-  "relato": "Chegou em 02/09 por um anúncio perguntando preço e prazo. Comparou com outra loja na mesma conversa e pediu foto da caixa lacrada antes de seguir.\\n\\nO primeiro travamento foi o parcelamento: queria mais parcelas sem juros do que a loja oferecia. Ele mesmo propôs a saída — dar uma entrada maior no Pix —, e a loja aceitou.\\n\\nO atrito que quase custou a venda apareceu na véspera da retirada: a cor escolhida tinha acabado e a Tatiane, que o atendia, só avisou quando ele perguntou o horário. A loja resolveu no mesmo minuto, oferecendo a outra cor com uma capa de cortesia, que ele aceitou.\\n\\nNa retirada, em 06/09, ele perguntou se a loja compra o aparelho antigo. A pergunta ficou sem resposta.",
+  "diagnostico": "Fato: comprou o produto por R$ 3.480 em 10x no dia 05/09 e retirou na loja no dia seguinte, elogiando o atendimento. Perguntou se a loja aceita o antigo dele na troca, e ninguém respondeu.\\n\\nValor em jogo: um usado para revender (valor não discutido na conversa) e a próxima compra de um cliente que saiu satisfeito.\\n\\nLeitura (confiança média): não há venda a fechar; há uma pergunta dele sem resposta que vale dinheiro. Responder agora é retomar algo que ele mesmo pediu, não insistir.",
+  "relato": "Chegou em 02/09 por um anúncio perguntando preço e prazo. Comparou com outra loja na mesma conversa e pediu foto da caixa lacrada antes de seguir.\\n\\nO primeiro travamento foi o parcelamento: queria mais parcelas sem juros do que a loja oferecia. Ele mesmo propôs a saída — dar uma entrada maior no Pix —, e a loja aceitou.\\n\\nO atrito que quase custou a venda apareceu na véspera da retirada: a cor escolhida tinha acabado e a Tatiane, que o atendia, só avisou quando ele perguntou o horário. A loja resolveu no mesmo minuto, oferecendo a outra cor com uma capa de cortesia, que ele aceitou.\\n\\nNa retirada, em 06/09, ele perguntou se a loja aceita o antigo dele na troca. A pergunta ficou sem resposta.",
   "sinais": [
     { "rotulo": "Pediu prova de procedência", "evidencia": "consegue mandar foto da caixa lacrada?" },
     { "rotulo": "Propôs a própria saída", "evidencia": "se eu der metade no pix fecha em 10?" }
@@ -393,13 +397,13 @@ produto, preço, nome nem situação daqui.
     { "rotulo": "Cor indisponível", "evidencia": "mas era a azul que eu queria", "desfecho": "Aceitou a outra cor com capa de cortesia" }
   ],
   "pontasSoltas": [
-    "Ele perguntou se a loja compra o aparelho antigo dele e ninguém respondeu essa pergunta.",
+    "Ele perguntou se a loja aceita o antigo dele na troca e ninguém respondeu essa pergunta.",
     "Ponto de treino: a falta da cor só foi avisada quando ele perguntou o horário da retirada. Avisar assim que souber evita o susto que quase custou a venda."
   ],
-  "proximaAcao": "Tatiane · até 12/09 — responder a pergunta que ficou sem resposta e oferecer uma avaliação do aparelho antigo dele.",
-  "proximaAcaoPorque": "Retoma algo que ele mesmo pediu, não uma oferta nova, e pode trazer um seminovo para o estoque por um cliente que já confia na loja. Métrica: avaliação feita até 19/09.",
+  "proximaAcao": "Tatiane · até 12/09 — responder a pergunta que ficou sem resposta e oferecer uma avaliação do antigo dele.",
+  "proximaAcaoPorque": "Retoma algo que ele mesmo pediu, não uma oferta nova, e pode trazer um usado para o estoque por um cliente que já confia na loja. Métrica: avaliação feita até 19/09.",
   "urgencia": "medium",
-  "mensagemSugerida": "Oi! Tudo certo com o aparelho novo? 😄 Você tinha perguntado se a gente compra o seu antigo e acabou ficando sem resposta — se ainda estiver com ele, faço uma avaliação sem compromisso. Quer?"
+  "mensagemSugerida": "Oi! Tudo certo com o produto novo? 😄 Você tinha perguntado se a gente aceita o seu antigo na troca e acabou ficando sem resposta — se ainda estiver com ele, faço uma avaliação sem compromisso. Quer?"
 }
 
 REPARE no exemplo: o diagnóstico separa o que aconteceu (Fato) do que você
@@ -444,7 +448,7 @@ function regras(nomeDaLoja: string): string {
     '   aí, diga que não está — não preencha.',
     '',
     '1a. VALOR EM JOGO é dinheiro que aparece na conversa ou no CRM (preço',
-    '   cotado, avaliação do aparelho, diferença a pagar). Se nenhum valor foi',
+    '   cotado, avaliação do usado na troca, diferença a pagar). Se nenhum valor foi',
     '   falado, escreva "não informado na conversa".',
     '',
     '2. CADA SINAL E CADA OBJEÇÃO LEVA EVIDÊNCIA: um trecho curto do que foi',
@@ -460,7 +464,7 @@ function regras(nomeDaLoja: string): string {
     '   pontasSoltas um item "Decisão da gerência: ..." com o tamanho da',
     '   diferença em R$ e o que se ganha ou perde — e deixe a decisão com a',
     '   gerência. Prefira saídas que não cortam margem: entrada, troca,',
-    '   parcelamento, outra cor ou memória, prova do aparelho.',
+    '   parcelamento, outra cor ou versão, prova do produto.',
     '',
     '4. FATO DO CRM E DEDUÇÃO SUA SÃO COISAS DIFERENTES. Se a conversa mostra',
     '   que a pessoa comprou mas o CRM não tem venda registrada, diga as duas',
@@ -482,7 +486,7 @@ function regras(nomeDaLoja: string): string {
     '',
     '7a. PONTO DE TREINO: quando a conversa mostrar um acerto ou um erro do',
     '   vendedor que vale ensinar (demorou a responder, mandou só áudio, não deu',
-    '   o preço, não perguntou se há aparelho de entrada, contornou bem uma',
+    '   o preço, não perguntou se há um usado de entrada, contornou bem uma',
     '   objeção), escreva em pontasSoltas um item "Ponto de treino: ..." citando',
     '   o que aconteceu.',
     '',

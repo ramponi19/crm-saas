@@ -12,11 +12,13 @@ function num(s: string): number {
 }
 
 export function SimularFinanciamentoView() {
-  const [valor, setValor] = useState('300000')
-  const [entrada, setEntrada] = useState('60000')
-  const [prazo, setPrazo] = useState('360')
-  const [taxa, setTaxa] = useState('0,9') // % a.m.
-  const [sistema, setSistema] = useState<Sistema>('sac')
+  // Campos vazios e Price como padrão (17/11/2026): os números de antes eram de financiamento
+  // imobiliário (R$ 300 mil, 360 meses, SAC) e não servem a qualquer empresa.
+  const [valor, setValor] = useState('')
+  const [entrada, setEntrada] = useState('')
+  const [prazo, setPrazo] = useState('')
+  const [taxa, setTaxa] = useState('') // % a.m.
+  const [sistema, setSistema] = useState<Sistema>('price')
 
   const r = useMemo(() => {
     const pv = Math.max(0, num(valor) - num(entrada))
@@ -56,10 +58,10 @@ export function SimularFinanciamentoView() {
             <Input label="Valor do bem (R$)" className="num" value={valor} onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ''))} />
             <Input label="Entrada (R$)" className="num" value={entrada} onChange={(e) => setEntrada(e.target.value.replace(/[^0-9.,]/g, ''))} />
             <Input label="Prazo (meses)" className="num" value={prazo} onChange={(e) => setPrazo(e.target.value.replace(/[^0-9]/g, ''))} />
-            <Input label="Taxa de juros (% ao mês)" className="num" value={taxa} onChange={(e) => setTaxa(e.target.value.replace(/[^0-9.,]/g, ''))} hint="Ex.: 0,9 para 0,9% a.m." />
+            <Input label="Taxa de juros (% ao mês)" className="num" value={taxa} onChange={(e) => setTaxa(e.target.value.replace(/[^0-9.,]/g, ''))} hint="Ex.: 1,5 para 1,5% a.m." />
             <Select label="Sistema de amortização" value={sistema} onChange={(e) => setSistema(e.target.value as Sistema)}>
-              <option value="sac">SAC (parcela decrescente)</option>
               <option value="price">Price (parcela fixa)</option>
+              <option value="sac">SAC (parcela decrescente)</option>
             </Select>
             <div className="rounded-card border border-line bg-raised px-3 py-2.5 text-[12.5px] text-ink-2">
               Valor financiado: <span className="num font-semibold text-ink">{formatCurrency(r.pv)}</span>
@@ -85,7 +87,7 @@ export function SimularFinanciamentoView() {
               ))}
             </div>
           </Card>
-          <p className="text-[11.5px] text-ink-3">Simulação aproximada (sem seguros, taxas administrativas ou TR). No SAC a parcela cai a cada mês; no Price é fixa.</p>
+          <p className="text-[11.5px] text-ink-3">Simulação aproximada (sem seguros, tarifas ou correção monetária). No SAC a parcela cai a cada mês; no Price é fixa.</p>
         </div>
       </div>
     </main>

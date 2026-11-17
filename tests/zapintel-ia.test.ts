@@ -101,7 +101,7 @@ describe('mascararDadosPessoais', () => {
     ['cartão com hífen', '5555-5555-5555-4444', '[CARTÃO]'],
     ['cartão corrido', '4111111111111111', '[CARTÃO]'],
     ['Amex 4-6-5', 'amex 3782 822463 10005', 'amex [CARTÃO]'],
-    ['IMEI não vira cartão', 'IMEI 356938035643809', 'IMEI [IMEI]'],
+    ['IMEI não vira cartão', 'IMEI 356938035643809', 'IMEI [NÚMERO DE SÉRIE]'],
     ['endereço com vírgula, nº e apto', 'Rua das Palmeiras, 742, apto 31, Campinas', 'Rua das Palmeiras, [Nº], apto [COMPLEMENTO], Campinas'],
     ['avenida com nº', 'Av. Brasil nº 1500 - Mogi Guaçu', 'Av. Brasil, [Nº] - Mogi Guaçu'],
     ['complemento só com CEP', 'casa 12 do condomínio, CEP 13840-000, Mogi Mirim', 'casa [COMPLEMENTO] do condomínio, CEP [CEP], Mogi Mirim'],

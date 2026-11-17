@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import type { LinhaRanking } from '@/lib/ranking'
 import { agora, partesNoFuso, primeiroDoMes } from '@/lib/datas'
 import { useFuso } from '@/components/fuso-provider'
+import { COLUNA_IMOVEIS_CAPTADOS, OPCAO_META_IMOVEIS_CAPTADOS, ROTULO_META_IMOVEIS_CAPTADOS } from '@/components/modules/imoveis/ranking-imob'
 import { Trophy, Medal, ChevronLeft, ChevronRight, RefreshCw, Plus, Trash2, Target, Crown } from 'lucide-react'
 
 export interface MetaUi { id: number; escopo: string; tipo: string; alvo: number; usuario_nome: string; realizado: number }
@@ -16,7 +17,7 @@ export interface MembroOpt { id: string; nome: string }
 /** Rótulo curto, para o crachá do cartão de meta. */
 const TIPO_LABEL: Record<string, string> = {
   vendas: 'Vendas', fechamentos: 'Fechamentos', visitas: 'Visitas', propostas: 'Propostas',
-  captacoes: 'Captações', imoveis_captados: 'Imóveis captados', faturamento: 'Faturamento',
+  captacoes: 'Captações', imoveis_captados: ROTULO_META_IMOVEIS_CAPTADOS, faturamento: 'Faturamento',
 }
 
 /**
@@ -28,11 +29,11 @@ const TIPO_LABEL: Record<string, string> = {
  * que `vendas` (ver `valorMetrica`), então eram duas opções para o mesmo número.
  * Segue no TIPO_LABEL porque meta antiga gravada com ele precisa se apresentar.
  */
-const TIPOS_META: { v: string; l: string; soCaptaAtivo?: boolean }[] = [
+const TIPOS_META: { v: string; l: string; soCaptaAtivo?: boolean; soComAgenda?: boolean }[] = [
   { v: 'vendas', l: 'Vendas (Fechamentos)' },
   { v: 'captacoes', l: 'Captações de Clientes' },
-  { v: 'imoveis_captados', l: 'Imóveis Captados', soCaptaAtivo: true },
-  { v: 'visitas', l: 'Visitas Realizadas' },
+  { v: 'imoveis_captados', l: OPCAO_META_IMOVEIS_CAPTADOS, soCaptaAtivo: true },
+  { v: 'visitas', l: 'Visitas Realizadas', soComAgenda: true },
   { v: 'propostas', l: 'Propostas Enviadas' },
   { v: 'faturamento', l: 'Faturamento (R$)' },
 ]
@@ -59,14 +60,17 @@ const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x)
 const PAPEL_LABEL: Record<string, string> = { owner: 'Proprietário', admin: 'Administrador', tecnico: 'Técnico', member: 'Membro' }
 const papelDe = (papel: string | undefined, equipeLabel: string) => (papel ? PAPEL_LABEL[papel] ?? equipeLabel : equipeLabel)
 
-export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAdmin, mostrarImoveis = false, equipeLabel = 'Vendedor' }: {
+export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAdmin, mostrarImoveis = false, mostrarVisitas = false, equipeLabel = 'Vendedor' }: {
   periodo: string
   linhas: LinhaRanking[]
   metas: MetaUi[]
   membros: MembroOpt[]
   papeis?: Record<string, string>
   isAdmin: boolean
+  /** Captação de imóvel (capacidade `captacaoDeImovel`, do módulo Imóveis). */
   mostrarImoveis?: boolean
+  /** Visitas realizadas (a tabela `visitas` é do módulo Agenda): só com ela ligada. */
+  mostrarVisitas?: boolean
   equipeLabel?: string
 }) {
   const router = useRouter()
@@ -135,7 +139,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
             {podio.length > 0 && (
               <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {podio.map((l, i) => (
-                  <PodioCard key={l.usuario_id} linha={l} pos={i} lider={i === 0} papel={papelDe(papeis[l.usuario_id], equipeLabel)} />
+                  <PodioCard key={l.usuario_id} linha={l} pos={i} lider={i === 0} papel={papelDe(papeis[l.usuario_id], equipeLabel)} mostrarVisitas={mostrarVisitas} />
                 ))}
               </div>
             )}
@@ -146,7 +150,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
             </div>
 
             {linhas.length === 0 ? (
-              <EmptyState icon={<Trophy size={24} strokeWidth={1.6} />} title="Sem dados no período" description="Quando houver vendas, visitas e propostas no mês, o ranking aparece aqui." />
+              <EmptyState icon={<Trophy size={24} strokeWidth={1.6} />} title="Sem dados no período" description={mostrarVisitas ? 'Quando houver vendas, visitas e propostas no mês, o ranking aparece aqui.' : 'Quando houver vendas e propostas no mês, o ranking aparece aqui.'} />
             ) : (
               <div className="overflow-x-auto rounded-card border border-line">
                 <table className="w-full min-w-[680px] text-[13px]">
@@ -159,8 +163,8 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
                       <th className="px-3 py-2.5 text-right font-semibold">Captações</th>
                       {/* Só onde a captação de imóvel existe — coluna zerada em toda
                           linha é ruído que faz o dono duvidar do resto da tabela. */}
-                      {mostrarImoveis && <th className="px-3 py-2.5 text-right font-semibold">Imóveis</th>}
-                      <th className="px-3 py-2.5 text-right font-semibold">Visitas</th>
+                      {mostrarImoveis && <th className="px-3 py-2.5 text-right font-semibold">{COLUNA_IMOVEIS_CAPTADOS}</th>}
+                      {mostrarVisitas && <th className="px-3 py-2.5 text-right font-semibold">Visitas</th>}
                       <th className="px-3 py-2.5 text-right font-semibold">Propostas</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Conversão</th>
                       <th className="px-3 py-2.5 text-right font-semibold">Faturamento</th>
@@ -185,7 +189,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.vendas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.captacoes}</td>
                         {mostrarImoveis && <td className="px-3 py-2.5 text-right num text-ink-2">{l.imoveisCaptados}</td>}
-                        <td className="px-3 py-2.5 text-right num text-ink-2">{l.visitas}</td>
+                        {mostrarVisitas && <td className="px-3 py-2.5 text-right num text-ink-2">{l.visitas}</td>}
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.propostas}</td>
                         <td className="px-3 py-2.5 text-right num text-ink-2">{l.conversao}%</td>
                         <td className="px-3 py-2.5 text-right">
@@ -230,6 +234,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
           membros={membros}
           equipeLabel={equipeLabel}
           mostrarImoveis={mostrarImoveis}
+          mostrarVisitas={mostrarVisitas}
           onClose={() => setNovaMeta(false)}
           onSaved={() => { setNovaMeta(false); router.refresh() }}
         />
@@ -238,7 +243,7 @@ export function RankingView({ periodo, linhas, metas, membros, papeis = {}, isAd
   )
 }
 
-function PodioCard({ linha, pos, lider, papel }: { linha: LinhaRanking; pos: number; lider: boolean; papel: string }) {
+function PodioCard({ linha, pos, lider, papel, mostrarVisitas }: { linha: LinhaRanking; pos: number; lider: boolean; papel: string; mostrarVisitas: boolean }) {
   const cor = pos === 0 ? 'text-accent' : pos === 1 ? 'text-ink-2' : 'text-ink-3'
   const ring = pos === 0 ? 'border-accent/40 bg-accent/[0.04]' : 'border-line bg-card'
   const Icon = pos === 0 ? Trophy : Medal
@@ -258,7 +263,7 @@ function PodioCard({ linha, pos, lider, papel }: { linha: LinhaRanking; pos: num
       <div className="mt-3 flex items-end justify-between border-t border-line-soft pt-2.5">
         <div><div className="num text-[22px] font-semibold text-ink">{linha.score}</div><div className="text-[10.5px] text-ink-3">pts</div></div>
         <div className="text-right text-[11px] text-ink-3">
-          {plural(linha.vendas, 'venda', 'vendas')} · {plural(linha.visitas, 'visita', 'visitas')}<br />{formatCurrency(linha.faturamento)}
+          {plural(linha.vendas, 'venda', 'vendas')}{mostrarVisitas && <> · {plural(linha.visitas, 'visita', 'visitas')}</>}<br />{formatCurrency(linha.faturamento)}
           {linha.vendasRetidas > 0 && (
             <><br /><span className="text-warn">
               {linha.vendasRetidas} {linha.vendasRetidas === 1 ? 'venda travada' : 'vendas travadas'}
@@ -304,11 +309,12 @@ function MetaCard({ meta, isAdmin, onDelete }: { meta: MetaUi; isAdmin: boolean;
   )
 }
 
-function NovaMetaModal({ periodo, membros, equipeLabel, mostrarImoveis, onClose, onSaved }: {
+function NovaMetaModal({ periodo, membros, equipeLabel, mostrarImoveis, mostrarVisitas, onClose, onSaved }: {
   periodo: string
   membros: MembroOpt[]
   equipeLabel: string
   mostrarImoveis: boolean
+  mostrarVisitas: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -324,7 +330,7 @@ function NovaMetaModal({ periodo, membros, equipeLabel, mostrarImoveis, onClose,
   const [alvo, setAlvo] = useState('')
   const [salvando, setSalvando] = useState(false)
 
-  const tipos = TIPOS_META.filter((t) => !t.soCaptaAtivo || mostrarImoveis)
+  const tipos = TIPOS_META.filter((t) => (!t.soCaptaAtivo || mostrarImoveis) && (!t.soComAgenda || mostrarVisitas))
   const isMoney = tipo === 'faturamento'
 
   async function salvar() {
@@ -359,7 +365,7 @@ function NovaMetaModal({ periodo, membros, equipeLabel, mostrarImoveis, onClose,
         />
         <p className="text-[11.5px] text-ink-3">
           Período — <strong className="font-semibold text-ink-2">{mesAno(periodo)}</strong>. Para outro mês, troque o
-          seletor da tela antes de criar. O progresso sai das vendas, visitas, propostas e captações do próprio mês.
+          seletor da tela antes de criar. O progresso sai das vendas, {mostrarVisitas ? 'visitas, ' : ''}propostas e captações do próprio mês.
         </p>
       </div>
     </Modal>

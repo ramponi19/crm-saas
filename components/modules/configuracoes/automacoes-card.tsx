@@ -22,7 +22,8 @@ interface Etapa { slug: string; label: string; tipo: string | null }
 
 const TEMPLATES = [
   { chave: 'boas_vindas', label: 'Boas-vindas' },
-  { chave: 'confirmacao_visita', label: 'Confirmação de visita' },
+  // A chave segue 'confirmacao_visita' (gravada nas automações); o texto é genérico.
+  { chave: 'confirmacao_visita', label: 'Confirmação de compromisso' },
   { chave: 'cobranca', label: 'Cobrança' },
   { chave: 'followup', label: 'Follow-up' },
   { chave: 'agradecimento', label: 'Pós-venda' },

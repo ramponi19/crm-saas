@@ -9,6 +9,7 @@ import { Button, Card, Badge, Modal, Input, Select, Textarea, EmptyState, notify
 import type { Tables } from '@/types/database'
 import type { RotulosAgenda } from '@/lib/empresa-config'
 import { embedLead } from '@/lib/leads'
+import { EMBED_IMOVEL_DA_VISITA, EXEMPLO_COMPROMISSO_IMOVEL, ROTULO_IMOVEL_DO_COMPROMISSO, TIPO_VISTORIA } from '@/components/modules/imoveis/agenda-imovel'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaDaSemana, diaNoFuso, diasEntre, formatarData, formatarHora, instanteLocal, paraData, partesNoFuso, primeiroDoMes, rotuloDoMes } from '@/lib/datas'
 
@@ -50,10 +51,9 @@ const stInfo = (s: string) => STATUS.find(x => x.v === s) ?? STATUS[0]
  * — é etapa do funil imobiliário, entre contrato e entrega de chaves, e até agora
  * não havia como distingui-la de uma visita comum.
  */
-/** Tipos de compromisso padrão; a empresa pode ter os seus (vocabulário, ex.: clínica). */
+/** Tipos de compromisso padrão; a empresa pode ter os seus (vocabulário). A vistoria vem do módulo Imóveis. */
 const TIPOS_PADRAO: { v: string; l: string }[] = [
   { v: 'visita', l: 'Visita' },
-  { v: 'vistoria', l: 'Vistoria' },
   { v: 'retorno', l: 'Retorno' },
   { v: 'apresentacao', l: 'Apresentação' },
   { v: 'follow_up', l: 'Follow-up' },
@@ -114,7 +114,8 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
 }) {
   const supabase = createClient()
   const fuso = useFuso()
-  const TIPOS = rotulos.tipos?.length ? rotulos.tipos : TIPOS_PADRAO
+  const TIPOS = rotulos.tipos?.length ? rotulos.tipos
+    : comImoveis ? [TIPOS_PADRAO[0], TIPO_VISTORIA, ...TIPOS_PADRAO.slice(1)] : TIPOS_PADRAO
   const rotuloTipo = (v: string | null) => TIPOS.find(t => t.v === v)?.l ?? TIPOS[0].l
   const L = {
     novo: rotulos.novo ?? 'Novo compromisso',
@@ -243,7 +244,8 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
       observacoes: form.observacoes.trim() || null,
     }
     // O lead da visita é o negócio (visitas.lead_id); nome/telefone vêm do contato.
-    const selectVisita: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)`
+    // O imóvel só com o módulo Imóveis ligado.
+    const selectVisita: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome)${comImoveis ? `, ${EMBED_IMOVEL_DA_VISITA}` : ''}`
     const { data, error } = await supabase.from('visitas')
       .insert(payload)
       .select(selectVisita)
@@ -498,7 +500,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
         <div className="space-y-3">
           <Input
             label="Título"
-            placeholder={rotulos.exemplo ?? (comImoveis ? 'Ex: Visita ao imóvel' : 'Ex: Reunião com o cliente')}
+            placeholder={rotulos.exemplo ?? (comImoveis ? EXEMPLO_COMPROMISSO_IMOVEL : 'Ex: Reunião com o cliente')}
             hint="Opcional — sem título, aparece o nome de quem vai ser atendido."
             value={form.titulo}
             onChange={e => set('titulo', e.target.value)}
@@ -541,7 +543,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
           </div>
 
           {comImoveis && (
-            <Select label="Imóvel" value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
+            <Select label={ROTULO_IMOVEL_DO_COMPROMISSO} value={form.imovel_id} onChange={e => set('imovel_id', e.target.value)}>
               <option value="">— selecionar —</option>
               {imoveis.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
             </Select>
@@ -550,7 +552,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
           <Input
             label="Local"
             placeholder="Ex: Av. Rondon Pacheco, 1000"
-            hint="Onde encontrar — vale para reunião e compromisso fora do imóvel."
+            hint="Onde encontrar — endereço, link da chamada ou ponto de encontro."
             value={form.local}
             onChange={e => set('local', e.target.value)}
           />
@@ -564,7 +566,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
           <Input
             label="Participantes"
             placeholder="email@exemplo.com, 34 99999-0000"
-            hint="Quem vai além da equipe — proprietário, cônjuge, despachante."
+            hint="Quem vai além da equipe — acompanhante, sócio, parceiro."
             value={form.participantes}
             onChange={e => set('participantes', e.target.value)}
           />

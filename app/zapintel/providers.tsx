@@ -14,10 +14,10 @@ import { LeadProvider } from "@/hooks/zapintel/useLeads";
 const EmpresaContext = createContext<number | null>(null);
 export const useEmpresaZapintel = () => useContext(EmpresaContext);
 
-export default function Providers({ children, empresaId }: { children: React.ReactNode; empresaId?: number }) {
+export default function Providers({ children, empresaId, papel }: { children: React.ReactNode; empresaId?: number; papel?: string }) {
   return (
     <EmpresaContext.Provider value={empresaId ?? null}>
-      <LeadProvider empresa={empresaId ?? null}>{children}</LeadProvider>
+      <LeadProvider empresa={empresaId ?? null} papel={papel}>{children}</LeadProvider>
     </EmpresaContext.Provider>
   );
 }

@@ -1,10 +1,10 @@
 'use client'
 
 import type { PainelDoLead } from '@/lib/empresa-config'
-import { LeadMatchPanel } from './lead-match-panel'
-import { LeadNegocioPanel } from './lead-negocio-panel'
-import { LeadInteressePanel } from './lead-interesse-panel'
-import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
+import { LeadMatchPanel } from '@/components/modules/imoveis/lead-match-panel'
+import { LeadNegocioPanel } from '@/components/modules/imoveis/lead-negocio-panel'
+import { LeadInteressePanel } from '@/components/modules/veiculos/lead-interesse-panel'
+import { LeadFinanciamentoPanel } from '@/components/modules/veiculos/lead-financiamento-panel'
 
 /**
  * Painéis de vertical do modal do lead, por nome.

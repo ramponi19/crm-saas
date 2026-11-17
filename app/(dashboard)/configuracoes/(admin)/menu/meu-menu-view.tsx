@@ -67,7 +67,7 @@ export function MeuMenuView({ itens, initialHidden, initialLabels }: {
       <div className="mx-auto max-w-[760px] space-y-4">
         <p className="text-[13px] text-ink-2">
           Arraste pela alça para mudar a ordem do menu. Renomeie itens
-          (ex.: <b className="text-ink">Clientes → Pacientes</b>) e oculte o que sua empresa não usa.
+          (ex.: <b className="text-ink">Clientes → Contatos</b>) e oculte o que sua empresa não usa.
           Ocultar tira do menu; a tela continua acessível por link.
         </p>
 

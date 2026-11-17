@@ -67,7 +67,7 @@ export default function FundirLeadsModal({ clientes, onClose, onFundido }: {
       m['mensagens.contato_id'] ? `${m['mensagens.contato_id']} mensagem(ns)` : null,
       m['vendas_vendas.cliente_id'] ? `${m['vendas_vendas.cliente_id']} venda(s)` : null,
       m['negocios.contato_id'] ? `${m['negocios.contato_id']} negócio(s) do funil` : null,
-      m['imoveis_negocios.cliente_id'] ? `${m['imoveis_negocios.cliente_id']} negócio(s) de imóvel` : null,
+      m['imoveis_negocios.cliente_id'] ? `${m['imoveis_negocios.cliente_id']} negócio(s) fechado(s)` : null,
       m['visitas.cliente_id'] ? `${m['visitas.cliente_id']} compromisso(s)` : null,
       j?.negociosJuntados ? `${j.negociosJuntados} negócio(s) repetido(s) juntado(s)` : null,
     ].filter(Boolean)

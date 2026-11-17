@@ -108,7 +108,7 @@ export default function PosVendaPage() {
           <p className="pv2-explica">
             {aba === "pendencia" && "Algo que a loja ficou de resolver depois da venda — entrega, troca, nota, garantia. É o cliente que pode estar insatisfeito agora."}
             {aba === "indicacao" && "Clientes que nunca ouviram um pedido de indicação. Quem já comprou e gostou é o caminho mais barato para o próximo cliente."}
-            {aba === "recompra" && "Clientes sem conversa há mais de 60 dias. Bom momento para saber como está o aparelho e oferecer a próxima troca."}
+            {aba === "recompra" && "Clientes sem conversa há mais de 60 dias. Bom momento para saber como foi a experiência com a compra e oferecer a próxima."}
             {aba === "todos" && "Todos os clientes: quem a análise leu comprando e quem tem venda do CRM ligada à conversa."}
           </p>
 

@@ -7,9 +7,9 @@ import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, Table, Input, Button, Badge, EmptyState, Select, notify, type Column } from '@/components/ui'
 import ClienteModal from './cliente-modal'
-import ClienteModalImob from './cliente-modal-imob'
+import ClienteModalImob from '@/components/modules/imoveis/cliente-modal-imob'
 import FundirLeadsModal from './fundir-leads-modal'
-import { TIPO_NEGOCIO, STATUS_APROVACAO, rotuloTipoNegocio, statusAprovacao } from './cliente-imob-tipos'
+import { TIPO_NEGOCIO, STATUS_APROVACAO, rotuloTipoNegocio, statusAprovacao } from '@/components/modules/imoveis/cliente-imob-tipos'
 import { iniciais } from '@/lib/sem-nome'
 import type { Cliente as ClienteDaCamada } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
@@ -37,6 +37,8 @@ interface Props {
   imob?: boolean
   etapas?: { id: string; label: string; tipo: string | null }[]
   equipe?: { id: string; nome: string }[]
+  /** Como a empresa chama quem atende (`vocabulario(cfg).equipe`). */
+  rotuloEquipe?: string
   jornada?: Record<number, ClienteImob>
   /** Motivos de perda da empresa: o modal da imobiliária pede um ao mover para etapa de perda. */
   motivos?: { id: number; label: string }[]
@@ -59,7 +61,7 @@ function statusBadge(c: Cliente) {
   return <Badge tone="ok" dot>Ativo</Badge>
 }
 
-export default function ClientesView({ clientes, imob = false, etapas = [], equipe = [], jornada = {}, motivos = [] }: Props) {
+export default function ClientesView({ clientes, imob = false, etapas = [], equipe = [], rotuloEquipe = 'Vendedor', jornada = {}, motivos = [] }: Props) {
   const fuso = useFuso()
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -176,7 +178,7 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
       render: (c) => <span className="text-ink-2">{jornada[c.id]?.etapaLabel ?? '—'}</span>,
     },
     {
-      key: 'corretor', header: 'Corretor', hideOnMobile: true,
+      key: 'corretor', header: rotuloEquipe, hideOnMobile: true,
       render: (c) => <span className="text-ink-2">{jornada[c.id]?.corretorNome ?? '—'}</span>,
     },
     {
@@ -263,7 +265,7 @@ export default function ClientesView({ clientes, imob = false, etapas = [], equi
 
       {imob && mostrarFiltros && (
         <div className="grid shrink-0 gap-3 px-4 pb-4 sm:grid-cols-3 sm:px-6">
-          <Select label="Corretor" value={fCorretor} onChange={(e) => setFCorretor(e.target.value)}>
+          <Select label={rotuloEquipe} value={fCorretor} onChange={(e) => setFCorretor(e.target.value)}>
             <option value="">Todos</option>
             {equipe.map((u) => <option key={u.id} value={u.nome}>{u.nome}</option>)}
           </Select>

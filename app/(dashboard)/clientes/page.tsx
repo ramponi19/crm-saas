@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
 import { calcularScore, mergeScoreConfig, type LeadScoreInput, type ScoreConfig } from '@/lib/lead-score'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import ClientesView, { type ClienteImob } from './components/clientes-view'
@@ -109,6 +109,7 @@ export default async function ClientesPage() {
       imob
       etapas={etapas.map((e) => ({ id: e.id, label: e.label, tipo: e.tipo ?? null }))}
       equipe={equipe}
+      rotuloEquipe={vocabulario(cfg).equipe}
       jornada={jornada}
       motivos={(motivosRaw ?? []) as { id: number; label: string }[]}
     />
