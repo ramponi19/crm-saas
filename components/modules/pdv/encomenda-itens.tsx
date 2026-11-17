@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Input, Select } from '@/components/ui'
 import { ProdutoAutocomplete } from '@/components/modules/leads/produto-autocomplete'
 import { formatCurrency } from '@/lib/utils'
+import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
 
 /**
  * OS ITENS DA ENCOMENDA.
@@ -52,9 +53,11 @@ export function descreverItem(i: ItemEncomenda): string {
   return `${i.produto.trim()}${especif ? ` ${especif}` : ''}`
 }
 
-export function EncomendaItens({ itens, onChange }: {
+export function EncomendaItens({ itens, onChange, celulares = false }: {
   itens: ItemEncomenda[]
   onChange: Dispatch<SetStateAction<ItemEncomenda[]>>
+  /** Módulo Celulares ligado: a variante do modelo se chama "Capacidade". */
+  celulares?: boolean
 }) {
   const supabase = createClient()
   const [buscando, setBuscando] = useState<string | null>(null)
@@ -124,7 +127,7 @@ export function EncomendaItens({ itens, onChange }: {
           {(item.coresDisp.length > 0 || item.armazDisp.length > 0) && (
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               {item.armazDisp.length > 0 && (
-                <Select label="Capacidade" value={item.capacidade}
+                <Select label={celulares ? ENCOMENDA_CELULAR.variante : 'Variante'} value={item.capacidade}
                   onChange={(e) => mexer(item.id, { capacidade: e.target.value })}>
                   <option value="">Selecionar…</option>
                   {item.armazDisp.map((a) => <option key={a} value={a}>{a}</option>)}

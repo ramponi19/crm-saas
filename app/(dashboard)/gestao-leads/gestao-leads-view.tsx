@@ -73,13 +73,15 @@ const TOM_FAIXA: Record<Gravidade | 'total', { caixa: string; numero: string }> 
   atencao:  { caixa: 'border-accent/25 bg-accent-soft',        numero: 'text-accent' },
 }
 
-export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, limiteDias, soMeus }: {
+export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, limiteDias, soMeus, equipe = 'Vendedor' }: {
   leads: LeadAtrasado[]
   templates: Record<string, string>
   reativacao: EstadoReativacao
   podeExecutar: boolean
   limiteDias: number
   soMeus: boolean
+  /** Como a empresa chama quem atende (`vocabulario(cfg).equipe`). */
+  equipe?: string
 }) {
   const router = useRouter()
   const [aba, setAba] = useState<'perdidos' | 'followup'>('perdidos')
@@ -239,7 +241,7 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
                               {l.dias} {l.dias === 1 ? 'dia' : 'dias'} sem contato
                               {' · '}Etapa: {l.etapa}
                               {l.regiao && <> · Região: {l.regiao}</>}
-                              {' · '}Corretor: {l.responsavel}
+                              {' · '}{equipe}: {l.responsavel}
                               {l.valor > 0 && <> · <span className="num">{formatCurrency(l.valor)}</span></>}
                             </span>
                           </span>
@@ -342,7 +344,7 @@ export function GestaoLeadsView({ leads, templates, reativacao, podeExecutar, li
                             {l.dias} {l.dias === 1 ? 'dia' : 'dias'} sem contato
                             <span className="mx-2 text-ink-3">·</span>Etapa: {l.etapa}
                             {l.regiao && <><span className="mx-2 text-ink-3">·</span>Região: {l.regiao}</>}
-                            <span className="mx-2 text-ink-3">·</span>Corretor: {l.responsavel}
+                            <span className="mx-2 text-ink-3">·</span>{equipe}: {l.responsavel}
                           </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-1.5 text-[11.5px] text-ink-3">

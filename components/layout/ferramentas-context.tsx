@@ -20,9 +20,29 @@ export interface Ferramenta {
 }
 
 const FerramentasContext = createContext<Ferramenta[]>([])
+/**
+ * Os MÓDULOS LIGADOS da empresa (endereços, `ligadosDaEmpresa`), para o navegador perguntar "o módulo
+ * está ligado?" (17/11/2026). Diferente das ferramentas: não muda se o dono ocultou o item no menu nem
+ * com o papel de quem está logado — o que é do módulo aparece quando a EMPRESA tem o módulo.
+ */
+const LigadosContext = createContext<ReadonlySet<string>>(new Set())
 
-export function FerramentasProvider({ valor, children }: { valor: Ferramenta[]; children: ReactNode }) {
-  return <FerramentasContext.Provider value={valor}>{children}</FerramentasContext.Provider>
+export function FerramentasProvider({ valor, ligados = [], children }: { valor: Ferramenta[]; ligados?: string[]; children: ReactNode }) {
+  return (
+    <FerramentasContext.Provider value={valor}>
+      <LigadosContext.Provider value={new Set(ligados)}>{children}</LigadosContext.Provider>
+    </FerramentasContext.Provider>
+  )
+}
+
+/** Os endereços dos módulos ligados para a empresa. */
+export function useModulosLigados(): ReadonlySet<string> {
+  return useContext(LigadosContext)
+}
+
+/** O módulo deste endereço está ligado para a empresa? */
+export function useModuloLigado(href: string): boolean {
+  return useContext(LigadosContext).has(href)
 }
 
 export function useFerramentas(): Ferramenta[] {

@@ -1,11 +1,11 @@
 export type ModuloPlano = 'bi' | 'multi_usuario' | 'api' | 'white_label'
-export type Plano = 'free' | 'starter' | 'pro'
+export type Plano = 'free' | 'starter' | 'pro' | 'unlimited'
 
 const MATRIZ: Record<ModuloPlano, Plano[]> = {
-  bi:            ['starter', 'pro'],
-  multi_usuario: ['starter', 'pro'],
-  api:           ['pro'],
-  white_label:   ['pro'],
+  bi:            ['starter', 'pro', 'unlimited'],
+  multi_usuario: ['starter', 'pro', 'unlimited'],
+  api:           ['pro', 'unlimited'],
+  white_label:   ['pro', 'unlimited'],
 }
 
 export function planoTemAcesso(plano: Plano | string | undefined, modulo: ModuloPlano): boolean {

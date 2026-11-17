@@ -3,6 +3,8 @@ import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import GarantiaView from './components/garantia-view'
 import type { VendaTermo } from './components/termos-view'
 import { comNomeDoCliente } from '@/lib/sem-nome'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { rotulosGarantia } from './rotulos'
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
@@ -10,7 +12,7 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function GarantiaPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
-  const [{ data: garantias }, { data: termosRaw }] = await Promise.all([
+  const [{ data: garantias }, { data: termosRaw }, cfg] = await Promise.all([
     supabase
       .from('assistencia_garantias')
       .select(`
@@ -39,7 +41,10 @@ export default async function GarantiaPage() {
       .eq('empresa_id', empresaId)
       .order('criado_em', { ascending: false })
       .limit(300),
+    carregarConfigEmpresa(supabase, empresaId!),
   ])
+  // "Aparelho recebido em troca" só com o módulo Celulares e aparelhos ligado.
+  const rotulos = rotulosGarantia(ligadosDaEmpresa(cfg).has('/check-imei'))
 
   const documentos = await documentosDisponiveis(supabase, empresaId!)
 
@@ -60,7 +65,7 @@ export default async function GarantiaPage() {
 
   const linhasTermo = ((termosRaw ?? []) as unknown as TermoRow[]).filter((t) => one(t.venda))
 
-  // Aparelhos recebidos em troca, para o termo de entrega do usado ter conteúdo.
+  // Itens recebidos em troca, para o termo de entrega do usado ter conteúdo.
   // Vêm do estoque, pelo `grupo_pdv` do fechamento — é o vínculo que liga a
   // unidade recebida à venda que a trouxe.
   const gruposTroca = [...new Set(
@@ -77,7 +82,7 @@ export default async function GarantiaPage() {
       if (!trocasPorGrupo.has(u.grupo_pdv)) trocasPorGrupo.set(u.grupo_pdv, [])
       trocasPorGrupo.get(u.grupo_pdv)!.push({
         // A observação começa com a descrição digitada no PDV, antes do " — ".
-        aparelho: (u.observacoes ?? '').split(' — ')[0]?.trim() || 'Aparelho recebido em troca',
+        aparelho: (u.observacoes ?? '').split(' — ')[0]?.trim() || rotulos.recebidoEmTroca,
         imei: u.imei,
         valor: Number(u.preco_custo) || 0,
       })

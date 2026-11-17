@@ -1,10 +1,10 @@
 'use client'
 
 import type { PainelDoLead } from '@/lib/empresa-config'
-import { LeadMatchPanel } from './lead-match-panel'
-import { LeadNegocioPanel } from './lead-negocio-panel'
-import { LeadInteressePanel } from './lead-interesse-panel'
-import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
+import { LeadMatchPanel } from '@/components/modules/imoveis/lead-match-panel'
+import { LeadNegocioPanel } from '@/components/modules/imoveis/lead-negocio-panel'
+import { LeadInteressePanel } from '@/components/modules/veiculos/lead-interesse-panel'
+import { LeadFinanciamentoPanel } from '@/components/modules/veiculos/lead-financiamento-panel'
 
 /**
  * Painéis de vertical do modal do lead, por nome.
@@ -25,7 +25,14 @@ import { LeadFinanciamentoPanel } from './lead-financiamento-panel'
  * Os três painéis recebem só `leadId`, então isto é ligação, não reescrita — o
  * comportamento é idêntico ao dos `if` que existiam antes.
  */
-export const PAINEIS_DO_LEAD: Record<PainelDoLead, (props: { leadId: number }) => React.ReactNode> = {
+/**
+ * Reservar do estoque e Orçamentos também são painéis declarados (17/11/2026), mas pedem mais que o
+ * `leadId` (o nome e o telefone do lead, o gancho que move a etapa): o modal os desenha no lugar de
+ * sempre, conferindo `perfil.paineis`. Aqui ficam só os que se bastam com o `leadId`.
+ */
+type PainelSimples = Exclude<PainelDoLead, 'reserva-estoque' | 'orcamento'>
+
+export const PAINEIS_DO_LEAD: Record<PainelSimples, (props: { leadId: number }) => React.ReactNode> = {
   'match-imoveis': ({ leadId }) => <LeadMatchPanel leadId={leadId} />,
   'negocio-imovel': ({ leadId }) => <LeadNegocioPanel leadId={leadId} />,
   'interesse-veiculo': ({ leadId }) => <LeadInteressePanel leadId={leadId} />,
@@ -43,7 +50,7 @@ export function PaineisDaVertical({ nomes, leadId }: { nomes: PainelDoLead[]; le
   return (
     <>
       {nomes.map((nome) => {
-        const Painel = PAINEIS_DO_LEAD[nome]
+        const Painel = (PAINEIS_DO_LEAD as Partial<Record<PainelDoLead, (props: { leadId: number }) => React.ReactNode>>)[nome]
         return Painel ? <Painel key={nome} leadId={leadId} /> : null
       })}
     </>

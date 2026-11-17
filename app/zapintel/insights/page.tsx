@@ -321,7 +321,7 @@ function Clientes({ d, lista }: { d: Insights; lista: (f: Record<string, string>
       </div>
       <p className="ins-nota">
         {c.semIndicacaoPedida > 0
-          ? <>{num(c.semIndicacaoPedida)} clientes nunca ouviram &ldquo;conhece alguém que queira trocar de iPhone?&rdquo;. Indicação já traz {num(c.chegaramPorIndicacao)} conversas sem ninguém pedir.</>
+          ? <>{num(c.semIndicacaoPedida)} clientes nunca ouviram &ldquo;conhece alguém que também queira comprar?&rdquo;. Indicação já traz {num(c.chegaramPorIndicacao)} conversas sem ninguém pedir.</>
           : <>Todos os clientes do período receberam pedido de indicação.</>}
         {c.semConversa60d > 0 && <> {num(c.semConversa60d)} estão há mais de 60 dias sem conversa.</>}
       </p>

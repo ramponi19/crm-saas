@@ -4,6 +4,7 @@ import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
+import { produtosDaFicha } from '@/lib/zapintel/produtos-da-ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
 import { gerarPerfil, guardarPerfil, lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
 
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
   }
 
   const ficha = montarFicha(lead, {
+    produtos: await produtosDaFicha(db, empresaId),
     leadId: id,
     filialId: banco.filial_id,
     canal: banco.origem ?? 'whatsapp',

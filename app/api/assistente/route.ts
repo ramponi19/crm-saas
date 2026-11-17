@@ -7,14 +7,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { acessoDoUsuario } from '@/lib/assistente/acesso'
 import { recorteDoServidor } from '@/lib/assistente/recorte'
 import { respostaDoChat, MODELO_CHAT_PADRAO, type Turno } from '@/lib/assistente/chat-dados'
-import { negocioDoPreset } from '@/lib/assistente/negocio'
+import { modulosDaEmpresa } from '@/lib/assistente/negocio'
+import { carregarConfigEmpresa } from '@/lib/empresa-config'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
 // Assistente de ajuda do CRM (Gemini Flash), com streaming. Meta-safe: só responde
 // no chat da tela — nunca envia mensagem a canal nem executa ação no sistema.
-function systemPrompt(preset: string | null, extra: string | null): string {
-  const ctx = negocioDoPreset(preset) ?? 'pequeno negócio'
-  return `Você é o assistente do Nexus, um CRM. Esta empresa é uma ${ctx}. Você faz DUAS coisas:
+function systemPrompt(modulos: string | null, extra: string | null): string {
+  const ctx = modulos ? `Esta empresa usa no Nexus: ${modulos}.` : 'Esta empresa é um pequeno negócio.'
+  return `Você é o assistente do Nexus, um CRM. ${ctx} Você faz DUAS coisas:
 
 1) AJUDA DE USO — orienta onde encontrar telas e como executar tarefas (vender no PDV, lançar orçamento, cadastrar produto/lead/cliente, gerar contrato, ver relatórios, etc.).
 
@@ -87,9 +88,10 @@ export async function POST(req: Request) {
   const usoId = (uso as { id?: number } | null)?.id ?? null
 
   if (comDados) {
-    const [acesso, { data: empresa }] = await Promise.all([
+    const [acesso, { data: empresa }, cfgEmpresa] = await Promise.all([
       acessoDoUsuario(supabase, empresaId, user.id),
-      supabase.from('empresas').select('nome, preset_onboarding').eq('id', empresaId).maybeSingle(),
+      supabase.from('empresas').select('nome').eq('id', empresaId).maybeSingle(),
+      carregarConfigEmpresa(supabase, empresaId),
     ])
     const empresaNome = (empresa?.nome as string | undefined) ?? 'Empresa'
     // O recorte (loja ou rede) é decidido aqui, com a sessão: empresa de
@@ -109,7 +111,7 @@ export async function POST(req: Request) {
       turnos: alternados(mensagens),
       modelo,
       empresa: empresaNome,
-      preset: (empresa?.preset_onboarding as string | null | undefined) ?? null,
+      modulos: modulosDaEmpresa(cfgEmpresa),
       lojas: r.lojas,
       tela: body.contexto ? String(body.contexto).slice(0, 60) : null,
       extra: cfg?.system_extra ?? null,
@@ -123,9 +125,8 @@ export async function POST(req: Request) {
   }
   if (!apiKey) return NextResponse.json({ error: 'Assistente ainda não configurado.' }, { status: 503 })
 
-  // Contexto do negócio p/ respostas mais úteis.
-  const { data: emp } = await supabase.from('empresas').select('preset_onboarding').eq('id', empresaId).maybeSingle()
-  let systemText = systemPrompt((emp as { preset_onboarding?: string | null } | null)?.preset_onboarding ?? null, cfg?.system_extra ?? null)
+  // Contexto do negócio p/ respostas mais úteis: os módulos ligados, não o ramo do preset.
+  let systemText = systemPrompt(modulosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId)), cfg?.system_extra ?? null)
   if (body.contexto) systemText += `\n\nContexto: o usuário está na tela "${String(body.contexto).slice(0, 60)}".`
 
   try {

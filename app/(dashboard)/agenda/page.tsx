@@ -6,6 +6,7 @@ import AgendaView from './agenda-view'
 import type { Tables } from '@/types/database'
 import { consultaClientes } from '@/lib/clientes'
 import { embedLead, leadsParaEscolher } from '@/lib/leads'
+import { EMBED_IMOVEL_DA_VISITA } from '@/components/modules/imoveis/agenda-imovel'
 
 export const metadata = { title: 'Agenda' }
 
@@ -38,7 +39,9 @@ export default async function AgendaPage() {
    * mandaria o compromisso do colega para o navegador de quem não pode ver.
    */
   // O lead da visita é o negócio (visitas.lead_id); nome/telefone vêm do contato.
-  const SELECT_VISITA: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome), imoveis:imoveis_imoveis(titulo, codigo, bairro)`
+  // O imóvel do compromisso só com o módulo Imóveis ligado (a tabela é dele).
+  const comImoveis = ligados.has('/imoveis')
+  const SELECT_VISITA: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome)${comImoveis ? `, ${EMBED_IMOVEL_DA_VISITA}` : ''}`
   let q = supabase.from('visitas')
     .select(SELECT_VISITA)
     .eq('empresa_id', empresaId)
@@ -49,17 +52,21 @@ export default async function AgendaPage() {
     // Os de conversa mais recente primeiro (era `leads` por ultima_mensagem_at).
     leadsParaEscolher(supabase, empresaId, 200),
     consultaClientes(supabase, 'id, nome').eq('empresa_id', empresaId).order('nome').limit(300),
-    supabase.from('imoveis_imoveis').select('id, titulo, codigo').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(300),
+    comImoveis
+      ? supabase.from('imoveis_imoveis').select('id, titulo, codigo').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(300)
+      : Promise.resolve({ data: [] as { id: number; titulo: string | null; codigo: string | null }[] }),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
 
+  type ImovelDaVisita = { titulo: string | null; codigo: string | null; bairro: string | null }
   type VisitaRow = Tables<'visitas'> & {
     leads: Embed<{ nome: string | null; telefone: string | null }>
     clientes: Embed<{ nome: string | null }>
-    imoveis: Embed<{ titulo: string | null; codigo: string | null; bairro: string | null }>
+    // O imóvel só vem com o módulo Imóveis ligado (EMBED_IMOVEL_DA_VISITA).
+    imoveis?: ImovelDaVisita | ImovelDaVisita[] | null
   }
   const visitas = ((visitasRaw ?? []) as unknown as VisitaRow[]).map(v => {
-    const l = one(v.leads), c = one(v.clientes), im = one(v.imoveis)
+    const l = one(v.leads), c = one(v.clientes), im = one(v.imoveis ?? null)
     return {
       ...v,
       lead_nome: l?.nome ?? null,
@@ -84,7 +91,7 @@ export default async function AgendaPage() {
       isGestor={isGestor}
       rotulos={cfg.vocabulario.agenda}
       equipe={vocabulario(cfg).equipe}
-      comImoveis={ligados.has('/imoveis')}
+      comImoveis={comImoveis}
     />
   )
 }

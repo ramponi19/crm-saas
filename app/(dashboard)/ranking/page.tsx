@@ -4,7 +4,7 @@ import { calcularRanking, valorMetrica } from '@/lib/ranking'
 import { imoveisCaptadosPorPessoa } from '@/lib/captacao-imob'
 import { janelaDoPeriodo } from '@/lib/ranking'
 import { RankingView, type MetaUi, type MembroOpt } from './ranking-view'
-import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
 import { mesNoFuso } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 
@@ -68,13 +68,15 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
    * recebe o número pronto e segue neutro. Quem não capta ativo nem paga a consulta.
    */
   const captaImovel = !!capacidades(cfg).captacaoDeImovel
+  // Visitas realizadas: a tabela `visitas` é do módulo Agenda; sem ele, nem consulta nem coluna.
+  const comVisitas = ligadosDaEmpresa(cfg).has('/agenda')
   const janela = janelaDoPeriodo(periodo)
   const captacoesImovel = captaImovel
     ? await imoveisCaptadosPorPessoa(supabase, empresaId, janela.ini, janela.fim)
     : undefined
 
   const [linhas, { data: metasRaw }, { data: membrosRaw }] = await Promise.all([
-    calcularRanking(supabase, empresaId, periodo, { imoveisCaptados: captacoesImovel }),
+    calcularRanking(supabase, empresaId, periodo, { imoveisCaptados: captacoesImovel, comVisitas }),
     supabase.from('metas').select('id, escopo, usuario_id, tipo, alvo, periodo').eq('empresa_id', empresaId).eq('periodo', periodo).order('id', { ascending: true }),
     supabase.from('empresa_usuarios').select('usuario_id, role, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
   ])
@@ -117,6 +119,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
       papeis={papeis}
       isAdmin={isAdmin}
       mostrarImoveis={captaImovel}
+      mostrarVisitas={comVisitas}
       equipeLabel={vocabulario(cfg).equipe}
     />
   )

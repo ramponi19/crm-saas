@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, notify } from '@/components/ui'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
+import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 interface Cfg { ativo: boolean; incluir_empresa: boolean }
 const PADRAO: Cfg = { ativo: true, incluir_empresa: true }
@@ -34,6 +36,8 @@ function Chave({ ligado, onToggle, titulo, descricao }: {
  */
 export function AssinaturaCard() {
   const supabase = createClient()
+  // A mensagem de exemplo de loja de celular só com o módulo Celulares e aparelhos ligado.
+  const mensagem = useModuloLigado('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.mensagemAssinada : 'Boa tarde! Chegou o produto que você pediu.'
   const [cfg, setCfg] = useState<Cfg>(PADRAO)
   const [nome, setNome] = useState('')
   const [empresa, setEmpresa] = useState('')
@@ -98,10 +102,10 @@ export function AssinaturaCard() {
           {exemplo ? (
             <>
               <div className="text-[13px] font-semibold italic text-ink">{exemplo}</div>
-              <div className="text-[13px] text-ink-2">Boa tarde! Chegou o aparelho que você pediu.</div>
+              <div className="text-[13px] text-ink-2">{mensagem}</div>
             </>
           ) : (
-            <div className="text-[13px] text-ink-2">Boa tarde! Chegou o aparelho que você pediu.</div>
+            <div className="text-[13px] text-ink-2">{mensagem}</div>
           )}
         </div>
 

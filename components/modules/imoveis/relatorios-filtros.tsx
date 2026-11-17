@@ -46,8 +46,10 @@ export const TIPOS_EXPORT = [
   { v: 'imob_corretores', l: 'Corretores' },
 ]
 
-export function RelatoriosFiltros({ equipe, de, ate, corretor }: {
+export function RelatoriosFiltros({ equipe, de, ate, corretor, rotuloEquipe }: {
   equipe: { id: string; nome: string }[]
+  /** Como a empresa chama quem atende (`vocabulario(cfg).equipe`). */
+  rotuloEquipe: string
   de: string
   ate: string
   corretor: string
@@ -128,7 +130,7 @@ export function RelatoriosFiltros({ equipe, de, ate, corretor }: {
         <div className="grid gap-3 rounded-card border border-line bg-card p-3 print:hidden sm:grid-cols-4">
           <Input label="Data início" type="date" value={de} onChange={(e) => aplicar({ de: e.target.value })} />
           <Input label="Data fim" type="date" value={ate} onChange={(e) => aplicar({ ate: e.target.value })} />
-          <Select label="Corretor" value={corretor} onChange={(e) => aplicar({ corretor: e.target.value })}>
+          <Select label={rotuloEquipe} value={corretor} onChange={(e) => aplicar({ corretor: e.target.value })}>
             <option value="">Todos</option>
             {equipe.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
           </Select>
@@ -158,7 +160,7 @@ export function RelatoriosFiltros({ equipe, de, ate, corretor }: {
         <p className="text-[12px] text-ink-2">
           Recorte: <strong>{de ? de.split('-').reverse().join('/') : 'início'}</strong> a{' '}
           <strong>{ate ? ate.split('-').reverse().join('/') : 'hoje'}</strong>
-          {nomeCorretor && <> · corretor <strong>{nomeCorretor}</strong></>}
+          {nomeCorretor && <> · {rotuloEquipe.toLowerCase()} <strong>{nomeCorretor}</strong></>}
         </p>
       )}
     </div>

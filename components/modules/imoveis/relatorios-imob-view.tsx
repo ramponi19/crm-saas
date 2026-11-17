@@ -2,8 +2,8 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getKanbanColumns, ganhoColId, type KanbanColumn } from '@/components/modules/leads/types'
 import { Home, Target, TrendingUp, Wallet, Award } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
-import { RelatorioPerdas } from './relatorio-perdas'
-import { RelatoriosFiltros } from './relatorios-filtros'
+import { RelatorioPerdas } from '@/components/modules/relatorios/relatorio-perdas'
+import { RelatoriosFiltros } from '@/components/modules/imoveis/relatorios-filtros'
 import { lerFechamentos } from '@/lib/fechamentos'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { agora, diaNoFuso, formatarData, instanteLocal, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
@@ -31,8 +31,10 @@ function Barra({ label, valor, max, cor }: { label: string; valor: number; max: 
 }
 
 /** Relatório imobiliário (server). Renderizado por /relatorios quando o módulo Imóveis está ligado. */
-export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
+export async function RelatoriosImobView({ de = '', ate = '', corretor = '', equipe = 'Corretor' }: {
   de?: string; ate?: string; corretor?: string
+  /** Como a empresa chama quem atende (`vocabulario(cfg).equipe`). */
+  equipe?: string
 } = {}) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
@@ -207,6 +209,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
           de={de}
           ate={ate}
           corretor={corretor}
+          rotuloEquipe={equipe}
         />
         <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
           {kpis.map((k) => <StatCard key={k.label} bare label={k.label} value={k.valor} delta={k.sub} deltaTone="neutral" />)}
@@ -225,7 +228,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
                 : origens.map((o) => <Barra key={o.label} label={o.label} valor={o.valor} max={maxOrigem} />)}
             </div>
           </Card>
-          <Card title="Desempenho por corretor">
+          <Card title={`Desempenho por ${equipe.toLowerCase()}`}>
             <div className="space-y-2">
               {corretores.length === 0 ? <p className="text-[13px] text-ink-3">Sem leads ainda.</p>
                 : corretores.map((c) => (
@@ -267,7 +270,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '' }: {
                 <thead>
                   <tr className="border-b border-line-soft text-left text-[11px] uppercase tracking-[0.05em] text-ink-3">
                     <th className="py-1.5 pr-2 font-semibold">#</th>
-                    <th className="py-1.5 pr-2 font-semibold">Corretor</th>
+                    <th className="py-1.5 pr-2 font-semibold">{equipe}</th>
                     <th className="py-1.5 pr-2 text-right font-semibold">Atend.</th>
                     <th className="py-1.5 pr-2 text-right font-semibold">Visitas</th>
                     <th className="py-1.5 pr-2 text-right font-semibold">Propostas</th>

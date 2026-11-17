@@ -82,7 +82,7 @@ v "aviso do banco lista os leads"   "supabase/funcoes/zapintel_ao_vivo.sql" "'le
 n "montar sem o motor de agosto"    "lib/zapintel/montar.ts" "classifyLead"
 n "vendedor nao sai do texto"       "lib/zapintel/montar.ts" "quemAtendeu("
 n "travamento sem objecao por palavra" "lib/zapintel/travou.ts" "OBJECOES"
-v "sugestao usa o papel do preset" "app/zapintel/api/sugestao/route.ts" "papelDoPreset(preset)"
+v "sugestao usa o papel da empresa" "app/zapintel/api/sugestao/route.ts" "papelDaEmpresa("
 v "conversa nao viaja para a tela"  "app/zapintel/api/conversa/route.ts" "messages: \[\]"
 v "ficha abre a conversa no CRM"    "app/zapintel/leads/[id]/page.tsx" "/leads?lead="
 n "ficha sem leitura automatica"    "app/zapintel/leads/[id]/page.tsx" "RegraAutomatica"
@@ -365,12 +365,12 @@ echo "== painel executivo (19/08) =="
 # Padroes escolhidos para NAO casarem com comentario: sao trechos de codigo
 # executavel (chamada, chave de objeto, expressao), nunca prosa minha.
 v "executivo exige dono ou admin"     "app/(dashboard)/executivo/page.tsx" "await requireEmpresaRole(.'owner', 'admin'.)"
-v "executivo trava por modulo ligado"  "app/(dashboard)/executivo/page.tsx" "ligadosDaEmpresa(cfg).has('/executivo')) return <VitrineDoModulo"
+v "executivo trava por modulo ligado"  "app/(dashboard)/executivo/page.tsx" "if (!ligados.has('/executivo') || !ligados.has('/imoveis')) return <VitrineDoModulo"
 v "executivo no menu e opcional"      "lib/menu.ts" "href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true"
 v "icone do executivo no mapa"        "components/layout/menu-icons.ts" "Landmark,"
 v "comissao respeita papel vago"      "lib/comissao-imob.ts" "temCaptador ? arredonda"
 v "rota informa os papeis"            "app/api/imob/negocios/route.ts" "captador: !!captadorId, vendedor: !!corretorId"
-v "eficiencia por origem e historica" "app/(dashboard)/executivo/page.tsx" "qFechados"
+v "eficiencia por origem e historica" "components/modules/imoveis/executivo-imob.tsx" "qFechados"
 
 echo "== menu do segmento (19/08) =="
 v "resolverMenu injeta extras"        "lib/menu.ts" "if (noCatalogo.has(ex.href)) continue"
@@ -406,7 +406,7 @@ echo "== funil: uma verdade so (19/08) =="
 n "superadmin nao edita funil morto"    "app/superadmin/presets/presets-view.tsx" "funil_seed"
 n "rota de presets nao grava seed"      "app/api/superadmin/presets/route.ts" "funil_seed"
 n "preset nao declara funil_seed"      "supabase/migrations/20261029000100_presets_completos.sql" "funil_seed"
-v "relatorio imob le o funil da empresa" "components/modules/relatorios/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
+v "relatorio imob le o funil da empresa" "components/modules/imoveis/relatorios-imob-view.tsx" "doBanco.length > 0 ? doBanco"
 v "funil da imob tem Aprovados"        "supabase/migrations/20261029000100_presets_completos.sql" '"label":"Aprovados"'
 
 echo "== gestao de leads (20/08) =="
@@ -430,15 +430,15 @@ n "menu nao renomeia mais conversao"   "supabase/migrations/20261029000100_prese
 echo "== cliente imobiliario (20/08) =="
 v "ficha imob por capacidade"          "app/(dashboard)/clientes/page.tsx" "clienteComPipeline"
 v "varejo mantem a ficha antiga"       "app/(dashboard)/clientes/components/clientes-view.tsx" "imob ? ("
-v "etapa grava no LEAD"                "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "kanban_status: id"
+v "etapa grava no LEAD"                "components/modules/imoveis/cliente-modal-imob.tsx" "kanban_status: id"
 # Sem 'as never' no insert do lead: quem confere o payload contra as colunas reais
 # e o TypeScript, nao um grep — foi assim que o 'email' inexistente apareceu.
-v "lead do cliente pela rota, no contato" "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "contato_id: cliente.id,"
+v "lead do cliente pela rota, no contato" "components/modules/imoveis/cliente-modal-imob.tsx" "contato_id: cliente.id,"
 v "empresa do lead e a da sessao"      "app/api/leads/route.ts" "criarLead(svc, auth.empresaId, {"
 v "cliente sem lead nao inventa score" "app/(dashboard)/clientes/components/clientes-view.tsx" "Sem lead vinculado"
-v "15 caracteristicas do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Ar Condicionado'"
-v "10 tipos de imovel do modelo"       "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "'Sala Comercial'"
-v "status de aprovacao existe"         "app/(dashboard)/clientes/components/cliente-imob-tipos.ts" "em_analise"
+v "15 caracteristicas do modelo"       "components/modules/imoveis/cliente-imob-tipos.ts" "'Ar Condicionado'"
+v "10 tipos de imovel do modelo"       "components/modules/imoveis/cliente-imob-tipos.ts" "'Sala Comercial'"
+v "status de aprovacao existe"         "components/modules/imoveis/cliente-imob-tipos.ts" "em_analise"
 
 echo "== fusao de clientes (20/08) =="
 v "fusao e a do core, com desfazer"    "app/api/clientes/fundir/route.ts" "fundirContatos(svc"
@@ -454,15 +454,15 @@ v "layout passa os rotulos"            "app/(dashboard)/layout.tsx" "RotulosProv
 v "rotulo resolve pela raiz da rota"   "components/layout/rotulos-context.tsx" "const raiz = ./. + (pathname.split"
 
 echo "== relatorios: filtro e exportacao (20/08) =="
-v "relatorio recorta por periodo"      "components/modules/relatorios/relatorios-imob-view.tsx" "soData.test(de)"
+v "relatorio recorta por periodo"      "components/modules/imoveis/relatorios-imob-view.tsx" "soData.test(de)"
 # O regex de data perdeu a barra do d num script meu e passou a NAO CASAR NUNCA: a
 # tela dizia "Recorte: julho" e mostrava agosto. Este check existe por causa disso.
-n "regex de data nao perdeu a barra"   "components/modules/relatorios/relatorios-imob-view.tsx" "/^d{4}"
+n "regex de data nao perdeu a barra"   "components/modules/imoveis/relatorios-imob-view.tsx" "/^d{4}"
 n "regex do export tambem esta certo"  "app/api/exportar/route.ts" "/^d{4}"
 v "export usa o mesmo recorte"         "app/api/exportar/route.ts" "cfg.corretor && corretor"
 v "seis conjuntos para exportar"       "app/api/exportar/route.ts" "imob_corretores"
 v "css de impressao existe"            "app/globals.css" "@media print"
-v "impressao esconde so os controles"  "components/modules/relatorios/relatorios-filtros.tsx" "gap-2 print:hidden"
+v "impressao esconde so os controles"  "components/modules/imoveis/relatorios-filtros.tsx" "gap-2 print:hidden"
 
 echo "== metas e ranking (20/08) =="
 # Lista vazia no banco nao pode vencer a declaracao do codigo: com
@@ -486,18 +486,18 @@ v "corretor conferido na empresa"      "app/api/imob/negocios/route.ts" "Correto
 # 0% passaria batido: o valor do negocio aparece cheio e a comissao sai zero.
 v "percentual obrigatorio no manual"   "app/api/imob/negocios/route.ts" "% de comissão combinado"
 v "percentual digitado tem funcao own" "lib/comissao-imob.ts" "calcularComissaoPorPercentual"
-v "os quatro status do molde"          "components/modules/financeiro/comissoes-imob.tsx" "v: .aprovada., l: .Aprovado."
+v "os quatro status do molde"          "components/modules/imoveis/comissoes-imob.tsx" "v: .aprovada., l: .Aprovado."
 v "aprovar e pagar sao datas do server" "app/api/imob/negocios/route.ts" "comissao_aprovada_em = hojeIso()"
 # Cancelar comissao avulsa nao pode mandar update com id nulo no imovel.
 v "cancelar respeita imovel nulo"      "app/api/imob/negocios/route.ts" "cancelado. && atual.imovel_id"
-v "filtro por corretor status e tipo"  "components/modules/financeiro/comissoes-imob.tsx" "Todos os corretores"
+v "filtro por corretor status e tipo"  "components/modules/imoveis/comissoes-imob.tsx" "Todos os corretores"
 # Cartao somando tudo com a tabela filtrada faz o dono cobrar o valor errado.
-v "totais seguem o recorte da tela"    "components/modules/financeiro/comissoes-imob.tsx" "}, .visiveis.)"
+v "totais seguem o recorte da tela"    "components/modules/imoveis/comissoes-imob.tsx" "}, .visiveis.)"
 v "comissao abre primeiro na imob"     "app/(dashboard)/financeiro/components/financeiro-view.tsx" "temComissoes ? .comissoes. : .fluxo."
 v "caixa nao aparece na aba comissao"  "app/(dashboard)/financeiro/components/financeiro-view.tsx" "tab === .comissoes. ? .hidden."
-v "conta do lancamento aparece antes"  "components/modules/financeiro/comissoes-imob.tsx" "Fica com a casa"
-v "cashback maior que a casa avisa"    "components/modules/financeiro/comissoes-imob.tsx" "cashbackCabe(conta, cashbackNum)"
-v "executivo ignora imovel nulo"       "app/(dashboard)/executivo/page.tsx" "filter((id): id is number"
+v "conta do lancamento aparece antes"  "components/modules/imoveis/comissoes-imob.tsx" "Fica com a casa"
+v "cashback maior que a casa avisa"    "components/modules/imoveis/comissoes-imob.tsx" "cashbackCabe(conta, cashbackNum)"
+v "executivo ignora imovel nulo"       "components/modules/imoveis/executivo-imob.tsx" "filter((id): id is number"
 echo "== menu configuravel e rolagem (20/08) =="
 # Salvar segmento zerava hidden_hrefs e modulos_extra: era ?? [] em campo que a
 # tela nem manda. Foi como a imobiliaria perdeu os extras do menu.
@@ -626,9 +626,9 @@ if [ ! -e "app/admin" ]; then printf "  ok    %s
 v "configuracoes com menu proprio"     "app/(dashboard)/configuracoes/layout.tsx" "secoesDeConfiguracoes({ isAdmin, abasDosModulos: abasDosModulos(ligadosDaEmpresa(cfg)), zapintel })"
 # 22/10/2026 (zero-segmento): secao de modulo existe quando o modulo esta ligado, nao pelo segmento.
 v "secao de modulo pelo modulo ligado"  "components/modules/configuracoes/secao-configuracoes.tsx" "ABAS_DE_MODULO.includes(abaReal) && !abas.includes(abaReal)"
-v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "ligadosDaEmpresa("
+v "integracoes: portais pelo modulo"    "app/(dashboard)/configuracoes/(admin)/integracoes/page.tsx" "capacidades(cfgEmpresa).integraPortais"
 # 22/10/2026: "segmento" nao entra em codigo novo; a lista de excecoes so encolhe.
-v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:modulos && npm run check:gravacao && npm run check:datas && next build"
+v "build reprova segmento novo"         "package.json" "npm run check:segmento && npm run check:segmento-modulo && npm run check:modulos && npm run check:gravacao && npm run check:datas && next build"
 v "build reprova rota fora de modulo"  "package.json" "npm run check:modulos && npm run check:gravacao && npm run check:datas && next build"
 # 05/11/2026: gravação do app sem conferir as linhas reprova o build; a lista de exceções só encolhe.
 v "build reprova gravacao sem conferencia" "package.json" "npm run check:gravacao && npm run check:datas && next build"
@@ -649,7 +649,7 @@ n "preset nao declara a tela"          "supabase/migrations/20261029000100_prese
 v "rota antiga cai em clientes"        "proxy.ts" "'/proprietarios': '/clientes'"
 v "imovel escolhe entre clientes"      "app/(dashboard)/imoveis/page.tsx" "consultaClientes(supabase).eq('empresa_id', empresaId).eq('ativo', true)"
 v "papel aparece na lista"             "app/(dashboard)/clientes/components/clientes-view.tsx" "Proprietário</Badge>"
-v "papel se marca na ficha"            "app/(dashboard)/clientes/components/cliente-modal-imob.tsx" "proprietario: form.proprietario"
+v "papel se marca na ficha"            "components/modules/imoveis/cliente-modal-imob.tsx" "proprietario: form.proprietario"
 v "filtro so proprietarios"            "app/(dashboard)/clientes/components/clientes-view.tsx" "soProprietarios"
 
 echo "== chave e atributo do imovel (21/08) =="
@@ -736,7 +736,7 @@ v "inbox desenha o cartao de anuncio"   "components/modules/comunicacao/conversa
 v "card usa o cartao compartilhado"     "components/modules/leads/lead-modal.tsx" "from '@/components/modules/conversa/anuncio-chat'"
 v "automacao ligar confere linhas"      "components/modules/configuracoes/automacoes-card.tsx" "update({ ativo: !a.ativo }).eq(.id., a.id).select(.id.)"
 v "motivo de perda confere linhas"      "components/modules/configuracoes/motivos-perda-card.tsx" "if (nadaGravado(gravou))"
-v "ficha de F&I confere linhas"         "components/modules/leads/lead-financiamento-panel.tsx" "update({ status }).eq(.id., f.id).select(.id.)"
+v "ficha de F&I confere linhas"         "components/modules/veiculos/lead-financiamento-panel.tsx" "update({ status }).eq(.id., f.id).select(.id.)"
 v "pagamento que nao grava desfaz venda" "app/(dashboard)/pdv/components/pdv-view.tsx" "if (ePag) throw new Error"
 # 04/11/2026 Automatize: fila só pela chave de serviço, travas do envio e vendedor que não edita
 v "fila de automacao so le pelo usuario"  "supabase/migrations/20261105000100_automatize.sql" "grant select on public.automacao_execucoes to authenticated"

@@ -133,21 +133,26 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
     filialId: usuario?.filial_id != null ? String(usuario.filial_id) : '',
   })
   const [saving, setSaving] = useState(false)
+  // Convite por e-mail (17/11/2026): a pessoa cria a própria senha pelo link. Sem provedor de e-mail
+  // configurado, o link aparece aqui para o dono repassar.
+  const [convite, setConvite] = useState(true)
+  const [linkConvite, setLinkConvite] = useState<string | null>(null)
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
   async function salvar() {
     if (!form.nome.trim() || !form.role) { notify.warn('Preencha nome e perfil'); return }
-    if (isNew && (!form.email.includes('@') || form.senha.length < 8)) {
-      notify.warn('E-mail inválido ou senha curta (mín. 8 chars)'); return
+    if (isNew && (!form.email.includes('@') || (!convite && form.senha.length < 8))) {
+      notify.warn(convite ? 'E-mail inválido' : 'E-mail inválido ou senha curta (mín. 8 chars)'); return
     }
     setSaving(true)
     try {
       if (isNew) {
-        const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string; readmitido?: boolean }>('/api/equipe/criar-usuario', {
+        const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string; readmitido?: boolean; convite?: { enviado: boolean; link: string | null } }>('/api/equipe/criar-usuario', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nome: form.nome, email: form.email, senha: form.senha, role: form.role,
+            nome: form.nome, email: form.email, role: form.role,
+            ...(convite ? { convite: true } : { senha: form.senha }),
             filialId: escolheLoja && form.filialId ? Number(form.filialId) : null,
           }),
         })
@@ -155,7 +160,13 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         // toast dizendo "erro ao criar", que sugeriria problema no cadastro.
         if (sessaoExpirada) return
         if (!ok) { notify.bad(json.error ?? 'Erro ao criar'); return }
-        notify.ok(json.readmitido ? 'Usuário readmitido na equipe!' : 'Usuário criado!')
+        if (json.convite && !json.convite.enviado && json.convite.link) {
+          // Sem provedor de e-mail: mostra o link e espera o dono copiar antes de fechar.
+          setLinkConvite(json.convite.link)
+          notify.ok('Convite criado. Copie o link e mande para a pessoa.')
+          return
+        }
+        notify.ok(json.readmitido ? 'Usuário readmitido na equipe!' : json.convite ? 'Convite enviado por e-mail!' : 'Usuário criado!')
       } else {
         const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -200,7 +211,21 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         {isNew && (
           <>
             <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="joao@loja.com" />
-            <Input label="Senha provisória" type="password" value={form.senha} onChange={e => set('senha', e.target.value)} placeholder="Mín. 8 caracteres" />
+            <label className="flex items-center gap-2 text-[13px] text-ink-2">
+              <input type="checkbox" checked={convite} onChange={e => setConvite(e.target.checked)} />
+              Enviar convite por e-mail (a pessoa cria a própria senha)
+            </label>
+            {!convite && (
+              <Input label="Senha provisória" type="password" value={form.senha} onChange={e => set('senha', e.target.value)} placeholder="Mín. 8 caracteres" />
+            )}
+            {linkConvite && (
+              <div className="rounded-control border border-line bg-raised p-2.5 text-[12px] text-ink-2">
+                <div className="mb-1 font-medium text-ink">Link do convite (o e-mail ainda não está configurado):</div>
+                <input readOnly value={linkConvite} onFocus={e => e.currentTarget.select()} className="w-full truncate bg-transparent text-ink" />
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => { void navigator.clipboard.writeText(linkConvite); notify.ok('Link copiado') }}>Copiar link</Button>
+                <Button size="sm" variant="ghost" className="ml-2 mt-2" onClick={onSaved}>Concluir</Button>
+              </div>
+            )}
           </>
         )}
         <Select label="Perfil de acesso" value={form.role} onChange={e => set('role', e.target.value)}>

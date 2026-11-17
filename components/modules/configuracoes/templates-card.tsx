@@ -10,7 +10,8 @@ import type { Json } from '@/types/database'
 // Modelos padrão usados por cobranças, confirmações, régua e automações (Fase 4).
 const TEMPLATES: { chave: string; label: string; descricao: string; exemplo: string }[] = [
   { chave: 'boas_vindas', label: 'Boas-vindas', descricao: 'Primeiro contato com um lead novo', exemplo: 'Olá {{nome}}! Obrigado pelo contato. Como posso ajudar?' },
-  { chave: 'confirmacao_visita', label: 'Confirmação de visita', descricao: 'Confirmar agendamento (imobiliária, serviços)', exemplo: 'Oi {{nome}}, confirmando sua visita em {{data}}. Podemos manter?' },
+  // A chave segue 'confirmacao_visita' (gravada nas automações); o texto é genérico (17/11/2026).
+  { chave: 'confirmacao_visita', label: 'Confirmação de compromisso', descricao: 'Confirmar um horário marcado com o cliente', exemplo: 'Oi {{nome}}, confirmando nosso horário em {{data}}. Podemos manter?' },
   { chave: 'cobranca', label: 'Cobrança', descricao: 'Lembrete de pagamento pendente', exemplo: 'Olá {{nome}}, consta um valor de {{valor}} em aberto. Pague em {{link}}.' },
   { chave: 'followup', label: 'Follow-up', descricao: 'Retomar contato com lead parado', exemplo: 'Oi {{nome}}, ainda tem interesse? Estou à disposição.' },
   { chave: 'agradecimento', label: 'Pós-venda', descricao: 'Agradecer após fechar', exemplo: 'Obrigado pela confiança, {{nome}}! Qualquer coisa, é só chamar.' },

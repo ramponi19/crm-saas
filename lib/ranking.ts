@@ -62,15 +62,20 @@ export async function calcularRanking(
    * Este módulo é núcleo e não consulta `imoveis`: quem sabe onde mora o ativo da
    * imobiliária é a camada dela (`lib/captacao-imob.ts`). Sem a injeção, a coluna sai
    * zerada — não erra, só não mostra.
+   *
+   * `comVisitas`: a tabela `visitas` é do módulo Agenda — sem ele ligado, a consulta não
+   * roda e as visitas ficam zeradas (17/11/2026). Padrão `true` (o comportamento de antes).
    */
-  opts: { imoveisCaptados?: Map<string, number> } = {},
+  opts: { imoveisCaptados?: Map<string, number>; comVisitas?: boolean } = {},
 ): Promise<LinhaRanking[]> {
   const { ini, fim } = janelaDoPeriodo(periodo)
 
   const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }, { data: trocasPendentes }] = await Promise.all([
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     db.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
-    db.from('visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),
+    opts.comVisitas === false
+      ? Promise.resolve({ data: [] as { corretor_id: string | null }[] })
+      : db.from('visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),
     // O lead é o negócio (a view `leads` caiu): ativos e inativos, como antes.
     db.from('negocios').select('responsavel_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),
     db.from('vendas_propostas').select('lead_id, created_at').eq('empresa_id', empresaId).gte('created_at', ini).lt('created_at', fim),

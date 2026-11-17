@@ -70,24 +70,27 @@ export async function getOrCreateCustomer(empresaId: number, nome: string, email
   return customer.id
 }
 
-// ─── Mapeia stripe_status → plano ────────────────────────────
+// ─── Mapeia stripe_status → plano e situação da empresa ──────
+/**
+ * A SITUAÇÃO DA EMPRESA PELO STATUS DA ASSINATURA (17/11/2026, "pronto para vender"):
+ *   active / trialing        → ativo
+ *   past_due                 → ativo, com aviso de pagamento atrasado (o Stripe ainda tenta cobrar)
+ *   canceled / unpaid / ...  → 'suspenso' = MODO SÓ LEITURA (vê tudo, não cria, não edita, não envia;
+ *                              o recebimento de mensagens continua). Nunca apaga dado.
+ * O plano vem do preço da assinatura. Preço que não é de nenhum plano = `plano` ausente: a empresa
+ * fica no plano que já tinha (antes caía no 'free', que está desativado, e perdia os limites).
+ */
 export async function stripeStatusToPlano(
   stripeStatus: string,
   priceId: string | null
-): Promise<{ plano: PlanoId; status: string; stripe_status: string }> {
-  if (stripeStatus === 'active' || stripeStatus === 'trialing') {
-    let plano: PlanoId = 'free'
-    if (priceId) {
-      const planos = await getPlanos()
-      const found = planos.find(p => p.stripe_price_id === priceId)
-      if (found) plano = found.id
-    }
-    return { plano, status: 'ativo', stripe_status: stripeStatus }
+): Promise<{ plano?: PlanoId; status: string; stripe_status: string }> {
+  let plano: PlanoId | undefined
+  if (priceId) {
+    const planos = await getPlanos()
+    plano = planos.find(p => p.stripe_price_id === priceId)?.id
   }
-  if (stripeStatus === 'past_due') {
-    return { plano: 'free', status: 'ativo', stripe_status: 'past_due' }
-  }
-  return { plano: 'free', status: 'suspenso', stripe_status: stripeStatus }
+  const status = stripeStatus === 'active' || stripeStatus === 'trialing' || stripeStatus === 'past_due' ? 'ativo' : 'suspenso'
+  return { ...(plano ? { plano } : {}), status, stripe_status: stripeStatus }
 }
 
 // ─── Reconciliar assinaturas Stripe → empresas ──────────────

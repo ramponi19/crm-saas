@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Target, Zap, LayoutDashboard, Users, ScanBarcode, Boxes, CornerDownLeft, MessageSquareText, Calculator, ScanSearch, Car, Wrench, LayoutGrid } from 'lucide-react'
-import { useFerramentas } from './ferramentas-context'
+import { useFerramentas, useModulosLigados } from './ferramentas-context'
+import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 import { createClient } from '@/lib/supabase/client'
 import { consultaClientes } from '@/lib/clientes'
 import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
@@ -29,16 +30,21 @@ interface Acao {
   label: string
   icon: typeof Plus
   run: (router: ReturnType<typeof useRouter>) => void
+  /**
+   * O módulo de que a ação depende (endereço do manifesto): só aparece com ele ligado para a
+   * empresa — oferecer "Nova venda no PDV" a quem não tem PDV leva a uma tela travada.
+   */
+  modulo?: string
 }
 
-const ACOES: Acao[] = [
-  { id: 'venda', label: 'Nova venda no PDV', icon: Plus, run: (r) => r.push('/pdv') },
+const ACOES_TODAS: Acao[] = [
+  { id: 'venda', label: 'Nova venda no PDV', icon: Plus, run: (r) => r.push('/pdv'), modulo: '/pdv' },
   { id: 'lead', label: 'Novo lead', icon: Target, run: (r) => r.push('/leads') },
-  { id: 'pix', label: 'Gerar cobrança Pix', icon: Zap, run: (r) => r.push('/pdv') },
+  { id: 'pix', label: 'Gerar cobrança Pix', icon: Zap, run: (r) => r.push('/pdv'), modulo: '/pdv' },
   { id: 'go-dash', label: 'Ir para Dashboard', icon: LayoutDashboard, run: (r) => r.push('/dashboard') },
   { id: 'go-clientes', label: 'Ir para Clientes', icon: Users, run: (r) => r.push('/clientes') },
-  { id: 'go-pdv', label: 'Ir para PDV', icon: ScanBarcode, run: (r) => r.push('/pdv') },
-  { id: 'go-estoque', label: 'Ir para Estoque', icon: Boxes, run: (r) => r.push('/estoque') },
+  { id: 'go-pdv', label: 'Ir para PDV', icon: ScanBarcode, run: (r) => r.push('/pdv'), modulo: '/pdv' },
+  { id: 'go-estoque', label: 'Ir para Estoque', icon: Boxes, run: (r) => r.push('/estoque'), modulo: '/estoque' },
   // O assistente abre pelo mesmo evento do menu (o robô flutuante saiu na etapa 0).
   { id: 'assistente', label: 'Perguntar ao assistente', icon: MessageSquareText, run: () => window.dispatchEvent(new Event('assistente:abrir')) },
   // Central de módulos (22/10/2026): a equipe também abre (vê a grade, sem botões).
@@ -138,6 +144,13 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listaRef = useRef<HTMLDivElement>(null)
+  // As ferramentas liberadas e os módulos ligados da empresa: Celulares diz se o
+  // ⌘K procura por IMEI e oferece as ações de loja.
+  const ferramentas = useFerramentas()
+  const ligados = useModulosLigados()
+  const celulares = ligados.has(HREF_CELULARES)
+  const comEstoque = ligados.has('/estoque')
+  const ACOES = ACOES_TODAS.filter((a) => !a.modulo || ligados.has(a.modulo))
 
   // Atalho global ⌘K / Ctrl+K
   useEffect(() => {
@@ -197,8 +210,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         // Lead = negócio ativo; nome/telefone no contato (o !inner faz o filtro valer
         // para o negócio). A ordem pela última mensagem é feita abaixo, em buscarLeads.
         buscarLeads(supabase, q, filtroEt),
-        comEtiqueta ? vazio : supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(`imei.ilike.%${q}%,numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
-        comEtiqueta ? vazio : supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
+        // Por IMEI só com o módulo Celulares; sem ele, pelo número de série.
+        comEtiqueta || !comEstoque ? vazio : supabase.from('estoque_unidades').select('id, imei, numero_serie, produtos:estoque_produtos!produto_id(nome)').or(celulares ? `imei.ilike.%${q}%,numero_serie.ilike.%${q}%` : `numero_serie.ilike.%${q}%`).eq('ativo', true).limit(LOTE),
+        comEtiqueta || !comEstoque ? vazio : supabase.from('estoque_produtos').select('id').ilike('nome', `%${q}%`).limit(10),
         numero && !comEtiqueta
           ? supabase.rpc('buscar_lead_por_numero' as never, { p_id: Number(numero) } as never)
           : Promise.resolve({ data: [] }),
@@ -242,17 +256,16 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         // seco — e quem já estava em /leads clicava no próprio resultado e nada
         // acontecia, porque `router.push` para a rota atual não faz nada.
         ...lds.filter((l) => !achado.some((a) => a.id === l.id)).map((l) => ({ tipo: 'lead' as const, id: l.id, titulo: l.nome ?? `Lead #${l.id}`, sub: [variasLojas ? l.loja : null, l.produto_interessado ?? l.telefone ?? 'sem produto'].filter(Boolean).join(' · '), href: `/leads?lead=${l.id}`, canais: l.canais, etiquetas: l.etiquetas })),
-        ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: u.imei ?? u.numero_serie ?? '—', href: '/estoque' })),
+        ...estoqueDedup.map((u) => ({ tipo: 'estoque' as const, id: u.id, titulo: estNome(u.produtos) ?? `Unidade #${u.id}`, sub: (celulares ? u.imei : null) ?? u.numero_serie ?? '—', href: '/estoque' })),
       ])
       setSel(0)
       setSearching(false)
     }, 300)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [query, filtroEt])
+  }, [query, filtroEt, celulares, comEstoque])
 
   // As ferramentas liberadas para esta empresa entram como ação: é o caminho
   // delas fora da tela-casa, já que não estão mais no menu.
-  const ferramentas = useFerramentas()
   const acoes: Acao[] = [
     ...ACOES,
     ...ferramentas.map((f) => ({ id: f.href, label: f.label, icon: ICONE_FERRAMENTA[f.href] ?? Wrench, run: (r: ReturnType<typeof useRouter>) => r.push(f.rota) })),

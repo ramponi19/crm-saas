@@ -74,7 +74,7 @@ export function mascararDadosPessoais(texto: string): string {
   // 2. Documento anunciado pela palavra: o número que vem depois some, qualquer formato.
   t = t.replace(/\b(CPF)\b(\s*(?:n[º°o.]?\s*)?[:\-]?\s*)(\d[\d.\-\s]{8,13}\d)/gi, (_m, k: string, sep: string) => `${k}${sep}[CPF]`)
   t = t.replace(/\b(RG|R\.G\.|identidade)(\s*(?:n[º°o.]?\s*)?[:\-]?\s*)([\dXx][\dXx.\-\s]{4,13}[\dXx])\b/gi, (_m, k: string, sep: string) => `${k}${sep}[RG]`)
-  t = t.replace(/\b(IMEI)\b(\s*[:\-]?\s*)(\d{15})\b/gi, (_m, k: string, sep: string) => `${k}${sep}[IMEI]`)
+  t = t.replace(/\b(IMEI)\b(\s*[:\-]?\s*)(\d{15})\b/gi, (_m, k: string, sep: string) => `${k}${sep}[NÚMERO DE SÉRIE]`)
   t = t.replace(/\b(CNH|habilita[cç][aã]o)\b(\s*(?:n[º°o.]?\s*)?[:\-]?\s*)(\d[\d.\-\s]{7,13}\d)/gi, (_m, k: string, sep: string) => `${k}${sep}[CNH]`)
   t = t.replace(/\b\d{1,2}\.\d{3}\.\d{3}-[\dXx]\b/g, '[RG]')
   const temCep = CEP_FORMATADO.test(texto) || /\bcep\b/i.test(texto)
@@ -93,7 +93,7 @@ export function mascararDadosPessoais(texto: string): string {
     if (m.startsWith('+') || pareceTelefone(d)) return '[TELEFONE]'
     // IMEI também passa no Luhn e tem 15 dígitos — o mesmo tamanho do Amex,
     // que começa com 34 ou 37. Sem isto o aparelho do cliente virava "cartão".
-    if (d.length === 15 && !/^3[47]/.test(d) && luhn(d)) return '[IMEI]'
+    if (d.length === 15 && !/^3[47]/.test(d) && luhn(d)) return '[NÚMERO DE SÉRIE]'
     if (luhn(d)) return '[CARTÃO]'
     return m
   })

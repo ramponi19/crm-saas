@@ -7,6 +7,7 @@
 import { valorPorExtenso } from './contrato-extenso'
 import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-tipos'
 import { agora, FUSO_PADRAO, paraData, partesNoFuso } from './datas'
+import { COLUNA_SERIE_CELULAR, MARCADORES_TROCA, ROTULO_ITENS_CELULAR, marcadoresTroca } from '@/components/modules/celulares/contrato-trocas'
 
 /**
  * Um bloco de texto posicionado na página, em PORCENTAGEM (escala com o papel).
@@ -59,7 +60,10 @@ export interface ModeloContrato {
   paginas: PaginaModelo[]
 }
 
-/** Aparelho entregue pelo cliente na troca. */
+/**
+ * Item entregue pelo cliente na troca. A troca (marcadores {{trocas}}) é do módulo Celulares e
+ * aparelhos: components/modules/celulares/contrato-trocas.ts. O campo segue `aparelho` (dado gravado).
+ */
 export interface ContratoTroca {
   aparelho: string
   imei?: string | null
@@ -86,8 +90,17 @@ export interface DadosMescla {
   garantia_dias: number
   vendedor?: string | null
   data?: string
-  /** Aparelhos recebidos em troca — para o termo de entrega do usado. */
+  /** Itens recebidos em troca — para o termo de entrega do usado. */
   trocas?: ContratoTroca[]
+}
+
+/**
+ * O que muda com o módulo Celulares e aparelhos (`check_imei`) ligado: a coluna de série vira
+ * "IMEI / Nº série" e os marcadores da troca existem. Sem o módulo, a troca só entra se a venda a
+ * tiver (venda antiga, ou a loja desligou o módulo depois).
+ */
+export interface OpcoesDoModulo {
+  celular?: boolean
 }
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -130,7 +143,7 @@ function enderecoLinha(c: ContratoComprador): string {
 }
 
 /** Tabela dos itens — usada pelo marcador {{itens}}. */
-function tabelaItens(itens: ContratoItem[], garantiaPadrao: number): string {
+function tabelaItens(itens: ContratoItem[], garantiaPadrao: number, colunaSerie: string): string {
   const validos = itens.filter((i) => i.descricao?.trim())
   const gar = (i: ContratoItem) => i.garantia_dias ?? garantiaPadrao
   const variam = new Set(validos.map(gar)).size > 1
@@ -143,7 +156,7 @@ function tabelaItens(itens: ContratoItem[], garantiaPadrao: number): string {
   return `<table style="width:100%;border-collapse:collapse;margin:6px 0">
     <thead><tr>
       <th style="text-align:left;border-bottom:1px solid currentColor;padding:4px 6px">Produto</th>
-      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">IMEI / Nº série</th>
+      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">${colunaSerie}</th>
       ${variam ? '<th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">Garantia</th>' : ''}
       <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">Valor</th>
     </tr></thead>
@@ -156,7 +169,7 @@ function tabelaItens(itens: ContratoItem[], garantiaPadrao: number): string {
  * A ordem importa na substituicao: chaves mais longas primeiro, senao
  * {{total}} comeria o inicio de {{total_extenso}}.
  */
-export function marcadores(d: DadosMescla, fuso: string = FUSO_PADRAO): Record<string, string> {
+export function marcadores(d: DadosMescla, fuso: string = FUSO_PADRAO, mod: OpcoesDoModulo = {}): Record<string, string> {
   const c = d.comprador
   const itensDesc = d.itens.filter((i) => i.descricao?.trim()).map((i) => i.descricao)
   // A divisão detalhada manda quando existe; a forma única é o caminho comum.
@@ -201,7 +214,7 @@ export function marcadores(d: DadosMescla, fuso: string = FUSO_PADRAO): Record<s
     'cliente.cep': esc(c.cep ?? ''),
     'produto.nome': esc(itensDesc.join(', ')),
     'produto.cor': '',
-    'itens': tabelaItens(d.itens, d.garantia_dias),
+    'itens': tabelaItens(d.itens, d.garantia_dias, mod.celular ? COLUNA_SERIE_CELULAR : 'Nº de série'),
     'total': brl(d.total),
     'total_extenso': valorPorExtenso(d.total),
     'desconto': brl(d.desconto ?? 0),
@@ -210,45 +223,16 @@ export function marcadores(d: DadosMescla, fuso: string = FUSO_PADRAO): Record<s
     'garantia_dias': String(d.garantia_dias),
     'vendedor': esc(d.vendedor ?? ''),
     'data_extenso': dataExtenso(d.data, fuso),
-    // Aparelhos entregues pelo cliente na troca — base do termo de entrega do
-    // usado. Sem troca, todos saem vazios (ou zerados), e o modelo que os usa
-    // simplesmente não mostra nada.
-    'trocas': tabelaTrocas(d.trocas ?? []),
-    'trocas.descricao': esc((d.trocas ?? []).map(descreverTroca).join('; ')),
-    'trocas.total': brl(somaTrocas(d.trocas)),
-    'trocas.total_extenso': valorPorExtenso(somaTrocas(d.trocas)),
-    'trocas.quantidade': String((d.trocas ?? []).length),
+    // A troca é do módulo de celular: entra com ele ligado ou quando a venda tem troca. Fora
+    // disso, {{trocas}} e companhia são marcador inexistente — saem vazios (ver `mesclar`).
+    ...(mod.celular || d.trocas?.length ? marcadoresTroca(d.trocas) : {}),
   }
 }
 
-const somaTrocas = (t?: ContratoTroca[]) => (t ?? []).reduce((s, x) => s + (Number(x.valor) || 0), 0)
-
-/** "iPhone 12 64GB (IMEI 3548…), avaliado em R$ 1.200,00" */
-function descreverTroca(t: ContratoTroca): string {
-  const partes = [t.aparelho?.trim() || 'aparelho']
-  if (t.imei?.trim()) partes.push(`IMEI ${t.imei.trim()}`)
-  return `${partes.join(', ')}, avaliado em ${brl(t.valor)}`
-}
-
-function tabelaTrocas(trocas: ContratoTroca[]): string {
-  const validas = trocas.filter((t) => t.aparelho?.trim() || t.valor > 0)
-  if (!validas.length) return ''
-  const linhas = validas.map((t) => `<tr>
-      <td>${esc(t.aparelho?.trim() || 'Aparelho')}</td>
-      <td style="text-align:right">${t.imei?.trim() ? esc(t.imei.trim()) : '—'}</td>
-      <td style="text-align:right">${brl(t.valor)}</td>
-    </tr>`).join('')
-  return `<table style="width:100%;border-collapse:collapse;margin:6px 0">
-    <thead><tr>
-      <th style="text-align:left;border-bottom:1px solid currentColor;padding:4px 6px">Aparelho entregue</th>
-      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">IMEI / Nº série</th>
-      <th style="text-align:right;border-bottom:1px solid currentColor;padding:4px 6px">Valor avaliado</th>
-    </tr></thead>
-    <tbody>${linhas}</tbody>
-  </table>`
-}
-
-/** Lista para a tela do /admin mostrar o que existe para inserir. */
+/**
+ * Lista para a tela do /admin mostrar o que existe para inserir. Sem os marcadores da troca, que são
+ * do módulo de celular: `marcadoresDisponiveis(celular)` os acrescenta.
+ */
 export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'cliente.nome', rotulo: 'Nome do cliente' },
   { chave: 'cliente.cpf', rotulo: 'CPF / CNPJ' },
@@ -260,7 +244,7 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'cliente.cidade', rotulo: 'Cidade/UF' },
   { chave: 'cliente.cep', rotulo: 'CEP' },
   { chave: 'produto.nome', rotulo: 'Produto(s) vendido(s)' },
-  { chave: 'itens', rotulo: 'Tabela de itens (produto, IMEI, valor)' },
+  { chave: 'itens', rotulo: 'Tabela de itens (produto, nº de série, valor)' },
   { chave: 'total', rotulo: 'Valor total (R$)' },
   { chave: 'total_extenso', rotulo: 'Valor total por extenso' },
   { chave: 'desconto', rotulo: 'Desconto' },
@@ -268,12 +252,6 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'garantia_dias', rotulo: 'Garantia (dias)' },
   { chave: 'vendedor', rotulo: 'Vendedor' },
   { chave: 'data_extenso', rotulo: 'Data por extenso' },
-  // Troca — para o termo de responsabilidade e entrega do aparelho usado.
-  { chave: 'trocas', rotulo: 'Tabela dos aparelhos entregues na troca' },
-  { chave: 'trocas.descricao', rotulo: 'Aparelhos da troca em texto corrido' },
-  { chave: 'trocas.total', rotulo: 'Valor total dado na troca (R$)' },
-  { chave: 'trocas.total_extenso', rotulo: 'Valor da troca por extenso' },
-  { chave: 'trocas.quantidade', rotulo: 'Quantos aparelhos na troca' },
   { chave: 'loja.nome', rotulo: 'Nome da loja' },
   { chave: 'loja.cnpj', rotulo: 'CNPJ da loja' },
   { chave: 'loja.telefone', rotulo: 'Telefone da loja' },
@@ -296,6 +274,17 @@ export const MARCADORES_DISPONIVEIS: { chave: string; rotulo: string }[] = [
   { chave: 'loja.conta', rotulo: 'Conta corrente da loja' },
   { chave: 'loja.pix', rotulo: 'Chave PIX da loja' },
 ]
+
+/**
+ * Os marcadores que a tela de montar o documento oferece. Com o módulo de celular, a tabela de itens
+ * fala de IMEI e a troca (termo de entrega do usado) entra logo depois da data, onde sempre esteve.
+ */
+export function marcadoresDisponiveis(celular: boolean): { chave: string; rotulo: string }[] {
+  if (!celular) return MARCADORES_DISPONIVEIS
+  const lista = MARCADORES_DISPONIVEIS.map((m) => (m.chave === 'itens' ? { ...m, rotulo: ROTULO_ITENS_CELULAR } : m))
+  const depois = lista.findIndex((m) => m.chave === 'data_extenso') + 1
+  return [...lista.slice(0, depois), ...MARCADORES_TROCA, ...lista.slice(depois)]
+}
 
 /**
  * Troca os {{marcadores}} pelos valores.
@@ -351,9 +340,9 @@ const CSS_PAGINA = `
 export function renderizarModelo(
   modelo: ModeloContrato,
   dados: DadosMescla,
-  opts: { reconstituido?: boolean; fuso?: string } = {},
+  opts: { reconstituido?: boolean; fuso?: string } & OpcoesDoModulo = {},
 ): string {
-  const valores = marcadores(dados, opts.fuso ?? FUSO_PADRAO)
+  const valores = marcadores(dados, opts.fuso ?? FUSO_PADRAO, { celular: opts.celular })
   const paginas = [...modelo.paginas].sort((a, b) => a.ordem - b.ordem)
 
   const corpo = paginas.map((p, i) => {

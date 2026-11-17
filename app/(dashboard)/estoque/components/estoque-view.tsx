@@ -11,6 +11,10 @@ import { createClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-cliente'
 import { buscarModeloApple } from '@/lib/apple-modelos'
 import { camposDaCategoria } from '@/lib/estoque-campos'
+import { ESTOQUE_CELULAR } from '@/components/modules/celulares/rotulos'
+import { CampoImei, CampoImei2, CampoModeloApple, TEXTOS_IMEI, useConsultaImei, type AchadoSerie } from '@/components/modules/celulares/entrada-estoque'
+import { ESTOQUE_VEICULO } from '@/components/modules/veiculos/rotulos'
+import { CamposVeiculoEntrada } from '@/components/modules/veiculos/campos-veiculo'
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   Modal, type Column, BuscaSelect } from '@/components/ui'
@@ -20,7 +24,7 @@ import { formatarDiaMes, formatarHora } from '@/lib/datas'
 
 export interface Unidade {
   id: number
-  /** Nulo em unidade sem cadastro de produto (aparelho recebido em troca). */
+  /** Nulo em unidade sem cadastro de produto (item recebido em troca). */
   produto_id: number | null
   produto_nome: string
   marca_nome: string
@@ -46,7 +50,7 @@ export interface Unidade {
   produto_foto?: string | null
   /** Saldo do lote. 1 em item serializado. */
   quantidade?: number
-  /** Em entrada por troca: quem aceitou o aparelho e responde por ele até chegar. */
+  /** Em entrada por troca: quem aceitou o item e responde por ele até chegar. */
   responsavel_nome?: string | null
   /** Fechamento do PDV que trouxe a unidade — agrupa as trocas da mesma venda. */
   grupo_pdv?: string | null
@@ -54,7 +58,7 @@ export interface Unidade {
   filial_id?: number | null
   filial_nome?: string | null
   created_at: string | null
-  // Veículos (quem usa placa)
+  // Veículos (quem usa placa — módulo Avaliações)
   placa: string | null
   chassi: string | null
   renavam: string | null
@@ -82,8 +86,13 @@ interface Props {
   tabelaPrecos: TabelaPrecoRef[]
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
-  /** Placa, chassi, renavam, km e ano no item (capacidade do preset, pela página). */
+  /**
+   * Placa, chassi, renavam, km e ano no item: o módulo Avaliações ligado E o campo
+   * `placa` no item (capacidade do preset). A página decide as duas coisas.
+   */
   usaPlaca?: boolean
+  /** Módulo Celulares ligado: IMEI, bateria, seminovo, número de modelo Apple. */
+  celulares?: boolean
   filiais: FilialOpt[]
   /** Falso em empresa de uma loja, e para quem não é dono nem admin. */
   podeTransferir: boolean
@@ -105,6 +114,36 @@ export type TabelaPrecoRef = { modelo: string; armazenamento: string | null; con
 
 type Preset = { condicao: string; tipo: string; seminovo: boolean } | null
 
+/**
+ * Os textos do Estoque sem módulo de ramo. Com o módulo Celulares ligado, a
+ * tela usa ESTOQUE_CELULAR (components/modules/celulares/rotulos.ts), do mesmo formato.
+ */
+const ESTOQUE_GENERICO: typeof ESTOQUE_CELULAR = {
+  colunaId: 'Nº de série',
+  idDaUnidade: (u) => u.numero_serie ?? u.imei ?? '—',
+  condicaoSeminovo: 'Usado',
+  buscaPlaceholder: 'Buscar por produto, marca ou número de série…',
+  botaoSeminovo: '',
+  tituloSeminovo: '',
+  subtituloSeminovo: '',
+  subtituloEntrada: 'Cadastre uma unidade física no estoque por número de série',
+  okSeminovo: 'Unidade adicionada ao estoque',
+  chegadaTitulo: 'Confirmar que o item chegou?',
+  chegadaSemNome: 'Item',
+  chegadaId: (u) => (u.numero_serie ? ` (nº de série ${u.numero_serie})` : ''),
+  chegadaFaltam: (n) => (n === 1 ? 'falta 1 item' : `faltam ${n} itens`),
+  chegadaEsteItem: 'este item',
+  chegadaEmMaos: ' Confirme apenas com o item em mãos.',
+  transferirId: (u) => (u.numero_serie ? ` · nº de série ${u.numero_serie}` : ''),
+  semCadastro: 'Item sem cadastro de produto',
+  clienteVendeu: 'Cliente (quem vendeu o item)',
+  escolhaProduto: 'Cada categoria pede os seus campos; um acessório pede código de barras.',
+  armazenamento: 'Variante',
+  armazenamentoPlaceholder: 'Ex.: Tamanho M',
+  fotosAjuda: 'A peça de verdade — riscos, marcas de uso. Serve de prova do estado na venda e na garantia.',
+  tipoSeminovo: 'Usado',
+}
+
 type Tone = 'neutro' | 'acc' | 'ok' | 'warn' | 'bad'
 
 const STATUS_BADGE: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
@@ -120,7 +159,8 @@ const STATUS_BADGE: Record<string, { label: string; tone: Tone; dot?: boolean }>
 
 const CONDICAO_BADGE: Record<string, { label: string; tone: Tone }> = {
   novo:     { label: 'Novo',        tone: 'acc' },
-  seminovo: { label: 'Seminovo',    tone: 'warn' },
+  // O rótulo vem dos textos da tela (Seminovo só com o módulo Celulares).
+  seminovo: { label: 'Usado',       tone: 'warn' },
   usado:    { label: 'Usado',       tone: 'neutro' },
   defeito:  { label: 'Com defeito', tone: 'bad' },
 }
@@ -156,10 +196,12 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, usaPlaca = false, filiais, podeTransferir }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, usaPlaca = false, celulares = false, filiais, podeTransferir }: Props) {
   // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
   const isVeiculo = usaPlaca
+  const R = celulares ? ESTOQUE_CELULAR : ESTOQUE_GENERICO
+  const V = ESTOQUE_VEICULO
   const fuso = useFuso()
   const [tab, setTab] = useState<Tab>('lista')
   const router = useRouter()
@@ -174,7 +216,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
   const [confirmar, setConfirmar] = useState<Unidade | null>(null)
   const [confirmando, setConfirmando] = useState<number | null>(null)
 
-  // Confirma a chegada física do aparelho aceito em troca. É o que tira a unidade
+  // Confirma a chegada física do item aceito em troca. É o que tira a unidade
   // do limbo: entra no PDV e a comissão do fechamento é liberada.
   async function confirmarChegada() {
     if (!confirmar) return
@@ -295,23 +337,22 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 
   const idCol: Column<Unidade> = isVeiculo
     ? {
-        key: 'placa', header: 'Placa', hideOnMobile: true, className: 'num',
-        render: (u) => <span className="text-ink-2">{u.placa ? u.placa.toUpperCase() : (u.chassi ? `chassi ${u.chassi.slice(-6)}` : '—')}</span>,
+        key: 'placa', header: V.colunaId, hideOnMobile: true, className: 'num',
+        render: (u) => <span className="text-ink-2">{V.idDaUnidade(u)}</span>,
       }
     : {
-        key: 'imei', header: 'IMEI', hideOnMobile: true, className: 'num',
-        render: (u) => {
-          const imeiMask = u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'
-          return <span className="text-ink-2">{imeiMask}</span>
-        },
+        key: 'imei', header: R.colunaId, hideOnMobile: true, className: 'num',
+        render: (u) => <span className="text-ink-2">{R.idDaUnidade(u)}</span>,
       }
 
-  const detalheCol: Column<Unidade> = isVeiculo
+  // Saúde da bateria é coluna do módulo Celulares; sem ele (e sem veículo) não há
+  // coluna de detalhe.
+  const detalheCol: Column<Unidade> | null = isVeiculo
     ? {
         key: 'anokm', header: 'Ano · Km', align: 'right', hideOnMobile: true, className: 'num',
         render: (u) => <span className="text-ink-2">{[u.ano ? String(u.ano) : null, u.km != null ? `${u.km.toLocaleString('pt-BR')} km` : null].filter(Boolean).join(' · ') || '—'}</span>,
       }
-    : {
+    : !celulares ? null : {
         key: 'bateria', header: 'Bateria', align: 'right', hideOnMobile: true, className: 'num',
         render: (u) => u.bateria
           ? <span className={cn('font-semibold', Number(u.bateria) >= 90 ? 'text-ok' : Number(u.bateria) >= 80 ? 'text-warn' : 'text-bad')}>{u.bateria}%</span>
@@ -325,10 +366,10 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 
   const listaCols: Column<Unidade>[] = [
     {
-      key: 'produto', header: isVeiculo ? 'Veículo' : 'Produto',
+      key: 'produto', header: isVeiculo ? V.colunaProduto : 'Produto',
       render: (u) => {
         // Miniatura junto do nome: não gasta coluna nova e já mostra se a foto
-        // da unidade foi salva. A da unidade ganha da do modelo — é o aparelho
+        // da unidade foi salva. A da unidade ganha da do modelo — é a peça
         // real que o cliente vai levar.
         const foto = (u.fotos_urls ?? '').split(',').map((s) => s.trim()).find(Boolean) ?? u.produto_foto ?? null
         return (
@@ -357,9 +398,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
     },
     {
       key: 'condicao', header: 'Condição', hideOnMobile: true,
-      render: (u) => { const c = CONDICAO_BADGE[u.condicao ?? 'novo'] ?? CONDICAO_BADGE.novo; return <Badge tone={c.tone}>{c.label}</Badge> },
+      render: (u) => {
+        const c = CONDICAO_BADGE[u.condicao ?? 'novo'] ?? CONDICAO_BADGE.novo
+        return <Badge tone={c.tone}>{u.condicao === 'seminovo' ? R.condicaoSeminovo : c.label}</Badge>
+      },
     },
-    detalheCol,
+    ...(detalheCol ? [detalheCol] : []),
     varianteCol,
     /**
      * A loja só aparece quando há mais de uma.
@@ -444,9 +488,9 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
       <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 sm:px-6 sm:py-6 scrollbar-thin">
         <div className="mx-auto max-w-[1240px] space-y-4">
 
-          {/* Check IMEI é aba de Estoque desde a etapa 0 (saiu do menu lateral): é
-              aqui que o aparelho entra. A aba leva à tela dela, /estoque/imei, que
-              tem o histórico de consultas carregado no servidor. */}
+          {/* A ferramenta do módulo Celulares é aba de Estoque desde a etapa 0 (saiu
+              do menu lateral). A aba leva à tela dela, /estoque/imei, que tem o
+              histórico de consultas carregado no servidor. */}
           <Tabs
             items={imei ? [...TABS, { value: 'imei', label: <span className="flex items-center gap-2"><ScanSearch size={14} strokeWidth={1.7} />{imei.label}</span> }] : TABS}
             value={tab}
@@ -459,7 +503,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
               <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-5 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
                 <StatCard bare label="Unidades ativas" value={stats.total} />
                 <StatCard bare label="Disponíveis" value={stats.disponiveis} deltaTone="ok" />
-                {/* Aparelho de troca que ainda não chegou. Estava sendo contado e
+                {/* Item de troca que ainda não chegou. Estava sendo contado e
                     não aparecia em lugar nenhum — é justamente o que alguém tem
                     de olhar todo dia para ir cobrar o cliente. */}
                 <StatCard bare label="Pendentes" value={stats.pendentes} />
@@ -499,7 +543,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   icon={<Search size={15} strokeWidth={1.7} />}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder={isVeiculo ? 'Buscar por modelo, marca, placa ou chassi…' : 'Buscar por produto, marca, IMEI ou número de série…'}
+                  placeholder={isVeiculo ? V.buscaPlaceholder : R.buscaPlaceholder}
                 />
                 {marcasUnicas.length > 0 && (
                   <Select wrapperClassName="w-full sm:w-[190px]" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
@@ -513,11 +557,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     pouco diferentes. O modal ficou só para ver/editar unidade
                     que já existe (clique na linha da lista). */}
                 <Button className="w-full sm:w-auto" icon={<ArrowDownLeft size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada(null)}>
-                  {isVeiculo ? 'Adicionar veículo' : 'Entrada de estoque'}
+                  {isVeiculo ? V.botaoEntrada : 'Entrada de estoque'}
                 </Button>
-                {!isVeiculo && (
+                {/* Compra do usado do cliente: do módulo Celulares. */}
+                {!isVeiculo && celulares && (
                   <Button variant="outline" className="w-full sm:w-auto" icon={<RefreshCw size={15} strokeWidth={1.7} />} onClick={() => abrirEntrada({ condicao: 'usado', tipo: 'compra', seminovo: true })}>
-                    Entrada de semi-novo
+                    {R.botaoSeminovo}
                   </Button>
                 )}
               </div>
@@ -545,8 +590,8 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                     {preset?.seminovo ? <RefreshCw size={18} strokeWidth={1.7} /> : <ArrowDownLeft size={18} strokeWidth={1.7} />}
                   </span>
                   <div>
-                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{preset?.seminovo ? 'Entrada de semi-novo' : isVeiculo ? 'Novo veículo no estoque' : 'Nova entrada de unidade'}</div>
-                    <div className="text-[12px] text-ink-2">{preset?.seminovo ? 'Compra de aparelho usado do cliente — entra disponível para revenda' : isVeiculo ? 'Cadastre um veículo no estoque por placa / chassi' : 'Cadastre uma unidade física no estoque por IMEI / número de série'}</div>
+                    <div className="text-[15px] font-semibold tracking-[-0.02em] text-ink">{preset?.seminovo ? R.tituloSeminovo : isVeiculo ? V.tituloEntrada : 'Nova entrada de unidade'}</div>
+                    <div className="text-[12px] text-ink-2">{preset?.seminovo ? R.subtituloSeminovo : isVeiculo ? V.subtituloEntrada : R.subtituloEntrada}</div>
                   </div>
                 </div>
                 <UnidadeInlineForm
@@ -556,12 +601,13 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   fornecedores={fornecedores}
                   empresaId={empresaId}
                   isVeiculo={isVeiculo}
+                  celulares={celulares}
                   preset={preset}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
                     setPreset(null)
                     setTab('lista')
-                    notify.ok(preset?.seminovo ? 'Semi-novo adicionado ao estoque' : 'Unidade adicionada ao estoque')
+                    notify.ok(preset?.seminovo ? R.okSeminovo : 'Unidade adicionada ao estoque')
                   }}
                 />
               </Card>
@@ -587,6 +633,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           unidade={unidadeSel}
           empresaId={empresaId}
           isVeiculo={isVeiculo}
+          celulares={celulares}
           onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
@@ -596,18 +643,18 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         onClose={() => setConfirmar(null)}
         onConfirm={confirmarChegada}
         loading={confirmando != null}
-        title="Confirmar que o aparelho chegou?"
+        title={R.chegadaTitulo}
         description={
-          `"${confirmar?.produto_nome ?? 'Aparelho'}"${confirmar?.imei ? ` (IMEI ${confirmar.imei})` : ''} passa a disponível para venda.`
-          // Quando a venda trouxe MAIS DE UM aparelho, confirmar só este não
+          `"${confirmar?.produto_nome ?? R.chegadaSemNome}"${confirmar ? R.chegadaId(confirmar) : ''} passa a disponível para venda.`
+          // Quando a venda trouxe MAIS DE UM item, confirmar só este não
           // libera nada — o outro segue segurando o fechamento. O texto antigo
           // prometia a liberação sempre, e no teste com duas trocas prometeu
           // errado: confirmei um e a comissão continuou (corretamente) retida.
           + (pendentesDoMesmoFechamento > 1
-            ? ` Ainda ${pendentesDoMesmoFechamento - 1 === 1 ? 'falta 1 aparelho' : `faltam ${pendentesDoMesmoFechamento - 1} aparelhos`} desta mesma venda`
+            ? ` Ainda ${R.chegadaFaltam(pendentesDoMesmoFechamento - 1)} desta mesma venda`
               + `${confirmar?.responsavel_nome ? ` — a comissão de ${confirmar.responsavel_nome}` : ' — a comissão'} só é liberada quando todos chegarem.`
-            : `${confirmar?.responsavel_nome ? ` A comissão de ${confirmar.responsavel_nome}` : ' A comissão'} pela venda que trouxe este aparelho é liberada.`)
-          + ' Confirme apenas com o aparelho em mãos.'
+            : `${confirmar?.responsavel_nome ? ` A comissão de ${confirmar.responsavel_nome}` : ' A comissão'} pela venda que trouxe ${R.chegadaEsteItem} é liberada.`)
+          + R.chegadaEmMaos
         }
         confirmLabel="Chegou, confirmar"
       />
@@ -630,7 +677,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
         <div className="flex flex-col gap-4">
           <p className="text-[13px] text-ink-2">
             <span className="font-semibold text-ink">{transferir?.produto_nome}</span>
-            {transferir?.imei ? ` · IMEI ${transferir.imei}` : ''}
+            {transferir ? R.transferirId(transferir) : ''}
             {transferir?.filial_nome ? ` · hoje em ${transferir.filial_nome}` : ''}
           </p>
 
@@ -669,18 +716,20 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, preset, onSaved }: {
+function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, celulares, preset, onSaved }: {
   produtos: ProdutoOpt[]
   clientes: { id: number; nome: string; telefone?: string | null; cpf_cnpj?: string | null }[]
   tabelaPrecos: TabelaPrecoRef[]
   fornecedores: { id: number; nome_fantasia: string }[]
   empresaId: number
   isVeiculo: boolean
+  celulares: boolean
   preset: Preset
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
   const fuso = useFuso()
+  const R = celulares ? ESTOQUE_CELULAR : ESTOQUE_GENERICO
   const [form, setForm] = useState({
     produto_id: '', tipo: preset?.tipo ?? 'compra', condicao: preset?.condicao ?? (isVeiculo ? 'usado' : 'novo'), estado: isVeiculo ? 'bom' : (preset?.seminovo ? 'bom' : 'lacrado'),
     status: 'disponivel', cor: '', armazenamento: '', imei: '', imei2: '', numero_serie: '',
@@ -709,34 +758,11 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
    * Preço NÃO é copiado de propósito: custo e venda são desta negociação, não da
    * anterior. Repetir o valor antigo seria o tipo de "ajuda" que passa batida.
    */
-  type Achado =
-    | { tipo: 'duplicado'; rotulo: string; status: string }
-    | { tipo: 'conhecido'; rotulo: string; quando: string | null }
   const [serieBuscando, setSerieBuscando] = useState(false)
-  const [serieAchado, setSerieAchado] = useState<Achado | null>(null)
+  const [serieAchado, setSerieAchado] = useState<AchadoSerie | null>(null)
 
-  /**
-   * Última consulta de bloqueio deste IMEI. Reprovado = aparelho impedido, e a
-   * entrada é barrada: cadastrar aparelho de origem duvidosa no estoque é o
-   * problema que o CRM tem de ajudar a evitar, não registrar bonitinho.
-   */
-  const [consultaImei, setConsultaImei] = useState<{ resultado: string; motivo: string | null; quando: string } | null>(null)
-  useEffect(() => {
-    const d = form.imei.replace(/\D/g, '')
-    if (isVeiculo || d.length !== 15) { setConsultaImei(null); return }
-    let cancelado = false
-    const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from('estoque_imei_consultas')
-        .select('resultado, motivo, consultado_em')
-        .eq('empresa_id', empresaId).eq('imei', d)
-        .order('consultado_em', { ascending: false }).limit(1)
-      if (cancelado) return
-      const c = (data ?? [])[0] as { resultado: string; motivo: string | null; consultado_em: string } | undefined
-      setConsultaImei(c ? { resultado: c.resultado, motivo: c.motivo, quando: c.consultado_em } : null)
-    }, 450)
-    return () => { cancelado = true; clearTimeout(t) }
-  }, [form.imei, isVeiculo, empresaId, supabase])
+  /** Consulta de aparelho impedido — do módulo Celulares, só com ele ligado. */
+  const consultaImei = useConsultaImei({ ativo: celulares && !isVeiculo, imei: form.imei, empresaId, supabase })
 
   useEffect(() => {
     const serie = form.imei.trim()
@@ -758,7 +784,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       if (!u) { setSerieAchado(null); return }
 
       const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
-      const rotulo = prod?.nome ?? 'Aparelho sem cadastro de produto'
+      const rotulo = prod?.nome ?? R.semCadastro
 
       // Ativo e não vendido = está no estoque agora. É duplicata, não histórico.
       if (u.ativo && u.status !== 'vendido') {
@@ -767,7 +793,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       }
 
       setSerieAchado({ tipo: 'conhecido', rotulo, quando: (u.created_at as string) ?? null })
-      // Preenche só o que identifica o aparelho, e sem sobrescrever o que a
+      // Preenche só o que identifica a peça, e sem sobrescrever o que a
       // pessoa já digitou.
       setForm(f => ({
         ...f,
@@ -778,7 +804,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       }))
     }, 450)
     return () => { cancelado = true; clearTimeout(t) }
-  }, [form.imei, isVeiculo, empresaId, supabase])
+  }, [form.imei, isVeiculo, empresaId, supabase, R.semCadastro])
 
   /**
    * Número de MODELO da Apple (o "A" atrás do aparelho e em Ajustes > Geral >
@@ -789,8 +815,8 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
    * serve para detectar duplicata — quem faz isso é o IMEI, no campo acima.
    */
   const modeloApple = useMemo(
-    () => (isVeiculo ? null : buscarModeloApple(form.modelo_num)),
-    [form.modelo_num, isVeiculo],
+    () => (isVeiculo || !celulares ? null : buscarModeloApple(form.modelo_num)),
+    [form.modelo_num, isVeiculo, celulares],
   )
 
   /**
@@ -800,8 +826,8 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
    */
   const produtoSel = produtos.find(p => p.id === Number(form.produto_id)) ?? null
   const campos = useMemo(
-    () => camposDaCategoria(isVeiculo ? 'veiculo' : produtoSel?.tipo_formulario),
-    [isVeiculo, produtoSel],
+    () => camposDaCategoria(isVeiculo ? 'veiculo' : produtoSel?.tipo_formulario, { celulares, veiculos: isVeiculo }),
+    [isVeiculo, celulares, produtoSel],
   )
 
   /**
@@ -861,19 +887,17 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
   async function salvar() {
     if (!form.produto_id) { notify.warn('Selecione um produto'); return }
     // Barra a duplicata de verdade. Só o aviso na tela não segura: quem está
-    // dando entrada em lote passa direto e o estoque fica com o mesmo aparelho
-    // contado duas vezes.
+    // dando entrada em lote passa direto e o estoque fica com a mesma peça
+    // contada duas vezes.
     if (serieAchado?.tipo === 'duplicado') {
       notify.bad('Este número de série já está no estoque', 'Localize a unidade existente em vez de cadastrar outra.')
       return
     }
-    // Aparelho impedido não entra. O aviso na tela não basta: quem está dando
-    // entrada em lote passa direto, e o prejuízo aqui não é de contagem.
+    // Impedido na consulta (módulo Celulares) não entra. O aviso na tela não
+    // basta: quem está dando entrada em lote passa direto, e o prejuízo aqui
+    // não é de contagem.
     if (consultaImei?.resultado === 'reprovado') {
-      notify.bad(
-        'IMEI reprovado na consulta de aparelhos impedidos',
-        consultaImei.motivo ? `Motivo: ${consultaImei.motivo}. Não cadastre este aparelho.` : 'Não cadastre este aparelho.',
-      )
+      notify.bad(TEXTOS_IMEI.reprovadoTitulo, TEXTOS_IMEI.reprovadoTexto(consultaImei.motivo))
       return
     }
     if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
@@ -897,7 +921,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       tipo: form.tipo, condicao: form.condicao, estado: form.estado,
       status: form.status,
       // Grava só o que o bloco da categoria mostrou. Sem isso, trocar de produto
-      // no meio do cadastro deixaria para trás o IMEI digitado no anterior.
+      // no meio do cadastro deixaria para trás o que foi digitado no anterior.
       cor: campos.cor ? (form.cor || null) : null,
       armazenamento: campos.armazenamento ? (form.armazenamento || null) : null,
       imei: campos.imei ? (form.imei || null) : null,
@@ -974,32 +998,16 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
 
   return (
     <div className="space-y-5">
-      {/* Atalho de entrada: o número de modelo escolhe o produto sozinho. Some
-          quando a categoria escolhida não é de aparelho — numa loja de perfume
-          esse campo seria só ruído. */}
-      {!isVeiculo && (!produtoSel || campos.numeroModeloApple) && (
-        <div className="flex flex-col gap-1.5">
-          <Input
-            label="Número de modelo (atrás do aparelho ou em Ajustes › Geral › Sobre)"
-            value={form.modelo_num}
-            onChange={e => set('modelo_num', e.target.value.toUpperCase())}
-            placeholder="A3106 — traz modelo, capacidades e cores"
-            className="num"
-            autoFocus
-          />
-          {modeloApple ? (
-            <span className="text-[11.5px] text-ok">
-              {modeloApple.codigo} = <strong className="font-semibold">{modeloApple.modelo}</strong>
-              {produtoDoModelo
-                ? ' — produto selecionado no catálogo.'
-                : ' — não há esse produto no catálogo ainda; escolha abaixo ou cadastre em Produtos.'}
-            </span>
-          ) : form.modelo_num.trim().length >= 4 ? (
-            <span className="text-[11.5px] text-ink-3">
-              Número de modelo não reconhecido. Siga pelo catálogo abaixo.
-            </span>
-          ) : null}
-        </div>
+      {/* Atalho de entrada (módulo Celulares): o número de modelo escolhe o
+          produto sozinho. Some quando a categoria escolhida não é de aparelho —
+          numa loja de perfume esse campo seria só ruído. */}
+      {celulares && !isVeiculo && (!produtoSel || campos.numeroModeloApple) && (
+        <CampoModeloApple
+          valor={form.modelo_num}
+          onChange={(v) => set('modelo_num', v)}
+          modelo={modeloApple}
+          noCatalogo={!!produtoDoModelo}
+        />
       )}
 
       <Select
@@ -1014,12 +1022,16 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {field('Tipo de entrada *', btnGroup('tipo', [{ v: 'compra', label: 'Compra' }, { v: 'consignado', label: 'Consignado' }, { v: 'troca', label: 'Troca' }]))}
-        {field('Condição *', btnGroup('condicao', isVeiculo ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }] : [{ v: 'novo', label: 'Novo' }, { v: 'seminovo', label: 'Seminovo' }, { v: 'usado', label: 'Usado' }]))}
+        {field('Condição *', btnGroup('condicao', isVeiculo
+          ? [{ v: 'novo', label: '0km' }, { v: 'usado', label: 'Usado' }]
+          : celulares
+            ? [{ v: 'novo', label: 'Novo' }, { v: 'seminovo', label: R.condicaoSeminovo }, { v: 'usado', label: 'Usado' }]
+            : [{ v: 'novo', label: 'Novo' }, { v: 'usado', label: 'Usado' }]))}
       </div>
 
       {!isVeiculo && (preset?.seminovo || form.condicao !== 'novo') && (
         <BuscaSelect
-          label="Cliente (quem vendeu o aparelho)"
+          label={R.clienteVendeu}
           valor={form.cliente_id}
           onChange={(v) => set('cliente_id', v)}
           vazio="— Não vincular —"
@@ -1055,83 +1067,35 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
         </div>
 
         {/* SEM PRODUTO ESCOLHIDO, ESTE BLOCO MENTE.
-            Os campos daqui vêm da categoria do produto: celular pede IMEI, IMEI 2
-            e saúde da bateria; acessório pede código de barras. Antes de escolher,
-            a tela caía no conjunto genérico (série + cor) — e quem já usava o CRM
-            lia isso como "sumiram os campos do aparelho". Agora o formulário diz
+            Os campos daqui vêm da categoria do produto (com o módulo Celulares, o
+            celular pede IMEI, IMEI 2 e bateria; acessório pede código de barras).
+            Antes de escolher, a tela caía no conjunto genérico (série + cor) — e
+            quem já usava o CRM lia isso como "sumiram os campos". Agora o formulário diz
             que está esperando o produto, em vez de mostrar a versão pobre. */}
         {!produtoSel && !isVeiculo && (
           <p className="mb-3 rounded-control border border-line bg-raised px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
-            <strong className="text-ink">Escolha o produto acima</strong> para abrir os campos certos. Um celular
-            pede IMEI, IMEI 2 e saúde da bateria; um acessório pede código de barras. Enquanto isso, só aparece o
-            básico.
+            <strong className="text-ink">Escolha o produto acima</strong> para abrir os campos certos. {R.escolhaProduto} Enquanto
+            isso, só aparece o básico.
           </p>
         )}
 
         <div className="space-y-5">
-          {campos.veiculo && (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <Input label="Placa" value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC1D23" className="num" />
-                <Input label="Ano/modelo" type="number" value={form.ano} onChange={e => set('ano', e.target.value)} placeholder="2022" className="num" />
-              </div>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <Input label="Chassi" value={form.chassi} onChange={e => set('chassi', e.target.value.toUpperCase())} placeholder="9BW…" className="num" />
-                <Input label="Km" type="number" value={form.km} onChange={e => set('km', e.target.value)} placeholder="45000" className="num" />
-              </div>
-              <Input label="Renavam" value={form.renavam} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" className="num" />
-            </>
-          )}
+          {campos.veiculo && <CamposVeiculoEntrada form={form} set={set} />}
 
           {(campos.imei || campos.numeroSerie) && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               {campos.imei && (
-                <div className="flex flex-col gap-1.5">
-                  <Input label="IMEI 1" value={form.imei} onChange={e => set('imei', e.target.value.replace(/\s/g, ''))} placeholder="Bipe ou digite" className="num" />
-                  {serieBuscando && <span className="text-[11.5px] text-ink-3">Procurando no histórico da loja…</span>}
-                  {!serieBuscando && serieAchado?.tipo === 'duplicado' && (
-                    <span className="text-[11.5px] font-medium text-bad">
-                      Já está no estoque ({serieAchado.rotulo} · {STATUS_BADGE[serieAchado.status]?.label ?? serieAchado.status}) — dois cadastros do mesmo aparelho fazem a contagem mentir.
-                    </span>
-                  )}
-                  {!serieBuscando && serieAchado?.tipo === 'conhecido' && (
-                    <span className="text-[11.5px] text-ok">
-                      Já passou pela loja{serieAchado.quando ? ` em ${fmtDate(serieAchado.quando, fuso)}` : ''} — dados preenchidos; confira os preços.
-                    </span>
-                  )}
-
-                  {/* Bloqueio: o resultado da consulta de aparelho impedido. */}
-                  {(() => {
-                    const d = form.imei.replace(/\D/g, '')
-                    if (d.length !== 15) return null
-                    if (!consultaImei) {
-                      return (
-                        <span className="text-[11.5px] text-warn">
-                          IMEI não consultado na base de aparelhos impedidos.{' '}
-                          <a href="/estoque/imei" target="_blank" rel="noopener" className="font-medium underline">Consultar agora</a>
-                        </span>
-                      )
-                    }
-                    const quando = fmtDate(consultaImei.quando, fuso)
-
-                    if (consultaImei.resultado === 'reprovado') {
-                      return (
-                        <span className="text-[11.5px] font-semibold text-bad">
-                          REPROVADO na consulta de {quando}
-                          {consultaImei.motivo ? ` — ${consultaImei.motivo}` : ''}. Aparelho impedido não deve entrar no estoque.
-                        </span>
-                      )
-                    }
-                    if (consultaImei.resultado === 'aprovado') {
-                      return <span className="text-[11.5px] text-ok">Aprovado na consulta de {quando} — sem impedimento.</span>
-                    }
-                    return <span className="text-[11.5px] text-warn">Consulta de {quando} ficou inconclusiva.</span>
-                  })()}
-                </div>
+                <CampoImei
+                  valor={form.imei}
+                  onChange={(v) => set('imei', v)}
+                  buscando={serieBuscando}
+                  achado={serieAchado}
+                  rotuloStatus={(st) => STATUS_BADGE[st]?.label ?? st}
+                  consulta={consultaImei}
+                  fmtData={(iso) => fmtDate(iso, fuso)}
+                />
               )}
-              {campos.imei2 && (
-                <Input label="IMEI 2 (dual SIM)" value={form.imei2} onChange={e => set('imei2', e.target.value.replace(/\s/g, ''))} placeholder="Se houver" className="num" />
-              )}
+              {campos.imei2 && <CampoImei2 valor={form.imei2} onChange={(v) => set('imei2', v)} />}
               {campos.numeroSerie && (
                 <Input label={campos.rotuloSerie} value={form.numero_serie} onChange={e => set('numero_serie', e.target.value)} placeholder={campos.semSerie ? '7891234567890' : 'XXXXX'} className="num" />
               )}

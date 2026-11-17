@@ -1,8 +1,8 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
-import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
-import type { NegocioComissao } from '@/components/modules/financeiro/comissoes-imob'
+import type { NegocioComissao } from '@/components/modules/imoveis/comissoes-imob'
 import FinanceiroView from './components/financeiro-view'
 import { comNomeDoCliente } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
@@ -43,9 +43,9 @@ export default async function FinanceiroPage() {
   const faturamentoVendas = (vendasMes ?? []).reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)
 
   /**
-   * Comissão por negócio — só com o módulo Imóveis ligado (a comissão é de cada
-   * negócio imobiliário; até 22/10 era a capacidade `comissaoPorNegocio` do
-   * preset, os mesmos casos).
+   * Comissão por negócio — a capacidade `comissaoPorNegocio`, que vem do módulo
+   * Imóveis ligado (a comissão é de cada negócio imobiliário; 17/11/2026: pela
+   * capacidade do manifesto, não pelo endereço do módulo).
    *
    * Aditivo: o livro-caixa acima continua igual para todos. Quem tem o módulo ganha
    * uma aba a mais, e quem não tem não paga por ela (a consulta nem roda).
@@ -55,7 +55,7 @@ export default async function FinanceiroPage() {
   let taxasComissao: TaxasComissao | null = null
   let equipeComissao: { id: string; nome: string }[] = []
 
-  if (ligadosDaEmpresa(cfg).has('/imoveis')) {
+  if (capacidades(cfg).comissaoPorNegocio) {
     const [{ data: negRaw }, { data: taxaRow }] = await Promise.all([
       supabase.from('imoveis_negocios')
         .select('id, tipo, valor, status, assinado_em, created_at, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, cashback_percentual, comissao_status, comissao_paga_em, comissao_aprovada_em, origem, cliente_nome, imovel_codigo, imovel_id, lead_id, cliente_id, corretor_id, captador_id')

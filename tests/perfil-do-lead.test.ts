@@ -25,14 +25,16 @@ test('imobiliária: módulos em preparação não ligam painel; vocabulário fic
   assert.equal(vocabulario(cfg).equipe, 'Corretor')
 })
 
-test('loja de veículos: Avaliações em preparação, nenhum painel', () => {
+// Reservar do estoque e Orçamentos são painéis de módulo desde 17/11/2026 (antes o card os mostrava
+// sempre): quem nasce com Estoque e Orçamentos os tem — e continua no autocomplete do catálogo.
+test('loja de veículos: Avaliações em preparação, nenhum painel de veículo', () => {
   assert.deepEqual(perfilDoLead(empresaNascidaCom('concessionaria')), {
-    paineis: [], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: false,
+    paineis: ['orcamento', 'reserva-estoque'], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: false,
   })
 })
 
-test('varejo: autocomplete do catálogo, nenhum painel, vendedor', () => {
-  const varejo = { paineis: [], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false }
+test('varejo: autocomplete do catálogo, reservar e orçar, vendedor', () => {
+  const varejo = { paineis: ['orcamento', 'reserva-estoque'], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false }
   assert.deepEqual(perfilDoLead(empresaNascidaCom('varejo')), varejo)
   assert.equal(vocabulario(empresaNascidaCom('varejo')).equipe, 'Vendedor')
 })

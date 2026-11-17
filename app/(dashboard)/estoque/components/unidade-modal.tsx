@@ -6,6 +6,10 @@ import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
 import type { TablesInsert, TablesUpdate } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { ESTOQUE_CELULAR } from '@/components/modules/celulares/rotulos'
+import { CamposCelularModal, CampoBateriaModal } from '@/components/modules/celulares/campos-unidade'
+import { ESTOQUE_VEICULO } from '@/components/modules/veiculos/rotulos'
+import { CamposVeiculoModal } from '@/components/modules/veiculos/campos-veiculo'
 
 interface Unidade {
   id?: number
@@ -37,8 +41,20 @@ interface Unidade {
 interface Props {
   unidade: Unidade | null
   empresaId: number
+  /** Módulo Avaliações ligado + campo placa no item (ver EstoqueView). */
   isVeiculo?: boolean
+  /** Módulo Celulares ligado: IMEI 1 e 2, bateria, armazenamento, seminovo. */
+  celulares?: boolean
   onClose: () => void
+}
+
+/** Os rótulos do modal sem módulo de ramo (com Celulares: ESTOQUE_CELULAR). */
+const GENERICO = {
+  armazenamento: 'Variante',
+  armazenamentoPlaceholder: 'Ex.: Tamanho M',
+  fotosAjuda: 'A peça de verdade — riscos, marcas de uso. Serve de prova do estado na venda e na garantia.',
+  tipoSeminovo: 'Usado',
+  condicaoSeminovo: 'Usado',
 }
 
 const EMPTY: Unidade = {
@@ -51,8 +67,9 @@ const EMPTY: Unidade = {
 
 const supabase = createClient()
 
-export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, onClose }: Props) {
+export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, celulares = false, onClose }: Props) {
   const router = useRouter()
+  const R = celulares ? ESTOQUE_CELULAR : GENERICO
   const isNew = !unidade?.id
   const [form, setForm] = useState<Unidade>(isNew ? EMPTY : { ...EMPTY, ...unidade })
   const [saving, setSaving] = useState(false)
@@ -87,8 +104,8 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
   const produtoSel = produtos.find((p) => p.id === form.produto_id)
 
   async function salvar() {
-    // Aparelho recebido em troca não tem cadastro de produto — é o celular usado
-    // do cliente. Exigir um aqui impediria precificar a revenda, que é justamente
+    // Item recebido em troca não tem cadastro de produto — é o usado do
+    // cliente. Exigir um aqui impediria precificar a revenda, que é justamente
     // o passo seguinte à troca. Para os outros tipos o produto continua obrigatório.
     if (!form.produto_id && form.tipo !== 'troca') { notify.warn('Selecione um produto'); return }
     setSaving(true)
@@ -165,7 +182,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
         disableOverlayClose={saving}
         title={
           <span className="flex items-center gap-2.5">
-            <span className="truncate">{isNew ? (isVeiculo ? 'Adicionar veículo' : 'Adicionar unidade') : (isVeiculo ? 'Editar veículo' : 'Editar unidade')}</span>
+            <span className="truncate">{isNew ? (isVeiculo ? ESTOQUE_VEICULO.modalNovo : 'Adicionar unidade') : (isVeiculo ? ESTOQUE_VEICULO.modalEditar : 'Editar unidade')}</span>
             {!isNew && <span className="num text-[12px] font-normal text-ink-3">#{unidade?.id}</span>}
           </span>
         }
@@ -218,38 +235,19 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
           </Select>
           <Select label="Tipo" value={form.tipo ?? ''} onChange={e => set('tipo', e.target.value || null)}>
             <option value="compra">Compra</option>
-            <option value="seminovo">Seminovo</option>
+            {/* "Seminovo" é do módulo Celulares; sem ele, só aparece se a unidade já tem. */}
+            {(celulares || form.tipo === 'seminovo') && <option value="seminovo">{R.tipoSeminovo}</option>}
             <option value="troca">Troca</option>
             <option value="consignado">Consignado</option>
           </Select>
 
           {isVeiculo ? (
-            <>
-              <Input label="Placa" value={form.placa ?? ''} onChange={e => set('placa', e.target.value.toUpperCase() || null)} placeholder="ABC1D23" className="num" />
-              <Input label="Ano/modelo" type="number" value={form.ano ?? ''} onChange={e => set('ano', e.target.value ? Number(e.target.value) : null)} placeholder="2022" className="num" />
-              <Input label="Chassi" value={form.chassi ?? ''} onChange={e => set('chassi', e.target.value.toUpperCase() || null)} placeholder="9BW…" className="num" />
-              <Input label="Renavam" value={form.renavam ?? ''} onChange={e => set('renavam', e.target.value || null)} placeholder="00000000000" className="num" />
-              <Input label="Km" type="number" value={form.km ?? ''} onChange={e => set('km', e.target.value ? Number(e.target.value) : null)} placeholder="45000" className="num" />
-              <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Prata, Preto…" />
-
-              <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
-                <option value="novo">0km</option>
-                <option value="seminovo">Seminovo</option>
-                <option value="usado">Usado</option>
-              </Select>
-              <Select label="Estado" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
-                <option value="excelente">Excelente</option>
-                <option value="otimo">Ótimo</option>
-                <option value="bom">Bom</option>
-                <option value="regular">Regular</option>
-              </Select>
-            </>
+            <CamposVeiculoModal form={form} set={set} />
           ) : (
             <>
-              <Input label="IMEI 1" value={form.imei ?? ''} onChange={e => set('imei', e.target.value || null)} placeholder="000000000000000" className="num" />
-              <Input label="IMEI 2 / Série" value={form.imei2 ?? ''} onChange={e => set('imei2', e.target.value || null)} placeholder="000000000000000" className="num" />
+              {celulares && <CamposCelularModal form={form} set={set} />}
               <Input label="Número de série" value={form.numero_serie ?? ''} onChange={e => set('numero_serie', e.target.value || null)} placeholder="XXXXX" className="num" />
-              <Input label="Bateria %" value={form.bateria ?? ''} onChange={e => set('bateria', e.target.value || null)} placeholder="95" className="num" />
+              {celulares && <CampoBateriaModal form={form} set={set} />}
               {produtoSel && produtoSel.cores.length > 0 ? (
                 <Select label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)}>
                   <option value="">Selecionar cor…</option>
@@ -260,18 +258,18 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
                 <Input label="Cor" value={form.cor ?? ''} onChange={e => set('cor', e.target.value || null)} placeholder="Preto, Branco…" />
               )}
               {produtoSel && produtoSel.armazenamentos.length > 0 ? (
-                <Select label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)}>
-                  <option value="">Selecionar armazenamento…</option>
+                <Select label={R.armazenamento} value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)}>
+                  <option value="">{`Selecionar ${R.armazenamento.toLowerCase()}…`}</option>
                   {produtoSel.armazenamentos.map(a => <option key={a} value={a}>{a}</option>)}
                   {form.armazenamento && !produtoSel.armazenamentos.includes(form.armazenamento) && <option value={form.armazenamento}>{form.armazenamento}</option>}
                 </Select>
               ) : (
-                <Input label="Armazenamento" value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder="256GB" />
+                <Input label={R.armazenamento} value={form.armazenamento ?? ''} onChange={e => set('armazenamento', e.target.value || null)} placeholder={R.armazenamentoPlaceholder} />
               )}
 
               <Select label="Condição" value={form.condicao ?? ''} onChange={e => set('condicao', e.target.value || null)}>
                 <option value="novo">Novo</option>
-                <option value="seminovo">Seminovo</option>
+                {(celulares || form.condicao === 'seminovo') && <option value="seminovo">{R.condicaoSeminovo}</option>}
                 <option value="usado">Usado</option>
               </Select>
               <Select label="Estado físico" value={form.estado ?? ''} onChange={e => set('estado', e.target.value || null)}>
@@ -324,8 +322,8 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
             placeholder="Defeitos, histórico, detalhes…"
           />
 
-          {/* Fotos DESTA unidade (não do modelo): estado real do aparelho —
-              riscos, marcas de uso, tela. É a prova do que foi vendido. */}
+          {/* Fotos DESTA unidade (não do modelo): estado real da peça —
+              riscos, marcas de uso. É a prova do que foi vendido. */}
           <div className="col-span-2">
             <UploadFotos
               label="Fotos desta unidade"
@@ -333,7 +331,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, on
               onChange={urls => set('fotos_urls', urls.join(',') || null)}
               empresaId={empresaId}
               max={8}
-              ajuda="O aparelho de verdade — riscos, marcas de uso, tela ligada. Serve de prova do estado na venda e na garantia."
+              ajuda={R.fotosAjuda}
             />
           </div>
           </fieldset>

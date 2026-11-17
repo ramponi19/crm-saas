@@ -9,9 +9,11 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, Button, Badge, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
-  renderizarModelo, blocosDaPagina, MARCADORES_DISPONIVEIS,
+  renderizarModelo, blocosDaPagina, marcadoresDisponiveis,
   type PaginaModelo, type BlocoTexto, type DadosMescla,
 } from '@/lib/contrato-modelo'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
+import { ITENS_EXEMPLO_CELULAR } from '@/components/modules/celulares/contrato-trocas'
 
 interface Props {
   empresaId: number
@@ -50,9 +52,10 @@ const EXEMPLO: Omit<DadosMescla, 'garantia_dias'> = {
     endereco: 'Rua das Flores', numero: '100', complemento: 'Apto 12', bairro: 'Centro',
     cidade: 'São Paulo', estado: 'SP', cep: '01000-000',
   },
+  // Itens neutros; com o módulo Celulares e aparelhos, os de celular (ITENS_EXEMPLO_CELULAR).
   itens: [
-    { descricao: 'iPhone 15 Pro 256GB', imei: '350000000000001', valor: 5000, garantia_dias: 90 },
-    { descricao: 'Acessório: Película', imei: null, valor: 300, garantia_dias: 90 },
+    { descricao: 'Produto exemplo', imei: 'SN-000001', valor: 5000, garantia_dias: 90 },
+    { descricao: 'Acessório exemplo', imei: null, valor: 300, garantia_dias: 90 },
   ],
   total: 5300, desconto: 0, forma_pagamento: 'credito', parcelas: 10,
   vendedor: 'Vendedor Exemplo', data: undefined,
@@ -105,6 +108,8 @@ function BlocoEditavel({
 
 export function ContratoModeloView({ empresaId, documentoId, nome, versao, paginasIniciais, garantiaPadrao, contratosEmitidos }: Props) {
   const supabase = createClient()
+  // IMEI, troca de aparelho e o exemplo de celular só com o módulo Celulares e aparelhos ligado.
+  const celular = !!useModuloLigado('/check-imei')
   const [paginas, setPaginas] = useState<PaginaModelo[]>(() =>
     paginasIniciais.length
       ? [...paginasIniciais].sort((a, b) => a.ordem - b.ordem)
@@ -235,7 +240,8 @@ export function ContratoModeloView({ empresaId, documentoId, nome, versao, pagin
   function prever() {
     const html = renderizarModelo(
       { id: 0, versao: 0, paginas: paginas.map((p, k) => ({ ...p, ordem: k + 1 })) },
-      { ...EXEMPLO, garantia_dias: garantiaPadrao },
+      { ...EXEMPLO, ...(celular ? { itens: ITENS_EXEMPLO_CELULAR } : {}), garantia_dias: garantiaPadrao },
+      { celular },
     )
     const w = window.open('', '_blank', 'width=880,height=1000')
     if (!w) { notify.warn('Permita pop-ups para pré-visualizar'); return }
@@ -364,7 +370,7 @@ export function ContratoModeloView({ empresaId, documentoId, nome, versao, pagin
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 <Braces size={13} strokeWidth={1.8} className="mr-0.5 text-ink-3" />
-                {MARCADORES_DISPONIVEIS.map((m) => (
+                {marcadoresDisponiveis(celular).map((m) => (
                   <button key={m.chave} type="button" title={m.rotulo} onClick={() => inserirMarcador(m.chave)}
                     className="rounded-full border border-line bg-card px-2 py-0.5 text-[11px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
                     {m.rotulo}

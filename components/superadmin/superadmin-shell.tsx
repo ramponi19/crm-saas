@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { LinkDeMenu } from '@/components/layout/link-de-menu'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { moduloPorChave } from '@/core/modulos'
 import { NavRolavel } from '@/components/layout/nav-rolavel'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -19,7 +20,8 @@ const navItems = [
   { href: '/superadmin/pedidos', label: 'Pedidos de módulo', icon: Inbox },
   { href: '/superadmin/presets', label: 'Presets', icon: Layers },
   { href: '/superadmin/laboratorio', label: 'Laboratório', icon: FlaskConical },
-  { href: '/superadmin/fipe', label: 'Tabela FIPE', icon: Car },
+  // O nome vem do manifesto: o texto de veículo é do módulo Consulta FIPE.
+  { href: '/superadmin/fipe', label: moduloPorChave('consulta_fipe')?.nome ?? '', icon: Car },
   { href: '/superadmin/metricas', label: 'Métricas', icon: LineChart },
   { href: '/superadmin/planos', label: 'Planos', icon: CreditCard },
   { href: '/superadmin/avisos', label: 'Avisos', icon: Megaphone },

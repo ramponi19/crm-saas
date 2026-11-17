@@ -2,13 +2,13 @@ import { createServiceClient } from '@/lib/supabase/service'
 import Link from 'next/link'
 import { TrendingUp, AlertTriangle, Layers, Clock } from 'lucide-react'
 import { Card, StatCard, Badge } from '@/components/ui'
+import { pagante, precosDosPlanos } from '@/lib/faturamento'
 import { lerNomesDosPresets, PRESET_PADRAO } from '@/lib/presets'
 import { agora, diaNoFuso, FUSO_PADRAO, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes } from '@/lib/datas'
 
 const ROXO = '#6D28D9'
 
 // Fallback caso planos_config não tenha o plano (preços em reais/mês).
-const PRECO_FALLBACK: Record<string, number> = { free: 0, starter: 97, pro: 197 }
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -34,7 +34,7 @@ export default async function MetricasPage() {
   const [{ data: empresas }, { data: planos }, PRESET_LABEL] = await Promise.all([
     supabase
       .from('empresas')
-      .select('id, nome, plano, status, preset_onboarding, created_at, limite_usuarios, limite_leads')
+      .select('id, nome, plano, status, stripe_status, trial_ends_at, demo, preset_onboarding, created_at, limite_usuarios, limite_leads')
       .neq('demo', true),
     supabase.from('planos_config').select('id, preco_centavos'),
     lerNomesDosPresets(supabase),
@@ -43,11 +43,8 @@ export default async function MetricasPage() {
   const lista = empresas ?? []
   const hoje = agora()
 
-  // Preço mensal por plano (planos_config em centavos → reais; fallback no hardcode).
-  const precoPlano: Record<string, number> = { ...PRECO_FALLBACK }
-  for (const p of (planos ?? []) as Array<{ id: string; preco_centavos: number | null }>) {
-    if (p.id) precoPlano[p.id] = (p.preco_centavos ?? 0) / 100
-  }
+  // Preço mensal por plano: o real, de planos_config (o mesmo da vitrine e do checkout).
+  const precoPlano = precosDosPlanos(planos as Array<{ id: string; preco_centavos: number | null }> | null)
 
   const ativas = lista.filter(e => e.status === 'ativo')
   const cancelados = lista.filter(e => e.status === 'cancelado')
@@ -73,11 +70,12 @@ export default async function MetricasPage() {
   })
   const maxMes = Math.max(1, ...meses.map(m => m.total))
 
-  // 2) MRR por plano (apenas ativas geram receita)
-  const planosPagos = Array.from(new Set(ativas.map(e => e.plano).filter(p => p && p !== 'free'))) as string[]
+  // 2) MRR por plano: só pagantes (ativas, fora do teste, plano com preço — lib/faturamento.ts)
+  const pagantes = lista.filter(e => pagante(e, hoje, precoPlano))
+  const planosPagos = Array.from(new Set(pagantes.map(e => e.plano).filter(Boolean))) as string[]
   const mrrPorPlano = planosPagos
     .map(plano => {
-      const qtd = ativas.filter(e => e.plano === plano).length
+      const qtd = pagantes.filter(e => e.plano === plano).length
       return { plano, qtd, mrr: qtd * (precoPlano[plano] ?? 0) }
     })
     .sort((a, b) => b.mrr - a.mrr)

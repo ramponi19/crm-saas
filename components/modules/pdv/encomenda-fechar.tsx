@@ -9,6 +9,7 @@ import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type DocumentoDisponivel, type EmitirContratoInput } from '@/lib/contrato-emitir'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
 import { finalizarEncomenda } from '@/lib/encomendas'
+import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
 
 /**
  * FECHAR A ENCOMENDA — o que acontece quando o cliente vem buscar.
@@ -56,7 +57,7 @@ export interface EncomendaParaFechar {
   grupo_pdv: string | null
 }
 
-export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vendedor, onPronto, onCancelar }: {
+export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vendedor, onPronto, onCancelar, celulares = false }: {
   encomenda: EncomendaParaFechar
   taxas: Taxa[]
   documentos: DocumentoDisponivel[]
@@ -64,6 +65,8 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
   vendedor: string | null
   onPronto: () => void
   onCancelar: () => void
+  /** Módulo Celulares ligado: sugestões de acessório de celular no campo. */
+  celulares?: boolean
 }) {
   const supabase = createClient()
   const [forma, setForma] = useState('pix')
@@ -241,7 +244,7 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
       <div className="mb-3">
         {acessorios.map((a) => (
           <div key={a.id} className="mb-2 flex items-center gap-2">
-            <Input wrapperClassName="flex-1" placeholder="Acessório (capa, película, fonte…)"
+            <Input wrapperClassName="flex-1" placeholder={celulares ? ENCOMENDA_CELULAR.acessorioPlaceholder : 'Acessório'}
               value={a.descricao}
               onChange={(e) => setAcessorios((xs) => xs.map((x) => x.id === a.id ? { ...x, descricao: e.target.value } : x))} />
             <Input wrapperClassName="w-28" type="number" placeholder="R$"

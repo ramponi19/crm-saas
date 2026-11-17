@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { meusFollowUps, type ResultadoVendas, type DadosPainel, type FunilDoPainel } from '@/lib/painel/metricas'
 import { useFuso } from '@/components/fuso-provider'
 import { formatarDiaMes } from '@/lib/datas'
+import { useModulosLigados } from '@/components/layout/ferramentas-context'
 
 /**
  * Tudo vem pronto do servidor (lib/painel/metricas.ts → painelCompleto), inclusive
@@ -152,10 +153,12 @@ function FunilLeads({ funil }: { funil: FunilDoPainel }) {
 }
 
 // ── Alertas ──
-function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas }: { estoqueDisponivel: number; leadsNovos: number; assistenciasAbertas: number }) {
+function Alertas({ estoqueDisponivel, leadsNovos, assistenciasAbertas, comEstoque, comAssist }: { estoqueDisponivel: number; leadsNovos: number; assistenciasAbertas: number; comEstoque: boolean; comAssist: boolean }) {
+  // Só alerta do que a empresa usa e do que existe (17/11/2026): conta vazia, ou sem o módulo, não
+  // acende "estoque baixo — 0 unidade".
   const items = [
-    estoqueDisponivel < 5 && { tone: 'warn' as const, icon: Package, title: 'Estoque baixo', desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária.` },
-    assistenciasAbertas > 0 && { tone: 'bad' as const, icon: AlertTriangle, title: 'Assistências abertas', desc: `${assistenciasAbertas} ordem(s) em andamento.` },
+    comEstoque && estoqueDisponivel > 0 && estoqueDisponivel < 5 && { tone: 'warn' as const, icon: Package, title: 'Estoque baixo', desc: `Apenas ${estoqueDisponivel} unidade(s) disponível — reposição necessária.` },
+    comAssist && assistenciasAbertas > 0 && { tone: 'bad' as const, icon: AlertTriangle, title: 'Assistências abertas', desc: `${assistenciasAbertas} ordem(s) em andamento.` },
     leadsNovos > 20 && { tone: 'acc' as const, icon: Users, title: `${leadsNovos} leads sem tratativa`, desc: 'Leads acumulados aguardando primeiro contato.' },
   ].filter(Boolean) as Array<{ tone: 'warn' | 'bad' | 'acc'; icon: typeof Package; title: string; desc: string }>
 
@@ -274,6 +277,12 @@ export function DashboardView({ data }: { data: DashboardData }) {
   const resultado: ResultadoVendas = data.periods[activePeriod] ?? data.periods.mes
   const { receita, lucro, margem, semCusto, qtdVendas, ticketMedio } = resultado
   const periodLabel = PERIOD_LABELS[activePeriod] ?? 'este mês'
+  // O painel é do core: o que é de módulo só aparece com ele ligado (17/11/2026). Vendas = PDV/Histórico.
+  const ligados = useModulosLigados()
+  const comVendas = ligados.has('/pdv') || ligados.has('/historico')
+  const comEstoque = ligados.has('/estoque')
+  const comAssist = ligados.has('/assistencia')
+  const comRelatorios = ligados.has('/relatorios')
 
   const spark = faturamentoMensal.slice(-7).map((m) => m.total)
   const sparkNorm = spark.length > 1 ? (() => { const mx = Math.max(...spark, 1); return spark.map((v) => v / mx) })() : undefined
@@ -288,29 +297,29 @@ export function DashboardView({ data }: { data: DashboardData }) {
           {/* O painel abre no conteúdo: sem saudação, sem frase de abertura (etapa 0). */}
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex gap-2">
-              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => router.push('/relatorios')}>Exportar</Button>
-              <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>
+              {comRelatorios && <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => router.push('/relatorios')}>Exportar</Button>}
+              {comVendas && <Button icon={<Plus size={15} strokeWidth={1.7} />} onClick={() => router.push('/pdv')}>Nova venda</Button>}
             </div>
           </div>
 
           <OnboardingCard />
 
           {/* KPIs */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          {comVendas && <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
             <StatCard bare label={`Vendas · ${periodLabel}`} value={<AnimatedCurrency value={receita} />} spark={sparkNorm} />
             <LucroBruto lucro={lucro} margem={margem} semCusto={semCusto} qtdVendas={qtdVendas} />
             <StatCard bare label="Ticket médio" value={<AnimatedCurrency value={ticketMedio} />} delta="por venda fechada" deltaTone="neutral" />
             <StatCard bare label="Vendas fechadas" value={<AnimatedInt value={qtdVendas} />} delta="no período" deltaTone="neutral" />
-          </div>
+          </div>}
 
           {/* Strip secundário */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              { icon: Package, val: `${globais.estoqueDisponivel} un`, sub: 'em estoque', alerta: globais.estoqueDisponivel < 5 },
+              comEstoque && { icon: Package, val: `${globais.estoqueDisponivel} un`, sub: 'em estoque', alerta: globais.estoqueDisponivel > 0 && globais.estoqueDisponivel < 5 },
               { icon: Users, val: String(globais.totalClientes), sub: 'clientes', alerta: false },
-              { icon: AlertTriangle, val: String(globais.assistenciasAbertas), sub: 'assistências abertas', alerta: globais.assistenciasAbertas > 0 },
+              comAssist && { icon: AlertTriangle, val: String(globais.assistenciasAbertas), sub: 'assistências abertas', alerta: globais.assistenciasAbertas > 0 },
               { icon: Users, val: String(globais.leadsAtivos), sub: 'leads ativos', alerta: globais.leadsNovos > 20 },
-            ].map(({ icon: Icon, val, sub, alerta }, i) => (
+            ].filter((x): x is { icon: typeof Package; val: string; sub: string; alerta: boolean } => !!x).map(({ icon: Icon, val, sub, alerta }, i) => (
               <div key={i} className={cn('flex items-center gap-3 rounded-card border bg-card p-4', alerta ? 'border-warn/30' : 'border-line')}>
                 <span className={cn('grid h-9 w-9 flex-none place-items-center rounded-control', alerta ? 'bg-warn-soft text-warn' : 'bg-ink/[0.04] text-ink-3')}><Icon size={17} strokeWidth={1.7} /></span>
                 <div>
@@ -324,24 +333,24 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <FollowupsCard />
 
           {/* Gráfico + Donut */}
-          <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.85fr)_minmax(0,1fr)]">
+          {comVendas && <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.85fr)_minmax(0,1fr)]">
             <Card title="Tendência de faturamento" actions={<span className="num text-[11px] text-ink-3">12 meses</span>}>
               <AreaChart data={faturamentoMensal} />
             </Card>
             <Card title="Vendas por canal">
               <DonutCanais counts={data.porCanal} />
             </Card>
-          </div>
+          </div>}
 
           {/* Produtos + Funil + Alertas */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card title="Produtos mais vendidos"><TopProdutos produtos={data.topProdutos} /></Card>
+            {comVendas && <Card title="Produtos mais vendidos"><TopProdutos produtos={data.topProdutos} /></Card>}
             <Card title="Funil de leads"><FunilLeads funil={globais.funil} /></Card>
-            <Card title="Alertas"><Alertas estoqueDisponivel={globais.estoqueDisponivel} leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} /></Card>
+            <Card title="Alertas"><Alertas estoqueDisponivel={globais.estoqueDisponivel} leadsNovos={globais.leadsNovos} assistenciasAbertas={globais.assistenciasAbertas} comEstoque={comEstoque} comAssist={comAssist} /></Card>
           </div>
 
           {/* Vendas recentes + Top vendedores */}
-          <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.7fr)_minmax(0,1fr)]">
+          {comVendas && <div className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1.7fr)_minmax(0,1fr)]">
             <Card title="Vendas recentes" flush>
               {vendasRecentes.length === 0 ? (
                 <div className="px-4 py-8 text-center text-[13px] text-ink-3">Nenhuma venda ainda.</div>
@@ -366,7 +375,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
               )}
             </Card>
             <Card title="Top vendedores"><TopVendedores vendedores={topVendedores} /></Card>
-          </div>
+          </div>}
 
         </div>
       </main>

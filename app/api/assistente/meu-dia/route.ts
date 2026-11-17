@@ -5,6 +5,7 @@ import { mensagemDoProvedor, MODELO_PADRAO } from '@/lib/assistente-erros'
 import { conversasDosLeads } from '@/lib/leads'
 import { periodo } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // "Iniciar o dia": roteiro priorizado a partir das demandas do usuário logado.
@@ -28,12 +29,16 @@ export async function POST() {
 
   const uid = user.id
   const head = { count: 'exact' as const, head: true }
+  // Compromissos de hoje: a tabela `visitas` é do módulo Agenda; sem ele, nem consulta (17/11/2026).
+  const comAgenda = await moduloEstaLigado(empresaId, 'agenda')
   const [atrasadas, hoje, leadsResp, fila, visitas] = await Promise.all([
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).lt('vencimento', inicioHoje),
     supabase.from('tarefas').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('concluida', false).gte('vencimento', inicioHoje).lt('vencimento', fimHoje),
     leadsComNaoLidas(supabase as unknown as SupabaseClient, empresaId, uid),
     supabase.from('cadencia_inscricoes').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('status', 'ativa').lt('proxima_acao_em', fimHoje),
-    supabase.from('visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje),
+    comAgenda
+      ? supabase.from('visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje)
+      : Promise.resolve({ count: 0 }),
   ])
 
   const n = {
@@ -58,7 +63,7 @@ export async function POST() {
     return NextResponse.json({ roteiro, counts: n })
   }
 
-  const fatos = `Tarefas atrasadas: ${n.tarefasAtrasadas}. Tarefas para hoje: ${n.tarefasHoje}. Leads aguardando resposta: ${n.leadsAguardando}. Contatos na Fila do dia: ${n.filaDoDia}. Compromissos/visitas hoje: ${n.visitasHoje}.`
+  const fatos = `Tarefas atrasadas: ${n.tarefasAtrasadas}. Tarefas para hoje: ${n.tarefasHoje}. Leads aguardando resposta: ${n.leadsAguardando}. Contatos na Fila do dia: ${n.filaDoDia}.${comAgenda ? ` Compromissos/visitas hoje: ${n.visitasHoje}.` : ''}`
   const prompt = `Você é o assistente do Nexus. Monte um ROTEIRO DO DIA curto, priorizado e motivador para o operador, a partir destes números (não invente dados além destes):
 ${fatos}
 Regras: comece pelo mais urgente (leads aguardando e fila do dia costumam vir primeiro). Máximo 6 itens numerados, uma linha cada. Use **negrito** no nome do menu onde agir (Leads, Fila do dia, Tarefas, Agenda). Se estiver tudo zerado, parabenize e sugira prospectar. Português do Brasil.`

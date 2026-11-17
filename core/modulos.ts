@@ -30,6 +30,9 @@ import type { CampoPadrao } from '@/core/campos'
  * componentes estão em components/modules/leads/paineis-vertical.tsx.
  */
 export type PainelDoLead = 'match-imoveis' | 'negocio-imovel' | 'interesse-veiculo' | 'financiamento'
+  // 17/11/2026: os dois painéis que o card mostrava SEMPRE, fora do manifesto. Reservar exige o
+  // Estoque; orçar exige Orçamentos. O card os desenha no lugar de sempre (precisam de mais que o leadId).
+  | 'reserva-estoque' | 'orcamento'
 
 /**
  * O QUE UM MÓDULO FAZ NAS TELAS DOS OUTROS (29/10/2026, fim do molde por vertical).
@@ -141,7 +144,7 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'agenda', href: '/agenda', tabelas: ['visitas'], nome: 'Agenda', grupo: 'pipeline', emPreparacao: true, abasConfiguracoes: ['agendamento'],
     frase: 'Visitas e atendimentos marcados num calendário só, com o lead e o responsável de cada horário.' },
 
-  { chave: 'orcamentos', href: '/orcamentos', tabelas: ['assistencia_orcamentos', 'avaliacao_cotacoes', 'avaliacao_precos', 'avaliacao_regras'], nome: 'Orçamentos', grupo: 'vendas', abasConfiguracoes: ['troca'],
+  { chave: 'orcamentos', href: '/orcamentos', tabelas: ['assistencia_orcamentos', 'avaliacao_cotacoes', 'avaliacao_precos', 'avaliacao_regras'], nome: 'Orçamentos', grupo: 'vendas', paineisDoLead: ['orcamento'],
     frase: 'Cotação e orçamento com link de aprovação para o cliente.' },
   { chave: 'propostas', href: '/propostas', tabelas: ['vendas_propostas'], nome: 'Propostas', grupo: 'vendas',
     frase: 'Proposta formal com itens, condições e validade, pronta para enviar.' },
@@ -155,17 +158,18 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
   { chave: 'avaliacoes', href: '/avaliacoes', tabelas: ['avaliacao_usados'], nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, requer: ['pdv'], abasConfiguracoes: ['veiculos-portais'],
     capacidades: { automacoesVeiculo: true, matchVeiculo: true }, paineisDoLead: ['interesse-veiculo', 'financiamento'],
-    frase: 'Vistoria do veículo na troca, com fotos, avarias e o valor oferecido.' },
+    frase: 'Avaliação do veículo na troca, com fotos, avarias e o valor oferecido.' },
   { chave: 'consulta_fipe', href: '/consulta-fipe', tabelas: ['avaliacao_fipe_consultas', 'avaliacao_fipe_referencia'], nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
     frase: 'O valor de referência do veículo na tabela FIPE, dentro da avaliação.' },
 
-  { chave: 'estoque', href: '/estoque', nome: 'Estoque', grupo: 'estoque',
+  { chave: 'estoque', href: '/estoque', nome: 'Estoque', grupo: 'estoque', paineisDoLead: ['reserva-estoque'],
     frase: 'As unidades de cada produto na loja, com custo, variante, número de série e transferência entre lojas.' },
   { chave: 'catalogo', href: '/catalogo', nome: 'Produtos', grupo: 'estoque', requer: ['estoque'],
     frase: 'O catálogo de modelos e preços que o PDV e os orçamentos usam.' },
   { chave: 'compras', href: '/compras', tabelas: ['vendas_pedidos_compra'], nome: 'Compras', grupo: 'estoque', requer: ['estoque'],
     frase: 'Pedido de compra ao fornecedor e a entrada da mercadoria no estoque.' },
-  { chave: 'check_imei', href: '/check-imei', nome: 'Check IMEI', grupo: 'estoque', requer: ['estoque'],
+  // A seção Troca (tolerância da avaliação do aparelho) é de celular: veio de Orçamentos em 17/11/2026.
+  { chave: 'check_imei', href: '/check-imei', nome: 'Check IMEI', grupo: 'estoque', requer: ['estoque'], abasConfiguracoes: ['troca'],
     frase: 'Consulta o IMEI antes de comprar ou vender um aparelho.' },
   { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['portais'],
     capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },

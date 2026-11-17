@@ -24,11 +24,13 @@ export function OnboardingCard() {
     ;(async () => {
       // As consultas estão em lib/painel/metricas.ts, com os outros números do painel.
       const n = await primeirosPassos(supabase)
+      // Os passos de qualquer empresa (17/11/2026): nada de ramo, nada que dependa de módulo.
       setPassos([
-        { key: 'prod', label: 'Cadastre seus produtos', href: '/catalogo', feito: n.produtos >= 3 },
-        { key: 'wpp', label: 'Conecte o WhatsApp', href: '/configuracoes/integracoes', feito: n.whatsapp >= 1 },
+        { key: 'loja', label: 'Complete os dados da sua loja', href: '/configuracoes/lojas', feito: n.lojasCompletas >= 1 },
+        { key: 'equipe', label: 'Cadastre sua equipe', href: '/configuracoes/usuarios', feito: n.equipe >= 2 },
+        { key: 'horario', label: 'Defina o horário de atendimento', href: '/configuracoes/horario', feito: n.horario >= 1 },
+        { key: 'canal', label: 'Conecte WhatsApp ou Instagram', href: '/configuracoes/integracoes', feito: n.canais >= 1 },
         { key: 'lead', label: 'Registre seu primeiro lead', href: '/leads', feito: n.leads >= 1 },
-        { key: 'venda', label: 'Faça uma venda no PDV', href: '/pdv', feito: n.vendas >= 1 },
       ])
     })()
   }, [])

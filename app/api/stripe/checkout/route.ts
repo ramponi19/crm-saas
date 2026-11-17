@@ -13,13 +13,18 @@ export async function POST(req: NextRequest) {
     const planos = await getPlanos()
     const plano = planos.find(p => p.id === planoId)
 
-    if (!plano || plano.preco_centavos === 0 || !plano.stripe_price_id) {
+    if (!plano || plano.preco_centavos === 0) {
       return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
+    }
+    // Pronto para cobrar (17/11/2026): falta só o preço de cada plano no Stripe (planos_config.stripe_price_id,
+    // decisão do Lucas). Sem ele, o plano ainda não está à venda — e a tela diz isso, sem erro genérico.
+    if (!plano.stripe_price_id) {
+      return NextResponse.json({ error: `O plano ${plano.nome} ainda não está à venda. Fale com o suporte.`, code: 'plano_sem_preco' }, { status: 409 })
     }
 
     const { data: empresaData } = await supabase
       .from('empresas')
-      .select('id, nome, stripe_customer_id, stripe_subscription_id, stripe_status')
+      .select('id, nome, stripe_customer_id, stripe_subscription_id, stripe_status, trial_ends_at')
       .eq('id', empresaId)
       .single()
 
@@ -44,7 +49,11 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       line_items: [{ price: plano.stripe_price_id, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 14,
+        // O teste já corre desde o cadastro (14 dias): a assinatura continua o que falta dele, sem dar outro.
+        // Teste vencido (ou a menos de 2 dias, mínimo do Stripe) = cobra já.
+        ...(empresaData.trial_ends_at && new Date(empresaData.trial_ends_at).getTime() > Date.now() + 2 * 86_400_000
+          ? { trial_end: Math.floor(new Date(empresaData.trial_ends_at).getTime() / 1000) }
+          : {}),
         metadata: { empresa_id: String(empresaId) },
       },
       metadata: { empresa_id: String(empresaId), plano_id: planoId },

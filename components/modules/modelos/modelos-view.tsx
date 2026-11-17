@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Trash2, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { Card, Input, Textarea, Select, Button, Badge, Modal, ConfirmDialog, notify } from '@/components/ui'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
+import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 // ⚠️ Zona sensível (Meta). Modelo criado aqui é submetido à ANÁLISE da Meta em
 // nome da empresa. Nome, categoria e exemplos seguem as regras dela.
@@ -36,6 +38,8 @@ const CATEGORIAS = [
 ]
 
 export function ModelosView() {
+  // O exemplo de variáveis de loja de celular só com o módulo Celulares e aparelhos ligado.
+  const exemploVariaveis = useModuloLigado('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.variaveisModelo : 'João | Pedido 1042'
   const [modelos, setModelos] = useState<Modelo[]>([])
   const [whatsappConectado, setWhatsappConectado] = useState(true)
   const [carregando, setCarregando] = useState(true)
@@ -215,7 +219,7 @@ export function ModelosView() {
           {variaveis > 0 && (
             <Input
               label={`Exemplos das ${variaveis} variáveis`}
-              placeholder="João | iPhone 15"
+              placeholder={exemploVariaveis}
               value={form.exemplos}
               onChange={(e) => setForm({ ...form, exemplos: e.target.value })}
               hint="Separe com barra vertical. A Meta recusa modelo sem exemplo — é como ela entende o contexto."

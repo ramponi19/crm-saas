@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import EstoqueView from './components/estoque-view'
-import { campoAtivo } from '@/lib/empresa-config'
+import { campoAtivo, carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 import { getEmpresaRole } from '@/lib/owner'
 import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
@@ -50,6 +51,11 @@ export default async function EstoquePage() {
 
   // Transferir mexe no estoque de duas lojas — mesma régua da tela de filiais.
   const papel = await getEmpresaRole()
+
+  // O que é de ramo aparece só com o módulo dono ligado: Celulares (IMEI,
+  // bateria, seminovo, modelo Apple) e Avaliações (veículo — e só para quem tem o
+  // campo placa no item).
+  const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId ?? 0))
 
   // Nome de quem respondeu pela unidade (entrada por troca). Consulta à parte
   // porque o embed não é possível — ver o comentário no select acima.
@@ -131,7 +137,8 @@ export default async function EstoquePage() {
       tabelaPrecos={(tabelaRaw ?? []) as unknown as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
       fornecedores={(fornecedoresRaw ?? []) as { id: number; nome_fantasia: string }[]}
       empresaId={empresaId!}
-      usaPlaca={comPlaca}
+      usaPlaca={comPlaca && ligados.has('/avaliacoes')}
+      celulares={ligados.has(HREF_CELULARES)}
       filiais={filiais}
       podeTransferir={separacaoAtiva(filiais) && (papel === 'owner' || papel === 'admin')}
     />

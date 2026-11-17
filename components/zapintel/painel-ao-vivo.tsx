@@ -12,6 +12,7 @@ import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/c
 import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
 import { useFuso } from "@/components/fuso-provider";
+import { rotuloDoModeloPedido, tituloDoModeloPedido } from "@/components/modules/celulares/zapintel-modelos";
 import { agora, diaNoFuso, primeiroDoMes, rotuloDoMes } from "@/lib/datas";
 
 /**
@@ -194,8 +195,8 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
       <section className="pv-tres iguais">
         <Calor celulas={d.calor} />
         <Bloco titulo="Modelos mais pedidos" nota="clientes que citaram o modelo · 30 dias">
-          <Barras itens={d.modelos.map((m) => ({ nome: `iPhone ${m.modelo}`, n: m.leads, chave: m.modelo }))} cor="var(--blue)"
-            onClick={(_, chave) => abrir({ titulo: `Pediram iPhone ${chave}`, tipo: "modelo", valor: chave })} />
+          <Barras itens={d.modelos.map((m) => ({ nome: rotuloDoModeloPedido(m.modelo), n: m.leads, chave: m.modelo }))} cor="var(--blue)"
+            onClick={(_, chave) => abrir({ titulo: tituloDoModeloPedido(chave), tipo: "modelo", valor: chave })} />
         </Bloco>
         <Bloco titulo="Sem conversa há…" nota="leads ainda em negociação, pela última mensagem">
           <Barras

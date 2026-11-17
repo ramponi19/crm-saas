@@ -2,9 +2,9 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
-import { RelatoriosImobView } from '@/components/modules/relatorios/relatorios-imob-view'
+import { RelatoriosImobView } from '@/components/modules/imoveis/relatorios-imob-view'
 import { exigirPlano } from '@/lib/acesso'
-import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Relatórios' }
@@ -20,11 +20,12 @@ export default async function RelatoriosPage({ searchParams }: {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
   // Mesma capacidade do dashboard: o módulo ligado traz as próprias telas de leitura.
-  if (capacidades(await carregarConfigEmpresa(supabase, empresaId ?? 0)).telasProprias) {
+  const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)
+  if (capacidades(cfg).telasProprias) {
     return (
       <>
         <Topbar title="Relatórios" />
-        <RelatoriosImobView de={sp.de ?? ''} ate={sp.ate ?? ''} corretor={sp.corretor ?? ''} />
+        <RelatoriosImobView de={sp.de ?? ''} ate={sp.ate ?? ''} corretor={sp.corretor ?? ''} equipe={vocabulario(cfg).equipe} />
       </>
     )
   }

@@ -6,7 +6,9 @@ import type { Database } from '@/types/database'
 
 type EmpresaUpdate = Database['public']['Tables']['empresas']['Update']
 
-const PLANOS_VALIDOS = ['free', 'starter', 'pro'] as const
+// 'unlimited' desde 17/11/2026 (o CHECK de empresas.plano passou a aceitar). Os limites seguem o plano pelo
+// gatilho empresas_limites_do_plano (migração 20261117000100).
+const PLANOS_VALIDOS = ['free', 'starter', 'pro', 'unlimited'] as const
 const STATUS_VALIDOS = ['ativo', 'suspenso', 'cancelado'] as const
 
 type Acao =

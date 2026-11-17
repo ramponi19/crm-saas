@@ -56,8 +56,10 @@ export async function POST(req: NextRequest) {
         const empresaId = Number(sub.metadata?.empresa_id)
         if (!empresaId) break
         empresaIdEvento = empresaId
+        // Assinatura encerrada: MODO SÓ LEITURA (17/11/2026). O plano fica o que era (não cai para o
+        // 'free', desativado) e nenhum dado é apagado; o superadmin reativa com um clique.
         await supabase.from('empresas').update({
-          plano: 'free', status: 'ativo', stripe_status: 'canceled',
+          status: 'suspenso', stripe_status: 'canceled',
           stripe_subscription_id: null, stripe_price_id: null,
         }).eq('id', empresaId)
         break

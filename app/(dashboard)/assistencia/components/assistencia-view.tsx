@@ -5,6 +5,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, type Column } from '@/components/ui'
 import OSModal from './os-modal'
 import ServicosCatalogo, { type ServicoReparo } from './servicos-catalogo'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
+import { rotulosOS } from '../rotulos'
 
 interface OS {
   id: number
@@ -63,6 +65,8 @@ const ABAS = [
 ]
 
 export default function AssistenciaView({ ordens, servicos }: Props) {
+  // "Aparelho" só com o módulo Celulares e aparelhos ligado; sem ele, "Item".
+  const rotulos = rotulosOS(!!useModuloLigado('/check-imei'))
   const [aba, setAba] = useState('ordens')
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
@@ -89,7 +93,7 @@ export default function AssistenciaView({ ordens, servicos }: Props) {
       render: (o) => <span className="font-semibold text-ink">{o.protocolo ?? `#OS-${o.id}`}</span>,
     },
     {
-      key: 'aparelho', header: 'Aparelho',
+      key: 'aparelho', header: rotulos.item,
       render: (o) => (
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{o.produtos?.nome ?? '—'}</div>

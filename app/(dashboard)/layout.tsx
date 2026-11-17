@@ -5,6 +5,10 @@ import { TempoRealEmpresa } from '@/components/layout/tempo-real-empresa'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
 import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
+import { SituacaoBanner } from '@/components/layout/situacao-banner'
+import { agora } from '@/lib/datas'
+import { aceitouVigentes } from '@/lib/termos'
+import { situacaoDaEmpresa, type EmpresaSituacao } from '@/lib/situacao-empresa'
 import { createClient } from '@/lib/supabase/server'
 import { getImpersonation } from '@/lib/supabase/server'
 import { EmpresaProvider } from '@/lib/empresa-context'
@@ -15,7 +19,7 @@ import { SessionGuard } from '@/components/layout/session-guard'
 import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import { carregarConfigEmpresa, camadasParaMenu, vocabulario } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, camadasParaMenu, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
@@ -31,6 +35,8 @@ export default async function DashboardLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  // Termos e privacidade com versão nova (lib/termos.ts; desligado sem as versões): aceita antes de usar.
+  if (!(await aceitouVigentes(supabase, user.id))) redirect('/aceite')
 
   const { data: usuarioRaw } = await supabase
     .from('usuarios')
@@ -83,6 +89,12 @@ export default async function DashboardLayout({
     plano = vinculoTyped.empresa?.plano ?? undefined
     empresaId = (vinculoTyped.empresa as { id?: number } | null)?.id
   }
+
+  // Situação da assinatura (17/11/2026): teste acabando, pagamento atrasado, modo somente leitura.
+  const { data: situacaoRow } = empresaId
+    ? await supabase.from('empresas').select('status, stripe_status, trial_ends_at, demo').eq('id', empresaId).maybeSingle()
+    : { data: null }
+  const situacao = situacaoDaEmpresa(situacaoRow as EmpresaSituacao | null, agora())
 
   // Avisos da plataforma (banner) — filtra por alvo: todos | plano | empresa.
   const { data: avisosRaw } = await supabase
@@ -186,6 +198,7 @@ export default async function DashboardLayout({
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
+          <SituacaoBanner situacao={situacao} podePagar={role === 'owner' || role === 'admin'} />
           <LimiteBanner />
           {/*
             Os rótulos da empresa chegam à barra do topo de cada tela.
@@ -193,7 +206,7 @@ export default async function DashboardLayout({
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
           <RotulosProvider valor={rotulos}>
-            <FerramentasProvider valor={ferramentas}>
+            <FerramentasProvider valor={ferramentas} ligados={[...ligadosDaEmpresa(cfg)]}>
               <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
             </FerramentasProvider>
           </RotulosProvider>

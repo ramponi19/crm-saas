@@ -4,7 +4,7 @@ import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { escopoDoUsuario } from '@/lib/escopo'
 import { painelCompleto } from '@/lib/painel/metricas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
-import DashboardImob from './dashboard-imob'
+import DashboardImob from '@/components/modules/imoveis/dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
 

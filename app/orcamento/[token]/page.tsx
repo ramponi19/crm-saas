@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { OrcamentoPublicoView, type OrcamentoPublico } from './orcamento-view'
+import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
 
 export const metadata = { title: 'Orçamento' }
 
@@ -14,7 +15,11 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
     .eq('token', token).maybeSingle()
   if (!orc || !(await moduloEstaLigado(orc.empresa_id, 'orcamentos'))) notFound()
 
-  const { data: empresa } = await svc.from('empresas').select('nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url)').eq('id', orc.empresa_id).maybeSingle()
+  const [{ data: empresa }, celular] = await Promise.all([
+    svc.from('empresas').select('nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url)').eq('id', orc.empresa_id).maybeSingle(),
+    // Aparelho e IMEI só com o módulo Celulares e aparelhos ligado; sem ele, item e nº de série.
+    moduloEstaLigado(orc.empresa_id, 'check_imei'),
+  ])
 
   const dados: OrcamentoPublico = {
     token,
@@ -38,5 +43,5 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
     created_at: orc.created_at,
   }
 
-  return <OrcamentoPublicoView dados={dados} empresaNome={empresa?.nome ?? 'Orçamento'} cor={empresa?.wl_cor || '#2E5CE6'} logo={empresa?.wl_logo_url ?? null} />
+  return <OrcamentoPublicoView dados={dados} rotulos={rotulosOrcamento(celular)} empresaNome={empresa?.nome ?? 'Orçamento'} cor={empresa?.wl_cor || '#2E5CE6'} logo={empresa?.wl_logo_url ?? null} />
 }

@@ -12,6 +12,8 @@ import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData, paraData } from '@/lib/datas'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
+import { rotulosOS } from '../rotulos'
 
 interface Cobranca {
   id: number
@@ -89,6 +91,8 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
   const fuso = useFuso()
+  // Aparelho, IMEI e exemplos de celular só com o módulo Celulares e aparelhos ligado.
+  const r = rotulosOS(!!useModuloLigado('/check-imei'))
   const [form, setForm] = useState<OS>(() => {
     const base = vazia(diaNoFuso(agora(), fuso))
     return isNew ? base : { ...base, ...os }
@@ -378,7 +382,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           <Stat label="Entrada" value={formatarData(os?.data_entrada ?? os?.created_at, undefined, '—', fuso)} />
 
           <Stat label="Orçamento" value={os?.orcamento_valor ? `R$ ${Number(os.orcamento_valor).toLocaleString('pt-BR')}` : '—'} />
-          <Stat label="Aparelho" value={os?.produtos?.nome ?? '—'} />
+          <Stat label={r.item} value={os?.produtos?.nome ?? '—'} />
         </div>
       )}
 
@@ -396,9 +400,9 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </Select>
         <div>
-          <Input label="IMEI / Nº série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+          <Input label={r.serie} value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
           {/* O que a VENDA diz — para o atendente não decidir a garantia de cabeça. */}
-          {buscandoVenda && <p className="mt-1 text-[11.5px] text-ink-3">procurando a venda deste aparelho…</p>}
+          {buscandoVenda && <p className="mt-1 text-[11.5px] text-ink-3">{r.procurandoVenda}</p>}
           {!buscandoVenda && garantiaDaVenda && (
             <p className={`mt-1 text-[11.5px] leading-snug ${garantiaDaVenda.restantes >= 0 ? 'text-ok' : 'text-bad'}`}>
               Vendido em {garantiaDaVenda.vendaEm} · garantia de {garantiaDaVenda.diasTotal} dias ·{' '}
@@ -411,7 +415,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           )}
           {!buscandoVenda && !garantiaDaVenda && (form.imei_serial ?? '').trim().length >= 6 && (
             <p className="mt-1 text-[11.5px] text-ink-3">
-              Nenhuma venda desta loja com este IMEI — trate como reparo externo, salvo comprovação.
+              {r.semVenda}
             </p>
           )}
         </div>
@@ -427,7 +431,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
             {servicos.map(s => <option key={s.id} value={s.id}>{s.nome} — R$ {Number(s.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</option>)}
           </Select>
         )}
-        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder="Ex: Tela trincada..." />
+        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder={r.estadoExemplo} />
         <Textarea wrapperClassName="col-span-2" label="Defeito relatado" rows={2} value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} placeholder="Descreva o problema..." />
         <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico..." />
         <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} placeholder="..." />

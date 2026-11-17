@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { verificarLimite } from '@/lib/limites'
+import { emailConvite, enviarEmail } from '@/lib/email'
 
 // Papéis que podem ser atribuídos por esta rota. 'owner' é definido apenas
 // na criação da empresa e não pode ser concedido aqui.
-const ROLES_PERMITIDOS = ['admin', 'vendedor'] as const
+// 'tecnico' (17/11/2026): o papel existia na tela, na permissão e no banco, e só esta rota o recusava.
+const ROLES_PERMITIDOS = ['admin', 'vendedor', 'tecnico'] as const
 
 /**
  * Mesma regra da rota atualizar-usuario: quem chama so concede papel ABAIXO do
@@ -22,9 +24,12 @@ const HIERARQUIA: Record<string, number> = { superadmin: 4, owner: 3, admin: 2, 
 const EMAIL_VALIDO = /^[^\s@%*]+@[^\s@%*]+\.[^\s@%*]+$/
 
 export async function POST(req: NextRequest) {
-  const { nome, email, senha, role, filialId } = await req.json() as
-    { nome?: string; email?: string; senha?: string; role?: string; filialId?: number | null }
-  if (!nome || !email || !senha || !role)
+  const { nome, email, senha, role, filialId, convite } = await req.json() as
+    { nome?: string; email?: string; senha?: string; role?: string; filialId?: number | null; convite?: boolean }
+  // CONVITE POR E-MAIL (17/11/2026): sem senha digitada pelo dono — a pessoa recebe o link e cria a dela
+  // (/reset-senha). O e-mail sai pelo provedor (lib/email.ts); sem provedor configurado, o link volta na
+  // resposta para o dono repassar (decisão (b) do Lucas: provedor e domínio).
+  if (!nome || !email || (!senha && !convite) || !role)
     return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 })
 
   // O cast existe porque `role` passou a ser tipado na desestruturacao; a
@@ -136,15 +141,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: existente.id, readmitido: true })
   }
 
-  const { data: authData, error: authError } = await service.auth.admin.createUser({
-    email,
-    password: senha,
-    email_confirm: true,
-    user_metadata: { nome },
-  })
-  if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
-
-  const userId = authData.user.id
+  let linkConvite: string | null = null
+  let userId: string
+  if (convite) {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
+    const { data: gerado, error: eLink } = await service.auth.admin.generateLink({
+      type: 'invite', email, options: { data: { nome }, redirectTo: `${base}/reset-senha` },
+    })
+    if (eLink || !gerado?.user) return NextResponse.json({ error: eLink?.message ?? 'Não foi possível gerar o convite' }, { status: 400 })
+    userId = gerado.user.id
+    linkConvite = gerado.properties?.action_link ?? null
+  } else {
+    const { data: authData, error: authError } = await service.auth.admin.createUser({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { nome },
+    })
+    if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
+    userId = authData.user.id
+  }
 
   // O trigger on_auth_user_created (handle_new_user) já insere a linha em
   // public.usuarios assim que o usuário é criado no Auth. Portanto NÃO inserimos
@@ -185,5 +201,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: vErr.message }, { status: 400 })
   }
 
+  if (convite && linkConvite) {
+    const { data: emp } = await service.from('empresas').select('nome').eq('id', empresaId).maybeSingle()
+    const { subject, html } = emailConvite(nome, (emp as { nome?: string } | null)?.nome ?? 'sua empresa', linkConvite)
+    const envio = await enviarEmail({ to: email, subject, html })
+    // Sem provedor (skipped) ou com falha: o dono recebe o link para mandar ele mesmo.
+    const enviado = envio.ok && !envio.skipped
+    return NextResponse.json({ ok: true, id: userId, convite: { enviado, link: enviado ? null : linkConvite } })
+  }
   return NextResponse.json({ ok: true, id: userId })
 }

@@ -89,7 +89,36 @@ const SEM_SESSAO = [
   '/api/agendar/',
   '/api/orcamento/',
   '/api/imob/',
+  // Webhooks de cobrança (17/11/2026): o Stripe e os provedores de Pix/boleto não têm sessão; cada rota
+  // confere a assinatura do provedor (stripe.webhooks.constructEvent / lib/payments). Antes: 401.
+  '/api/stripe/webhook',
+  '/api/payments/webhook/',
 ]
+
+/** APIs que gravam por POST mas não mudam dado da loja, ou que são justamente para sair do só leitura. */
+const LIVRES_NO_SOMENTE_LEITURA = [
+  '/api/superadmin', '/api/stripe/', '/api/push/', '/api/acesso', '/api/filial/selecionar', '/api/assistente',
+  '/api/exportar', '/api/equipe/online', '/api/termos', '/api/register', '/api/zapintel/preview', '/api/ausencia',
+]
+
+const cacheSituacao = new Map<number, { somenteLeitura: boolean; expira: number }>()
+/** A empresa da sessão (respeita impersonação) está em só leitura? 30 s de cache; falha = não trava. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function empresaSomenteLeitura(supabase: any): Promise<boolean> {
+  try {
+    const { data: empresaId } = await supabase.rpc('get_empresa_id')
+    if (!empresaId) return false
+    const c = cacheSituacao.get(empresaId)
+    if (c && c.expira > Date.now()) return c.somenteLeitura
+    const { data } = await supabase.from('empresas').select('status').eq('id', empresaId).maybeSingle()
+    const somenteLeitura = !!data && data.status !== 'ativo'
+    if (cacheSituacao.size > 500) cacheSituacao.clear()
+    cacheSituacao.set(empresaId, { somenteLeitura, expira: Date.now() + 30_000 })
+    return somenteLeitura
+  } catch {
+    return false
+  }
+}
 
 export async function proxy(request: NextRequest) {
   // Antes de qualquer coisa: a rota precisa mesmo de sessão? Ver SEM_SESSAO.
@@ -125,6 +154,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublicRoute = request.nextUrl.pathname === '/' ||
                         request.nextUrl.pathname.startsWith('/privacy') ||
+                        request.nextUrl.pathname.startsWith('/termos') ||
                         request.nextUrl.pathname.startsWith('/para/') ||
                         request.nextUrl.pathname.startsWith('/entrar') ||
                         request.nextUrl.pathname.startsWith('/register') ||
@@ -135,6 +165,8 @@ export async function proxy(request: NextRequest) {
                         // Webhooks de parceiro (Stripe, Meta): quem chama nao tem
                         // sessao; cada rota confere a propria assinatura ou token.
                         request.nextUrl.pathname.startsWith('/api/webhook/') ||
+                        request.nextUrl.pathname.startsWith('/api/stripe/webhook') ||
+                        request.nextUrl.pathname.startsWith('/api/payments/webhook/') ||
                         /**
                          * ⚠️ OS CRONS NUNCA RODARAM. Descoberto em 01/09/2026.
                          *
@@ -220,6 +252,23 @@ export async function proxy(request: NextRequest) {
       url.pathname = LEGADO_ADMIN[legado] + p.slice(legado.length)
       // 308: a mudança é definitiva — o navegador pode lembrar do endereço novo.
       return NextResponse.redirect(url, 308)
+    }
+  }
+
+  /**
+   * MODO SÓ LEITURA (17/11/2026): empresa com teste vencido, assinatura encerrada ou suspensa pelo
+   * superadmin (empresas.status ≠ 'ativo') vê tudo e não grava nada pelas APIs — inclusive as que gravam
+   * com service_role, que a RLS restritiva (sessao_pode_escrever, migração 20261117000100) não pega.
+   * Ficam livres: o que só lê por POST (Assistente, exportar, presença), pagar (Stripe), aceitar termos,
+   * trocar de loja, as do superadmin. O recebimento de mensagens não passa aqui (Edge, service_role).
+   */
+  if (user && request.nextUrl.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+    && !LIVRES_NO_SOMENTE_LEITURA.some((l) => request.nextUrl.pathname.startsWith(l))) {
+    if (await empresaSomenteLeitura(supabase)) {
+      return NextResponse.json({
+        error: 'Esta empresa está em modo somente leitura: dá para ver tudo, mas não criar, editar ou enviar. Regularize a assinatura em Configurações → Plano.',
+        code: 'somente_leitura',
+      }, { status: 423 })
     }
   }
 

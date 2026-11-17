@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
 import { agora, diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * `cliente`: o conjunto sai da camada de clientes (lib/clientes.ts) — `contatos` com a
@@ -86,6 +87,13 @@ export async function GET(req: Request) {
   const perms = permsDoPapel(vinculo?.role ?? null, (empresa?.permissoes ?? null) as PermissoesMap | null)
   if (!perms.exportar) {
     return NextResponse.json({ error: 'Seu perfil não tem permissão para exportar dados.' }, { status: 403 })
+  }
+
+  // Os conjuntos imob_* são do módulo Imóveis (17/11/2026): sem ele ligado, 403 — as tabelas
+  // e os campos são dele, e a tela que os oferece só existe com ele.
+  if (tipo.startsWith('imob_')) {
+    const trava = await exigirModuloLigado(empresaId, 'imoveis')
+    if (trava) return trava
   }
 
   // Tabela dinâmica: o client tipado não aceita nome de tabela em string; cast

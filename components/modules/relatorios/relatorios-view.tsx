@@ -10,6 +10,8 @@ import { RelatorioPerdas } from './relatorio-perdas'
 import { resultadoDasVendas, temCusto } from '@/lib/painel/metricas'
 import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
+import { useCelulares } from '@/components/modules/celulares/use-celulares'
+import { RELATORIOS_CELULAR } from '@/components/modules/celulares/rotulos'
 import { agora, diaNoFuso, formatarData, formatarDiaMes, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
 
 interface Venda {
@@ -31,7 +33,7 @@ interface Venda {
   forma_pagamento: string | null
   observacoes: string | null
   status: string | null
-  /** Aparelho aceito em troca nesta venda ainda não chegou na loja. */
+  /** Item aceito em troca nesta venda ainda não chegou na loja. */
   troca_pendente?: boolean
 }
 
@@ -138,7 +140,8 @@ async function exportClientes(fuso: string) {
   )
 }
 
-async function exportEstoque(fuso: string) {
+/** O IMEI entra no arquivo só com o módulo Celulares ligado. */
+async function exportEstoque(fuso: string, celulares: boolean) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('estoque_unidades')
@@ -149,11 +152,11 @@ async function exportEstoque(fuso: string) {
   if (data.length === 0) { toast.info('Nenhuma unidade para exportar'); return }
   downloadCSV(
     'estoque',
-    ['Produto', 'IMEI', 'Nº Série', 'Estado', 'Status', 'Custo', 'Venda'],
+    ['Produto', ...(celulares ? [RELATORIOS_CELULAR.colunaImei] : []), 'Nº Série', 'Estado', 'Status', 'Custo', 'Venda'],
     (data as Array<{ imei: string | null; numero_serie: string | null; estado: string | null; status: string | null; preco_custo: number | null; preco_venda: number | null; produtos: { nome: string | null } | { nome: string | null }[] | null }>).map(u => {
       const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
       return [
-        prod?.nome ?? '', u.imei ?? '', u.numero_serie ?? '', u.estado ?? '',
+        prod?.nome ?? '', ...(celulares ? [u.imei ?? ''] : []), u.numero_serie ?? '', u.estado ?? '',
         u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
       ]
     }),
@@ -194,6 +197,7 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
 
 export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const fuso = useFuso()
+  const celulares = useCelulares()
   const [aba, setAba]           = useState('vendas')
   // Período padrão: do dia 1 até hoje, no calendário da loja. O `setDate(1)` antigo
   // mantinha a hora e cortava em UTC: depois das 21h o "início do mês" virava dia 2.
@@ -348,7 +352,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
             ))}
           </div>
 
-          {/* Quanto do total ainda depende de um aparelho de troca chegar. */}
+          {/* Quanto do total ainda depende de um item de troca chegar. */}
           {troca.qtd > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-card border border-warn/30 bg-warn-soft px-4 py-3">
               <div>
@@ -360,7 +364,8 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
                 <div className="num text-[18px] font-bold text-warn">{formatCurrency(troca.valorPendente)}</div>
               </div>
               <p className="min-w-[220px] flex-1 text-[12px] text-ink-2">
-                {troca.qtd === 1 ? '1 venda depende' : `${troca.qtd} vendas dependem`} de um aparelho aceito em troca que ainda não chegou na loja.
+                {troca.qtd === 1 ? '1 venda depende' : `${troca.qtd} vendas dependem`}{' '}
+                {celulares ? RELATORIOS_CELULAR.trocaPendente : 'de um item aceito em troca que ainda não chegou na loja.'}{' '}
                 O total acima já inclui esse valor — confirme a chegada no Estoque para liberar comissão e ranking.
               </p>
             </div>
@@ -421,7 +426,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               {[
                 { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas, fuso) },
                 { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => exportClientes(fuso) },
-                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso) },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso, celulares) },
                 { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos, fuso) },
               ].map(e => (
                 <button key={e.label} onClick={e.action}

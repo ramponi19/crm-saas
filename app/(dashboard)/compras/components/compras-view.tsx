@@ -9,6 +9,8 @@ import { formatarDiaMes } from '@/lib/datas'
 import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Modal, Input, Select, Textarea, Button, Badge, EmptyState } from '@/components/ui'
+import { useCelulares } from '@/components/modules/celulares/use-celulares'
+import { COMPRAS_CELULAR } from '@/components/modules/celulares/rotulos'
 
 interface Pedido {
   id: number
@@ -60,6 +62,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
   const router = useRouter()
+  const celulares = useCelulares()
   const [recebendo, setRecebendo] = useState<number | null>(null)
   const [pedidos,        setPedidos]        = useState(pedidosInit)
   const [fornecedores,   setFornecedores]   = useState(fornecedoresInit)
@@ -329,7 +332,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
             required
             value={formPedido.descricao}
             onChange={e => setFormPedido(f => ({ ...f, descricao: e.target.value }))}
-            placeholder="Ex: Reposição de estoque smartphones"
+            placeholder={celulares ? COMPRAS_CELULAR.descricaoPlaceholder : 'Ex: Reposição de estoque'}
           />
           {isAdmin && (
             <Select
