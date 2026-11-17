@@ -1680,3 +1680,11 @@ mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta
 - **Depois:** 85 tabelas com `somente_leitura_*`; políticas `imoveis_*_do_tenant`; presets `geral:true`, os 4 de ramo `false`; JM e Preview ativas, limites intactos. **JM continua gravando nas duas lojas** — pela sessão de um vendedor de cada loja (simulada no banco, `role authenticated`, tudo desfeito): Mogi e Jaguariúna `sessao_pode_escrever = true`, criar/editar/apagar tarefa, editar negócio e contato = 1 linha cada; contraprova: vendedor de Mogi editando negócio de Jaguariúna = 0 linha (a RLS de loja vale na simulação). Envio/recebimento reais depois da aplicação: Mogi 7 enviadas e 2 recebidas até 12:24.
 - **Volta:** `supabase/scripts/volta/volta-pronto-vender.sql` (app anterior antes, se o app novo estiver no ar).
 
+## 50. 17/11: Blocos 2 e 4 em produção (app `47e27482` + `6e3ba30a`, Edge v82)
+
+- **App:** push `47e27482` (merge da `feat/pronto-vender`; IOwait 0,14%), READY `dpl_8jfsT3eRR6LeCXHPwhNkCWeWhJkw`; ajuste `6e3ba30a` (IOwait 0,25%): sem `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` na Vercel (não existem hoje), webhook responde 503 e checkout 409 claros, em vez de 500. Os dois blocos subiram juntos (os commits se misturaram na branch).
+- **Edge `webhook-leads` v82** às 12:32:51 UTC (`tools/deploy-edge.sh origin/main`, conferida com o deno; volta = v81 = `6dc76a07`): empresa com status ≠ 'ativo' não envia (CRM, Automatize, Transmissão → 423 `somente_leitura`); o recebimento não muda.
+- **Smoke sem login:** `/termos` 200; cadastro lista "CRM geral" primeiro (Imobiliária/Saúde/Food/Veículos fora); CNPJ inválido → 400 "CNPJ inválido"; `/aceite` sem login → `/login`; webhook do Stripe passou do 401 da sessão para a rota (500 sem chaves → 503 depois de `6e3ba30a`).
+- **Tráfego real da JM depois da migração (12:23–12:33 UTC):** Mogi 39 enviadas e 17 recebidas; Jaguariúna sem mensagem nesse intervalo — normal para o horário (13/11: 0 antes de 9h40; 16/11: 3), conferir de novo ao longo da manhã.
+- **Pendente:** smoke LOGADO com o Lucas (Bloco 1 e 2 e 4 na tela da JM: menu sem módulo em preparação, Estoque com IMEI, ⌘K, Configurações, card do lead com os painéis de Reserva e Orçamento, painel inicial, aviso de situação ausente).
+
