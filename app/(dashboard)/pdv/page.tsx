@@ -82,7 +82,7 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:vendas_pedidos_compra!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),

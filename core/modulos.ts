@@ -127,7 +127,7 @@ export const GRUPOS_MODULO: { id: GrupoModulo; label: string }[] = [
 ]
 
 export const MODULOS: ModuloManifesto[] = [
-  { chave: 'chat', href: '/chat', tabelas: ['mensagens_internas'], nome: 'Chat da equipe', grupo: 'comunicacao',
+  { chave: 'chat', href: '/chat', nome: 'Chat da equipe', grupo: 'comunicacao',
     frase: 'Conversa interna da equipe, com aviso de mensagem nova no menu.' },
   // Módulo Transmissão (10/11/2026): o filtro da lista é o embrião do módulo Públicos.
   { chave: 'transmissao', href: '/transmissao', tabelas: ['transmissoes'], nome: 'Transmissão', grupo: 'comunicacao',
@@ -141,12 +141,12 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'O que cada vendedor precisa fazer hoje: retornos, tarefas e leads esperando resposta.' },
   { chave: 'gestao_leads', href: '/gestao-leads', nome: 'Gestão de Leads', grupo: 'pipeline',
     frase: 'Mostra o lead que parou — sem resposta, sem próximo passo — e quem precisa cobrar, antes que ele esfrie.' },
-  { chave: 'agenda', href: '/agenda', tabelas: ['visitas'], nome: 'Agenda', grupo: 'pipeline', emPreparacao: true, abasConfiguracoes: ['agendamento'],
+  { chave: 'agenda', href: '/agenda', nome: 'Agenda', grupo: 'pipeline', emPreparacao: true, abasConfiguracoes: ['agendamento'],
     frase: 'Visitas e atendimentos marcados num calendário só, com o lead e o responsável de cada horário.' },
 
-  { chave: 'orcamentos', href: '/orcamentos', tabelas: ['assistencia_orcamentos', 'avaliacao_cotacoes', 'avaliacao_precos', 'avaliacao_regras'], nome: 'Orçamentos', grupo: 'vendas', paineisDoLead: ['orcamento'],
+  { chave: 'orcamentos', href: '/orcamentos', nome: 'Orçamentos', grupo: 'vendas', paineisDoLead: ['orcamento'],
     frase: 'Cotação e orçamento com link de aprovação para o cliente.' },
-  { chave: 'propostas', href: '/propostas', tabelas: ['vendas_propostas'], nome: 'Propostas', grupo: 'vendas',
+  { chave: 'propostas', href: '/propostas', nome: 'Propostas', grupo: 'vendas',
     frase: 'Proposta formal com itens, condições e validade, pronta para enviar.' },
   { chave: 'pdv', href: '/pdv', tabelas: ['vendas_vendas', 'vendas_pagamentos', 'vendas_termos', 'vendas_alertas', 'vendas_pre_vendas', 'vendas_contratos', 'vendas_contrato_modelos', 'vendas_contrato_documentos', 'vendas_comissoes'], nome: 'PDV', grupo: 'vendas', requer: ['estoque'], abasConfiguracoes: ['contrato', 'documentos', 'pagamentos'],
     frase: 'Venda no balcão com pagamento, troca, encomenda e contrato.' },
@@ -154,23 +154,23 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Todas as vendas da loja, com a 2ª via dos documentos emitidos.' },
   { chave: 'simular_parcela', href: '/simular-parcela', nome: 'Simular parcela', grupo: 'vendas',
     frase: 'Quanto fica cada parcela com as taxas da sua maquininha e do link de pagamento.' },
-  { chave: 'simular_financiamento', href: '/simular-financiamento', tabelas: ['vendas_fichas_financiamento'], nome: 'Financiamento', grupo: 'vendas', emPreparacao: true,
+  { chave: 'simular_financiamento', href: '/simular-financiamento', nome: 'Financiamento', grupo: 'vendas', emPreparacao: true,
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
-  { chave: 'avaliacoes', href: '/avaliacoes', tabelas: ['avaliacao_usados'], nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, requer: ['pdv'], abasConfiguracoes: ['veiculos-portais'],
+  { chave: 'avaliacoes', href: '/avaliacoes', nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, requer: ['pdv'], abasConfiguracoes: ['veiculos-portais'],
     capacidades: { automacoesVeiculo: true, matchVeiculo: true }, paineisDoLead: ['interesse-veiculo', 'financiamento'],
     frase: 'Avaliação do veículo na troca, com fotos, avarias e o valor oferecido.' },
-  { chave: 'consulta_fipe', href: '/consulta-fipe', tabelas: ['avaliacao_fipe_consultas', 'avaliacao_fipe_referencia'], nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
+  { chave: 'consulta_fipe', href: '/consulta-fipe', nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
     frase: 'O valor de referência do veículo na tabela FIPE, dentro da avaliação.' },
 
   { chave: 'estoque', href: '/estoque', nome: 'Estoque', grupo: 'estoque', paineisDoLead: ['reserva-estoque'],
     frase: 'As unidades de cada produto na loja, com custo, variante, número de série e transferência entre lojas.' },
   { chave: 'catalogo', href: '/catalogo', nome: 'Produtos', grupo: 'estoque', requer: ['estoque'],
     frase: 'O catálogo de modelos e preços que o PDV e os orçamentos usam.' },
-  { chave: 'compras', href: '/compras', tabelas: ['vendas_pedidos_compra'], nome: 'Compras', grupo: 'estoque', requer: ['estoque'],
+  { chave: 'compras', href: '/compras', nome: 'Compras', grupo: 'estoque', requer: ['estoque'],
     frase: 'Pedido de compra ao fornecedor e a entrada da mercadoria no estoque.' },
   // A seção Troca (tolerância da avaliação do aparelho) é de celular: veio de Orçamentos em 17/11/2026.
-  { chave: 'check_imei', href: '/check-imei', nome: 'Check IMEI', grupo: 'estoque', requer: ['estoque'], abasConfiguracoes: ['troca'],
-    frase: 'Consulta o IMEI antes de comprar ou vender um aparelho.' },
+  { chave: 'celulares', href: '/check-imei', nome: 'Celulares e aparelhos', grupo: 'estoque', requer: ['estoque'], abasConfiguracoes: ['troca'],
+    frase: 'Para quem vende celular: IMEI, bateria e armazenamento no estoque, troca de aparelho com cotação e checklist, e a consulta de IMEI.' },
   { chave: 'imoveis', href: '/imoveis', nome: 'Imóveis', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['portais'],
     capacidades: { agendaVisitas: true, telasProprias: true, integraPortais: true, comissaoPorNegocio: true, captacaoDeImovel: true, clienteComPipeline: true },
     paineisDoLead: ['negocio-imovel', 'match-imoveis'],
@@ -184,15 +184,15 @@ export const MODULOS: ModuloManifesto[] = [
       { entidade: 'contato', chave: 'proprietario', rotulo: 'Proprietário', tipo: 'booleano', ordem: 150 },
     ],
     frase: 'A carteira de imóveis com fotos, chaves e proprietários.' },
-  { chave: 'cardapio', href: '/cardapio', tabelas: ['pedidos'], nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
+  { chave: 'cardapio', href: '/cardapio', nome: 'Cardápio', grupo: 'estoque', emPreparacao: true, abasConfiguracoes: ['cardapio'],
     capacidades: { usaComanda: true },
     frase: 'O cardápio com preços e o pedido do cliente pelo celular.' },
   // `pedidos` saiu da publicação do realtime em 09/11/2026 (ninguém usava o KDS):
   // ativar o KDS exige pôr de volta (ver `realtime` no ModuloManifesto).
-  { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true, requer: ['cardapio'], realtime: ['pedidos'],
+  { chave: 'kds', href: '/kds', nome: 'Cozinha (KDS)', grupo: 'estoque', emPreparacao: true, requer: ['cardapio'], realtime: ['cardapio_pedidos'],
     frase: 'A tela da cozinha com os pedidos na ordem em que entraram.' },
 
-  { chave: 'garantia', href: '/garantia', tabelas: ['assistencia_garantias'], nome: 'Garantia', grupo: 'posvenda', abasConfiguracoes: ['contrato', 'documentos'],
+  { chave: 'garantia', href: '/garantia', nome: 'Garantia', grupo: 'posvenda', abasConfiguracoes: ['contrato', 'documentos'],
     frase: 'O prazo de garantia de cada venda e o aviso do que está vencendo.' },
   { chave: 'assistencia', href: '/assistencia', nome: 'Assistência', grupo: 'posvenda', requer: ['estoque'], abasConfiguracoes: ['pagamentos'],
     frase: 'Ordem de serviço com status, peças e aviso ao cliente.' },
@@ -209,7 +209,12 @@ export const MODULOS: ModuloManifesto[] = [
   { chave: 'ranking', href: '/ranking', nome: 'Metas e ranking', grupo: 'insights', emPreparacao: true,
     frase: 'A equipe ordenada pelo que vendeu no mês, com a meta de cada um.' },
 
-  { chave: 'inteligencia', href: '/zapintel', tabelas: ['rastreamento_config', 'rastreamento_links', 'rastreamento_visitas', 'rastreamento_eventos'], nome: 'ZapIntel', grupo: 'inteligencia', addon: true,
+  // Rastreamento de origem (17/11/2026, decisão do Lucas): links rastreáveis (/i/<código>), pixel do site
+  // (/track.js) e conversão para a Meta. Em preparação até os relatórios de retorno por origem.
+  { chave: 'rastreamento', href: '/rastreamento', nome: 'Rastreamento de origem', grupo: 'insights', emPreparacao: true,
+    frase: 'Links rastreáveis e o pixel do site: de onde veio cada lead e cada venda.' },
+
+  { chave: 'inteligencia', href: '/zapintel', nome: 'ZapIntel', grupo: 'inteligencia', addon: true,
     frase: 'Lê as conversas do WhatsApp e mostra por que a loja vende e por que perde.' },
 ]
 

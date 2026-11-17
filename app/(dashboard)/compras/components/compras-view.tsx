@@ -95,7 +95,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     setErroPedido(null)
     const supabase = createClient()
     const { data, error } = await supabase
-      .from('vendas_pedidos_compra')
+      .from('compras_pedidos')
       .insert({
         empresa_id:    empresaId,
         descricao:     formPedido.descricao.trim(),

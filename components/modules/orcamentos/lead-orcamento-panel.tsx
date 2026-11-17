@@ -51,7 +51,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
      * O vendedor precisa ler o código na lista para ditar no PDV. Buscar
      * cotação por cotação seria N+1 dentro de um modal que abre a cada lead.
      */
-    const { data } = await supabase.from('assistencia_orcamentos')
+    const { data } = await supabase.from('orcamentos_orcamentos')
       // O embed é nomeado pela CONSTRAINT. O hint pela coluna
       // (`!troca_cotacao_id`) também resolve — medido nos dois —, mas o nome da
       // constraint é único por definição, então não passa a ambíguo no dia em
@@ -59,7 +59,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
       //
       // Hint que o PostgREST não resolve falha ALTO, com PGRST200 ("no matches
       // were found"), não em silêncio — conferido com um hint inventado.
-      .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes:avaliacao_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
+      .select('id, tipo, status, total, token, valor_devolver, troca_cotacoes:celulares_troca_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)')
       .eq('lead_id', leadId).order('created_at', { ascending: false })
 
     type Linha = Omit<Orc, 'numero_cotacao'> & { troca_cotacoes: { numero: number | null } | { numero: number | null }[] | null }

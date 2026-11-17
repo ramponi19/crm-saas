@@ -1,5 +1,5 @@
 /**
- * O MÓDULO "CELULARES E APARELHOS" (chave `check_imei` em core/modulos.ts).
+ * O MÓDULO "CELULARES E APARELHOS" (chave `celulares` em core/modulos.ts).
  *
  * Tudo o que é de loja de celular — IMEI, bateria, armazenamento, número de modelo
  * Apple, seminovo, aparelho na troca — mora nesta pasta e só aparece com o módulo

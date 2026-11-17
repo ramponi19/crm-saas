@@ -24,7 +24,7 @@ try {
   ids.NA = sql(`insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status, created_at) values (1, 3, ${ids.A}, 1, 17, 'aberto', now() - interval '5 days') returning id`)
   ids.NB = sql(`insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status, created_at) values (1, 3, ${ids.B}, 1, 27, 'aberto', now() - interval '10 days') returning id`)
   ids.tarefa = sql(`insert into tarefas (empresa_id, filial_id, lead_id, negocio_id, contato_id, titulo, tipo, concluida, origem) values (1, 3, ${ids.NA}, ${ids.NA}, ${ids.A}, '${MK} tarefa', 'ligacao', false, 'manual') returning id`)
-  ids.proposta = sql(`insert into vendas_propostas (empresa_id, filial_id, lead_id, cliente_nome, itens, total, status, token) values (1, 3, ${ids.NA}, '${MK}', '[]', 0, 'rascunho', 'tk${T}') returning id`)
+  ids.proposta = sql(`insert into propostas_propostas (empresa_id, filial_id, lead_id, cliente_nome, itens, total, status, token) values (1, 3, ${ids.NA}, '${MK}', '[]', 0, 'rascunho', 'tk${T}') returning id`)
   ids.hist = sql(`insert into negocio_historico (empresa_id, negocio_id, acao, detalhe) values (1, ${ids.NA}, 'teste_e2e', '{}') returning id`)
   ids.cad = sql(`insert into cadencias (empresa_id, nome, ativo, gatilho) values (1, '${MK} cad', false, 'manual') returning id`)
   ids.inscNA = sql(`insert into cadencia_inscricoes (empresa_id, cadencia_id, lead_id, negocio_id, filial_id, status, passo_ordem, proxima_acao_em) values (1, ${ids.cad}, ${ids.NA}, ${ids.NA}, 3, 'ativa', 1, now() + interval '1 day') returning id`)
@@ -49,7 +49,7 @@ try {
   confere(ativos === ids.NB, `fica o mais avançado (NB=${ids.NB}): ativos ${ativos}`)
   confere(sql(`select (dados->'_juntado'->>'para')||'|'||(dados->'_lead'->>'ativo') from negocios where id=${ids.NA}`) === `${ids.NB}|false`, 'NA saiu do funil (ativo=false) apontando para NB')
   confere(sql(`select lead_id||'|'||negocio_id from tarefas where id=${ids.tarefa}`) === `${ids.NB}|${ids.NB}`, 'tarefa foi para NB')
-  confere(sql(`select lead_id from vendas_propostas where id=${ids.proposta}`) === ids.NB, 'proposta foi para NB')
+  confere(sql(`select lead_id from propostas_propostas where id=${ids.proposta}`) === ids.NB, 'proposta foi para NB')
   confere(sql(`select negocio_id from negocio_historico where id=${ids.hist}`) === ids.NB, 'histórico foi para NB')
   confere(sql(`select count(*) from negocio_historico where negocio_id in (${ids.NA}, ${ids.NB}) and acao in ('juntado','juntado_em')`) === '2', 'histórico registra a junção nos dois')
   confere(sql(`select status from cadencia_inscricoes where id=${ids.inscNA}`) === 'saiu' && sql(`select status from cadencia_inscricoes where id=${ids.inscNB}`) === 'ativa', 'cadência repetida: a de NA saiu, a de NB segue')
@@ -66,7 +66,7 @@ try {
   confere(sql(`select count(*) from contatos where id=${ids.B}`) === '1', 'B voltou')
   confere(sql(`select contato_id||'|'||ativo from negocios where id=${ids.NB}`) === `${ids.B}|true` && sql(`select contato_id||'|'||ativo||'|'||(dados ? '_juntado') from negocios where id=${ids.NA}`) === `${ids.A}|true|false`, 'NA de volta ao funil (sem _juntado), NB de volta com B')
   confere(sql(`select lead_id||'|'||negocio_id from tarefas where id=${ids.tarefa}`) === `${ids.NA}|${ids.NA}`, 'tarefa voltou para NA')
-  confere(sql(`select lead_id from vendas_propostas where id=${ids.proposta}`) === ids.NA, 'proposta voltou para NA')
+  confere(sql(`select lead_id from propostas_propostas where id=${ids.proposta}`) === ids.NA, 'proposta voltou para NA')
   confere(sql(`select negocio_id from negocio_historico where id=${ids.hist}`) === ids.NA, 'histórico voltou para NA')
   confere(sql(`select status from cadencia_inscricoes where id=${ids.inscNA}`) === 'ativa', 'cadência de NA ativa de novo')
   confere(sql(`select status||'|'||negocio_id from automacao_execucoes where id=${ids.exec}`) === `agendada|${ids.NA}`, 'automação agendada de novo em NA')
@@ -80,7 +80,7 @@ try {
   for (const q of [
     `delete from automacao_execucoes where negocio_id in (${neg})`, ids.aut && `delete from automacoes where id=${ids.aut}`,
     `delete from cadencia_inscricoes where negocio_id in (${neg}) or lead_id in (${neg})`, ids.cad && `delete from cadencias where id=${ids.cad}`,
-    `delete from tarefas where lead_id in (${neg}) or negocio_id in (${neg})`, `delete from vendas_propostas where lead_id in (${neg})`,
+    `delete from tarefas where lead_id in (${neg}) or negocio_id in (${neg})`, `delete from propostas_propostas where lead_id in (${neg})`,
     `delete from negocio_historico where negocio_id in (${neg})`, `delete from eventos where entidade_id in (${neg}) and tipo like 'negocio.%'`,
     `delete from negocios where id in (${neg})`, `delete from conversas where contato_id in (${cts})`,
     `delete from contato_identidades where contato_id in (${cts})`, `delete from contato_fusoes where contato_principal_id in (${cts})`,

@@ -181,7 +181,7 @@ export default async function DashboardImob() {
   const fimJanela = instanteLocal(somarDias(diaNoFuso(agora, fuso), DIAS_AGENDA), '00:00', fuso).toISOString()
 
   const SELECT_VISITA: string = `id, data_hora, status, ${embedLead('visitas_lead_id_fkey')}, imoveis:imoveis_imoveis(codigo, titulo)`
-  let vq = supabase.from('visitas').select(SELECT_VISITA)
+  let vq = supabase.from('agenda_visitas').select(SELECT_VISITA)
     .eq('empresa_id', empresaId).gte('data_hora', iniHoje).lt('data_hora', fimJanela).order('data_hora').limit(8)
   if (!isGestor) vq = vq.eq('corretor_id', user.id)
 

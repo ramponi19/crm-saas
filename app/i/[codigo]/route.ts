@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { excedeuLimite } from '@/lib/rate-limit'
 
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   if (id == null) return naoAchou()
   const { data: link } = await db.from('rastreamento_links').select('*').eq('id', id).maybeSingle()
   if (!link || link.ativo === false) return naoAchou()
+  // Módulo em preparação (17/11/2026): o link só redireciona com o Rastreamento ligado na empresa.
+  if (!(await moduloEstaLigado(link.empresa_id as number, 'rastreamento'))) return naoAchou()
 
   const empresaId = link.empresa_id as number
   const { data: empresa } = await db.from('empresas').select('id').eq('id', empresaId).eq('status', 'ativo').maybeSingle()

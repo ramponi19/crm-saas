@@ -34,8 +34,8 @@ type Linha = Record<string, unknown>
 /** Tabelas com chave estrangeira para `contatos` que a fusão move (fora identidades e o próprio registro). */
 export const TABELAS_DO_CONTATO: { tabela: string; coluna: string }[] = [
   { tabela: 'assistencia_garantias', coluna: 'cliente_id' },
-  { tabela: 'assistencia_orcamentos', coluna: 'cliente_id' },
-  { tabela: 'avaliacao_cotacoes', coluna: 'cliente_id' },
+  { tabela: 'orcamentos_orcamentos', coluna: 'cliente_id' },
+  { tabela: 'celulares_troca_cotacoes', coluna: 'cliente_id' },
   { tabela: 'conversas', coluna: 'contato_id' },
   { tabela: 'estoque_unidades', coluna: 'cliente_id' },
   { tabela: 'financeiro_cobrancas', coluna: 'cliente_id' },
@@ -47,7 +47,7 @@ export const TABELAS_DO_CONTATO: { tabela: string; coluna: string }[] = [
   { tabela: 'tarefas', coluna: 'contato_id' },
   { tabela: 'vendas_contratos', coluna: 'cliente_id' },
   { tabela: 'vendas_vendas', coluna: 'cliente_id' },
-  { tabela: 'visitas', coluna: 'cliente_id' },
+  { tabela: 'agenda_visitas', coluna: 'cliente_id' },
 ]
 
 /** Campos que a fusão preenche no principal quando ele os tinha vazios (coalesce). */

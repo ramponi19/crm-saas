@@ -52,7 +52,7 @@ const TABELAS: Record<string, Conjunto> = {
                      colunas: 'nome, kanban_status, origem, valor_estimado, ultima_tratativa, ultima_mensagem_at, responsavel_id, created_at' },
   imob_financeiro: { tabela: 'imoveis_negocios', data: 'created_at', corretor: 'corretor_id', dono: 'corretor_id', verOutros: 'verVendasOutros',
                      colunas: 'origem, cliente_nome, imovel_codigo, tipo, valor, percentual, comissao_total, comissao_captador, comissao_vendedor, cashback, cashback_percentual, comissao_status, comissao_aprovada_em, comissao_paga_em, status, assinado_em, corretor_id, captador_id, created_at' },
-  imob_corretores: { tabela: 'visitas', data: 'data_hora', corretor: 'corretor_id', dono: 'corretor_id', verOutros: 'verLeadsOutros',
+  imob_corretores: { tabela: 'agenda_visitas', data: 'data_hora', corretor: 'corretor_id', dono: 'corretor_id', verOutros: 'verLeadsOutros',
                      colunas: 'titulo, tipo, status, data_hora, corretor_id, lead_id, imovel_id, created_at' },
 }
 

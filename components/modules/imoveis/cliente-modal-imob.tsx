@@ -182,7 +182,7 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motiv
       leadId != null
         ? supabase.from('chamadas').select('direcao, resultado, duracao_seg, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(15)
         : Promise.resolve({ data: [] }),
-      supabase.from('visitas').select('titulo, tipo, status, data_hora').eq('cliente_id', cliente.id).order('data_hora', { ascending: false }).limit(15),
+      supabase.from('agenda_visitas').select('titulo, tipo, status, data_hora').eq('cliente_id', cliente.id).order('data_hora', { ascending: false }).limit(15),
       supabase.from('imoveis_negocios').select('tipo, valor, status, created_at').eq('cliente_id', cliente.id).order('created_at', { ascending: false }).limit(10),
     ])
 

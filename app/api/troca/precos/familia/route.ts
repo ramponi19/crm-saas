@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   const bruto = b.valor
   const valor = bruto == null || bruto === '' ? null : Math.max(0, Number(bruto) || 0)
 
-  const { data: existentes } = await supabase.from('avaliacao_precos')
+  const { data: existentes } = await supabase.from('celulares_troca_precos')
     .select('id, modelo, armazenamento, descontos')
     .eq('empresa_id', empresaId)
     .in('modelo', [...new Set(familia.linhas.map((l) => l.modelo))])
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
     else descontos[avaria] = valor
 
     if (atual) {
-      const { data: gravou, error } = await supabase.from('avaliacao_precos')
+      const { data: gravou, error } = await supabase.from('celulares_troca_precos')
         .update({ descontos: descontos as never, atualizado_em: agora } as never).eq('id', atual.id).select('id')
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 409 })
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   }
 
   if (paraInserir.length) {
-    const { error } = await supabase.from('avaliacao_precos').insert(paraInserir as never)
+    const { error } = await supabase.from('celulares_troca_precos').insert(paraInserir as never)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

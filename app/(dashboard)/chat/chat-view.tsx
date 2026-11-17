@@ -126,7 +126,7 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
   useEffect(() => {
     if (!peer) { setDireto([]); return }
     let cancel = false
-    supabase.from('mensagens_internas')
+    supabase.from('chat_mensagens')
       .select('id, autor_id, destinatario_id, conteudo, created_at')
       .eq('empresa_id', empresaId).eq('tipo', 'direto')
       .or(`and(autor_id.eq.${meuId},destinatario_id.eq.${peer}),and(autor_id.eq.${peer},destinatario_id.eq.${meuId})`)
@@ -142,7 +142,7 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
   // Realtime: um canal por empresa; a RLS já filtra (mural p/ todos, direto só meu).
   useEffect(() => {
     const ch = supabase.channel(`chat_${empresaId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens_internas', filter: `empresa_id=eq.${empresaId}` },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens', filter: `empresa_id=eq.${empresaId}` },
         (payload: RealtimePostgresInsertPayload<Msg & { tipo: string }>) => {
           const m = payload.new
           if (m.tipo === 'mural') {
@@ -167,7 +167,7 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
     if (aba === 'direto' && !peer) { notify.warn('Escolha com quem conversar'); return }
     setEnviando(true)
     const row = { empresa_id: empresaId, autor_id: meuId, tipo: aba, conteudo: texto, destinatario_id: aba === 'direto' ? peer : null }
-    const { data, error } = await supabase.from('mensagens_internas').insert(row).select('id, autor_id, destinatario_id, conteudo, created_at').single()
+    const { data, error } = await supabase.from('chat_mensagens').insert(row).select('id, autor_id, destinatario_id, conteudo, created_at').single()
     setEnviando(false)
     if (error) { notify.bad('Erro ao enviar', error.message); return }
     setDraft('')
@@ -182,7 +182,7 @@ export function ChatView({ empresaId, meuId, membros, muralInicial }: { empresaI
   }
 
   async function apagar(id: number, tipo: 'mural' | 'direto') {
-    const { data: apagadas, error } = await supabase.from('mensagens_internas').delete().eq('id', id).select('id')
+    const { data: apagadas, error } = await supabase.from('chat_mensagens').delete().eq('id', id).select('id')
     if (error) { notify.bad('Erro ao apagar'); return }
     // 0 linhas = a mensagem não é sua (a RLS só deixa o autor apagar) ou já tinha saído.
     if (nadaGravado(apagadas)) { notify.bad('Não foi possível apagar', 'Só quem enviou pode apagar a mensagem, ou ela já foi apagada.'); return }

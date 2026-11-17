@@ -73,7 +73,7 @@ try {
   const loja = sql(`select f.id||'|'||f.matriz||'|'||(eu.filial_id = f.id) from filiais f join empresa_usuarios eu on eu.empresa_id=f.empresa_id where f.empresa_id=${empresaB}`)
   confere(/^\d+\|(t|true)\|(t|true)$/.test(loja), `B nasce com a loja principal e o dono vinculado a ela (${loja})`)
   const modsB = sql(`select coalesce(string_agg(modulo, ','), '') from empresa_modulos where empresa_id=${empresaB} and ativo`)
-  confere(!/estoque|pdv|check_imei|imoveis|agenda|cardapio/.test(modsB), `B (CRM geral) sem módulo de ramo ligado (${modsB || 'nenhum'})`)
+  confere(!/estoque|pdv|celulares|imoveis|agenda|cardapio/.test(modsB), `B (CRM geral) sem módulo de ramo ligado (${modsB || 'nenhum'})`)
 
   const cA = await sessao(E.dono)
   const cB = await sessao(EMAIL_B)

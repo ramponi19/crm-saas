@@ -8,7 +8,7 @@ import { Card, Button, Input, notify } from '@/components/ui'
 import { TOLERANCIA_PADRAO } from '@/lib/troca-referencia'
 
 /**
- * Seção "Troca" de Configurações — do módulo Celulares e aparelhos (`check_imei`, que declara
+ * Seção "Troca" de Configurações — do módulo Celulares e aparelhos (`celulares`, que declara
  * `abasConfiguracoes: ['troca']` em core/modulos.ts): sem ele ligado, a seção não existe.
  *
  * Quanto o vendedor pode passar do preço de referência ao avaliar um aparelho

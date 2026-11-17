@@ -187,14 +187,14 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
     // O que não saiu é dito ao vendedor: meia encomenda calada é o que este
     // desfazer existe para evitar.
     const sobras: string[] = []
-    const apagar = async (tabela: 'vendas_vendas' | 'vendas_pedidos_compra', id: number, rotulo: string) => {
+    const apagar = async (tabela: 'vendas_vendas' | 'compras_pedidos', id: number, rotulo: string) => {
       const { data } = await supabase.from(tabela).delete().eq('id', id).select('id')
       if (nadaGravado(data)) sobras.push(`${rotulo} #${id}`)
     }
-    if (pedidoSolto != null) await apagar('vendas_pedidos_compra', pedidoSolto, 'pedido')
+    if (pedidoSolto != null) await apagar('compras_pedidos', pedidoSolto, 'pedido')
     for (const c of criados) {
       await apagar('vendas_vendas', c.vendaId, 'venda')
-      await apagar('vendas_pedidos_compra', c.pedidoId, 'pedido')
+      await apagar('compras_pedidos', c.pedidoId, 'pedido')
     }
     if (sobras.length) {
       notify.bad('A encomenda não foi desfeita por inteiro',
@@ -264,7 +264,7 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
       const descricao = descreverItem(item)
       const vItem = Number(item.valor) || 0
 
-      const { data: pedido, error: e1 } = await supabase.from('vendas_pedidos_compra').insert({
+      const { data: pedido, error: e1 } = await supabase.from('compras_pedidos').insert({
         empresa_id: empresaId,
         // Fornecedor sai do balcão: quem compra define depois, em Compras. O
         // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.

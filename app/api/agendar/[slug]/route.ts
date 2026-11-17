@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   }
 
   // Evita marcar em cima de outra consulta no mesmo horário.
-  const { data: conflito } = await svc.from('visitas')
+  const { data: conflito } = await svc.from('agenda_visitas')
     .select('id').eq('empresa_id', empresa.id).eq('data_hora', dataHora.toISOString()).neq('status', 'cancelada').maybeSingle()
   if (conflito) return NextResponse.json({ error: 'Horário indisponível' }, { status: 409, headers: CORS })
 
@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     observacoes: 'Agendamento online',
   })
 
-  const { error } = await svc.from('visitas').insert({
+  const { error } = await svc.from('agenda_visitas').insert({
     empresa_id: empresa.id, lead_id: lead?.id ?? null, corretor_id: responsavel,
     data_hora: dataHora.toISOString(), status: 'agendada',
     observacoes: b.observacoes?.trim() || 'Agendado pelo cliente (online)',

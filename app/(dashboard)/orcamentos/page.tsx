@@ -31,7 +31,7 @@ export default async function OrcamentosPage() {
   const soMeus = !ehGestor && !!papel
     && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
 
-  const baseOrc = supabase.from('assistencia_orcamentos')
+  const baseOrc = supabase.from('orcamentos_orcamentos')
     .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, cliente_id, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, valor_devolver, acerto, observacoes, token, created_at')
     .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(200)
 
@@ -75,9 +75,9 @@ export default async function OrcamentosPage() {
   let corteBateria = 80
   if (trocaLiberada) {
     const [{ data: tp }, { data: tr }] = await Promise.all([
-      supabase.from('avaliacao_precos').select('modelo, armazenamento, na_troca, descontos')
+      supabase.from('celulares_troca_precos').select('modelo, armazenamento, na_troca, descontos')
         .eq('empresa_id', empresaId).eq('ativo', true),
-      supabase.from('avaliacao_regras').select('bonus_seminovo, corte_bateria')
+      supabase.from('celulares_troca_regras').select('bonus_seminovo, corte_bateria')
         .eq('empresa_id', empresaId).maybeSingle(),
     ])
     for (const p of tp ?? []) {

@@ -23,7 +23,7 @@ export default async function ChatPage() {
      * pareceria congelado sem nenhum erro na tela. Busca em ordem decrescente e
      * inverte para exibir.
      */
-    supabase.from('mensagens_internas')
+    supabase.from('chat_mensagens')
       .select('id, autor_id, conteudo, created_at')
       .eq('empresa_id', empresaId).eq('tipo', 'mural')
       .order('created_at', { ascending: false }).limit(100),

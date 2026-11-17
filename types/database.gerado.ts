@@ -49,6 +49,56 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"agenda_visitas": {
+                  Row: {
+                    "cliente_id": number | null,"corretor_id": string | null,"created_at": string | null,"data_hora": string,"empresa_id": number,"filial_id": number | null,"fim": string | null,"id": number,"imovel_id": number | null,"lead_id": number | null,"local": string | null,"observacoes": string | null,"participantes": string | null,"status": string,"tipo": string,"titulo": string | null,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_id"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"data_hora": string,"empresa_id": number,"filial_id"?: number | null,"fim"?: string | null,"id"?: number,"imovel_id"?: number | null,"lead_id"?: number | null,"local"?: string | null,"observacoes"?: string | null,"participantes"?: string | null,"status"?: string,"tipo"?: string,"titulo"?: string | null,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "cliente_id"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"data_hora"?: string,"empresa_id"?: number,"filial_id"?: number | null,"fim"?: string | null,"id"?: number,"imovel_id"?: number | null,"lead_id"?: number | null,"local"?: string | null,"observacoes"?: string | null,"participantes"?: string | null,"status"?: string,"tipo"?: string,"titulo"?: string | null,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "visitas_cliente_id_fkey"
+      columns: ["cliente_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_corretor_id_fkey"
+      columns: ["corretor_id"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_imovel_id_fkey"
+      columns: ["imovel_id"]
+isOneToOne: false
+      referencedRelation: "imoveis_imoveis"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visitas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"assistencia_garantias": {
                   Row: {
                     "aprovado_em": string | null,"celular_reserva_fornecido": boolean | null,"cliente_id": number | null,"created_at": string | null,"data_entrada": string | null,"defeito_relatado": string | null,"dentro_garantia": boolean | null,"dias_garantia_restantes": number | null,"empresa_id": number,"estado_entrada": string | null,"filial_id": number | null,"id": number,"imei_serial": string | null,"modelo_reserva": string | null,"observacoes": string | null,"orcamento_valor": number | null,"parecer_tecnico": string | null,"produto_id": number | null,"protocolo": string | null,"recusado_em": string | null,"responsavel_tecnico_id": string | null,"status": string | null,"tipo": string | null,"token": string | null,"usuario_id": string | null
@@ -96,56 +146,6 @@ isOneToOne: false
       columns: ["usuario_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"assistencia_orcamentos": {
-                  Row: {
-                    "acerto": string | null,"aparelho": string | null,"aparelho_novo": string | null,"aparelho_usado": string | null,"aprovado_em": string | null,"cliente_id": number | null,"cliente_nome": string,"cliente_telefone": string | null,"created_at": string | null,"defeito": string | null,"empresa_id": number,"filial_id": number | null,"garantia_dias": number | null,"id": number,"imei": string | null,"itens": NonNullable<Json>,"lead_id": number | null,"observacoes": string | null,"os_id": number | null,"prazo_dias": number | null,"recusado_em": string | null,"status": string,"tipo": string,"token": string,"total": number,"troca_cotacao_id": number | null,"unidade_id": number | null,"usuario_id": string | null,"valor_devolver": number,"valor_entrada": number | null,"valor_novo": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome": string,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id": number,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: never,"imei"?: string | null,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string,"tipo"?: string,"token"?: string,"total"?: number,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number,"valor_entrada"?: number | null,"valor_novo"?: number | null
-                  }
-                  Update: {
-                    "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: never,"imei"?: string | null,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string,"tipo"?: string,"token"?: string,"total"?: number,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number,"valor_entrada"?: number | null,"valor_novo"?: number | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "orcamentos_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
-      columns: ["troca_cotacao_id"]
-isOneToOne: false
-      referencedRelation: "avaliacao_cotacoes"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "orcamentos_unidade_id_fkey"
-      columns: ["unidade_id"]
-isOneToOne: false
-      referencedRelation: "estoque_unidades"
       referencedColumns: ["id"]
     }
                   ]
@@ -291,125 +291,7 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"avaliacao_cotacoes": {
-                  Row: {
-                    "armazenamento": string,"avarias": NonNullable<Json>,"bonus": number,"checklist": NonNullable<Json>,"cliente_id": number | null,"cliente_nome": string | null,"created_at": string,"descontos_total": number,"empresa_id": number,"filial_id": number | null,"id": number,"imei": string | null,"lead_id": number | null,"modelo": string,"na_troca": number,"numero": number | null,"observacoes": string | null,"status": string,"usada_em": string | null,"usuario_id": string | null,"valor_final": number,"venda_id": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "armazenamento"?: string,"avarias"?: NonNullable<Json>,"bonus"?: number,"checklist"?: NonNullable<Json>,"cliente_id"?: number | null,"cliente_nome"?: string | null,"created_at"?: string,"descontos_total"?: number,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"imei"?: string | null,"lead_id"?: number | null,"modelo": string,"na_troca"?: number,"numero"?: number | null,"observacoes"?: string | null,"status"?: string,"usada_em"?: string | null,"usuario_id"?: string | null,"valor_final"?: number,"venda_id"?: number | null
-                  }
-                  Update: {
-                    "armazenamento"?: string,"avarias"?: NonNullable<Json>,"bonus"?: number,"checklist"?: NonNullable<Json>,"cliente_id"?: number | null,"cliente_nome"?: string | null,"created_at"?: string,"descontos_total"?: number,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"imei"?: string | null,"lead_id"?: number | null,"modelo"?: string,"na_troca"?: number,"numero"?: number | null,"observacoes"?: string | null,"status"?: string,"usada_em"?: string | null,"usuario_id"?: string | null,"valor_final"?: number,"venda_id"?: number | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "troca_cotacoes_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "troca_cotacoes_venda_id_fkey"
-      columns: ["venda_id"]
-isOneToOne: false
-      referencedRelation: "vendas_vendas"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"avaliacao_fipe_consultas": {
-                  Row: {
-                    "ano": string,"ano_label": string | null,"codigo_fipe": string | null,"codigo_marca": number,"codigo_modelo": number,"criado_em": string | null,"id": number,"marca_nome": string | null,"mes_referencia": string | null,"modelo_nome": string | null,"referencia_codigo": number,"tipo": number,"valor": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "ano": string,"ano_label"?: string | null,"codigo_fipe"?: string | null,"codigo_marca": number,"codigo_modelo": number,"criado_em"?: string | null,"id"?: never,"marca_nome"?: string | null,"mes_referencia"?: string | null,"modelo_nome"?: string | null,"referencia_codigo": number,"tipo": number,"valor"?: number | null
-                  }
-                  Update: {
-                    "ano"?: string,"ano_label"?: string | null,"codigo_fipe"?: string | null,"codigo_marca"?: number,"codigo_modelo"?: number,"criado_em"?: string | null,"id"?: never,"marca_nome"?: string | null,"mes_referencia"?: string | null,"modelo_nome"?: string | null,"referencia_codigo"?: number,"tipo"?: number,"valor"?: number | null
-                  }
-                  Relationships: [
-                    
-                  ]
-                },"avaliacao_fipe_referencia": {
-                  Row: {
-                    "atualizado_em": string | null,"codigo": number | null,"id": number,"mes": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "atualizado_em"?: string | null,"codigo"?: number | null,"id"?: number,"mes"?: string | null
-                  }
-                  Update: {
-                    "atualizado_em"?: string | null,"codigo"?: number | null,"id"?: number,"mes"?: string | null
-                  }
-                  Relationships: [
-                    
-                  ]
-                },"avaliacao_precos": {
-                  Row: {
-                    "armazenamento": string,"ativo": boolean,"atualizado_em": string,"descontos": NonNullable<Json>,"empresa_id": number,"id": number,"modelo": string,"na_troca": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "armazenamento"?: string,"ativo"?: boolean,"atualizado_em"?: string,"descontos"?: NonNullable<Json>,"empresa_id": number,"id"?: number,"modelo": string,"na_troca"?: number | null
-                  }
-                  Update: {
-                    "armazenamento"?: string,"ativo"?: boolean,"atualizado_em"?: string,"descontos"?: NonNullable<Json>,"empresa_id"?: number,"id"?: number,"modelo"?: string,"na_troca"?: number | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "troca_precos_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"avaliacao_regras": {
-                  Row: {
-                    "atualizado_em": string,"bonus_seminovo": number,"corte_bateria": number,"empresa_id": number,"observacoes": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "atualizado_em"?: string,"bonus_seminovo"?: number,"corte_bateria"?: number,"empresa_id": number,"observacoes"?: string | null
-                  }
-                  Update: {
-                    "atualizado_em"?: string,"bonus_seminovo"?: number,"corte_bateria"?: number,"empresa_id"?: number,"observacoes"?: string | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "troca_regras_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: true
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"avaliacao_usados": {
+                },"avaliacoes_usados": {
                   Row: {
                     "created_at": string | null,"empresa_id": number,"filial_id": number | null,"fotos_urls": string | null,"id": number,"km": number | null,"lead_id": number | null,"observacoes": string | null,"status": string,"unidade_id": number | null,"usuario_id": string | null,"valor_mercado": number | null,"valor_ofertado": number | null,"veiculo": Json | null
                   }
@@ -443,6 +325,32 @@ isOneToOne: false
       foreignKeyName: "avaliacoes_usados_unidade_id_fkey"
       columns: ["unidade_id"]
 isOneToOne: false
+      referencedRelation: "estoque_unidades"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"avaliacoes_veiculo_dados": {
+                  Row: {
+                    "ano": number | null,"chassi": string | null,"created_at": string | null,"empresa_id": number,"km": number | null,"placa": string | null,"renavam": string | null,"unidade_id": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ano"?: number | null,"chassi"?: string | null,"created_at"?: string | null,"empresa_id": number,"km"?: number | null,"placa"?: string | null,"renavam"?: string | null,"unidade_id": number
+                  }
+                  Update: {
+                    "ano"?: number | null,"chassi"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"km"?: number | null,"placa"?: string | null,"renavam"?: string | null,"unidade_id"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "veiculo_dados_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "veiculo_dados_unidade_id_fkey"
+      columns: ["unidade_id"]
+isOneToOne: true
       referencedRelation: "estoque_unidades"
       referencedColumns: ["id"]
     }
@@ -629,6 +537,148 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"cardapio_pedidos": {
+                  Row: {
+                    "cliente_nome": string | null,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"itens": NonNullable<Json>,"mesa": string | null,"observacoes": string | null,"origem": string | null,"status": string,"total": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"mesa"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"status"?: string,"total"?: number
+                  }
+                  Update: {
+                    "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"mesa"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"status"?: string,"total"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pedidos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"celulares_imei_consultas": {
+                  Row: {
+                    "consultado_em": string,"consultado_por": string | null,"empresa_id": number,"fonte": string,"id": number,"imei": string,"motivo": string | null,"observacoes": string | null,"resultado": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "consultado_em"?: string,"consultado_por"?: string | null,"empresa_id": number,"fonte"?: string,"id"?: number,"imei": string,"motivo"?: string | null,"observacoes"?: string | null,"resultado": string
+                  }
+                  Update: {
+                    "consultado_em"?: string,"consultado_por"?: string | null,"empresa_id"?: number,"fonte"?: string,"id"?: number,"imei"?: string,"motivo"?: string | null,"observacoes"?: string | null,"resultado"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "imei_consultas_consultado_por_fkey"
+      columns: ["consultado_por"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "imei_consultas_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"celulares_troca_cotacoes": {
+                  Row: {
+                    "armazenamento": string,"avarias": NonNullable<Json>,"bonus": number,"checklist": NonNullable<Json>,"cliente_id": number | null,"cliente_nome": string | null,"created_at": string,"descontos_total": number,"empresa_id": number,"filial_id": number | null,"id": number,"imei": string | null,"lead_id": number | null,"modelo": string,"na_troca": number,"numero": number | null,"observacoes": string | null,"status": string,"usada_em": string | null,"usuario_id": string | null,"valor_final": number,"venda_id": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "armazenamento"?: string,"avarias"?: NonNullable<Json>,"bonus"?: number,"checklist"?: NonNullable<Json>,"cliente_id"?: number | null,"cliente_nome"?: string | null,"created_at"?: string,"descontos_total"?: number,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"imei"?: string | null,"lead_id"?: number | null,"modelo": string,"na_troca"?: number,"numero"?: number | null,"observacoes"?: string | null,"status"?: string,"usada_em"?: string | null,"usuario_id"?: string | null,"valor_final"?: number,"venda_id"?: number | null
+                  }
+                  Update: {
+                    "armazenamento"?: string,"avarias"?: NonNullable<Json>,"bonus"?: number,"checklist"?: NonNullable<Json>,"cliente_id"?: number | null,"cliente_nome"?: string | null,"created_at"?: string,"descontos_total"?: number,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"imei"?: string | null,"lead_id"?: number | null,"modelo"?: string,"na_troca"?: number,"numero"?: number | null,"observacoes"?: string | null,"status"?: string,"usada_em"?: string | null,"usuario_id"?: string | null,"valor_final"?: number,"venda_id"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "troca_cotacoes_cliente_id_fkey"
+      columns: ["cliente_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "troca_cotacoes_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "troca_cotacoes_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "troca_cotacoes_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "troca_cotacoes_usuario_id_fkey"
+      columns: ["usuario_id"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "troca_cotacoes_venda_id_fkey"
+      columns: ["venda_id"]
+isOneToOne: false
+      referencedRelation: "vendas_vendas"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"celulares_troca_precos": {
+                  Row: {
+                    "armazenamento": string,"ativo": boolean,"atualizado_em": string,"descontos": NonNullable<Json>,"empresa_id": number,"id": number,"modelo": string,"na_troca": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "armazenamento"?: string,"ativo"?: boolean,"atualizado_em"?: string,"descontos"?: NonNullable<Json>,"empresa_id": number,"id"?: number,"modelo": string,"na_troca"?: number | null
+                  }
+                  Update: {
+                    "armazenamento"?: string,"ativo"?: boolean,"atualizado_em"?: string,"descontos"?: NonNullable<Json>,"empresa_id"?: number,"id"?: number,"modelo"?: string,"na_troca"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "troca_precos_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"celulares_troca_regras": {
+                  Row: {
+                    "atualizado_em": string,"bonus_seminovo": number,"corte_bateria": number,"empresa_id": number,"observacoes": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string,"bonus_seminovo"?: number,"corte_bateria"?: number,"empresa_id": number,"observacoes"?: string | null
+                  }
+                  Update: {
+                    "atualizado_em"?: string,"bonus_seminovo"?: number,"corte_bateria"?: number,"empresa_id"?: number,"observacoes"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "troca_regras_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: true
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"chamadas": {
                   Row: {
                     "created_at": string | null,"direcao": string,"duracao_seg": number | null,"empresa_id": number,"filial_id": number | null,"id": number,"lead_id": number | null,"observacao": string | null,"resultado": string,"usuario_id": string | null
@@ -687,6 +737,70 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"chat_mensagens": {
+                  Row: {
+                    "autor_id": string,"conteudo": string,"created_at": string | null,"destinatario_id": string | null,"empresa_id": number,"id": number,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "autor_id": string,"conteudo": string,"created_at"?: string | null,"destinatario_id"?: string | null,"empresa_id": number,"id"?: never,"tipo"?: string
+                  }
+                  Update: {
+                    "autor_id"?: string,"conteudo"?: string,"created_at"?: string | null,"destinatario_id"?: string | null,"empresa_id"?: number,"id"?: never,"tipo"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mensagens_internas_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"compras_pedidos": {
+                  Row: {
+                    "created_at": string | null,"data_pedido": string | null,"descricao": string | null,"empresa_id": number,"filial_id": number | null,"fornecedor_id": number | null,"id": number,"observacoes": string | null,"solicitado_em": string | null,"solicitado_por": string | null,"status": string | null,"usuario_id": string | null,"valor_total": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id": number,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: never,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
+                  }
+                  Update: {
+                    "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: never,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pedidos_compra_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_compra_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_compra_fornecedor_id_fkey"
+      columns: ["fornecedor_id"]
+isOneToOne: false
+      referencedRelation: "estoque_fornecedores"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_compra_solicitado_por_fkey"
+      columns: ["solicitado_por"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_compra_usuario_id_fkey"
+      columns: ["usuario_id"]
+isOneToOne: false
+      referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"configuracoes_sistema": {
                   Row: {
                     "chave": string,"empresa_id": number,"id": number,"updated_at": string | null,"valor": Json | null
@@ -706,6 +820,34 @@ isOneToOne: false
       referencedRelation: "empresas"
       referencedColumns: ["id"]
     }
+                  ]
+                },"consulta_fipe_consultas": {
+                  Row: {
+                    "ano": string,"ano_label": string | null,"codigo_fipe": string | null,"codigo_marca": number,"codigo_modelo": number,"criado_em": string | null,"id": number,"marca_nome": string | null,"mes_referencia": string | null,"modelo_nome": string | null,"referencia_codigo": number,"tipo": number,"valor": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ano": string,"ano_label"?: string | null,"codigo_fipe"?: string | null,"codigo_marca": number,"codigo_modelo": number,"criado_em"?: string | null,"id"?: never,"marca_nome"?: string | null,"mes_referencia"?: string | null,"modelo_nome"?: string | null,"referencia_codigo": number,"tipo": number,"valor"?: number | null
+                  }
+                  Update: {
+                    "ano"?: string,"ano_label"?: string | null,"codigo_fipe"?: string | null,"codigo_marca"?: number,"codigo_modelo"?: number,"criado_em"?: string | null,"id"?: never,"marca_nome"?: string | null,"mes_referencia"?: string | null,"modelo_nome"?: string | null,"referencia_codigo"?: number,"tipo"?: number,"valor"?: number | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"consulta_fipe_referencia": {
+                  Row: {
+                    "atualizado_em": string | null,"codigo": number | null,"id": number,"mes": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string | null,"codigo"?: number | null,"id"?: number,"mes"?: string | null
+                  }
+                  Update: {
+                    "atualizado_em"?: string | null,"codigo"?: number | null,"id"?: number,"mes"?: string | null
+                  }
+                  Relationships: [
+                    
                   ]
                 },"contato_fusoes": {
                   Row: {
@@ -1079,32 +1221,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"estoque_imei_consultas": {
-                  Row: {
-                    "consultado_em": string,"consultado_por": string | null,"empresa_id": number,"fonte": string,"id": number,"imei": string,"motivo": string | null,"observacoes": string | null,"resultado": string
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "consultado_em"?: string,"consultado_por"?: string | null,"empresa_id": number,"fonte"?: string,"id"?: number,"imei": string,"motivo"?: string | null,"observacoes"?: string | null,"resultado": string
-                  }
-                  Update: {
-                    "consultado_em"?: string,"consultado_por"?: string | null,"empresa_id"?: number,"fonte"?: string,"id"?: number,"imei"?: string,"motivo"?: string | null,"observacoes"?: string | null,"resultado"?: string
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "imei_consultas_consultado_por_fkey"
-      columns: ["consultado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "imei_consultas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"estoque_marcas": {
                   Row: {
                     "ativo": boolean | null,"created_at": string | null,"empresa_id": number,"id": number,"nome": string,"ordem": number | null
@@ -1294,32 +1410,6 @@ isOneToOne: false
       columns: ["reservado_lead_id"]
 isOneToOne: false
       referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"estoque_veiculo_dados": {
-                  Row: {
-                    "ano": number | null,"chassi": string | null,"created_at": string | null,"empresa_id": number,"km": number | null,"placa": string | null,"renavam": string | null,"unidade_id": number
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "ano"?: number | null,"chassi"?: string | null,"created_at"?: string | null,"empresa_id": number,"km"?: number | null,"placa"?: string | null,"renavam"?: string | null,"unidade_id": number
-                  }
-                  Update: {
-                    "ano"?: number | null,"chassi"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"km"?: number | null,"placa"?: string | null,"renavam"?: string | null,"unidade_id"?: number
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "veiculo_dados_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "veiculo_dados_unidade_id_fkey"
-      columns: ["unidade_id"]
-isOneToOne: true
-      referencedRelation: "estoque_unidades"
       referencedColumns: ["id"]
     }
                   ]
@@ -1827,26 +1917,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"mensagens_internas": {
-                  Row: {
-                    "autor_id": string,"conteudo": string,"created_at": string | null,"destinatario_id": string | null,"empresa_id": number,"id": number,"tipo": string
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "autor_id": string,"conteudo": string,"created_at"?: string | null,"destinatario_id"?: string | null,"empresa_id": number,"id"?: never,"tipo"?: string
-                  }
-                  Update: {
-                    "autor_id"?: string,"conteudo"?: string,"created_at"?: string | null,"destinatario_id"?: string | null,"empresa_id"?: number,"id"?: never,"tipo"?: string
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "mensagens_internas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"metas": {
                   Row: {
                     "alvo": number,"created_at": string | null,"empresa_id": number,"escopo": string,"filial_id": number | null,"id": number,"periodo": string,"tipo": string,"usuario_id": string | null
@@ -2123,29 +2193,53 @@ isOneToOne: true
       referencedColumns: ["id"]
     }
                   ]
-                },"pedidos": {
+                },"orcamentos_orcamentos": {
                   Row: {
-                    "cliente_nome": string | null,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"itens": NonNullable<Json>,"mesa": string | null,"observacoes": string | null,"origem": string | null,"status": string,"total": number
+                    "acerto": string | null,"aparelho": string | null,"aparelho_novo": string | null,"aparelho_usado": string | null,"aprovado_em": string | null,"cliente_id": number | null,"cliente_nome": string,"cliente_telefone": string | null,"created_at": string | null,"defeito": string | null,"empresa_id": number,"filial_id": number | null,"garantia_dias": number | null,"id": number,"imei": string | null,"itens": NonNullable<Json>,"lead_id": number | null,"observacoes": string | null,"os_id": number | null,"prazo_dias": number | null,"recusado_em": string | null,"status": string,"tipo": string,"token": string,"total": number,"troca_cotacao_id": number | null,"unidade_id": number | null,"usuario_id": string | null,"valor_devolver": number,"valor_entrada": number | null,"valor_novo": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"mesa"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"status"?: string,"total"?: number
+                    "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome": string,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id": number,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: never,"imei"?: string | null,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string,"tipo"?: string,"token"?: string,"total"?: number,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number,"valor_entrada"?: number | null,"valor_novo"?: number | null
                   }
                   Update: {
-                    "cliente_nome"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"mesa"?: string | null,"observacoes"?: string | null,"origem"?: string | null,"status"?: string,"total"?: number
+                    "acerto"?: string | null,"aparelho"?: string | null,"aparelho_novo"?: string | null,"aparelho_usado"?: string | null,"aprovado_em"?: string | null,"cliente_id"?: number | null,"cliente_nome"?: string,"cliente_telefone"?: string | null,"created_at"?: string | null,"defeito"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"garantia_dias"?: number | null,"id"?: never,"imei"?: string | null,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"os_id"?: number | null,"prazo_dias"?: number | null,"recusado_em"?: string | null,"status"?: string,"tipo"?: string,"token"?: string,"total"?: number,"troca_cotacao_id"?: number | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_devolver"?: number,"valor_entrada"?: number | null,"valor_novo"?: number | null
                   }
                   Relationships: [
                     {
-      foreignKeyName: "pedidos_empresa_id_fkey"
+      foreignKeyName: "orcamentos_cliente_id_fkey"
+      columns: ["cliente_id"]
+isOneToOne: false
+      referencedRelation: "contatos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orcamentos_empresa_id_fkey"
       columns: ["empresa_id"]
 isOneToOne: false
       referencedRelation: "empresas"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "pedidos_filial_id_fkey"
+      foreignKeyName: "orcamentos_filial_id_fkey"
       columns: ["filial_id"]
 isOneToOne: false
       referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orcamentos_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orcamentos_troca_cotacao_id_fkey"
+      columns: ["troca_cotacao_id"]
+isOneToOne: false
+      referencedRelation: "celulares_troca_cotacoes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orcamentos_unidade_id_fkey"
+      columns: ["unidade_id"]
+isOneToOne: false
+      referencedRelation: "estoque_unidades"
       referencedColumns: ["id"]
     }
                   ]
@@ -2176,6 +2270,38 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"propostas_propostas": {
+                  Row: {
+                    "cliente_nome": string,"created_at": string,"empresa_id": number,"filial_id": number | null,"id": number,"itens": NonNullable<Json>,"lead_id": number | null,"observacoes": string | null,"status": string,"token": string,"total": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_nome"?: string,"created_at"?: string,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string,"token"?: string,"total"?: number
+                  }
+                  Update: {
+                    "cliente_nome"?: string,"created_at"?: string,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string,"token"?: string,"total"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "propostas_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "propostas_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "propostas_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"publicos": {
                   Row: {
@@ -2379,6 +2505,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"simular_financiamento_fichas": {
+                  Row: {
+                    "banco": string | null,"created_at": string | null,"empresa_id": number,"entrada": number | null,"filial_id": number | null,"id": number,"lead_id": number | null,"observacoes": string | null,"parcelas": number | null,"status": string,"taxa": number | null,"usuario_id": string | null,"valor": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "banco"?: string | null,"created_at"?: string | null,"empresa_id": number,"entrada"?: number | null,"filial_id"?: number | null,"id"?: never,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
+                  }
+                  Update: {
+                    "banco"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"entrada"?: number | null,"filial_id"?: number | null,"id"?: never,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "fichas_financiamento_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_financiamento_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_financiamento_lead_id_fkey"
+      columns: ["lead_id"]
+isOneToOne: false
+      referencedRelation: "negocios"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"stripe_eventos": {
                   Row: {
                     "empresa_id": number | null,"id": string,"payload": Json | null,"processado_em": string | null,"tipo": string
@@ -2472,6 +2630,26 @@ isOneToOne: false
       columns: ["responsavel_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"termos_aceites": {
+                  Row: {
+                    "aceito_em": string,"documento": string,"empresa_id": number | null,"id": number,"ip": string | null,"user_agent": string | null,"usuario_id": string,"versao": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aceito_em"?: string,"documento": string,"empresa_id"?: number | null,"id"?: never,"ip"?: string | null,"user_agent"?: string | null,"usuario_id": string,"versao": string
+                  }
+                  Update: {
+                    "aceito_em"?: string,"documento"?: string,"empresa_id"?: number | null,"id"?: never,"ip"?: string | null,"user_agent"?: string | null,"usuario_id"?: string,"versao"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "termos_aceites_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
       referencedColumns: ["id"]
     }
                   ]
@@ -2773,38 +2951,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"vendas_fichas_financiamento": {
-                  Row: {
-                    "banco": string | null,"created_at": string | null,"empresa_id": number,"entrada": number | null,"filial_id": number | null,"id": number,"lead_id": number | null,"observacoes": string | null,"parcelas": number | null,"status": string,"taxa": number | null,"usuario_id": string | null,"valor": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "banco"?: string | null,"created_at"?: string | null,"empresa_id": number,"entrada"?: number | null,"filial_id"?: number | null,"id"?: never,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
-                  }
-                  Update: {
-                    "banco"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"entrada"?: number | null,"filial_id"?: number | null,"id"?: never,"lead_id"?: number | null,"observacoes"?: string | null,"parcelas"?: number | null,"status"?: string,"taxa"?: number | null,"usuario_id"?: string | null,"valor"?: number | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "fichas_financiamento_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "fichas_financiamento_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"vendas_pagamentos": {
                   Row: {
                     "bandeira_cartao": string | null,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"forma_pagamento": string,"id": number,"parcelas": number | null,"valor_com_juros": number | null,"valor_pago": number,"venda_id": number | null
@@ -2834,50 +2980,6 @@ isOneToOne: false
       columns: ["venda_id"]
 isOneToOne: false
       referencedRelation: "vendas_vendas"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"vendas_pedidos_compra": {
-                  Row: {
-                    "created_at": string | null,"data_pedido": string | null,"descricao": string | null,"empresa_id": number,"filial_id": number | null,"fornecedor_id": number | null,"id": number,"observacoes": string | null,"solicitado_em": string | null,"solicitado_por": string | null,"status": string | null,"usuario_id": string | null,"valor_total": number | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id": number,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: never,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
-                  }
-                  Update: {
-                    "created_at"?: string | null,"data_pedido"?: string | null,"descricao"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"fornecedor_id"?: number | null,"id"?: never,"observacoes"?: string | null,"solicitado_em"?: string | null,"solicitado_por"?: string | null,"status"?: string | null,"usuario_id"?: string | null,"valor_total"?: number | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "pedidos_compra_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_fornecedor_id_fkey"
-      columns: ["fornecedor_id"]
-isOneToOne: false
-      referencedRelation: "estoque_fornecedores"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_solicitado_por_fkey"
-      columns: ["solicitado_por"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "pedidos_compra_usuario_id_fkey"
-      columns: ["usuario_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
       referencedColumns: ["id"]
     }
                   ]
@@ -2928,38 +3030,6 @@ isOneToOne: false
       columns: ["vendedor_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"vendas_propostas": {
-                  Row: {
-                    "cliente_nome": string,"created_at": string,"empresa_id": number,"filial_id": number | null,"id": number,"itens": NonNullable<Json>,"lead_id": number | null,"observacoes": string | null,"status": string,"token": string,"total": number
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "cliente_nome"?: string,"created_at"?: string,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string,"token"?: string,"total"?: number
-                  }
-                  Update: {
-                    "cliente_nome"?: string,"created_at"?: string,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"itens"?: NonNullable<Json>,"lead_id"?: number | null,"observacoes"?: string | null,"status"?: string,"token"?: string,"total"?: number
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "propostas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "propostas_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
       referencedColumns: ["id"]
     }
                   ]
@@ -3041,7 +3111,7 @@ isOneToOne: false
       foreignKeyName: "vendas_pedido_compra_id_fkey"
       columns: ["pedido_compra_id"]
 isOneToOne: false
-      referencedRelation: "vendas_pedidos_compra"
+      referencedRelation: "compras_pedidos"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "vendas_produto_id_fkey"
@@ -3066,56 +3136,6 @@ isOneToOne: false
       columns: ["vendedor_id"]
 isOneToOne: false
       referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    }
-                  ]
-                },"visitas": {
-                  Row: {
-                    "cliente_id": number | null,"corretor_id": string | null,"created_at": string | null,"data_hora": string,"empresa_id": number,"filial_id": number | null,"fim": string | null,"id": number,"imovel_id": number | null,"lead_id": number | null,"local": string | null,"observacoes": string | null,"participantes": string | null,"status": string,"tipo": string,"titulo": string | null,"updated_at": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "cliente_id"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"data_hora": string,"empresa_id": number,"filial_id"?: number | null,"fim"?: string | null,"id"?: number,"imovel_id"?: number | null,"lead_id"?: number | null,"local"?: string | null,"observacoes"?: string | null,"participantes"?: string | null,"status"?: string,"tipo"?: string,"titulo"?: string | null,"updated_at"?: string | null
-                  }
-                  Update: {
-                    "cliente_id"?: number | null,"corretor_id"?: string | null,"created_at"?: string | null,"data_hora"?: string,"empresa_id"?: number,"filial_id"?: number | null,"fim"?: string | null,"id"?: number,"imovel_id"?: number | null,"lead_id"?: number | null,"local"?: string | null,"observacoes"?: string | null,"participantes"?: string | null,"status"?: string,"tipo"?: string,"titulo"?: string | null,"updated_at"?: string | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "visitas_cliente_id_fkey"
-      columns: ["cliente_id"]
-isOneToOne: false
-      referencedRelation: "contatos"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_corretor_id_fkey"
-      columns: ["corretor_id"]
-isOneToOne: false
-      referencedRelation: "usuarios"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_empresa_id_fkey"
-      columns: ["empresa_id"]
-isOneToOne: false
-      referencedRelation: "empresas"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_filial_id_fkey"
-      columns: ["filial_id"]
-isOneToOne: false
-      referencedRelation: "filiais"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_imovel_id_fkey"
-      columns: ["imovel_id"]
-isOneToOne: false
-      referencedRelation: "imoveis_imoveis"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "visitas_lead_id_fkey"
-      columns: ["lead_id"]
-isOneToOne: false
-      referencedRelation: "negocios"
       referencedColumns: ["id"]
     }
                   ]
@@ -3390,6 +3410,9 @@ isOneToOne: true
 "refresh_status_atrasados":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"sessao_pode_escrever":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "set_impersonation":
 { Args: { "p_empresa_id": number,"p_ttl_seconds"?: number }; Returns: undefined
                            },
@@ -3525,6 +3548,9 @@ isOneToOne: true
 { Args: { "p_emp": number }; Returns: {
               "ativo": boolean,"contato_id": number,"convertido_em": number,"created_at": string,"empresa_id": number,"filial_id": number,"funil_id": number,"id": number,"kanban_status": string,"nome": string,"origem": string,"origem_id": string,"produto_interessado": string,"responsavel_desde": string,"responsavel_id": string,"telefone": string
             }[]
+                           },
+"zapintel_padrao_produto":
+{ Args: { "p_nome": string }; Returns: string
                            },
 "zapintel_posvenda":
 { Args: { "p_empresa"?: number,"p_filial"?: number }; Returns: Json

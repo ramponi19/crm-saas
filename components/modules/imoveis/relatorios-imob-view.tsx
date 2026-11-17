@@ -75,7 +75,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '', equ
   if (corretor) qLeads = qLeads.eq('responsavel_id', corretor)
   let qLeadsMes = supabase.from('negocios').select('responsavel_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes)
   if (corretor) qLeadsMes = qLeadsMes.eq('responsavel_id', corretor)
-  let qVisitas = supabase.from('visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes)
+  let qVisitas = supabase.from('agenda_visitas').select('corretor_id').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', inicioMes).lt('data_hora', fimMes)
   if (corretor) qVisitas = qVisitas.eq('corretor_id', corretor)
 
   const [{ data: leads }, { data: imoveis }, { data: membros }, { data: leadsMes }, { data: visitasMes }, { data: propostasMes }, { data: etapasRaw }] = await Promise.all([
@@ -84,7 +84,7 @@ export async function RelatoriosImobView({ de = '', ate = '', corretor = '', equ
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     qLeadsMes,
     qVisitas,
-    supabase.from('vendas_propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
+    supabase.from('propostas_propostas').select('status, lead_id').eq('empresa_id', empresaId).gte('created_at', inicioMes).lt('created_at', fimMes),
     /**
      * Etapas do funil PADRÃO, do banco.
      *

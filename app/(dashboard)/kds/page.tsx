@@ -11,7 +11,7 @@ export default async function KdsPage() {
   if (!empresaId) redirect('/dashboard')
 
   const { data } = await supabase
-    .from('pedidos')
+    .from('cardapio_pedidos')
     .select('id, mesa, cliente_nome, itens, total, status, observacoes, created_at')
     .eq('empresa_id', empresaId).in('status', ['recebido', 'preparando', 'pronto'])
     .order('created_at', { ascending: true }).limit(200)

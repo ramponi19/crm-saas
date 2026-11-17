@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params
   const svc = createServiceClient()
 
-  const { data: orc } = await svc.from('assistencia_orcamentos')
+  const { data: orc } = await svc.from('orcamentos_orcamentos')
     .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, cliente_id, usuario_id, observacoes, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
   if (!orc || !(await moduloEstaLigado(orc.empresa_id, 'orcamentos'))) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   if (b.acao === 'recusar') {
     // Idempotente: só recusa se ainda não foi aprovado nem recusado.
-    const { data: claimed } = await svc.from('assistencia_orcamentos')
+    const { data: claimed } = await svc.from('orcamentos_orcamentos')
       .update({ status: 'recusado', recusado_em: nowIso } as never)
       .eq('id', orc.id).is('aprovado_em', null).is('recusado_em', null)
       .select('id').maybeSingle()
@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (b.acao === 'aprovar') {
     // Claim atômico: marca aprovado ANTES das automações. Só um request concorrente
     // vence (aprovado_em IS NULL) — evita venda/estoque duplicados por replay/corrida.
-    const { data: claimed } = await svc.from('assistencia_orcamentos')
+    const { data: claimed } = await svc.from('orcamentos_orcamentos')
       .update({ status: 'aprovado', aprovado_em: nowIso } as never)
       .eq('id', orc.id).is('aprovado_em', null).is('recusado_em', null)
       .select('id').maybeSingle()
@@ -43,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (!osId && (orc.tipo === 'assistencia' || orc.tipo === 'melhoria')) {
       // Melhoria sem descrição: o defeito da OS diz "do aparelho" só com o módulo de celular ligado.
       const melhoria = !orc.defeito && orc.tipo === 'melhoria'
-        ? rotulosOrcamento(await moduloEstaLigado(orc.empresa_id, 'check_imei')).melhoria
+        ? rotulosOrcamento(await moduloEstaLigado(orc.empresa_id, 'celulares')).melhoria
         : null
       const { data: os } = await svc.from('assistencia_garantias').insert({
         empresa_id: orc.empresa_id,
@@ -181,7 +181,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         // criada. Registrado por escrito no próprio orçamento, porque quem abrir a
         // tela precisa saber por que não há venda — silêncio aqui viraria "o
         // sistema perdeu minha venda".
-        await svc.from('assistencia_orcamentos').update({
+        await svc.from('orcamentos_orcamentos').update({
           observacoes: [orc.observacoes, `[${nowIso.slice(0, 10)}] Cliente aprovou pelo link, mas o item já não estava disponível no estoque (status: ${uni?.status ?? 'não encontrado'}). Nenhuma venda foi registrada — confira com o vendedor.`].filter(Boolean).join(' '),
         } as never).eq('id', orc.id)
       } else {
@@ -213,7 +213,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       }
     }
 
-    if (osId && osId !== orc.os_id) await svc.from('assistencia_orcamentos').update({ os_id: osId } as never).eq('id', orc.id)
+    if (osId && osId !== orc.os_id) await svc.from('orcamentos_orcamentos').update({ os_id: osId } as never).eq('id', orc.id)
     return NextResponse.json({ ok: true, status: 'aprovado' }, { headers: CORS })
   }
 

@@ -38,8 +38,8 @@ try {
   let r = await api('/api/troca/precos', 'POST', { modelo: MOD, armazenamento: '128GB', na_troca: 1000 })
   confere(r.status === 200, `matriz: cria preço (${r.status} ${JSON.stringify(r.json).slice(0, 80)})`)
   r = await api('/api/troca/precos', 'POST', { modelo: MOD, armazenamento: '128GB', na_troca: 1100 })
-  confere(r.status === 200 && sql(`select na_troca from avaliacao_precos where modelo='${MOD}'`) === '1100.00' || sql(`select na_troca from avaliacao_precos where modelo='${MOD}'`) === '1100', `matriz: atualiza preço (${sql(`select na_troca from avaliacao_precos where modelo='${MOD}'`)})`)
-  const maxNum = Number(sql(`select coalesce(max(numero),0) from avaliacao_cotacoes where empresa_id=1`))
+  confere(r.status === 200 && sql(`select na_troca from celulares_troca_precos where modelo='${MOD}'`) === '1100.00' || sql(`select na_troca from celulares_troca_precos where modelo='${MOD}'`) === '1100', `matriz: atualiza preço (${sql(`select na_troca from celulares_troca_precos where modelo='${MOD}'`)})`)
+  const maxNum = Number(sql(`select coalesce(max(numero),0) from celulares_troca_cotacoes where empresa_id=1`))
   r = await api('/api/troca/cotacoes', 'POST', { modelo: MOD, armazenamento: '128GB', cliente_nome: `CLI ${MOD}` })
   cotId = r.json?.id
   confere(r.status === 200 && r.json?.numero === maxNum + 1, `cotação criada com número do gatilho (${r.json?.numero} = ${maxNum + 1})`)
@@ -48,9 +48,9 @@ try {
     confere(g.status() === 200, `${rota} 200`)
   }
   await page.goto(BASE + '/orcamentos/precos', { waitUntil: 'networkidle' })
-  confere((await page.content()).includes(MOD), 'a matriz recebeu do servidor a linha de teste (avaliacao_precos; a tela só desenha os modelos do catálogo)')
+  confere((await page.content()).includes(MOD), 'a matriz recebeu do servidor a linha de teste (celulares_troca_precos; a tela só desenha os modelos do catálogo)')
   r = await api(`/api/troca/cotacoes?id=${cotId}`, 'DELETE')
-  confere(r.status === 200 && sql(`select count(*) from avaliacao_cotacoes where id=${cotId}`) === '0', `apagar cotação (${r.status})`)
+  confere(r.status === 200 && sql(`select count(*) from celulares_troca_cotacoes where id=${cotId}`) === '0', `apagar cotação (${r.status})`)
   r = await api(`/api/troca/cotacoes?id=${cotId}`, 'DELETE')
   confere(r.status === 404 && /Nada foi gravado/.test(r.json?.error ?? ''), `apagar de novo = 404 Nada foi gravado (${r.status})`)
   r = await api('/api/orcamentos?id=999999999', 'DELETE')
@@ -60,8 +60,8 @@ try {
 
   // embed do painel de orçamento do card, com o JWT do dono no PostgREST local
   const tok = await (await fetch(`${env.API_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: env.ANON_KEY, 'content-type': 'application/json' }, body: JSON.stringify({ email: E.dono, password: SENHA }) })).json()
-  const rr = await fetch(`${env.API_URL}/rest/v1/orcamentos?select=id,tipo,status,total,token,valor_devolver,troca_cotacoes:avaliacao_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)&limit=3`, { headers: { apikey: env.ANON_KEY, Authorization: `Bearer ${tok.access_token}` } })
-  confere(rr.status === 200, `embed troca_cotacoes:avaliacao_cotacoes no orçamento (${rr.status} ${(await rr.text()).slice(0, 80)})`)
+  const rr = await fetch(`${env.API_URL}/rest/v1/orcamentos?select=id,tipo,status,total,token,valor_devolver,troca_cotacoes:celulares_troca_cotacoes!orcamentos_troca_cotacao_id_fkey(numero)&limit=3`, { headers: { apikey: env.ANON_KEY, Authorization: `Bearer ${tok.access_token}` } })
+  confere(rr.status === 200, `embed troca_cotacoes:celulares_troca_cotacoes no orçamento (${rr.status} ${(await rr.text()).slice(0, 80)})`)
 
   // --- financeiro ---
   await page.goto(BASE + '/financeiro', { waitUntil: 'networkidle' })
@@ -112,8 +112,8 @@ try {
 } finally {
   sql(`delete from financeiro_lancamentos where descricao like '%${MOD}'`)
   sql(`delete from financeiro_cobrancas where descricao like '%${MOD}'`)
-  sql(`delete from avaliacao_cotacoes where modelo='${MOD}'`)
-  sql(`delete from avaliacao_precos where modelo='${MOD}'`)
+  sql(`delete from celulares_troca_cotacoes where modelo='${MOD}'`)
+  sql(`delete from celulares_troca_precos where modelo='${MOD}'`)
   await browser.close()
 }
 console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\nTUDO OK')

@@ -13,7 +13,7 @@ import { chaveLinha } from '@/lib/troca-modelos'
 
 /**
  * OS BOTÕES DE ORÇAMENTO DE UMA LOJA DE CELULAR, no painel Orçamentos do card do lead (módulo
- * Celulares e aparelhos, `check_imei`; saiu do painel do core em 17/11/2026). Sem o módulo, o painel
+ * Celulares e aparelhos, `celulares`; saiu do painel do core em 17/11/2026). Sem o módulo, o painel
  * (components/modules/orcamentos/lead-orcamento-panel.tsx) oferece "Venda" e "Conserto".
  *
  * `Venda / semi-novo` e `Downgrade` eram a MESMA operação (entra um aparelho do cliente, sai um do
@@ -71,8 +71,8 @@ export function BotoesOrcamentoCelular({ leadId, leadNome, leadTelefone, onNovo,
   async function abrirTroca() {
     setAbrindoTroca(true)
     const [{ data: precos }, { data: regras }, { data: unis }] = await Promise.all([
-      supabase.from('avaliacao_precos').select('modelo, armazenamento, na_troca, descontos').eq('ativo', true),
-      supabase.from('avaliacao_regras').select('bonus_seminovo, corte_bateria').maybeSingle(),
+      supabase.from('celulares_troca_precos').select('modelo, armazenamento, na_troca, descontos').eq('ativo', true),
+      supabase.from('celulares_troca_regras').select('bonus_seminovo, corte_bateria').maybeSingle(),
       supabase.from('estoque_unidades')
         .select('id, preco_venda, cor, armazenamento, condicao, produtos:estoque_produtos!produto_id(nome)')
         .eq('status', 'disponivel').eq('ativo', true).limit(400),

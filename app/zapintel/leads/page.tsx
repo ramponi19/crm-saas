@@ -7,7 +7,6 @@ import { useLeads } from "@/hooks/zapintel/useLeads";
 import { useEmpresaZapintel } from "../providers";
 import { useRpcAoVivo } from "@/hooks/zapintel/useRpcAoVivo";
 import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
-import { filtroDoModeloPedido } from "@/components/modules/celulares/zapintel-modelos";
 import type { Classe, Urgencia } from "@/hooks/zapintel/useDashboardAoVivo";
 import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAMILIAS_DE_OBJECAO, FAIXA_PARADO, num, ha } from "@/components/zapintel/rotulos";
 
@@ -48,7 +47,7 @@ const TEXTOS = ["classe", "urgencia", "perfil", "sinal", "objecao", "parado", "m
  * contagem que o card (Concorrência: 29 perdidos no card, 56 na lista).
  */
 const ETIQUETAS: [string, (v: string) => string][] = [
-  ["perfil", (v) => `Perfil: ${v}`], ["sinal", (v) => `Sinal: ${v}`], ["modelo", filtroDoModeloPedido],
+  ["perfil", (v) => `Perfil: ${v}`], ["sinal", (v) => `Sinal: ${v}`], ["modelo", (v) => `Pediu ${v}`],
   ["sinal_familia", (v) => `Sinal: ${v}`], ["fase", () => "Ainda em aberto"],
   ["dias", (v) => `Conversa nos últimos ${v} dias`], ["funil", () => "Só quem está no funil"],
   ["largada", () => "Cliente sem resposta há 3+ dias"], ["retomar", () => "Cliente sumiu — retomar"],

@@ -2,7 +2,7 @@ import { CATEGORIAS_SERVICO_CELULAR, ROTULOS_OS_CELULAR } from '@/components/mod
 
 /**
  * Os textos da Assistência (17/11/2026, "o core é genérico"): item e nº de série, exemplos neutros.
- * Com o módulo Celulares e aparelhos (`check_imei`) ligado, aparelho, IMEI e os exemplos de celular —
+ * Com o módulo Celulares e aparelhos (`celulares`) ligado, aparelho, IMEI e os exemplos de celular —
  * moram em components/modules/celulares/garantia-rotulos.ts. A coluna `imei_serial` continua.
  */
 export const ROTULOS_OS: typeof ROTULOS_OS_CELULAR = {

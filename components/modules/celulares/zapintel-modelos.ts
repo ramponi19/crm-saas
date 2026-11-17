@@ -27,10 +27,5 @@ export const PALAVRAS_DE_TROCA_CELULAR = ['meu aparelho']
 /** O que a ficha escreve quando o cliente quer dar o usado na troca. */
 export const ROTULO_TROCA_CELULAR = 'com aparelho na troca'
 
-/**
- * O painel ao vivo e a lista de leads mostram os modelos que a conta do banco extrai das
- * mensagens (o campo `modelos` do painel: "15 Pro Max", "16"…), que são modelos de iPhone.
- */
-export const rotuloDoModeloPedido = (modelo: string) => `iPhone ${modelo}`
-export const tituloDoModeloPedido = (modelo: string) => `Pediram iPhone ${modelo}`
-export const filtroDoModeloPedido = (modelo: string) => `Pediu iPhone ${modelo}`
+// "Produtos mais pedidos" do painel ao vivo: desde 17/11/2026 o banco devolve o nome do produto do
+// catálogo da empresa (migração 20261117000200) — não há mais rótulo de celular para pôr na frente.

@@ -95,7 +95,7 @@ export interface DadosMescla {
 }
 
 /**
- * O que muda com o módulo Celulares e aparelhos (`check_imei`) ligado: a coluna de série vira
+ * O que muda com o módulo Celulares e aparelhos (`celulares`) ligado: a coluna de série vira
  * "IMEI / Nº série" e os marcadores da troca existem. Sem o módulo, a troca só entra se a venda a
  * tiver (venda antiga, ou a loja desligou o módulo depois).
  */

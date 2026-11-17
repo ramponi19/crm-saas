@@ -1,5 +1,5 @@
 {
-  "app/(dashboard)/estoque/components/unidade-modal.tsx|estoque_veiculo_dados|upsert": {
+  "app/(dashboard)/estoque/components/unidade-modal.tsx|avaliacoes_veiculo_dados|upsert": {
     "n": 1,
     "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
   },
@@ -23,7 +23,7 @@
     "n": 1,
     "motivo": "ultimo_acesso em segundo plano; o erro já vai para o log e a resposta não depende dele"
   },
-  "app/api/avaliacoes/route.ts|avaliacao_usados|update": {
+  "app/api/avaliacoes/route.ts|avaliacoes_usados|update": {
     "n": 1,
     "motivo": "vínculo da unidade criada; o UPDATE anterior da mesma avaliação já foi conferido (404)"
   },
@@ -59,7 +59,7 @@
     "n": 1,
     "motivo": "cancelar a inscrição do próprio navegador; 0 = já não estava inscrito"
   },
-  "app/api/troca/regras/route.ts|avaliacao_regras|upsert": {
+  "app/api/troca/regras/route.ts|celulares_troca_regras|upsert": {
     "n": 1,
     "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
   },

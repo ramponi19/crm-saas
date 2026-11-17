@@ -39,12 +39,12 @@ export default async function CotacaoPage({
      * A lista de aparelhos vem do CATÁLOGO (lib/troca-modelos), não daqui. Isto
      * é só o que a loja já preencheu — o resto se digita na hora.
      */
-    supabase.from('avaliacao_precos')
+    supabase.from('celulares_troca_precos')
       .select('modelo, armazenamento, na_troca, descontos')
       .eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('avaliacao_regras').select('bonus_seminovo, corte_bateria').eq('empresa_id', empresaId).maybeSingle(),
+    supabase.from('celulares_troca_regras').select('bonus_seminovo, corte_bateria').eq('empresa_id', empresaId).maybeSingle(),
     // Os chips de "últimos avaliados": o balcão repete modelo o dia inteiro.
-    supabase.from('avaliacao_cotacoes')
+    supabase.from('celulares_troca_cotacoes')
       .select('id, modelo, armazenamento, valor_final, created_at')
       .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(8),
   ])

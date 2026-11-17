@@ -1,6 +1,6 @@
 /**
  * Auditoria de 16/10/2026 (58d7d3f), portada para a main em 09/11/2026 sobre o
- * core v1 (`canais`, `negocios`, `avaliacao_*`, `assistencia_orcamentos`).
+ * core v1 (`canais`, `negocios`, `avaliacao_*`, `orcamentos_orcamentos`).
  *
  * Cada teste chama o handler de verdade (Next), com a sessão e o banco
  * simulados por `banco-falso`, e prova uma tranca que faltava: canal de outra
@@ -400,15 +400,15 @@ describe('exportar: escopo do vendedor e planilha sem fórmula', () => {
 describe('troca: o que já foi usado não muda, e vendedor só preenche em branco', () => {
   test('cotação já usada numa venda: 409', async () => {
     estado.responder = (c) => {
-      if (c.tabela === 'avaliacao_precos') return ok({ na_troca: 1000, descontos: {} })
-      if (c.tabela === 'avaliacao_regras') return ok({ bonus_seminovo: 0 })
-      if (c.tabela === 'avaliacao_cotacoes' && c.op === 'update') return ok(null)   // usada_em preenchido
-      if (c.tabela === 'avaliacao_cotacoes' && c.op === 'select') return ok({ usada_em: '2026-10-10' })
+      if (c.tabela === 'celulares_troca_precos') return ok({ na_troca: 1000, descontos: {} })
+      if (c.tabela === 'celulares_troca_regras') return ok({ bonus_seminovo: 0 })
+      if (c.tabela === 'celulares_troca_cotacoes' && c.op === 'update') return ok(null)   // usada_em preenchido
+      if (c.tabela === 'celulares_troca_cotacoes' && c.op === 'select') return ok({ usada_em: '2026-10-10' })
       return ok()
     }
     const r = await salvarCotacao(json('http://x/api/troca/cotacoes', { id: 5, modelo: 'iPhone 14', armazenamento: '128GB' }))
     assert.equal(r.status, 409)
-    const upd = todas().find((c) => c.tabela === 'avaliacao_cotacoes' && c.op === 'update')!
+    const upd = todas().find((c) => c.tabela === 'celulares_troca_cotacoes' && c.op === 'update')!
     assert.deepEqual(filtro(upd, 'is'), ['usada_em', null])
   })
 
@@ -422,7 +422,7 @@ describe('troca: o que já foi usado não muda, e vendedor só preenche em branc
 
   test('vendedor não sobrescreve valor já preenchido', async () => {
     estado.papel = 'vendedor'
-    estado.responder = (c) => c.tabela === 'avaliacao_precos' && c.op === 'select'
+    estado.responder = (c) => c.tabela === 'celulares_troca_precos' && c.op === 'select'
       ? ok({ id: 1, na_troca: 1500, descontos: {} }) : ok()
     const r = await salvarPreco(json('http://x/api/troca/precos', { modelo: 'iPhone 14', armazenamento: '128GB', na_troca: 9999 }))
     assert.equal(r.status, 403)
@@ -432,8 +432,8 @@ describe('troca: o que já foi usado não muda, e vendedor só preenche em branc
   test('vendedor preenche célula em branco', async () => {
     estado.papel = 'vendedor'
     estado.responder = (c) => {
-      if (c.tabela === 'avaliacao_precos' && c.op === 'select') return ok({ id: 1, na_troca: null, descontos: {} })
-      if (c.tabela === 'avaliacao_precos') return ok([{ id: 1 }])
+      if (c.tabela === 'celulares_troca_precos' && c.op === 'select') return ok({ id: 1, na_troca: null, descontos: {} })
+      if (c.tabela === 'celulares_troca_precos') return ok([{ id: 1 }])
       return ok()
     }
     const r = await salvarPreco(json('http://x/api/troca/precos', { modelo: 'iPhone 14', armazenamento: '128GB', na_troca: 1500 }))
@@ -444,27 +444,27 @@ describe('troca: o que já foi usado não muda, e vendedor só preenche em branc
 describe('orçamentos: aprovado não muda; lead de outra empresa não entra', () => {
   test('editar orçamento aprovado: 409', async () => {
     estado.responder = (c) => {
-      if (c.tabela === 'assistencia_orcamentos' && c.op === 'update') return ok(null)
-      if (c.tabela === 'assistencia_orcamentos' && c.op === 'select') return ok({ aprovado_em: '2026-10-10' })
+      if (c.tabela === 'orcamentos_orcamentos' && c.op === 'update') return ok(null)
+      if (c.tabela === 'orcamentos_orcamentos' && c.op === 'select') return ok({ aprovado_em: '2026-10-10' })
       return ok()
     }
     const r = await salvarOrcamento(json('http://x/api/orcamentos', { id: 8, cliente_nome: 'C', tipo: 'venda', itens: [] }))
     assert.equal(r.status, 409)
-    const upd = todas().find((c) => c.tabela === 'assistencia_orcamentos' && c.op === 'update')!
+    const upd = todas().find((c) => c.tabela === 'orcamentos_orcamentos' && c.op === 'update')!
     assert.deepEqual(filtro(upd, 'is'), ['aprovado_em', null])
   })
 
   test('lead de outra empresa grava nulo e valores negativos viram zero', async () => {
     estado.responder = (c) => {
       if (c.tabela === 'negocios') return ok(null)                     // não é da empresa
-      if (c.tabela === 'assistencia_orcamentos' && c.op === 'insert') return ok({ id: 1, token: 't' })
+      if (c.tabela === 'orcamentos_orcamentos' && c.op === 'insert') return ok({ id: 1, token: 't' })
       return ok()
     }
     const r = await salvarOrcamento(json('http://x/api/orcamentos', {
       cliente_nome: 'C', tipo: 'downgrade', lead_id: 555, valor_novo: -100, valor_entrada: -50, itens: [],
     }))
     assert.equal(r.status, 200)
-    const ins = todas().find((c) => c.tabela === 'assistencia_orcamentos' && c.op === 'insert')!.dados as Record<string, unknown>
+    const ins = todas().find((c) => c.tabela === 'orcamentos_orcamentos' && c.op === 'insert')!.dados as Record<string, unknown>
     assert.equal(ins.lead_id, null)
     assert.equal(ins.valor_novo, 0)
     assert.equal(ins.valor_entrada, 0)

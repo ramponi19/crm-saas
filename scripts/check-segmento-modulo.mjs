@@ -36,7 +36,7 @@ const ler = (p) => readFileSync(join(RAIZ, p), 'utf8')
 const L = '\\p{L}\\p{N}_'
 const palavra = (re, flags = 'iu') => new RegExp(`(?<![${L}])(?:${re})(?![${L}])`, flags)
 const SEGMENTOS = [
-  { nome: 'celular', donos: ['check_imei'], termos: [palavra('IMEI2?', 'u'), palavra('iphones?|ipad|macbook|airpods|apple'), palavra('smartphones?'), palavra('semi-?novos?'), palavra('aparelhos?')] },
+  { nome: 'celular', donos: ['celulares'], termos: [palavra('IMEI2?', 'u'), palavra('iphones?|ipad|macbook|airpods|apple'), palavra('smartphones?'), palavra('semi-?novos?'), palavra('aparelhos?')] },
   { nome: 'imóvel', donos: ['imoveis'], termos: [palavra('im[oó]vel|im[oó]veis'), palavra('imobili[aá]ri[ao]s?'), palavra('corretor(?:es|as?)?'), palavra('vistorias?'), palavra('IPTU|CRECI', 'u'), palavra('condom[ií]nios?')] },
   { nome: 'veículo', donos: ['avaliacoes', 'consulta_fipe', 'simular_financiamento'], termos: [palavra('ve[ií]culos?'), palavra('FIPE', 'u'), palavra('placas?'), palavra('chassi'), palavra('renavam'), palavra('quilometragem'), palavra('concession[aá]rias?')] },
   { nome: 'restaurante', donos: ['cardapio', 'kds'], termos: [palavra('card[aá]pios?'), palavra('cozinha'), palavra('comandas?'), palavra('gar[çc]o(?:m|ns)'), palavra('KDS', 'u')] },
@@ -50,7 +50,7 @@ const SEGMENTOS = [
  * Um caminho que termina em "/" é a pasta inteira.
  */
 const ARQUIVOS = {
-  check_imei: [
+  celulares: [
     'lib/imei.ts', 'lib/apple-modelos.ts', 'lib/troca-acesso.ts', 'lib/troca-avarias.ts', 'lib/troca-checklist.ts',
     'lib/troca-modelos.ts', 'lib/troca-referencia.ts', 'components/modules/celulares/',
     'app/(dashboard)/orcamentos/cotacao/', 'app/(dashboard)/orcamentos/precos/', 'app/(dashboard)/orcamentos/checklist/',

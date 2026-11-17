@@ -37,7 +37,7 @@ export async function POST() {
     leadsComNaoLidas(supabase as unknown as SupabaseClient, empresaId, uid),
     supabase.from('cadencia_inscricoes').select('*', head).eq('empresa_id', empresaId).eq('responsavel_id', uid).eq('status', 'ativa').lt('proxima_acao_em', fimHoje),
     comAgenda
-      ? supabase.from('visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje)
+      ? supabase.from('agenda_visitas').select('*', head).eq('empresa_id', empresaId).eq('corretor_id', uid).gte('data_hora', inicioHoje).lt('data_hora', fimHoje)
       : Promise.resolve({ count: 0 }),
   ])
 

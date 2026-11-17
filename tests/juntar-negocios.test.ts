@@ -40,11 +40,11 @@ test('junção: etapa sem ordem perde para qualquer etapa; três abertos viram u
 // As 21 colunas com chave estrangeira para `negocios` (levantadas no banco em 06/11/2026):
 // cada uma muda de negócio ou tem regra própria. Coluna nova com FK para negocios tem de entrar aqui.
 test('junção: nenhuma coluna que aponta para negocios fica de fora', () => {
-  const fks = ['assistencia_orcamentos.lead_id', 'automacao_execucoes.negocio_id', 'avaliacao_cotacoes.lead_id', 'avaliacao_usados.lead_id',
+  const fks = ['orcamentos_orcamentos.lead_id', 'automacao_execucoes.negocio_id', 'celulares_troca_cotacoes.lead_id', 'avaliacoes_usados.lead_id',
     'cadencia_inscricoes.lead_id', 'cadencia_inscricoes.negocio_id', 'chamadas.lead_id', 'estoque_unidades.reservado_lead_id',
     'imoveis_negocios.lead_id', 'imoveis_perfis_busca.lead_id', 'integracao_eventos.lead_id', 'negocio_historico.negocio_id',
     'rastreamento_eventos.lead_id', 'rastreamento_visitas.lead_id', 'tarefas.lead_id', 'tarefas.negocio_id',
-    'vendas_fichas_financiamento.lead_id', 'vendas_propostas.lead_id', 'visitas.lead_id', 'zapintel_lead_perfil.lead_id', 'zapintel_venda_lead.lead_id']
+    'simular_financiamento_fichas.lead_id', 'propostas_propostas.lead_id', 'agenda_visitas.lead_id', 'zapintel_lead_perfil.lead_id', 'zapintel_venda_lead.lead_id']
   const cobertas = new Set([...TABELAS_DO_NEGOCIO.map((t) => `${t.tabela}.${t.coluna}`), ...TABELAS_COM_REGRA])
   assert.deepEqual(fks.filter((f) => !cobertas.has(f)), [])
 })

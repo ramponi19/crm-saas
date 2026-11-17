@@ -44,7 +44,7 @@ export function KdsView({ empresaId, inicial }: { empresaId: number; inicial: Pe
 
   useEffect(() => {
     const ch = supabase.channel(`kds_${empresaId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${empresaId}` },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapio_pedidos', filter: `empresa_id=eq.${empresaId}` },
         (payload: RealtimePostgresChangesPayload<Pedido & { itens: unknown }>) => {
           const nova = payload.new as Pedido | undefined
           const velha = payload.old as { id: number } | undefined
@@ -66,7 +66,7 @@ export function KdsView({ empresaId, inicial }: { empresaId: number; inicial: Pe
     const prox = PROX[p.status]
     if (!prox) return
     setPedidos((prev) => prox === 'entregue' ? prev.filter((x) => x.id !== p.id) : prev.map((x) => x.id === p.id ? { ...x, status: prox } : x))
-    const { data: gravadas, error } = await supabase.from('pedidos').update({ status: prox }).eq('id', p.id).select('id')
+    const { data: gravadas, error } = await supabase.from('cardapio_pedidos').update({ status: prox }).eq('id', p.id).select('id')
     if (error || nadaGravado(gravadas)) {
       setPedidos((prev) => [...prev.filter((x) => x.id !== p.id), p].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')))
       notify.bad('Erro ao atualizar pedido', error ? undefined : NADA_GRAVADO)
@@ -75,7 +75,7 @@ export function KdsView({ empresaId, inicial }: { empresaId: number; inicial: Pe
 
   async function cancelar(p: Pedido) {
     setPedidos((prev) => prev.filter((x) => x.id !== p.id))
-    const { data: gravadas, error } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', p.id).select('id')
+    const { data: gravadas, error } = await supabase.from('cardapio_pedidos').update({ status: 'cancelado' }).eq('id', p.id).select('id')
     if (error || nadaGravado(gravadas)) {
       setPedidos((prev) => [...prev.filter((x) => x.id !== p.id), p].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')))
       notify.bad('Pedido não cancelado', error?.message ?? NADA_GRAVADO)

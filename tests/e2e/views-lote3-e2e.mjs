@@ -87,10 +87,10 @@ try {
   }
   // propostas (API)
   r = await api(dono, '/api/propostas', 'POST', { cliente_nome: MK, itens: [{ descricao: 'x', quantidade: 1, valor: 10 }] })
-  criados.proposta = r.json?.id ?? sql(`select id from vendas_propostas where cliente_nome='${MK}' limit 1`)
+  criados.proposta = r.json?.id ?? sql(`select id from propostas_propostas where cliente_nome='${MK}' limit 1`)
   confere(r.status === 200 && !!criados.proposta, `proposta criada (${r.status})`)
   r = await api(dono, '/api/propostas', 'PATCH', { id: Number(criados.proposta), observacoes: 'obs' })
-  confere(r.status === 200 && sql(`select observacoes from vendas_propostas where id=${criados.proposta}`) === 'obs', 'proposta editada')
+  confere(r.status === 200 && sql(`select observacoes from propostas_propostas where id=${criados.proposta}`) === 'obs', 'proposta editada')
   r = await api(dono, '/api/propostas', 'DELETE', { id: Number(criados.proposta) })
   confere(r.status === 200, 'proposta apagada')
   r = await api(dono, '/api/propostas', 'PATCH', { id: Number(criados.proposta), observacoes: 'obs2' })
@@ -110,12 +110,12 @@ try {
   r = await api(dono, '/api/contrato-documentos', 'PATCH', { id: Number(criados.doc), nome: 'x' })
   confere(r.status === 404, `renomear documento apagado = 404 (${r.status})`)
   // compras: receber pedido
-  criados.pedido = sql(`insert into vendas_pedidos_compra (empresa_id, filial_id, descricao, valor_total, status) values (1, 3, '${MK}', 1, 'pendente') returning id`).split('\n')[0]
+  criados.pedido = sql(`insert into compras_pedidos (empresa_id, filial_id, descricao, valor_total, status) values (1, 3, '${MK}', 1, 'pendente') returning id`).split('\n')[0]
   await loja(dono, 3)
   await dono.goto(BASE + '/compras', { waitUntil: 'networkidle' })
-  confere((await dono.locator('body').innerText()).includes(MK), 'compras lista o pedido (vendas_pedidos_compra + fornecedor)')
+  confere((await dono.locator('body').innerText()).includes(MK), 'compras lista o pedido (compras_pedidos + fornecedor)')
   r = await api(dono, '/api/compras/receber', 'POST', { pedidoId: Number(criados.pedido) })
-  confere(r.status === 200 && sql(`select status from vendas_pedidos_compra where id=${criados.pedido}`) === 'recebido', `receber pedido grava (${r.status})`)
+  confere(r.status === 200 && sql(`select status from compras_pedidos where id=${criados.pedido}`) === 'recebido', `receber pedido grava (${r.status})`)
   // OS: marcar pronto e salvar
   const cli = sql(`select id from contatos where empresa_id=1 limit 1`)
   criados.os = sql(`insert into assistencia_garantias (empresa_id, filial_id, tipo, protocolo, cliente_id, status, defeito_relatado, token, orcamento_valor) values (1, 3, 'assistencia', '${MK}', ${cli}, 'em_analise', 'teste', 'tok${T}', 100) returning id`).split('\n')[0]
@@ -141,7 +141,7 @@ try {
   } else falha('botão de marcar pronto não encontrado no modal da OS')
   // fichas de financiamento + orçamento do card (REST com o JWT, os selects do painel)
   const tok = await (await fetch(`${env.API_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: env.ANON_KEY, 'content-type': 'application/json' }, body: JSON.stringify({ email: E.dono, password: SENHA }) })).json()
-  for (const q of ['vendas_fichas_financiamento?select=id,banco,status&limit=2', 'vendas_comissoes?select=id&limit=1', 'vendas_contratos?select=id&limit=1', 'assistencia_servicos?select=id,nome,preco&ativo=eq.true&limit=2', `vendas_contrato_documentos?select=id,nome,contrato_modelos:vendas_contrato_modelos!inner(id)&limit=2`]) {
+  for (const q of ['simular_financiamento_fichas?select=id,banco,status&limit=2', 'vendas_comissoes?select=id&limit=1', 'vendas_contratos?select=id&limit=1', 'assistencia_servicos?select=id,nome,preco&ativo=eq.true&limit=2', `vendas_contrato_documentos?select=id,nome,contrato_modelos:vendas_contrato_modelos!inner(id)&limit=2`]) {
     const rr = await fetch(`${env.API_URL}/rest/v1/${q}`, { headers: { apikey: env.ANON_KEY, Authorization: `Bearer ${tok.access_token}` } })
     confere(rr.status === 200, `REST ${q.split('?')[0]} ${rr.status}`)
   }
@@ -152,8 +152,8 @@ try {
   sql(`delete from estoque_movimentacoes where id>${movMax} and observacoes like '%${MK}%'`)
   sql(`delete from tarefas where titulo like '%${MK}%'`)
   if (criados.os) sql(`delete from assistencia_garantias where id=${criados.os}`)
-  if (criados.pedido) sql(`delete from vendas_pedidos_compra where id=${criados.pedido}`)
-  sql(`delete from vendas_propostas where cliente_nome='${MK}'`)
+  if (criados.pedido) sql(`delete from compras_pedidos where id=${criados.pedido}`)
+  sql(`delete from propostas_propostas where cliente_nome='${MK}'`)
   sql(`delete from vendas_contrato_documentos where nome like '${MK}%'`)
   sql(`update usuarios set filial_atual_id=3 where id='${DONO}'`)
   await browser.close()

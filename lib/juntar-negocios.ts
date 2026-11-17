@@ -39,9 +39,9 @@ type Linha = Record<string, unknown>
 
 /** Colunas que apontam para `negocios` e mudam de negócio sem regra especial. */
 export const TABELAS_DO_NEGOCIO: { tabela: string; coluna: string; pk?: string }[] = [
-  { tabela: 'assistencia_orcamentos', coluna: 'lead_id' },
-  { tabela: 'avaliacao_cotacoes', coluna: 'lead_id' },
-  { tabela: 'avaliacao_usados', coluna: 'lead_id' },
+  { tabela: 'orcamentos_orcamentos', coluna: 'lead_id' },
+  { tabela: 'celulares_troca_cotacoes', coluna: 'lead_id' },
+  { tabela: 'avaliacoes_usados', coluna: 'lead_id' },
   { tabela: 'chamadas', coluna: 'lead_id' },
   { tabela: 'estoque_unidades', coluna: 'reservado_lead_id' },
   { tabela: 'imoveis_negocios', coluna: 'lead_id' },
@@ -51,9 +51,9 @@ export const TABELAS_DO_NEGOCIO: { tabela: string; coluna: string; pk?: string }
   { tabela: 'rastreamento_visitas', coluna: 'lead_id' },
   { tabela: 'tarefas', coluna: 'lead_id' },
   { tabela: 'tarefas', coluna: 'negocio_id' },
-  { tabela: 'vendas_fichas_financiamento', coluna: 'lead_id' },
-  { tabela: 'vendas_propostas', coluna: 'lead_id' },
-  { tabela: 'visitas', coluna: 'lead_id' },
+  { tabela: 'simular_financiamento_fichas', coluna: 'lead_id' },
+  { tabela: 'propostas_propostas', coluna: 'lead_id' },
+  { tabela: 'agenda_visitas', coluna: 'lead_id' },
   { tabela: 'zapintel_venda_lead', coluna: 'lead_id', pk: 'venda_id' },
 ]
 /** Tratadas à parte (ver o cabeçalho) — listadas para a conferência de que nada ficou de fora. */

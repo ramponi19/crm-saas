@@ -42,7 +42,7 @@ export default async function AgendaPage() {
   // O imóvel do compromisso só com o módulo Imóveis ligado (a tabela é dele).
   const comImoveis = ligados.has('/imoveis')
   const SELECT_VISITA: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome)${comImoveis ? `, ${EMBED_IMOVEL_DA_VISITA}` : ''}`
-  let q = supabase.from('visitas')
+  let q = supabase.from('agenda_visitas')
     .select(SELECT_VISITA)
     .eq('empresa_id', empresaId)
   if (!isGestor) q = q.eq('corretor_id', user.id)
@@ -59,7 +59,7 @@ export default async function AgendaPage() {
   ])
 
   type ImovelDaVisita = { titulo: string | null; codigo: string | null; bairro: string | null }
-  type VisitaRow = Tables<'visitas'> & {
+  type VisitaRow = Tables<'agenda_visitas'> & {
     leads: Embed<{ nome: string | null; telefone: string | null }>
     clientes: Embed<{ nome: string | null }>
     // O imóvel só vem com o módulo Imóveis ligado (EMBED_IMOVEL_DA_VISITA).

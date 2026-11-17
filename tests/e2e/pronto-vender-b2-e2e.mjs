@@ -1,5 +1,5 @@
 // Bloco 2 da frente "pronto para vender" (17/11/2026): texto de ramo só com o módulo dono ligado.
-//   A = empresa 1 (JM): Estoque + "Celulares e aparelhos" (check_imei) ligados — tem de ver tudo de celular.
+//   A = empresa 1 (JM): Estoque + "Celulares e aparelhos" (celulares) ligados — tem de ver tudo de celular.
 //   B = empresa nova pelo /api/register (preset Serviços), com Estoque instalado pela Central e SEM o módulo
 //       de celular — tem de ver o Estoque genérico. Apagada no fim.
 // Rodar: node tests/e2e/pronto-vender-b2-e2e.mjs (app LOCAL :3010, Supabase LOCAL; ver LEIA-ME.md)
@@ -55,7 +55,7 @@ try {
   const pB = await entrar(EMAIL_B)
   let r = await api(pB, '/api/modulos/instalar', 'POST', { chave: 'estoque', instalar: true })
   confere(r.status === 200, `B instala o Estoque pela Central: ${r.status} ${r.json?.error ?? ''}`)
-  confere(sql(`select coalesce((select ativo::text from empresa_modulos where empresa_id=${empresaB} and modulo='check_imei'),'sem linha')`) !== 'true', 'B não tem o módulo de celular')
+  confere(sql(`select coalesce((select ativo::text from empresa_modulos where empresa_id=${empresaB} and modulo='celulares'),'sem linha')`) !== 'true', 'B não tem o módulo de celular')
 
   // Estoque: A vê celular, B vê genérico.
   const eA = await texto(pA, '/estoque')

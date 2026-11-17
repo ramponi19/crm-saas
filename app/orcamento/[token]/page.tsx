@@ -10,7 +10,7 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
   const { token } = await params
   const svc = createServiceClient()
 
-  const { data: orc } = await svc.from('assistencia_orcamentos')
+  const { data: orc } = await svc.from('orcamentos_orcamentos')
     .select('id, empresa_id, tipo, status, cliente_nome, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, total, valor_devolver, acerto, observacoes, created_at')
     .eq('token', token).maybeSingle()
   if (!orc || !(await moduloEstaLigado(orc.empresa_id, 'orcamentos'))) notFound()
@@ -18,7 +18,7 @@ export default async function OrcamentoTokenPage({ params }: { params: Promise<{
   const [{ data: empresa }, celular] = await Promise.all([
     svc.from('empresas').select('nome, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url)').eq('id', orc.empresa_id).maybeSingle(),
     // Aparelho e IMEI só com o módulo Celulares e aparelhos ligado; sem ele, item e nº de série.
-    moduloEstaLigado(orc.empresa_id, 'check_imei'),
+    moduloEstaLigado(orc.empresa_id, 'celulares'),
   ])
 
   const dados: OrcamentoPublico = {

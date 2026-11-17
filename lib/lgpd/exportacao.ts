@@ -35,7 +35,7 @@ const VIDA_ARQUIVO_MS = 24 * 3600 * 1000
 /** Tabelas exportadas como estão (todas com `id` e `empresa_id`). */
 export const TABELAS_LGPD = [
   'empresa_usuarios', 'contatos', 'contato_identidades', 'negocios', 'negocio_historico', 'conversas', 'mensagens',
-  'tarefas', 'visitas', 'vendas_vendas', 'vendas_comissoes', 'estoque_produtos', 'imoveis_imoveis',
+  'tarefas', 'agenda_visitas', 'vendas_vendas', 'vendas_comissoes', 'estoque_produtos', 'imoveis_imoveis',
   'financeiro_cobrancas', 'financeiro_lancamentos',
 ] as const
 

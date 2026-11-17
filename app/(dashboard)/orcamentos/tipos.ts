@@ -23,7 +23,7 @@ export interface PrecoRef { modelo: string; armazenamento: string | null; condic
 
 /**
  * OS RÓTULOS DO ORÇAMENTO (17/11/2026, "o core é genérico"): o orçamento fala de "item" e de "nº de
- * série". Com o módulo Celulares e aparelhos (`check_imei`) ligado, fala de aparelho e IMEI — esses
+ * série". Com o módulo Celulares e aparelhos (`celulares`) ligado, fala de aparelho e IMEI — esses
  * textos moram em components/modules/celulares/orcamento-rotulos.ts. As colunas do banco
  * (`aparelho`, `imei`, `aparelho_novo`…) continuam com o nome de sempre.
  */

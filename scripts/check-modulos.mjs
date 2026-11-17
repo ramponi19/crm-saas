@@ -87,9 +87,10 @@ const DONOS = {
   '/termos': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
   '/login': PLAT, '/register': PLAT, '/entrar': PLAT, '/reset-senha': PLAT, '/offline': PLAT, '/privacy': PLAT,
   '/superadmin': PLAT, '/vitrine': PLAT, '/design': PLAT, '/para': PLAT, '/landing': PLAT,
-  '/i': PLAT, '/track.js': PLAT,
+  // o arquivo do pixel é da plataforma; os endpoints e o link são do módulo Rastreamento (abaixo)
+  '/track.js': PLAT,
   '/api/superadmin': PLAT, '/api/cron': PLAT, '/api/saude': PLAT, '/api/register': PLAT,
-  '/api/planos-publicos': PLAT, '/api/stripe': PLAT, '/api/rastreamento': PLAT,
+  '/api/planos-publicos': PLAT, '/api/stripe': PLAT,
   '/api/payments/webhook': PLAT,
   // o superadmin inspeciona o ZapIntel de qualquer empresa (cookie próprio)
   '/api/zapintel/preview': PLAT,
@@ -105,6 +106,7 @@ const DONOS = {
   '/configuracoes/pagamentos': mod('pdv'),
 
   // módulo — telas públicas (link com token, site da loja)
+  '/i': mod('rastreamento'), '/api/rastreamento': mod('rastreamento'),
   '/agendar': mod('agenda'), '/os': mod('assistencia'), '/orcamento': mod('orcamentos'),
   '/proposta': mod('propostas'), '/imovel': mod('imoveis'), '/imob': mod('imoveis'), '/menu': mod('cardapio'),
   // módulo — APIs cujo nome não é o endereço do módulo

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { enviarCapi } from '@/lib/rastreamento/capi'
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
   const { data: cfg } = await db.from('rastreamento_config')
     .select('empresa_id, ativo, meta_pixel_id, capi_token_enc, capi_ativo, capi_test_code')
     .eq('public_token', companyToken).maybeSingle()
-  if (!cfg || cfg.ativo === false) return json({ ok: false, error: 'token_invalido' }, 404)
+  if (!cfg || cfg.ativo === false || !(await moduloEstaLigado(cfg.empresa_id as number, 'rastreamento'))) return json({ ok: false, error: 'token_invalido' }, 404)
 
   const empresaId = cfg.empresa_id as number
 

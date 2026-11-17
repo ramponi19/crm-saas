@@ -60,11 +60,11 @@ export async function POST(req: Request) {
     .filter((c) => AVARIA_POR_CHAVE[c] || c === BONUS_LEVA_SEMINOVO.chave)
 
   const [{ data: preco }, { data: regras }] = await Promise.all([
-    supabase.from('avaliacao_precos')
+    supabase.from('celulares_troca_precos')
       .select('na_troca, descontos')
       .eq('empresa_id', empresaId).eq('modelo', modelo).eq('armazenamento', armazenamento)
       .eq('ativo', true).maybeSingle(),
-    supabase.from('avaliacao_regras').select('bonus_seminovo').eq('empresa_id', empresaId).maybeSingle(),
+    supabase.from('celulares_troca_regras').select('bonus_seminovo').eq('empresa_id', empresaId).maybeSingle(),
   ])
 
   /**
@@ -134,12 +134,12 @@ export async function POST(req: Request) {
      * rota promete valores congelados. Antes o update reescrevia modelo e valor de
      * uma cotacao ja abatida, e um id que nao batia respondia ok sem gravar nada.
      */
-    const { data, error } = await supabase.from('avaliacao_cotacoes')
+    const { data, error } = await supabase.from('celulares_troca_cotacoes')
       .update(dados as never).eq('id', b.id).eq('empresa_id', empresaId).is('usada_em', null)
       .select('numero').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) {
-      const { data: existe } = await supabase.from('avaliacao_cotacoes').select('usada_em')
+      const { data: existe } = await supabase.from('celulares_troca_cotacoes').select('usada_em')
         .eq('id', b.id).eq('empresa_id', empresaId).maybeSingle()
       if (existe?.usada_em) {
         return NextResponse.json({ error: 'Cotação já usada numa venda — não pode mais ser alterada.' }, { status: 409 })
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
 
   // `usuario_id` só na criação, como em orçamentos: é o dono da cotação, e o
   // admin que corrigir uma vírgula não pode virar dono dela.
-  const { data, error } = await supabase.from('avaliacao_cotacoes')
+  const { data, error } = await supabase.from('celulares_troca_cotacoes')
     .insert({ ...dados, usuario_id: user.id } as never)
     // `numero` vem do gatilho `numerar_cotacao_troca`, contado por empresa. É o
     // código que o vendedor digita no PDV — quem chama precisa recebê-lo.
@@ -175,7 +175,7 @@ export async function DELETE(req: Request) {
   // RLS decide o que este usuário alcança — a cláusula de empresa/loja está na
   // política, não aqui. Cotacao ja usada numa venda nao e apagada: a venda
   // perderia o registro do valor que abateu.
-  const { data: apagou, error } = await supabase.from('avaliacao_cotacoes').delete()
+  const { data: apagou, error } = await supabase.from('celulares_troca_cotacoes').delete()
     .eq('id', id).is('usada_em', null).is('venda_id', null).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (nadaGravado(apagou)) return NextResponse.json({ error: 'Cotação não encontrada ou já usada numa venda' }, { status: 409 })

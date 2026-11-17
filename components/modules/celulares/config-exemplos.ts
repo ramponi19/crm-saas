@@ -1,6 +1,6 @@
 /**
  * Exemplos de Configurações e de Modelos de mensagem numa loja de celular (módulo Celulares e
- * aparelhos, `check_imei`). É o texto que a JM sempre viu; sem o módulo, cada tela mostra o seu
+ * aparelhos, `celulares`). É o texto que a JM sempre viu; sem o módulo, cada tela mostra o seu
  * exemplo neutro.
  */
 export const EXEMPLOS_CONFIG_CELULAR = {

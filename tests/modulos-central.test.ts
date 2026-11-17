@@ -87,7 +87,7 @@ test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo
   assert.deepEqual([...ligadosDaEmpresa(cfg)].sort(), [...antiga].sort())
   assert.deepEqual(abasDosModulos(new Set(['/imoveis', '/agenda'])).sort(), ['agendamento', 'portais'])
   // Troca, Contrato, Documentos e Meios de pagamento são seções de módulo desde 17/11/2026 (uma vez cada).
-  // Troca é do módulo de celular (check_imei), não de Orçamentos: o varejo sem ele não a tem.
+  // Troca é do módulo de celular (celulares), não de Orçamentos: o varejo sem ele não a tem.
   assert.deepEqual(abasDosModulos(new Set(VAREJO)).sort(), ['contrato', 'documentos', 'pagamentos'])
   assert.deepEqual(abasDosModulos(new Set([...VAREJO, '/check-imei'])).sort(), ['contrato', 'documentos', 'pagamentos', 'troca'])
   assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'contrato', 'documentos', 'pagamentos', 'portais', 'troca', 'veiculos-portais'])

@@ -135,7 +135,7 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
      */
     async function gravarVeiculo(unidadeId: number) {
       if (!isVeiculo) return
-      const { error } = await supabase.from('estoque_veiculo_dados').upsert({
+      const { error } = await supabase.from('avaliacoes_veiculo_dados').upsert({
         unidade_id: unidadeId,
         empresa_id: empresaId,
         placa: form.placa, chassi: form.chassi, renavam: form.renavam,

@@ -87,7 +87,7 @@ try {
     'estoque_unidades?select=id,produtos:estoque_produtos!produto_id(nome,garantia_dias,foto_url,marcas_produtos:estoque_marcas!marca_id(nome),categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))&limit=2',
     'estoque_unidades?select=*,produtos:estoque_produtos!produto_id(nome,foto_url,marcas_produtos:estoque_marcas!marca_id(nome)),fornecedores:estoque_fornecedores!fornecedor_id(nome_fantasia)&limit=2',
     'vendas?select=id,clientes!cliente_id(nome),produtos:estoque_produtos!produto_id(nome)&limit=2',
-    'vendas_pedidos_compra?select=*,fornecedores:estoque_fornecedores(nome_fantasia,contato,telefone)&limit=2',
+    'compras_pedidos?select=*,fornecedores:estoque_fornecedores(nome_fantasia,contato,telefone)&limit=2',
     'assistencia_garantias?select=*,clientes(nome,telefone),produtos:estoque_produtos(nome)&limit=2',
   ]) {
     const rr = await fetch(`${env.API_URL}/rest/v1/${q}`, { headers: { apikey: env.ANON_KEY, Authorization: `Bearer ${tok.access_token}` } })

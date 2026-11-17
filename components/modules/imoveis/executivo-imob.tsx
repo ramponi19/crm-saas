@@ -73,7 +73,7 @@ export async function ExecutivoImob({ tipo }: { tipo?: string }) {
     supabase.from('negocios').select(COLUNAS_LEAD).eq('empresa_id', empresaId).eq('ativo', true).limit(500),
     supabase.from('funil_etapas').select('funil_id, slug, tipo, probabilidade').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'lead_scoring').maybeSingle(),
-    supabase.from('visitas').select('imovel_id').eq('empresa_id', empresaId).not('imovel_id', 'is', null).limit(1000),
+    supabase.from('agenda_visitas').select('imovel_id').eq('empresa_id', empresaId).not('imovel_id', 'is', null).limit(1000),
     supabase.from('empresa_usuarios').select('usuario_id').eq('empresa_id', empresaId).eq('ativo', true),
     qFechados,
   ])

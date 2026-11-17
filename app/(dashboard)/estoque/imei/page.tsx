@@ -10,7 +10,7 @@ export default async function CheckImeiPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const { data } = await supabase
-    .from('estoque_imei_consultas')
+    .from('celulares_imei_consultas')
     .select('id, imei, resultado, motivo, observacoes, consultado_em, usuarios!consultado_por(nome)')
     .eq('empresa_id', empresaId)
     .order('consultado_em', { ascending: false })

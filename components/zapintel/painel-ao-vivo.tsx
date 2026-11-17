@@ -12,7 +12,6 @@ import { CLASSE, corDoTexto, ORDEM_FUNIL, URG, FAIXA_PARADO, num, ha } from "@/c
 import { ErroDeTela } from "@/components/zapintel/erro-de-tela";
 import { mensagemDeErroDeTela } from "@/lib/zapintel/mensagem-erro";
 import { useFuso } from "@/components/fuso-provider";
-import { rotuloDoModeloPedido, tituloDoModeloPedido } from "@/components/modules/celulares/zapintel-modelos";
 import { agora, diaNoFuso, primeiroDoMes, rotuloDoMes } from "@/lib/datas";
 
 /**
@@ -194,10 +193,14 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
       {/* ── Ritmo: calor, modelos, parados ──────────────────────────────── */}
       <section className="pv-tres iguais">
         <Calor celulas={d.calor} />
-        <Bloco titulo="Modelos mais pedidos" nota="clientes que citaram o modelo · 30 dias">
-          <Barras itens={d.modelos.map((m) => ({ nome: rotuloDoModeloPedido(m.modelo), n: m.leads, chave: m.modelo }))} cor="var(--blue)"
-            onClick={(_, chave) => abrir({ titulo: tituloDoModeloPedido(chave), tipo: "modelo", valor: chave })} />
-        </Bloco>
+        {/* Os produtos do catálogo da empresa citados pelos clientes (17/11/2026: o banco devolve o nome do
+            produto; sem catálogo, o bloco não aparece). */}
+        {d.modelos.length > 0 && (
+          <Bloco titulo="Produtos mais pedidos" nota="clientes que citaram o produto · 30 dias">
+            <Barras itens={d.modelos.map((m) => ({ nome: m.modelo, n: m.leads, chave: m.modelo }))} cor="var(--blue)"
+              onClick={(_, chave) => abrir({ titulo: `Pediram ${chave}`, tipo: "modelo", valor: chave })} />
+          </Bloco>
+        )}
         <Bloco titulo="Sem conversa há…" nota="leads ainda em negociação, pela última mensagem">
           <Barras
             itens={d.inatividade.map((i) => ({ nome: FAIXA_PARADO[i.faixa] ?? i.faixa, n: i.leads, chave: i.faixa }))}

@@ -9,7 +9,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const falhas = []; const ok = (m) => console.log('ok  ', m); const falha = (m) => { falhas.push(m); console.log('FALHA', m) }
 const confere = (c, m) => (c ? ok(m) : falha(m))
 const toasts = (page) => page.evaluate(() => [...document.querySelectorAll('[data-sonner-toast]')].map((e) => e.innerText.replace(/\n/g, ' ')))
-const MODS = `'estoque','pdv','assistencia','avaliacoes','historico','catalogo','compras','check_imei'`
+const MODS = `'estoque','pdv','assistencia','avaliacoes','historico','catalogo','compras','celulares'`
 const ativo = (m) => sql(`select coalesce((select ativo::text from empresa_modulos where empresa_id=1 and modulo='${m}'),'sem linha')`)
 
 // Foto das linhas de empresa_modulos da JM para devolver no fim.
@@ -40,7 +40,7 @@ try {
   r = await api('/api/modulos/instalar', 'POST', { chave: 'assistencia', instalar: false })
   confere(r.status === 200, `desinstalar Assistência: ${r.status}`)
   // 17/11/2026: Histórico requer PDV; Produtos, Compras e Check IMEI requerem Estoque — saem antes.
-  for (const ch of ['historico', 'catalogo', 'compras', 'check_imei']) {
+  for (const ch of ['historico', 'catalogo', 'compras', 'celulares']) {
     r = await api('/api/modulos/instalar', 'POST', { chave: ch, instalar: false })
     confere(r.status === 200, `desinstalar ${ch}: ${r.status} ${r.json?.error ?? ''}`)
   }

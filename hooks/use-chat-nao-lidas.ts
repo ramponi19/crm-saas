@@ -43,7 +43,7 @@ export function useChatNaoLidas() {
     // outro — o segundo a montar ficaria sem evento nenhum.
     const canal = supabase
       .channel(`chat_nao_lidas_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens_internas' },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens' },
         () => { if (vivo) void recontar() })
       /**
        * A primeira contagem sai DEPOIS de a inscrição existir, não antes.

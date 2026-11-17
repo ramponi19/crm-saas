@@ -961,7 +961,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
      * perder a entrada do balcão não.
      */
     if (campos.veiculo && (form.placa || form.chassi || form.renavam || form.km || form.ano)) {
-      const { error: erroVeic } = await supabase.from('estoque_veiculo_dados').insert({
+      const { error: erroVeic } = await supabase.from('avaliacoes_veiculo_dados').insert({
         unidade_id: data.id,
         empresa_id: empresaId,
         placa: form.placa || null,

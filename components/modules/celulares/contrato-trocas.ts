@@ -3,7 +3,7 @@ import type { ContratoItem } from '@/lib/contrato-tipos'
 import type { ContratoTroca } from '@/lib/contrato-modelo'
 
 /**
- * O CONTRATO DE UMA LOJA DE CELULAR (módulo Celulares e aparelhos, `check_imei`; 17/11/2026).
+ * O CONTRATO DE UMA LOJA DE CELULAR (módulo Celulares e aparelhos, `celulares`; 17/11/2026).
  *
  * O contrato do core fala de produto e nº de série. A troca de aparelho — o cliente entrega o usado
  * e ele abate no total — é do módulo de celular: os marcadores {{trocas}} e companhia, a tabela

@@ -48,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   }
   if (itens.length === 0) return NextResponse.json({ error: 'Itens indisponíveis' }, { status: 400, headers: CORS })
 
-  const { data: pedido, error } = await svc.from('pedidos').insert({
+  const { data: pedido, error } = await svc.from('cardapio_pedidos').insert({
     empresa_id: empresa.id, mesa: (b.mesa || '').trim() || null, cliente_nome: (b.cliente_nome || '').trim() || null,
     itens: itens as never, total, status: 'recebido', observacoes: (b.observacoes || '').trim() || null, origem: 'cardapio',
   }).select('id').single()

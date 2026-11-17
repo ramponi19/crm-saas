@@ -26,7 +26,7 @@ import { agora, diaDaSemana, diaNoFuso, diasEntre, formatarData, formatarHora, i
  * na clínica, lista de espera e o "Retorno".
  */
 
-type Visita = Tables<'visitas'> & {
+type Visita = Tables<'agenda_visitas'> & {
   lead_nome: string | null; lead_tel: string | null
   cliente_nome: string | null
   imovel_nome: string | null; imovel_bairro: string | null
@@ -246,13 +246,13 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
     // O lead da visita é o negócio (visitas.lead_id); nome/telefone vêm do contato.
     // O imóvel só com o módulo Imóveis ligado.
     const selectVisita: string = `*, ${embedLead('visitas_lead_id_fkey', 'nome, telefone')}, clientes:contatos!cliente_id(nome)${comImoveis ? `, ${EMBED_IMOVEL_DA_VISITA}` : ''}`
-    const { data, error } = await supabase.from('visitas')
+    const { data, error } = await supabase.from('agenda_visitas')
       .insert(payload)
       .select(selectVisita)
       .single()
     setLoading(false)
     if (error) { notify.bad(error.message); return }
-    const d = data as unknown as Tables<'visitas'> & {
+    const d = data as unknown as Tables<'agenda_visitas'> & {
       leads?: { nome: string | null; telefone: string | null } | null
       clientes?: { nome: string | null } | null
       imoveis?: { titulo: string | null; codigo: string | null; bairro: string | null } | null
@@ -280,7 +280,7 @@ export default function AgendaView({ inicial, leads, clientes, imoveis, usuarios
   }
 
   async function mudarStatus(v: Visita, status: string) {
-    const { data: gravadas, error } = await supabase.from('visitas').update({ status }).eq('id', v.id).select('id')
+    const { data: gravadas, error } = await supabase.from('agenda_visitas').update({ status }).eq('id', v.id).select('id')
     if (error) { notify.bad(error.message); return }
     if (nadaGravado(gravadas)) { notify.bad(NADA_GRAVADO); return }
     setLista(l => l.map(x => x.id === v.id ? { ...x, status } : x))

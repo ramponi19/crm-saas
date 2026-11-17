@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { rastrDb } from '@/lib/rastreamento/db'
 
@@ -15,6 +16,9 @@ function slugify(v: string): string {
 export async function GET() {
   const auth = await requireOwnerOrAdminApi()
   if (auth.error) return auth.error
+  // Rastreamento de origem é módulo em preparação (17/11/2026) até os relatórios de retorno por origem.
+  const trava = await exigirModuloLigado(auth.empresaId, 'rastreamento')
+  if (trava) return trava
   const db = rastrDb()
 
   const { data: links } = await db.from('rastreamento_links')
@@ -33,6 +37,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireOwnerOrAdminApi()
   if (auth.error) return auth.error
+  // Rastreamento de origem é módulo em preparação (17/11/2026) até os relatórios de retorno por origem.
+  const trava = await exigirModuloLigado(auth.empresaId, 'rastreamento')
+  if (trava) return trava
 
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ error: 'json_invalido' }, { status: 400 }) }

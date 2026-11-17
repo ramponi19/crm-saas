@@ -1,7 +1,7 @@
 import { ROTULOS_ORCAMENTO, type RotulosOrcamento } from '@/app/(dashboard)/orcamentos/tipos'
 
 /**
- * O orçamento de uma loja de celular (módulo Celulares e aparelhos, `check_imei`): aparelho e IMEI
+ * O orçamento de uma loja de celular (módulo Celulares e aparelhos, `celulares`): aparelho e IMEI
  * no lugar de item e nº de série. É o texto que a JM sempre viu; sem o módulo, vale o genérico de
  * app/(dashboard)/orcamentos/tipos.ts.
  */

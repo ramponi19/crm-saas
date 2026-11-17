@@ -45,7 +45,7 @@ async function cotacaoDaEmpresa(
   id: number | null | undefined,
 ): Promise<number | null> {
   if (id == null) return null
-  const { data } = await supabase.from('avaliacao_cotacoes')
+  const { data } = await supabase.from('celulares_troca_cotacoes')
     .select('id').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
   return data?.id ?? null
 }
@@ -171,12 +171,12 @@ export async function POST(req: Request) {
      * por link, deu baixa no estoque) com os itens e o total daquele momento;
      * editar depois deixava orcamento e venda contando historias diferentes.
      */
-    const { data, error } = await supabase.from('assistencia_orcamentos').update(patch)
+    const { data, error } = await supabase.from('orcamentos_orcamentos').update(patch)
       .eq('id', b.id).eq('empresa_id', empresaId).is('aprovado_em', null)
       .select('id, token').maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) {
-      const { data: existe } = await supabase.from('assistencia_orcamentos').select('aprovado_em')
+      const { data: existe } = await supabase.from('orcamentos_orcamentos').select('aprovado_em')
         .eq('id', b.id).eq('empresa_id', empresaId).maybeSingle()
       if (existe?.aprovado_em) {
         return NextResponse.json({ error: 'Orçamento já aprovado — crie um novo para mudar valores.' }, { status: 409 })
@@ -191,7 +191,7 @@ export async function POST(req: Request) {
   // `usuario_id` só na CRIAÇÃO: é o dono do orçamento, e o escopo por vendedor
   // depende dele. Na edição o dono não muda — senão o admin que corrigisse uma
   // vírgula viraria dono do orçamento do vendedor e sumiria com ele da lista dele.
-  const { data, error } = await supabase.from('assistencia_orcamentos')
+  const { data, error } = await supabase.from('orcamentos_orcamentos')
     .insert({ ...dados, status: statusEnviado ?? 'rascunho', usuario_id: user.id })
     .select('id, token').single()
   if (error || !data) return NextResponse.json({ error: error?.message || 'Falha ao criar' }, { status: 500 })
@@ -206,7 +206,7 @@ export async function DELETE(req: Request) {
   if (trava) return trava
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
-  const { data: apagou, error } = await supabase.from('assistencia_orcamentos').delete().eq('id', id).select('id')
+  const { data: apagou, error } = await supabase.from('orcamentos_orcamentos').delete().eq('id', id).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })

@@ -15,10 +15,10 @@ export default async function PrecosTrocaPage() {
   if (!(await cotacaoDeTrocaLiberada())) redirect('/orcamentos')
 
   const [{ data: precos }, { data: regras }] = await Promise.all([
-    supabase.from('avaliacao_precos')
+    supabase.from('celulares_troca_precos')
       .select('modelo, armazenamento, na_troca, descontos')
       .eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('avaliacao_regras')
+    supabase.from('celulares_troca_regras')
       .select('bonus_seminovo, corte_bateria')
       .eq('empresa_id', empresaId).maybeSingle(),
   ])

@@ -108,10 +108,10 @@ try {
   confere(!itensB.some((h) => /\/(troca|contrato|documentos|cardapio|agendamento|portais)$/.test(h)), `B: menu de Configurações sem seção de módulo desligado (${itensB.filter((h) => /troca|contrato|documentos/.test(h)).join(',') || 'ok'})`)
 
   // ── 4. Tela pública por token: só com o módulo ligado na empresa dona do link ─
-  const cols = sql(`select string_agg(column_name, ',') from information_schema.columns where table_schema='public' and table_name='assistencia_orcamentos' and is_nullable='NO' and column_default is null`)
-  console.log('  (assistencia_orcamentos, obrigatórias sem padrão:', cols || 'nenhuma', ')')
+  const cols = sql(`select string_agg(column_name, ',') from information_schema.columns where table_schema='public' and table_name='orcamentos_orcamentos' and is_nullable='NO' and column_default is null`)
+  console.log('  (orcamentos_orcamentos, obrigatórias sem padrão:', cols || 'nenhuma', ')')
   for (const emp of [1, empresaB]) {
-    const tok = sql(`insert into assistencia_orcamentos (empresa_id, cliente_nome) values (${emp}, 'Cliente e2e') returning token`)
+    const tok = sql(`insert into orcamentos_orcamentos (empresa_id, cliente_nome) values (${emp}, 'Cliente e2e') returning token`)
     orcTokens.push(tok)
   }
   const pubA = await fetch(`${BASE}/orcamento/${orcTokens[0]}`)
@@ -136,7 +136,7 @@ try {
 } finally {
   await browser.close()
   try {
-    if (orcTokens.length) sql(`delete from assistencia_orcamentos where token in (${orcTokens.map((t) => `'${t}'`).join(',')})`)
+    if (orcTokens.length) sql(`delete from orcamentos_orcamentos where token in (${orcTokens.map((t) => `'${t}'`).join(',')})`)
     sql(`update empresa_menu set itens = ${menuAntes ? `'${menuAntes.replace(/'/g, "''")}'::jsonb` : 'itens'} where empresa_id=1`)
     apagarB()
     const sobra = sql(`select count(*) from empresas where nome='Empresa B e2e'`) + '/' + sql(`select count(*) from auth.users where email='${EMAIL_B}'`)

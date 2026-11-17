@@ -10,7 +10,7 @@ import { useFuso } from '@/components/fuso-provider'
 import { formatarDataHora, instanteLocal } from '@/lib/datas'
 
 type Tarefa = Tables<'tarefas'>
-type Visita = Tables<'visitas'>
+type Visita = Tables<'agenda_visitas'>
 
 const fmt = (s: string | null, fuso: string) => s
   ? formatarDataHora(s, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso)
@@ -52,7 +52,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
       const [t, v] = await Promise.all([
         supabase.from('tarefas').select('*').eq('lead_id', leadId).order('concluida').order('vencimento', { nullsFirst: false }),
         agendaVisitas
-          ? supabase.from('visitas').select('*').eq('lead_id', leadId).order('data_hora', { ascending: true })
+          ? supabase.from('agenda_visitas').select('*').eq('lead_id', leadId).order('data_hora', { ascending: true })
           : Promise.resolve({ data: [] }),
       ])
       if (cancel) return
@@ -99,7 +99,7 @@ export function LeadAcoesPanel({ leadId, empresaId, agendaVisitas = false }: {
       data_hora: instanteDoCampo(visData, fuso), status: 'agendada',
       observacoes: visObs || null,
     }
-    const { data, error } = await supabase.from('visitas').insert(payload).select('*').single()
+    const { data, error } = await supabase.from('agenda_visitas').insert(payload).select('*').single()
     setVisSalvando(false)
     if (error) { notify.bad(error.message); return }
     setVisitas(v => [...v, data as unknown as Visita].sort((a, b) => a.data_hora.localeCompare(b.data_hora)))

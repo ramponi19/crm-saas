@@ -1,5 +1,5 @@
 /**
- * Garantia e assistência numa loja de celular (módulo Celulares e aparelhos, `check_imei`): IMEI,
+ * Garantia e assistência numa loja de celular (módulo Celulares e aparelhos, `celulares`): IMEI,
  * aparelho, celular reserva. É o texto que a JM sempre viu; sem o módulo, as telas de Garantia e de
  * Assistência usam o genérico delas (nº de série, item, equipamento reserva).
  */

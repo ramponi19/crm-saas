@@ -17,7 +17,7 @@ import { MODELOS_CELULAR, PALAVRAS_DE_TROCA_CELULAR, ROTULO_TROCA_CELULAR } from
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function produtosDaFicha(db: SupabaseClient<any>, empresaId: number): Promise<ProdutosDaFicha> {
   const [celular, comEstoque] = await Promise.all([
-    moduloEstaLigado(empresaId, 'check_imei'),
+    moduloEstaLigado(empresaId, 'celulares'),
     moduloEstaLigado(empresaId, 'estoque'),
   ])
   let catalogo: [string, string][] = []

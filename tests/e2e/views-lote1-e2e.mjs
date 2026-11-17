@@ -2,7 +2,7 @@
 //  (A) transferir unidade Mogi -> Jaguariúna grava as 2 linhas em estoque_movimentacoes, e o Histórico do /estoque as mostra (embed produto + usuário)
 //  (B) unidade: editar e salvar grava; salvar com a unidade fora da vista avisa "Nada foi gravado"; remover grava ativo=false
 //  (C) /catalogo abre com subcategoria (embed estoque_subcategorias)
-//  (D) /estoque/imei registra consulta em estoque_imei_consultas e a lista mostra
+//  (D) /estoque/imei registra consulta em celulares_imei_consultas e a lista mostra
 //  (E) webhook de pagamento lê financeiro_webhook_eventos sem erro (ref desconhecida = naoEncontrada)
 //  (F) nenhuma das 8 views existe mais no local
 import { E } from './_usuarios.mjs'
@@ -28,7 +28,7 @@ const unid = sql(`select u.id from estoque_unidades u join estoque_produtos p on
 const foto = sql(`select row_to_json(u)::text from estoque_unidades u where id=${unid}`)
 const snap = JSON.parse(foto)
 const movMax = sql(`select coalesce(max(id),0) from estoque_movimentacoes`)
-const imeiMax = sql(`select coalesce(max(id),0) from estoque_imei_consultas`)
+const imeiMax = sql(`select coalesce(max(id),0) from celulares_imei_consultas`)
 const subcat = sql(`select s.nome from estoque_produtos p join estoque_subcategorias s on s.id=p.subcategoria_id where p.empresa_id=1 and p.ativo limit 1`)
 console.log('unidade', unid, 'produto', snap.produto_id, 'subcategoria', subcat || '(nenhum produto com subcategoria)')
 
@@ -120,10 +120,10 @@ try {
   await espera(400)
   await page.getByRole('button', { name: /Registrar consulta/ }).click()
   await espera(1500)
-  confere(sql(`select count(*) from estoque_imei_consultas where id>${imeiMax} and imei='${imei}'`) === '1', `consulta de IMEI gravada em estoque_imei_consultas (${imei})`)
+  confere(sql(`select count(*) from celulares_imei_consultas where id>${imeiMax} and imei='${imei}'`) === '1', `consulta de IMEI gravada em celulares_imei_consultas (${imei})`)
   await page.reload({ waitUntil: 'networkidle' })
   confere((await page.locator('body').innerText()).replace(/\D/g, '').includes(imei), 'lista de consultas mostra o IMEI')
-  sql(`delete from estoque_imei_consultas where id>${imeiMax} and imei='${imei}'`)
+  sql(`delete from celulares_imei_consultas where id>${imeiMax} and imei='${imei}'`)
 
   // (E) webhook
   const w = await page.evaluate(async () => {
@@ -135,7 +135,7 @@ try {
   sql(`update usuarios set filial_atual_id=3 where id='${DONO}'`)
   restaura()
   sql(`delete from estoque_movimentacoes where id>${movMax} and observacoes like '%TESTE VIEWS ${T}%'`)
-  sql(`delete from estoque_imei_consultas where id>${imeiMax}`)
+  sql(`delete from celulares_imei_consultas where id>${imeiMax}`)
   const depois = sql(`select row_to_json(u)::text from estoque_unidades u where id=${unid}`)
   const d = JSON.parse(depois)
   for (const k of ['filial_id', 'status', 'ativo', 'observacoes', 'recebido_em', 'recebido_por']) if (JSON.stringify(d[k]) !== JSON.stringify(snap[k])) falha(`unidade não voltou igual em ${k}: ${d[k]} x ${snap[k]}`)

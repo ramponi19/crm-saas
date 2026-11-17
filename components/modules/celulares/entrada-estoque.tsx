@@ -41,7 +41,7 @@ export function useConsultaImei({ ativo, imei, empresaId, supabase }: {
     let cancelado = false
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from('estoque_imei_consultas')
+        .from('celulares_imei_consultas')
         .select('resultado, motivo, consultado_em')
         .eq('empresa_id', empresaId).eq('imei', d)
         .order('consultado_em', { ascending: false }).limit(1)

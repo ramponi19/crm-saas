@@ -23,7 +23,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
   const [assistencia, celular] = await Promise.all([
     moduloEstaLigado(data.empresa_id, 'assistencia'),
     // "Aparelho / item" só com o módulo Celulares e aparelhos ligado; sem ele, "Item".
-    moduloEstaLigado(data.empresa_id, 'check_imei'),
+    moduloEstaLigado(data.empresa_id, 'celulares'),
   ])
   if (!assistencia) notFound()
   const rotulos = rotulosOS(celular)

@@ -2,7 +2,7 @@ import { ROTULOS_GARANTIA_CELULAR } from '@/components/modules/celulares/garanti
 
 /**
  * Os textos da Garantia (17/11/2026, "o core é genérico"): nº de série, item, equipamento reserva.
- * Com o módulo Celulares e aparelhos (`check_imei`) ligado, IMEI, aparelho e celular reserva — os
+ * Com o módulo Celulares e aparelhos (`celulares`) ligado, IMEI, aparelho e celular reserva — os
  * textos de celular moram em components/modules/celulares/garantia-rotulos.ts. As colunas do banco
  * (`imei_serial`, `celular_reserva_fornecido`) continuam com o nome de sempre.
  */

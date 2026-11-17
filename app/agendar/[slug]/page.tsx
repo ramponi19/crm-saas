@@ -24,7 +24,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
   const agoraMs = agora().getTime()
   const [{ data: horarioRow }, { data: ocupadasRaw }, fuso] = await Promise.all([
     svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresa.id).eq('chave', 'horario_comercial').maybeSingle(),
-    svc.from('visitas').select('data_hora').eq('empresa_id', empresa.id).neq('status', 'cancelada').gte('data_hora', new Date(agoraMs).toISOString()),
+    svc.from('agenda_visitas').select('data_hora').eq('empresa_id', empresa.id).neq('status', 'cancelada').gte('data_hora', new Date(agoraMs).toISOString()),
     fusoDaEmpresa(svc, empresa.id),
   ])
 

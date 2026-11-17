@@ -340,6 +340,8 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true },
       // Módulo Metas e ranking (17/11/2026): era um "extra" de uma base só, sem dono.
       { href: '/ranking', label: 'Metas e ranking', icon: 'Trophy', opcional: true },
+      // Módulo Rastreamento de origem (17/11/2026, em preparação até os relatórios de retorno por origem).
+      { href: '/rastreamento', label: 'Rastreamento', icon: 'Split', opcional: true, adminOnly: true },
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true, donoNaoOculta: true },
       { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true, donoNaoOculta: true },
       // Leituras que moravam no /admin (21/10/2026): agora em Insights.
@@ -654,7 +656,7 @@ export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',
   '/estoque': 'estoque', '/catalogo': 'estoque', '/compras': 'estoque', '/imoveis': 'estoque', '/cardapio': 'estoque',
   '/garantia': 'posvenda', '/assistencia': 'posvenda',
-  '/executivo': 'insights', '/relatorios': 'insights', '/financeiro': 'insights', '/ranking': 'insights',
+  '/executivo': 'insights', '/relatorios': 'insights', '/financeiro': 'insights', '/ranking': 'insights', '/rastreamento': 'insights',
   '/visao-geral': 'insights', '/conversao': 'insights', '/metas': 'insights',
   '/cadencias': 'automacoes', '/distribuicao': 'automacoes', '/scoring': 'automacoes',
   '/modelos': 'automacoes', '/respostas': 'automacoes', '/automacoes': 'automacoes',

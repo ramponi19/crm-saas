@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   if (trava) return trava
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
   const veiculo = limparVeiculo(b.veiculo)
-  const { data, error } = await supabase.from('avaliacao_usados').insert({
+  const { data, error } = await supabase.from('avaliacoes_usados').insert({
     empresa_id: empresaId,
     lead_id: numOrNull(b.lead_id),
     veiculo: veiculo as unknown as Json,
@@ -95,7 +95,7 @@ export async function PATCH(req: Request) {
   if (typeof b.status === 'string' && (STATUS as readonly string[]).includes(b.status)) patch.status = b.status as Status
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nada a atualizar' }, { status: 400 })
 
-  const { data: gravou, error } = await supabase.from('avaliacao_usados').update(patch as never).eq('id', id).eq('empresa_id', empresaId).select('id')
+  const { data: gravou, error } = await supabase.from('avaliacoes_usados').update(patch as never).eq('id', id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (nadaGravado(gravou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
 
@@ -103,7 +103,7 @@ export async function PATCH(req: Request) {
   let unidadeId: number | null = null
   if (patch.status === 'aceito') {
     const { data: av } = await supabase
-      .from('avaliacao_usados')
+      .from('avaliacoes_usados')
       .select('id, veiculo, km, valor_ofertado, unidade_id')
       .eq('id', id).eq('empresa_id', empresaId).maybeSingle()
     if (av && !av.unidade_id) {
@@ -128,7 +128,7 @@ export async function PATCH(req: Request) {
       } as never).select('id').single()
       if (unidade?.id) {
         unidadeId = unidade.id
-        await supabase.from('avaliacao_usados').update({ unidade_id: unidade.id } as never).eq('id', id).eq('empresa_id', empresaId)
+        await supabase.from('avaliacoes_usados').update({ unidade_id: unidade.id } as never).eq('id', id).eq('empresa_id', empresaId)
       }
     }
   }
@@ -142,7 +142,7 @@ export async function DELETE(req: Request) {
   if (trava) return trava
   const b = await req.json().catch(() => ({})) as { id?: number }
   if (!b.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
-  const { data: apagou, error } = await supabase.from('avaliacao_usados').delete().eq('id', b.id).eq('empresa_id', empresaId).select('id')
+  const { data: apagou, error } = await supabase.from('avaliacoes_usados').delete().eq('id', b.id).eq('empresa_id', empresaId).select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (nadaGravado(apagou)) return NextResponse.json({ error: NADA_GRAVADO }, { status: 404 })
   return NextResponse.json({ ok: true })
