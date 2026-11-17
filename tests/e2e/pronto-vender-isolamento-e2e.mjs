@@ -71,7 +71,7 @@ try {
   const linhaB = sql(`select plano||'|'||coalesce(cnpj,'')||'|'||coalesce(telefone,'')||'|'||coalesce(preset_onboarding,'')||'|'||limite_usuarios from empresas where id=${empresaB}`)
   confere(linhaB === 'unlimited|11.222.333/0001-81|(11) 99999-8888|geral|999', `B: Unlimited, CNPJ e telefone formatados, preset CRM geral, limite 999 (${linhaB})`)
   const loja = sql(`select f.id||'|'||f.matriz||'|'||(eu.filial_id = f.id) from filiais f join empresa_usuarios eu on eu.empresa_id=f.empresa_id where f.empresa_id=${empresaB}`)
-  confere(/^\d+\|t\|t$/.test(loja), `B nasce com a loja principal e o dono vinculado a ela (${loja})`)
+  confere(/^\d+\|(t|true)\|(t|true)$/.test(loja), `B nasce com a loja principal e o dono vinculado a ela (${loja})`)
   const modsB = sql(`select coalesce(string_agg(modulo, ','), '') from empresa_modulos where empresa_id=${empresaB} and ativo`)
   confere(!/estoque|pdv|check_imei|imoveis|agenda|cardapio/.test(modsB), `B (CRM geral) sem módulo de ramo ligado (${modsB || 'nenhum'})`)
 
@@ -148,13 +148,13 @@ try {
   confere(!eMsg, `só leitura: o recebimento (service_role) continua gravando (${eMsg?.message ?? 'ok'})`)
   // Superadmin reativa com um clique (a mesma chamada do botão "Reativar").
   const pS = await entrar(E.superadmin)
-  r = await api(pS, `/api/superadmin/empresas/${empresaB}`, 'PATCH', { tipo: 'alterar_status', status: 'ativo' })
+  r = await api(pS, `/api/superadmin/empresas/${empresaB}`, 'POST', { tipo: 'alterar_status', status: 'ativo' })
   confere(r.status === 200 && sql(`select status from empresas where id=${empresaB}`) === 'ativo', `superadmin reativa: ${r.status}`)
   const { error: eVolta } = await cB.from('tarefas').insert({ empresa_id: empresaB, titulo: 'voltou e2e' })
   confere(!eVolta, `reativada: B volta a gravar (${eVolta?.message ?? 'ok'})`)
 
   // ── Plano e limites ─────────────────────────────────────────────────────────
-  r = await api(pS, `/api/superadmin/empresas/${empresaB}`, 'PATCH', { tipo: 'trocar_plano', plano: 'starter' })
+  r = await api(pS, `/api/superadmin/empresas/${empresaB}`, 'POST', { tipo: 'trocar_plano', plano: 'starter' })
   const lim = sql(`select plano||'|'||limite_usuarios||'|'||limite_leads from empresas where id=${empresaB}`)
   confere(r.status === 200 && lim === 'starter|3|500', `trocar de plano atualiza os limites (${r.status} ${lim})`)
 

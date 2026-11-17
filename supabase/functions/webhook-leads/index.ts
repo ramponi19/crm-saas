@@ -1782,6 +1782,12 @@ async function aprovadoNoNumero(empresaId: number, modeloId: number, canal: Cana
  * sem opt-out e não bloqueado. A mensagem é gravada com origem 'automacao' (o id da
  * automação fica em automacao_execucoes.mensagem_id).
  */
+/** Empresa em modo somente leitura (status ≠ 'ativo', 17/11/2026): não envia nada — nem pelo CRM, nem automático. */
+async function somenteLeitura(empresaId: number): Promise<boolean> {
+  const { data } = await db.from("empresas").select("status").eq("id", empresaId).maybeSingle();
+  return !!data && data.status !== "ativo";
+}
+
 async function envioAutomatico(req: Request, body: Record<string, unknown>): Promise<Response> {
   if (!(await segredoInternoOk(req))) return json({ error: "não autorizado" }, 401);
 
@@ -1791,6 +1797,7 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
   const { data: neg } = await db.from("negocios").select("id, empresa_id, filial_id, contato_id").eq("id", negocioId).maybeSingle();
   if (!neg) return json({ error: "negócio não encontrado" }, 404);
   const empresaId = neg.empresa_id as number;
+  if (await somenteLeitura(empresaId)) return json({ error: "empresa em modo somente leitura", codigo: "somente_leitura" }, 423);
 
   const { data: a } = await db.from("automacoes").select("id, ativo, acao, modelo_id")
     .eq("id", automacaoId).eq("empresa_id", empresaId).maybeSingle();
@@ -1830,6 +1837,7 @@ async function envioTransmissao(req: Request, body: Record<string, unknown>): Pr
   if (!e) return json({ error: "envio não encontrado" }, 404);
   if (e.status !== "enviando") return json({ error: "envio não está reservado" }, 409);
   const empresaId = e.empresa_id as number;
+  if (await somenteLeitura(empresaId)) return json({ error: "empresa em modo somente leitura", codigo: "somente_leitura" }, 423);
 
   const { data: t } = await db.from("transmissoes").select("id, empresa_id, filial_id, status, modelo_id")
     .eq("id", e.transmissao_id).eq("empresa_id", empresaId).maybeSingle();
@@ -2038,6 +2046,11 @@ serve(async (req: Request) => {
       if (!usuario) return json({ error: "não autorizado" }, 401);
 
       const empresaId = lead.empresa_id as number;
+      // Modo somente leitura (17/11/2026, migração 20261117000100): empresa com status ≠ 'ativo' (teste vencido,
+      // assinatura encerrada, suspensa) vê tudo, mas NÃO envia. O recebimento não passa aqui e continua.
+      if (await somenteLeitura(empresaId)) {
+        return json({ error: "Esta empresa está em modo somente leitura: não dá para enviar mensagens.", codigo: "somente_leitura" }, 423);
+      }
       const lojaDoLead = (lead.filial_id as number | null) ?? null;
       // O canal da conversa (`canalId`, conferido) ou, sem ele, o do cliente nesta loja.
       const negocio = { empresa_id: empresaId, filial_id: lojaDoLead, contato_id: lead.contato_id as number };
