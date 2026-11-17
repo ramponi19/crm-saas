@@ -7,6 +7,8 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 import { Card, Table, Badge, Button, EmptyState, Modal, Input, Select, notify, type Column } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { categoriasServico, rotulosOS } from '../rotulos'
 
 export interface ServicoReparo {
   id: number
@@ -16,8 +18,6 @@ export interface ServicoReparo {
   tempo_estimado_min: number | null
   ativo: boolean
 }
-
-const CATEGORIAS = ['Tela', 'Bateria', 'Conector de carga', 'Câmera', 'Alto-falante', 'Botão', 'Placa', 'Software', 'Outros']
 
 const EMPTY = { nome: '', categoria: '', preco: '', tempo: '' }
 
@@ -29,6 +29,9 @@ export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo
   const [form, setForm] = useState(EMPTY)
   const [salvando, setSalvando] = useState(false)
   const [removendo, setRemovendo] = useState<number | null>(null)
+  // Categorias e exemplo de reparo de celular só com o módulo Celulares e aparelhos ligado.
+  const celular = !!useFerramenta('/check-imei')
+  const categorias = categoriasServico(celular)
 
   function abrirNovo() { setForm(EMPTY); setEdit(null); setNovo(true) }
   function abrirEdit(s: ServicoReparo) {
@@ -106,11 +109,13 @@ export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo
           <Button onClick={salvar} loading={salvando}>Salvar</Button>
         </>}>
           <div className="space-y-3.5">
-            <Input label="Nome do serviço" value={form.nome} onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Troca de tela iPhone 13" />
+            <Input label="Nome do serviço" value={form.nome} onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))} placeholder={rotulosOS(celular).servicoExemplo} />
             <div className="grid grid-cols-2 gap-3">
               <Select label="Categoria" value={form.categoria} onChange={(e) => setForm(f => ({ ...f, categoria: e.target.value }))}>
                 <option value="">—</option>
-                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                {/* Categoria gravada que saiu da lista (ou de quando o módulo era outro) continua visível. */}
+                {form.categoria && !categorias.includes(form.categoria) && <option value={form.categoria}>{form.categoria}</option>}
               </Select>
               <Input label="Tempo estimado (min)" type="number" value={form.tempo} onChange={(e) => setForm(f => ({ ...f, tempo: e.target.value }))} placeholder="60" />
             </div>

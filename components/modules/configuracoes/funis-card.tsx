@@ -6,10 +6,14 @@ import { Plus, Trash2, Star, SlidersHorizontal, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 interface Funil { id: number; nome: string; padrao: boolean; interno: boolean }
 
 export function FunisCard() {
+  // O exemplo de funis de loja de celular só com o módulo Celulares e aparelhos ligado.
+  const exemploFunis = useFerramenta('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.funisParalelos : 'Vendas e Locação, Varejo e Atacado'
   const supabase = createClient()
   const [empresaId, setEmpresaId] = useState<number | null>(null)
   const [funis, setFunis] = useState<Funil[]>([])
@@ -75,7 +79,7 @@ export function FunisCard() {
     <div className="space-y-5">
       <Card title="Novo funil">
         <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
-          Crie funis paralelos (ex.: Vendas e Locação, Novos e Seminovos). As etapas são copiadas de um funil
+          Crie funis paralelos (ex.: {exemploFunis}). As etapas são copiadas de um funil
           existente — depois você edita cada uma em <strong className="text-ink">Editar etapas</strong>.
         </p>
         <p className="-mt-2 mb-4 text-[12.5px] text-ink-2">

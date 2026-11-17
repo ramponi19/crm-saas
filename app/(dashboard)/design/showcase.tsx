@@ -216,7 +216,7 @@ export function DesignShowcase() {
                 </div>
                 <div className="cursor-grab rounded-[10px] border border-line bg-card p-3 transition-colors hover:border-accent hover:shadow-[0_4px_12px_-6px_rgba(46,92,230,0.25)]">
                   <div className="flex justify-between gap-2 text-[12.5px] font-semibold text-ink">Larissa Mendes</div>
-                  <div className="mt-0.5 mb-2 text-[11px] text-ink-3">iPhone 15 · Instagram</div>
+                  <div className="mt-0.5 mb-2 text-[11px] text-ink-3">Plano anual · Instagram</div>
                   <div className="flex items-center gap-1.5">
                     <span className="num grid h-[19px] w-[19px] place-items-center rounded-full bg-ink text-[8px] font-bold text-white">RF</span>
                     <span className="ml-auto text-[10px] font-semibold text-bad">SLA 3min</span>
@@ -232,7 +232,7 @@ export function DesignShowcase() {
             <Button variant="outline" onClick={() => setModal(true)}>Abrir Modal</Button>
             <Button variant="outline" onClick={() => setDrawer(true)}>Abrir Drawer</Button>
             <Button variant="outline" onClick={() => setConfirm(true)}>ConfirmDialog</Button>
-            <Button variant="outline" icon={<Bell size={15} strokeWidth={1.7} />} onClick={() => notify.ok('Venda registrada', 'iPhone 13 · R$ 3.450 no Pix')}>Toast ok</Button>
+            <Button variant="outline" icon={<Bell size={15} strokeWidth={1.7} />} onClick={() => notify.ok('Venda registrada', 'Pedido #1042 · R$ 3.450 no Pix')}>Toast ok</Button>
             <Button variant="outline" onClick={() => notify.bad('Falha no envio', 'Não foi possível enviar a cobrança.')}>Toast erro</Button>
             <Button variant="outline" onClick={() => notify.warn('SLA quase estourando', 'Lead sem resposta há 4 min.')}>Toast alerta</Button>
           </div>

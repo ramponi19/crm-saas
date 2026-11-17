@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import Image from 'next/image'
 import { AprovacaoOS } from './aprovacao-os'
+import { rotulosOS } from '@/app/(dashboard)/assistencia/rotulos'
 
 export const metadata = { title: 'Orçamento' }
 
@@ -18,7 +19,14 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
     .select('id, empresa_id, protocolo, defeito_relatado, parecer_tecnico, orcamento_valor, status, aprovado_em, recusado_em, created_at, produtos:estoque_produtos(nome), clientes:contatos!cliente_id(nome), empresa:empresas(nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp))')
     .eq('token', token).maybeSingle()
 
-  if (!data || !(await moduloEstaLigado(data.empresa_id, 'assistencia'))) notFound()
+  if (!data) notFound()
+  const [assistencia, celular] = await Promise.all([
+    moduloEstaLigado(data.empresa_id, 'assistencia'),
+    // "Aparelho / item" só com o módulo Celulares e aparelhos ligado; sem ele, "Item".
+    moduloEstaLigado(data.empresa_id, 'check_imei'),
+  ])
+  if (!assistencia) notFound()
+  const rotulos = rotulosOS(celular)
 
   const d = data as unknown as {
     protocolo: string | null; defeito_relatado: string | null; parecer_tecnico: string | null
@@ -49,7 +57,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
 
           <div className="space-y-3 text-[13.5px]">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Aparelho / item</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{rotulos.itemPublico}</div>
               <div className="text-ink">{one(d.produtos)?.nome ?? '—'}</div>
             </div>
             {d.defeito_relatado && (

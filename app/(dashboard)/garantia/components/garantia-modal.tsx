@@ -11,6 +11,8 @@ import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData } from '@/lib/datas'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { rotulosGarantia } from '../rotulos'
 
 interface Garantia {
   id?: number
@@ -82,6 +84,8 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
   const fuso = useFuso()
+  // IMEI, celular reserva e exemplos de celular só com o módulo Celulares e aparelhos ligado.
+  const r = rotulosGarantia(!!useFerramenta('/check-imei'))
   const [form, setForm] = useState<Garantia>(() => {
     const base = vazia(diaNoFuso(agora(), fuso))
     return isNew ? base : { ...base, ...garantia }
@@ -174,23 +178,23 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
           {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </Select>
 
-        <Input label="IMEI / Nº de série" value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
+        <Input label={r.serie} value={form.imei_serial ?? ''} onChange={e => set('imei_serial', e.target.value)} placeholder="358000000000000" />
         <Input label="Data de entrada" type="date" value={form.data_entrada ?? ''} onChange={e => set('data_entrada', e.target.value)} />
 
         <Input label="Dias de garantia restantes" type="number" value={form.dias_garantia_restantes ?? ''} onChange={e => set('dias_garantia_restantes', e.target.value ? Number(e.target.value) : null)} placeholder="365" />
         <Input label="Orçamento (R$)" type="number" value={form.orcamento_valor ?? ''} onChange={e => set('orcamento_valor', e.target.value ? Number(e.target.value) : null)} placeholder="0,00" />
 
-        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder="Ex: Tela trincada, sem carregador..." />
+        <Input wrapperClassName="col-span-2" label="Estado de entrada" value={form.estado_entrada ?? ''} onChange={e => set('estado_entrada', e.target.value)} placeholder={r.estadoExemplo} />
 
         <Textarea wrapperClassName="col-span-2" label="Defeito relatado pelo cliente" rows={2} value={form.defeito_relatado ?? ''} onChange={e => set('defeito_relatado', e.target.value)} placeholder="Descreva o problema..." />
 
         <Textarea wrapperClassName="col-span-2" label="Parecer técnico" rows={2} value={form.parecer_tecnico ?? ''} onChange={e => set('parecer_tecnico', e.target.value)} placeholder="Diagnóstico técnico..." />
 
-        <Select label="Celular reserva" value={form.celular_reserva_fornecido ? 'sim' : 'nao'} onChange={e => set('celular_reserva_fornecido', e.target.value === 'sim')}>
+        <Select label={r.reserva} value={form.celular_reserva_fornecido ? 'sim' : 'nao'} onChange={e => set('celular_reserva_fornecido', e.target.value === 'sim')}>
           <option value="nao">Não fornecido</option>
           <option value="sim">Fornecido</option>
         </Select>
-        <Input label="Modelo reserva" value={form.modelo_reserva ?? ''} onChange={e => set('modelo_reserva', e.target.value)} placeholder="Ex: iPhone 11" />
+        <Input label="Modelo reserva" value={form.modelo_reserva ?? ''} onChange={e => set('modelo_reserva', e.target.value)} placeholder={r.modeloReservaExemplo} />
 
         <Textarea wrapperClassName="col-span-2" label="Observações" rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} placeholder="Observações adicionais..." />
       </form>

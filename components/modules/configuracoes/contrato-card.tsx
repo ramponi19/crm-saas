@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, notify } from '@/components/ui'
 import { GARANTIA_PADRAO_DIAS } from '@/lib/contrato-emitir'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 /**
  * Garantia padrão da loja, impressa no contrato de venda.
@@ -16,6 +18,8 @@ import { GARANTIA_PADRAO_DIAS } from '@/lib/contrato-emitir'
  */
 export function ContratoCard() {
   const supabase = createClient()
+  // O exemplo de garantia por modelo de celular só com o módulo Celulares e aparelhos ligado.
+  const porModelo = useFerramenta('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.garantiaPorModelo : 'novo 90, usado 30…'
   const [empresaId, setEmpresaId] = useState<number | null>(null)
   const [dias, setDias] = useState(String(GARANTIA_PADRAO_DIAS))
   const [saving, setSaving] = useState(false)
@@ -73,7 +77,7 @@ export function ContratoCard() {
         placeholder={String(GARANTIA_PADRAO_DIAS)}
       />
       <p className="mt-2 text-[11.5px] text-ink-3">
-        Vale para produtos sem garantia própria. Para definir por modelo (novo 90, seminovo 30…), use o campo
+        Vale para produtos sem garantia própria. Para definir por modelo ({porModelo}), use o campo
         <strong className="text-ink-2"> Garantia</strong> no cadastro do produto. Alterar aqui não muda contrato já emitido.
       </p>
     </Card>

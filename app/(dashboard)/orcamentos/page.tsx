@@ -4,6 +4,8 @@ import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { chaveLinha } from '@/lib/troca-modelos'
 import type { ValoresDoModelo } from '@/components/modules/orcamentos/avaliar-aparelho'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
 import { OrcamentosView, type Orcamento, type UnidadeOpt, type PrecoRef } from './orcamentos-view'
 
 export const metadata = { title: 'Orçamentos' }
@@ -33,7 +35,7 @@ export default async function OrcamentosPage() {
     .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, cliente_id, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, valor_devolver, acerto, observacoes, token, created_at')
     .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(200)
 
-  const [{ data }, { data: unidadesRaw }, { data: tabelaRaw }] = await Promise.all([
+  const [{ data }, { data: unidadesRaw }, { data: tabelaRaw }, cfg] = await Promise.all([
     soMeus ? baseOrc.eq('usuario_id', user.id) : baseOrc,
     supabase.from('estoque_unidades')
       .select('id, preco_venda, condicao, produtos:estoque_produtos!produto_id(nome)')
@@ -41,7 +43,10 @@ export default async function OrcamentosPage() {
     supabase.from('estoque_tabela_precos')
       .select('modelo, armazenamento, condicao, preco_sugerido')
       .eq('empresa_id', empresaId).eq('ativo', true),
+    carregarConfigEmpresa(supabase, empresaId),
   ])
+  // "Aparelho" só com o módulo Celulares e aparelhos ligado; sem ele, "Item".
+  const rotulos = rotulosOrcamento(ligadosDaEmpresa(cfg).has('/check-imei'))
 
   const orcamentos: Orcamento[] = (data ?? []).map((o) => ({
     ...o, total: Number(o.total) || 0,
@@ -51,7 +56,7 @@ export default async function OrcamentosPage() {
   type UniRow = { id: number; preco_venda: number | null; condicao: string | null; produtos: Embed<{ nome: string | null }> }
   const unidades: UnidadeOpt[] = ((unidadesRaw ?? []) as unknown as UniRow[]).map((u) => ({
     id: u.id,
-    label: `${one(u.produtos)?.nome ?? 'Aparelho'}${u.condicao ? ` · ${u.condicao}` : ''}`,
+    label: `${one(u.produtos)?.nome ?? rotulos.unidadeSemProduto}${u.condicao ? ` · ${u.condicao}` : ''}`,
     preco: Number(u.preco_venda) || 0,
   }))
 

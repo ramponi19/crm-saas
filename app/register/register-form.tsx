@@ -267,7 +267,7 @@ export function RegisterForm({ presets }: { presets: { chave: string; nome: stri
                   required
                   value={form.nomeEmpresa}
                   onChange={e => set('nomeEmpresa', e.target.value)}
-                  placeholder="Ex: Tech Mobile, iPhone Store..."
+                  placeholder="Ex: Loja Central, Casa & Cia..."
                 />
                 <Input
                   label="CNPJ"

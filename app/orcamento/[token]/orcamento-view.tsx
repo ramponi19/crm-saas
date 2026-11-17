@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { RotulosOrcamento } from '@/app/(dashboard)/orcamentos/tipos'
 
 export interface OrcamentoPublico {
   token: string
@@ -35,7 +36,12 @@ const ACERTO_CLIENTE: Record<string, string> = {
   nenhum: 'Sem devolução, conforme combinado',
 }
 
-export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados: OrcamentoPublico; empresaNome: string; cor: string; logo: string | null }) {
+export function OrcamentoPublicoView({ dados, rotulos: r, empresaNome, cor, logo }: {
+  dados: OrcamentoPublico
+  /** Aparelho/IMEI com o módulo de celular ligado; item/nº de série sem ele (a página resolve). */
+  rotulos: RotulosOrcamento
+  empresaNome: string; cor: string; logo: string | null
+}) {
   const [status, setStatus] = useState(dados.status)
   const [busy, setBusy] = useState(false)
   const finalizado = status === 'aprovado' || status === 'recusado'
@@ -70,13 +76,13 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
             <span className="text-[14px] font-semibold">{dados.cliente_nome}</span>
           </div>
 
-          {/* Aparelho (assistência/melhoria) */}
+          {/* O item (assistência/melhoria) */}
           {(dados.tipo === 'assistencia' || dados.tipo === 'melhoria') && (
             <>
               {(dados.aparelho || dados.imei || dados.defeito) && (
                 <div className="mb-3 space-y-1 rounded-control border border-line-soft bg-bg p-3 text-[13px]">
-                  {dados.aparelho && <div><span className="text-ink-3">Aparelho:</span> <span className="font-medium">{dados.aparelho}</span></div>}
-                  {dados.imei && <div><span className="text-ink-3">IMEI/Série:</span> <span className="num">{dados.imei}</span></div>}
+                  {dados.aparelho && <div><span className="text-ink-3">{r.item}:</span> <span className="font-medium">{dados.aparelho}</span></div>}
+                  {dados.imei && <div><span className="text-ink-3">{r.serieCurta}:</span> <span className="num">{dados.imei}</span></div>}
                   {dados.defeito && <div><span className="text-ink-3">Diagnóstico:</span> {dados.defeito}</div>}
                 </div>
               )}
@@ -100,8 +106,8 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
             <>
               {(dados.aparelho || dados.imei) && (
                 <div className="mb-3 space-y-1 rounded-control border border-line-soft bg-bg p-3 text-[13px]">
-                  {dados.aparelho && <div><span className="text-ink-3">Aparelho:</span> <span className="font-medium">{dados.aparelho}</span></div>}
-                  {dados.imei && <div><span className="text-ink-3">IMEI/Série:</span> <span className="num">{dados.imei}</span></div>}
+                  {dados.aparelho && <div><span className="text-ink-3">{r.item}:</span> <span className="font-medium">{dados.aparelho}</span></div>}
+                  {dados.imei && <div><span className="text-ink-3">{r.serieCurta}:</span> <span className="num">{dados.imei}</span></div>}
                 </div>
               )}
               {dados.itens.filter((it) => it.descricao).length > 0 && (
@@ -121,11 +127,11 @@ export function OrcamentoPublicoView({ dados, empresaNome, cor, logo }: { dados:
           {dados.tipo === 'downgrade' && (
             <div className="space-y-2 text-[13.5px]">
               <div className="flex items-center justify-between rounded-control border border-line-soft px-3 py-2.5">
-                <span>{dados.aparelho_novo || 'Aparelho novo'}</span>
+                <span>{dados.aparelho_novo || r.itemNovo}</span>
                 <span className="num font-medium">{brl(dados.valor_novo || 0)}</span>
               </div>
               <div className="flex items-center justify-between rounded-control border border-line-soft px-3 py-2.5 text-ok">
-                <span>Entrada: {dados.aparelho_usado || 'seu aparelho'}</span>
+                <span>Entrada: {dados.aparelho_usado || r.entradaDoCliente}</span>
                 <span className="num font-medium">− {brl(dados.valor_entrada || 0)}</span>
               </div>
               {/* Acessórios/serviços que entraram na negociação. */}
