@@ -5,7 +5,8 @@ import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { ondeTravou, contextoDaSugestao } from '@/lib/zapintel/travou'
 import { montarFicha } from '@/lib/zapintel/ficha'
-import { papelDoPreset } from '@/lib/zapintel/papel'
+import { produtosDaFicha } from '@/lib/zapintel/produtos-da-ficha'
+import { papelDaEmpresa } from '@/lib/zapintel/papel'
 import { perguntarIA } from '@/lib/zapintel/ia'
 
 /**
@@ -30,7 +31,7 @@ import { perguntarIA } from '@/lib/zapintel/ia'
  * já morreram em 10/10. Aqui o contexto vem de onde ele mora:
  *
  *     nome da loja ..... `carregarConversas` (tabela `empresas`)
- *     papel ............ `papelDoPreset(preset)`: Vendedor, Corretor…
+ *     papel ............ `papelDaEmpresa`: o vocabulário da empresa no CRM
  *
  * ══ POR QUE A IA NÃO PODE INVENTAR NÚMERO ══════════════════════════════════
  *
@@ -68,7 +69,7 @@ export async function POST(req: Request) {
   const db = rastrDb()
   // A empresa vem da sessão, não do corpo: pedir a conversa de um lead de outra
   // empresa não encontra nada, porque a busca é feita dentro da sua.
-  const { analisados, porId, nomeDaLoja: nomeDoCrm, preset, indisponivel } = await carregarConversas(db, empresaId, [id])
+  const { analisados, porId, nomeDaLoja: nomeDoCrm, indisponivel } = await carregarConversas(db, empresaId, [id])
   // Nome da empresa ilegível: o prompt não inventa um ("Loja"). Ver `contextoDoPerfil`.
   const nomeDaLoja = indisponivel.includes('empresa') ? 'a loja' : nomeDoCrm
   const lead = analisados[0]
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const papel = papelDoPreset(preset)
+  const papel = await papelDaEmpresa(db, empresaId)
 
   /**
    * ⚠ O RAMO DO NEGÓCIO SAIU DAQUI, e a razão está na tela.
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
    * uma palavra.
    */
   const ficha = montarFicha(lead, {
+    produtos: await produtosDaFicha(db, empresaId),
     leadId: id,
     filialId: lead.crm?.filialId ?? null,
     canal: lead.crm?.canal ?? 'whatsapp',

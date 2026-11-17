@@ -2,7 +2,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { mensagemDoProvedor } from '@/lib/assistente-erros'
 import type { Acesso } from './acesso'
-import { negocioDoPreset } from './negocio'
 import { executar, FERRAMENTAS, ROTULO, type Recorte } from './ferramentas'
 import { AVISO_SEM_CONSULTA, avisoSemFundamento, numerosAfirmados, semFundamento, semNumeros, trocarTrechos } from './numeros'
 import { formatarNoFuso } from '@/lib/datas'
@@ -51,7 +50,7 @@ export const MODELO_CHAT_PADRAO = 'claude-sonnet-5-5'
 export interface Turno { role: 'user' | 'model'; text: string }
 
 function instrucoes(o: {
-  empresa: string; preset: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null; fuso: string
+  empresa: string; modulos: string | null; acesso: Acesso; lojas: string[]; tela: string | null; extra: string | null; fuso: string
   recorte: string
 }): string {
   // "Agora" no relógio DA LOJA: é o que o assistente usa para "hoje", "ontem" e "este mês".
@@ -64,7 +63,7 @@ function instrucoes(o: {
     !o.acesso.verFinanceiro && 'não vê custo, lucro nem margem',
   ].filter(Boolean)
 
-  return `Você é o assistente do Nexus CRM da empresa "${o.empresa}", uma ${negocioDoPreset(o.preset) ?? 'pequena empresa'}.
+  return `Você é o assistente do Nexus CRM da empresa "${o.empresa}"${o.modulos ? ` (módulos que ela usa no Nexus: ${o.modulos})` : ''}.
 Agora é ${agora} (horário de Brasília).
 Quem está perguntando: ${o.acesso.nome} (papel: ${o.acesso.papel || 'não identificado'}).
 Lojas que essa pessoa pode ver: ${o.lojas.length ? o.lojas.join(', ') : 'uma loja'}.
@@ -110,7 +109,8 @@ export function respostaDoChat(o: {
   turnos: Turno[]
   modelo: string
   empresa: string
-  preset: string | null
+  /** Os módulos ligados para a empresa, pelo nome (lib/assistente/negocio.ts). Null = nenhum. */
+  modulos: string | null
   lojas: string[]
   tela: string | null
   extra: string | null
@@ -127,7 +127,7 @@ export function respostaDoChat(o: {
   const system: Anthropic.TextBlockParam[] = [{
     type: 'text',
     text: instrucoes({
-      empresa: o.empresa, preset: o.preset, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra, fuso: o.fuso,
+      empresa: o.empresa, modulos: o.modulos, acesso: o.acesso, lojas: o.lojas, tela: o.tela, extra: o.extra, fuso: o.fuso,
       recorte: o.recorte?.rotulo ?? (o.lojas.length === 1 ? o.lojas[0] : 'todas as lojas que a pessoa vê'),
     }),
     cache_control: { type: 'ephemeral' },

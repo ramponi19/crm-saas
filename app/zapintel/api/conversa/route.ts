@@ -3,6 +3,7 @@ import { zapintelAcesso, lojaVisivel, leadDeFunilInterno, logFalhaFunilInterno }
 import { rastrDb } from '@/lib/rastreamento/db'
 import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
+import { produtosDaFicha } from '@/lib/zapintel/produtos-da-ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
 import { lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
 import { iaDoCrmLigada } from '@/lib/zapintel/ia'
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
     }
 
     const ficha = montarFicha(lead, {
+      produtos: await produtosDaFicha(db, empresaId),
       leadId: id,
       filialId: banco.filial_id,
       canal: banco.origem ?? 'whatsapp',

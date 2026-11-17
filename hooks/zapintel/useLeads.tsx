@@ -1,6 +1,5 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { papelDoPreset } from "@/lib/zapintel/papel";
 import { useRpcAoVivo } from "./useRpcAoVivo";
 
 /**
@@ -56,7 +55,11 @@ interface Resumo {
   lojas: Loja[];
 }
 
-export function LeadProvider({ children, empresa }: { children: ReactNode; empresa: number | null }) {
+export function LeadProvider({ children, empresa, papel = "Vendedor" }: {
+  children: ReactNode; empresa: number | null;
+  /** Como a empresa chama quem atende (`vocabulario(cfg).equipe`), decidido no servidor. */
+  papel?: string;
+}) {
   const [lojaAtiva, setLojaAtiva] = useState<number | null>(null);
   /**
    * O RESUMO SÓ ANDA COM MENSAGEM, E NO MÁXIMO A CADA 30 s (21/10/2026). Ele
@@ -77,8 +80,8 @@ export function LeadProvider({ children, empresa }: { children: ReactNode; empre
     ultimaMensagem: resumo?.ultimaMensagem ?? null,
     aoVivo,
     storeName: resumo?.empresaNome ?? "",
-    // A chave do JSON do zapintel_resumo continua `segmento` (é o preset).
-    sellerName: papelDoPreset(resumo?.segmento),
+    // O vocabulário da empresa, vindo do servidor (era o mapa por preset até 17/11/2026).
+    sellerName: papel,
   };
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

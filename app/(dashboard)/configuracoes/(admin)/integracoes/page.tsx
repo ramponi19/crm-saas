@@ -2,7 +2,7 @@ import { after } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { renovarTokensInstagram } from '@/lib/canais/renovacao'
-import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { getPortalToken } from '@/lib/portal-token'
 import IntegracoesView from './integracoes-view'
 
@@ -23,10 +23,12 @@ export default async function IntegracoesPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const svc = createServiceClient()
 
-  const [{ data: empresa }, { data: importCfg }] = await Promise.all([
+  // Portais, site e importação: a capacidade `integraPortais` (do módulo Imóveis, ligado para a empresa).
+  const [{ data: empresa }, cfgEmpresa] = await Promise.all([
     supabase.from('empresas').select('slug').eq('id', empresaId).single(),
-    svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'import_imoveis').maybeSingle(),
+    carregarConfigEmpresa(supabase, empresaId),
   ])
+  const portais = !!capacidades(cfgEmpresa).integraPortais
 
   /**
    * Segunda chance de renovar o token do Instagram, fora do agendador.
@@ -43,11 +45,15 @@ export default async function IntegracoesPage() {
     catch (e) { console.error('[integracoes] renovação de token falhou:', e) }
   })
 
-  // Portais e site do imóvel: quando o módulo Imóveis está ligado para a empresa (22/10/2026).
-  const portais = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId)).has('/imoveis')
   // O token nasce na instalação do Imóveis, cifrado (lib/portal-token.ts); aqui só é LIDO,
-  // e só por quem já passou pela trava de Configurações (dono ou admin).
-  const tokenPortal = portais ? await getPortalToken(svc, empresaId) : null
+  // e só por quem já passou pela trava de Configurações (dono ou admin). A configuração da
+  // importação (`import_imoveis`) também só com o módulo ligado.
+  const [tokenPortal, { data: importCfg }] = portais
+    ? await Promise.all([
+      getPortalToken(svc, empresaId),
+      svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'import_imoveis').maybeSingle(),
+    ])
+    : [null, { data: null }]
 
   const cfg = (importCfg?.valor as { feed_url?: string; ultima_importacao?: string } | null) ?? null
 

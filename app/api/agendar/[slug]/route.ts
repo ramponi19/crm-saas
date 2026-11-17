@@ -11,7 +11,7 @@ const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods
 
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }) }
 
-// Agendamento online do paciente (público). Cria o lead + a consulta (visita).
+// Agendamento online do cliente (público). Cria o lead + a consulta (visita).
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const svc = createServiceClient()
@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { error } = await svc.from('visitas').insert({
     empresa_id: empresa.id, lead_id: lead?.id ?? null, corretor_id: responsavel,
     data_hora: dataHora.toISOString(), status: 'agendada',
-    observacoes: b.observacoes?.trim() || 'Agendado pelo paciente (online)',
+    observacoes: b.observacoes?.trim() || 'Agendado pelo cliente (online)',
   })
   if (error) return NextResponse.json({ error: 'Falha ao agendar' }, { status: 500, headers: CORS })
 

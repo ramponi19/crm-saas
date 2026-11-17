@@ -4,6 +4,7 @@ import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { diasParado, DIAS_ATENCAO } from '@/lib/lead-parado'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
+import { carregarConfigEmpresa, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
 import { GestaoLeadsView, type LeadAtrasado, type EstadoReativacao } from './gestao-leads-view'
 
 export const metadata = { title: 'Gestão de Leads' }
@@ -112,9 +113,13 @@ export default async function GestaoLeadsPage() {
    * O lead não tem endereço no nosso modelo, e inventar um campo para preencher a
    * coluna seria pior: o que o corretor precisa saber ao retomar contato é a região
    * de interesse. Bairro tem precedência sobre cidade porque é mais específico.
+   *
+   * O perfil de busca é do módulo Imóveis (`imoveis_perfis_busca`): sem ele ligado, a
+   * consulta não roda e a região fica vazia (17/11/2026).
    */
+  const cfgEmpresa = await carregarConfigEmpresa(supabase, empresaId)
   const idsLista = abertos.map((x) => x.lead.id)
-  const { data: perfisRaw } = idsLista.length
+  const { data: perfisRaw } = idsLista.length && ligadosDaEmpresa(cfgEmpresa).has('/imoveis')
     ? await supabase.from('imoveis_perfis_busca').select('lead_id, cidades, bairros').eq('empresa_id', empresaId).in('lead_id', idsLista)
     : { data: [] }
   const regiaoPorLead = new Map<number, string>()
@@ -162,6 +167,7 @@ export default async function GestaoLeadsPage() {
       podeExecutar={isAdmin}
       limiteDias={DIAS_ATENCAO}
       soMeus={restringe}
+      equipe={vocabulario(cfgEmpresa).equipe}
     />
   )
 }

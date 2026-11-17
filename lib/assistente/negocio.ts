@@ -1,21 +1,20 @@
-/**
- * O QUE A EMPRESA FAZ, EM UMA FRASE, PARA O PROMPT DO ASSISTENTE.
- *
- * O mesmo mapa morava duas vezes — no assistente de ajuda (app/api/assistente)
- * e no chat com dados (chat-dados.ts) —, cada um chaveado pelo preset de
- * onboarding da empresa. Ficou um só (29/10/2026). Preset desconhecido devolve
- * null e cada prompt mantém o seu texto genérico.
- */
-const NEGOCIO_DO_PRESET: Record<string, string> = {
-  varejo: 'loja de varejo/celulares (PDV, estoque, produtos, garantia, assistência, orçamentos)',
-  assistencia: 'assistência técnica (ordens de serviço, garantia, orçamentos)',
-  servicos: 'prestador de serviços',
-  imobiliaria: 'imobiliária (imóveis, proprietários, chaves, visitas na Agenda)',
-  saude: 'clínica/saúde (agendamento de consultas na Agenda)',
-  food: 'restaurante/food (cardápio, cozinha/KDS)',
-  concessionaria: 'loja de veículos (avaliações, consulta FIPE, financiamento)',
-}
+import { MODULOS } from '@/core/modulos'
+import { ligadosDaEmpresa, type ConfigEmpresa } from '@/lib/empresa-config'
 
-export function negocioDoPreset(preset: string | null | undefined): string | null {
-  return NEGOCIO_DO_PRESET[preset ?? ''] ?? null
+/**
+ * O QUE A EMPRESA USA, EM UMA LINHA, PARA O PROMPT DO ASSISTENTE.
+ *
+ * Até 17/11/2026 a frase vinha do PRESET de onboarding ("loja de varejo/celulares",
+ * "imobiliária", "clínica"…): texto de ramo dentro do core, e errado para quem
+ * mudou de módulos depois do cadastro. Agora descreve pelos módulos LIGADOS para a
+ * empresa, com o nome do manifesto (core/modulos.ts) — o mesmo que ela vê no menu.
+ * Nenhum módulo ligado = null, e cada prompt mantém o seu texto genérico.
+ *
+ * Usado pelo assistente de ajuda (app/api/assistente) e pelo chat com dados
+ * (lib/assistente/chat-dados.ts).
+ */
+export function modulosDaEmpresa(cfg: ConfigEmpresa): string | null {
+  const ligados = ligadosDaEmpresa(cfg)
+  const nomes = MODULOS.filter((m) => ligados.has(m.href)).map((m) => m.nome)
+  return nomes.length ? nomes.join(', ') : null
 }

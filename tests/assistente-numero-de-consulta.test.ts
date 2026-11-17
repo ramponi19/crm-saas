@@ -92,7 +92,7 @@ async function conversar(rodadas: Rodada[], pergunta: string, resultado = '{"err
     recorte: { alcance: [1, 2, 0], loja: null, rotulo: 'Rede JM', escolheLoja: true },
     acesso: { empresaId: 1, userId: 'u', nome: 'Teste', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
     turnos: [{ role: 'user', text: pergunta }],
-    modelo: 'claude-falso', empresa: 'JM Store Importados', preset: null, lojas: ['Mogi Guaçu', 'Jaguariúna'],
+    modelo: 'claude-falso', empresa: 'JM Store Importados', modulos: null, lojas: ['Mogi Guaçu', 'Jaguariúna'],
     tela: null, extra: null, fuso: 'America/Sao_Paulo', registrar: async () => {},
   })
   const corpo = await r.text()

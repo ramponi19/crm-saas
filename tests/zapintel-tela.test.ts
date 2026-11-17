@@ -42,6 +42,9 @@ mock.module('@/lib/zapintel/conversas', {
   },
 })
 mock.module('@/lib/zapintel/ficha', { namedExports: { montarFicha: () => ({}) } })
+// O que a ficha procura e o papel vêm da configuração da empresa (17/11/2026): fora do teste.
+mock.module('@/lib/zapintel/produtos-da-ficha', { namedExports: { produtosDaFicha: async () => undefined } })
+mock.module('@/lib/zapintel/papel', { namedExports: { papelDaEmpresa: async () => 'Vendedor' } })
 mock.module('@/lib/zapintel/travou', { namedExports: { ondeTravou: () => null } })
 mock.module('@/lib/zapintel/perfil', { namedExports: { lerPerfil: async () => null, marcaDaConversa: () => ({}) } })
 mock.module('@/lib/zapintel/ia', { namedExports: { iaDoCrmLigada: async () => true } })

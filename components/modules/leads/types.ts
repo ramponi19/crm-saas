@@ -78,23 +78,11 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
 ]
 
 /**
- * Funil imobiliário (preset de onboarding 'imobiliaria').
- *
- * As três etapas depois do crédito — contrato, vistoria e entrega de chaves —
- * existem porque o negócio imobiliário NÃO acaba na proposta aceita: o contrato é
- * assinado, o imóvel é vistoriado e a chave é entregue, e cada uma dessas coisas
- * pode travar por semanas. Sem elas, todo negócio fechado ficava empilhado em
- * "Fechamento" e ninguém sabia se estava esperando assinatura ou chave.
- *
- * O dono ajusta em Administração → Funil: pode renomear, reordenar e excluir o que
- * a operação dele não usa. Isto é o ponto de partida, não a regra.
- */
-/**
  * Colunas do kanban quando a empresa ainda não tem etapas no banco: o funil padrão.
  *
- * O funil com que cada preset nasce (o da imobiliária, com análise de crédito e
- * entrega de chaves) mora em presets_onboarding.etapas e é gravado em funil_etapas
- * no cadastro (lib/presets.ts, 29/10/2026). Este fallback não sabe quem a empresa é.
+ * O funil com que cada preset nasce mora em presets_onboarding.etapas e é gravado em
+ * funil_etapas no cadastro (lib/presets.ts, 29/10/2026); o dono ajusta em
+ * Administração → Funil. Este fallback não sabe quem a empresa é.
  */
 export function getKanbanColumns(): KanbanColumn[] {
   return KANBAN_COLUMNS

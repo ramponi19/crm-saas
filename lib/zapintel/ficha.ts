@@ -132,17 +132,44 @@ export interface Ficha {
   diasAteVenda: number | null
 }
 
-/** O que o cliente pediu. Lido só da fala DELE — a loja oferece, ele pede. */
-const MODELOS: [string, string][] = [
-  ['17 pro max', 'iPhone 17 Pro Max'], ['17 pro', 'iPhone 17 Pro'], ['iphone 17', 'iPhone 17'],
-  ['16 pro max', 'iPhone 16 Pro Max'], ['16 pro', 'iPhone 16 Pro'], ['iphone 16', 'iPhone 16'],
-  ['15 pro max', 'iPhone 15 Pro Max'], ['15 pro', 'iPhone 15 Pro'], ['iphone 15', 'iPhone 15'],
-  ['iphone 14', 'iPhone 14'], ['iphone 13', 'iPhone 13'], ['iphone 12', 'iPhone 12'],
-  ['iphone 11', 'iPhone 11'], ['macbook', 'MacBook'], ['ipad', 'iPad'],
-  ['apple watch', 'Apple Watch'], ['airpod', 'AirPods'], ['212 vip', 'Perfume 212 VIP'],
-]
+/**
+ * O QUE O CLIENTE PODE PEDIR, E COMO ELE FALA DA TROCA — da EMPRESA, não daqui (17/11/2026).
+ *
+ * Até aqui um dicionário de loja de celular morava neste arquivo: o ZapIntel é vendido a
+ * qualquer empresa. Agora os modelos vêm do catálogo da empresa (`estoque_produtos.nome`,
+ * `modelosDoCatalogo`) e o vocabulário de celular do módulo dele, só com ele ligado
+ * (components/modules/celulares/zapintel-modelos.ts; quem monta é
+ * lib/zapintel/produtos-da-ficha.ts). Sem nada disso, a ficha não procura modelo.
+ */
+export interface ProdutosDaFicha {
+  /** [o que procurar na fala do cliente, em minúsculas, como mostrar] — do mais específico ao mais genérico. */
+  modelos: [string, string][]
+  /** Expressões (em minúsculas) com que o cliente oferece o usado na troca. */
+  palavrasDeTroca: string[]
+  /** O que a ficha escreve em "procurou" quando ele oferece o usado na troca. */
+  rotuloTroca: string
+}
 
-const PALAVRAS_DE_TROCA = ['troca', 'na troca', 'dou o meu', 'entrada o meu', 'meu aparelho']
+export const PRODUTOS_GENERICOS: ProdutosDaFicha = {
+  modelos: [],
+  palavrasDeTroca: ['troca', 'na troca', 'dou o meu', 'entrada o meu'],
+  rotuloTroca: 'com usado na troca',
+}
+
+/**
+ * Os nomes do catálogo viram o que procurar na fala do cliente: em minúsculas, espaços
+ * juntados, do mais longo para o mais curto (o mais específico ganha, como no dicionário).
+ * Nome com menos de 3 letras não entra: casaria com qualquer conversa.
+ */
+export function modelosDoCatalogo(nomes: (string | null | undefined)[]): [string, string][] {
+  const vistos = new Map<string, string>()
+  for (const n of nomes) {
+    const rotulo = (n ?? '').replace(/\s+/g, ' ').trim()
+    const chave = rotulo.toLowerCase()
+    if (chave.length >= 3 && !vistos.has(chave)) vistos.set(chave, rotulo)
+  }
+  return [...vistos.entries()].sort((a, b) => b[0].length - a[0].length)
+}
 
 /**
  * Cumprimento, não pedido.
@@ -343,23 +370,25 @@ export interface ContextoDaFicha {
   comprou: boolean
   valorVenda: number | null
   diasAteVenda: number | null
+  /** O que procurar na fala do cliente (lib/zapintel/produtos-da-ficha.ts). Ausente = genérico. */
+  produtos?: ProdutosDaFicha
 }
 
 /** Produz a ficha de UM lead já analisado. */
 export function montarFicha(a: Lead, ctx: ContextoDaFicha): Ficha {
+  const produtos = ctx.produtos ?? PRODUTOS_GENERICOS
   const msgs = (a.messages || []).filter((m) => texto(m) || m.mediaType)
   const comTexto = msgs.filter((m) => texto(m))
   const ultima = comTexto[comTexto.length - 1]
 
   const falaDoCliente = comTexto.filter((m) => !m.isStore).map((m) => texto(m).toLowerCase()).join(' ')
   // SÓ O MAIS ESPECÍFICO. A lista está em ordem do mais longo para o mais
-  // curto, e "iphone 17 pro max" contém "17 pro" e "iphone 17" — sem parar no
-  // primeiro, a ficha dizia "Procurou iPhone 17 Pro Max, iPhone 17 Pro,
-  // iPhone 17" para quem pediu um aparelho só.
+  // curto, e um nome comprido contém os mais curtos da mesma linha — sem parar
+  // no primeiro, a ficha listava três modelos para quem pediu um só.
   const procurou: string[] = []
-  const achado = MODELOS.find(([chave]) => falaDoCliente.includes(chave))
+  const achado = produtos.modelos.find(([chave]) => falaDoCliente.includes(chave))
   if (achado) procurou.push(achado[1])
-  if (PALAVRAS_DE_TROCA.some((k) => falaDoCliente.includes(k))) procurou.push('com aparelho na troca')
+  if (produtos.palavrasDeTroca.some((k) => falaDoCliente.includes(k))) procurou.push(produtos.rotuloTroca)
 
   const esperasDaLoja = esperas(msgs)
 

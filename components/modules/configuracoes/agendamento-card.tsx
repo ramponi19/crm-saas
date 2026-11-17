@@ -6,7 +6,7 @@ import { useOrigem } from '@/lib/navegador'
 import { Card, Button, notify } from '@/components/ui'
 import { CalendarClock, Copy, ExternalLink, Download } from 'lucide-react'
 
-/** Agendamento online 24h (Saúde): URL pública + QR. O paciente marca sozinho. */
+/** Agendamento online 24h: URL pública + QR. O cliente marca sozinho. */
 export function AgendamentoCard({ slug }: { slug: string | null }) {
   const base = useOrigem()
   const [qr, setQr] = useState('')
@@ -31,7 +31,7 @@ export function AgendamentoCard({ slug }: { slug: string | null }) {
   return (
     <Card title={<span className="flex items-center gap-2"><CalendarClock size={16} strokeWidth={1.7} className="text-accent" />Agendamento online 24h</span>}>
       <p className="-mt-0.5 mb-4 text-[12.5px] text-ink-2">
-        Compartilhe o link ou imprima o QR. O paciente escolhe o horário livre e marca sozinho, a qualquer hora — o agendamento cai direto na sua Agenda.
+        Compartilhe o link ou imprima o QR. O cliente escolhe o horário livre e marca sozinho, a qualquer hora — o agendamento cai direto na sua Agenda.
       </p>
 
       <div className="flex flex-wrap items-center gap-2 rounded-control border border-line bg-raised px-3 py-2">
