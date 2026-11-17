@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Biblioteca de documentos da loja (contrato de venda, termo de garantia…).
@@ -16,6 +17,8 @@ export async function GET(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   const incluirArquivados = new URL(req.url).searchParams.get('arquivados') === '1'
   let q = supabase
@@ -56,6 +59,8 @@ export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId, userId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   let body: { nome?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }
@@ -88,6 +93,8 @@ export async function DELETE(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   let body: { id?: unknown; cienteDasEmissoes?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }
@@ -138,6 +145,8 @@ export async function PATCH(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   let body: { id?: unknown; nome?: unknown; arquivado?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }

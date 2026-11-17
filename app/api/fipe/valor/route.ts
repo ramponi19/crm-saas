@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { consultarValor } from '@/lib/fipe'
 
 /** Valor FIPE de um veículo (cache-aware). POST { tipo, marca, modelo, ano, marcaNome?, modeloNome?, anoLabel? } */
@@ -7,6 +8,8 @@ export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(await getEmpresaId(), 'consulta_fipe')
+  if (trava) return trava
 
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
   const tipo = Number(b.tipo), marca = Number(b.marca), modelo = Number(b.modelo)

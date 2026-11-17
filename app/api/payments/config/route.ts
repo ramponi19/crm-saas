@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { encryptCredenciais } from '@/lib/payments/crypto'
 import { buildProvider, type ProviderId } from '@/lib/payments'
+import { algumModuloLigado, exigirModuloLigado } from '@/lib/modulo-ligado'
 
 const PROVIDERS_VALIDOS: ProviderId[] = ['manual', 'mercadopago', 'asaas', 'efibank', 'pagseguro']
 
@@ -17,6 +18,13 @@ export async function POST(req: NextRequest) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  // Cobrança/meio de pagamento é usado pelo PDV e pela Assistência, não só pelo
+  // Financeiro: basta um dos três ligado. Nenhum → o 403 padrão do Financeiro.
+  const algumLigado = await algumModuloLigado(empresaId, ['pdv', 'assistencia', 'financeiro'])
+  if (!algumLigado) {
+    const trava = await exigirModuloLigado(empresaId, 'financeiro')
+    if (trava) return trava
+  }
   const { provider, credenciais, modo, ativo, testar } = await req.json() as {
     provider: ProviderId
     credenciais: Record<string, string>
@@ -65,6 +73,13 @@ export async function GET() {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  // Cobrança/meio de pagamento é usado pelo PDV e pela Assistência, não só pelo
+  // Financeiro: basta um dos três ligado. Nenhum → o 403 padrão do Financeiro.
+  const algumLigado = await algumModuloLigado(empresaId, ['pdv', 'assistencia', 'financeiro'])
+  if (!algumLigado) {
+    const trava = await exigirModuloLigado(empresaId, 'financeiro')
+    if (trava) return trava
+  }
   const { data } = await supabase
     .from('financeiro_config_pagamento')
     .select('provider, ativo, modo, atualizado_em, credenciais_cipher')

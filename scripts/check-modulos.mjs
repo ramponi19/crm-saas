@@ -66,7 +66,7 @@ const mod = (chave) => {
 const DONOS = {
   // core — telas
   '/dashboard': CORE, '/leads': CORE, '/clientes': CORE, '/tarefas': CORE, '/comunicacao': CORE,
-  '/configuracoes': CORE, '/modulos': CORE, '/equipe': CORE,
+  '/configuracoes': CORE, '/modulos': CORE,
   // core — Insights e Automações (os itens `sempreLiberado` do menu)
   '/visao-geral': CORE, '/conversao': CORE, '/metas': CORE, '/cadencias': CORE, '/distribuicao': CORE,
   '/scoring': CORE, '/modelos': CORE, '/respostas': CORE, '/automacoes': CORE,
@@ -80,18 +80,28 @@ const DONOS = {
   '/api/scoring': CORE, '/api/whatsapp': CORE,
   // as taxas da maquininha são uma seção de Configurações (o PDV e o Simular parcela leem)
   '/api/taxas': CORE,
+  // o Assistente (chat com os dados da loja) é do core desde 17/11/2026: o widget é de todo usuário
+  '/api/assistente': CORE,
 
   // plataforma
   '/login': PLAT, '/register': PLAT, '/entrar': PLAT, '/reset-senha': PLAT, '/offline': PLAT, '/privacy': PLAT,
   '/superadmin': PLAT, '/vitrine': PLAT, '/design': PLAT, '/para': PLAT, '/landing': PLAT,
   '/i': PLAT, '/track.js': PLAT,
-  // só redireciona para /catalogo (a trava da tela de destino vale)
-  '/produtos': PLAT,
   '/api/superadmin': PLAT, '/api/cron': PLAT, '/api/saude': PLAT, '/api/register': PLAT,
   '/api/planos-publicos': PLAT, '/api/stripe': PLAT, '/api/rastreamento': PLAT,
   '/api/payments/webhook': PLAT,
   // o superadmin inspeciona o ZapIntel de qualquer empresa (cookie próprio)
   '/api/zapintel/preview': PLAT,
+
+  // módulo — seções de Configurações que um módulo traz (core/modulos.ts → abasConfiguracoes;
+  // 17/11/2026: antes contavam como core por estarem em /configuracoes). Quem confere é a
+  // SecaoConfiguracoes (notFound sem o módulo) ou exigirAbaDeModulo. Pagamentos, Contrato e
+  // Documentos servem a mais de um módulo (PDV, Garantia, Assistência, Financeiro): o dono
+  // anotado é o primeiro; a conferência aceita qualquer um deles ligado.
+  '/configuracoes/cardapio': mod('cardapio'), '/configuracoes/agendamento': mod('agenda'),
+  '/configuracoes/portais': mod('imoveis'), '/configuracoes/troca': mod('orcamentos'),
+  '/configuracoes/contrato': mod('pdv'), '/configuracoes/documentos': mod('pdv'),
+  '/configuracoes/pagamentos': mod('pdv'),
 
   // módulo — telas públicas (link com token, site da loja)
   '/agendar': mod('agenda'), '/os': mod('assistencia'), '/orcamento': mod('orcamentos'),
@@ -107,7 +117,7 @@ const DONOS = {
 }
 const PREFIXOS = Object.keys(DONOS).sort((a, b) => b.length - a.length)
 
-const GUARDA = /\b(exigirModuloLigado|moduloLigado|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(/
+const GUARDA = /\b(exigirModuloLigado|moduloLigado|moduloEstaLigado|exigirAbaDeModulo|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(|<SecaoConfiguracoes\b/
 
 // ── As rotas ─────────────────────────────────────────────────────────────────
 function arquivos(dir) {

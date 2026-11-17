@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { rotuloDaFilial } from '@/lib/filiais'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Manda unidades do estoque para outra loja da rede.
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
   const sessao = await requireEmpresaRoleApi(['owner', 'admin'])
   if (sessao.error) return sessao.error
   const { supabase, empresaId, userId } = sessao
+  const trava = await exigirModuloLigado(empresaId, 'estoque')
+  if (trava) return trava
 
   let body: { ids?: unknown; filialDestino?: unknown; observacoes?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }

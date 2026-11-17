@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { moduloPorChave } from '@/core/modulos'
+import { abasDosModulos, moduloPorChave } from '@/core/modulos'
+import { notFound } from 'next/navigation'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { estaLigado } from '@/lib/modulos-central'
 
@@ -43,4 +44,24 @@ export async function moduloEstaLigado(empresaId: number, chave: string): Promis
     ligados: ligadosDaEmpresa(cfg),
     ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)),
   })
+}
+
+/**
+ * Seção de Configurações que pertence a módulo (core/modulos.ts → abasConfiguracoes), em página que
+ * não passa pela SecaoConfiguracoes (Documentos): sem nenhum módulo dono ligado, a página não existe
+ * (17/11/2026 — esconder o item do menu não protege o endereço).
+ */
+export async function exigirAbaDeModulo(empresaId: number, aba: string): Promise<void> {
+  const cfg = await carregarConfigEmpresa(createServiceClient(), empresaId)
+  if (!abasDosModulos(ligadosDaEmpresa(cfg)).includes(aba)) notFound()
+}
+
+/**
+ * Algum destes módulos ligado? Para o que mais de um módulo usa (cobrança e meios de pagamento:
+ * PDV, Assistência, Financeiro): uma leitura da configuração da empresa, não uma por módulo.
+ */
+export async function algumModuloLigado(empresaId: number, chaves: string[]): Promise<boolean> {
+  const cfg = await carregarConfigEmpresa(createServiceClient(), empresaId)
+  const e = { ligados: ligadosDaEmpresa(cfg), ativos: new Set(cfg.modulos.filter((r) => r.ativo).map((r) => r.modulo)) }
+  return chaves.some((c) => { const m = moduloPorChave(c); return !!m && estaLigado(m, e) })
 }

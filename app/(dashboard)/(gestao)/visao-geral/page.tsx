@@ -101,7 +101,7 @@ export default async function AdminOverviewPage() {
 
   const atalhos = [
     { href: '/configuracoes/empresa', label: 'Minha empresa', desc: 'Identidade, marca e white-label', icon: Building2 },
-    { href: '/configuracoes/pagamentos', label: 'Configurações', desc: 'Pagamentos, taxas e preferências', icon: Settings },
+    { href: '/configuracoes/taxas', label: 'Configurações', desc: 'Taxas e preferências', icon: Settings },
     { href: '/configuracoes/usuarios', label: 'Equipe', desc: 'Usuários, metas e comissões', icon: UserCog },
     { href: '/configuracoes/faturamento', label: 'Planos', desc: 'Assinatura e upgrade', icon: CreditCard },
   ]

@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * Feed XML de imóveis para portais (padrão OLX / Canal Pro — Grupo OLX Brasil:
@@ -54,7 +55,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!slugValido(slug)) return naoAchou()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).eq('status', 'ativo').maybeSingle()
-  if (!empresa) return naoAchou()
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'imoveis'))) return naoAchou()
 
   const { data: imoveis } = await svc
     .from('imoveis_imoveis')

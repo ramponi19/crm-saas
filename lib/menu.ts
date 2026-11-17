@@ -15,6 +15,7 @@
  */
 
 import { planoTemAcesso, type ModuloPlano } from './plano'
+import { HREFS_EM_PREPARACAO } from '@/core/modulos'
 
 export type BadgeKey = 'leads' | 'garantia' | 'chat'
 
@@ -317,30 +318,16 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/estoque', label: 'Estoque', icon: 'Boxes' },
       // Só faz sentido onde se vende aparelho — opcional, como a FIPE em veículos.
       { href: '/check-imei', label: 'Check IMEI', icon: 'ScanSearch', opcional: true, ferramenta: { rota: '/estoque/imei' } },
-      { href: '/catalogo', label: 'Produtos', icon: 'Smartphone' },
+      { href: '/catalogo', label: 'Produtos', icon: 'BookOpen' },
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
       { href: '/assistencia', label: 'Assistência', icon: 'Wrench' },
-      // Ferramenta compartilhada (imob + veículos) — opcional, junto do simulador.
+      // Os itens abaixo são de módulos (core/modulos.ts); sem grupo com nome de ramo de negócio
+      // no core (17/11/2026). Quem decide o grupo na barra é GRUPO_DO_HREF.
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator', opcional: true },
-    ],
-  },
-  {
-    label: 'Imóveis',
-    items: [
       { href: '/imoveis', label: 'Imóveis', icon: 'Home', opcional: true },
-    ],
-  },
-  {
-    label: 'Veículos',
-    items: [
       { href: '/avaliacoes', label: 'Avaliações', icon: 'ClipboardCheck', opcional: true },
       { href: '/consulta-fipe', label: 'Consulta FIPE', icon: 'Car', opcional: true, ferramenta: { rota: '/avaliacoes/fipe' } },
-    ],
-  },
-  {
-    label: 'Food',
-    items: [
       { href: '/cardapio', label: 'Cardápio', icon: 'UtensilsCrossed', opcional: true },
       { href: '/kds', label: 'Cozinha (KDS)', icon: 'CookingPot', opcional: true },
     ],
@@ -351,6 +338,8 @@ export const CATALOGO: MenuGroupBase[] = [
       // Painel do dono: opcional (fora de hrefsBase), então nenhuma empresa
       // herda por acidente — só quem tem '/executivo' na lista habilitada.
       { href: '/executivo', label: 'Executivo', icon: 'Landmark', opcional: true, adminOnly: true },
+      // Módulo Metas e ranking (17/11/2026): era um "extra" de uma base só, sem dono.
+      { href: '/ranking', label: 'Metas e ranking', icon: 'Trophy', opcional: true },
       { href: '/relatorios', label: 'Relatórios', icon: 'BarChart3', modulo: 'bi', adminOnly: true, donoNaoOculta: true },
       { href: '/financeiro', label: 'Financeiro', icon: 'Wallet', adminOnly: true, donoNaoOculta: true },
       // Leituras que moravam no /admin (21/10/2026): agora em Insights.
@@ -439,6 +428,8 @@ export function hrefsLigados(base: Iterable<string>, instalados?: Record<string,
   }
   NUCLEO.forEach((h) => habilitados.add(h))
   SEMPRE.forEach((h) => habilitados.add(h))
+  // Em preparação nunca está ligado, venha de onde vier (core/modulos.ts, 17/11/2026).
+  HREFS_EM_PREPARACAO.forEach((h) => habilitados.delete(h))
   return habilitados
 }
 
@@ -675,7 +666,6 @@ export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
  */
 const GRUPO_DO_LEGADO: Record<string, GrupoMenuId> = {
   Hoje: 'inicio', Comercial: 'pipeline', 'Operação': 'vendas', 'Gestão': 'insights',
-  'Imóveis': 'estoque', 'Veículos': 'vendas', Food: 'vendas',
 }
 
 export interface GrupoNav {

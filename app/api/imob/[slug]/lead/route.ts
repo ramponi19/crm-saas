@@ -5,6 +5,7 @@ import { escolherResponsavel } from '@/lib/distribuicao'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
 import { criarLead, registrarMensagemDoLead } from '@/lib/leads'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * Captura de leads do SITE PRÓPRIO da imobiliária.
@@ -31,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
-  if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'imoveis'))) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
 
   /**
    * Teto por origem, ANTES de conferir o token.

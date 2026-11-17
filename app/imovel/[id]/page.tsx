@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { BedDouble, Bath, Car, Ruler, MapPin, MessageCircle } from 'lucide-react'
 
 const brl = (v: number | null) =>
@@ -39,7 +40,7 @@ export default async function ImovelPublicoPage({ params }: { params: Promise<{ 
   if (!Number.isFinite(imovelId)) notFound()
 
   const data = await getImovel(imovelId)
-  if (!data) notFound()
+  if (!data || !(await moduloEstaLigado(data.imovel.empresa_id, 'imoveis'))) notFound()
   const { imovel, empresa } = data
 
   const cor = empresa?.wl_cor || '#2E5CE6'

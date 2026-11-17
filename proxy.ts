@@ -3,14 +3,14 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { moduloDaRota, hrefsLigados } from '@/lib/menu'
 import { camadasDoMenu, instaladosDoManifesto, type ModuloRow } from '@/lib/empresa-config'
 import { temVitrine } from '@/lib/modulos-vitrine'
-import { COOKIE_VERSAO_MODULOS } from '@/core/modulos'
+import { COOKIE_VERSAO_MODULOS, HREFS_EM_PREPARACAO } from '@/core/modulos'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
 /**
- * Cache dos módulos habilitados por empresa (trava de rota por segmento).
+ * Cache dos módulos habilitados por empresa (trava de rota por módulo).
  *
- * `segmentos_config` muda uma vez a cada muito tempo, e sem cache isso viraria
+ * A base do menu e os módulos da empresa mudam pouco, e sem cache isso viraria
  * duas consultas a cada navegação. TTL curto porque o superadmin ligar um módulo
  * e o menu demorar 1 minuto para valer é aceitável; o contrário (consulta a cada
  * clique) não é.
@@ -40,6 +40,8 @@ const LEGADO_ADMIN: Record<string, string> = {
   '/empresa': '/configuracoes/empresa',
   '/planos': '/configuracoes/faturamento',
   '/equipe': '/configuracoes/usuarios',
+  // A tela de Produtos virou o Catálogo (o redirecionador de app/(dashboard)/produtos saiu em 17/11/2026).
+  '/produtos': '/catalogo',
 }
 
 /**
@@ -67,7 +69,7 @@ const LEGADO_ADMIN: Record<string, string> = {
  * Nenhuma rota autenticada entra aqui — e nenhuma deve entrar sem que alguém
  * confira esse subconjunto de novo.
  *
- * Só `/api/*`, de propósito: `moduloDaRota()` olha o primeiro segmento do
+ * Só `/api/*`, de propósito: `moduloDaRota()` olha a primeira parte do
  * caminho contra os hrefs do menu, que são todos telas. Rota de API nunca cai
  * na trava de módulo, então sair cedo aqui não escapa de trava nenhuma. Tela
  * pública (`/imovel/`, `/proposta/`, `/orcamento/`) fica fora desta lista
@@ -235,7 +237,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Trava de rota por SEGMENTO. Até aqui o opt-in de módulo era só de menu: o
+  // Trava de rota por MÓDULO. Até aqui o opt-in de módulo era só de menu: o
   // link sumia, mas quem tinha a tela nos favoritos continuava usando — o dono
   // desligava o módulo e ele seguia funcionando. Papel e plano já travam nas
   // próprias páginas (requireEmpresaRole / exigirPlano); esta trava cuida só da
@@ -260,7 +262,7 @@ export async function proxy(request: NextRequest) {
   const modulo = user ? moduloDaRota(request.nextUrl.pathname) : null
   if (modulo) {
     // SUPERADMIN PASSA. Ele constrói módulo novo antes de existir liberação, e a
-    // trava olha o segmento da empresa (inclusive a de preview, quando ele está
+    // trava olha os módulos da empresa (inclusive a de preview, quando ele está
     // impersonando): sem esta saída, o laboratório barraria justamente quem está
     // fazendo a página.
     //
@@ -271,10 +273,13 @@ export async function proxy(request: NextRequest) {
     const { data: eu } = await supabase.from('usuarios').select('is_super_admin').eq('id', user!.id).maybeSingle()
     if (eu?.is_super_admin && !vitrine) return supabaseResponse
 
-    const habilitados = await modulosHabilitados(supabase, request.cookies.get(COOKIE_VERSAO_MODULOS)?.value ?? '')
+    // Em preparação (17/11/2026): nunca abre para a loja, nem com a base sem lista nem com a
+    // consulta falhando — não depende de `habilitados`.
+    const emPreparacao = HREFS_EM_PREPARACAO.has(modulo)
+    const habilitados = emPreparacao ? null : await modulosHabilitados(supabase, request.cookies.get(COOKIE_VERSAO_MODULOS)?.value ?? '')
     // habilitados === null => não deu para saber. Passa direto: derrubar o CRM
     // inteiro por uma consulta que falhou é muito pior do que uma tela a mais.
-    if (habilitados && !habilitados.has(modulo)) {
+    if (emPreparacao || (habilitados && !habilitados.has(modulo))) {
       /**
        * MÓDULO DESLIGADO = VITRINE, NÃO REDIRECT (etapa 0). Agenda, Executivo e
        * Gestão de Leads mostram o que fazem e o botão de ativar, no mesmo

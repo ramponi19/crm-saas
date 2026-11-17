@@ -20,7 +20,7 @@ export async function VitrineDoModulo({ href }: { href: string }) {
   return (
     <>
       <Topbar title={modulo.nome} />
-      <Vitrine modulo={modulo} chave={moduloPorHref(href)?.chave ?? null} />
+      <Vitrine modulo={modulo} chave={moduloPorHref(href)?.chave ?? null} emPreparacao={!!moduloPorHref(href)?.emPreparacao} />
     </>
   )
 }

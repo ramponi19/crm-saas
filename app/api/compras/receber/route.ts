@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Marca um pedido de compra como RECEBIDO e dá ENTRADA da unidade no estoque
@@ -11,6 +12,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'compras')
+  if (trava) return trava
 
   const { pedidoId } = (await req.json().catch(() => ({}))) as { pedidoId?: number }
   if (!pedidoId) return NextResponse.json({ error: 'Pedido ausente' }, { status: 400 })

@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { MenuView, type MenuItem } from './menu-view'
 
 export const metadata = { title: 'Cardápio' }
@@ -14,7 +15,7 @@ export default async function MenuPublicoPage({ params }: { params: Promise<{ sl
 
   const { data: empresa } = await svc
     .from('empresas').select('id, nome, ...empresa_branding(wl_logo_url:logo_url, wl_cor:cor, wl_whatsapp:whatsapp)').eq('slug', slug).maybeSingle()
-  if (!empresa) notFound()
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'cardapio'))) notFound()
   // Ver a nota em /agendar: cardápio é de quem trabalha com comanda.
   if (!capacidades(await carregarConfigEmpresa(svc, empresa.id)).usaComanda) notFound()
 

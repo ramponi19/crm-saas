@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { ranquear, type PerfilBusca, type ImovelMatchInput } from '@/lib/match-imoveis'
 import { ranquearVeiculos, type InteresseVeiculo, type VeiculoMatchInput } from '@/lib/match-veiculos'
 
@@ -18,6 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'imoveis')
+  if (trava) return trava
 
 
   // ── Loja de veículos ──

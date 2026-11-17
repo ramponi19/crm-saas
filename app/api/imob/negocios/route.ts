@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { consultaClientes } from '@/lib/clientes'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { calcularComissao, calcularComissaoPorPercentual, cashbackCabe, mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 import { agora, diaNoFuso } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
@@ -60,6 +61,8 @@ export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor'])
   if (auth.error) return auth.error
   const { empresaId, userId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'imoveis')
+  if (trava) return trava
 
   const b = (await req.json().catch(() => ({}))) as CorpoNovo
   const tipo = TIPOS.includes(b.tipo as never) ? (b.tipo as string) : null
@@ -322,6 +325,8 @@ export async function PATCH(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor'])
   if (auth.error) return auth.error
   const { empresaId, role } = auth
+  const trava = await exigirModuloLigado(empresaId, 'imoveis')
+  if (trava) return trava
 
   const b = (await req.json().catch(() => ({}))) as CorpoPatch
   if (!b.id) return NextResponse.json({ error: 'Negócio não informado' }, { status: 400 })

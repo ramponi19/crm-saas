@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
+import { exigirAbaDeModulo } from '@/lib/modulo-ligado'
 import { Topbar } from '@/components/layout/topbar'
 import { garantiaPadraoLoja } from '@/lib/contrato-emitir'
 import type { PaginaModelo } from '@/lib/contrato-modelo'
@@ -15,6 +16,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   if (!Number.isFinite(documentoId)) notFound()
 
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  await exigirAbaDeModulo(empresaId, 'documentos')
 
   // Filtra por empresa junto do id: id de outro tenant devolve 404, não erro.
   const { data: doc } = await supabase

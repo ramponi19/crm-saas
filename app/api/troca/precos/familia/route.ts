@@ -5,6 +5,7 @@ import { AVARIA_POR_CHAVE } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { familiasDeTroca } from '@/lib/troca-modelos'
 import { getEmpresaRole } from '@/lib/owner'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Aplica UM valor a UMA coluna em toda uma família de modelos.
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
   // Aplicar em bloco sobrescreve valores ja preenchidos da familia inteira: so
   // dono ou admin (o vendedor so preenche celula em branco, em /api/troca/precos).

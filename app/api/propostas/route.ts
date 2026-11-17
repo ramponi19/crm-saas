@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { Json } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 interface Item { descricao: string; qtd: number; valor: number }
 
@@ -17,6 +18,8 @@ function normalizar(itensRaw: unknown): { itens: Item[]; total: number } {
 
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'propostas')
+  if (trava) return trava
   const body = await req.json().catch(() => ({})) as { cliente_nome?: string; lead_id?: number | null; itens?: unknown; observacoes?: string }
   const { itens, total } = normalizar(body.itens)
   const { data, error } = await supabase.from('vendas_propostas').insert({
@@ -34,6 +37,8 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'propostas')
+  if (trava) return trava
   const body = await req.json().catch(() => ({})) as { id?: number; cliente_nome?: string; itens?: unknown; observacoes?: string; status?: string }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
@@ -52,6 +57,8 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'propostas')
+  if (trava) return trava
   const body = await req.json().catch(() => ({})) as { id?: number }
   if (!body.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { data: apagou, error } = await supabase.from('vendas_propostas').delete().eq('id', body.id).eq('empresa_id', empresaId).select('id')

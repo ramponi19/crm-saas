@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { enviarPush } from '@/lib/push'
 import { NextResponse } from 'next/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 interface NotifyBody { destinatario_id?: string; texto?: string }
 
@@ -9,6 +10,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'chat')
+  if (trava) return trava
 
   const body = (await req.json().catch(() => ({}))) as NotifyBody
   if (!body.destinatario_id) return NextResponse.json({ error: 'Destinatário ausente' }, { status: 400 })

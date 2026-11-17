@@ -84,11 +84,12 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
         ...(tem('agendamento') ? [{ href: '/configuracoes/agendamento', label: 'Agendamento' }] : []),
       ] },
       { label: 'Loja', itens: [
-        { href: '/configuracoes/pagamentos', label: 'Meios de pagamento' },
+        // Seções de módulo (17/11/2026): só com o módulo dono ligado (core/modulos.ts → abasConfiguracoes).
+        ...(tem('pagamentos') ? [{ href: '/configuracoes/pagamentos', label: 'Meios de pagamento' }] : []),
         { href: '/configuracoes/taxas', label: 'Taxas' },
-        { href: '/configuracoes/troca', label: 'Troca' },
-        { href: '/configuracoes/contrato', label: 'Contrato' },
-        { href: '/configuracoes/documentos', label: 'Documentos' },
+        ...(tem('troca') ? [{ href: '/configuracoes/troca', label: 'Troca' }] : []),
+        ...(tem('contrato') ? [{ href: '/configuracoes/contrato', label: 'Contrato' }] : []),
+        ...(tem('documentos') ? [{ href: '/configuracoes/documentos', label: 'Documentos' }] : []),
         ...(tem('cardapio') ? [{ href: '/configuracoes/cardapio', label: 'Cardápio' }] : []),
         { href: '/configuracoes/dados', label: 'Exportar dados' },
       ] },
@@ -106,10 +107,4 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
     ] }],
   }
   return [perfil, trabalho, ia, integracoes].filter((s) => s.grupos.some((g) => g.itens.length > 0))
-}
-
-/** Primeira tela que esta pessoa pode abrir em Configurações. */
-export function primeiraDeConfiguracoes(secoes: SecaoConfig[]): string {
-  const trabalho = secoes.find((s) => s.id === 'trabalho')
-  return (trabalho ?? secoes[0]).grupos[0].itens[0].href
 }

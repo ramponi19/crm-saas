@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import { conversaEsperando, lerEsperando, type MapaEsperando } from '@/lib/esperando'
-import { FILTRO_ETIQUETAS_VAZIO, filtroEtiquetasAtivo, type FiltroEtiquetas } from '@/lib/etiquetas'
+import { filtroEtiquetasAtivo, type FiltroEtiquetas } from '@/lib/etiquetas'
 
 /**
  * A INBOX ÚNICA LÊ O CORE DIRETO (04/11/2026): `conversas`, `contatos`,
@@ -41,8 +41,6 @@ export interface FiltrosInbox {
   /** Etiqueta do contato: contém alguma de `com`, não contém nenhuma de `sem` (11/11/2026). */
   etiquetas: FiltroEtiquetas
 }
-
-export const FILTROS_VAZIOS: FiltrosInbox = { canal: null, naoLidas: false, aguardando: false, antigos: false, responsavel: null, busca: '', etiquetas: FILTRO_ETIQUETAS_VAZIO }
 
 export interface ContatoInbox { id: number; nome: string | null; telefone: string | null; instagram: string | null; foto_url: string | null; etiqueta_ids?: number[] }
 export interface CanalInbox { id: number; tipo: CanalTipo; nome_exibicao: string | null; filial_id: number | null }

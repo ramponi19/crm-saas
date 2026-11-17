@@ -5,6 +5,7 @@ import { AVARIA_POR_CHAVE, BONUS_LEVA_SEMINOVO, calcularTroca } from '@/lib/troc
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { TOTAL_ITENS } from '@/lib/troca-checklist'
 import { consultaClientes } from '@/lib/clientes'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Grava a cotação de troca.
@@ -44,6 +45,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
 
   const b = (await req.json().catch(() => ({}))) as Body
@@ -164,6 +167,8 @@ export async function DELETE(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(await getEmpresaId(), 'orcamentos')
+  if (trava) return trava
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })

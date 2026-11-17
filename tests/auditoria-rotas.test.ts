@@ -70,6 +70,8 @@ mock.module('@/lib/superadmin', {
 mock.module('@/lib/automacoes', { namedExports: { executarEntradaEtapa: async () => {} } })
 mock.module('@/lib/cadencia', { namedExports: { inscreverPorEtapa: async () => {} } })
 mock.module('@/lib/troca-acesso', { namedExports: { cotacaoDeTrocaLiberada: async () => true } })
+// A trava de módulo das APIs (17/11/2026): aqui o módulo está ligado; a trava tem teste próprio.
+mock.module('@/lib/modulo-ligado', { namedExports: { exigirModuloLigado: async () => null, moduloEstaLigado: async () => true, exigirAbaDeModulo: async () => {} } })
 mock.module('@/lib/roleta', {
   namedExports: {
     membrosElegiveis: async () => ({ ids: ['u-9'], loja: null }),

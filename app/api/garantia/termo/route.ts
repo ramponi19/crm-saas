@@ -1,6 +1,7 @@
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Anexa o termo de garantia ASSINADO a uma venda (POST) ou devolve um link
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
 
   const empresaId = await getEmpresaId()
   if (!empresaId) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
+  const trava = await exigirModuloLigado(empresaId, 'garantia')
+  if (trava) return trava
 
   const form = await req.formData()
   const termoId = Number(form.get('termoId'))
@@ -81,6 +84,8 @@ export async function GET(req: NextRequest) {
   const empresaId = await getEmpresaId()
   const termoId = Number(req.nextUrl.searchParams.get('termoId'))
   if (!empresaId || !Number.isFinite(termoId)) return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
+  const trava = await exigirModuloLigado(empresaId, 'garantia')
+  if (trava) return trava
 
   const { data: termo } = await supabase
     .from('vendas_termos').select('arquivo_url')

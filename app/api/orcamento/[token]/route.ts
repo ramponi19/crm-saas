@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }) }
@@ -12,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { data: orc } = await svc.from('assistencia_orcamentos')
     .select('id, empresa_id, lead_id, tipo, status, aprovado_em, recusado_em, aparelho, imei, defeito, itens, total, valor_devolver, acerto, os_id, cliente_nome, cliente_id, usuario_id, observacoes, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id')
     .eq('token', token).maybeSingle()
-  if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
+  if (!orc || !(await moduloEstaLigado(orc.empresa_id, 'orcamentos'))) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404, headers: CORS })
 
   const b = (await req.json().catch(() => ({}))) as { acao?: string }
   const nowIso = new Date().toISOString()

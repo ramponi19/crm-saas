@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Confirma que o aparelho aceito em troca chegou fisicamente na loja.
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
 
   const empresaId = await getEmpresaId()
   if (!empresaId) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
+  const trava = await exigirModuloLigado(empresaId, 'estoque')
+  if (trava) return trava
 
   // Só sai de `pendente`: o filtro no UPDATE faz a confirmação ser idempotente.
   // Dois cliques (ou dois atendentes) não sobrescrevem quem confirmou primeiro,

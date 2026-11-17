@@ -4,6 +4,7 @@ import { getPortalToken } from '@/lib/portal-token'
 import { escolherResponsavel } from '@/lib/distribuicao'
 import { tokenDaRequisicao, tokenConfere } from '@/lib/token-externo'
 import { criarLead, registrarMensagemDoLead } from '@/lib/leads'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * Webhook INBOUND de leads dos portais (Grupo OLX: ZAP, VivaReal, Imovelweb).
@@ -34,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
-  if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'imoveis'))) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
 
   const esperado = await getPortalToken(svc, empresa.id)
   if (!tokenConfere(token, esperado)) {

@@ -16,9 +16,11 @@ export interface VitrineProps {
   modulo: VitrineModulo
   /** Chave do módulo no manifesto (core/modulos.ts): o tile em /modulos?m=<chave>. */
   chave: string | null
+  /** Módulo em preparação (core/modulos.ts): a vitrine explica, sem levar a instalar. */
+  emPreparacao?: boolean
 }
 
-export function Vitrine({ modulo, chave }: VitrineProps) {
+export function Vitrine({ modulo, chave, emPreparacao = false }: VitrineProps) {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-8 scrollbar-thin sm:px-6">
       <div className="mx-auto max-w-[760px]">
@@ -28,7 +30,7 @@ export function Vitrine({ modulo, chave }: VitrineProps) {
               <Sparkles size={18} strokeWidth={1.7} />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">Módulo desligado nesta loja</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">{emPreparacao ? 'Em preparação' : 'Módulo desligado nesta loja'}</div>
               <h1 className="mt-0.5 text-[22px] font-bold tracking-[-0.03em] text-ink">{modulo.nome}</h1>
               <p className="mt-1 text-[13.5px] leading-relaxed text-ink-2">{modulo.frase}</p>
             </div>
@@ -48,7 +50,7 @@ export function Vitrine({ modulo, chave }: VitrineProps) {
             >
               Ver na Central de módulos
             </Link>
-            <span className="text-[12.5px] text-ink-2">Lá o dono instala o módulo ou faz o pedido.</span>
+            <span className="text-[12.5px] text-ink-2">{emPreparacao ? 'Este módulo ainda não está disponível para instalar.' : 'Lá o dono instala o módulo ou faz o pedido.'}</span>
           </div>
         </Card>
       </div>

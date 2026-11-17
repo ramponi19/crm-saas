@@ -1,6 +1,3 @@
-// kanban_status agora é dinâmico (varia por funil da empresa) — string livre.
-export type KanbanStatus = string
-
 export interface Lead {
   id: number
   nome: string | null

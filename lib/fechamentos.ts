@@ -116,14 +116,3 @@ export async function lerFechamentos(db: Db, empresaId: number, filtro: FiltroFe
   return lista.filter((f) => (!filtro.de || (f.em != null && f.em >= filtro.de)) && (!filtro.ate || (f.em != null && f.em < filtro.ate)))
 }
 
-/** Quantos ganhos e perdas (atuais + reabertos), para os funis que contavam a etapa de hoje. */
-export async function contarFechamentos(db: Db, empresaId: number, filtro: Omit<FiltroFechamentos, 'status'> = {}) {
-  const todos = await lerFechamentos(db, empresaId, filtro)
-  return {
-    ganhos: todos.filter((f) => f.status === 'ganho').length,
-    perdas: todos.filter((f) => f.status === 'perdido').length,
-    reabertosGanhos: todos.filter((f) => f.status === 'ganho' && f.reaberto).length,
-    reabertosPerdas: todos.filter((f) => f.status === 'perdido' && f.reaberto).length,
-    todos,
-  }
-}

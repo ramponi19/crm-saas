@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { Json } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 const STATUS = ['em_analise', 'ofertado', 'aceito', 'recusado'] as const
 type Status = (typeof STATUS)[number]
@@ -57,6 +58,8 @@ async function resolverProduto(sb: Sb, empresaId: number, v: Veiculo): Promise<n
 
 export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'avaliacoes')
+  if (trava) return trava
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
   const veiculo = limparVeiculo(b.veiculo)
   const { data, error } = await supabase.from('avaliacao_usados').insert({
@@ -76,6 +79,8 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'avaliacoes')
+  if (trava) return trava
   const b = await req.json().catch(() => ({})) as Record<string, unknown>
   const id = Number(b.id)
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
@@ -133,6 +138,8 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const trava = await exigirModuloLigado(empresaId, 'avaliacoes')
+  if (trava) return trava
   const b = await req.json().catch(() => ({})) as { id?: number }
   if (!b.id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { data: apagou, error } = await supabase.from('avaliacao_usados').delete().eq('id', b.id).eq('empresa_id', empresaId).select('id')

@@ -4,6 +4,7 @@ import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { AVARIA_POR_CHAVE } from '@/lib/troca-avarias'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { getEmpresaRole } from '@/lib/owner'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Grava a matriz de troca — uma LINHA por vez (modelo + armazenamento).
@@ -43,6 +44,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
 
   const b = (await req.json().catch(() => ({}))) as Body

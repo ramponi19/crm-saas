@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 // Upload de mídia do chat do lead (imagem/vídeo/áudio) para o bucket público
 // chat-midia. O envio real ao canal acontece na Edge webhook-leads, que recebe
@@ -21,6 +22,8 @@ const EXT_POR_MIME: Record<string, string> = {
 export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor', 'tecnico', 'member'])
   if (auth.error) return auth.error
+  const trava = await exigirModuloLigado(auth.empresaId, 'chat')
+  if (trava) return trava
 
   const form = await req.formData().catch(() => null)
   const file = form?.get('file')

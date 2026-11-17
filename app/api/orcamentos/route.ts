@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { consultaClientes } from '@/lib/clientes'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 interface ItemOrc { descricao?: string; qtd?: number; valor?: number }
 interface Body {
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
 
   const b = (await req.json().catch(() => ({}))) as Body
   const tipo = TIPOS.includes(b.tipo || '') ? b.tipo! : 'assistencia'
@@ -199,6 +202,8 @@ export async function DELETE(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(await getEmpresaId(), 'orcamentos')
+  if (trava) return trava
   const id = Number(new URL(req.url).searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'ID ausente' }, { status: 400 })
   const { data: apagou, error } = await supabase.from('assistencia_orcamentos').delete().eq('id', id).select('id')

@@ -1,7 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { limitesDoMes, mesNoFuso } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
-import EquipeView from '@/app/(dashboard)/equipe/components/equipe-view'
+import EquipeView from '@/components/modules/equipe/equipe-view'
 import { UsoEquipe } from '@/components/admin/uso-equipe'
 import { carregarUsoDaEquipe } from '@/lib/uso-equipe'
 import { sinaisDePresenca } from '@/lib/presenca'

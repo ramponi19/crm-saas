@@ -2,6 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { getEmpresaRole } from '@/lib/owner'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * As duas regras da loja: o bônus e o corte de bateria.
@@ -21,6 +22,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
   if (!(await cotacaoDeTrocaLiberada())) return NextResponse.json({ error: 'Módulo não liberado' }, { status: 403 })
   // O bonus e o corte valem para TODA cotacao da loja: e regra do dono, nao do
   // atendimento. Antes qualquer usuario logado mudava os dois.

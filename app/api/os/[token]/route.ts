@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * Aprovação/recusa do orçamento de uma OS pelo cliente, via link público (token).
@@ -17,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .from('assistencia_garantias')
     .select('id, empresa_id, protocolo, status, responsavel_tecnico_id, aprovado_em, recusado_em, clientes:contatos!cliente_id(nome)')
     .eq('token', token).maybeSingle()
-  if (!os) return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
+  if (!os || !(await moduloEstaLigado(os.empresa_id, 'assistencia'))) return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
   if (os.aprovado_em || os.recusado_em) {
     return NextResponse.json({ error: 'Este orçamento já foi respondido.' }, { status: 409 })
   }

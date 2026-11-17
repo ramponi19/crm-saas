@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { nadaGravado } from '@/lib/linhas-afetadas'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 // Reserva de unidade do estoque para um lead (48h). Feita no modal do lead;
 // a venda é finalizada no PDV (aba Reservas). Cancelamento: só quem reservou
@@ -21,6 +22,8 @@ async function expirarReservas(svc: ReturnType<typeof createServiceClient>, empr
 export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor', 'tecnico', 'member'])
   if (auth.error) return auth.error
+  const trava = await exigirModuloLigado(auth.empresaId, 'estoque')
+  if (trava) return trava
 
   const body = await req.json().catch(() => null) as { unidadeId?: number; leadId?: number } | null
   if (!body?.unidadeId || !body?.leadId) {
@@ -77,6 +80,8 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor', 'tecnico', 'member'])
   if (auth.error) return auth.error
+  const trava = await exigirModuloLigado(auth.empresaId, 'estoque')
+  if (trava) return trava
 
   const body = await req.json().catch(() => null) as { unidadeId?: number } | null
   if (!body?.unidadeId) return NextResponse.json({ error: 'unidadeId é obrigatório' }, { status: 400 })

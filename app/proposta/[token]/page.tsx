@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import Image from 'next/image'
 import { PrintButton } from './print-button'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
@@ -22,7 +23,7 @@ export default async function PropostaPublicaPage({ params }: { params: Promise<
     .eq('token', token)
     .maybeSingle()
 
-  if (!data) notFound()
+  if (!data || !data.empresa_id || !(await moduloEstaLigado(data.empresa_id, 'propostas'))) notFound()
 
   const d = data as unknown as {
     empresa_id: number | null

@@ -1,5 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { requireEmpresaRole } from '@/lib/owner'
+import { exigirAbaDeModulo } from '@/lib/modulo-ligado'
 import { Topbar } from '@/components/layout/topbar'
 import { DocumentosView, type DocumentoLista } from './documentos-view'
 
@@ -9,6 +10,7 @@ export const metadata = { title: 'Documentos' }
 export default async function ContratosPage() {
   await requireEmpresaRole(['owner', 'admin'])
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  await exigirAbaDeModulo(empresaId, 'documentos')
 
   const { data: docs } = await supabase
     .from('vendas_contrato_documentos')

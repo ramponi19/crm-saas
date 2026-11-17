@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireEmpresaRoleApi } from '@/lib/owner'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 
 /**
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { empresaId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'imoveis')
+  if (trava) return trava
 
   const bruto = (await req.json().catch(() => ({}))) as Partial<TaxasComissao>
   // `mesclarTaxas` já descarta negativo e não-número, caindo no padrão de mercado.

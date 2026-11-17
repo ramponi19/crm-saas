@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { parseFeedImoveis } from '@/lib/importar-imoveis'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 // Bloqueia alvos internos (SSRF): localhost, IPs privados/loopback/link-local e metadata.
 function hostBloqueado(u: string): boolean {
@@ -24,6 +25,8 @@ export async function POST(req: Request) {
   const ctx = await requireOwnerOrAdminApi()
   if (ctx.error) return ctx.error
   const { empresaId } = ctx
+  const trava = await exigirModuloLigado(empresaId, 'imoveis')
+  if (trava) return trava
   const svc = createServiceClient()
 
   const body = await req.json().catch(() => ({} as { feedUrl?: string }))

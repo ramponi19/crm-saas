@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { nomeCompleto } from '@/lib/troca-modelos'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Resolve o CÓDIGO da cotação para o abatimento do PDV.
@@ -29,6 +30,8 @@ export async function GET(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'orcamentos')
+  if (trava) return trava
 
   const cru = new URL(req.url).searchParams.get('numero') ?? ''
   // Aceita "42", "#42" e "TR-42": o vendedor lê o código de onde estiver escrito.

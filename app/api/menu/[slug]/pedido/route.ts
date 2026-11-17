@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }) }
@@ -12,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const svc = createServiceClient()
 
   const { data: empresa } = await svc.from('empresas').select('id').eq('slug', slug).maybeSingle()
-  if (!empresa) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'cardapio'))) return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404, headers: CORS })
 
   // Cardápio é de quem trabalha com comanda. Sem esta guarda, dava para mandar
   // pedido para o slug de qualquer loja — e o pedido caía numa tela que ela não

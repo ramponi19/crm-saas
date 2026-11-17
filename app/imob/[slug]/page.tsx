@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import SiteView from './site-view'
 
 async function getSite(slug: string) {
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function SitePublicoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const data = await getSite(slug)
-  if (!data) notFound()
+  if (!data || !(await moduloEstaLigado(data.empresa.id, 'imoveis'))) notFound()
   // Site imobiliário: só para quem tem o módulo que integra portais e site (Imóveis)
   if (!capacidades(await carregarConfigEmpresa(createServiceClient(), data.empresa.id)).integraPortais) notFound()
 

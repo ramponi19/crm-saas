@@ -16,10 +16,6 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/sync-fipe",
-      "schedule": "0 5 * * *"
-    },
-    {
       "path": "/api/cron/renovar-tokens",
       "schedule": "30 4 * * *"
     },

@@ -1,6 +1,7 @@
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * `imoveis_captados` entra aqui porque `valorMetrica` já sabe medir e a tela já
@@ -23,6 +24,8 @@ export async function POST(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'ranking')
+  if (trava) return trava
   if (!(await exigirAdmin(supabase, empresaId, user.id))) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
   const b = (await req.json().catch(() => ({}))) as { escopo?: string; usuario_id?: string | null; tipo?: string; alvo?: number; periodo?: string }
@@ -50,6 +53,8 @@ export async function DELETE(req: Request) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !empresaId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(empresaId, 'ranking')
+  if (trava) return trava
   if (!(await exigirAdmin(supabase, empresaId, user.id))) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
   const id = Number(new URL(req.url).searchParams.get('id'))

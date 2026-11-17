@@ -33,7 +33,8 @@ test('manifesto: chave válida e única, endereço do menu', () => {
 
 test('estado: preparação, pago, instalado e disponível', () => {
   assert.deepEqual(estadoDoModulo(m('agenda'), entrada()), { tipo: 'preparacao' })
-  assert.deepEqual(estadoDoModulo(m('pdv'), entrada()), { tipo: 'instalado', podeDesinstalar: true })
+  // O Histórico lê as vendas do PDV (requer pdv desde 17/11/2026): com ele ligado, o PDV não sai.
+  assert.deepEqual(estadoDoModulo(m('pdv'), entrada()), { tipo: 'instalado', podeDesinstalar: false, usadoPor: ['Histórico de vendas'] })
   assert.deepEqual(estadoDoModulo(m('gestao_leads'), entrada()), { tipo: 'disponivel' })
   // Relatórios é recurso 'bi': fora no plano free, dentro no starter/pro, e o forçado do superadmin vale.
   assert.deepEqual(estadoDoModulo(m('relatorios'), entrada({ plano: 'free' })), { tipo: 'pago', onde: 'no plano Starter' })
@@ -85,8 +86,9 @@ test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo
   const antiga = hrefsHabilitados({ base: { habilitados: VAREJO }, overrides: { habilitados: ['/fila'] }, instalados: instaladosDoManifesto(linhas) })
   assert.deepEqual([...ligadosDaEmpresa(cfg)].sort(), [...antiga].sort())
   assert.deepEqual(abasDosModulos(new Set(['/imoveis', '/agenda'])).sort(), ['agendamento', 'portais'])
-  assert.deepEqual(abasDosModulos(new Set(VAREJO)), [])
-  assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'portais', 'veiculos-portais'])
+  // Troca, Contrato, Documentos e Meios de pagamento são seções de módulo desde 17/11/2026 (uma vez cada).
+  assert.deepEqual(abasDosModulos(new Set(VAREJO)).sort(), ['contrato', 'documentos', 'pagamentos', 'troca'])
+  assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'contrato', 'documentos', 'pagamentos', 'portais', 'troca', 'veiculos-portais'])
 })
 
 test('dependências: requisitos transitivos, na ordem de instalar', () => {
@@ -126,4 +128,14 @@ test('dependências: requisito pago ou em preparação bloqueia com o motivo', (
   assert.deepEqual(estadoDoModulo(fakeRel, e), { tipo: 'disponivel', junto: ['Relatórios'], bloqueio: 'Precisa de Relatórios, que é no plano Starter: peça Relatórios primeiro.' })
   const fakeAgenda = { ...m('fila'), requer: ['agenda'] }
   assert.deepEqual(estadoDoModulo(fakeAgenda, e), { tipo: 'disponivel', junto: ['Agenda'], bloqueio: 'Precisa de Agenda, que ainda está em preparação.' })
+})
+
+test('em preparação nunca está ligado: nem pela base, nem pelo superadmin, nem pela Central (17/11/2026)', () => {
+  const lig = hrefsHabilitados({
+    base: { habilitados: ['/agenda', '/imoveis', '/cardapio', '/kds', '/executivo', '/simular-financiamento', '/avaliacoes', '/consulta-fipe', '/ranking', '/pdv'] },
+    overrides: { habilitados: ['/agenda'] },
+    instalados: { '/imoveis': true },
+  })
+  for (const x of MODULOS.filter((mm) => mm.emPreparacao)) assert.ok(!lig.has(x.href), `${x.href} em preparação apareceu ligado`)
+  assert.ok(lig.has('/pdv'))
 })

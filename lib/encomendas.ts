@@ -28,8 +28,6 @@ import { agora, diaNoFuso, diasEntre, FUSO_PADRAO, paraData } from '@/lib/datas'
  * Sem React e sem `notify` de propósito: quem chama decide como avisar.
  */
 
-export type StatusEncomenda = 'encomenda' | 'pendente_entrega'
-
 /** Situação de uma encomenda em aberto, do ponto de vista do balcão. */
 export type Situacao = 'sem_prazo' | 'no_prazo' | 'vence_hoje' | 'atrasada' | 'chegou'
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import type { PaginaModelo } from '@/lib/contrato-modelo'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 
 /**
  * Modelo de contrato da empresa. Só owner/admin — é parametrização.
@@ -14,6 +15,8 @@ export async function GET(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   const documentoId = Number(new URL(req.url).searchParams.get('documento'))
   if (!Number.isFinite(documentoId)) {
@@ -32,6 +35,8 @@ export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin'])
   if (auth.error) return auth.error
   const { supabase, empresaId, userId } = auth
+  const trava = await exigirModuloLigado(empresaId, 'pdv')
+  if (trava) return trava
 
   let body: { paginas?: unknown; documentoId?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 }) }

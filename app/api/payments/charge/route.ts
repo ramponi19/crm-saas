@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getPaymentProvider, type CriarCobrancaInput } from '@/lib/payments'
+import { algumModuloLigado, exigirModuloLigado } from '@/lib/modulo-ligado'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -8,6 +9,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
   const empresaId = await getEmpresaId()
+  // Cobrança/meio de pagamento é usado pelo PDV e pela Assistência, não só pelo
+  // Financeiro: basta um dos três ligado. Nenhum → o 403 padrão do Financeiro.
+  const algumLigado = await algumModuloLigado(empresaId, ['pdv', 'assistencia', 'financeiro'])
+  if (!algumLigado) {
+    const trava = await exigirModuloLigado(empresaId, 'financeiro')
+    if (trava) return trava
+  }
   const body = await req.json() as Omit<CriarCobrancaInput, 'empresaId'>
 
   if (!body.tipo || !body.valor || body.valor <= 0) {

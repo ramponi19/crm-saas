@@ -261,11 +261,6 @@ export function ehDataPura(valor: Valor): valor is string {
   return typeof valor === 'string' && SO_DATA.test(valor.trim())
 }
 
-/** Para gravar um instante: ISO em UTC. */
-export function paraBanco(d: Date): string {
-  return d.toISOString()
-}
-
 /**
  * Instantes do banco iguais? O PostgREST devolve `2026-11-10T13:00:00+00:00` e o
  * `toISOString` dá `2026-11-10T13:00:00.000Z`: o texto difere, o instante não.

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { getReferenciaAtual, fetchMarcas, fetchModelos, fetchAnos } from '@/lib/fipe'
 
 /**
@@ -12,6 +13,8 @@ export async function GET(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const trava = await exigirModuloLigado(await getEmpresaId(), 'consulta_fipe')
+  if (trava) return trava
 
   const url = new URL(req.url)
   const tipo = Number(url.searchParams.get('tipo'))

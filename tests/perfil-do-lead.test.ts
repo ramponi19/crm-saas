@@ -14,17 +14,20 @@ test('a migração traz os 7 presets', () => {
   assert.deepEqual(Object.keys(PRESETS).sort(), ['assistencia', 'concessionaria', 'food', 'imobiliaria', 'saude', 'servicos', 'varejo'])
 })
 
-test('imobiliária: texto livre, painéis de negócio e match, visitas, corretor', () => {
+// Imóveis, Agenda, Avaliações e Financiamento estão em preparação (17/11/2026): nunca ligados, então
+// o card dessas empresas é o comum — só o vocabulário do preset fica. Quando um módulo sair da
+// preparação, o painel dele volta aqui.
+test('imobiliária: módulos em preparação não ligam painel; vocabulário fica (corretor)', () => {
   const cfg = empresaNascidaCom('imobiliaria')
   assert.deepEqual(perfilDoLead(cfg), {
-    paineis: ['negocio-imovel', 'match-imoveis'], interesse: 'Imóvel interessado', agendaVisitas: true, textoLivre: true,
+    paineis: [], interesse: 'Imóvel interessado', agendaVisitas: false, textoLivre: false,
   })
   assert.equal(vocabulario(cfg).equipe, 'Corretor')
 })
 
-test('loja de veículos: texto livre, interesse e financiamento, sem visitas', () => {
+test('loja de veículos: Avaliações em preparação, nenhum painel', () => {
   assert.deepEqual(perfilDoLead(empresaNascidaCom('concessionaria')), {
-    paineis: ['interesse-veiculo', 'financiamento'], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: true,
+    paineis: [], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: false,
   })
 })
 

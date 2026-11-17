@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { campoAtivo } from '@/lib/empresa-config'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
+import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
 /**
  * Feed XML de veículos para portais (Sprint 4.2c). O portal consome esta URL
@@ -30,7 +31,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!slugValido(slug)) return vazio
 
   const { data: empresa } = await svc.from('empresas').select('id, nome').eq('slug', slug).eq('status', 'ativo').maybeSingle()
-  if (!empresa) return vazio
+  if (!empresa || !(await moduloEstaLigado(empresa.id, 'avaliacoes'))) return vazio
 
   /**
    * Só quem trabalha com veículo publica feed de veículo.

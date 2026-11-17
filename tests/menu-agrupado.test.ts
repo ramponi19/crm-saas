@@ -38,10 +38,10 @@ test('todo preset e papel: mesmos itens, mesma ordem, no máximo 9 entradas', ()
   }
 })
 
-test('o Ranking da imobiliária (extra, grupo antigo "Gestão") cai em Insights', () => {
+test('o Ranking virou módulo em preparação (17/11/2026): nem o extra da base da imobiliária o põe no menu', () => {
   const grupos = resolverMenuAgrupado({ base: empresaNascidaCom('imobiliaria').base, role: 'owner', isSuperAdmin: false })
-  const insights = grupos.find((g) => g.id === 'insights')
-  assert.ok(insights?.itens.some((i) => i.href === '/ranking'))
+  assert.ok(!grupos.some((g) => g.itens.some((i) => i.href === '/ranking')))
+  assert.equal(GRUPO_DO_HREF['/ranking'], 'insights')
 })
 
 test('todo item de menu do catálogo tem grupo declarado (nada cai no padrão por esquecimento)', () => {
