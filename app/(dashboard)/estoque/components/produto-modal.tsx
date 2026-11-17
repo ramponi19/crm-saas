@@ -6,7 +6,18 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { Modal, Input, Select, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { X, Plus } from 'lucide-react'
-import { APPLE_MODELOS } from '@/lib/apple-modelos'
+import { SeletorModeloApple, marcaApple } from '@/components/modules/celulares/seletor-modelo-apple'
+import { PRODUTO_CELULAR } from '@/components/modules/celulares/rotulos'
+import type { AppleModelo } from '@/lib/apple-modelos'
+
+/** Os textos do cadastro sem módulo de segmento (com Celulares: PRODUTO_CELULAR). */
+const PRODUTO_GENERICO = {
+  nomePlaceholder: 'Ex.: Produto X',
+  coresPlaceholder: 'Ex.: Preto (Enter p/ adicionar)',
+  variantes: 'Variantes',
+  variantesPlaceholder: 'Ex.: Tamanho M (Enter p/ adicionar)',
+  variantesAjuda: 'No estoque, ao escolher este modelo, Cor e Variante viram listas com estas opções.',
+}
 
 interface Produto {
   id?: number
@@ -22,6 +33,8 @@ interface Props {
   onClose: () => void
   onSaved: (p: Produto & { id: number; marca_nome: string; categoria_nome: string | null; ativo: boolean }) => void
   onDeleted?: (id: number) => void
+  /** Módulo Celulares ligado: seletor de modelo Apple e textos de celular. */
+  celulares?: boolean
 }
 
 /** Campo de "chips": digita + Enter (ou vírgula) adiciona; clique no × remove. */
@@ -56,7 +69,7 @@ function ChipsField({ label, values, onChange, placeholder }: { label: string; v
   )
 }
 
-export default function ProdutoModal({ produto, marcas, categorias, onClose, onSaved, onDeleted }: Props) {
+export default function ProdutoModal({ produto, marcas, categorias, onClose, onSaved, onDeleted, celulares = false }: Props) {
   const supabase = createClient()
   const { empresa } = useEmpresa()
   const isNew = !produto?.id
@@ -69,7 +82,6 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
   const [foto, setFoto] = useState<string[]>([])
   const [cores, setCores] = useState<string[]>([])
   const [armazenamentos, setArmazenamentos] = useState<string[]>([])
-  const [modeloApple, setModeloApple] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
 
@@ -84,11 +96,10 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
     })
   }, [produto?.id, supabase])
 
-  function aplicarModeloApple(nome: string) {
-    setModeloApple(nome)
-    const m = APPLE_MODELOS.find((x) => x.nome === nome)
-    if (!m) return
-    setForm((f) => ({ ...f, nome: m.nome, marca_id: f.marca_id || String(marcas.find((mc) => /apple/i.test(mc.nome))?.id ?? '') }))
+  const T = celulares ? PRODUTO_CELULAR : PRODUTO_GENERICO
+
+  function aplicarModeloApple(m: AppleModelo) {
+    setForm((f) => ({ ...f, nome: m.nome, marca_id: f.marca_id || String(marcaApple(marcas)?.id ?? '') }))
     setCores(m.cores)
     setArmazenamentos(m.armazenamentos)
   }
@@ -158,23 +169,14 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
         }
       >
         <form onSubmit={e => { e.preventDefault(); salvar() }} className="grid gap-3">
-          {/* Seletor de modelo Apple: EXCLUSIVO da JM Store (não aparece nos outros tenants). */}
-          {isNew && empresa?.slug === 'jm-store' && (
-            <Select label="Modelo Apple (opcional — preenche tudo)" value={modeloApple} onChange={e => aplicarModeloApple(e.target.value)}>
-              <option value="">Preencher manualmente…</option>
-              {(['iPhone', 'iPad', 'Mac', 'Watch'] as const).map((linha) => (
-                <optgroup key={linha} label={linha}>
-                  {APPLE_MODELOS.filter((m) => m.linha === linha).map((m) => <option key={m.nome} value={m.nome}>{m.nome}</option>)}
-                </optgroup>
-              ))}
-            </Select>
-          )}
+          {/* Seletor de modelo Apple: do módulo Celulares, só com ele ligado. */}
+          {isNew && celulares && <SeletorModeloApple onEscolher={aplicarModeloApple} />}
           <Input
             label="Nome do modelo"
             required
             value={form.nome}
             onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
-            placeholder="Ex.: iPhone 15 Pro Max"
+            placeholder={T.nomePlaceholder}
           />
           <Select
             label="Marca"
@@ -203,9 +205,9 @@ export default function ProdutoModal({ produto, marcas, categorias, onClose, onS
           />
           <UploadFotos label="Foto do modelo" value={foto} onChange={setFoto} empresaId={empresa?.id ?? 0} max={1}
             disabled={!empresa?.id} ajuda="Aparece no PDV e no catálogo. JPG, PNG ou WEBP até 8 MB." />
-          <ChipsField label="Cores do modelo" values={cores} onChange={setCores} placeholder="Ex.: Titânio Preto (Enter p/ adicionar)" />
-          <ChipsField label="Armazenamentos" values={armazenamentos} onChange={setArmazenamentos} placeholder="Ex.: 256GB (Enter p/ adicionar)" />
-          <p className="-mt-1 text-[11px] text-ink-3">No estoque, ao escolher este modelo, Cor e Armazenamento viram listas com estas opções.</p>
+          <ChipsField label="Cores do modelo" values={cores} onChange={setCores} placeholder={T.coresPlaceholder} />
+          <ChipsField label={T.variantes} values={armazenamentos} onChange={setArmazenamentos} placeholder={T.variantesPlaceholder} />
+          <p className="-mt-1 text-[11px] text-ink-3">{T.variantesAjuda}</p>
         </form>
       </Modal>
 

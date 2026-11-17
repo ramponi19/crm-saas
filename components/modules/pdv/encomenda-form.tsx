@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
-import { ChevronDown, MapPin, Plus, Smartphone, Trash2, UserPlus } from 'lucide-react'
+import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, notify } from '@/components/ui'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
@@ -14,11 +14,11 @@ import { EncomendaItens, itemVazio, itensValidos, descreverItem, type ItemEncome
 import { lerCliente, type Cliente } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, somarDias } from '@/lib/datas'
+import {
+  EntradaAparelhos, FORMA_APARELHO, TEXTOS_ENTRADA_APARELHO, aparelhoVazio, type AparelhoEntrada,
+} from '@/components/modules/celulares/encomenda-entrada'
 
 interface Cli { id: number; nome: string }
-
-/** Aparelho recebido como entrada. `valor` fica string porque vem de <input>. */
-interface AparelhoEntrada { aparelho: string; imei: string; valor: string }
 
 /**
  * LANÇAR UMA ENCOMENDA — o formulário que mora na aba, não num modal.
@@ -48,7 +48,6 @@ const FORMAS = [
   { key: 'debito', label: 'Débito' },
   { key: 'credito', label: 'Crédito' },
   { key: 'link', label: 'Link' },
-  { key: 'aparelho', label: 'Aparelho semi-novo' },
 ]
 
 /** `YYYY-MM-DD` de hoje + n dias, no dia da loja (nada de toISOString aqui). */
@@ -65,8 +64,10 @@ function umaLinha(c: Pick<Cliente, 'endereco' | 'numero' | 'complemento' | 'bair
   return [rua, compl, c.bairro, cidade, c.cep].filter(Boolean).join(' · ')
 }
 
-export function EncomendaForm({ clientes, taxas = [] }: {
+export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
   clientes: Cli[]; taxas?: Taxa[]
+  /** Módulo Celulares ligado: oferece aparelho usado como entrada. */
+  celulares?: boolean
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -85,7 +86,9 @@ export function EncomendaForm({ clientes, taxas = [] }: {
   const [formaEntrada, setFormaEntrada] = useState('pix')
   const [pagamento, setPagamento] = useState<'a_vista' | 'parcelado'>('a_vista')
   const [parcelas, setParcelas] = useState(2)
-  const [aparelhos, setAparelhos] = useState<AparelhoEntrada[]>([{ aparelho: '', imei: '', valor: '' }])
+  const [aparelhos, setAparelhos] = useState<AparelhoEntrada[]>([aparelhoVazio()])
+  /** A forma "aparelho" é do módulo Celulares: sem ele, não é oferecida. */
+  const formas = celulares ? [...FORMAS, FORMA_APARELHO] : FORMAS
   const [prazo, setPrazo] = useState('')
   const [obs, setObs] = useState('')
   const [vendedor, setVendedor] = useState('')
@@ -117,10 +120,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
    * gravação). Sem isto, o abatimento apareceria como "troca R$ 2.000" sem
    * dizer troca de quê, e daqui a três meses ninguém saberia qual aparelho foi.
    */
-  const textoAparelhos = aparelhosValidos.length === 0 ? '' :
-    ` Entrada em aparelho: ${aparelhosValidos.map((a) =>
-      `${a.aparelho.trim() || 'aparelho'}${a.imei.trim() ? ` (IMEI ${a.imei.trim()})` : ''} — ${formatCurrency(Number(a.valor) || 0)}`,
-    ).join('; ')}.`
+  const textoAparelhos = TEXTOS_ENTRADA_APARELHO.nota(aparelhosValidos)
   const restante = Math.max(0, vVenda - vEntrada)
 
   /**
@@ -173,7 +173,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
   function limpar() {
     setClienteId(''); setEnderecoDe(null); setItens([itemVazio()]); setEntrada(''); setFormaEntrada('pix')
     setPagamento('a_vista'); setParcelas(2); setPrazo(''); setObs('')
-    setAparelhos([{ aparelho: '', imei: '', valor: '' }])
+    setAparelhos([aparelhoVazio()])
   }
 
   /**
@@ -381,13 +381,13 @@ export function EncomendaForm({ clientes, taxas = [] }: {
           usuario_id: user?.id ?? null,
           preco_custo: Number(a.valor) || 0,
           imei: a.imei.trim() || null,
-          observacoes: `${a.aparelho.trim() || 'Aparelho recebido'} — entrada da encomenda${cliNome ? ` de ${cliNome}` : ''}.`,
+          observacoes: TEXTOS_ENTRADA_APARELHO.observacaoUnidade(a, cliNome),
           ativo: true,
         })) as never,
       )
       if (e4) {
         notify.warn(
-          aparelhosValidos.length > 1 ? 'Aparelhos não entraram no estoque' : 'Aparelho não entrou no estoque',
+          TEXTOS_ENTRADA_APARELHO.naoEntrou(aparelhosValidos.length),
           'A encomenda foi lançada. Dê entrada em Estoque.',
         )
       }
@@ -455,7 +455,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
           </div>
         )}
 
-        <EncomendaItens itens={itens} onChange={setItens} />
+        <EncomendaItens itens={itens} onChange={setItens} celulares={celulares} />
 
         {/* O total sai da soma dos itens — nao e digitado. */}
         {vVenda > 0 && (
@@ -468,7 +468,7 @@ export function EncomendaForm({ clientes, taxas = [] }: {
         <div>
           <Select label="Entrada" value={formaEntrada} onChange={(e) => setFormaEntrada(e.target.value)}>
             <option value="">— Sem entrada —</option>
-            {FORMAS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+            {formas.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </Select>
 
           {formaEntrada && formaEntrada !== 'aparelho' && (
@@ -477,53 +477,9 @@ export function EncomendaForm({ clientes, taxas = [] }: {
             </div>
           )}
 
-          {/**
-            * APARELHO COMO ENTRADA.
-            *
-            * O cliente entrega o usado e leva o novo encomendado — na conta do
-            * restante dá no mesmo que ter pago em PIX. A diferença aparece no
-            * fechamento: cada aparelho vira uma unidade no estoque, com o valor
-            * avaliado como custo, igual à troca do PDV.
-            *
-            * IMEI aqui não é burocracia: é o que liga o aparelho recebido ao
-            * cliente que entregou, e sem ele a unidade entra anônima no estoque.
-            */}
-          {formaEntrada === 'aparelho' && (
-            <div className="mt-2.5 space-y-2">
-              {aparelhos.map((a, i) => (
-                <div key={i} className="rounded-control border border-line-soft bg-bg p-2.5">
-                  <div className="flex items-center gap-2">
-                    <Smartphone size={14} strokeWidth={1.8} className="shrink-0 text-ink-3" />
-                    <Input wrapperClassName="flex-1" placeholder="Aparelho (ex.: iPhone 13 128GB Azul)"
-                      value={a.aparelho}
-                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, aparelho: e.target.value } : x))} />
-                    {aparelhos.length > 1 && (
-                      <button type="button" aria-label="Remover aparelho"
-                        onClick={() => setAparelhos((xs) => xs.filter((_, j) => j !== i))}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-control text-ink-3 transition-colors hover:text-bad">
-                        <Trash2 size={14} strokeWidth={1.8} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <Input placeholder="IMEI" value={a.imei}
-                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, imei: e.target.value } : x))} />
-                    <Input type="number" placeholder="Valor avaliado (R$)" value={a.valor}
-                      onChange={(e) => setAparelhos((xs) => xs.map((x, j) => j === i ? { ...x, valor: e.target.value } : x))} />
-                  </div>
-                </div>
-              ))}
-              <button type="button"
-                onClick={() => setAparelhos((xs) => [...xs, { aparelho: '', imei: '', valor: '' }])}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-accent transition-opacity hover:opacity-80">
-                <Plus size={13} strokeWidth={2} /> Outro aparelho
-              </button>
-              {vAparelhos > 0 && (
-                <p className="text-[12px] text-ink-2">
-                  Entrada em aparelho: <strong className="num text-ink">{formatCurrency(vAparelhos)}</strong>
-                </p>
-              )}
-            </div>
+          {/* Aparelho como entrada: do módulo Celulares (ver o componente). */}
+          {celulares && formaEntrada === 'aparelho' && (
+            <EntradaAparelhos aparelhos={aparelhos} setAparelhos={setAparelhos} total={vAparelhos} />
           )}
         </div>
 

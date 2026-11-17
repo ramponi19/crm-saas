@@ -6,7 +6,9 @@ import PDVView from './components/pdv-view'
 import type { EncomendaPDV } from '@/components/modules/pdv/encomendas-abertas'
 import type { Tables } from '@/types/database'
 import { comNome } from '@/lib/sem-nome'
-import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
+import { capacidades, carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
+import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
 import { consultaClientes } from '@/lib/clientes'
 import { embedLead } from '@/lib/leads'
 
@@ -176,13 +178,16 @@ export default async function PDVPage() {
     pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null; solicitado_em: string | null }>
     vendas_pagamentos: { valor_pago: number | null }[] | null
   }
+  // Módulo Celulares ligado: a troca de aparelho, o IMEI e os textos de celular no PDV.
+  const celulares = ligadosDaEmpresa(cfgEmpresa).has(HREF_CELULARES)
+  const trocaSemDescricao = celulares ? ENCOMENDA_CELULAR.trocaSemDescricao : 'Item'
   const trocaPorGrupo = new Map<string, { descricao: string; imei: string | null; valor: number }[]>()
   for (const t of (trocasRaw ?? []) as { grupo_pdv: string | null; imei: string | null; preco_custo: number | null; observacoes: string | null }[]) {
     if (!t.grupo_pdv) continue
     const lista = trocaPorGrupo.get(t.grupo_pdv) ?? []
     lista.push({
       // A descricao mora antes do travessao: "iPhone 13 128GB — entrada da encomenda de Fulano."
-      descricao: (t.observacoes ?? '').split(' — ')[0] || 'Aparelho',
+      descricao: (t.observacoes ?? '').split(' — ')[0] || trocaSemDescricao,
       imei: t.imei,
       valor: Number(t.preco_custo) || 0,
     })
@@ -233,6 +238,7 @@ export default async function PDVPage() {
           taxas={taxas ?? []}
           vendasRecentes={vendasFmt}
           usaComanda={!!capacidades(cfgEmpresa).usaComanda}
+          celulares={celulares}
           tabelaPrecos={(tabelaPrecos ?? []) as { modelo: string; armazenamento: string | null; condicao: string; preco_sugerido: number }[]}
           toleranciaTroca={Number((cfgTroca?.valor as { tolerancia_percentual?: unknown } | null)?.tolerancia_percentual ?? TOLERANCIA_PADRAO)}
           encomendas={encomendas}

@@ -1,5 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import CatalogoView from './components/catalogo-view'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 
 export const metadata = { title: 'Catálogo' }
 
@@ -137,8 +139,14 @@ export default async function CatalogoPage() {
     total_produtos: prodPorMarca[m.id] ?? 0,
   }))
 
+  // Tipos de categoria e textos de segmento só com o módulo dono ligado:
+  // Celulares (aparelho, IMEI, armazenamento) e Avaliações (veículo).
+  const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId ?? 0))
+
   return (
     <CatalogoView
+      celulares={ligados.has(HREF_CELULARES)}
+      veiculos={ligados.has('/avaliacoes')}
       produtos={produtos}
       unidades={unidades}
       categorias={categorias}

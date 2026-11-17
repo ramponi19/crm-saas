@@ -18,10 +18,10 @@ import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type EmitirContratoInput, type DocumentoDisponivel } from '@/lib/contrato-emitir'
 import { camposDaCategoria } from '@/lib/estoque-campos'
-import {
-  referenciaDaTroca, avaliarTroca, textoDoAceite, TOLERANCIA_PADRAO,
-  type PrecoRef, type AvaliacaoTroca,
-} from '@/lib/troca-referencia'
+import { textoDoAceite, TOLERANCIA_PADRAO, type PrecoRef } from '@/lib/troca-referencia'
+import { useTrocaPdv, TrocaPdvBloco, TEXTOS_TROCA_PDV } from '@/components/modules/celulares/pdv-troca'
+import { PDV_CELULAR } from '@/components/modules/celulares/rotulos'
+import { CAMPO_COMANDA } from '@/components/modules/cardapio/rotulos'
 import {
   resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
   FORMAS_PARCELAVEIS, type LinhaPagamento,
@@ -48,7 +48,7 @@ interface ItemEstoque {
 /** Item vendido por quantidade (capinha, película) e não por peça identificada. */
 const porQuantidade = (i: ItemEstoque) => camposDaCategoria(i.tipo_formulario).semSerie
 
-/** Foto da unidade tem prioridade: é o aparelho real, não o do catálogo. */
+/** Foto da unidade tem prioridade: é a peça real, não a do catálogo. */
 const fotoDoItem = (i: { fotos_urls?: string | null; produto_foto?: string | null }) =>
   (i.fotos_urls ?? '').split(',').map((u) => u.trim()).find(Boolean) ?? i.produto_foto ?? null
 interface ClienteSimples { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }
@@ -57,26 +57,15 @@ interface VendaRecente { id: number; valor_venda: number; lucro: number | null; 
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
-interface Props { itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]; usaComanda?: boolean; isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[] }
-interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
-/**
- * Aparelho entregue na troca. `valor` fica string porque vem de <input>.
- *
- * `cotacaoId`/`cotacaoNumero` aparecem quando a linha foi preenchida por CÓDIGO
- * — o número que a cotação de Upgrade/Downgrade gerou. Guardar o id é o que
- * permite marcar a cotação como usada no fechamento e impedir que o mesmo
- * abatimento entre em duas vendas.
- */
-interface TrocaItem {
-  aparelho: string
-  imei: string
-  valor: string
-  codigo?: string
-  cotacaoId?: number | null
-  cotacaoNumero?: number | null
-  /** A cotação já tinha sido consumida em outra venda. Só avisa; não bloqueia. */
-  cotacaoJaUsada?: boolean
+interface Props {
+  itensDisponiveis: ItemEstoque[]; reservas?: ReservaPDV[]; clientes: ClienteSimples[]; taxas: Taxa[]; vendasRecentes: VendaRecente[]
+  /** Mesa/comanda no carrinho: capacidade do módulo Cardápio. */
+  usaComanda?: boolean
+  /** Módulo Celulares ligado: troca de aparelho, bateria na vitrine, acessórios de celular. */
+  celulares?: boolean
+  isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[]
 }
+interface ItemCarrinho { item: ItemEstoque; desconto: number; reserva?: boolean; qtd: number }
 /**
  * Contexto da venda fechada, guardado para emitir o documento escolhido.
  * Inclui `empresaId` porque ele é resolvido dentro do fechamento.
@@ -91,14 +80,16 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
   { key: 'link', label: 'Link', icon: Link2 },
 ]
 
+/** Sugestões de "Ofertar acessórios" sem módulo de segmento: o operador escreve o nome. */
+const ACESSORIOS_GENERICOS = ['Acessório']
+
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, celulares = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [] }: Props) {
   const fuso = useFuso()
   // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
   // por mesa usam o mesmo campo. Vem pronta da página (capacidades dos módulos ligados: Cardápio).
-  const isFood = usaComanda
   const [comanda, setComanda] = useState('')
   // Relógio congelado no mount: `Date.now()` em render torna o componente impuro.
   const [agora] = useState(() => Date.now())
@@ -147,54 +138,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const [finalizando, setFinalizando] = useState(false)
   // #3 upsell de acessórios (ofertas editáveis)
   const [acessorios, setAcessorios] = useState<{ descricao: string; valor: number }[]>([])
-  // #1 aparelhos na troca (abatem no total + entram no estoque).
-  // É lista porque o cliente com frequência entrega mais de um aparelho na
-  // mesma compra — cada um vira uma unidade própria no estoque, com seu IMEI e
-  // seu valor, e a soma abate do total.
-  const [trocaAtiva, setTrocaAtiva] = useState(false)
-  const [trocas, setTrocas] = useState<TrocaItem[]>([{ aparelho: '', imei: '', valor: '' }])
-  /** Índice da linha cujo código está sendo buscado — para o "buscando…". */
-  const [buscandoCodigo, setBuscandoCodigo] = useState<number | null>(null)
-
-  /**
-   * O CÓDIGO DA COTAÇÃO preenche a linha da troca.
-   *
-   * Pedido do dono: "quando for realizar a venda do aparelho digitar o codigo e
-   * ja vir o valor de abatimento". O ganho não é digitar menos — é o valor do
-   * usado chegar EXATAMENTE como foi cotado. Redigitado com o cliente na frente,
-   * ele muda; e muda sempre para cima.
-   *
-   * A cotação já usada não bloqueia: existe caso legítimo (venda cancelada e
-   * refeita). Ela avisa, e quem decide é o vendedor — mas o aviso é vermelho,
-   * porque abater duas vezes é dinheiro saindo duas vezes.
-   */
-  async function aplicarCodigoTroca(i: number, codigo: string) {
-    const limpo = codigo.replace(/\D/g, '')
-    if (!limpo) return
-    setBuscandoCodigo(i)
-    const r = await fetch(`/api/troca/cotacoes/buscar?numero=${limpo}`)
-    setBuscandoCodigo(null)
-    const j = await r.json().catch(() => ({}))
-    if (!r.ok) { notify.bad('Código não encontrado', j.error); return }
-
-    setTrocas((ts) => ts.map((x, k) => (k === i ? {
-      ...x,
-      aparelho: j.aparelho,
-      imei: j.imei || x.imei,
-      valor: String(j.valor),
-      codigo: String(j.numero),
-      cotacaoId: j.id,
-      cotacaoNumero: j.numero,
-      cotacaoJaUsada: !!j.ja_usada,
-    } : x)))
-
-    if (j.ja_usada) {
-      notify.warn(`Cotação #${j.numero} JÁ FOI USADA`, 'Confira antes de fechar — o abatimento pode sair em dobro.')
-    } else {
-      notify.ok(`Cotação #${j.numero}`, `${j.aparelho} · ${fmt(j.valor)}`)
-    }
-  }
-  // #2 entrega pendente (semi-novo que não sai na hora)
+  // #1 troca (módulo Celulares): abate no total + entra no estoque. Sem o
+  // módulo ligado, não há troca — `trocasValidas` fica vazia.
+  const troca = useTrocaPdv({ ligado: celulares, tabelaPrecos, tolerancia: toleranciaTroca })
+  const { trocasValidas, trocaNum, trocasAcima } = troca
+  // #2 entrega pendente (venda que não sai na hora)
   const [entregaPendente, setEntregaPendente] = useState(false)
   // Termo de garantia a assinar. Marcado aqui, a venda entra na fila de Garantia
   // até alguém anexar o termo assinado — sem mexer no status da venda, que é o
@@ -324,31 +272,6 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
   const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
   const acessoriosTotal = acessorios.reduce((a, x) => a + (Number(x.valor) || 0), 0)
-  /** Trocas realmente preenchidas (valor > 0), com o valor já numérico. */
-  const trocasValidas = trocaAtiva
-    ? trocas
-        .map((t) => ({ ...t, num: parseFloat(String(t.valor).replace(',', '.')) || 0 }))
-        .filter((t) => t.num > 0)
-    : []
-  const trocaNum = trocasValidas.reduce((s, t) => s + t.num, 0)
-
-  /**
-   * Cada troca comparada com o preço de referência do modelo. A loja pagar MAIS
-   * do que o aparelho vale é o risco que some: abate do que o cliente paga, a
-   * venda continua com preço cheio, e o prejuízo só aparece na revenda.
-   */
-  const avaliacoesTroca = useMemo(
-    () => trocas.map((t) => {
-      const num = parseFloat(String(t.valor).replace(',', '.')) || 0
-      const ref = referenciaDaTroca(t.aparelho, tabelaPrecos)
-      return { aparelho: t.aparelho, referencia: ref, avaliacao: avaliarTroca(num, ref, toleranciaTroca) }
-    }),
-    [trocas, tabelaPrecos, toleranciaTroca],
-  )
-  /** Trocas que passaram da tolerância — exigem aceite antes de fechar. */
-  const trocasAcima = trocaAtiva
-    ? avaliacoesTroca.filter((a): a is typeof a & { avaliacao: AvaliacaoTroca } => !!a.avaliacao?.exigeAceite)
-    : []
   const [confirmarTroca, setConfirmarTroca] = useState(false)
   const abatimento = descontoNum + trocaNum
 
@@ -441,9 +364,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       const grupoPdv = crypto.randomUUID()
       const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
       const unitStatus = entregaPendente ? 'reservado' : 'vendido'
-      const trocaNota = trocasValidas.length
-        ? ` Troca: ${trocasValidas.map((t) => `${t.aparelho.trim() || 'aparelho'} (${fmt(t.num)})`).join(', ')}.`
-        : ''
+      const trocaNota = TEXTOS_TROCA_PDV.notaVenda(trocasValidas)
       let primeiraVendaId: number | null = null
       let trocaNotaPendente = trocaNota.length > 0
 
@@ -538,7 +459,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           forma_pagamento: formaPagamento,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
           canal_venda: 'loja_fisica',
-          comanda: isFood ? (comanda.trim() || null) : null,
+          comanda: usaComanda ? (comanda.trim() || null) : null,
           desconto_valor: descontoItem,
           produto_id: c.item.produto_id,
           numero_serie: c.item.imei ?? c.item.numero_serie,
@@ -599,7 +520,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'pendente',
           grupo_pdv: grupoPdv, usuario_id: user.id,
           preco_custo: t.num, imei: t.imei.trim() || null,
-          observacoes: `${t.aparelho.trim() || 'Aparelho recebido em troca'} — entrada por troca no PDV${clienteSelecionado ? ` (cliente ${clienteSelecionado.nome})` : ''}.`,
+          observacoes: TEXTOS_TROCA_PDV.observacaoUnidade(t, clienteSelecionado?.nome ?? null),
           ativo: true,
         } as never)
       }
@@ -626,8 +547,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         // agora: o abatimento saiu duas vezes. A venda já existe; quem precisa
         // saber é o operador, agora, e não o fechamento do mês.
         if (nadaGravado(marcada)) {
-          notify.warn('Esta cotação de troca já tinha sido usada',
-            `Cotação #${t.cotacaoId}: confira o abatimento desta venda antes de entregar o aparelho.`)
+          notify.warn(TEXTOS_TROCA_PDV.cotacaoUsadaTitulo, TEXTOS_TROCA_PDV.cotacaoUsadaTexto(t.cotacaoId))
         }
       }
 
@@ -777,7 +697,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       notify.ok(entregaPendente ? 'Venda registrada — pendente de entrega' : 'Venda finalizada')
       setCarrinho([]); setDesconto('')
       setPagamentos([{ id: 'p1', forma: 'dinheiro', valor: 0, parcelas: 1, bandeira: 'visa_master' }])
-      setAcessorios([]); setTrocaAtiva(false); setTrocas([{ aparelho: '', imei: '', valor: '' }]); setEntregaPendente(false); setTermoGarantia(false)
+      setAcessorios([]); troca.limpar(); setEntregaPendente(false); setTermoGarantia(false)
       if (valorPix <= 0.005) setClienteSelecionado(null)
       setComanda('')
       router.refresh()
@@ -962,15 +882,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         open={confirmarTroca}
         onClose={() => setConfirmarTroca(false)}
         onConfirm={() => { setConfirmarTroca(false); finalizarVenda(true, true) }}
-        title={trocasAcima.length === 1 ? 'Troca acima do preço de referência' : 'Trocas acima do preço de referência'}
-        description={
-          trocasAcima.map((t) =>
-            `"${t.aparelho.trim() || 'Aparelho'}": avaliado em ${fmt(t.avaliacao.valor)}, referência ${fmt(t.avaliacao.referencia)}`
-            + ` — ${fmt(t.avaliacao.excedente)} a mais (${t.avaliacao.percentual.toFixed(0)}%).`,
-          ).join(' ')
-          + ' A loja está pagando mais do que o aparelho vale, e isso só aparece no resultado quando ele for revendido.'
-          + ' Ao confirmar, fica registrado na venda que você aceitou, com seu nome e a hora.'
-        }
+        title={TEXTOS_TROCA_PDV.acimaTitulo(trocasAcima.length)}
+        description={TEXTOS_TROCA_PDV.acimaDescricao(trocasAcima)}
         confirmLabel="Estou ciente, finalizar"
         tone="danger"
       />
@@ -988,7 +901,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             <p className="num text-[26px] font-bold tracking-[-0.035em] text-ink">{fmt(ultimoTotal)}</p>
             {ultimoValorVenda > ultimoTotal + 0.005 && (
               <p className="mt-1 text-[11.5px] text-ink-3">
-                Venda registrada por <strong className="text-ink">{fmt(ultimoValorVenda)}</strong> — a diferença entrou em aparelho.
+                Venda registrada por <strong className="text-ink">{fmt(ultimoValorVenda)}</strong>{TEXTOS_TROCA_PDV.sucessoDiferenca}
               </p>
             )}
           </div>
@@ -1032,8 +945,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
 
         {aba === 'encomenda' ? (
           <div className="mx-auto max-w-[720px] space-y-4">
-            <EncomendaForm clientes={clientes} taxas={taxas} />
-            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} documentos={documentos} />
+            <EncomendaForm clientes={clientes} taxas={taxas} celulares={celulares} />
+            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} documentos={documentos} celulares={celulares} />
           </div>
         ) : (
         <div className="grid grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
@@ -1144,7 +1057,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                         {item.armazenamento && <span className="text-ink-3"> · {item.armazenamento}</span>}
                       </div>
                       <div className="mt-0.5 text-[11px] text-ink-3">
-                        {item.cor ?? item.marca_nome}{item.bateria ? ` · bateria ${item.bateria}%` : ''}
+                        {item.cor ?? item.marca_nome}{celulares && item.bateria ? PDV_CELULAR.bateria(item.bateria) : ''}
                         {lote && <span className="font-medium text-ink-2"> · {item.quantidade ?? 1} em estoque</span>}
                       </div>
                       <div className="mt-3 flex items-center justify-between">
@@ -1167,10 +1080,10 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               <span className="num text-[11px] text-ink-3">{carrinho.length} {carrinho.length === 1 ? 'item' : 'itens'}</span>
             </div>
 
-            {/* Mesa / comanda (Food) */}
-            {isFood && (
+            {/* Mesa / comanda (módulo Cardápio) */}
+            {usaComanda && (
               <div className="mb-4">
-                <Input label="Mesa / Comanda" value={comanda} onChange={(e) => setComanda(e.target.value)} placeholder="Ex: Mesa 5" />
+                <Input label={CAMPO_COMANDA.rotulo} value={comanda} onChange={(e) => setComanda(e.target.value)} placeholder={CAMPO_COMANDA.placeholder} />
               </div>
             )}
 
@@ -1310,8 +1223,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               {trocaNum > 0 && (
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[13px] text-ink-2">
-                    Pago em aparelho (troca)
-                    {trocasValidas.length > 1 && <span className="text-ink-3"> · {trocasValidas.length} aparelhos</span>}
+                    {TEXTOS_TROCA_PDV.resumoPagoEm}
+                    {trocasValidas.length > 1 && <span className="text-ink-3">{TEXTOS_TROCA_PDV.resumoQtd(trocasValidas.length)}</span>}
                   </span>
                   <span className="num text-[13px] font-semibold text-ink-2">− {fmt(trocaNum)}</span>
                 </div>
@@ -1334,7 +1247,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             <div className="mb-4">
               <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">Ofertar acessórios</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {['Kit proteção', 'Película', 'Capinha', 'Fonte', 'Cabo', 'Fone'].map((s) => (
+                {(celulares ? PDV_CELULAR.acessorios : ACESSORIOS_GENERICOS).map((s) => (
                   <button key={s} type="button" onClick={() => setAcessorios((a) => [...a, { descricao: s, valor: 0 }])}
                     className="rounded-full border border-line px-2.5 py-1 text-[11.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent">+ {s}</button>
                 ))}
@@ -1351,104 +1264,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               ))}
             </div>
 
-            {/* #1 Aparelho na troca */}
-            <div className="mb-4 rounded-card border border-line p-3">
-              <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2">
-                <input type="checkbox" checked={trocaAtiva} onChange={(e) => setTrocaAtiva(e.target.checked)} className="size-4 accent-accent" /> Aparelho(s) na troca (abatem no total)
-              </label>
-              {trocaAtiva && (
-                <div className="mt-2.5 space-y-2.5">
-                  {trocas.map((t, i) => (
-                    <div key={i} className="space-y-2 rounded-control border border-line-soft bg-raised p-2">
-                      {/* CÓDIGO DA COTAÇÃO — o caminho curto. Preenche aparelho,
-                          IMEI e valor com o que foi cotado no atendimento, em vez
-                          de o vendedor redigitar o valor do usado na frente do
-                          cliente. Os campos abaixo seguem editáveis: cotação é
-                          ponto de partida, não camisa de força. */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          value={t.codigo ?? ''}
-                          inputMode="numeric"
-                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, codigo: e.target.value } : x)))}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicarCodigoTroca(i, e.currentTarget.value) } }}
-                          onBlur={(e) => { if (e.target.value && t.cotacaoNumero == null) void aplicarCodigoTroca(i, e.target.value) }}
-                          placeholder="Código da cotação"
-                          aria-label={`Código da cotação do aparelho ${i + 1}`}
-                          className="num h-9 w-[150px] flex-none rounded-control border border-dashed border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-solid focus:border-accent" />
-                        {buscandoCodigo === i
-                          ? <span className="text-[11.5px] text-ink-3">buscando…</span>
-                          : t.cotacaoNumero != null && (
-                            <span className={cn('text-[11.5px] font-medium', t.cotacaoJaUsada ? 'text-bad' : 'text-ok')}>
-                              {t.cotacaoJaUsada ? `#${t.cotacaoNumero} já usada` : `#${t.cotacaoNumero} aplicada`}
-                            </span>
-                          )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <input value={t.aparelho}
-                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, aparelho: e.target.value } : x)))}
-                          placeholder={`Aparelho ${i + 1} (ex.: iPhone 12 64GB Preto)`}
-                          className="h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
-                        {trocas.length > 1 && (
-                          <button type="button" aria-label={`Remover aparelho ${i + 1}`}
-                            onClick={() => setTrocas((ts) => ts.filter((_, j) => j !== i))}
-                            className="grid h-9 w-9 flex-none place-items-center rounded-control text-ink-3 hover:bg-bad/10 hover:text-bad">
-                            <Minus size={15} strokeWidth={2} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={t.imei}
-                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, imei: e.target.value } : x)))}
-                          placeholder="IMEI (opcional)"
-                          className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-[12.5px] text-ink outline-none focus:border-accent" />
-                        <input type="number" value={t.valor}
-                          onChange={(e) => setTrocas((ts) => ts.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)))}
-                          placeholder="Valor R$"
-                          className="num h-9 w-full rounded-control border border-line bg-card px-2.5 text-right text-[12.5px] text-ink outline-none focus:border-accent" />
-                      </div>
-
-                      {/* Referência do modelo e o quanto o valor passou dela. O
-                          vendedor vê ANTES de fechar, não depois. */}
-                      {(() => {
-                        const a = avaliacoesTroca[i]
-                        if (!a?.referencia) {
-                          return t.aparelho.trim() ? (
-                            <p className="mt-1.5 text-[11px] text-ink-3">Sem preço de referência para este modelo na tabela.</p>
-                          ) : null
-                        }
-                        const av = a.avaliacao
-                        return (
-                          <p className={cn('mt-1.5 text-[11px]', av?.exigeAceite ? 'font-medium text-bad' : 'text-ink-3')}>
-                            Referência {fmt(a.referencia)}
-                            {av && av.excedente > 0 && (
-                              <> · {fmt(av.excedente)} acima ({av.percentual.toFixed(0)}%)
-                                {av.exigeAceite ? ' — vai pedir confirmação' : ''}</>
-                            )}
-                            {av && av.excedente < 0 && <> · {fmt(-av.excedente)} abaixo — margem para a loja</>}
-                          </p>
-                        )
-                      })()}
-                    </div>
-                  ))}
-
-                  <button type="button"
-                    onClick={() => setTrocas((ts) => [...ts, { aparelho: '', imei: '', valor: '' }])}
-                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-control border border-dashed border-line text-[12.5px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
-                    <Plus size={14} strokeWidth={1.9} /> Outro aparelho na troca
-                  </button>
-
-                  {/* O vendedor precisa saber, ANTES de fechar, que a comissão
-                      depende dele trazer o aparelho — senão descobre depois, no
-                      ranking, sem entender por quê. */}
-                  <p className="text-[11px] text-ink-3">
-                    Cada aparelho entra no estoque como uma unidade <strong className="font-semibold text-warn">pendente</strong>, no seu nome,
-                    com o IMEI e o custo dele. A soma abate no total.
-                    Comissão e ranking só contam esta venda quando alguém confirmar a chegada no Estoque.
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* #1 Troca: do módulo Celulares, só com ele ligado. */}
+            {celulares && <TrocaPdvBloco troca={troca} />}
 
             {/* #2 Entrega pendente */}
             <label className="mb-2 flex items-center gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">
