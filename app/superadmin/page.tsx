@@ -4,15 +4,9 @@ import { TrendingUp, ArrowUpRight } from 'lucide-react'
 import { SyncStripeButton } from '@/components/superadmin/sync-stripe-button'
 import { StatCard } from '@/components/ui'
 import { agora } from '@/lib/datas'
+import { emTeste, faturamentoEstimado, precosDosPlanos } from '@/lib/faturamento'
 
 const ROXO = '#6D28D9'
-
-// Preço mensal por plano (centavos → exibido em reais). Ajustar quando os preços Stripe forem definidos.
-const PRECO_PLANO: Record<string, number> = {
-  free: 0,
-  starter: 97,
-  pro: 197,
-}
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -21,26 +15,25 @@ function fmtBRL(v: number) {
 export default async function SuperAdminDashboard() {
   const supabase = await createClient()
 
-  const { data: empresas } = await supabase
-    .from('empresas')
-    .select('id, nome, plano, status, stripe_status, trial_ends_at, created_at')
+  const [{ data: empresas }, { data: planos }] = await Promise.all([
+    supabase.from('empresas').select('id, nome, plano, status, stripe_status, trial_ends_at, created_at, demo'),
+    supabase.from('planos_config').select('id, preco_centavos'),
+  ])
+  const precos = precosDosPlanos(planos as Array<{ id: string; preco_centavos: number | null }> | null)
+  const hoje = agora()
 
   const lista = empresas ?? []
   const total = lista.length
 
   const ativas = lista.filter(e => e.status === 'ativo').length
-  const emTrial = lista.filter(
-    e => e.stripe_status === 'trialing' ||
-         (e.trial_ends_at && new Date(e.trial_ends_at) > new Date())
-  ).length
+  // Em teste = o teste ainda corre (lib/faturamento.ts); 'trialing' sozinho é só o padrão da coluna.
+  const emTrial = lista.filter(e => emTeste(e, hoje)).length
   const inadimplentes = lista.filter(
     e => e.stripe_status === 'past_due' || e.status === 'suspenso'
   ).length
 
-  // MRR estimado: soma do preço do plano das empresas pagantes (status ativo, não-free)
-  const mrr = lista
-    .filter(e => e.status === 'ativo' && e.plano !== 'free')
-    .reduce((acc, e) => acc + (PRECO_PLANO[e.plano] ?? 0), 0)
+  // Faturamento estimado: preço real do plano (planos_config) das pagantes — sem teste e sem demonstração.
+  const mrr = faturamentoEstimado(lista, hoje, precos)
 
   // Novos cadastros nos últimos 30 dias (janela móvel: não depende de fuso)
   const trintaDiasAtras = new Date(agora().getTime() - 30 * 86_400_000)

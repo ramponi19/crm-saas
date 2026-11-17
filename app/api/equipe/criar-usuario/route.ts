@@ -5,7 +5,8 @@ import { verificarLimite } from '@/lib/limites'
 
 // Papéis que podem ser atribuídos por esta rota. 'owner' é definido apenas
 // na criação da empresa e não pode ser concedido aqui.
-const ROLES_PERMITIDOS = ['admin', 'vendedor'] as const
+// 'tecnico' (17/11/2026): o papel existia na tela, na permissão e no banco, e só esta rota o recusava.
+const ROLES_PERMITIDOS = ['admin', 'vendedor', 'tecnico'] as const
 
 /**
  * Mesma regra da rota atualizar-usuario: quem chama so concede papel ABAIXO do

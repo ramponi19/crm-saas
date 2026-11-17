@@ -44,13 +44,17 @@ export async function GET(
   try {
     switch (job) {
       case 'expirar-trials': {
-        // Empresas em trial cujo trial_ends_at já passou e que não têm assinatura ativa → suspenso
+        // Teste vencido sem assinatura → 'suspenso' = MODO SÓ LEITURA (17/11/2026: vê tudo, não cria, não
+        // edita, não envia; nunca apaga dado). Só a situação muda: `stripe_status` fica como está — o
+        // 'trial_expired' que se gravava aqui não existe no CHECK e derrubava o job com 500.
+        // Empresa de demonstração e quem não tem fim de teste (contrato fora do Stripe, como a JM) ficam.
         const agora = new Date().toISOString()
         const { data, error } = await supabase
           .from('empresas')
-          .update({ status: 'suspenso', stripe_status: 'trial_expired' })
+          .update({ status: 'suspenso' })
           .lt('trial_ends_at', agora)
           .eq('status', 'ativo')
+          .eq('demo', false)
           .is('stripe_subscription_id', null)
           .select('id')
         if (error) throw error
