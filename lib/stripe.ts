@@ -17,6 +17,14 @@ export function getStripe(): Stripe {
   return _stripe
 }
 
+/**
+ * O Stripe está configurado neste ambiente? (17/11/2026) Sem `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`
+ * (decisão (a) do Lucas: conta, chaves e preços), as rotas respondem 503 claro em vez de 500.
+ */
+export function stripeConfigurado(): boolean {
+  return !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_WEBHOOK_SECRET
+}
+
 export type PlanoId = string
 
 // ─── Busca planos do banco ────────────────────────────────────

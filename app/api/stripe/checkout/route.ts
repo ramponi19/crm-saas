@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
-import { getStripe, getPlanos, getOrCreateCustomer, PlanoId } from '@/lib/stripe'
+import { getStripe, getPlanos, getOrCreateCustomer, stripeConfigurado, PlanoId } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
     // Pronto para cobrar (17/11/2026): falta só o preço de cada plano no Stripe (planos_config.stripe_price_id,
     // decisão do Lucas). Sem ele, o plano ainda não está à venda — e a tela diz isso, sem erro genérico.
-    if (!plano.stripe_price_id) {
+    if (!plano.stripe_price_id || !stripeConfigurado()) {
       return NextResponse.json({ error: `O plano ${plano.nome} ainda não está à venda. Fale com o suporte.`, code: 'plano_sem_preco' }, { status: 409 })
     }
 

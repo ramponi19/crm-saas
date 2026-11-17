@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStripe, stripeStatusToPlano } from '@/lib/stripe'
+import { getStripe, stripeConfigurado, stripeStatusToPlano } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import Stripe from 'stripe'
 import type { Json } from '@/types/database'
 
 export async function POST(req: NextRequest) {
+  // Sem as chaves do Stripe no ambiente: 503 claro (o Stripe tenta de novo depois), não 500.
+  if (!stripeConfigurado()) return NextResponse.json({ error: 'Stripe não configurado neste ambiente' }, { status: 503 })
   const body = await req.text()
   const sig  = req.headers.get('stripe-signature')!
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
