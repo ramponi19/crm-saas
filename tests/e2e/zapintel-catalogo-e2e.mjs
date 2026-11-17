@@ -59,7 +59,7 @@ try {
   const etapa = sql(`select id from funil_etapas where empresa_id=${empresaB} and funil_id=${funil} order by ordem limit 1`)
   const neg = sql(`insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status) values (${empresaB}, ${loja}, ${contato}, ${funil}, ${etapa}, 'aberto') returning id`)
   const conv = sql(`insert into conversas (empresa_id, filial_id, contato_id) values (${empresaB}, ${loja}, ${contato}) returning id`)
-  for (const [i, txt] of ['Oi, vocês têm a mesa de jantar lyon grande?', 'E a cadeira eames, sai quanto?', 'Meu filho quer um iphone 15 pro max também'].entries()) {
+  for (const [i, txt] of ['Oi, voces tem a mesa de jantar lyon grande?', 'E a cadeira eames, sai quanto?', 'Meu filho quer um iphone 15 pro max tambem'].entries()) {
     sql(`insert into mensagens (empresa_id, filial_id, contato_id, conversa_id, direcao, conteudo, tipo, origem, created_at)
          values (${empresaB}, ${loja}, ${contato}, ${conv}, 'recebida', '${txt}', 'texto', 'whatsapp', now() - interval '${10 - i} minutes')`)
   }
@@ -92,7 +92,10 @@ try {
   await page.waitForTimeout(3000)
   const t = await page.locator('body').innerText()
   confere(/Produtos mais pedidos/.test(t) && /Cadeira Eames/.test(t), 'B: a tela mostra "Produtos mais pedidos" com "Cadeira Eames"')
-  confere(!/iPhone/i.test(t), 'B: nenhuma menção a iPhone na tela do ZapIntel')
+  // A fala do cliente aparece como ele escreveu (mensagem é dado, não regra): fora dela, nada de iPhone.
+  const semFala = t.replace(/Meu filho quer um iphone 15 pro max tambem/gi, '')
+  const resto = semFala.match(/.{0,60}iphone.{0,60}/i)
+  confere(!resto, `B: fora da fala do cliente, nenhuma menção a iPhone na tela (${resto ? resto[0] : 'nenhuma'})`)
 } catch (e) {
   falha('erro: ' + String(e?.stack ?? e).slice(0, 500))
 } finally {
