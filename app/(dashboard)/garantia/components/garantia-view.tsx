@@ -7,7 +7,7 @@ import { Card, Table, Button, Badge, StatCard, Tabs, EmptyState, type Column } f
 import GarantiaModal from './garantia-modal'
 import { TermosView, type VendaTermo } from './termos-view'
 import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosGarantia } from '../rotulos'
 
 interface Garantia {
@@ -70,7 +70,7 @@ export default function GarantiaView({ garantias, termos = [], documentos = [], 
   // para a fila de assinatura não se perder no meio dos reparos.
   const [aba, setAba] = useState<'protocolos' | 'termos'>('protocolos')
   // "IMEI" na lista só com o módulo Celulares e aparelhos ligado; sem ele, "Série".
-  const r = rotulosGarantia(!!useFerramenta('/check-imei'))
+  const r = rotulosGarantia(!!useModuloLigado('/check-imei'))
   const termosPendentes = termos.filter((t) => t.status === 'pendente').length
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)

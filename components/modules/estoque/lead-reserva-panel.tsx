@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Package, Search, Loader2, X, Clock } from 'lucide-react'
 import { Input, Badge, notify } from '@/components/ui'
 import { formatCurrency } from '@/lib/utils'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { RESERVA_CELULAR } from '@/components/modules/celulares/card-reserva'
 
 // Reserva de unidade do estoque para o lead: busca o estoque disponível com
@@ -57,7 +57,7 @@ function horasRestantes(iso: string | null): string {
 
 export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onReservado?: (descricao: string) => void }) {
   const supabase = createClient()
-  const celular = !!useFerramenta('/check-imei')
+  const celular = !!useModuloLigado('/check-imei')
   const [busca, setBusca] = useState('')
   const [resultados, setResultados] = useState<UnidadeDisp[]>([])
   const [buscando, setBuscando] = useState(false)

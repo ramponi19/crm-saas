@@ -52,7 +52,7 @@ export default async function EstoquePage() {
   // Transferir mexe no estoque de duas lojas — mesma régua da tela de filiais.
   const papel = await getEmpresaRole()
 
-  // O que é de segmento aparece só com o módulo dono ligado: Celulares (IMEI,
+  // O que é de ramo aparece só com o módulo dono ligado: Celulares (IMEI,
   // bateria, seminovo, modelo Apple) e Avaliações (veículo — e só para quem tem o
   // campo placa no item).
   const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId ?? 0))

@@ -80,7 +80,7 @@ const FORMAS_PAG: { key: string; label: string; icon: typeof Banknote }[] = [
   { key: 'link', label: 'Link', icon: Link2 },
 ]
 
-/** Sugestões de "Ofertar acessórios" sem módulo de segmento: o operador escreve o nome. */
+/** Sugestões de "Ofertar acessórios" sem módulo de ramo: o operador escreve o nome. */
 const ACESSORIOS_GENERICOS = ['Acessório']
 
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()

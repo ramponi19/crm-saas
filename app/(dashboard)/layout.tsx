@@ -15,7 +15,7 @@ import { SessionGuard } from '@/components/layout/session-guard'
 import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
-import { carregarConfigEmpresa, camadasParaMenu, vocabulario } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, camadasParaMenu, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
 import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
@@ -193,7 +193,7 @@ export default async function DashboardLayout({
             senão o menu diria "Pipeline" e o topo da mesma página, "Leads".
           */}
           <RotulosProvider valor={rotulos}>
-            <FerramentasProvider valor={ferramentas}>
+            <FerramentasProvider valor={ferramentas} ligados={[...ligadosDaEmpresa(cfg)]}>
               <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
             </FerramentasProvider>
           </RotulosProvider>

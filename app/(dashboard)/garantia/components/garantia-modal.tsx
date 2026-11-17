@@ -11,7 +11,7 @@ import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData } from '@/lib/datas'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosGarantia } from '../rotulos'
 
 interface Garantia {
@@ -85,7 +85,7 @@ export default function GarantiaModal({ garantia, isNew, onClose }: Props) {
   const empresaId = empresa?.id
   const fuso = useFuso()
   // IMEI, celular reserva e exemplos de celular só com o módulo Celulares e aparelhos ligado.
-  const r = rotulosGarantia(!!useFerramenta('/check-imei'))
+  const r = rotulosGarantia(!!useModuloLigado('/check-imei'))
   const [form, setForm] = useState<Garantia>(() => {
     const base = vazia(diaNoFuso(agora(), fuso))
     return isNew ? base : { ...base, ...garantia }

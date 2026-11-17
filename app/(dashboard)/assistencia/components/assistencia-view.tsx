@@ -5,7 +5,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, type Column } from '@/components/ui'
 import OSModal from './os-modal'
 import ServicosCatalogo, { type ServicoReparo } from './servicos-catalogo'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosOS } from '../rotulos'
 
 interface OS {
@@ -66,7 +66,7 @@ const ABAS = [
 
 export default function AssistenciaView({ ordens, servicos }: Props) {
   // "Aparelho" só com o módulo Celulares e aparelhos ligado; sem ele, "Item".
-  const rotulos = rotulosOS(!!useFerramenta('/check-imei'))
+  const rotulos = rotulosOS(!!useModuloLigado('/check-imei'))
   const [aba, setAba] = useState('ordens')
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)

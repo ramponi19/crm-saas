@@ -7,7 +7,7 @@ import { Button, Badge, notify } from '@/components/ui'
 import {
   OrcamentoEditorModal, orcamentoVazio, type EditorOrcamento,
 } from '@/components/modules/orcamentos/orcamento-editor-modal'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { BotoesOrcamentoCelular } from '@/components/modules/celulares/card-orcamento-troca'
 
 /**
@@ -42,7 +42,7 @@ export function LeadOrcamentoPanel({ leadId, leadNome, leadTelefone, onSalvo }: 
   const [itens, setItens] = useState<Orc[]>([])
   const [carregou, setCarregou] = useState(false)
   const [editor, setEditor] = useState<EditorOrcamento | null>(null)
-  const celular = !!useFerramenta('/check-imei')
+  const celular = !!useModuloLigado('/check-imei')
 
   const carregar = useCallback(async () => {
     /**

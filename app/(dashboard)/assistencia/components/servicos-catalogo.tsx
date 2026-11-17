@@ -7,7 +7,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { formatCurrency } from '@/lib/utils'
 import { Card, Table, Badge, Button, EmptyState, Modal, Input, Select, notify, type Column } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { categoriasServico, rotulosOS } from '../rotulos'
 
 export interface ServicoReparo {
@@ -30,7 +30,7 @@ export default function ServicosCatalogo({ servicos }: { servicos: ServicoReparo
   const [salvando, setSalvando] = useState(false)
   const [removendo, setRemovendo] = useState<number | null>(null)
   // Categorias e exemplo de reparo de celular só com o módulo Celulares e aparelhos ligado.
-  const celular = !!useFerramenta('/check-imei')
+  const celular = !!useModuloLigado('/check-imei')
   const categorias = categoriasServico(celular)
 
   function abrirNovo() { setForm(EMPTY); setEdit(null); setNovo(true) }

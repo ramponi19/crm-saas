@@ -115,7 +115,7 @@ export type TabelaPrecoRef = { modelo: string; armazenamento: string | null; con
 type Preset = { condicao: string; tipo: string; seminovo: boolean } | null
 
 /**
- * Os textos do Estoque sem módulo de segmento. Com o módulo Celulares ligado, a
+ * Os textos do Estoque sem módulo de ramo. Com o módulo Celulares ligado, a
  * tela usa ESTOQUE_CELULAR (components/modules/celulares/rotulos.ts), do mesmo formato.
  */
 const ESTOQUE_GENERICO: typeof ESTOQUE_CELULAR = {

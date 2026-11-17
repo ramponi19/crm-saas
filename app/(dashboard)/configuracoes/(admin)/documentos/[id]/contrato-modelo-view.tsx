@@ -12,7 +12,7 @@ import {
   renderizarModelo, blocosDaPagina, marcadoresDisponiveis,
   type PaginaModelo, type BlocoTexto, type DadosMescla,
 } from '@/lib/contrato-modelo'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { ITENS_EXEMPLO_CELULAR } from '@/components/modules/celulares/contrato-trocas'
 
 interface Props {
@@ -109,7 +109,7 @@ function BlocoEditavel({
 export function ContratoModeloView({ empresaId, documentoId, nome, versao, paginasIniciais, garantiaPadrao, contratosEmitidos }: Props) {
   const supabase = createClient()
   // IMEI, troca de aparelho e o exemplo de celular só com o módulo Celulares e aparelhos ligado.
-  const celular = !!useFerramenta('/check-imei')
+  const celular = !!useModuloLigado('/check-imei')
   const [paginas, setPaginas] = useState<PaginaModelo[]>(() =>
     paginasIniciais.length
       ? [...paginasIniciais].sort((a, b) => a.ordem - b.ordem)

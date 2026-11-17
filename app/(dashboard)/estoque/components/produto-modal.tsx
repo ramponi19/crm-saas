@@ -10,7 +10,7 @@ import { SeletorModeloApple, marcaApple } from '@/components/modules/celulares/s
 import { PRODUTO_CELULAR } from '@/components/modules/celulares/rotulos'
 import type { AppleModelo } from '@/lib/apple-modelos'
 
-/** Os textos do cadastro sem módulo de segmento (com Celulares: PRODUTO_CELULAR). */
+/** Os textos do cadastro sem módulo de ramo (com Celulares: PRODUTO_CELULAR). */
 const PRODUTO_GENERICO = {
   nomePlaceholder: 'Ex.: Produto X',
   coresPlaceholder: 'Ex.: Preto (Enter p/ adicionar)',

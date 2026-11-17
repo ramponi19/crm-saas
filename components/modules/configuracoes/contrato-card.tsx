@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, notify } from '@/components/ui'
 import { GARANTIA_PADRAO_DIAS } from '@/lib/contrato-emitir'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 /**
@@ -19,7 +19,7 @@ import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-e
 export function ContratoCard() {
   const supabase = createClient()
   // O exemplo de garantia por modelo de celular só com o módulo Celulares e aparelhos ligado.
-  const porModelo = useFerramenta('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.garantiaPorModelo : 'novo 90, usado 30…'
+  const porModelo = useModuloLigado('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.garantiaPorModelo : 'novo 90, usado 30…'
   const [empresaId, setEmpresaId] = useState<number | null>(null)
   const [dias, setDias] = useState(String(GARANTIA_PADRAO_DIAS))
   const [saving, setSaving] = useState(false)

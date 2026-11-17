@@ -5,7 +5,7 @@ import { Button, Input, Select, Textarea, Modal, notify } from '@/components/ui'
 import { Plus, X } from 'lucide-react'
 import { ClienteAutocomplete } from '@/app/(dashboard)/orcamentos/cliente-autocomplete'
 import type { ItemOrc, Orcamento, UnidadeOpt, PrecoRef } from '@/app/(dashboard)/orcamentos/tipos'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
 
 /**
@@ -93,7 +93,7 @@ export function OrcamentoEditorModal({
   const [editor, setEditor] = useState<EditorOrcamento>(inicial)
   const [salvando, setSalvando] = useState(false)
   // Aparelho e IMEI só com o módulo Celulares e aparelhos ligado; sem ele, item e nº de série.
-  const r = rotulosOrcamento(!!useFerramenta('/check-imei'))
+  const r = rotulosOrcamento(!!useModuloLigado('/check-imei'))
 
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const isDowngrade = editor.tipo === 'downgrade'

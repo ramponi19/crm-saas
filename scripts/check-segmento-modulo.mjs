@@ -149,15 +149,50 @@ function arquivos(dir) {
   return out
 }
 
+/**
+ * OS REGISTROS DE MÓDULO: o manifesto, o catálogo do menu e o menu de Configurações. Cada módulo se
+ * declara ali com o próprio nome ("Imóveis", "Cardápio"). Não é exceção: o texto é conferido POR
+ * DECLARAÇÃO — no manifesto, cada `{ chave: 'x', ... }` é do módulo x; no menu, a linha com o `href`
+ * (ou a rota da ferramenta) de um módulo é dele; em Configurações, a linha com `tem('<seção>')` é do
+ * módulo que traz a seção. Texto de segmento fora dessas declarações reprova como em qualquer arquivo.
+ */
+const ABA_DO_MODULO = new Map()
+for (const bloco of corpo.split(/\{\s*chave:/).slice(1)) {
+  const chave = bloco.match(/^\s*'([a-z][a-z0-9_]*)'/)?.[1]
+  for (const m of (bloco.match(/abasConfiguracoes:\s*\[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([a-z-]+)'/g)) {
+    if (!ABA_DO_MODULO.has(m[1])) ABA_DO_MODULO.set(m[1], new Set())
+    ABA_DO_MODULO.get(m[1]).add(chave)
+  }
+}
+const HREF_DO_MODULO = new Map([...MODULOS].map(([chave, m]) => [m.href, chave]))
+for (const [href, rota] of FERRAMENTA) if (HREF_DO_MODULO.has(href)) HREF_DO_MODULO.set(rota, HREF_DO_MODULO.get(href))
+/** [trecho, donos do trecho] de um arquivo de registro. */
+function unidadesDoRegistro(arq, src) {
+  if (arq === 'core/modulos.ts') {
+    const i = src.indexOf('export const MODULOS'), f = src.indexOf('\n]', i)
+    const partes = src.slice(i, f).split(/(?=\{\s*chave:)/)
+    const fora = src.slice(0, i) + src.slice(f)
+    return [[fora, new Set()], ...partes.map((p) => [p, new Set([p.match(/chave:\s*'([a-z0-9_]+)'/)?.[1]].filter(Boolean))])]
+  }
+  return src.split('\n').map((linha) => {
+    const donos = new Set()
+    for (const m of linha.matchAll(/'(\/[a-z0-9\-/]+)'/g)) if (HREF_DO_MODULO.has(m[1])) donos.add(HREF_DO_MODULO.get(m[1]))
+    for (const m of linha.matchAll(/tem\('([a-z-]+)'\)/g)) for (const c of ABA_DO_MODULO.get(m[1]) ?? []) donos.add(c)
+    return [linha, donos]
+  })
+}
+const REGISTROS = new Set(['core/modulos.ts', 'lib/menu.ts', 'lib/configuracoes-menu.ts'])
+
 const listar = process.argv.includes('--listar')
 const erros = []
 const todos = [...['app', 'components', 'lib', 'hooks', 'core'].flatMap((d) => arquivos(join(RAIZ, d))), join(RAIZ, 'proxy.ts')]
 for (const abs of todos) {
   const arq = relative(RAIZ, abs).split('\\').join('/')
   if (TEXTO_PUBLICO.some((p) => casa(arq, p))) continue
-  const donos = donosDoArquivo(arq)
+  const fonte = readFileSync(abs, 'utf8')
+  const unidades = REGISTROS.has(arq) ? unidadesDoRegistro(arq, semComentarios(fonte)) : [[fonte, donosDoArquivo(arq)]]
   const achados = new Map()
-  for (const t of textos(readFileSync(abs, 'utf8'))) {
+  for (const [trecho, donos] of unidades) for (const t of textos(trecho)) {
     for (const seg of SEGMENTOS) {
       if (seg.donos.some((d) => donos.has(d))) continue
       for (const re of seg.termos) {

@@ -139,7 +139,7 @@ export default async function CatalogoPage() {
     total_produtos: prodPorMarca[m.id] ?? 0,
   }))
 
-  // Tipos de categoria e textos de segmento só com o módulo dono ligado:
+  // Tipos de categoria e textos de ramo só com o módulo dono ligado:
   // Celulares (aparelho, IMEI, armazenamento) e Avaliações (veículo).
   const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId ?? 0))
 

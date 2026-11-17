@@ -48,7 +48,7 @@ interface Props {
   onClose: () => void
 }
 
-/** Os rótulos do modal sem módulo de segmento (com Celulares: ESTOQUE_CELULAR). */
+/** Os rótulos do modal sem módulo de ramo (com Celulares: ESTOQUE_CELULAR). */
 const GENERICO = {
   armazenamento: 'Variante',
   armazenamentoPlaceholder: 'Ex.: Tamanho M',

@@ -93,7 +93,7 @@ interface Props {
   veiculos?: boolean
 }
 
-/** Os textos do catálogo sem módulo de segmento (com Celulares: PRODUTO_CELULAR). */
+/** Os textos do catálogo sem módulo de ramo (com Celulares: PRODUTO_CELULAR). */
 const CATALOGO_GENERICO = {
   buscaUnidades: 'Buscar por produto ou número de série…',
   precoModeloPlaceholder: 'Ex: Produto X',

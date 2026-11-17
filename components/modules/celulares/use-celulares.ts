@@ -1,4 +1,4 @@
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { HREF_CELULARES } from './modulo'
 
 /**
@@ -9,5 +9,5 @@ import { HREF_CELULARES } from './modulo'
  * `ligadosDaEmpresa(cfg).has(HREF_CELULARES)` (lib/empresa-config.ts).
  */
 export function useCelulares(): boolean {
-  return !!useFerramenta(HREF_CELULARES)
+  return useModuloLigado(HREF_CELULARES)
 }

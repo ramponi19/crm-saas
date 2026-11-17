@@ -158,7 +158,7 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'Simulação de financiamento com entrada, prazo e parcela para mandar ao cliente.' },
   { chave: 'avaliacoes', href: '/avaliacoes', tabelas: ['avaliacao_usados'], nome: 'Avaliação de veículos', grupo: 'vendas', emPreparacao: true, requer: ['pdv'], abasConfiguracoes: ['veiculos-portais'],
     capacidades: { automacoesVeiculo: true, matchVeiculo: true }, paineisDoLead: ['interesse-veiculo', 'financiamento'],
-    frase: 'Vistoria do veículo na troca, com fotos, avarias e o valor oferecido.' },
+    frase: 'Avaliação do veículo na troca, com fotos, avarias e o valor oferecido.' },
   { chave: 'consulta_fipe', href: '/consulta-fipe', tabelas: ['avaliacao_fipe_consultas', 'avaliacao_fipe_referencia'], nome: 'Consulta FIPE', grupo: 'vendas', emPreparacao: true,
     frase: 'O valor de referência do veículo na tabela FIPE, dentro da avaliação.' },
 

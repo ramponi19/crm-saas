@@ -12,7 +12,7 @@ import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData, paraData } from '@/lib/datas'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosOS } from '../rotulos'
 
 interface Cobranca {
@@ -92,7 +92,7 @@ export default function OSModal({ os, isNew, onClose }: Props) {
   const empresaId = empresa?.id
   const fuso = useFuso()
   // Aparelho, IMEI e exemplos de celular só com o módulo Celulares e aparelhos ligado.
-  const r = rotulosOS(!!useFerramenta('/check-imei'))
+  const r = rotulosOS(!!useModuloLigado('/check-imei'))
   const [form, setForm] = useState<OS>(() => {
     const base = vazia(diaNoFuso(agora(), fuso))
     return isNew ? base : { ...base, ...os }

@@ -6,14 +6,14 @@ import { Plus, Trash2, Star, SlidersHorizontal, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Button, Input, Select, Badge, notify } from '@/components/ui'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 interface Funil { id: number; nome: string; padrao: boolean; interno: boolean }
 
 export function FunisCard() {
   // O exemplo de funis de loja de celular só com o módulo Celulares e aparelhos ligado.
-  const exemploFunis = useFerramenta('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.funisParalelos : 'Vendas e Locação, Varejo e Atacado'
+  const exemploFunis = useModuloLigado('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.funisParalelos : 'Vendas e Locação, Varejo e Atacado'
   const supabase = createClient()
   const [empresaId, setEmpresaId] = useState<number | null>(null)
   const [funis, setFunis] = useState<Funil[]>([])

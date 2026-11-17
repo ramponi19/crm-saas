@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Trash2, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { Card, Input, Textarea, Select, Button, Badge, Modal, ConfirmDialog, notify } from '@/components/ui'
-import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { EXEMPLOS_CONFIG_CELULAR } from '@/components/modules/celulares/config-exemplos'
 
 // ⚠️ Zona sensível (Meta). Modelo criado aqui é submetido à ANÁLISE da Meta em
@@ -39,7 +39,7 @@ const CATEGORIAS = [
 
 export function ModelosView() {
   // O exemplo de variáveis de loja de celular só com o módulo Celulares e aparelhos ligado.
-  const exemploVariaveis = useFerramenta('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.variaveisModelo : 'João | Pedido 1042'
+  const exemploVariaveis = useModuloLigado('/check-imei') ? EXEMPLOS_CONFIG_CELULAR.variaveisModelo : 'João | Pedido 1042'
   const [modelos, setModelos] = useState<Modelo[]>([])
   const [whatsappConectado, setWhatsappConectado] = useState(true)
   const [carregando, setCarregando] = useState(true)
