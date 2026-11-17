@@ -154,3 +154,48 @@ trava, de segmento ou de dono (o que falta está na coluna); **em preparação**
 - **Órfãos com dono:** `/api/assistente*` → core; `/ranking` + `/api/ranking/metas` → módulo novo **Metas e ranking** (`ranking`, em preparação). `/equipe` (inalcançável) e `/produtos` (redirecionador) apagados; o proxy leva os dois endereços antigos. Grupos de menu com nome de ramo (`Imóveis/Veículos/Food`, `GRUPO_DO_LEGADO`) saíram; Produtos com ícone de livro. Cron `sync-fipe` fora do `vercel.json` (módulo em preparação). Símbolos sem uso apagados.
 - **Manifesto:** `requer` que faltava (Histórico→PDV; Produtos, Compras, Check IMEI→Estoque; KDS→Cardápio; Executivo→Imóveis); `tabelas` com o dono das tabelas sem o prefixo do módulo (herança do corte); frase do Estoque genérica.
 - **Trava nova (entra no build no Bloco 2):** `scripts/check-segmento-modulo.mjs` — texto de segmento fora dos arquivos do módulo dono e tabela sem dono, sem lista de exceções. Hoje: 0 tabelas sem dono; 85 arquivo×segmento com texto fora (o Bloco 2 zera).
+
+## 5. Bloco 2 — segmento só dentro do módulo (branch, gate e e2e verdes)
+
+- **Trava no build:** `scripts/check-segmento-modulo.mjs` no `check` e no `build`, **sem lista de exceções**: 722 arquivos, 109 tabelas, nenhum texto de ramo fora do módulo dono, nenhuma tabela sem dono. Os registros (manifesto, catálogo do menu, menu de Configurações) são conferidos por declaração.
+- **Celular → módulo "Celulares e aparelhos"** (chave `check_imei`, o antigo Check IMEI; a JM já o tem ligado): IMEI, bateria, armazenamento, seminovo, modelo Apple (antes `slug === 'jm-store'`), troca de aparelho (cotação, preços, checklist, seção Troca, bloco do PDV, contrato `{{trocas}}`), acessórios do PDV, entrada "aparelho" da encomenda. Estoque, Produtos, PDV, Orçamentos, Garantia, Assistência, Histórico, Relatórios, card do lead e ⌘K ficaram genéricos ("Nº de série", "Item", "Variante"). Arquivos em `components/modules/celulares/`.
+- **Card do lead:** Reserva (Estoque) e Orçamento viraram painéis declarados (`paineisDoLead`), não mais renderizados sempre.
+- **Imóvel/veículo/clínica:** painéis, ficha do cliente, dashboard, executivo, relatórios, comissões e cards de portais foram para `components/modules/imoveis|veiculos|cardapio`; "Corretor" e "paciente" viraram o vocabulário da empresa; Agenda sem "vistoria"/imóvel sem o módulo; simulador sem padrão de imóvel; `/api/exportar` (imob_*) e `meu-dia` travados pelo módulo.
+- **Assistente e ZapIntel:** descrevem a empresa pelos módulos ligados e pelo vocabulário, não pelo preset; a ficha monta os produtos pelo catálogo da empresa (o dicionário de iPhone só com o módulo de celular); IMEI aparece como "[NÚMERO DE SÉRIE]" para a IA.
+- **No navegador:** `useModuloLigado` (layout passa `ligadosDaEmpresa`): o que é do módulo aparece quando a EMPRESA tem o módulo, mesmo que o dono tenha ocultado a ferramenta no menu.
+- **Provas:** 394 unitários, verificador 634/5, e2e `pronto-vender-b2-e2e` 15/15 (JM vê IMEI; empresa nova de Serviços com Estoque instalado vê o Estoque genérico, sem Troca, sem padrão de imóvel), Bloco 1 35/35 de novo.
+- **O que a JM nota:** "Vendedor:" em vez de "Corretor:" na Gestão de Leads; "Confirmação de compromisso"; some o tipo "Veículo" das categorias; categoria de serviço "Placa" virou "Microsoldagem" (gravados continuam); o Assistente diz "usa no Nexus: PDV, Estoque…".
+
+## 6. Blocos 3 e 4 — migração, cadastro, planos, só leitura, isolamento
+
+- **Migração `20261117000100_pronto_vender`** (aguarda aprovação; testada no local ida/volta/ida): bucket `imoveis` por pasta; Unlimited e status do Stripe; limites pelo plano (gatilho); modo só leitura (políticas restritivas `somente_leitura_*` em 85 tabelas); presets só módulos e rótulos, "CRM geral" padrão, Imobiliária/Saúde/Food/Veículos fora do cadastro; `empresa_modulos` sem `vendas`/`avaliacao`; `termos_aceites`.
+- **App:** cadastro com CRM geral, CNPJ (dígito verificador) e telefone com máscara, loja principal com o dono; preset não liga módulo em preparação; Unlimited no superadmin e nas matrizes de plano; faturamento estimado pelo preço real, sem teste nem demo; papel Técnico; excluir empresa cancela a assinatura, apaga login e arquivos; Stripe: `past_due` só avisa, cancelado = só leitura, nunca cai para 'free'; cron do teste sem erro; avisos no topo (teste acabando 3 dias antes, atraso, só leitura); proxy 423 em toda API que grava com a empresa em só leitura; webhooks do Stripe e de pagamento sem sessão; Edge não envia (CRM, Automatize, Transmissão) em só leitura; superadmin "Reativar" com um clique; primeiro acesso genérico (loja, equipe, horário, canal, primeiro lead); painel inicial só mostra vendas/estoque/assistência com o módulo e não acende "estoque baixo" em conta vazia.
+- **Prontos esperando decisão:** (a) checkout/assinatura — falta o preço de cada plano no Stripe (`planos_config.stripe_price_id`); (b) convite por e-mail e confirmação — falta provedor (`RESEND_API_KEY`, `EMAIL_FROM`) e domínio; sem eles o convite devolve o link ao dono e a confirmação fica desligada (`EXIGIR_CONFIRMACAO_EMAIL=1` liga); (c) termos e privacidade — falta o texto (/termos, /privacy) e as versões (`TERMOS_VERSAO`, `PRIVACIDADE_VERSAO`).
+- **Provas (local, migração aplicada):** e2e `pronto-vender-isolamento-e2e` **36/36** duas vezes com duas empresas — B não lê linha de A em nenhuma das 98 tabelas com `empresa_id`, não grava/troca/apaga arquivo de A nos buckets `imoveis` e `produtos`, não recebe realtime de A, não abre rota de A; Técnico criado; só leitura bloqueia banco e API (423) e mostra o aviso, o recebimento continua gravando; superadmin reativa; plano atualiza limites; excluir empresa apaga login e arquivos e o mesmo e-mail se cadastra de novo.
+
+## 7. Pronto para vender
+
+| Item | Pronto? | O que falta |
+|---|---|---|
+| Core genérico; segmento só no módulo, com trava no build | sim | deploy do Bloco 2 |
+| Módulo em preparação fora do menu, da Central (só "em preparação") e das telas | sim (em produção) | — |
+| Toda rota de módulo travada no servidor; nenhuma rota/tabela sem dono | sim (rotas em produção) | — |
+| Bucket do Imóveis por empresa | sim | aplicar a migração |
+| Cadastro genérico: CRM geral padrão, CNPJ e telefone com máscara, loja principal com o dono | sim | migração + deploy |
+| Presets só ligam módulos e rótulos | sim | migração |
+| Unlimited aceito; trocar de plano atualiza limites | sim | migração + deploy |
+| Faturamento estimado pelo preço real, sem empresa em teste | sim | deploy |
+| Papel Técnico | sim | deploy |
+| Excluir empresa libera o login e cancela a assinatura | sim | deploy |
+| Teste: cron sem erro, aviso 3 dias antes, só leitura depois | sim | migração + deploy (app e Edge) |
+| Pagamento atrasado: aviso; encerrada: só leitura; nada apagado; reativar com um clique | sim | migração + deploy |
+| Primeiro acesso guiado e genérico, sem alerta falso | sim | deploy |
+| Isolamento: e2e com duas empresas (tabelas, Storage, rotas, realtime) | sim (local) | — |
+| (a) Checkout e assinatura no Stripe, webhook liberado | pronto | **preços dos planos no Stripe** |
+| (b) Convite por e-mail e confirmação de e-mail | pronto | **provedor e domínio de e-mail** |
+| (c) Termos e privacidade com versão e registro de aceite | pronto | **o texto** |
+| Imóveis, Agenda, Cardápio, KDS, Avaliações, FIPE, Financiamento, Executivo, Metas e ranking | não | construir para servir a qualquer empresa (seguem em preparação) |
+| ZapIntel: "Modelos mais pedidos" vem da regex de iPhone nas funções SQL | não | trocar pelo catálogo da empresa (migração do ZapIntel) |
+| Rastreamento de origem (links, pixel) sem tela | não | tela no ZapIntel ou apagar |
+| Tabelas com prefixo de outro módulo (`assistencia_orcamentos`, `avaliacao_*`, `vendas_*`, `visitas`, `pedidos`) | dono declarado | renomear (migração própria) |
+

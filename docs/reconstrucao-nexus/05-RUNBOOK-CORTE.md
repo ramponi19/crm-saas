@@ -537,6 +537,12 @@ branches abertas antes de numerar).
    e as automações "entrou no público"; as transmissões ficam com o filtro que usaram; `transmissao_publico`
    volta ao corpo da 0500).
 
+## Pronto para vender (APLICADA 17/11 12:23 UTC; 06 seção 49)
+
+- **Migração `20261117000100_pronto_vender`**: bucket `imoveis` por pasta; Unlimited + status do Stripe; limites pelo plano (gatilho `empresas_limites_do_plano`); modo só leitura (`sessao_pode_escrever()` + políticas restritivas `somente_leitura_*` em toda tabela com `empresa_id`, menos as de leitura/presença/cache); presets só módulos e rótulos, "CRM geral" padrão; `empresa_modulos` sem chaves legadas; `termos_aceites`. Volta: `supabase/scripts/volta/volta-pronto-vender.sql` (cópias em `ops.presets_antes_20261117` e `ops.empresa_modulos_legado_20261117`).
+- **Ordem do app (Blocos 2 e 4):** depois da migração. O app novo vive sem ela (preset padrão cai em `varejo`, aceite de termos desligado), mas o só leitura do proxy e da Edge só faz sentido com as políticas.
+- **Edge `webhook-leads`:** a versão com a trava de só leitura (envio pelo CRM, Automatize e Transmissão) sobe junto do app (`tools/deploy-edge.sh`).
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
